@@ -148,11 +148,6 @@ func (w *Worker) activeRuntime(ctx context.Context, epoch int64, model string) e
 	return w.authorizeRuntime(ctx, epoch, "active", model)
 }
 
-// The credential owner ($2) may serve this run: it is their own, or they share
-// it in the binding's workspace with 分享给团队成员 while the admin allows member
-// subscriptions. Mirrors runMayUseCredentialSql in lib/personal-policy.ts;
-// membership lives in the workspace database and is checked by the server,
-// and leaving stops the runs (stopRequestedAt), which this query refuses.
-const runMayUseCredential = `($2=r."userId" OR (
-	EXISTS (SELECT 1 FROM workspace_subscription_shares sh WHERE sh."ownerId"=$2 AND sh."allowOthers" AND sh."workspaceId"::text=b."workspaceId"::text)
-	AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies pp WHERE pp."workspaceId"::text=b."workspaceId"::text AND NOT pp.subscriptions)))`
+// Personal subscriptions never serve another member's run, including historical
+// sharing rows. Mirrors the server's owner-only admission and renewal policy.
+const runMayUseCredential = `($2=r."userId" AND coalesce(r."agentDefinition"#>>'{executionIdentity,actor}',r."userId")=r."userId")`

@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { dbUrl, seedAgent, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
-test('device runs on a shared subscription', { skip: !dbUrl }, async t => {
+test('device subscription leases remain personal despite legacy sharing metadata', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool: appPool } = await import('../lib/db')
@@ -45,42 +45,33 @@ test('device runs on a shared subscription', { skip: !dbUrl }, async t => {
   const credential = async (binding: string, consumer: string, run: string) => authorizedAccessName(pool,
     { connectionId: connection, ownerId: owner, workspaceId: team.id, provider: 'claude' } as never, { bindingId: binding, consumerId: consumer, runId: run }, Number(epoch), authorizeSubscriptionWorkspace)
 
-  await t.test('a member\'s run is bound to a teammate\'s subscription only while it is shared for members', async () => {
+  const legacyBinding = async (consumerId: string) => {
+    const id = randomUUID()
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,$6,'claude_code_cli','synthetic-model')`, [id, owner, team.id, consumerId, connection, epoch])
+    return id
+  }
+  await t.test('a member cannot opt another member into their personal subscription pool', async () => {
     const peerAgent = await seedAgent(pool, peer, 'claude_code')
     await setSubscriptionShare(pool, owner, team.id, true, false)
-    assert.equal(await sharedNativeBinding(pool, peer, peerAgent, 'claude_code', team.id), null, 'shared for the owner\'s own bots only')
-    await setSubscriptionShare(pool, owner, team.id, true, true)
-    const binding = await sharedNativeBinding(pool, peer, peerAgent, 'claude_code', team.id)
-    assert.ok(binding)
-    const { rows: [row] } = await pool.query('SELECT "ownerId","consumerId",route,"connectionId" FROM byos_bindings WHERE id=$1', [binding])
-    assert.deepEqual(row, { ownerId: owner, consumerId: peerAgent, route: 'claude_code_cli', connectionId: connection })
-    assert.equal(await sharedNativeBinding(pool, peer, peerAgent, 'claude_code', team.id), binding, 'the same binding again, not a new one')
-    assert.equal(await sharedNativeBinding(pool, peer, peerAgent, 'codex', team.id), null, 'no Codex subscription is shared')
+    assert.equal(await sharedNativeBinding(pool, peer, peerAgent, 'claude_code', team.id), null)
+    await assert.rejects(setSubscriptionShare(pool, owner, team.id, true, true), { code: 'subscriptionPersonalOnly' })
+    assert.equal(await sharedNativeBinding(pool, peer, peerAgent, 'claude_code', team.id), null)
+    assert.equal(await sharedNativeBinding(pool, peer, peerAgent, 'codex', team.id), null)
     assert.equal(await sharedNativeBinding(pool, outsider, await seedAgent(pool, outsider, 'claude_code'), 'claude_code', elsewhere.id), null)
   })
 
-  await t.test('the owner and, while shared for members, a member take the lease and read the credential; nobody else', async () => {
-    await setSubscriptionShare(pool, owner, team.id, true, true)
-    const ownBinding = randomUUID()
-    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,$6,'claude_code_cli','synthetic-model')`,
-      [ownBinding, owner, team.id, ownAgent, connection, epoch])
-    const own = await runOn(owner, ownAgent, ownBinding)
+  await t.test('only the owner can lease or read a personal subscription, including a historically bound peer Run', async () => {
+    const ownBinding = await legacyBinding(ownAgent), own = await runOn(owner, ownAgent, ownBinding)
     assert.equal((await lease(owner, own)).ownerId, owner)
     assert.equal(await credential(ownBinding, ownAgent, own.run), access)
-
-    const peerAgent = await seedAgent(pool, peer, 'claude_code')
-    const shared = (await sharedNativeBinding(pool, peer, peerAgent, 'claude_code', team.id))!
+    const peerAgent = await seedAgent(pool, peer, 'claude_code'), shared = await legacyBinding(peerAgent)
     const peers = await runOn(peer, peerAgent, shared)
-    const use = await lease(peer, peers)
-    assert.equal(use.ownerId, owner, 'the use is the credential owner\'s')
-    assert.equal(use.bindingId, shared)
-    assert.equal(await credential(shared, peerAgent, peers.run), access)
-    await assert.rejects(lease(owner, peers), /account_unavailable/, 'only the device of the run\'s own person')
-
-    await setSubscriptionShare(pool, owner, team.id, true, false)
-    await assert.rejects(lease(peer, peers), /account_unavailable/, '分享给团队成员 off')
+    await assert.rejects(lease(peer, peers), /account_unavailable/)
     await assert.rejects(credential(shared, peerAgent, peers.run), /subscription_access_unavailable/)
-    assert.equal((await lease(owner, own)).ownerId, owner, 'the owner\'s own run is unaffected')
+    await assert.rejects(lease(owner, peers), /account_unavailable/)
+    await setSubscriptionShare(pool, owner, team.id, true, false)
+    await assert.rejects(lease(peer, peers), /account_unavailable/)
+    assert.equal((await lease(owner, own)).ownerId, owner)
   })
 
   await t.test('the run harness must pass its current self-test even when an old broker flag remains', async () => {
@@ -107,17 +98,17 @@ test('device runs on a shared subscription', { skip: !dbUrl }, async t => {
   })
 
   await t.test('the admin switch, leaving the team, another workspace or a stop request refuse a member\'s lease', async () => {
-    await setSubscriptionShare(pool, owner, team.id, true, true)
+    await assert.rejects(setSubscriptionShare(pool, owner, team.id, true, true), { code: 'subscriptionPersonalOnly' })
     const fresh = async () => {
       const agent = await seedAgent(pool, peer, 'claude_code')
-      const binding = (await sharedNativeBinding(pool, peer, agent, 'claude_code', team.id))!
+      const binding = await legacyBinding(agent)
       return { agent, binding, run: await runOn(peer, agent, binding) }
     }
     const switched = await fresh()
     await pool.query(`INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false) ON CONFLICT ("workspaceId") DO UPDATE SET subscriptions=false`, [team.id])
     await assert.rejects(lease(peer, switched.run), /account_unavailable/, '团队权限 › 订阅与 API Key set to 禁止')
     await pool.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [team.id])
-    assert.equal((await lease(peer, switched.run)).ownerId, owner)
+    await assert.rejects(lease(peer, switched.run), /account_unavailable/, 'removing an admin restriction cannot authorize personal subscription lending')
 
     const stopped = await fresh()
     await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1`, [stopped.run.run])

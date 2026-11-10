@@ -56,7 +56,35 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const enabledMigration = await readFile(new URL('../drizzle/20261108120101_enabled_models.sql', import.meta.url), 'utf8')
     await pool.query(enabledMigration)
     await pool.query(enabledMigration)
-    assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true, 'on by default')
+    await pool.query(`CREATE TABLE workspace_audit_events (id uuid PRIMARY KEY,"workspaceId" uuid,"actorType" text,"actorName" text,action text,category text,"targetType" text,"targetId" text,metadata jsonb);
+      CREATE TABLE byos_native_runs ("runId" uuid,"bindingId" uuid)`);
+    await pool.query(`ALTER TABLE byos_bindings ADD COLUMN id uuid, ADD COLUMN "ownerId" text`);
+    const legacyWorkspace = randomUUID(), legacyBinding = randomUUID(), legacyRun = randomUUID();
+    await pool.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ('alice',$1,true)`, [legacyWorkspace]);
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId") VALUES ($1,'alice')`, [legacyBinding]);
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentDefinition",status,"leaseExpiresAt") VALUES ($1,'bob',$2,'running',now()+interval '1 hour')`,
+      [legacyRun, JSON.stringify({ subscription: { bindingId: legacyBinding } })]);
+    for (const migration of ["20261110020020_personal_subscriptions_organization_connections.sql", "20261110020021_organization_model_policy.sql"]) {
+      const sql = await readFile(new URL(`../drizzle/${migration}`, import.meta.url), "utf8");
+      await pool.query(sql);
+      await pool.query(sql);
+    }
+    const preserved = (await pool.query(`SELECT "allowOthers","legacyAllowOthers","sharingRevokedAt" FROM workspace_subscription_shares WHERE "workspaceId"=$1`, [legacyWorkspace])).rows[0];
+    assert.equal(preserved.allowOthers, false);
+    assert.equal(preserved.legacyAllowOthers, true);
+    assert.ok(preserved.sharingRevokedAt);
+    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='credential.revoked'`, [legacyWorkspace])).rows[0].n, 1, 'replay cannot duplicate revocation audit');
+    const stoppedLegacy = (await pool.query(`SELECT "stopRequestedAt" IS NOT NULL AND "leaseExpiresAt"<=now() AS stopped FROM agent_runs WHERE id=$1`, [legacyRun])).rows[0];
+    assert.equal(stoppedLegacy.stopped, true, 'an old borrowed Run is stopped before any credential can be renewed');
+    const legacyConsent = (await pool.query(`SELECT "legacyApiKeyAfterQuota","apiKeyFallbackAuthorizedAt" FROM "user" WHERE id='alice'`)).rows[0];
+    assert.equal(legacyConsent.legacyApiKeyAfterQuota, true);
+    assert.equal(legacyConsent.apiKeyFallbackAuthorizedAt, null);
+    await pool.query('DELETE FROM agent_runs WHERE id=$1', [legacyRun]);
+    await pool.query('DELETE FROM byos_bindings WHERE id=$1', [legacyBinding]);
+    await pool.query('DELETE FROM workspace_subscription_shares WHERE "workspaceId"=$1', [legacyWorkspace]);
+    assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), false, 'paid fallback requires explicit fresh authorization')
+    await store.setApiKeyAfterQuota(pool, 'alice', true)
+    assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true)
 
     const personal = { id: randomUUID(), kind: 'personal' as const }
     const team = { id: randomUUID(), kind: 'team' as const }

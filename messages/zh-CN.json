@@ -1116,6 +1116,7 @@
     "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
     "executionCommandNotFound": "找不到这次检测。",
     "executionAccountUnavailable": "此账号不可用。",
+    "subscriptionPersonalOnly": "个人订阅只能由本人使用。请添加组织 API Key 来共享模型访问。",
     "threadModelUnavailable": "这个线程原来的模型已不可用。",
     "runModelMissing": "这个运行没有指定模型。",
     "generic": "操作未成功，请稍后重试。",

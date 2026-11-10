@@ -9,7 +9,7 @@ export type ExecutionAccountUsage = {
 export function executionAccountUsage(rows: { identity: ExecutionIdentity | null; seconds: number }[]): ExecutionAccountUsage[] {
   const result = new Map<string, ExecutionAccountUsage>()
   for (const { identity, seconds } of rows) {
-    if (!identity || identity.version !== 1) continue
+    if (!identity || (identity.version !== 1 && identity.version !== 2)) continue
     for (const lane of ['model', 'runtime'] as const) {
       const account = identity.billingAccount[lane]
       const id = JSON.stringify([lane, account.kind, account.ownerId, account.resourceId])

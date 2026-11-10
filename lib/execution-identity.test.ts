@@ -8,7 +8,7 @@ const resourcePolicySql = "select w.kind,l.\"organizationId\",p.\"modelCredentia
 const id = (last: number) => `10000000-0000-4000-8000-${String(last).padStart(12, '0')}`
 function fixture() {
   const members = new Set(['requester', 'bot-owner', 'resource-owner'])
-  const state = { botOwner: 'bot-owner', workspace: id(1), deviceOwner: 'requester', keyOwner: 'requester', share: false, enabled: true, kind: 'local', revision: '1', subscription: true, e2b: true }
+  const state = { botOwner: 'bot-owner', workspace: id(1), deviceOwner: 'requester', keyOwner: 'requester', share: false, enabled: true, kind: 'local', revision: '1', subscription: true, e2b: true, keyRevision: '1', revoked: false, organizationId: null as string | null, linkedOrganizationId: null as string | null, orgActive: true, modelPolicy: null as unknown }
   const definition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'A task', parent: null, executionId: null, model: 'example-model', apiKey: { keyId: id(2), model: 'example-model' } })
   const run = { userId: 'requester', botId: id(3), deviceId: id(4), agentDefinition: definition }
   const query = { async query(sql: string, args: unknown[]) {
@@ -16,8 +16,10 @@ function fixture() {
     if (sql.includes('FROM mikka_workspace_members')) rows = [...members].map(userId => ({ userId }))
     else if (sql.includes('FROM bots')) rows = [{ ownerId: state.botOwner, workspaceId: state.workspace }]
     else if (sql.includes('FROM devices')) rows = [{ ownerId: state.deviceOwner, kind: state.kind, enabled: state.enabled }]
-    else if (sql.includes('FROM model_api_keys')) rows = [{ ownerId: state.keyOwner, shared: state.share }]
+    else if (sql.includes('FROM model_api_keys')) rows = state.revoked ? [] : [{ ownerId: state.keyOwner, shared: state.share, revision: state.keyRevision, ownership: state.organizationId ? 'organization' : 'personal', organizationId: state.organizationId, models: ['example-model'], modelSettings: null }]
     else if (sql.includes('FROM byos_bindings')) rows = state.subscription ? [{ ownerId: state.keyOwner, workspaceId: state.workspace, revision: state.revision, shared: state.share, modelId: 'example-model', route: 'codex_cli' }] : []
+    else if (sql.includes('FROM mikka_organization_workspaces l JOIN mikka_organizations')) rows = state.orgActive && state.linkedOrganizationId && members.has('requester') ? [{ organizationId: state.linkedOrganizationId, name: 'Test organization', revision: 1, modelPolicy: state.modelPolicy }] : []
+    else if (sql.includes("SELECT to_jsonb(p)->'modelPolicy'")) rows = [{ modelPolicy: state.modelPolicy }]
     else if (sql.includes('FROM user_e2b_keys')) rows = state.e2b ? [{ found: 1 }] : []
     else if (sql.replace(/\s+/g, ' ').trim() === resourcePolicySql) {
       assert.deepEqual(args, [state.workspace])
@@ -142,4 +144,76 @@ test('usage attributes the frozen payer and leaves external amounts unknown', as
   assert.equal(rows[0].runs, 2); assert.equal(rows[0].seconds, 60)
   assert.equal(rows.find(row => row.kind === 'api_key')?.amount, 'provider_unknown')
   assert.deepEqual(executionAccountUsage([{ identity: null, seconds: 10 }]), [])
+})
+
+
+test('shared Thread attribution preserves its Owner while the Actor pays with their own credential', async () => {
+  const f = fixture()
+  const identity = await freezeExecutionIdentity(f.query, { ...f.run, actorId: 'requester', threadOwnerId: 'bot-owner' }, f.query)
+  assert.equal(identity.version, 2)
+  assert.equal(identity.actor, 'requester')
+  assert.equal(identity.threadOwner, 'bot-owner')
+  assert.equal(identity.credentialOwner, 'requester')
+  assert.deepEqual(identity.modelPayer, { kind: 'personal', id: 'requester' })
+  assert.deepEqual(identity.computePayer, { kind: 'personal', id: 'requester' })
+  assert.deepEqual(identity.modelSelection, { harness: 'codex', model: 'example-model' })
+  await assert.rejects(freezeExecutionIdentity(f.query, { ...f.run, actorId: 'bot-owner', threadOwnerId: 'requester' }, f.query), ExecutionIdentityError)
+})
+
+test('legacy subscription shares never let the requester spend another member subscription', async () => {
+  const f = fixture()
+  f.run.agentDefinition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'task', parent: null, executionId: null, subscription: { id: id(9), modelId: 'example-model', route: 'codex_cli' } })
+  f.state.keyOwner = 'resource-owner'; f.state.share = true
+  await assert.rejects(freezeExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
+  f.state.keyOwner = 'requester'
+  const own = await freezeExecutionIdentity(f.query, f.run, f.query)
+  assert.equal(own.billingAccount.model.ownerId, 'requester')
+})
+
+test('organization connection requires a current tenant link and member, freezes payer and revision, and revokes promptly', async () => {
+  const f = fixture()
+  f.state.organizationId = id(30); f.state.linkedOrganizationId = id(30)
+  f.state.keyOwner = `organization:${id(30)}`
+  const identity = await f.freeze()
+  assert.equal(identity.resourceBindings[1].access, 'organization')
+  assert.equal(identity.resourceBindings[1].revision, '1')
+  assert.deepEqual(identity.modelPayer, { kind: 'organization', id: id(30) })
+  assert.deepEqual(identity.computePayer, { kind: 'personal', id: 'requester' })
+  f.state.orgActive = false
+  await assert.rejects(revalidateExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
+  f.state.orgActive = true; f.state.linkedOrganizationId = id(31)
+  await assert.rejects(revalidateExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
+  f.state.linkedOrganizationId = id(30); f.state.keyRevision = '2'
+  await assert.rejects(revalidateExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
+  f.state.keyRevision = '1'; f.state.revoked = true
+  await assert.rejects(revalidateExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
+})
+
+test('an Organization model restriction reaches claim and rejects previously frozen personal access', async () => {
+  const f = fixture(); await f.freeze()
+  f.state.modelPolicy = { sourceOrder: ['organization', 'personal_subscription', 'personal_api_key', 'shared_api_key'], paidFallback: 'deny', models: { 'example-model': { mode: 'organization_only' } } }
+  await assert.rejects(revalidateExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
+})
+
+
+test('a cross-Actor run requires a live independent receipt and exact dedicated cloud authority', async t => {
+  let accepted = true
+  const calls: Record<string, unknown>[] = []
+  t.mock.module('./collaboration-run-authority.ts', { namedExports: { validateCollaborationRunAuthority: async (_: unknown, input: Record<string, unknown>) => { calls.push(input); return accepted } } })
+  const f = fixture(); f.state.kind = 'cloud'; f.state.organizationId = id(30); f.state.linkedOrganizationId = id(30); f.state.keyOwner = `organization:${id(30)}`
+  const authority = { ...f.run, actorId: 'bot-owner', threadOwnerId: 'requester', collaborationAuthorizationId: id(50) }
+  const identity = await freezeExecutionIdentity(f.query, authority, f.query)
+  assert.equal(identity.actor, 'bot-owner'); assert.equal(identity.requester, 'bot-owner')
+  assert.equal(identity.executionPrincipal, 'requester'); assert.equal(identity.outputOwner, 'requester')
+  assert.equal(identity.threadOwner, 'requester'); assert.equal(identity.collaborationAuthorizationId, id(50))
+  assert.deepEqual(identity.modelPayer, { kind: 'organization', id: id(30) })
+  assert.deepEqual(identity.computePayer, { kind: 'personal', id: 'requester' })
+  assert.equal(calls[0].actorId, 'bot-owner'); assert.equal(calls[0].executionOwnerId, 'requester')
+  f.definition.executionIdentity = identity
+  accepted = false
+  await assert.rejects(revalidateExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
+  accepted = true; f.state.kind = 'local'
+  await assert.rejects(revalidateExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
+  f.state.kind = 'cloud'; delete f.definition.apiKey
+  await assert.rejects(revalidateExecutionIdentity(f.query, f.run, f.query), ExecutionIdentityError)
 })

@@ -84,6 +84,7 @@ export const organizationResourcePolicies = pgTable('mikka_organization_resource
   modelCredentialSharing: text('modelCredentialSharing').$type<SharingRule>().notNull().default('allow'),
   mcpSharing: text('mcpSharing').$type<SharingRule>().notNull().default('allow'),
   allowedModelProviders: jsonb('allowedModelProviders').$type<string[] | null>(),
+  modelPolicy: jsonb('modelPolicy').$type<import('@/lib/organization-model-policy').OrganizationModelPolicy | null>(),
   auditRetentionDays: integer('auditRetentionDays'),
   legalHold: boolean('legalHold').notNull().default(false),
   revision: integer('revision').notNull().default(1),
@@ -108,7 +109,7 @@ export const organizationPolicyOutbox = pgTable('mikka_organization_policy_outbo
   id: uuid('id').primaryKey(),
   organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   workspaceIds: jsonb('workspaceIds').$type<string[]>().notNull(),
-  changes: jsonb('changes').$type<{ modelCredentials: boolean; mcp: boolean; modelProviders: boolean }>().notNull(),
+  changes: jsonb('changes').$type<{ modelCredentials: boolean; mcp: boolean; modelProviders: boolean; modelPolicy?: boolean }>().notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
 })

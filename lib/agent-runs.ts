@@ -213,8 +213,14 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
     } catch { throw invalid() }
     const { executionIdentitySchema } = await import('./execution-identity')
     const originalIdentity = executionIdentitySchema.safeParse(current.agentDefinition.executionIdentity)
-    if (!originalIdentity.success || originalIdentity.data.requester !== userId || originalIdentity.data.executionPrincipal !== userId ||
-      originalIdentity.data.outputOwner !== userId || originalIdentity.data.botId !== current.botId) throw new ActionFailureError('executionAccountUnavailable')
+    if (!originalIdentity.success || originalIdentity.data.executionPrincipal !== userId ||
+      originalIdentity.data.outputOwner !== userId || originalIdentity.data.botId !== current.botId ||
+      originalIdentity.data.requester !== (originalIdentity.data.actor ?? userId)) throw new ActionFailureError('executionAccountUnavailable')
+    // This admission targets an Owner's personal local computer. A delegated
+    // cloud run cannot recover here by silently replacing its Actor with Owner.
+    if ((originalIdentity.data.actor ?? userId) !== userId) throw new ActionFailureError('executionAccountUnavailable')
+    const originalModel = current.agentDefinition.apiKey?.model ?? current.agentDefinition.subscription?.modelId ?? current.agentDefinition.model
+    if (input.model !== originalModel || input.modelDispatch?.entry?.harness !== current.agentDefinition.harness) throw new ActionFailureError('executionAccountUnavailable')
     const result = await queueAdmittedRun(userId, {
       ...input, issueId: current.issueId!, repo: repo.remoteUrl,
       requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
@@ -231,8 +237,11 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
     // admission authenticates its replacement; the requester's standing scope
     // must still equal the original host-frozen identity.
     const nextIdentity = executionIdentitySchema.safeParse(definition.executionIdentity)
-    const standing = ['requester', 'executionPrincipal', 'outputOwner', 'botId', 'botOwner', 'workspaceId', 'personalResourcePolicy'] as const
-    if (!nextIdentity.success || standing.some(field => originalIdentity.data[field] !== nextIdentity.data[field])) throw new ActionFailureError('executionAccountUnavailable')
+    const standing = ['requester', 'executionPrincipal', 'outputOwner', 'botId', 'botOwner', 'workspaceId', 'personalResourcePolicy', 'collaborationAuthorizationId'] as const
+    if (!nextIdentity.success || standing.some(field => originalIdentity.data[field] !== nextIdentity.data[field]) ||
+      (originalIdentity.data.actor ?? originalIdentity.data.requester) !== (nextIdentity.data.actor ?? nextIdentity.data.requester) ||
+      (originalIdentity.data.threadOwner ?? originalIdentity.data.outputOwner) !== (nextIdentity.data.threadOwner ?? nextIdentity.data.outputOwner) ||
+      originalIdentity.data.billingAccount.model.ownerId !== nextIdentity.data.billingAccount.model.ownerId) throw new ActionFailureError('executionAccountUnavailable')
     return result
   })
 }

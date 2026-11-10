@@ -27,6 +27,12 @@ const unexpectedWorkspace = () => { throw new Error('Unexpected Workspace operat
 mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: {
   workspaceDb: { select: unexpectedWorkspace, transaction: unexpectedWorkspace },
   workspacePool: { query: async (sql: string, params: unknown[]) => {
+    if (sql.startsWith("SELECT to_jsonb(p)->'modelPolicy'")) {
+      assert.deepEqual(params, [scope.workspaceId]); return { rows: [], rowCount: 0 }
+    }
+    if (sql.startsWith('SELECT o.id AS "organizationId",o.name,p.revision')) {
+      assert.deepEqual(params, [scope.workspaceId, scope.ownerId]); return { rows: [], rowCount: 0 }
+    }
     assert.equal(sql.replace(/\s+/g, ' ').trim(), resourcePolicySql)
     assert.deepEqual(params, [scope.workspaceId])
     // Only this known non-Org Team is modeled. Production resource policy
@@ -50,11 +56,13 @@ function fixture() {
   const calls: Call[] = []
   let allowed = true, health: unknown[] = [], afterLock: (() => void) | undefined, profile: AgentProfileSelection | undefined
   let profileState: { archivedAt?: Date; enabled?: boolean; version?: number; ownerId?: string; workspaceId?: string } = {}
-  const mayUse = (owner: string) => owner === scope.ownerId || (allowed && shares.has(owner))
+  const mayUse = (owner: string) => owner === scope.ownerId
   const mayUseKey = (row: Key) => row.ownerId === scope.ownerId || (allowed && keyShares.has(row.id))
   const query = async (sql: string, params: unknown[] = []) => {
     let kind: string, rows: unknown[]
-    if (sql.includes('FROM model_order_settings')) {
+    if (sql.startsWith('SELECT "apiKeyAfterQuota"')) {
+      kind = 'paid_fallback'; rows = [{ apiKeyAfterQuota: false, authorizedAt: null }]
+    } else if (sql.includes('FROM model_order_settings')) {
       kind = 'settings'; rows = [{ location: 'cloud', customized: false, preferredHarness: 'codex', autoModelRouting: false }]
     } else if (sql.includes('FROM factory_agent_profiles')) {
       kind = 'profile_lock'
@@ -118,6 +126,11 @@ for (const shared of [false, true]) test(`fixed ${shared ? 'shared' : 'own'} dis
   const resolve = () => resolveModelDispatch(f.query as Pool, { ...scope, botId: null }, undefined, 'cloud', undefined,
     { exactEntry: entry, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
   const selected = await resolve()
+  if (shared) {
+    assert.equal(selected.kind, 'none'); assert.equal(providerCalls, 0)
+    assert.equal(f.calls.some(call => call.kind === 'catalogue'), false)
+    return
+  }
   assert.equal(selected.kind, 'cloud')
   assert.deepEqual(selected.entry, entry)
   assert.equal(f.calls.some(call => ['pooled_owners', 'catalogue_rank', 'own_keys', 'shared_keys'].includes(call.kind)), false)
@@ -135,7 +148,8 @@ test('a harness-only dispatch keeps its preference model even with a conflicting
     { exactEntry: entry, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
   assert.equal(resolved.kind, 'none')
   if (resolved.kind === 'none') assert.equal(resolved.reason, 'notOffered')
-  assert.ok(f.calls.some(call => call.kind === 'pooled_owners'))
+  assert.equal(f.calls.some(call => call.kind === 'pooled_owners'), false)
+  assert.ok(f.calls.some(call => call.kind === 'catalogue'))
   assert.equal(providerCalls, 0)
 })
 
@@ -144,6 +158,11 @@ for (const shared of [false, true]) for (const kind of ['subscription', 'api_key
   const f = fixture(), entry = f.source(kind, shared), selected = f.selection(entry)
   const baseline = await result(() => assertFrozenModelTarget(f.query, scope, entry))
   const originalCalls = f.calls.splice(0), originalMemberships = memberships.splice(0)
+  if (kind === 'subscription' && shared) {
+    assert.equal(baseline.code, 'agentProfileModelUnavailable')
+    assert.deepEqual(await result(() => assertProfileTarget(f.query, scope, selected)), baseline)
+    assert.equal(providerCalls, 0); return
+  }
   assert.deepEqual(baseline, { ok: true })
   assert.deepEqual(await result(() => assertProfileTarget(f.query, scope, selected)), baseline)
   const finalFences = (calls: Call[]) => calls.filter(call => ['source_lock', 'fresh_share', 'connection_state', 'key_state', 'provider_health'].includes(call.kind))

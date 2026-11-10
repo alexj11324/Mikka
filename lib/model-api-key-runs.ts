@@ -20,9 +20,11 @@ export async function stopRunsUsingApiKeys(query: Query, scope: { keyId?: string
   if (!scope.keyId && !scope.workspaceId) throw new Error('stopRunsUsingApiKeys needs a key or a workspace')
   const { rowCount, rows } = await query.query<{ id: string }>(`UPDATE agent_runs r SET "stopRequestedAt"=clock_timestamp(),
       "leaseExpiresAt"=LEAST(r."leaseExpiresAt",clock_timestamp()),"updatedAt"=clock_timestamp()
-    FROM model_api_key_runs m JOIN model_api_keys k ON k.id=m."keyId"
-    WHERE m."runId"=r.id AND r."stopRequestedAt" IS NULL AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')
-      AND ($1::uuid IS NULL OR k.id=$1) AND ($2::text IS NULL OR k."ownerId"=$2) AND ($3::text IS NULL OR m."workspaceId"::text=$3)
+    FROM model_api_keys k
+    WHERE r."stopRequestedAt" IS NULL AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')
+      AND ($1::uuid IS NULL OR k.id=$1) AND ($2::text IS NULL OR k."ownerId"=$2)
+      AND ((to_jsonb(r)#>>'{agentDefinition,apiKey,keyId}'=k.id::text AND ($3::text IS NULL OR to_jsonb(r)->>'workspaceId'=$3))
+        OR EXISTS (SELECT 1 FROM model_api_key_runs m WHERE m."runId"=r.id AND m."keyId"=k.id AND ($3::text IS NULL OR m."workspaceId"::text=$3)))
       AND (NOT $4::boolean OR r."userId"<>k."ownerId") RETURNING r.id`,
   [scope.keyId ?? null, scope.ownerId ?? null, scope.workspaceId ?? null, scope.othersOnly ?? false])
   for (const { id } of rows) { await runListChanged(query, id); await runChanged(query, id) }

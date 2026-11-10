@@ -9,6 +9,7 @@ export const ACTION_ERROR_CODES = [
   'executionRuleOrderInvalid',
   'executionCommandNotFound',
   'executionAccountUnavailable',
+  'subscriptionPersonalOnly',
   'threadModelUnavailable',
   'runModelMissing',
   'authRequired',

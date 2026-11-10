@@ -33,6 +33,9 @@ export async function freezeBotModel(
   const selected = savedKey ? undefined : await settings.botModel(settingsScope, scope.botId);
   const choice = await resolveBotModelChoice(pool, settings, settingsScope, scope.botId,
     { selected, key: keyChoice }, { keys });
+  // A disappeared/revoked explicit credential needs a new choice. It cannot
+  // silently move the next turn to another model or payer.
+  if (choice.fallback === 'preference' && (keyChoice || selected)) throw new ActionFailureError('executionModelUnknown');
   if (choice.kind === "hosted") return { harness: "ai_sdk", model: COORDINATOR_MODEL };
   if (choice.kind === "apiKey")
     return {
@@ -41,6 +44,8 @@ export async function freezeBotModel(
       modelSelection: hostedApiKeySnapshotSchema.parse({
         ...(scope.botId === null ? { coordinator: true } : { consumerId: scope.botId }),
         type: "api_key", keyId: choice.key.id, ownerId: scope.ownerId, workspaceId, modelId: choice.model,
+        ...(choice.key.revision !== undefined ? { credentialOwnerId: choice.key.ownerId, credentialRevision: choice.key.revision } : {}),
+        ...(choice.key.organizationId ? { organizationId: choice.key.organizationId } : {}),
         ...(choice.fallback === "points" ? { afterPoints: true } : {}),
         ...(choice.quota ? { afterQuota: {
           subscription: choice.quota.subscription === "codex" ? "codex" : "claude",
@@ -50,15 +55,12 @@ export async function freezeBotModel(
         } } : {}),
       }),
     };
-  const bindingId = choice.sharedOwnerId && scope.botId
-    ? await settings.bindingForOthersBot(settingsScope, scope.botId, choice.sharedOwnerId, choice.binding.bindingId)
-    : await settings.bindingForBot(settingsScope, scope.botId, choice.binding.bindingId);
+  const bindingId = await settings.bindingForBot(settingsScope, scope.botId, choice.binding.bindingId);
   const frozen = await freezeHostedModelSelection(
     { ...scope, workspaceId },
     { harness: "ai_sdk", model: null },
     { type: "subscription", bindingId },
     dependencies,
-    choice.sharedOwnerId,
   );
   return choice.fallback === "points" && frozen.modelSelection
     ? { ...frozen, modelSelection: { ...frozen.modelSelection, afterPoints: true } }

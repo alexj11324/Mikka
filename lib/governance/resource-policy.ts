@@ -53,7 +53,8 @@ const approvalInput = z.object({ workspaceId: z.uuid(), kind: z.enum(['subscript
 export async function requestOrganizationResourceApproval(organizationId: string, userId: string, input: unknown) {
   const value = approvalInput.parse(input)
   if (value.kind === 'subscription') {
-    if (value.resourceId !== userId) throw new GovernanceError('access_denied')
+    // Neither an admin approval nor an old share can authorize pooling a personal provider subscription.
+    throw new GovernanceError('access_denied')
   } else {
     z.uuid().parse(value.resourceId)
     const owned = value.kind === 'mcp'
@@ -82,6 +83,7 @@ export async function decideOrganizationResourceApproval(organizationId: string,
     await requireOrganizationAdmin(tx, organizationId, actorId)
     const [row] = await tx.update(organizationResourceApprovals).set({ status: value.status, decidedBy: actorId, updatedAt: new Date() }).where(and(eq(organizationResourceApprovals.id, value.id), eq(organizationResourceApprovals.organizationId, organizationId))).returning()
     if (!row) throw new GovernanceError('not_found')
+    if (row.kind === 'subscription' && value.status === 'approved') throw new GovernanceError('access_denied')
     await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.resource_decided', targetId: value.id, metadata: { status: value.status } })
     if (value.status === 'denied') await tx.insert(organizationPolicyOutbox).values({ id: randomUUID(), organizationId, workspaceIds: [row.workspaceId], changes: { modelCredentials: row.kind !== 'mcp', mcp: row.kind === 'mcp', modelProviders: false } })
     armDueTimerAfterCommit(tx, 'audit-retention')
@@ -92,7 +94,7 @@ export async function decideOrganizationResourceApproval(organizationId: string,
 /** The policy becomes authoritative in WS first. Stops are durable and run only after commit. */
 export async function retryOrganizationPolicyOutbox(organizationId?: string) {
   const { workspacePool } = await import('@/lib/workspace-db')
-  const { rows } = await workspacePool.query<{ id: string; organizationId: string; workspaceIds: string[]; changes: { modelCredentials: boolean; mcp: boolean; modelProviders: boolean } }>('select id,"organizationId","workspaceIds",changes from mikka_organization_policy_outbox where "deliveredAt" is null and ($1::uuid is null or "organizationId"=$1) order by "createdAt",id limit 50', [organizationId ?? null])
+  const { rows } = await workspacePool.query<{ id: string; organizationId: string; workspaceIds: string[]; changes: { modelCredentials: boolean; mcp: boolean; modelProviders: boolean; modelPolicy?: boolean } }>('select id,"organizationId","workspaceIds",changes from mikka_organization_policy_outbox where "deliveredAt" is null and ($1::uuid is null or "organizationId"=$1) order by "createdAt",id limit 50', [organizationId ?? null])
   const { stopRunsUsingSubscriptions } = await import('@/lib/personal-policy')
   const { stopRunsUsingApiKeys } = await import('@/lib/model-api-key-runs')
   const { workspaceResourcePolicy } = await import('./resource-access')
@@ -112,7 +114,7 @@ export async function retryOrganizationPolicyOutbox(organizationId?: string) {
         returning r.id,r."deviceId",true as stopped`, [workspaceId])
         notifyStoppedPolicyRuns(pool, stopped.rows.filter(row => row.deviceId))
       }
-      if (receipt.changes.modelProviders && policy.allowedModelProviders !== null) await stopRunsForPolicyChange(pool, { kind: 'workspace', workspaceId })
+      if (receipt.changes.modelPolicy || receipt.changes.modelProviders && policy.allowedModelProviders !== null) await stopRunsForPolicyChange(pool, { kind: 'workspace', workspaceId })
     }
     await workspacePool.query('update mikka_organization_policy_outbox set "deliveredAt"=now() where id=$1', [receipt.id])
   }

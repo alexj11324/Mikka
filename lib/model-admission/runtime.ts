@@ -1,6 +1,9 @@
 import 'server-only'
 import { pool } from '@/lib/db'
 import { ModelAdmissionStore } from './store'
+import { workspaceModelPolicy } from '../organization-connections-access'
+import { organizationModelAllowed } from '../organization-model-policy'
+import { GovernanceError } from '../governance/errors'
 
 export const modelAdmission = new ModelAdmissionStore(pool)
 
@@ -13,8 +16,10 @@ export async function assertSubscriptionModelTransport(scope: { workspaceId: str
     const current = await readCliRunPolicy(pool, scope.runId, scope.ownerId)
     for (const id of current.workspaceIds) workspaces.add(id)
   }
-  for (const workspaceId of workspaces)
+  for (const workspaceId of workspaces) {
+    if (!organizationModelAllowed(await workspaceModelPolicy(workspaceId), model, 'personal_subscription')) throw new GovernanceError('access_denied')
     await modelAdmission.subscription({ workspaceId, ownerId: scope.ownerId }, model, route, { signal, auditAllowed })
+  }
 }
 
 /** Existing native/Decision transports do not attest an exact controlled
@@ -22,6 +27,8 @@ export async function assertSubscriptionModelTransport(scope: { workspaceId: str
  * This does not disable ordinary unmanaged model use. */
 export async function assertUnmanagedModelTransport(scope: { workspaceId: string; ownerId?: string; workspaceIds?: string[] }, model: string,
   signal?: AbortSignal) {
-  for (const workspaceId of new Set([scope.workspaceId,...scope.workspaceIds??[]]))
+  for (const workspaceId of new Set([scope.workspaceId,...scope.workspaceIds??[]])) {
+    if (!organizationModelAllowed(await workspaceModelPolicy(workspaceId), model, 'personal_api_key')) throw new GovernanceError('access_denied')
     await modelAdmission.gateway({ workspaceId, ownerId:scope.ownerId }, model, 'unsupported-model-transport', { signal })
+  }
 }

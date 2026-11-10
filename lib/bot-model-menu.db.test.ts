@@ -41,6 +41,14 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     // Resource policy still runs against real non-Org rows in this isolated schema.
     await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
 
+    await pool.query(`CREATE TABLE workspace_audit_events (id uuid PRIMARY KEY,"workspaceId" uuid,"actorType" text,"actorName" text,action text,category text,"targetType" text,"targetId" text,metadata jsonb);
+      CREATE TABLE byos_native_runs ("runId" uuid,"bindingId" uuid)`);
+    await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"agentDefinition" jsonb,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz)`);
+    for (const migration of ["20261110020020_personal_subscriptions_organization_connections.sql", "20261110020021_organization_model_policy.sql"]) {
+      const sql = await readFile(new URL(`../drizzle/${migration}`, import.meta.url), "utf8");
+      await pool.query(sql);
+      await pool.query(sql);
+    }
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
     mock.module(new URL("./workspace-db.ts", import.meta.url).href, { namedExports: { workspaceDb: drizzle(pool), workspacePool: pool } });
     // Points and their fallback have their own tests: here Mikka 默认 has points.
@@ -151,12 +159,11 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(picked.current.id, optionFor(picked, "claude-opus-fixture"));
     assert.equal(picked.current.chosen, true);
 
-    // 5. A disappeared preference shows the same actual fallback the next run freezes.
+    // 5. A disappeared preference offers a replacement but requires a new explicit choice.
     await settings.setBotModel(alice, botB, gpt);
     await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE id=$1`, [codex]);
     const lost = await botModelMenu(pool, settings, alice, botB);
-    const lostRun = await freezeBotModel({ ownerId: "alice", botId: botB, workspaceId: workspace }, dependencies);
-    assert.equal(lost.current.modelId, lostRun.model, "the chip must name the model the next run actually freezes");
+    await assert.rejects(freezeBotModel({ ownerId: "alice", botId: botB, workspaceId: workspace }, dependencies), { code: "executionModelUnknown" });
     assert.equal(lost.current.provider, "claude");
     assert.equal(lost.current.chosen, false);
     assert.equal(lost.current.fallback, "preference");
@@ -219,7 +226,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.deepEqual(again, [unasked], "a reconnect (new revision) is asked again");
 
     // C22: an API key's models are a menu group, and the Coordinator saved on one runs on it.
-    const { addApiKey } = await import("./model-api-keys");
+    const { addApiKey, setApiKeyAfterQuota } = await import("./model-api-keys");
     const { apiKeyOptionId } = await import("./bot-model-menu-view");
     const env = { WORKSPACE_SECRETS_KEY: randomBytes(32).toString("hex") };
     const listing = (async () => new Response(JSON.stringify({ data: [{ id: "deepseek-chat" }] }), { status: 200 })) as unknown as typeof fetch;
@@ -234,7 +241,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.deepEqual([keyMenu.current.id, keyMenu.current.kind, keyMenu.current.chosen, keyMenu.current.available], [keyOption, "apiKey", true, true]);
     assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), {
       harness: "ai_sdk", model: "deepseek-chat",
-      modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat" },
+      modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat", credentialOwnerId: "alice", credentialRevision: 1 },
     });
     // Mikka 默认 picked after a key model: it is what the chip shows and what the next turn runs on, not the key
     // (production, 2026-11-02: the pick saved, but the old key choice won on read and the chip went back to the key).
@@ -251,10 +258,11 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     pointsChoice = { kind: "api_key", keyId: key.id, model: "deepseek-chat" };
     const pointsMenu = await botModelMenu(pool, settings, alice, null);
     const pointsRun = await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies);
-    assert.equal(pointsMenu.current.modelId, pointsRun.model);
-    assert.equal(pointsMenu.current.fallback, "points");
-    assert.equal(pointsMenu.current.credentialLabel, `····${key.last4}`);
-    assert.equal((pointsRun.modelSelection as { afterPoints?: boolean })?.afterPoints, true);
+    assert.equal(pointsMenu.current.kind, "hosted");
+    assert.equal(pointsMenu.current.available, false);
+    assert.equal(pointsMenu.current.fallback, undefined);
+    assert.equal(pointsRun.model, COORDINATOR_MODEL);
+    assert.equal(pointsRun.modelSelection, undefined);
     pointsChoice = null;
     // No card yet but free messages left: listed, the tag names them.
     hostedTrial = 12;
@@ -274,6 +282,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const sameModelKey = await addApiKey(pool, "alice", { provider: "anthropic", apiKey: `fixture-compatible-${randomUUID()}` }, {
       env, fetch: (async () => Response.json({ data: [{ id: "claude-opus-fixture" }] })) as unknown as typeof fetch,
     });
+    assert.equal((await botModelMenu(pool, settings, alice, botA)).current.kind, "subscription", "default false does not authorize spending a paid key");
+    await setApiKeyAfterQuota(pool, "alice", true);
     const out = await botModelMenu(pool, settings, alice, botA);
     // The chip names the key's model the next turn runs on.
     assert.deepEqual([out.current.id, out.current.modelId, out.current.kind, out.current.available], [apiKeyOptionId(sameModelKey.id, "claude-opus-fixture"), "claude-opus-fixture", "apiKey", true]);
@@ -281,18 +291,19 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const switched = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.deepEqual(switched, {
       harness: "ai_sdk", model: "claude-opus-fixture",
-      modelSelection: { consumerId: botA, type: "api_key", keyId: sameModelKey.id, ownerId: "alice", workspaceId: workspace, modelId: "claude-opus-fixture",
+      modelSelection: { consumerId: botA, type: "api_key", keyId: sameModelKey.id, ownerId: "alice", workspaceId: workspace, modelId: "claude-opus-fixture", credentialOwnerId: "alice", credentialRevision: 1,
         afterQuota: { subscription: "claude", plan: "Max", keyProvider: "anthropic", keyName: null } },
     });
     // Turned off: the turn stays on the subscription and stops there; the composer offers 添加 API Key 继续 instead.
-    await pool.query(`UPDATE "user" SET "apiKeyAfterQuota"=false WHERE id='alice'`);
+    await setApiKeyAfterQuota(pool, "alice", false);
     const off = await botModelMenu(pool, settings, alice, botA);
     assert.deepEqual([off.current.modelId, off.current.available, off.current.quota?.fallback], ["claude-opus-fixture", false, null]);
     const stays = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.equal(stays.modelSelection?.type, "subscription");
     // A teammate's key is never spent this way: Alice shares hers with the team, Bob can pick it, but his bot on his
     // exhausted subscription does not move to it.
-    await pool.query(`UPDATE "user" SET "apiKeyAfterQuota"=true`);
+    await setApiKeyAfterQuota(pool, "alice", true);
+    await setApiKeyAfterQuota(pool, "bob", true);
     const { setApiKeyShare, usableApiKeys } = await import("./model-api-keys");
     await setApiKeyShare(pool, "alice", { id: workspace, kind: "team" }, key.id, true);
     assert.ok((await usableApiKeys(pool, "bob", workspace)).some((row) => row.id === key.id && !row.mine));
@@ -317,17 +328,16 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const twoKeys = (await botModelMenu(pool, settings, alice, null)).groups.filter(group => group.kind === "apiKey" && group.options.some(option => option.modelId === "deepseek-chat"));
     assert.equal(twoKeys.length, 2);
     assert.deepEqual(new Set(twoKeys.map(group => group.credentialLabel)), new Set([`····${key.last4}`, `····${secondKey.last4}`]));
-    // An invalid saved key follows the very same subscription fallback as reservation.
+    // A withdrawn saved key offers a suggestion but cannot charge it without a new choice.
     await chooseBotModel(pool, settings, alice, null, keyOption);
     await pool.query(`UPDATE model_api_keys SET models='[]'::jsonb WHERE id=$1`, [key.id]);
     const lostKeyMenu = await botModelMenu(pool, settings, alice, null);
-    const lostKeyRun = await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies);
-    assert.equal(lostKeyMenu.current.modelId, lostKeyRun.model);
+    await assert.rejects(freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), { code: "executionModelUnknown" });
     assert.equal(lostKeyMenu.current.fallback, "preference");
 
-    // Shared subscriptions are explicit model choices, not an unselectable Claude-first fallback.
+    // Legacy grants and guessed binding ids never expose or authorize another member subscription.
     const bob = { ownerId: "bob", workspaceId: workspace };
-    await pool.query(`UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"='alice' AND "workspaceId"=$1`, [workspace]);
+    await assert.rejects(pool.query(`UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"='alice' AND "workspaceId"=$1`, [workspace]), { code: "23514" });
     await pool.query(`UPDATE byos_connections SET state='connected', paused=false, epoch=1, "removedAt"=NULL WHERE id=ANY($1::uuid[])`, [[claude, codex]]);
     const haiku = await binding("alice", workspace, claude, "claude-haiku-5-5", "claude_cpa");
     const luna = await binding("alice", workspace, codex, "gpt-6-luna", "codex_cpa");
@@ -336,37 +346,20 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await pool.query(`UPDATE byos_connections SET quota=$3::jsonb,
       "modelCatalog"=jsonb_build_object('revision','1','models',jsonb_build_array($2::text)) WHERE id=$1`, [codex, "gpt-6-luna", quota(0.2, FUTURE, "codex")]);
     const sharedModels = await botModelMenu(pool, settings, bob, bobBot);
-    const sharedGroups = sharedModels.groups.filter(group => group.kind === "subscription" && group.owner === "Alice");
-    assert.ok(sharedGroups.some(group => group.provider === "claude" && group.options.some(option => option.modelId === "claude-haiku-5-5")));
-    assert.ok(sharedGroups.some(group => group.provider === "codex" && group.options.some(option => option.modelId === "gpt-6-luna")));
-    for (const group of sharedGroups) {
-      assert.equal(group.credentialLabel, "Alice");
-      assert.equal(group.plan, undefined);
-      for (const option of group.options) assert.deepEqual(Object.keys(option).sort(), ["id", "modelId", "provider"]);
-    }
-    assert.ok(!JSON.stringify(sharedGroups).includes("PRIVATE-LOGIN-SENTINEL"));
-    let savedShared = "";
-    for (const [id, model, connectionId, route] of [[haiku, "claude-haiku-5-5", claude, "claude_cpa"], [luna, "gpt-6-luna", codex, "codex_cpa"]]) {
-      const selected = await chooseBotModel(pool, settings, bob, bobBot, id);
-      assert.deepEqual([selected.current.kind, selected.current.modelId, selected.current.chosen, selected.current.credentialLabel], ["subscription", model, true, "Alice"]);
-      assert.equal(selected.current.quota, undefined);
-      const saved = (await pool.query(`SELECT b.* FROM bot_model_choices c JOIN byos_bindings b ON b.id=c."bindingId"
-        WHERE c."ownerId"='bob' AND c."workspaceId"=$1 AND c."botKey"=$2`, [workspace, bobBot])).rows[0];
-      savedShared = saved.id;
-      assert.deepEqual([saved.ownerId, saved.workspaceId, saved.consumerId, saved.connectionId, saved.modelId, saved.route], ["alice", workspace, bobBot, connectionId, model, route]);
-      const frozen = await freezeBotModel({ ...bob, botId: bobBot }, dependencies);
-      assert.equal(frozen.model, model);
-      assert.deepEqual(frozen.modelSelection, { type: "subscription", bindingId: saved.id, ownerId: "alice", runOwnerId: "bob",
-        consumerId: bobBot, workspaceId: workspace, connectionId, connectionRevision: 1, modelId: model, route });
-    }
+    assert.deepEqual(sharedModels.groups.filter(group => group.kind === "subscription" && group.owner === "Alice"), []);
+    assert.ok(!JSON.stringify(sharedModels).includes("PRIVATE-LOGIN-SENTINEL"));
+    for (const selected of [haiku, luna]) await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, selected), { code: "executionModelUnknown" });
+    // A saved choice migrated from the historical borrower mode also fails.
+    const savedShared = randomUUID();
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision","modelId",route)
+      VALUES ($1,'alice',$2,$3,$4,1,'gpt-6-luna','codex_cpa')`, [savedShared, workspace, bobBot, codex]);
+    await pool.query(`UPDATE bot_model_choices SET "bindingId"=$3,"apiKeyId"=NULL WHERE "ownerId"='bob' AND "workspaceId"=$1 AND "botKey"=$2`, [workspace, bobBot, savedShared]);
+    assert.equal(await settings.sharedChatBinding(bob, bobBot, savedShared), undefined);
+    await assert.rejects(freezeBotModel({ ...bob, botId: bobBot }, dependencies), { code: "executionModelUnknown" });
     const latestLuna = await binding("alice", workspace, codex, "gpt-6-luna", "codex_cpa");
-    await pool.query('UPDATE byos_bindings SET "createdAt"=now()+interval \'1 day\' WHERE id=$1', [latestLuna]);
     const deduped = await botModelMenu(pool, settings, bob, bobBot);
-    assert.equal(deduped.current.id, latestLuna);
-    assert.equal(deduped.current.chosen, true);
-    const dedupedSelection = (await freezeBotModel({ ...bob, botId: bobBot }, dependencies)).modelSelection;
-    assert.equal(dedupedSelection?.type, "subscription");
-    assert.equal(dedupedSelection?.type === "subscription" ? dedupedSelection.bindingId : undefined, savedShared);
+    assert.ok(!deduped.groups.flatMap(group => group.options).some(option => option.id === latestLuna || option.modelId === "gpt-6-luna"));
+    assert.equal(deduped.current.chosen, false);
 
     await assert.rejects(chooseBotModel(pool, settings, bob, botA, luna), { code: "botNotFound" });
     await assert.rejects(chooseBotModel(pool, settings, { ...bob, workspaceId: elsewhere }, bobBot, luna), { code: "botNotFound" });
@@ -388,9 +381,9 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     }
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [codex, quota(1, FUTURE, "codex")]);
     const exhaustedShared = await botModelMenu(pool, settings, bob, bobBot);
-    assert.equal(exhaustedShared.current.availability, "exhausted");
-    assert.equal(exhaustedShared.current.quota, undefined);
-    assert.ok(!JSON.stringify(exhaustedShared.current).includes(FUTURE));
+    assert.ok(!exhaustedShared.groups.some(group => group.owner === "Alice"));
+    assert.notEqual(exhaustedShared.current.modelId, "gpt-6-luna");
+    await assert.rejects(freezeBotModel({ ...bob, botId: bobBot }, dependencies), { code: "executionModelUnknown" });
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [codex, quota(0.2, FUTURE, "codex")]);
 
     for (const owner of ["alice", "bob"]) {

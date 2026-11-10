@@ -85,6 +85,12 @@ export function apiKeyEndpoint(key: ApiKeyAgentFields & Pick<ApiKeyView, 'baseUr
 /** One credential row as the page and the model picker read it. Never the key itself. */
 export interface ApiKeyView {
   id: string
+  /** Present for organization-owned connections; secrets remain write-only. */
+  ownership?: 'organization'
+  organizationId?: string
+  connectionKind?: 'api_key' | 'gateway' | 'custom_endpoint'
+  revision?: number
+  revokedAt?: string | null
   provider: ApiKeyProvider
   /** A custom provider's own name; null for the presets. */
   name: string | null

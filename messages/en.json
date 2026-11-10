@@ -1116,6 +1116,7 @@
     "executionRuleOrderInvalid": "The execution rule order has changed. Reload and retry.",
     "executionCommandNotFound": "This detection command was not found.",
     "executionAccountUnavailable": "This account is unavailable.",
+    "subscriptionPersonalOnly": "Personal subscriptions can only be used by their owner. Add an organization API key to share model access.",
     "threadModelUnavailable": "The model this thread ran on is no longer available.",
     "runModelMissing": "This run has no model.",
     "generic": "Something went wrong. Please try again.",

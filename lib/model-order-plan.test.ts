@@ -260,6 +260,7 @@ test('order view serializes supplied heartbeat times without changing its displa
   t.mock.module('./execution-settings.ts', { namedExports: { ExecutionSettings: class { async modelCandidates() { return [] } } } })
   t.mock.module('./personal-policy.ts', { namedExports: { pooledOwners: async () => [] } })
   t.mock.module('./subscription-runtime.ts', { namedExports: { authorizeSubscriptionWorkspace: async () => {} } })
+  t.mock.module('./organization-connections-access.ts', { namedExports: { workspaceModelPolicy: async () => ({ sourceOrder: ['personal_subscription','personal_api_key','organization','shared_api_key'], models: {}, paidFallback: 'deny' }), organizationConnectionAuthority: async () => null } })
   t.mock.module('./model-api-keys.ts', { namedExports: { usableApiKeys: async () => [] } })
   t.mock.module('./model-provider-health.ts', { namedExports: { providerHealthStates: async () => new Map(), providerSourceKey: () => '' } })
   t.mock.module('./cloud-template-models.ts', { namedExports: { cloudModelSupport: () => 'unknown' } })
