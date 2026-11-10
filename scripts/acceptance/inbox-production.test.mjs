@@ -292,8 +292,9 @@ test('Factory discovery follows selected-team issue pages and the sixth returned
   assert.deepEqual(report.inventory.factory.workspaces.map(row => row.workspaceId), [TEAM])
   assert.equal(report.inventory.factory.issuesRead, 2)
   assert.equal(report.inventory.factory.tasksRead, 7)
-  assert.equal(report.inventory.factory.issuePaginationComplete, true)
-  assert.equal(report.inventory.factory.returnedTaskReadsComplete, true)
+  assert.equal(report.inventory.factory.stopReason, 'required_samples_found')
+  assert.equal(report.inventory.factory.issuePaginationComplete, false)
+  assert.equal(report.inventory.factory.returnedTaskReadsComplete, false)
   assert.equal(report.inventory.factory.complete, false)
   assert.equal(report.inventory.factory.taskCompleteness, 'unknown_server_limit_before_filter')
   assert.equal(f.calls.filter(call => call.path === '/api/issues/search').length, 2)
@@ -314,8 +315,9 @@ test('empty or short Factory responses never prove all tasks enumerated or absen
     const f = fixture({ inventoryOnly: true, noFactory }), report = await runInboxProduction(f.args)
     assert.equal(report.inventory.factory.complete, false)
     assert.equal(report.inventory.factory.taskCompleteness, 'unknown_server_limit_before_filter')
-    assert.equal(report.inventory.factory.issuePaginationComplete, true)
-    assert.equal(report.inventory.factory.returnedTaskReadsComplete, true)
+    assert.equal(report.inventory.factory.issuePaginationComplete, noFactory)
+    assert.equal(report.inventory.factory.returnedTaskReadsComplete, noFactory)
+    assert.equal(report.inventory.factory.stopReason, noFactory ? null : 'required_samples_found')
     assert.equal(report.completeAcceptance, false)
     if (noFactory) assert.equal(report.coverage.cachedReviewSummary, 'not_observed')
   }
@@ -379,6 +381,59 @@ test('a withdrawn source/window between issue pages prevents the next page from 
     request: async () => { pages++; return { status: 200, body: { items: [], nextCursor: 'next-page', truncated: false } } },
   }), /inbox_window_invalid/)
   assert.equal(pages, 1); assert.equal(leases, 2)
+})
+
+function sampleDiscovery(options = {}) {
+  const calls = [], tailTask = OTHER_TASKS[0]
+  let prReads = 0
+  const request = async (_, path, init) => {
+    calls.push(path); assert.equal(init.headers['x-mikka-workspace-id'], TEAM)
+    if (path.startsWith('/api/issues/search')) return { status: 200, body: {
+      items: [{ id: ISSUE }, { id: LATER_ISSUE }], nextCursor: null, truncated: false,
+    } }
+    if (path === '/api/factory/tasks?issueId=' + ISSUE) return { status: 200, body: {
+      issueId: ISSUE, liveWorkspaceId: TEAM, tasks: [TASK_EMPTY, TASK_PR, tailTask].map(id => ({ id })),
+    } }
+    if (path === '/api/factory/tasks?issueId=' + LATER_ISSUE || path === `/api/factory/tasks/${tailTask}/flow`) {
+      assert.notEqual(options.rejectOptional, true, 'both required samples already proved: no unrelated task/issue request')
+      if (path.includes('?')) return { status: 200, body: { issueId: LATER_ISSUE, liveWorkspaceId: TEAM, tasks: [] } }
+    }
+    const task = /^\/api\/factory\/tasks\/([^/]+)\/flow$/.exec(path)
+    assert.ok(task)
+    const id = task[1], isPr = id === TASK_PR && !options.noPrOnly
+    if (isPr) prReads++
+    const handoff = isPr && !(options.changedReadback && prReads > 1)
+    return { status: 200, body: { version: 2, id, issueId: ISSUE, revision: 4, stage: handoff ? 'handoff' : 'implement',
+      ...(handoff ? { needsYou: { kind: 'pr_review', since: new Date(NOW).toISOString() } } : {}),
+      pullRequest: isPr ? { url: 'https://github.com/alexj11324/Mikka-handoff/pull/61', state: 'open' } : null,
+      review: isPr ? { candidateId: NONCE, summary: { branch: 'private-branch-canary', additions: 4, deletions: 1,
+        changedFiles: 1, headSha: SHA, checks: options.unknownChecks ? null : { passed: 3, failed: 0, pending: 0, skipped: 0 },
+        checksUpdatedAt: options.unknownChecks ? null : new Date(NOW).toISOString() } } : null,
+    } }
+  }
+  return { calls, run: () => readInboxFactoryInventory({ workspaceId: TEAM, request }) }
+}
+
+test('finding both required real samples stops unrelated task and issue discovery without claiming full enumeration', async () => {
+  const f = sampleDiscovery({ rejectOptional: true }), inventory = await f.run()
+  assert.equal(inventory.stopReason, 'required_samples_found'); assert.equal(inventory.workspaces[0].stopReason, 'required_samples_found')
+  assert.equal(inventory.complete, false); assert.equal(inventory.taskCompleteness, 'unknown_server_limit_before_filter')
+  assert.equal(inventory.issuesRead, 1); assert.equal(inventory.tasksRead, 2); assert.equal(inventory.workspaces[0].tasksReturned, 3)
+  assert.equal(inventory.returnedTaskReadsComplete, false); assert.equal(inventory.issuePaginationComplete, false)
+  assert.equal(inventory.summaries.some(row => row.kind === 'no_pr'), true)
+  assert.equal(inventory.summaries.some(row => row.kind === 'pr' && row.handoff && row.complete && row.sameReadback === true), true)
+  assert.equal(f.calls.length, 5)
+})
+
+test('one sample, unknown checks or a changed handoff readback cannot stop remaining discovery', async () => {
+  for (const options of [{ noPrOnly: true }, { unknownChecks: true }, { changedReadback: true }]) {
+    const f = sampleDiscovery(options), inventory = await f.run()
+    assert.equal(inventory.stopReason, null); assert.equal(inventory.issuesRead, 2); assert.equal(inventory.tasksRead, 3)
+    assert.equal(inventory.summaries.some(row => row.sameReadback === true), false)
+    assert.equal(f.calls.includes('/api/factory/tasks?issueId=' + LATER_ISSUE), true)
+    assert.equal(f.calls.includes(`/api/factory/tasks/${OTHER_TASKS[0]}/flow`), true)
+    assert.equal(inventory.complete, false)
+  }
 })
 
 test('exact owned source runs transitions, duplicates, real push boundary and receipt readbacks, then cleans', async () => {

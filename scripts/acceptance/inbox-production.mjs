@@ -237,6 +237,7 @@ export async function readInboxFactoryInventory({ workspaceId, request, observe 
       issuesRead: 0, tasksReturned: 0, tasksRead: 0, denied: 0, issuePaginationComplete: false,
       returnedTaskReadsComplete: false, stopReason: 'not_visited' }], summaries: [] }
   observe(inventory)
+  let noPrObserved = false, handoffObserved = false
   const bounded = () => {
     if (now() >= deadline) inventory.stopReason = 'time_limit'
     else if (inventory.requests >= requestLimit) inventory.stopReason = 'request_limit'
@@ -279,6 +280,7 @@ export async function readInboxFactoryInventory({ workspaceId, request, observe 
           check(flow?.id === task.id && flow.issueId === issue.id, 'fixture_binding_failed')
           const observed = { workspaceId, issueId: issue.id, ...reviewSummary(flow) }
           inventory.tasksRead++; scope.tasksRead++; inventory.summaries.push(observed)
+          if (observed.kind === 'no_pr') noPrObserved = true
           if (observed.kind === 'pr' && observed.complete && observed.handoff) {
             if (!bounded()) { scope.stopReason = inventory.stopReason; break discovery }
             const { body: second } = await read(`factory_readback_${tag}_${taskIndex}`, path, workspaceId)
@@ -286,6 +288,13 @@ export async function readInboxFactoryInventory({ workspaceId, request, observe 
             const readback = reviewSummary(second)
             observed.sameReadback = readback.kind === 'pr' && readback.complete && readback.handoff
               && readback.revision === observed.revision && readback.summaryDigest === observed.summaryDigest
+            if (observed.sameReadback) handoffObserved = true
+          }
+          if (noPrObserved && handoffObserved) {
+            // Both required real observations are proved. Further discovery
+            // cannot establish full enumeration with this server contract.
+            inventory.stopReason = 'required_samples_found'; scope.stopReason = inventory.stopReason
+            break discovery
           }
         }
       }
