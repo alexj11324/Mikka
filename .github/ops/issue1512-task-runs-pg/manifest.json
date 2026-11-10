@@ -1,0 +1,73 @@
+{
+  "schema": "issue1512-task-runs-pg17-v1",
+  "enabled": true,
+  "repository": "alexj11324/Mikka",
+  "opsBranch": "ops/1512-task-runs-pg-20261110",
+  "admissionMessage": "issue1512 task-runs PG admit 20261110",
+  "expiresAt": "2026-11-10T02:05:00.000Z",
+  "base": {
+    "sha": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+    "tree": "845fb6f21f3ec78c94f60888c11e38573e38e3ea"
+  },
+  "red": {
+    "sha": "01d436073027acd94fcc0d43fb75e435d2ddd7ac",
+    "tree": "028c27f1443cfb9c98564a0bed2412d467b0288f",
+    "parent": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+    "sourceBlob": "f2213c69a435b967feb8d9f335213394c2e08630",
+    "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb"
+  },
+  "green": {
+    "sha": "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+    "tree": "41aff4c08572a384f15ec113f0e41add8b936b69",
+    "parent": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+    "sourceBlob": "e2c0a834f2a4ef8cb10c836302f0929f02db6051",
+    "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb"
+  },
+  "appPath": "app/actions/task-runs.ts",
+  "testPath": "tests/action-read-egress.db.test.ts",
+  "originalTestBytes": 37665,
+  "originalTestBlob": "91ff7f3c0d47a085162bab67aa9604ff6836c14a",
+  "expectedTests": 16,
+  "expectedRedName": "the real task-run action reads no team metadata and still reads current tenant membership",
+  "expectedRedParent": "task-run visibility skips unused team metadata without weakening fresh workspace authority",
+  "expectedRedMessage": "task runs consume only the predicate, never team settings or link pages",
+  "driverSha256": "36ffce799cffe19b49ed695cacd3068983e0f4ea09d00a7eb7123eb7b12b3e1b",
+  "runtime": {
+    "node": "24.22.2",
+    "pnpm": "10.34.3",
+    "postgres": "17",
+    "jobMinutes": 30,
+    "runnerCount": 1
+  },
+  "policy": {
+    "actionsCache": false,
+    "persistentPnpmCache": false,
+    "nodeCompileCache": false,
+    "tsxDiskCache": false,
+    "productionAccess": false,
+    "productionSecrets": false,
+    "rerun": false,
+    "nativeRun": false,
+    "onlyLoopbackDatabase": true
+  },
+  "commonBlobs": {
+    "package.json": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+    "pnpm-lock.yaml": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+    "pnpm-workspace.yaml": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+    "tsconfig.json": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+    "scripts/run-db-tests.mjs": "061d3ad2527420a0de0098e03fdbed87509aedd8",
+    "scripts/setup-e2e-db.mjs": "aaf8571eae3dcdb2f88b0dba5feb5a0878e8af41",
+    "scripts/test-accounts/bootstrap.mjs": "3e29dba60095fb14a3efab57cd1571c6d3a8d8cb",
+    "scripts/test-accounts/environment.mjs": "ca7f18242173d25bf5e4afb8ade4d0387db656c7",
+    "tests/migrate-empty-db.test.mjs": "8b77ac4fb0757735c70af1fe0bc0e2a6a2744678",
+    "tests/fixtures/activity-runtime.mjs": "1f510854af9306cfb6b73b274d73a398f2bdfa05",
+    "tests/helpers/task-workspace.ts": "d5ab78b16f374eeb402e99778cd6839af1d3a4de",
+    "tests/helpers/e2e-target.mjs": "2627923cc99fe2e9c14d88e6949b59d49d5d1640",
+    "tests/support/workspace-admin-db.ts": "39a66afa93b60da2bf5385964786fe834584136c",
+    "lib/issue-visibility.ts": "8abe623866731df1ec998de9e77d15af568a90c9",
+    "lib/issue-team-access.ts": "47ff8b6d00ed227d8d9768a062a03784f2f19d76",
+    "apps/desktop/test/db-query-diagnostics.cjs": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+    "apps/desktop/test/db-query-operations.cjs": "9011b6edb7296c8872d3e311074529a49987b575",
+    "apps/desktop/test/db-query-unattributed-sources.cjs": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+  }
+}
