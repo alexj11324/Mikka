@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { taskStateOf, type TaskState as CanonicalTaskState, type TaskReason, type TaskStateRun } from '@/lib/task-state'
 import type { listIssues } from '../app/actions/issues'
 import type { Thread } from '../app/actions/task-runs'
-import { pendingTaskCount, tasksOf, TASK_GROUPS, type TaskState } from './use-bot-tasks'
+import type { TaskState } from './use-bot-tasks'
 import * as legacySlot from './use-bot-tasks'
 import { inboxCount, inboxSelection, localTaskState, pendingTaskCount, tasksOf, TASK_GROUPS } from './use-bot-tasks'
 
