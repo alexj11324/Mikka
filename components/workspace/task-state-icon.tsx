@@ -23,9 +23,9 @@ const STATE_TONES: Record<TaskState, StatusTone> = {
 }
 
 /** A task's own state icon; never a run's result or its thread group. */
-export function TaskStateIcon({ state, className }: { state: TaskState; className?: string }) {
+export function TaskStateIcon({ state }: { state: TaskState }) {
   const Icon = STATE_ICONS[state]
-  return <Icon aria-hidden="true" data-task-state={state} className={cn('size-3.5 shrink-0', statusIconTints[STATE_TONES[state]], className)} />
+  return <Icon aria-hidden="true" data-task-state={state} className={cn('size-3.5 shrink-0', statusIconTints[STATE_TONES[state]])} />
 }
 
 /** A task state's words, as its rows lead with them: the reason it waits when there is one, else the state's name. */

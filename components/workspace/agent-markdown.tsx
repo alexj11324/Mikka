@@ -74,7 +74,7 @@ const components: NonNullable<ComponentProps<typeof Markdown>['components']> = {
   a: ({ node: _node, ...props }) => <CitationAnchor {...props} />,
   img: MarkdownImage,
   pre: MarkdownPre,
-  code: ({ node: _node, ...props }) => <code {...props} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]" />,
+  code: ({ node: _node, ...props }) => <code {...props} className="rounded bg-muted px-1 py-0.5 font-mono text-sm" />,
   table: MarkdownTable,
   thead: ({ node: _node, ...props }) => <TableHeader {...props} />,
   tbody: ({ node: _node, ...props }) => <TableBody {...props} />,
