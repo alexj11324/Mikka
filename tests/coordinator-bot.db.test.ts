@@ -101,6 +101,81 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     return { pid, resume, settled, reached }
   }
 
+  for (const legacyEvent of [false, true]) await t.test(
+    legacyEvent ? 'a captured legacy event still runs the execution migration' : 'an empty execution family skips its recursive update after every NOWAIT read',
+    async () => {
+      const p = await person(legacyEvent ? 'cost-event' : 'cost-empty')
+      const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+      const eventId = legacyEvent ? await sourceEvent(p.id) : null
+      await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,NULL,1,'{"role":"user","content":"old chat still moves"}')`, [randomUUID(), p.id])
+      await pool.query(`INSERT INTO chat_preferences ("userId","chatKey",muted) VALUES ($1,'coordinator',true)`, [p.id])
+      const tx = await pool.connect()
+      const statements: string[] = []
+      const originalQuery = tx.query, release = tx.release, query = tx.query.bind(tx)
+      tx.query = (async (text: string, values?: unknown[]) => {
+        statements.push(text)
+        return query(text, values)
+      }) as PoolClient['query']
+      tx.release = () => { tx.query = originalQuery; tx.release = release; release.call(tx) }
+      await bots.backfillCoordinatorChat({ connect: async () => tx } as Pick<import('pg').Pool, 'connect'>, p.id, coordinator)
+      const lockOrder = ['SELECT i.id FROM issues', 'SELECT id FROM factory_tasks', 'SELECT id FROM coordinator_events', 'SELECT id FROM agent_runs']
+        .map(prefix => statements.findIndex(statement => statement.startsWith(prefix)))
+      assert.ok(lockOrder.every((index, i) => index >= 0 && (i === 0 || index > lockOrder[i - 1])), 'all original NOWAIT reads run in their original order')
+      assert.equal(statements.filter(statement => statement.startsWith('WITH RECURSIVE')).length, legacyEvent ? 1 : 0)
+      assert.deepEqual((await messageRows(p.id)).rows.map(row => [row.botId, row.text]), [[coordinator.botId, 'old chat still moves']])
+      assert.deepEqual((await pool.query('SELECT "chatKey",muted FROM chat_preferences WHERE "userId"=$1', [p.id])).rows, [{ chatKey: coordinator.botId, muted: true }])
+      if (eventId) assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: coordinator.botId }])
+    },
+  )
+
+  await t.test('stale attention reads only settlement fields and preserves the decision input and owner log', async st => {
+    const p = await person('cost-attention')
+    const now = new Date('2030-01-02T12:00:00.000Z')
+    const earlier = new Date(now.getTime() - 45 * 60_000)
+    const matterId = randomUUID(), pendingId = randomUUID()
+    st.after(() => pool.query('DELETE FROM attention_matters WHERE "userId"=$1', [p.id]))
+    for (const id of [matterId, pendingId]) {
+      await pool.query(`INSERT INTO attention_matters(id,"userId","matterKey",source,title,level,assessment,evidence,state,reason,"personAsked",recheck,handoffs,"handedAt","updatedAt")
+        VALUES($1::uuid,$2,$1::text,'github','Renew the domain','high',$3,$3,'handed','deadline approaching',true,true,1,$4,$4)`,
+      [id, p.id, { unusedLargeSource: 'x'.repeat(30_000) }, earlier])
+      await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier,"deliveredAt")
+        VALUES($1,$2,'matter_handoff',$3,'{}','attention',$4)`,
+      [randomUUID(), p.id, `matter_handoff:${id}:1`, id === matterId ? earlier : null])
+    }
+    await pool.query(`INSERT INTO attention_log(id,"userId","matterId",action,spends,"createdAt") VALUES($1,$2,$3,'notify',true,$4)`,
+      [randomUUID(), p.id, matterId, new Date(now.getTime() - 5 * 60_000)])
+    const { releaseAttention } = await import('../lib/attention/store')
+    const { settleInput, settleQuestions } = await import('../lib/attention/interrupt')
+    const observed: Array<{ owner: string; purpose: string; input: string; questions: unknown }> = []
+    const statements: string[] = []
+    const originalQuery = appPool.query, query = appPool.query.bind(appPool)
+    appPool.query = (async (text: string, values?: unknown[]) => {
+      statements.push(typeof text === 'string' ? text : (text as unknown as { text: string }).text)
+      return query(text, values)
+    }) as typeof appPool.query
+    try {
+      assert.equal(await releaseAttention(p.id, now, async (owner, purpose, input, questions) => {
+        observed.push({ owner, purpose, input, questions })
+        return new Map([['settle', { type: 'choice' as const, name: 'settle', choice: 'quiet' }]])
+      }), false)
+    } finally { appPool.query = originalQuery }
+    assert.deepEqual(observed, [{
+      owner: p.id, purpose: 'attention-settle',
+      input: settleInput({ id: matterId, title: 'Renew the domain', level: 'high', reason: 'deadline approaching', personAsked: true, recheck: true, minutesWaiting: 45 }, { today: 1, minutesSinceLast: 5 }, now),
+      questions: settleQuestions(),
+    }])
+    const staleRead = statements.filter(statement => statement.includes('from "attention_matters"') && statement.includes('"handedAt"'))
+    assert.equal(staleRead.length, 1, 'one real stale-row query')
+    const projection = staleRead[0].split(' from ')[0]
+    assert.doesNotMatch(projection, /"assessment"|"evidence"/, 'unused large source fields never cross the database boundary')
+    assert.match(projection, /"userId"/)
+    assert.deepEqual((await pool.query('SELECT state,reason,"updatedAt" FROM attention_matters WHERE id=$1', [matterId])).rows, [{ state: 'quiet', reason: 'no decision recorded', updatedAt: now }])
+    assert.deepEqual((await pool.query('SELECT "userId","matterId",action,spends,reason FROM attention_log WHERE "matterId"=$1 AND action=\'quiet\'', [matterId])).rows,
+      [{ userId: p.id, matterId, action: 'quiet', spends: false, reason: 'no decision recorded' }])
+    assert.equal((await pool.query('SELECT state FROM attention_matters WHERE id=$1', [pendingId])).rows[0].state, 'handed', 'an undelivered handoff is not settled')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM attention_log WHERE "matterId"=$1', [pendingId])).rows[0].n, 0)
+  })
+
   await t.test('existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing', async () => {
     const p = await person('backfill')
     const agent = await seedAgent(pool, p.id)

@@ -7,6 +7,7 @@ import { count, dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seed
 
 test('workspace settings backend', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
+  const { seedPersonalWorkspace } = await import('./support/workspace-admin-db')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { WorkspaceError } = await import('../lib/workspace-access')
   const general = await import('../lib/workspace-admin/general')
@@ -99,8 +100,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
 
   await t.test('a personal workspace has its 常规 but is neither transferred nor deleted (decision 2026-11-02-0203)', async () => {
     const owner = await seedUser(pool, 'personal-owner')
-    const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
-    await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
+    const ws = { id: await seedPersonalWorkspace(pool, owner) }
     const read = await general.readWorkspaceGeneral(owner, ws.id)
     assert.equal(read.personal, true)
     assert.equal(read.canEdit, true, 'its own name, icon and address stay editable')
@@ -211,6 +211,28 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal(await count(pool, 'model_api_keys where "ownerId"=$1', [member]), 2, 'the API keys themselves are the member\'s')
   })
 
+
+  await t.test('workspace deletion removes task artifacts when their run has no Bot', async () => {
+    const admin = await seedUser(pool, 'artifact-delete-admin')
+    const workspace = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }], 'Artifact deletion')
+    const keep = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }], 'Keep artifacts')
+    const seed = async (workspaceId: string) => {
+      const issueId = await seedIssue(pool, admin, workspaceId)
+      const agentId = await seedAgent(pool, admin)
+      const runId = await seedRun(pool, { userId: admin, agentId, issueId, workspaceId })
+      const artifactId = randomUUID()
+      await pool.query(`INSERT INTO artifacts(id,"userId","workspaceId",kind,title,"runId","issueId") VALUES($1,$2,$3,'markdown','Acceptance',$4,$5)`, [artifactId, admin, workspaceId, runId, issueId])
+      return { issueId, runId, artifactId }
+    }
+    const doomed = await seed(workspace.id), retained = await seed(keep.id)
+    await general.deleteWorkspaceData(admin, workspace.id, workspace.name)
+    assert.equal(await count(pool, 'issues where id=$1', [doomed.issueId]), 0)
+    assert.equal(await count(pool, 'agent_runs where id=$1', [doomed.runId]), 0)
+    assert.equal(await count(pool, 'artifacts where id=$1', [doomed.artifactId]), 0)
+    assert.equal(await count(pool, 'issues where id=$1', [retained.issueId]), 1)
+    assert.equal(await count(pool, 'agent_runs where id=$1', [retained.runId]), 1)
+    assert.equal(await count(pool, 'artifacts where id=$1', [retained.artifactId]), 1)
+  })
 
   await t.test('workspace deletion counts persisted tenant tasks without Team links and never follows a foreign link', async () => {
     const admin = await seedUser(pool, 'ungrouped-admin'), member = await seedUser(pool, 'ungrouped-member')

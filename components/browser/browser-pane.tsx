@@ -62,7 +62,8 @@ const LOCATION_SCRIPT = `(${locationScript.toString()})()`
  * the person drag a box over the frame instead: the note carries the URL and
  * that box, nothing read from the page.
  */
-export function BrowserPane({ onClose }: { onClose: () => void }) {
+/** `inTab`: drawn as a tab of the conversation's work area (FRAME_OWNS_PANEL), filling it, with no edge of its own. */
+export function BrowserPane({ onClose, inTab = false }: { onClose: () => void; inTab?: boolean }) {
   const t = useTranslations('Browser')
   const tCommon = useTranslations('Common')
   const tRoles = useTranslations('Artifact.roles')
@@ -256,7 +257,7 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
   const tool = (label: string, icon: ReactNode, props: { onClick?: () => void; disabled?: boolean; pressed?: boolean }) =>
     <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', props.pressed && pressed)} aria-label={label} aria-pressed={props.pressed} disabled={props.disabled} onClick={props.onClick} />}>{icon}</TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
 
-  return <ResizablePane render="aside" aria-label={t('label')} data-slot="browser-pane" storageKey="mikka:browser-width" defaultWidth={560} min={360} max="half" edge="start" label={tCommon('resize.browser')} className="flex min-h-0 shrink-0 flex-col border-l bg-background">
+  const content = <>
     <div className="flex h-11 shrink-0 items-center gap-0.5 px-2">
       {tool(t('back'), <ArrowLeft data-icon="inline-start" />, { onClick: () => go(-1), disabled: history.index <= 0 })}
       {tool(t('forward'), <ArrowRight data-icon="inline-start" />, { onClick: () => go(1), disabled: history.index >= history.entries.length - 1 })}
@@ -289,5 +290,7 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
         </InputGroup>
       </form>}
     </div>
-  </ResizablePane>
+  </>
+  if (inTab) return <section aria-label={t('label')} data-slot="browser-pane" className="flex size-full min-h-0 flex-col bg-background">{content}</section>
+  return <ResizablePane render="aside" aria-label={t('label')} data-slot="browser-pane" storageKey="mikka:browser-width" defaultWidth={560} min={360} max="half" edge="start" label={tCommon('resize.browser')} className="flex min-h-0 shrink-0 flex-col border-l bg-background">{content}</ResizablePane>
 }

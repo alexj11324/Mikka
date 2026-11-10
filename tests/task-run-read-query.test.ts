@@ -96,7 +96,17 @@ test('task runs fetch owner bot looks with the bounded latest issue rows in one 
   assert.match(text, /from \(select distinct on \("agent_runs"\."issueId"\)/)
   assert.match(text, /order by "agent_runs"\."issueId", "agent_runs"\."createdAt" desc, "agent_runs"\."id" desc limit \$\d+\) "latest_task_runs" left join "bots"/)
   assert.match(text, /left join "bots" on \("bots"\."id" = "botId" and "bots"\."ownerId" = \$\d+ and "bots"\."workspaceId" = \$\d+\)/)
-  assert.equal(params.filter(value => value === OWNER).length, 2, 'both the latest rows and bot looks are owner constrained')
+  const bindingValue = (pattern: RegExp) => {
+    const match = text.match(pattern)
+    assert.ok(match, `expected authorization binding: ${pattern}`)
+    return params[Number(match[1]) - 1]
+  }
+  assert.equal(bindingValue(/"agent_runs"\."userId" = \$(\d+)/), OWNER, 'the latest run rows remain owned by the reader')
+  assert.equal(bindingValue(/"bots"\."ownerId" = \$(\d+)/), OWNER, 'bot decoration independently keeps its owner boundary')
+  const acl = text.match(/mikka_resource_acl_allowed\('account', \$(\d+), "issues"\."workspaceId", \$(\d+), "issues"\."id", \$(\d+)\)/)
+  assert.ok(acl, 'the resource check binds the exact task and its tenant')
+  assert.deepEqual(acl.slice(1).map(slot => params[Number(slot) - 1]), [OWNER, 'task', 'canReadContent'], 'resource ACL evaluates the actual reader and content action')
+  assert.equal(params.filter(value => value === OWNER).length, 3, 'only the run owner, bot owner and ACL actor bindings name the reader')
   assert.ok(params.includes(200), 'the original issue-row cap is applied before bot decoration')
   assert.match(text, /where \("agent_runs"\."userId" = \$\d+ and "agent_runs"\."workspaceId" = \$\d+ and /)
   assert.match(text, /"issues"\."ownershipState" = \$\d+/)

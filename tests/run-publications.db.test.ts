@@ -706,11 +706,13 @@ test('run result publication commits one owner-scoped result through retries and
 
     await t.test('opening the owner PR records the repository installation; a failed record never blocks the PR', async () => {
       const { createOwnerPullRequestOpener } = await import('../lib/run-publications')
-      const github = (f: Fixture, installations: 'ok' | 'down') => {
+      const observed = new Map<string, { creates: number; details: number }>()
+      const github = (f: Fixture, installations: 'ok' | 'down', details: 'ok' | 'down' = 'ok') => {
         const [, , owner, repo] = f.remoteKey.split('/')
         const marker = `<!-- mikka-issue:${f.issueId} -->`
-        const pr = { number: 9, html_url: `https://github.com/${owner}/${repo}/pull/9`, state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: f.branch, repo: { id: 4242 } }, base: { repo: { id: 4242 } } }
+        const pr = { number: 9, html_url: `https://github.com/${owner}/${repo}/pull/9`, state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: f.branch, sha: 'a'.repeat(40), repo: { id: 4242 } }, base: { repo: { id: 4242 } } }
         let created = false
+        const requests = { creates: 0, details: 0 }; observed.set(f.runId, requests)
         return (async (input: string | URL | Request, init?: RequestInit) => {
           const url = new URL(String(input))
           assert.equal(url.origin, 'https://api.github.com')
@@ -721,7 +723,14 @@ test('run result publication commits one owner-scoped result through retries and
             : Response.json({ installations: [{ id: 1, app_id: 999, account: { login: owner }, suspended_at: null }, { id: 77, app_id: 123, account: { login: owner }, suspended_at: null }] })
           if (url.pathname.endsWith(`/git/ref/heads/${f.branch}`)) return Response.json({ object: { sha: 'a'.repeat(40) } })
           if (url.pathname.endsWith('/pulls') && (init?.method ?? 'GET') === 'GET') return Response.json(created ? [pr] : [])
-          if (url.pathname.endsWith('/pulls')) { created = true; return Response.json(pr, { status: 201 }) }
+          if (url.pathname.endsWith('/pulls')) { created = true; requests.creates++; return Response.json(pr, { status: 201 }) }
+          if (url.pathname.endsWith('/pulls/9')) {
+            requests.details++
+            return details === 'down' ? Response.json({ message: 'synthetic-detail-secret' }, { status: 502 })
+              : Response.json({ ...pr, additions: 3, deletions: 1, changed_files: 1 })
+          }
+          if (url.pathname.endsWith('/check-runs')) return Response.json({ total_count: 0, check_runs: [] })
+          if (url.pathname.endsWith('/status')) return Response.json({ sha: 'a'.repeat(40), total_count: 0, statuses: [] })
           throw new Error(`Unexpected ${url.pathname}`)
         }) as typeof fetch
       }
@@ -738,6 +747,11 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await publishRunResult(f.runId, createOwnerPullRequestOpener({ credential: credential(f), fetcher: github(f, 'ok'), env: { GITHUB_APP_ID: '123' } })), { done: true })
       assert.equal((await receipt(f)).status, 'published')
       assert.deepEqual(await row(f), { githubAccountId: f.githubAccountId, installationId: '77', repositoryId: '4242', pushGrantedAt: null })
+      const full = (await receipt(f)).pullRequest
+      assert.equal(full.branch, f.branch); assert.equal(full.headSha, 'a'.repeat(40))
+      assert.equal(full.additions, 3); assert.equal(full.deletions, 1); assert.equal(full.changedFiles, 1)
+      assert.equal(full.reviewChecks.complete, true)
+      assert.deepEqual(observed.get(f.runId), { creates: 1, details: 1 })
 
       const down = await ready()
       const logged: string[] = []
@@ -750,6 +764,19 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(await row(down), undefined)
       assert.deepEqual(logged.map(line => JSON.parse(line)), [{ event: 'github_installation_record_failed', code: 'github_502' }])
       assert.doesNotMatch(logged.join(''), /synthetic-owner-token/)
+
+      const optional = await ready()
+      const opener = createOwnerPullRequestOpener({ credential: credential(optional), fetcher: github(optional, 'ok', 'down'), env: { GITHUB_APP_ID: '123' } })
+      assert.deepEqual(await publishRunResult(optional.runId, opener), { done: true })
+      const retained = await receipt(optional)
+      assert.equal(retained.status, 'published', 'optional metadata failure cannot undo an already verified external publication')
+      assert.equal(retained.pullRequest.url.endsWith('/pull/9'), true)
+      assert.equal(retained.pullRequest.headSha, 'a'.repeat(40)); assert.equal(retained.pullRequest.branch, optional.branch)
+      assert.equal(retained.pullRequest.additions, undefined); assert.equal(retained.pullRequest.changedFiles, undefined)
+      assert.equal(retained.pullRequest.reviewChecks, null, 'refused metadata stays unknown')
+      assert.deepEqual(await row(optional), { githubAccountId: optional.githubAccountId, installationId: '77', repositoryId: '4242', pushGrantedAt: null })
+      assert.deepEqual(await publishRunResult(optional.runId, opener), { done: true }, 'database publication replay does not touch GitHub')
+      assert.deepEqual(observed.get(optional.runId), { creates: 1, details: 1 })
     })
 
     await t.test('Plugins › GitHub settings gate nothing: a stored deny or ask still opens the pull request with no card', async () => {

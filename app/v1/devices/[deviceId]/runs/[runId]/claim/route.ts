@@ -1,3 +1,4 @@
+import { withFactoryQuestionDeliveryContext } from '@/lib/factory/questions/continuation-delivery-context'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { CodedError, causeFields, logCodedError } from '@mikka/protocol/coded-error'
 import { serverRunFailure } from '@/lib/run-failure-details'
@@ -426,7 +427,9 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, run.continuesRunId), eq(agentRuns.userId, caller.userId), eq(agentRuns.issueId, issueId))).limit(1)
     : []
   const earlierHarness = earlier?.agentDefinition?.harness ?? (earlier?.agentDefinition == null && earlier?.agentId === run.agentId ? agent.harness : undefined)
-  const followUp = earlier ? continuationFollowUp(run.prompt) : null
+  const followUp = earlier ? run.agentDefinition?.workspaceReview
+    ? await (await import('@/lib/coding-workspace/diff/feedback-brief')).reviewBatchFollowUp(pool, run)
+    : continuationFollowUp(run.prompt) : null
   const threadContinuation = earlier && run.continuesRunId
     ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId && earlierHarness === harness && profileNativeSessionMatches(earlier.agentDefinition, run.agentDefinition) ? { resumeSessionId: earlier.sessionId } : {}) }
     : {}
@@ -525,7 +528,12 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(taskSecrets ? { taskSecrets } : {}),
     ...threadContinuation,
     ...retry,
-    ...factoryClaim,
+    ...withFactoryQuestionDeliveryContext(factoryClaim, {
+      issueId: run.issueId, kind: current.kind, readOnly: assignmentPolicy.readOnly,
+      gitPush: assignmentPolicy.permissions.git_push,
+      repository: githubConnected && githubRepository ? repo.repoPath.slice('v2/github.com/'.length) : undefined,
+      branch: publication?.pushBranch, baseBranch: run.baseBranch ?? undefined,
+    }),
     ...skillAssignment,
     ...benchmarkAssignment,
     policy: assignmentPolicy,

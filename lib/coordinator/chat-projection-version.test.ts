@@ -49,12 +49,19 @@ const database = drizzle(async (query, params) => {
 })
 
 const unused = () => { throw new Error('unexpected_projection_version_dependency') }
-mock.module('@/lib/db', { namedExports: { db: database } })
-// Run the real task-workspace guard against a separate, strict WS executor.
-// This fixture must not authorize a chat from its APP Bot row alone.
+mock.module('@/lib/db', { namedExports: { db: database, pool: { query: unused, connect: unused } } })
+// Keep the real chatReader and tenant check; this transport models only this
+// owner's active Personal Workspace, alongside the existing opaque chat rows.
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
 const workspaceDatabase = drizzle(async (query, params) => {
-  workspaceReads.push(query)
-  assert.equal(query, 'select "mikka_workspaces"."id", "mikka_workspaces"."kind" from "mikka_workspaces" inner join "mikka_workspace_members" on "mikka_workspace_members"."workspaceId" = "mikka_workspaces"."id" where ("mikka_workspace_members"."userId" = $1 and "mikka_workspace_members"."status" = $2 and "mikka_workspaces"."id" = $3 and ("mikka_workspaces"."kind" = $4 or ("mikka_workspaces"."kind" = $5 and "mikka_workspaces"."userId" = $6))) order by "mikka_workspaces"."createdAt" asc')
+  let actualSql = query
+  // This is the real Drizzle transport SQL: only fixed aliases are expanded,
+  // then every base table, column, JOIN and owner/tenant predicate is checked.
+  for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+    actualSql = actualSql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+      .replaceAll('"' + name + '".', '"' + table + '".')
+  }
+  assert.equal(actualSql, expectedMembershipSql)
   assert.deepEqual(params, [owner, 'active', workspaceId, 'team', 'personal', owner])
   return { rows: membershipActive ? [[workspaceId, 'team']] : [] }
 })
@@ -74,7 +81,7 @@ for (const [path, exports] of [
   ['./triage', { eventsForInbox: unused, isolateTaskRequest: unused }],
   ['@/lib/task-identifier-server', { taskIdentifiers: unused }],
   ['@/lib/artifacts/store', { artifactSummaries: async () => ({}) }],
-  ['@/lib/preferences', { readPreferences: unused }],
+  ['@/lib/preferences', { readPreferences: unused, readCoordinatorPromptPreferences: unused }],
   ['./triage-batch', { TRIAGE_RETRY_COOLDOWN_MS: 60_000 }],
   ['@/lib/schedules/store', { scheduledInbox: unused }],
   ['../live/chats', { botChatChanged: unused }],

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { copyRunPrompt } from '../../run-prompt-copy'
 import type { PoolClient } from 'pg'
 import type { agentRuns } from '../../db/schema'
 import { retryWorkerDefinition } from '../../agent-kit/worker'
@@ -29,7 +30,8 @@ export async function queueLocalQuestionContinuation(
     FOR UPDATE OF r FOR SHARE OF e`, [context.questionOriginRunId,userId,input.issueId,input.agentId,input.deviceRepoId,botId,context.attemptId,context.sourceEventId])
   if (!origin?.agentDefinition?.executionIdentity || !origin.deviceId || !origin.deviceRepoId || !origin.issueId)
     throw new FactoryError('factoryQuestionContinuationUnavailable')
-  const prompt = `${origin.prompt}\n\n${input.note ?? ''}`
+  const copied = copyRunPrompt(origin, `${origin.prompt}\n\n${input.note ?? ''}`)
+  const { prompt } = copied
   const definition = retryWorkerDefinition(origin.agentDefinition, prompt)!
   // Revalidate the frozen executionIdentity (including its original workspace,
   // exact subscription/key and current revocation state), never mint a new one
@@ -37,7 +39,7 @@ export async function queueLocalQuestionContinuation(
   const result = await acceptLocalRun({
     id: randomUUID(), userId, botId: origin.botId, issueId: origin.issueId,
     agentId: origin.agentId, deviceId: origin.deviceId, deviceRepoId: origin.deviceRepoId,
-    source: origin.source, prompt, definition, continuation: true, sourceRunId: origin.id,
+    source: origin.source, ...copied, definition, continuation: true, sourceRunId: origin.id,
     requestEventId: definition.repositoryAdmission?.requestEventId,
   }, tx)
   const { recordFactoryDispatchFailure } = await import('../dispatch-recovery')

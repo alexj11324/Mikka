@@ -29,6 +29,8 @@ import { assertFrozenProjectExecution, assertProjectExecutionTarget, requireProj
  * recovery admission independently of the parent computer's current state. */
 export async function queueCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, input: {
   botId: string; issueId: string; agentId: string; deviceRepoId: string; title: string; body: string; note?: string
+  /** Host recovery guidance belongs to execution instructions, never the person's run note. */
+  executionNote?: string
   /** The run keeps no bot of its own, like the run it continues (an MCP client's): it still runs on `botId`'s computer. */
   withoutBot?: boolean
   /** Required (lib/computer/run-model.ts): a new run's from 优先使用的模型, a thread's next run its own. Never 'auto' or empty. */
@@ -96,7 +98,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const { rows: [repository] } = await client.query<{ repoPath: string; remoteUrl: string | null }>('SELECT "repoPath","remoteUrl" FROM device_repos WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 FOR SHARE', [input.deviceRepoId, actor.userId, target.deviceId])
     if (!repository) throw new ComputerError(409, 'Bot computer task is unavailable')
     assertProjectExecutionTarget(projectExecution, { userId: actor.userId, workspaceId: actor.workspaceId, repositoryKey: repository.remoteUrl ? repository.repoPath : null, runtime: 'cloud', harness: target.harness })
-    const instructions = [target.instructions, input.agentProfile?.instructions].filter(Boolean).join('\n\n')
+    const instructions = [target.instructions, input.agentProfile?.instructions, input.executionNote].filter(Boolean).join('\n\n')
     const { prompt, taskLength: promptTaskLength } = runPromptParts(input.title, input.body, instructions, input.note)
     if (digest) {
       const priorRun = (await client.query(`SELECT r."userId",r."issueId",r."agentId",r."deviceId",r."deviceRepoId",r.prompt,r."agentDefinition",r."dispatchFingerprint",r."botId" AS "runBotId",b."botId",b."workspaceId"

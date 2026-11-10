@@ -55,9 +55,9 @@ function scalar(value: unknown): unknown {
 }
 type Usage = Pick<GenerationMetrics, keyof typeof USAGE>
 type Request = { start?: bigint; model?: string; conversation?: string; streamRequest?: string; receivingStream?: string; invalid?: boolean }
-type Handler = { stream: string; added: boolean; usage?: Usage; effort?: GenerationMetrics['effort'] }
+type Handler = { stream: string; added: boolean; completed?: boolean; usage?: Usage; effort?: GenerationMetrics['effort'] }
 type Pair = { handler?: Handler; received?: bigint }
-type Stream = { request?: string; firstOutput?: bigint; completed?: { key: string; at: bigint; usage: Usage; effort?: GenerationMetrics['effort'] } }
+type Stream = { request?: string; firstOutput?: bigint; completed?: { key: string; at: bigint; usage?: Usage; effort?: GenerationMetrics['effort'] } }
 type Fallback = { value: GenerationMetrics; count: number }
 type Emit = (value: GenerationMetrics) => void
 export type CodexGenerationReceipt = {
@@ -152,8 +152,9 @@ export class CodexGenerationCollector {
     if (!trace || !span || (!parent && name !== 'try_run_sampling_request') || start === undefined || end === undefined || end < start) { this.counts.invalidSpans++; return }
     const key = `${trace}:${span}`, parentKey = `${trace}:${parent}`
     const fields: Record<string, unknown> = {}
-    if (Array.isArray(raw?.attributes) && raw.attributes.length <= 128) {
-      for (const item of raw.attributes) {
+    const attributes = Array.isArray(raw?.attributes) && raw.attributes.length <= 128 ? raw.attributes : undefined
+    if (attributes) {
+      for (const item of attributes) {
         const attribute = object(item)
         if (typeof attribute?.key === 'string' && FIELDS.has(attribute.key)) fields[attribute.key] = scalar(attribute.value)
       }
@@ -193,22 +194,31 @@ export class CodexGenerationCollector {
       else {
         const usage: Usage = {}
         if (name === 'completed') for (const [property, attribute] of Object.entries(USAGE)) usage[property as keyof Usage] = number(fields[attribute])
-        pair.handler = { stream: parentKey, added: fields.from === 'output_item_added',
+        const fullUsage = name === 'completed' && Object.keys(USAGE).every(key => usage[key as keyof Usage] !== undefined)
+        // Official 0.163 also completes responses with usage=None. Require raw
+        // key absence, not invalid scalars or a list we could not safely read.
+        const noUsage = name === 'completed' && attributes !== undefined
+          && attributes.every(item => typeof object(item)?.key === 'string')
+          && Object.values(USAGE).every(key => !Object.hasOwn(fields, key))
+        const handler: Handler = { stream: parentKey, added: fields.from === 'output_item_added',
           ...(name === 'completed' ? { effort: generationEffort(fields['codex.request.reasoning_effort']) } : {}),
-          // Fixed 0.163 supplies all four counts, including genuine zeros.
+          ...(fullUsage || noUsage ? { completed: true } : {}),
           // A partial tuple cannot safely cancel its full app-server receipt.
-          ...(name === 'completed' && Object.keys(USAGE).every(key => usage[key as keyof Usage] !== undefined) ? { usage } : {}) }
+          ...(fullUsage ? { usage } : {}) }
+        // An empty replay must not erase usage before the receiving child arrives.
+        if (!pair.handler?.completed || (handler.completed && (!pair.handler.usage || handler.usage))) pair.handler = handler
       }
       if (pair.handler && pair.received !== undefined) {
         this.pairs.delete(pairKey)
         const handler = pair.handler
-        if (!handler.added && !handler.usage) return
+        if (!handler.added && !handler.completed) return
         const stream = this.streams.get(handler.stream) ?? {}
         if (handler.added && (stream.firstOutput === undefined || pair.received < stream.firstOutput)) stream.firstOutput = pair.received
-        if (handler.usage) {
+        if (handler.completed) {
           if (stream.completed && stream.completed.key !== pairKey) { this.truncate(); return }
           if (stream.completed) this.counts.duplicateCompletions++
-          stream.completed = { key: pairKey, at: pair.received, usage: handler.usage, effort: handler.effort }
+          if (!stream.completed?.usage || handler.usage)
+            stream.completed = { key: pairKey, at: pair.received, usage: handler.usage, effort: handler.effort }
         }
         this.streams.set(handler.stream, stream)
       } else this.pairs.set(pairKey, pair)
@@ -233,11 +243,14 @@ export class CodexGenerationCollector {
         firstOutputMs, ttftMs: firstOutputMs,
         ...(firstOutputMs === undefined ? {} : { ttftBasis: 'request_to_first_output_item' as const }),
         timingBasis: 'official_cli_trace', modelBasis: 'native_sampling_config', outcome: 'ok' }
-      const signature = this.signature(value, request.conversation), fallback = this.fallback.get(signature)
-      if (fallback) {
-        if (--fallback.count === 0) this.fallback.delete(signature)
-        this.fallbackCount--; this.counts.matchedFallbacks++
-      } else this.unmatchedNative.set(signature, (this.unmatchedNative.get(signature) ?? 0) + 1)
+      // Missing numbers are not a numeric receipt and must never cancel one.
+      if (end.usage) {
+        const signature = this.signature(value, request.conversation), fallback = this.fallback.get(signature)
+        if (fallback) {
+          if (--fallback.count === 0) this.fallback.delete(signature)
+          this.fallbackCount--; this.counts.matchedFallbacks++
+        } else this.unmatchedNative.set(signature, (this.unmatchedNative.get(signature) ?? 0) + 1)
+      }
       this.completed.add(stream.request!)
       this.counts.nativeGenerations++
       this.streams.delete(key); this.requests.delete(stream.request!)

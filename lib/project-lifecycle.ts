@@ -6,6 +6,7 @@ import { projects, projectEvents } from '@/lib/db/projects'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { accessibleProjects, requireProjectWrite, type ProjectReader, type ProjectTransaction } from '@/lib/project-access'
 import { lockTeamRelations } from '@/lib/team-access'
+import { withResourceAccess } from '@/lib/resource-access/store'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { projectMapChanged } from '@/lib/live/project-map'
@@ -54,10 +55,15 @@ async function contents(tx: ProjectTransaction, project: Project, workspaceId: s
     canDelete: Object.values(counts).every(count => count === 0), recovery: 'restore_archive' }
 }
 
-async function lockedProject<T>(reader: ProjectReader, workspaceId: string, id: string, operation: (tx: ProjectTransaction, project: Project) => Promise<T>) {
+async function lockedProject<T>(reader: ProjectReader, workspaceId: string, id: string,
+  action: 'canReadContent' | 'canSteer', operation: (tx: ProjectTransaction, project: Project) => Promise<T>) {
+  // Keep the established Workspace -> relations -> APP ACL lock order shared
+  // with Project mutations; taking the ACL first can deadlock a concurrent
+  // relation edit that is waiting on the same Project policy.
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     await lockTeamRelations(tx)
-    return operation(tx, await requireProjectWrite(tx, reader, id, workspaceId, { allowArchived: true }))
+    return withResourceAccess(reader, { kind: 'project', id, workspaceId }, action,
+      async () => operation(tx, await requireProjectWrite(tx, reader, id, workspaceId, { allowArchived: true })))
   })
 }
 
@@ -69,13 +75,13 @@ async function journal(tx: ProjectTransaction, project: Project, reader: Project
 }
 
 export async function projectLifecycleImpact(reader: ProjectReader, workspaceId: string, id: string) {
-  return lockedProject(reader, workspaceId, id, (tx, project) => contents(tx, project, workspaceId))
+  return lockedProject(reader, workspaceId, id, 'canReadContent', (tx, project) => contents(tx, project, workspaceId))
 }
 
 /** Archive is independent of delivery status. Existing tasks, Runs, decisions
  * and bindings remain addressable; new admission fails until an explicit restore. */
 export async function setProjectArchive(reader: ProjectReader, workspaceId: string, input: { id: string; revision?: number; archived: boolean; message: string }) {
-  return lockedProject(reader, workspaceId, input.id, async (tx, project) => {
+  return lockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
     if (input.revision !== undefined && input.revision !== project.revision) throw new ActionFailureError('projectSaveConflict')
     if (Boolean(project.archivedAt) !== input.archived) {
       const actorId = taskReaderScope(reader).userId, updatedAt = new Date()
@@ -94,7 +100,7 @@ export async function setProjectArchive(reader: ProjectReader, workspaceId: stri
 /** A hard delete never becomes an implicit archive. History is not recoverable
  * by this API, so only a confirmed, truly unused Project may be removed. */
 export async function deleteProjectData(reader: ProjectReader, workspaceId: string, input: { id: string; revision: number; confirmation: string }) {
-  return lockedProject(reader, workspaceId, input.id, async (tx, project) => {
+  return lockedProject(reader, workspaceId, input.id, 'canSteer', async (tx, project) => {
     const [member] = await tx.select({ role: workspaceMembers.role }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, taskReaderScope(reader).userId)))
     if (member?.role !== 'admin') throw new ActionFailureError('workspaceAccessDenied')
@@ -104,6 +110,10 @@ export async function deleteProjectData(reader: ProjectReader, workspaceId: stri
     if (!impact.canDelete) throw new ActionFailureError('projectDeleteNotEmpty')
     const auditId = await journal(tx, project, reader, workspaceId, 'project.deleted', { counts: impact.counts })
     await tx.delete(projects).where(and(eq(projects.id, project.id), eq(projects.workspaceId, workspaceId)))
+    // The Project ACL lives in the APP database and has no source-delete
+    // trigger. Remove it inside the same authorization lease so a deleted ID
+    // cannot later be reused as an accessible Project.
+    await db.execute(sql`delete from resource_access_policies where kind='project' and id=${project.id} and "workspaceId"=${workspaceId}`)
     await workspaceListChanged(tx, workspaceId, ['workspace_settings'])
     return { deleted: true as const, projectId: project.id, auditId }
   })

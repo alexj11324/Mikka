@@ -6,14 +6,15 @@ import { requireIssueAccess, requireUser } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues, teamProjects } from '@/lib/db/team-schema'
 import { projects, projectEvents } from '@/lib/db/projects'
-import { accessibleProjects, requireProjectWrite } from '@/lib/project-access'
+import { accessibleProjects, accessibleProjectReferences, requireProjectWrite } from '@/lib/project-access'
 import { lockTeamRelations, requireActiveTeam } from '@/lib/team-access'
 import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 import { withTaskWorkspace } from '@/lib/task-workspace'
+import { withResourceAccess } from '@/lib/resource-access/store'
 import { ActionFailureError } from '@/lib/action-error'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
-import { pool } from '@/lib/db'
-import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
+import { db } from '@/lib/db'
+import { notifyStoppedPolicyRuns, runPolicyStopSQL, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 
 async function result<T>(operation: () => Promise<T>) {
   const t = await getTranslations()
@@ -39,21 +40,28 @@ export async function setIssueTeam(input: { issueId: string; teamId: string | nu
       const destination = input.teamId ? await requireActiveTeam(tx, input.teamId, user.id, false, workspace.id) : null
       if (destination && (workspace.kind === 'personal' || destination.workspaceId !== workspace.id)) throw new ActionFailureError('workspaceAccessDenied')
       // Project collaboration Teams are independent of the task's optional grouping.
-      const previousLists = await issueListScopesBeforeChange(issue)
-      if ((current?.teamId ?? null) !== (destination?.id ?? null)) await stopRunsForPolicyChange(pool, { kind: 'task', issueId: issue.id })
-      if (destination) await tx.insert(teamIssues).values({ issueId: issue.id, teamId: destination.id, workspaceId: workspace.id, userId: issue.userId })
-        .onConflictDoUpdate({ target: teamIssues.issueId, set: { teamId: destination.id, workspaceId: workspace.id } })
-      else await tx.delete(teamIssues).where(eq(teamIssues.issueId, issue.id))
-      if (current?.teamId !== destination?.id) await issueListScopeChanged(tx, issue.id, previousLists)
-      return input.teamId
+      return withResourceAccess(user, { kind: 'task', id: issue.id, workspaceId: workspace.id }, 'canSteer', async (_policy, app) => {
+        const previousLists = await issueListScopesBeforeChange(issue)
+        if ((current?.teamId ?? null) !== (destination?.id ?? null)) {
+          const stopped = await app.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId: issue.id }))
+          notifyStoppedPolicyRuns(app, stopped.rows)
+        }
+        if (destination) await tx.insert(teamIssues).values({ issueId: issue.id, teamId: destination.id, workspaceId: workspace.id, userId: issue.userId })
+          .onConflictDoUpdate({ target: teamIssues.issueId, set: { teamId: destination.id, workspaceId: workspace.id } })
+        else await tx.delete(teamIssues).where(eq(teamIssues.issueId, issue.id))
+        if (current?.teamId !== destination?.id) await issueListScopeChanged(tx, issue.id, previousLists)
+        return input.teamId
+      })
     })
   })
 }
 export async function listProjectTeams() {
   const user = await requireUser()
   const { workspace } = await loadWorkspaceContext(undefined, user)
-  const allowed = await accessibleProjects(user, workspaceDb, workspace.id)
-  return allowed.length ? workspaceDb.select().from(teamProjects).where(and(eq(teamProjects.workspaceId, workspace.id), inArray(teamProjects.projectId, allowed.map(project => project.id)))) : []
+  return withTaskWorkspace(user, workspace.id, async () => {
+    const allowed = await accessibleProjects(user, workspaceDb, workspace.id)
+    return allowed.length ? workspaceDb.select().from(teamProjects).where(and(eq(teamProjects.workspaceId, workspace.id), inArray(teamProjects.projectId, allowed.map(project => project.id)))) : []
+  })
 }
 export async function setProjectTeams(input: { projectId: string; revision: number; teamIds: string[]; primaryTeamId: string | null }) {
   return result(async () => {
@@ -62,6 +70,8 @@ export async function setProjectTeams(input: { projectId: string; revision: numb
     if (parsed.primaryTeamId && !ids.includes(parsed.primaryTeamId)) throw new ActionFailureError('issueMetadataInvalid')
     const user = await requireUser()
     const { workspace } = await loadWorkspaceContext(undefined, user)
+    const reference = (await accessibleProjectReferences(user, workspace.id)).find(item => item.id === parsed.projectId)
+    if (!reference) throw new ActionFailureError('projectNotFound')
     return withTaskWorkspace(user, workspace.id, async (tenant, tx) => {
       await lockTeamRelations(tx)
       const project = await requireProjectWrite(tx, user, parsed.projectId, tenant.id)
@@ -71,15 +81,17 @@ export async function setProjectTeams(input: { projectId: string; revision: numb
         const team = await requireActiveTeam(tx, id, user.id, false, tenant.id)
         if (team.workspaceId !== tenant.id) throw new ActionFailureError('workspaceAccessDenied')
       }
-      const [updated] = await tx.update(projects).set({ revision: parsed.revision + 1, updatedAt: new Date() })
-        .where(and(eq(projects.id, project.id), eq(projects.workspaceId, tenant.id), eq(projects.revision, parsed.revision))).returning()
-      if (!updated) throw new ActionFailureError('projectStale')
-      await tx.delete(teamProjects).where(eq(teamProjects.projectId, project.id))
-      if (ids.length) await tx.insert(teamProjects).values(ids.map(teamId => ({ projectId: project.id, teamId, workspaceId: tenant.id, userId: project.userId, isPrimary: teamId === parsed.primaryTeamId })))
-      const t = await getTranslations()
-      await tx.insert(projectEvents).values({ id: crypto.randomUUID(), projectId: project.id, userId: user.id, message: ids.length ? t('FeatureCopy.c_7cc606e0') : t('FeatureCopy.c_c8d00bc5') })
-      await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
-      return (await accessibleProjects(user, tx, tenant.id)).find(item => item.id === project.id)!
+      return withResourceAccess(user, reference, 'canSteer', async () => {
+        const [updated] = await tx.update(projects).set({ revision: parsed.revision + 1, updatedAt: new Date() })
+          .where(and(eq(projects.id, project.id), eq(projects.workspaceId, tenant.id), eq(projects.revision, parsed.revision))).returning()
+        if (!updated) throw new ActionFailureError('projectStale')
+        await tx.delete(teamProjects).where(eq(teamProjects.projectId, project.id))
+        if (ids.length) await tx.insert(teamProjects).values(ids.map(teamId => ({ projectId: project.id, teamId, workspaceId: tenant.id, userId: project.userId, isPrimary: teamId === parsed.primaryTeamId })))
+        const t = await getTranslations()
+        await tx.insert(projectEvents).values({ id: crypto.randomUUID(), projectId: project.id, userId: user.id, message: ids.length ? t('FeatureCopy.c_7cc606e0') : t('FeatureCopy.c_c8d00bc5') })
+        await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
+        return (await accessibleProjects(user, tx, tenant.id)).find(item => item.id === project.id)!
+      })
     })
   })
 }

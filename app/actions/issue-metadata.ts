@@ -41,7 +41,7 @@ export async function getIssuePropertyOptions(id: string) {
   return db.transaction(async tx => {
   const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-  await requireCurrentIssueWorkspace(user, issue.workspaceId)
+  await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
   const activeMembers = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
     .where(and(eq(workspaceMembers.workspaceId, issue.workspaceId!), eq(workspaceMembers.status, 'active')))
   const members = activeMembers.length ? await tx.select({ id: users.id, name: users.name, image: users.image }).from(users)
@@ -78,7 +78,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
       const withAssignee = <T>(work: () => Promise<T>) => assigneeId
         ? withTaskWorkspace(assigneeId, issue.workspaceId!, work)
         : work()
-      const result = await withIssueWorkspace(user, issue.workspaceId, () => withAssignee(() => db.transaction(async tx => {
+      const result = await withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canSteer' }, () => withAssignee(() => db.transaction(async tx => {
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
         requireLockedIssueScope(latest, user.id, issue.scopeVersion, issue.workspaceId)
         if (!latest || latest.revision !== parsed.data.revision) return { error: 'issueOutdated' }

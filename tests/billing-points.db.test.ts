@@ -67,6 +67,21 @@ test('Stripe purchased points ledger', { skip: !dbUrl }, async t => {
     assert.deepEqual(grants.filter(row => row.reason === 'refund').map(row => [row.points, row.amountCents]), [[-250, -250], [-750, -750]])
   })
 
+  await t.test('Managed Payments tax remains on the receipt; proportional refunds cannot erase or mint extra points', async () => {
+    const purchase = { ...session(), amount_subtotal: 1000, amount_total: 1080,
+      total_details: { amount_tax: 80, amount_discount: 0, amount_shipping: 0 } }
+    await applyStripeEvent(event('checkout.session.completed', purchase), options)
+    assert.deepEqual((await rows(purchase.payment_intent)).map(row => [row.points, row.amountCents]), [[1000, 1080]])
+    const first = refund(540), second = refund(540)
+    await applyStripeEvent(event('charge.refunded', charge(purchase, [first])), options)
+    assert.equal((await rows(purchase.payment_intent)).reduce((sum, row) => sum + row.points, 0), 500)
+    await applyStripeEvent(event('charge.refunded', charge(purchase, [first, second])), options)
+    const settled = await rows(purchase.payment_intent)
+    assert.equal(settled.reduce((sum, row) => sum + row.points, 0), 0)
+    assert.equal(settled.reduce((sum, row) => sum + row.amountCents, 0), 0)
+    assert.equal(settled.filter(row => row.reason === 'refund').every(row => row.parentGrantId === settled.find(row => row.reason === 'purchase').id), true)
+  })
+
   await t.test('refund delivered before its purchase stays retryable and later applies', async () => {
     const purchase = session(), refunded = event('charge.refunded', charge(purchase, [refund(100)]))
     await assert.rejects(applyStripeEvent(refunded, options), /purchase has not arrived/)

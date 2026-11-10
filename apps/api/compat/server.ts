@@ -59,8 +59,8 @@ export class NextResponse<_Body = unknown> extends Response {
   }
   static override json<Body>(body: Body, init?: ResponseInit): NextResponse<Body> {
     const response = Response.json(body, init)
-    // srvx materializes responses lazily and spreads their init after headers are read.
-    // Copy native accessors into a plain init so that status survives serialization.
+    // srvx materializes a response after headers are accessed by spreading its
+    // init. Response getters are not own properties, so copy the HTTP fields.
     return new NextResponse<Body>(response.body, {
       status: response.status, statusText: response.statusText, headers: response.headers,
     })

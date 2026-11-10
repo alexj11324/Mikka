@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -49,8 +50,8 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
       {...underBar}
       refreshControl={<RefreshControl {...refresh} />}
       contentContainerStyle={{ paddingBottom: insets.bottom + bottom }}
-      ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label="任务" onRetry={reload} />}
-      ListEmptyComponent={loading && !data ? <View style={styles.center}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>没有任务</Text>}
+      ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />}
+      ListEmptyComponent={loading && !data ? <View style={styles.center}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>{mobileMessages.MobileCore.noTasks}</Text>}
       renderItem={({ item }) => item.kind === 'section'
         ? <TaskGroupBar id={item.id} count={item.count} folded={item.folded} onToggle={() => toggle(item.id)} />
         : <TaskRowView task={item.task} />}

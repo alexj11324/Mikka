@@ -31,12 +31,12 @@ const enter = async (reader: Reader, args: unknown[]) => {
 const forbidden = () => { throw new Error('No database, provider or tool effects in prompt concurrency fixture') }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 
-stub('./store.ts', { loadConversation: async () => conversation, saveSummary: forbidden })
+stub('./store.ts', { loadConversationForPrompt: async () => ({ ...conversation, personalInstructions: personal }), saveSummary: forbidden })
 stub('./bot-instructions.ts', { botInstructions: forbidden })
-stub('./personal-instructions.ts', { withPersonalInstructions: async (...args: unknown[]) => {
+stub('./personal-instructions.ts', { withPersonalInstructionText: async (...args: unknown[]) => {
   await enter('personal', args)
   if (denied) throw denied
-  return instructionsWithPersonal(args[1] as string, personal)
+  return instructionsWithPersonal(args[1] as string, args[2] as string)
 } })
 stub('./github-context.ts', { githubPromptContext: async (...args: unknown[]) => { await enter('github', args); return github } })
 stub('./execution-context.ts', { executionContextParts: async (...args: unknown[]) => { await enter('execution', args); return facts } })
@@ -88,7 +88,7 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
     assert.deepEqual(calls.map(call => call.reader), ['execution', 'personal', 'github'])
     assert.deepEqual(calls.find(call => call.reader === 'execution')?.args, [owner, bot])
     assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, undefined, undefined, undefined, bot])
-    assert.deepEqual(calls.find(call => call.reader === 'personal')?.args, [owner, withCoordinatorPresentation(executionInstructions(snapshot)), { servers: [], skills: [] }])
+    assert.deepEqual(calls.find(call => call.reader === 'personal')?.args, [owner, withCoordinatorPresentation(executionInstructions(snapshot)), personal, { servers: [], skills: [] }])
   } finally {
     // Complete in reverse order; assembly order and the cache boundary must not change.
     gates.github!.resolve(); gates.personal!.resolve(); gates.execution!.resolve()

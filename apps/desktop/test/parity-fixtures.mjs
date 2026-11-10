@@ -20,7 +20,7 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
   const coordinatorIds = [ids.coordinator, ...(includePeerCoordinator ? [ids.peerCoordinator] : [])]
   const fixture = {
     ...ids, epoch, workspaceName: 'Desktop acceptance', teamName: 'Application', botName: 'Ada', groupName: 'Release review',
-    issueTitle: 'Review the desktop workspace', issueIdentifier: null, artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview',
+    issueTitle: 'Review the desktop workspace', issueIdentifier: 'APP-1', agentLabel: 'Codex', artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview',
     // The address is visible in Settings. Independent baseline/candidate
     // databases need the same display text; fresh UUIDs still own every row.
     workspaceSlug: 'desktop-review',

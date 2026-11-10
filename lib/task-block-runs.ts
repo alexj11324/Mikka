@@ -13,13 +13,14 @@ import type { ThreadOutcome } from '@/lib/thread-groups'
 import type { MobileTaskBot, MobileTaskSchedule } from '@/lib/mobile-task-view'
 import type { Definition } from '@/lib/schedules/contract'
 import { readCompactRunFailure, type CompactRunFailure } from './run-failure-projection'
+import { taskReviewSourceHint } from './coding-workspace/task-review/summary-selection'
 
 /**
  * Each listed task's newest thread from the last 30 days, as far as 受阻 needs it
  * (lib/task-blocked.ts): the same window and owner as the web's listTaskRuns.
  * One small read beside the task list, which the 任务 list already makes.
  */
-export type TaskRunSnapshot = Omit<TaskStateRun, 'runId' | 'status'> & { issueId: string; runId: string | null; status: string | null; outcome: ThreadOutcome | null; failureDetails: CompactRunFailure | null; bot: MobileTaskBot | null; schedule: MobileTaskSchedule | null }
+export type TaskRunSnapshot = Omit<TaskStateRun, 'runId' | 'status'> & { issueId: string; runId: string | null; status: string | null; outcome: ThreadOutcome | null; failureDetails: CompactRunFailure | null; bot: MobileTaskBot | null; schedule: MobileTaskSchedule | null; codingReview: boolean }
 type ScheduleRow = { title: string; timing: Definition['timing']; nextAt: string | null }
 type ScheduleLabels = { daily: (time: string) => string; interval: (minutes: number) => string }
 
@@ -57,7 +58,7 @@ export async function newestTaskRuns(userId: string, issueIds: readonly string[]
   // task's persisted tenant, including pending/legacy run exclusion, even when
   // no explicit workspace filter was supplied. All decorations share one read.
   const rows = await db.select({ issueId: issues.id, runId: latest.runId, status: latest.status, outcome: latest.outcome, failureDetails: latest.failureDetails, pauseReason: latest.pauseReason, stopReason: latest.stopReason, threadReplacedBy: latest.threadReplacedBy, awaitingApproval: latest.awaitingApproval, deviceOffline: sql<boolean>`coalesce(${latest.deviceOffline},false)`, offlineDevice: latest.offlineDevice,
-    bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }, schedule: taskSchedule(issues.id, userId, workspaceId),
+    bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }, schedule: taskSchedule(issues.id, userId, workspaceId), codingReview: taskReviewSourceHint,
   }).from(issues).leftJoin(latest, eq(latest.issueId, issues.id))
     .leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, userId), eq(bots.workspaceId, issues.workspaceId)))
     .where(and(inArray(issues.id, [...issueIds]), eq(issues.ownershipState, 'bound'), workspaceId ? eq(issues.workspaceId, workspaceId) : undefined))

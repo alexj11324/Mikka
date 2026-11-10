@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { Ellipsis } from 'lucide-react-native'
 import { NavBar } from '@/components/NavBar'
 import { colors } from '@/lib/theme'
@@ -11,11 +12,11 @@ export function ChatHeader({ name, color, shape, botId, coordinator, tasks, onTa
   return (
     <NavBar titleView={<ChatTitlePill name={name} color={color} shape={shape} botId={botId} coordinator={coordinator} onPress={onInfo} />}
       right={name ? {
-        icon: 'ellipsis', label: '更多', web: <Ellipsis size={20} color={colors.ink} />, onOpen: () => {},
+        icon: 'ellipsis', label: mobileMessages.Nav.more, web: <Ellipsis size={20} color={colors.ink} />, onOpen: () => {},
         items: [
           ...(tasks ?? []).map(task => ({ label: displayTitle(task.title), icon: taskSymbol(task), onPress: () => onTask(task.id) })),
-          { label: '全部任务', icon: 'checklist', onPress: onAllTasks },
-          { label: '资料', icon: 'person.crop.circle', onPress: onInfo },
+          { label: mobileMessages.MobileCore.allTasks, icon: 'checklist', onPress: onAllTasks },
+          { label: mobileMessages.MobileCore.info, icon: 'person.crop.circle', onPress: onInfo },
         ],
       } : undefined} />
   )

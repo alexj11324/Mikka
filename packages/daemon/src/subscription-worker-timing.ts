@@ -39,6 +39,41 @@ function goTiming(value: unknown): WorkerGoTiming | undefined {
   } catch { return undefined }
 }
 
+
+const TRANSPORT_MS = ['getConnMs', 'gotConnMs', 'dnsStartMs', 'dnsDoneMs', 'connectStartMs', 'connectDoneMs', 'tlsStartMs', 'tlsDoneMs', 'wroteRequestMs', 'firstByteMs', 'headersMs', 'firstEventMs', 'firstTextMs'] as const
+const TRANSPORT_COUNTS = ['getConnCalls', 'dnsCalls', 'connectCalls', 'tlsCalls', 'writeCalls'] as const
+const TRANSPORT_FLAGS = ['reused', 'dnsFailed', 'connectFailed', 'tlsFailed', 'writeFailed'] as const
+export type WorkerTransportTiming = { version: 1 } & Partial<Record<typeof TRANSPORT_MS[number] | typeof TRANSPORT_COUNTS[number], number | null>> & Partial<Record<typeof TRANSPORT_FLAGS[number], boolean | null>>
+const TRANSPORT_KEYS = new Set<string>(['version', ...TRANSPORT_MS, ...TRANSPORT_COUNTS, ...TRANSPORT_FLAGS])
+
+function transportTiming(value: unknown): WorkerTransportTiming | undefined {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !TRANSPORT_KEYS.has(key))) return
+    const fields = value as Record<string, unknown>
+    if (!Object.hasOwn(fields, 'version') || fields.version !== 1) return
+    const result: WorkerTransportTiming = { version: 1 }
+    for (const key of TRANSPORT_MS) {
+      if (!Object.hasOwn(fields, key)) continue
+      const field = fields[key]
+      if (field !== null && (typeof field !== 'number' || !Number.isFinite(field) || field < 0 || field > 3_600_000)) return
+      result[key] = field === null ? null : Math.round((field as number) * 1_000) / 1_000
+    }
+    for (const key of TRANSPORT_COUNTS) {
+      if (!Object.hasOwn(fields, key)) continue
+      const field = fields[key]
+      if (field !== null && (typeof field !== 'number' || !Number.isSafeInteger(field) || field < 0 || field > 1_000_000)) return
+      result[key] = field as number | null
+    }
+    for (const key of TRANSPORT_FLAGS) {
+      if (!Object.hasOwn(fields, key)) continue
+      const field = fields[key]
+      if (field !== null && typeof field !== 'boolean') return
+      result[key] = field as boolean | null
+    }
+    return result
+  } catch { return undefined }
+}
+
 type WorkerRow = {
   ordinal: number; method: Method; startedMs: number | null; settledMs: number | null
   outcome: 'pending' | 'result' | 'error' | 'cancelled'
@@ -86,6 +121,8 @@ export class SubscriptionCallTiming {
       preRead.worker.settle(outcome === 'cancelled' ? 'cancelled' : outcome === 'error' || outcome === 'timeout' ? 'error' : 'result')
     } }
   }
+  /** Separate from the legacy stages: adding HTTP evidence never grows its log. */
+  transportSnapshot() { return this.workers.filter(worker => worker.snapshot().method === 'executeStream').map(worker => worker.transportSnapshot()) }
   snapshot(): SubscriptionStages {
     const row = this.preRead?.worker.snapshot()
     const streamPreRead: StreamPreRead | undefined = row && this.preRead ? {
@@ -100,6 +137,8 @@ export class SubscriptionCallTiming {
 
 export class SubscriptionWorkerTiming {
   private readonly row: WorkerRow
+  private transportState: 'reported' | 'missing' | 'invalid' = 'missing'
+  private transport?: WorkerTransportTiming
   constructor(private readonly call: SubscriptionCallTiming, ordinal: number, method: Method) {
     this.row = { ordinal, method, startedMs: call.offset(), settledMs: null, outcome: 'pending', identityMode: 'unobserved', spawnToConfigWriteMs: null, identityMs: null, identityLoginCalls: null, identityLoginMs: null, parentAccessAuthorityCalls: null, parentAccessAuthorityMs: null, parentProjectionReadCalls: null, parentProjectionReadMs: null, goState: 'missing' }
   }
@@ -132,6 +171,13 @@ export class SubscriptionWorkerTiming {
     this.row.goState = timing ? 'reported' : 'invalid'
     if (timing) this.row.go = timing
   }
+  terminalTransport(value: unknown, present: boolean) {
+    if (this.row.outcome !== 'pending' || !present) return
+    const timing = transportTiming(value)
+    this.transportState = timing ? 'reported' : 'invalid'
+    if (timing) this.transport = timing
+  }
+  transportSnapshot() { return { ordinal: this.row.ordinal, outcome: this.row.outcome, state: this.transportState, ...(this.transport ? { timing: { ...this.transport } } : {}) } }
   settle(outcome: Exclude<WorkerRow['outcome'], 'pending'>) {
     if (this.row.outcome !== 'pending') return
     this.row.settledMs = this.call.offset()

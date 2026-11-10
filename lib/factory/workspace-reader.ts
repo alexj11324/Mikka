@@ -29,7 +29,9 @@ export async function factoryWorkspaceReader(userId: string) {
   const choices = await activeTaskWorkspaces(reader, selection.workspaceId ?? undefined)
   const saved = selection.present ? undefined : (await cookies()).get('mikka-workspace')?.value
   const selected = selection.present ? choices.find(workspace => workspace.id === selection.workspaceId)
-    : choices.find(workspace => workspace.id === saved) ?? choices[0]
+    : choices.find(workspace => workspace.id === saved)
+      ?? choices.find(workspace => workspace.kind === 'personal')
+      ?? choices[0]
   if (!selected) throw new FactoryError('factoryNotFound')
   return { ...reader, [tokenWorkspace]: selected.id }
 }

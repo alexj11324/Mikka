@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 /**
  * The home chat list (#1408 Phase 2b), as pure data: which chats show where, in what order and with what badge. The
  * screen draws it; the server keeps only each chat's own state (chat-preferences). The list is newest first: chats are
@@ -24,7 +25,7 @@ export type ListChat = {
 }
 
 export type SectionId = 'working' | 'bots' | 'groups'
-export const SECTION_TITLES: Record<SectionId, string> = { working: '正在工作', bots: 'Bot', groups: '群聊' }
+export const SECTION_TITLES: Record<SectionId, string> = { working: mobileMessages.MobileCore.working, bots: 'Bot', groups: mobileMessages.MobileCore.groupChats }
 const SECTIONS: readonly SectionId[] = ['working', 'bots', 'groups']
 
 export type HomeItem<C> =

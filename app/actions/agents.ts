@@ -233,8 +233,14 @@ const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength,
   // Only the report's summary: runSummaryText reads nothing else of it.
   sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, failureDetails: agentRuns.failureDetails, report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
-  agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome,
+  agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome, kind: agentRuns.kind,
   botColor: sql<string | null>`(select b.color from bots b where b.id = ${runBotId})`, botShape: sql<string | null>`(select b.shape from bots b where b.id = ${runBotId})`,
+  // Who did the stretch (lib/issue-threads.ts threadProfile): the frozen Profile's public summary and its current mark.
+  profile: sql<unknown>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
+    'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId','name',${agentRuns.agentDefinition}->'agentProfile'->'name',
+    'roles',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'roles','description',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'description',
+    'icon',(select p.icon from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId}),
+    'color',(select p.color from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId})) end`,
 }
 
 // A read after a cursor: the client holds the run's prompt (immutable), so only what names the thread is read.

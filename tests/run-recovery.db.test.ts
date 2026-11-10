@@ -6,6 +6,8 @@ import test from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { remoteKey } from '@mikka/protocol/repository'
+import { runPromptParts } from '../lib/run-prompt'
+import { threadPromptView } from '../lib/thread-prompt'
 
 const connection = process.env.E2E_DATABASE_URL
 if (connection) {
@@ -146,12 +148,18 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
 
   await t.test('ten independent cron scans create one retry and fence the old attempt', async () => {
     const run = await fixture()
+    const { prompt, taskLength } = runPromptParts('Recovery 🧪', 'Keep the task body.', 'SYNTHETIC_INTERNAL_STANDING_INSTRUCTION')
+    const prefix = 'Factory host guidance 🔍\n\n'
+    await pool.query('UPDATE agent_runs SET prompt=$2,"promptTaskStart"=$3,"promptTaskLength"=$4 WHERE id=$1',
+      [run.id, prefix + prompt, Array.from(prefix).length, taskLength])
     const old = await issueRunToken({ id: run.id, userId: run.userId })
     await Promise.all(Array.from({ length: 10 }, () => sweepExpiredRunLeases(now)))
-    const { rows } = await pool.query('SELECT id,status,attempt,"deviceId" FROM agent_runs WHERE "retryOf"=$1', [run.id])
+    const { rows } = await pool.query('SELECT id,status,attempt,"deviceId",prompt,"promptTaskStart","promptTaskLength" FROM agent_runs WHERE "retryOf"=$1', [run.id])
     assert.equal(rows.length, 1)
     assert.equal(rows[0].attempt, 2)
     assert.equal(rows[0].deviceId, run.otherDeviceId)
+    assert.equal(threadPromptView(rows[0].prompt, rows[0].promptTaskStart, rows[0].promptTaskLength).task, '# Recovery 🧪\n\nKeep the task body.')
+    assert.ok(rows[0].prompt.includes('SYNTHETIC_INTERNAL_STANDING_INSTRUCTION'))
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [run.id])).rows[0].status, 'failed')
     assert.equal(Boolean(await verifyRunToken(new Request('http://localhost/mikka/api/mcp'), old.token)), false)
     await pool.query('UPDATE agent_runs SET status=\'preparing\',"leaseExpiresAt"=$2 WHERE id=$1', [rows[0].id, new Date(Date.now() + 90_000)])

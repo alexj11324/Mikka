@@ -15,6 +15,7 @@ import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/wo
 import { recordPushGrant } from './support/github-app-stub'
 import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
 import { seedRunProjectResources } from './helpers/run-project-resources'
+import { threadPromptView } from '../lib/thread-prompt'
 
 test('quota exhausted mid-run: continue on the person\'s key, else pause with the reset; resume and retry actions', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
@@ -202,6 +203,9 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     assert.equal(continuation.deviceRepoId, original.deviceRepoId)
     assert.equal(continuation.issueId, original.issueId)
     assert.equal(continuation.botId, p.botId)
+    assert.ok(original.promptTaskLength > 0)
+    assert.deepEqual(threadPromptView(continuation.prompt, continuation.promptTaskStart, continuation.promptTaskLength),
+      threadPromptView(original.prompt, original.promptTaskStart, original.promptTaskLength))
     assert.deepEqual(continuation.agentDefinition.apiKey, { keyId: key.id, model: 'subscription-model' })
     assert.equal(continuation.agentDefinition.modelSource, 'api_key')
     assert.equal(continuation.agentDefinition.subscription, undefined)
@@ -620,6 +624,8 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
       assert.equal(child.workspaceId,p.workspaceId)
       assert.equal(child.agentDefinition.executionIdentity.workspaceId,p.workspaceId)
       assert.equal(child.retryOf,original.id); assert.equal(child.issueId,original.issueId); assert.equal(child.botId,null)
+      assert.ok(child.prompt.includes('## This run continues after a usage limit'))
+      assert.equal(threadPromptView(child.prompt,child.promptTaskStart,child.promptTaskLength).task.includes('## This run continues after a usage limit'),false)
       assert.equal(child.agentDefinition.subscription.bindingId,original.agentDefinition.subscription.bindingId)
       assert.equal(await bounded(actAs(reader,()=>withTaskWorkspace(reader,p.workspaceId,()=>quota.queueCloudQuotaContinuation(original,cloud,null))),
         'cloud retry failed to borrow the active WS lease'),childId)

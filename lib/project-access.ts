@@ -1,9 +1,12 @@
 import 'server-only'
 import { and, eq, inArray, or, sql } from 'drizzle-orm'
+import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
+import { db } from '@/lib/db'
 import { projectDb, projects, projectTasks, projectMembers } from '@/lib/db/projects'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
-import { taskReaderScope } from '@/lib/task-workspace'
+import { activeTaskWorkspaces, taskReaderScope } from '@/lib/task-workspace'
+import type { ResourceReference } from '@/lib/resource-access/contract'
 
 export type ProjectTransaction = Parameters<Parameters<typeof projectDb.transaction>[0]>[0]
 export type ProjectReader = Parameters<typeof taskReaderScope>[0]
@@ -18,8 +21,24 @@ function projectMembership(reader: ProjectReader, workspaceId: string) {
   )
 }
 
+/** Tenant and Enterprise admission precede APP content ACLs. Source Project
+ * rows are read only after their stable IDs pass the authoritative ACL; no
+ * request cache can preserve access after a grant or membership revocation.
+ * A selected Workspace is required: omitting it must never enumerate every
+ * tenant of a human who belongs to more than one. */
+export async function accessibleProjectReferences(reader: ProjectReader, workspaceId: string): Promise<ResourceReference[]> {
+  if (!z.uuid().safeParse(workspaceId).success) return []
+  const tenants = await activeTaskWorkspaces(reader, workspaceId)
+  if (!tenants.length) return []
+  const { rows } = await db.execute<{ id: string; workspaceId: string }>(sql`select id,"workspaceId" from resource_access_policies
+    where kind='project' and "workspaceId"=any(${sql.param(tenants.map(tenant => tenant.id))}::uuid[])
+      and mikka_resource_acl_allowed('account',${taskReaderScope(reader).userId},"workspaceId",kind,id,'canReadContent')`)
+  return rows.map(row => ({ ...row, kind: 'project' }))
+}
+
 /** Caller holds withTaskWorkspace and lockTeamRelations before taking this row lock.
- * It intentionally uses only the Workspace DB, including the fresh ACL check. */
+ * It intentionally uses only the Workspace DB; the content ACL lock belongs to
+ * the caller's withResourceAccess lease. */
 export async function requireProjectWrite(tx: ProjectTransaction, reader: ProjectReader, projectId: string, workspaceId: string, options: { allowArchived?: boolean } = {}) {
   const [row] = await tx.select({ project: projects }).from(projects)
     .innerJoin(workspaces, eq(workspaces.id, projects.workspaceId))
@@ -31,9 +50,15 @@ export async function requireProjectWrite(tx: ProjectTransaction, reader: Projec
   return row.project
 }
 
-/** Explicit active tenant only. No creator, Team, name or legacy JSONB fallback. */
+/** Explicit active tenant only. No creator, Team, name or legacy JSONB fallback.
+ * The authoritative ACL selects stable Project IDs first; canonical relations
+ * hydrate `issueIds`/`memberIds` so stored JSONB never becomes a second
+ * relationship source. */
 export async function accessibleProjects(reader: ProjectReader, tx: ProjectTransaction | typeof projectDb = projectDb, workspaceId?: string, projectId?: string) {
   if (!workspaceId) return []
+  const references = await accessibleProjectReferences(reader, workspaceId)
+  const ids = references.filter(reference => !projectId || reference.id === projectId).map(reference => reference.id)
+  if (!ids.length) return []
   const rows = await tx.select({
     project: projects,
     issueIds: sql<string[]>`coalesce((select jsonb_agg(pt."issueId" order by pt."issueId") from ${projectTasks} pt where pt."projectId" = ${projects.id} and pt."workspaceId" = ${projects.workspaceId}), '[]'::jsonb)`,
@@ -41,7 +66,7 @@ export async function accessibleProjects(reader: ProjectReader, tx: ProjectTrans
   }).from(projects)
     .innerJoin(workspaces, eq(workspaces.id, projects.workspaceId))
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, projects.workspaceId))
-    .where(and(projectMembership(reader, workspaceId), projectId ? eq(projects.id, projectId) : undefined))
+    .where(and(projectMembership(reader, workspaceId), inArray(projects.id, ids)))
   return rows.map(({ project, issueIds, memberIds }) => ({
     ...project, createdBy: project.userId, issueIds, memberIds,
     lead: project.leadUserId ?? '',

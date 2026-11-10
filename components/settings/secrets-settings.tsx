@@ -55,10 +55,11 @@ export function SecretsSettings({ workspaceId, workspaceName }: { workspaceId: s
     </> : undefined}>
       {list.loading && <SettingsLoading label={t('loading')} rows={2} bare />}
       {list.error && <FieldError className="px-5 py-4">{list.error}</FieldError>}
+      {/* Empty: the state as a title and Add as the one primary move; Bulk add stays beside it (UI audit settings2-05). */}
       {secrets?.length === 0 && role && <div className="flex flex-col items-start gap-3 px-5 py-6">
-        <p className="text-sm text-muted-foreground">{t('empty')}</p>
+        <p className="text-sm font-medium">{t('empty')}</p>
         <div className="flex gap-2">
-          <Button type="button" variant="secondary" size="sm" onClick={() => open({ kind: 'new' })}><Plus data-icon="inline-start" />{t('add')}</Button>
+          <Button type="button" size="sm" onClick={() => open({ kind: 'new' })}><Plus data-icon="inline-start" />{t('add')}</Button>
           <Button type="button" variant="secondary" size="sm" onClick={() => open({ kind: 'bulk' })}>{t('bulkAdd')}</Button>
         </div>
       </div>}

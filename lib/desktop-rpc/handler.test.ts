@@ -162,6 +162,9 @@ test('registry schemas reject forged authority, malformed nested input and extra
     ['workspace-secrets.createSecret', [{ name: 'KEY', kind: 'secret', value: 'fixture', scope: { type: 'repository', repository: {} } }]],
     ['preferences.updatePreferences', [{ administrator: true }]],
     ['artifacts.listArtifacts', ['unwanted']],
+    ['teams.deleteTeam', ['not-a-team', 'Design']],
+    ['teams.deleteTeam', [owner]],
+    ['teams.getTeamDeletionImpact', [owner, { workspaceId: peer }]],
   ]
   for (const [name, args] of cases) assert.equal(desktopActionSchemas[name].safeParse(args).success, false, name)
   assert.equal(desktopActionSchemas['coordinator.pollCoordinatorChat'].safeParse([null, undefined, { after: 2, cursor: 1, prefix: 'a'.repeat(32) }]).success, true)
@@ -210,6 +213,23 @@ test('Coordinator submission accepts an optional captured workspace without wide
     assert.equal(schema.safeParse([...legacy, expected]).success, false)
   }
   assert.equal(schema.safeParse([...legacy, peer, { admin: true }]).success, false)
+})
+
+test('Coordinator task titles cross the shared Web and desktop RPC boundary', () => {
+  const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
+  const args = ['Task description', null, null, owner, undefined, undefined, undefined, undefined, undefined]
+  for (const workspaceId of [undefined, peer]) {
+    const parsed = schema.safeParse([...args, workspaceId, '  修复登录后回跳  '])
+    assert.equal(parsed.success, true)
+    if (parsed.success) {
+      assert.ok(Array.isArray(parsed.data))
+      assert.equal(parsed.data[10], '修复登录后回跳')
+    }
+    for (const title of ['', ' ', 'x'.repeat(61), 'two\nlines', null, { admin: true }]) {
+      assert.equal(schema.safeParse([...args, workspaceId, title]).success, false)
+    }
+  }
+  assert.equal(schema.safeParse([...args, peer, 'Title', { admin: true }]).success, false)
 })
 
 test('billing re-export consumers accept only the existing workspace selector and purchase amounts', () => {

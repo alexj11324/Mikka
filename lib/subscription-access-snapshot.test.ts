@@ -96,3 +96,106 @@ test('only an authorized connected row without a projection is an explicit prepa
   const network = new Error('database unavailable')
   await assert.rejects(authorizedAccessName({ query: async () => { throw network } } as never, scope, use, 2), error => error === network)
 })
+
+test('snapshot reuses only a live machine token and still authorizes and reads every projection', async () => {
+  let logins = 0, reads = 0, authorities = 0
+  const clientId = 'bounded-reuse'
+  const fetcher: typeof fetch = async (input, init) => {
+    if (init?.method === 'POST') { logins++; return Response.json({ accessToken: 'fixture-token', expiresIn: 60 }) }
+    reads++
+    const requested = new URL(String(input)).pathname.split('/').at(-1)!
+    return Response.json({ secret: { secretKey: requested, version: 1, secretValue: `projection-${reads}` } })
+  }
+  const scope = { ownerId: 'owner', workspaceId: 'space', connectionId: 'connection', provider: 'codex' as const }
+  for (let round = 1; round <= 2; round++) {
+    const expectedName = round === 1 ? name : name.replace(/1$/, '2')
+    const database = { query: async () => { authorities++; return { rows: [{ accessSecretName: expectedName }] } } }
+    const authorized = await authorizedAccessName(database as never, scope, { bindingId: 'binding', consumerId: 'consumer' }, 1)
+    const call = new SubscriptionCallTiming(), worker = call.startWorker('executeStream')!
+    const finishIdentity = worker.beginIdentity()
+    await withSubscriptionTiming(call, () => withSubscriptionWorkerTiming(worker, () =>
+      subscriptionAccessSnapshot({ ...config, clientId, name: authorized, fetcher })))
+    finishIdentity(); worker.settle('result')
+    if (round === 2) assert.equal(worker.snapshot().identityLoginMs, null)
+    assert.equal(worker.snapshot().identityLoginCalls, round === 1 ? 1 : 0)
+    assert.equal(worker.snapshot().parentProjectionReadCalls, 1)
+  }
+  assert.deepEqual({ logins, reads, authorities }, { logins: 1, reads: 2, authorities: 2 })
+  let enteredProjection = false
+  await assert.rejects((async () => {
+    await authorizedAccessName({ query: async () => ({ rows: [] }) } as never, scope, { bindingId: 'binding', consumerId: 'consumer' }, 1)
+    enteredProjection = true
+    return subscriptionAccessSnapshot({ ...config, clientId, fetcher })
+  })(), /subscription_access_unavailable/)
+  assert.equal(enteredProjection, false)
+  assert.deepEqual({ logins, reads }, { logins: 1, reads: 2 })
+})
+
+test('snapshot refuses an already cancelled call before any login or projection', async () => {
+  let calls = 0
+  const abort = new AbortController()
+  abort.abort(new Error('private-cancellation-reason'))
+  const fetcher: typeof fetch = async (_input, init) => {
+    calls++
+    return Response.json(init?.method === 'POST'
+      ? { accessToken: 'fixture-token', expiresIn: 60 }
+      : { secret: { secretKey: name, version: 1, secretValue: 'projection' } })
+  }
+  await assert.rejects(subscriptionAccessSnapshot({ ...config, clientId: 'cancelled-snapshot', signal: abort.signal, fetcher }), /subscription_access_unavailable/)
+  assert.equal(calls, 0)
+})
+
+test('snapshot evicts refused tokens without retrying the rejected projection', async () => {
+  for (const status of [401, 403]) {
+    let logins = 0, reads = 0
+    let denied = false
+    const fetcher: typeof fetch = async (_input, init) => {
+      if (init?.method === 'POST') { logins++; return Response.json({ accessToken: `token-${logins}`, expiresIn: 60 }) }
+      reads++
+      return denied ? new Response('', { status }) : Response.json({ secret: { secretKey: name, version: 1, secretValue: 'projection' } })
+    }
+    const options = { ...config, clientId: `denied-${status}`, fetcher }
+    await subscriptionAccessSnapshot(options)
+    denied = true
+    await assert.rejects(subscriptionAccessSnapshot(options), /http_refused/)
+    assert.deepEqual({ logins, reads }, { logins: 1, reads: 2 })
+    denied = false
+    await subscriptionAccessSnapshot(options)
+    assert.deepEqual({ logins, reads }, { logins: 2, reads: 3 })
+  }
+})
+
+test('a cancelled login response never reaches the projection GET or warms the next call', async () => {
+  let logins = 0, reads = 0
+  const abort = new AbortController()
+  const fetcher: typeof fetch = async (_input, init) => {
+    if (init?.method === 'POST') {
+      logins++
+      if (logins === 1) abort.abort()
+      return Response.json({ accessToken: 'fixture-token', expiresIn: 60 })
+    }
+    reads++
+    return Response.json({ secret: { secretKey: name, version: 1, secretValue: 'projection' } })
+  }
+  const options = { ...config, clientId: 'cancel-after-login', fetcher }
+  await assert.rejects(subscriptionAccessSnapshot({ ...options, signal: abort.signal }), /identity_failed/)
+  assert.deepEqual({ logins, reads }, { logins: 1, reads: 0 })
+  await subscriptionAccessSnapshot(options)
+  assert.deepEqual({ logins, reads }, { logins: 2, reads: 1 })
+})
+
+test('cancellation after a warm lookup still prevents the projection GET', async () => {
+  let logins = 0, reads = 0
+  const fetcher: typeof fetch = async (_input, init) => {
+    if (init?.method === 'POST') { logins++; return Response.json({ accessToken: 'fixture-token', expiresIn: 60 }) }
+    reads++
+    return Response.json({ secret: { secretKey: name, version: 1, secretValue: 'projection' } })
+  }
+  const options = { ...config, clientId: 'cancel-after-lookup', fetcher }
+  await subscriptionAccessSnapshot(options)
+  const abort = new AbortController()
+  const pending = subscriptionAccessSnapshot({ ...options, signal: abort.signal })
+  abort.abort()
+  await assert.rejects(pending, /fetch_failed/)
+  assert.deepEqual({ logins, reads }, { logins: 1, reads: 1 })
+})

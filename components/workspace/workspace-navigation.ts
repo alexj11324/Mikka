@@ -9,7 +9,7 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
  * Nothing outside this file and lib/settings-navigation.ts writes the
  * browser history; scripts/navigation-policy.mjs enforces that.
  */
-export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts'
+export type WorkspaceSection = 'inbox' | 'my-issues' | 'agent' | 'coordinator' | 'group' | 'projects' | 'views' | 'team-home' | 'team-issues' | 'team-projects' | 'all-issues' | 'plugins' | 'suggestions' | 'artifacts' | 'memory' | 'tasks'
 
 export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   inbox: 'Nav.inbox',
@@ -26,10 +26,12 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
   plugins: 'Nav.plugins',
   suggestions: 'Nav.suggestions',
   artifacts: 'Nav.artifacts',
+  memory: 'HostedSettings.memory.title',
+  tasks: 'Nav.tasks',
 }
 
 /** Sections a reload or a shared link reopens; the others start from their parent page. The Coordinator's chat is the default and needs none. */
-const URL_SECTIONS = ['agent', 'plugins', 'suggestions', 'artifacts', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
+const URL_SECTIONS = ['agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'tasks', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
 const READ_SECTIONS: readonly string[] = [...URL_SECTIONS, 'coordinator']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** Query keys that belong to a page inside a section (the plugins page's app and category); a new place drops them. */
@@ -325,16 +327,40 @@ export const NAVIGATE_EVENT = 'mikka:navigate'
  * unsaved-changes check as back and forward.
  */
 export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'replace' = 'push') {
+  if (toWorkArea(change)) return
   goTo(change, mode)
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
+/**
+ * A chat's work area (the hosted chat, FRAME_OWNS_PANEL; decision 2026-11-10), while that chat is on screen: a task or
+ * a thread opened from anywhere on the page opens as one of its tabs instead of a right column beside the chat.
+ */
+export type WorkAreaOpener = { task: (issueId: string) => void; thread: (runId: string) => void }
+let workArea: WorkAreaOpener | null = null
+
+/** The chat on screen hands over its work area; the returned function takes it back (on unmount). */
+export function setWorkAreaOpener(opener: WorkAreaOpener): () => void {
+  workArea = opener
+  return () => { if (workArea === opener) workArea = null }
+}
+
+/** A move that only opens a task or a thread beside the centre goes to the chat's work area when there is one. */
+function toWorkArea(change: Partial<WorkspaceLocation>): boolean {
+  if (!workArea || !Object.keys(change).every(key => key === 'task' || key === 'thread')) return false
+  if (change.thread) workArea.thread(change.thread)
+  else if (change.task) workArea.task(change.task)
+  else return false
+  return true
 }
 
 function here() {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`
 }
 
-/** Opens a thread in the right column beside what is in the centre (R-82). */
+/** Opens a thread in the right column beside what is in the centre (R-82), or in the chat's work area (setWorkAreaOpener). */
 export function openThread(runId: string) {
+  if (toWorkArea({ thread: runId })) return
   const from = here()
   goTo({ thread: runId })
   // Remembers where it came from, so ← steps back to that list as the browser's back does.
@@ -368,6 +394,7 @@ export function toggleAllThreads(open: boolean) {
  * task. ← in the task steps back to where it was opened, as a thread's does.
  */
 export function openTask(issueId: string) {
+  if (toWorkArea({ task: issueId })) return
   const from = here()
   goTo({ task: issueId, thread: null })
   window.history.replaceState({ ...window.history.state, [OPENED_TASK]: { issueId, from } satisfies OpenedTask }, '', here())

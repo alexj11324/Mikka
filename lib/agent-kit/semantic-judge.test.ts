@@ -17,6 +17,7 @@ mock.module(new URL('../cloud-services/runtime.ts',import.meta.url).href,{namedE
 mock.module(new URL('../abuse/context.ts',import.meta.url).href,{namedExports:{hostedBillingScope:{getStore:()=>({workspaceId:'fixture-workspace',ownerId:'fixture-owner'})}}})
 mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{canUseMikkaPaid:async()=>{},hostedUsage:{reserve:async()=>{},settle:async()=>{}}}})
 mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
+mock.module(new URL('../credit-shares.ts',import.meta.url).href,{namedExports:{withSharedCredits:async(workspaceId:string,attempt:(payer:string)=>unknown)=>attempt(workspaceId)}})
 mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{}}})
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
 const prior={fetch:globalThis.fetch,key:process.env.AI_GATEWAY_API_KEY,flag:process.env.MIKKA_AGENT_KIT_LIVE_EVAL,edition:process.env.MIKKA_EDITION,error:console.error}

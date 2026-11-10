@@ -7,6 +7,7 @@ import { realCliMembershipGuard, type CliMembershipGuard } from '@/lib/agent-too
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
+import { assertOrganizationModelProvider } from '@/lib/governance/resource-access'
 import { admitModelRoute, GATEWAY_MODEL_ENDPOINT, ModelAdmissionError, modelAdmissionRevision,
   parseModelAdmissionPolicy, subscriptionModelRoute, ZEROCAT_MODEL_ENDPOINT, type GatewayAdmission } from './contract'
 
@@ -93,6 +94,8 @@ export class ModelAdmissionStore {
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
     const { signal } = options
     if (signal?.aborted) throw new DOMException('Model admission cancelled', 'AbortError')
+    const organizationRule = await assertOrganizationModelProvider(scope.workspaceId, transport.provider)
+    if (organizationRule && transport.endpoint === 'unsupported-model-transport') throw new ModelAdmissionError('modelRouteDenied')
     const { rows: [row] } = await this.pool.query(`SELECT model_admission FROM workspace_computer_policies WHERE "workspaceId"=$1`, [scope.workspaceId])
     if (row?.model_admission == null) return null
     if (!scope.ownerId) throw new ModelAdmissionError('modelPrincipalUnavailable')

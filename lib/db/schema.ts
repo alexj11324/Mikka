@@ -1,7 +1,7 @@
 import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, check, foreignKey, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -56,7 +56,8 @@ export const issues = pgTable('issues', {
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc())])
+}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc()),
+  check('issues_short_title_compact', sql`mikka_issue_short_title_valid(${table.shortTitle})`)])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
@@ -426,6 +427,25 @@ export const agentRuns = pgTable('agent_runs', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`), index('agent_runs_continues_run_idx').on(table.continuesRunId).where(sql`${table.continuesRunId} is not null`)])
 
+/** Confirmed VM running intervals; mutable thread-machine custody is separate. */
+export const threadMachineSessions = pgTable('thread_machine_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(), botId: uuid('botId'), sandboxId: text('sandboxId').notNull(),
+  startedAt: timestamp('startedAt', { withTimezone: true }).notNull(),
+  endedAt: timestamp('endedAt', { withTimezone: true }),
+  reason: text('reason').$type<'paused' | 'retired' | 'provider_missing' | 'transferred' | 'replaced' | 'scope_changed'>(),
+  source: text('source').$type<'running_since' | 'observed' | 'running_since_backfill'>().notNull(),
+}, table => [
+  uniqueIndex('thread_machine_sessions_open_run').on(table.runId).where(sql`${table.endedAt} IS NULL`),
+  index('thread_machine_sessions_scope_run').on(table.ownerId, table.workspaceId, table.runId, table.startedAt, table.id),
+  check('thread_machine_sessions_reason_check', sql`${table.reason} IN ('paused','retired','provider_missing','transferred','replaced','scope_changed')`),
+  check('thread_machine_sessions_source_check', sql`${table.source} IN ('running_since','observed','running_since_backfill')`),
+  check('thread_machine_sessions_check', sql`${table.endedAt} IS NULL OR ${table.endedAt}>=${table.startedAt}`),
+  check('thread_machine_sessions_check1', sql`(${table.endedAt} IS NULL)=(${table.reason} IS NULL)`),
+])
+
 /** A verified owner/repository binding. Installation tokens are never stored. */
 /** Plugins → GitHub connection, separate from the login identity; one GitHub account may serve many users. Tokens are sealed like Better Auth's. */
 export const githubConnections = pgTable('github_connections', {
@@ -460,7 +480,7 @@ export const runPublications = pgTable('run_publications', {
   status: text('status').$type<'assigned' | 'pending' | 'processing' | 'awaiting_approval' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
   workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
-  pullRequest: jsonb('pullRequest').$type<{ url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed'; additions?: number; deletions?: number } | null>(),
+  pullRequest: jsonb('pullRequest').$type<import('../run-publication-result').PublishedPullRequest | null>(),
   errorCode: text('errorCode'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -579,6 +599,22 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
+
+/** First inbox and run settings are committed together, before preparation.
+ * Replays still check the current chat lease and fresh execution authority. */
+export const coordinatorStartupReceipts = pgTable('coordinator_startup_receipts', {
+  userId: text('userId').notNull(), botId: uuid('botId').notNull(), holder: text('holder').notNull(),
+  round: integer('round').notNull(), version: integer('version').notNull().default(1),
+  settings: jsonb('settings').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupSettings>().notNull(),
+  inbox: jsonb('inbox').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupInbox>().notNull(),
+}, table => [
+  primaryKey({ columns: [table.userId, table.botId, table.holder, table.round] }),
+  foreignKey({ columns: [table.userId, table.botId], foreignColumns: [coordinatorSessions.userId, coordinatorSessions.botId] }).onDelete('cascade'),
+  check('coordinator_startup_receipts_round_check', sql`${table.round} = 0`),
+  check('coordinator_startup_receipts_version_check', sql`${table.version} = 1`),
+  check('coordinator_startup_receipts_settings_check', sql`jsonb_typeof(${table.settings}) = 'object'`),
+  check('coordinator_startup_receipts_inbox_check', sql`jsonb_typeof(${table.inbox}) = 'object'`),
+])
 
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
@@ -1019,6 +1055,19 @@ export const runCaptures = pgTable('run_captures', {
   uniqueIndex('run_captures_recording_key').on(table.runId).where(sql`${table.status} = 'recording'`),
 ])
 
+/** A private poster derived from one immutable recording, with the same access boundary. */
+export const runCapturePosters = pgTable('run_capture_posters', {
+  captureId: uuid('captureId').primaryKey().references(() => runCaptures.id, { onDelete: 'cascade' }),
+  captureSha256: text('captureSha256').notNull(),
+  storageKey: text('storageKey').notNull(), inlineContent: bytea('inlineContent'),
+  size: integer('size').notNull(), sha256: text('sha256').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  check('run_capture_posters_captureSha256_check', sql`${table.captureSha256} ~ '^[a-f0-9]{64}$'`),
+  check('run_capture_posters_size_check', sql`${table.size}>0 AND ${table.size}<=256000`),
+  check('run_capture_posters_sha256_check', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
+])
+
 /** A recording's timeline (Figma 13): what the agent did, in its own words, and when. */
 export const runCaptureSteps = pgTable('run_capture_steps', {
   id: uuid('id').primaryKey(),
@@ -1220,12 +1269,38 @@ export const workspaceBilling = pgTable('workspace_billing', {
   plan: text('plan'),
   status: text('status'),
   seats: integer('seats').notNull().default(0),
+  // Historical seat quantities are retained; new checkouts use resource_v1.
+  billingModel: text('billingModel').$type<'legacy_seat' | 'resource_v1'>().notNull().default('legacy_seat'),
+  stripePriceId: text('stripePriceId'),
+  billingPlan: text('billingPlan').$type<'free' | 'pro' | 'enterprise'>().notNull().default('free'),
+  billingExpiresAt: timestamp('billingExpiresAt', { withTimezone: true }),
+  billingRevision: bigint('billingRevision', { mode: 'number' }).notNull().default(0),
+  billingInvoiceId: text('billingInvoiceId'),
   currentPeriodEnd: timestamp('currentPeriodEnd', { withTimezone: true }),
   autoRechargeEnabled: boolean('autoRechargeEnabled').notNull().default(false),
   autoRechargeThreshold: integer('autoRechargeThreshold'),
   autoRechargePacks: integer('autoRechargePacks'),
+  autoRechargeMonthlyCap: integer('autoRechargeMonthlyCap'),
+  autoRechargeAmountPoints: integer('autoRechargeAmountPoints'),
+  autoRechargeConsentBy: text('autoRechargeConsentBy'),
+  autoRechargeConsentAt: timestamp('autoRechargeConsentAt', { withTimezone: true }),
+  autoRechargeRevision: integer('autoRechargeRevision').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** One recoverable subscription Checkout per account, with immutable provider parameters. */
+export const billingCheckoutRequests = pgTable('billing_checkout_requests', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspaceId').notNull().references(() => workspaceBilling.workspaceId),
+  actorId: text('actorId').notNull(),
+  customerId: text('customerId').notNull(),
+  priceId: text('priceId').notNull(),
+  params: jsonb('params').$type<Record<string, unknown>>().notNull(),
+  sessionId: text('sessionId').unique(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  closedAt: timestamp('closedAt', { withTimezone: true }),
+}, table => [uniqueIndex('billing_checkout_requests_active_idx').on(table.workspaceId).where(sql`${table.closedAt} IS NULL`)])
 
 /** Credit grants: 'plan' per paid invoice (replaces the previous period's), 'purchased' never expires. */
 export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
@@ -1236,10 +1311,15 @@ export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
   reason: text('reason').notNull(),
   externalId: text('externalId').notNull().unique(),
   stripePaymentIntentId: text('stripePaymentIntentId'),
+  parentGrantId: uuid('parentGrantId'),
+  stripeInvoiceId: text('stripeInvoiceId'),
+  paymentAllocations: jsonb('paymentAllocations').$type<Record<string, { paidCents: number; totalCents: number }>>().notNull().default({}),
   amountCents: integer('amountCents'),
   currency: text('currency'),
   receiptUrl: text('receiptUrl'),
   stripeFeeCents: integer('stripeFeeCents'),
+  periodStart: timestamp('periodStart', { withTimezone: true }),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('workspace_credit_grants_workspace_idx').on(table.workspaceId, table.createdAt), index('workspace_credit_grants_payment_intent_idx').on(table.stripePaymentIntentId)])
 
@@ -1248,6 +1328,19 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   type: text('type').notNull(),
   processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** APP -> Workspace entitlement delivery. No credentials or payment payloads. */
+export const billingEntitlementOutbox = pgTable('billing_entitlement_outbox', {
+  eventId: text('eventId').primaryKey().references(() => stripeWebhookEvents.id),
+  workspaceId: uuid('workspaceId').notNull(),
+  subscriptionId: text('subscriptionId').notNull(),
+  plan: text('plan').$type<'free' | 'pro' | 'enterprise'>().notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  revision: bigint('revision', { mode: 'number' }).notNull(),
+  billingModel: text('billingModel').$type<'legacy_seat' | 'resource_v1'>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
+}, table => [index('billing_entitlement_pending_idx').on(table.workspaceId, table.deliveredAt, table.revision)])
 
 /** A live key's post-commit revision (lib/live/revisions.ts). No content: kind, ID and a counter. */
 export const liveRevisions = pgTable('live_revisions', {

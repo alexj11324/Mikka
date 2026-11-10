@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { isLiveRevisionKind, LIVE_ID } from '../live/events'
 import type { LiveScope } from '../live/scope'
 import { liveRevisionKey, readLiveRevisions, type LiveRef, type LiveRevisions } from '../live/revisions'
+import { readBatchOwnerRevisionKinds, type BatchReadAction } from './read-batch-contract'
 
 type Database = Parameters<typeof readLiveRevisions>[0]
 type RevisionRead = { ref: LiveRef; resolve: (revision: number | undefined) => void; reject: (error: unknown) => void }
@@ -10,13 +11,14 @@ type BatchContext = {
   active: boolean
   owners: Map<object, Map<string, Promise<LiveScope | null>>>
   revisions: Map<Database, RevisionQueue>
+  ownerRevisionKinds: ReturnType<typeof readBatchOwnerRevisionKinds>
 }
 const batches = new AsyncLocalStorage<BatchContext>()
 
 /** Installed only by the bounded read action. Detached after-work cannot keep
  * using the batch's authority/revision observations once its items settle. */
-export async function withReadBatchContext<T>(work: () => Promise<T>): Promise<T> {
-  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map() }
+export async function withReadBatchContext<T>(work: () => Promise<T>, actions: readonly BatchReadAction[] = []): Promise<T> {
+  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions) }
   try { return await batches.run(scope, work) }
   finally { scope.active = false; scope.owners.clear(); scope.revisions.clear() }
 }
@@ -29,6 +31,22 @@ export function readBatchOwnerScope(database: object, ownerId: string, read: () 
   let pending = owners.get(ownerId)
   if (!pending) { pending = Promise.resolve().then(read); owners.set(ownerId, pending) }
   return pending
+}
+
+/** A prepared batch already knows its owner-list kinds, but never their home.
+ * Once the original reader resolves that home, read those counters together.
+ * Later readers keep the conservative earlier values; only this reader's
+ * original refs leave the helper. Missing/failed counters remain no proof. */
+export async function readBatchOwnerRevisions(database: Database, refs: readonly LiveRef[], home?: LiveScope | null): Promise<LiveRevisions> {
+  const scope = batches.getStore()
+  if (!scope?.active || !home || !scope.ownerRevisionKinds.length) return readBatchRevisions(database, refs)
+  const requested = new Set(refs.filter(ref => isLiveRevisionKind(ref.kind) && LIVE_ID.test(ref.id))
+    .map(ref => liveRevisionKey(ref.kind, ref.id.toLowerCase())))
+  // An entity read or another home cannot start this owner's list prefetch.
+  if (!scope.ownerRevisionKinds.some(kind => requested.has(liveRevisionKey(kind, home.workspaceId.toLowerCase()))))
+    return readBatchRevisions(database, refs)
+  const values = await readBatchRevisions(database, [...refs, ...scope.ownerRevisionKinds.map(kind => ({ kind, id: home.workspaceId }))])
+  return Object.fromEntries(Object.entries(values).filter(([key]) => requested.has(key)))
 }
 
 /** Each caller still awaits the revision before its data. Keys arriving in the

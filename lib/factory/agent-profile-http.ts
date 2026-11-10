@@ -3,9 +3,11 @@ import { AgentKitError } from '@/lib/agent-kit/store'
 import { boundedJSON } from '@/lib/agent-kit/http'
 import { AgentProfileError, agentProfileDefinitionSchema, type AgentProfileScope } from './agent-profile-definition'
 import type { AgentProfileStore } from './agent-profile-store'
+import { profileMarkInputSchema } from './agent-profile-mark'
 
-const createSchema = z.strictObject({ workspaceId: z.uuid().optional(), profile: agentProfileDefinitionSchema, requestId: z.uuid().optional() })
-const updateSchema = z.strictObject({ workspaceId: z.uuid().optional(), version: z.number().int().positive(), profile: agentProfileDefinitionSchema })
+// `mark` sits beside the definition: presentation only, never part of its digest.
+const createSchema = z.strictObject({ workspaceId: z.uuid().optional(), profile: agentProfileDefinitionSchema, mark: profileMarkInputSchema.optional(), requestId: z.uuid().optional() })
+const updateSchema = z.strictObject({ workspaceId: z.uuid().optional(), version: z.number().int().positive(), profile: agentProfileDefinitionSchema, mark: profileMarkInputSchema.optional() })
 const archiveSchema = z.strictObject({ workspaceId: z.uuid().optional(), version: z.number().int().positive() })
 const response = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
 export function createAgentProfileHandler(deps: {
@@ -38,11 +40,11 @@ export function createAgentProfileHandler(deps: {
       }
       if (request.method === 'POST') {
         const input = createSchema.parse(body)
-        return response({ profile: await deps.store.create(scope, input.profile, input.requestId) }, 201)
+        return response({ profile: await deps.store.create(scope, input.profile, input.requestId, input.mark) }, 201)
       }
       if (request.method === 'PATCH') {
         const input = updateSchema.parse(body)
-        return response({ profile: await deps.store.update(scope, profileId!, input.version, input.profile) })
+        return response({ profile: await deps.store.update(scope, profileId!, input.version, input.profile, input.mark) })
       }
       const input = archiveSchema.parse(body)
       return response({ profile: await deps.store.archive(scope, profileId!, input.version) })

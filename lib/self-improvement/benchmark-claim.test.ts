@@ -19,6 +19,7 @@ import { ActionFailureError } from '../action-error'
 import { PublicationError } from '../run-publication-result'
 import * as startupTracing from '../computer/startup-tracing'
 import * as startupDiagnostics from '../computer/startup-diagnostics'
+import * as questionDeliveryContext from '../factory/questions/continuation-delivery-context'
 import * as decisionMcpTool from '../project-map/mcp-tool'
 import { issueTaskSecretAccess } from '../secrets/task-access'
 import { deploymentSwitch, type DeploymentSwitch } from '@/lib/deployment-switches'
@@ -169,6 +170,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/secrets/task-access':{issueTaskSecretAccess},
     '@/lib/execution-identity':{executionMembersActive:async()=>{throw Error('This benchmark fixture has no frozen workspace Secret authority')}},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},
+    '@/lib/factory/questions/continuation-delivery-context':questionDeliveryContext,
     '@/lib/factory/questions/retry':{},'@mikka/protocol/skill':{SKILL_ARTIFACT_HEADER:'x-mikka-skill-artifacts'},
     '@/lib/self-improvement/contract':{ImprovementError},'@/lib/factory/contract':{FactoryError},
     '@/lib/self-improvement/server':{

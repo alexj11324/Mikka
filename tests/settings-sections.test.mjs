@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { SETTINGS_SECTIONS, isSettingsSectionParam, resolveSettingsSection, settingsHref, visibleSettingsSections } from '../lib/settings-sections.ts'
 
-test('every v4 nav item has exactly one section, in Figma order', () => {
-  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal').map(s => s.id), ['account', 'security', 'preferences', 'notifications', 'memory', 'connections', 'models', 'logins', 'privacy', 'computers', 'developer'])
+test('every v4 nav item has exactly one section, in Figma order (Bot 权限 after 连接, 2026-11-09)', () => {
+  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal').map(s => s.id), ['account', 'security', 'preferences', 'notifications', 'memory', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'developer'])
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace').map(s => s.id), ['general', 'members', 'teams', 'permissions', 'secrets', 'audit', 'usage', 'billing', 'cloud'])
 })
 

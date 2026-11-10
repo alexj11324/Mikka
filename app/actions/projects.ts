@@ -14,10 +14,12 @@ import { issueView } from '@/lib/task-identifier-server'
 import { activityActor } from '@/lib/activity-actor'
 import { issueListChanged } from '@/lib/live/lists'
 import { projectInput, projectPatch, projectPeople, hasDependencyCycle, type ProjectChanges } from '@/lib/project-input'
-import { accessibleProjects, requireProjectWrite, type ProjectTransaction } from '@/lib/project-access'
+import { accessibleProjects, accessibleProjectReferences, requireProjectWrite, type ProjectTransaction } from '@/lib/project-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { lockTeamRelations } from '@/lib/team-access'
 import { withTaskWorkspace } from '@/lib/task-workspace'
+import { withResourceAccess, lockResourcesAccess } from '@/lib/resource-access/store'
+import { registerProjectAccess, bindProjectTasks } from '@/lib/resource-access/projects'
 import { notifyStoppedPolicyRuns, runPolicyStopSQL, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 import { deleteProjectData, projectLifecycleImpact, setProjectArchive } from '@/lib/project-lifecycle'
 
@@ -76,8 +78,11 @@ async function persistProject(input: unknown, partial: boolean) {
   const requestedWorkspace = z.object({ workspaceId: z.uuid().optional() }).safeParse(input)
   if (!requestedWorkspace.success) return { error: i18nText('Errors.projectCheckFields') }
   const context = await projectContext(requestedWorkspace.data.workspaceId)
-  try {
-    return await withTaskWorkspace(context.user, context.workspaceId, async (_workspace, tx) => {
+  const reference = patch?.success
+    ? (await accessibleProjectReferences(context.user, context.workspaceId)).find(item => item.id === patch.data.id)
+    : undefined
+  if (patch?.success && !reference) return { error: i18nText('Errors.projectNotFound') }
+  const write = () => withTaskWorkspace(context.user, context.workspaceId, async (_workspace, tx) => {
       const current = patch?.success ? await readProject(tx, context.user, context.workspaceId, patch.data.id) : undefined
       const merged = patch?.success ? { ...current, ...patch.data.changes, id: patch.data.id, revision: patch.data.revision } : input
       // Legacy patch fields and the explicit ID fields have the same authority.
@@ -101,21 +106,33 @@ async function persistProject(input: unknown, partial: boolean) {
       if (hasDependencyCycle(nextId, values.properties.dependencyIds, graph)) return { error: i18nText('Errors.projectDependencyCycle') }
       // These old columns are harmless compatibility snapshots, never relation inputs.
       const stored = { ...values, lead: people.leadUserId ?? '', leadUserId: people.leadUserId, properties: { ...values.properties, members: people.memberIds } }
-      // Signal that the matching canonical member writes below are part of this
-      // already-authorized transaction. The marker expires with this transaction.
-      await tx.execute(sql`select set_config('mikka.project_v2_writer', '1', true)`)
-      const [saved] = existing
-        ? await tx.update(projects).set({ ...stored, revision: existing.revision + 1, updatedAt: new Date() })
-          .where(and(eq(projects.id, nextId), eq(projects.workspaceId, context.workspaceId), eq(projects.revision, existing.revision))).returning()
-        : await tx.insert(projects).values({ ...stored, id: nextId, workspaceId: context.workspaceId, userId: context.user.id, issueIds: [], revision: 1 }).returning()
-      if (!saved) throw new ActionFailureError('projectSaveConflict')
-      await tx.delete(projectMembers).where(eq(projectMembers.projectId, nextId))
-      for (let offset = 0; offset < people.memberIds.length; offset += batchSize) {
-        await tx.insert(projectMembers).values(people.memberIds.slice(offset, offset + batchSize).map(userId => ({ projectId: nextId, workspaceId: context.workspaceId, userId })))
+      // Match the established lock order: Workspace/member, relations, then the
+      // APP content ACL. The already-held relation lock must not wait behind a
+      // second path that takes the ACL first.
+      const save = async () => {
+        // Signal that the matching canonical member writes below are part of this
+        // already-authorized transaction. The marker expires with this transaction.
+        await tx.execute(sql`select set_config('mikka.project_v2_writer', '1', true)`)
+        const [saved] = existing
+          ? await tx.update(projects).set({ ...stored, revision: existing.revision + 1, updatedAt: new Date() })
+            .where(and(eq(projects.id, nextId), eq(projects.workspaceId, context.workspaceId), eq(projects.revision, existing.revision))).returning()
+          : await tx.insert(projects).values({ ...stored, id: nextId, workspaceId: context.workspaceId, userId: context.user.id, issueIds: [], revision: 1 }).returning()
+        if (!saved) throw new ActionFailureError('projectSaveConflict')
+        // A new Project becomes a content resource only after its canonical row
+        // exists. The nested APP commit can leave an unreachable policy if this
+        // Workspace transaction later fails, never an unguarded Project.
+        if (!existing) await registerProjectAccess(context.user, nextId, context.workspaceId)
+        await tx.delete(projectMembers).where(eq(projectMembers.projectId, nextId))
+        for (let offset = 0; offset < people.memberIds.length; offset += batchSize) {
+          await tx.insert(projectMembers).values(people.memberIds.slice(offset, offset + batchSize).map(userId => ({ projectId: nextId, workspaceId: context.workspaceId, userId })))
+        }
+        await emitProjectChange(tx, nextId, context.user.id, i18nText(existing ? 'Projects.activity.updatedOverview' : 'Projects.activity.created'))
+        return { project: await readProject(tx, context.user, context.workspaceId, nextId) }
       }
-      await emitProjectChange(tx, nextId, context.user.id, i18nText(existing ? 'Projects.activity.updatedOverview' : 'Projects.activity.created'))
-      return { project: await readProject(tx, context.user, context.workspaceId, nextId) }
+      return reference ? withResourceAccess(context.user, reference, 'canSteer', save) : save()
     })
+  try {
+    return await write()
   } catch (error) {
     return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectSaveFailed') }
   }
@@ -137,7 +154,19 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
       const projectIds = [...new Set([previous?.projectId, parsed.data.projectId].filter((id): id is string => Boolean(id)))].sort()
       const linked: (typeof projects.$inferSelect)[] = []
       for (const id of projectIds) linked.push(await requireProjectWrite(tx, context.user, id, context.workspaceId, { allowArchived: id !== parsed.data.projectId }))
+      const references = await accessibleProjectReferences(context.user, context.workspaceId)
+      const projectReferences = linked.map(project => references.find(reference => reference.id === project.id))
+      if (projectReferences.some(reference => !reference)) throw new ActionFailureError('projectNotFound')
+      const priorByProject = new Map<string, string[]>()
+      for (const project of linked) {
+        const rows = await tx.select({ id: projectTasks.issueId }).from(projectTasks).where(eq(projectTasks.projectId, project.id))
+        priorByProject.set(project.id, rows.map(row => row.id).sort())
+      }
       return db.transaction(async application => {
+        await lockResourcesAccess(application, context.user.id, [
+          ...projectReferences.map(reference => ({ reference: reference!, action: 'canSteer' as const })),
+          { reference: { kind: 'task' as const, id: parsed.data.issueId, workspaceId: context.workspaceId }, action: 'canManageAccess' as const },
+        ], true)
         const [task] = await application.select().from(issues).where(and(eq(issues.id, parsed.data.issueId), issueVisibilityPredicate(context.user.id, { allowedIds: [], workspaceIds: [context.workspaceId] }))).for('update')
         if (!task) throw new ActionFailureError('issueNotFound')
         if (task.revision !== parsed.data.revision) throw new ActionFailureError('issueOutdated')
@@ -147,6 +176,11 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
         await tx.delete(projectTasks).where(eq(projectTasks.issueId, task.id))
         if (parsed.data.projectId) await tx.insert(projectTasks).values({ issueId: task.id, projectId: parsed.data.projectId, workspaceId: context.workspaceId })
         for (const project of linked) {
+          const before = priorByProject.get(project.id) ?? []
+          const after = project.id === parsed.data.projectId
+            ? [...before.filter(id => id !== task.id), task.id].sort()
+            : before.filter(id => id !== task.id)
+          await bindProjectTasks(application, context.user, { kind: 'project', id: project.id, workspaceId: context.workspaceId }, before, after)
           await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date() }).where(eq(projects.id, project.id))
           await emitProjectChange(tx, project.id, context.user.id, i18nText(project.id === parsed.data.projectId ? 'Projects.activity.tasksAdded' : 'Projects.activity.tasksRemoved'))
         }
@@ -168,8 +202,12 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
 export async function listProjectEvents(id: string, workspaceId?: string) {
   z.uuid().parse(id)
   const context = await projectContext(workspaceId)
-  await readProject(projectDb, context.user, context.workspaceId, id)
-  return projectDb.select().from(projectEvents).where(eq(projectEvents.projectId, id)).orderBy(desc(projectEvents.createdAt)).limit(100)
+  const reference = (await accessibleProjectReferences(context.user, context.workspaceId)).find(item => item.id === id)
+  if (!reference) throw new ActionFailureError('projectNotFound')
+  return withResourceAccess(context.user, reference, 'canReadContent', async () => {
+    await readProject(projectDb, context.user, context.workspaceId, id)
+    return projectDb.select().from(projectEvents).where(eq(projectEvents.projectId, id)).orderBy(desc(projectEvents.createdAt)).limit(100)
+  })
 }
 
 export async function setProjectIssues(input: { id: string; revision: number; issueIds: string[]; workspaceId?: string }) {
@@ -177,6 +215,8 @@ export async function setProjectIssues(input: { id: string; revision: number; is
   const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), issueIds: z.array(z.uuid()), workspaceId: z.uuid().optional() }).safeParse(input)
   if (!parsed.success) return { error: i18nText('Errors.projectIssuesInvalid') }
   const context = await projectContext(parsed.data.workspaceId)
+  const reference = (await accessibleProjectReferences(context.user, context.workspaceId)).find(item => item.id === parsed.data.id)
+  if (!reference) return { error: i18nText('Errors.projectNotFound') }
   const ids = [...new Set(parsed.data.issueIds)].sort()
   try {
     return await withTaskWorkspace(context.user, context.workspaceId, async (_workspace, tx) => {
@@ -186,7 +226,7 @@ export async function setProjectIssues(input: { id: string; revision: number; is
       const prior = await tx.select({ id: projectTasks.issueId }).from(projectTasks).where(eq(projectTasks.projectId, current.id))
       const before = new Set(prior.map(row => row.id)), after = new Set(ids)
       const changed = [...new Set([...before, ...after])].filter(id => before.has(id) !== after.has(id))
-      return db.transaction(async application => {
+      return withResourceAccess(context.user, reference, 'canSteer', () => db.transaction(async application => {
         for (let offset = 0; offset < ids.length; offset += batchSize) {
           const batch = ids.slice(offset, offset + batchSize)
           const found = await application.select({ id: issues.id }).from(issues)
@@ -200,6 +240,7 @@ export async function setProjectIssues(input: { id: string; revision: number; is
           const stopped = await application.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'tasks', issueIds: changed }))
           notifyStoppedPolicyRuns(application, stopped.rows)
         }
+        await bindProjectTasks(application, context.user, reference, [...before].sort(), ids)
         await tx.delete(projectTasks).where(eq(projectTasks.projectId, current.id))
         for (let offset = 0; offset < ids.length; offset += batchSize) {
           await tx.insert(projectTasks).values(ids.slice(offset, offset + batchSize).map(issueId => ({ issueId, projectId: current.id, workspaceId: context.workspaceId })))
@@ -208,7 +249,7 @@ export async function setProjectIssues(input: { id: string; revision: number; is
         await emitProjectChange(tx, current.id, context.user.id, i18nText('FeatureCopy.c_310e5541', { value0: ids.length }))
         for (const id of changed) await issueListChanged(application, id)
         return { project: await readProject(tx, context.user, context.workspaceId, current.id), error: undefined }
-      })
+      }))
     })
   } catch (error) {
     return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectIssuesSaveFailed') }

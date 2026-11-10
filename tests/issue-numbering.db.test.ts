@@ -152,6 +152,25 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
       assert.equal(number, 1)
     })
 
+    await t.test('subtree ranges and single allocations are disjoint, and a failed range rolls back', async () => {
+      const owner = await user()
+      await assert.rejects(db.transaction(async tx => {
+        assert.equal(await allocateIssueNumbers(tx, owner, 4), 1)
+        throw new Error('range rollback')
+      }), /range rollback/)
+      const sizes = [3, 1, 4, 2]
+      const ranges = await Promise.all(sizes.map(count => db.transaction(async tx => {
+        const first = await allocateIssueNumbers(tx, owner, count)
+        return Array.from({ length: count }, (_, index) => first + index)
+      })))
+      assert.deepEqual(ranges.flat().sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      assert.equal(await db.transaction(tx => allocateIssueNumbers(tx, owner)), 11)
+      for (const count of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        await assert.rejects(db.transaction(tx => allocateIssueNumbers(tx, owner, count)), /Invalid issue number allocation/)
+      }
+      assert.equal(await db.transaction(tx => allocateIssueNumbers(tx, owner)), 12, 'invalid ranges consume no numbers')
+    })
+
     await t.test('allocation does not wait for an existing issue row lock', async () => {
       const owner = await user()
       const issueId = randomUUID()

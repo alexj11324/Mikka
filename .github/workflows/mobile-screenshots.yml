@@ -1,0 +1,178 @@
+name: Mobile App Store screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      overlay_sha:
+        description: Exact reviewed hosted UI commit (40 lowercase hex characters)
+        type: string
+        required: true
+        default: c34b3adf07240afebae725b2af599cfbc69c4f42
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-app-store-screenshots
+  cancel-in-progress: false
+
+jobs:
+  screenshots:
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963'
+    runs-on: macos-26
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_API_URL: https://app.aspectlylabs.com/mikka
+      OVERLAY_SHA: ${{ inputs.overlay_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Validate trusted source and existing main CI
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/mobile-screenshots.mjs source
+      - name: Check screenshot credential and artifact boundaries
+        run: node --test scripts/release/mobile-screenshots.test.mjs
+      - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
+      - run: pnpm --filter @mikka/mobile typecheck
+      - name: Install pinned native UI driver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/mikka-maestro"
+          cd "$RUNNER_TEMP/mikka-maestro"
+          if gh release download cli-2.12.1 --repo mobile-dev-inc/Maestro --pattern maestro.zip --pattern checksums_sha256.txt > download.log 2>&1; then
+            :
+          else
+            status=$?
+            echo "::error::Pinned Maestro asset download failed (exit $status)."
+            exit "$status"
+          fi
+          shasum -a 256 -c checksums_sha256.txt
+          unzip -q maestro.zip
+          echo "$RUNNER_TEMP/mikka-maestro/maestro/bin" >> "$GITHUB_PATH"
+      - name: Read existing hosted UI checkout key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: HOSTED_UI_READ_KEY
+          recursive: false
+          include-imports: false
+      - name: Check out exact reviewed private UI
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: alexj11324/mikka-hosted-ui
+          ref: ${{ inputs.overlay_sha }}
+          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
+          path: .hosted-ui
+          persist-credentials: false
+      - name: Require the exact mobile overlay
+        run: |
+          test "$(git -C .hosted-ui rev-parse HEAD)" = "$OVERLAY_SHA"
+          test -d .hosted-ui/mobile
+          echo 'HOSTED_UI_READ_KEY=' >> "$GITHUB_ENV"
+          echo 'MIKKA_MOBILE_OVERLAY_DIR=.hosted-ui/mobile' >> "$GITHUB_ENV"
+      - name: Build unsigned Release app and boot English iPhone
+        run: bash scripts/release/mobile-screenshots-build.sh
+      - name: Read existing review email
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: APP_STORE_REVIEW_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read existing review password
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: APP_STORE_REVIEW_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Sign in normally and capture read-only native screens
+        run: node scripts/release/mobile-screenshots.mjs capture
+      - name: Remove private driver output, credentials and simulator
+        if: always()
+        run: node scripts/release/mobile-screenshots.mjs cleanup
+      - name: Preserve PNGs and sanitized provenance
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mobile-app-store-${{ github.sha }}
+          path: ${{ runner.temp }}/mikka-app-store-export/
+          if-no-files-found: error
+          retention-days: 14
+
+  driver-preflight:
+    name: Credential-free native driver preflight
+    if: >-
+      github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') &&
+      github.ref != 'refs/heads/main' && github.repository == 'alexj11324/Mikka' &&
+      github.repository_id == '1427517699' && github.repository_owner_id == '183887963'
+    runs-on: macos-26
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      CI: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install pinned native UI driver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/mikka-maestro"
+          cd "$RUNNER_TEMP/mikka-maestro"
+          if gh release download cli-2.12.1 --repo mobile-dev-inc/Maestro --pattern maestro.zip --pattern checksums_sha256.txt > download.log 2>&1; then
+            :
+          else
+            status=$?
+            echo "::error::Pinned Maestro asset download failed (exit $status)."
+            exit "$status"
+          fi
+          shasum -a 256 -c checksums_sha256.txt
+          unzip -q maestro.zip
+          echo "$RUNNER_TEMP/mikka-maestro/maestro/bin" >> "$GITHUB_PATH"
+      - name: Boot English simulator and check stock Settings accessibility
+        run: bash scripts/release/mobile-screenshots-build.sh --preflight-only
+      - name: Remove owned simulator and private driver output
+        if: always()
+        run: node scripts/release/mobile-screenshots.mjs cleanup

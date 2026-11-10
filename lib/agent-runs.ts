@@ -345,7 +345,9 @@ async function runVisibilityPredicate(reader: IssueReader) {
   const visibility = await issueVisibility(reader, false, undefined, db, { withTeamLinks: false })
   const tenant = visibility.workspaceIds.length ? inArray(agentRuns.workspaceId, visibility.workspaceIds) : sql`false`
   const task = and(visibility.predicate, eq(agentRuns.workspaceId, issues.workspaceId))
-  return and(tenant, or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), task)), task))
+  // Task-bound runs use the exact same Task gate for every reader. Factoring
+  // it once avoids sending and evaluating the full recursive ACL twice.
+  return and(tenant, or(and(eq(agentRuns.userId, userId), isNull(agentRuns.issueId)), task))
 }
 
 /**

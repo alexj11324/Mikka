@@ -2,6 +2,7 @@ import { bearerMatches, deviceGatewayTicketValid } from '../device-gateway-ticke
 import { LIVE_CHANNEL, LIVE_ID, LIVE_REVISION_PARAM, liveInvalidations } from '../live/events'
 import { LIVE_PRESENCE_PARAM } from '../live/presence'
 import { readSessionLiveTicket } from '../live/session-ticket'
+import { liveRevocation } from '../live/revocation'
 import { builtinGatewayConfig } from './config'
 import type { GatewayHub, GatewaySocket } from './hub'
 
@@ -60,6 +61,7 @@ export async function gatewayRequest(request: Request, hub: GatewayHub, env: Env
     const chunks: Uint8Array[] = []
     let size = 0
     let events
+    let revoke = false
     try {
       while (true) {
         const { done, value } = await reader.read()
@@ -68,9 +70,15 @@ export async function gatewayRequest(request: Request, hub: GatewayHub, env: Env
         if (size > 2048) { await reader.cancel(); return new Response(null, { status: 400 }) }
         chunks.push(value)
       }
-      events = liveInvalidations(JSON.parse(Buffer.concat(chunks).toString('utf8')), true)
+      const payload: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      revoke = liveRevocation(payload)
+      if (!revoke) events = liveInvalidations(payload, true)
     } catch { return new Response(null, { status: 400 }) }
     finally { reader.releaseLock() }
+    if (revoke) {
+      await hub.revokeLive(found.key)
+      return Response.json({ revoked: true })
+    }
     if (!events) return new Response(null, { status: 400 })
     await hub.live(found.key, events)
   }

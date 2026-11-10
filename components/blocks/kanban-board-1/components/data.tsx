@@ -1,5 +1,6 @@
 import type { listIssues } from '@/app/actions/issues'
 import type { TaskRun } from '@/app/actions/task-runs'
+import type { TaskState } from '@/hooks/use-bot-tasks'
 import { threadGroup, type GroupIssue } from '@/lib/thread-groups'
 import { CircleStop } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
@@ -42,6 +43,19 @@ export type RunOwner = Pick<TaskRun, 'bot' | 'harnesses'>
 /** The task's newest thread, by its group in the right column (R-52); a settled thread (空闲, 已解决) shows nothing. */
 export type AgentState = 'running' | 'waiting' | 'blocked'
 export const AGENT_STATES: AgentState[] = ['running', 'waiting', 'blocked']
+/**
+ * A card's status-line kind (the board's own state glyph) for the task's own state from localTaskState (decision #1864
+ * point 6): 运行中 / 排队中 run, 等你处理 waits, 受阻 / 失败 block, the closed ones are done; 待办 and 暂不处理 draw no line
+ * (the column already says so).
+ */
+export function cardStateKind(state: TaskState): AgentState | 'done' | null {
+  if (state === 'running' || state === 'queued') return 'running'
+  if (state === 'waiting') return 'waiting'
+  if (state === 'blocked' || state === 'failed') return 'blocked'
+  if (state === 'done' || state === 'canceled' || state === 'duplicate') return 'done'
+  return null
+}
+
 export function agentStateOf(run: Pick<TaskRun, 'status' | 'outcome'> | undefined, issue: GroupIssue | undefined): AgentState | null {
   if (!run) return null
   const group = threadGroup({ id: '', status: run.status, issueId: null, createdAt: '', outcome: run.outcome }, issue)

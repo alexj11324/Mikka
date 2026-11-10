@@ -1,13 +1,13 @@
 import { HARNESS } from '@/lib/harness'
+import { mobileMessages } from '@/lib/messages'
 import type { TaskActivity, ThreadItem } from '@/lib/types'
-import { attemptState } from './task-groups'
 
 export type Attempt = Extract<TaskActivity, { kind: 'attempt' }>
 /** One attempt's part of the task's conversation, and the raw error it ended with (2026-11-05-0330: inside the attempt). */
 export type Segment = { attempt: Attempt; items: ThreadItem[]; error: string | null }
 
 /**
- * A task's one conversation (Alex 2026-11-07: 「第二次尝试明显应该在第一次之后」): each attempt's thread, oldest at the
+ * A task's one conversation (Alex 2026-11-07: the second run comes after the first): each attempt's thread, oldest at the
  * top. A thread read from an earlier run also holds the runs after it (R-81), so each attempt keeps only what no
  * newer attempt already shows.
  */
@@ -26,12 +26,50 @@ export function conversationSegments(activity: readonly TaskActivity[], threads:
 
 const agent = (harness: string) => HARNESS[harness] ?? harness
 
-/** Between two attempts: 「第 1 次尝试失败 · 换 Claude Code 再试」, or 「· 再试」 with the same Agent. */
-export function dividerText(previous: Attempt, next: Attempt): string {
-  const result = attemptState(previous)
-  const word = result === 'failed' ? '失败' : result === 'blocked' ? '受阻' : '结束'
-  return `第 ${previous.n} 次尝试${word} · ${next.harness === previous.harness ? '再试' : `换 ${agent(next.harness)} 再试`}`
+/**
+ * A task is one conversation (Alex 2026-11-08). Runs with the same Agent in a row (follow-ups, waiting for a reply,
+ * the factory's review, verify and fix) are one stretch of it; a new stretch starts only when the task switched to
+ * another Agent (Claude Code ↔ Codex ↔ Cursor).
+ */
+export type AgentRun = { harness: string; attempts: Attempt[] }
+
+/**
+ * A factory stage's start, marked inline in the conversation (2026-11-04-2200). Implementing is the conversation
+ * itself, and verification belongs to it, so neither is marked; 审阅 is its own result card (reviewRun), not a marker.
+ */
+const STAGE_MARK: Partial<Record<NonNullable<Attempt['stage']>, string>> = { fix: mobileMessages.MobileCore.conversation.fix }
+
+/** The factory's review: one run per task, drawn as a 审阅 result card that opens to its transcript. */
+export const reviewRun = (attempt: Pick<Attempt, 'stage'>) => attempt.stage === 'review'
+
+/**
+ * What sits between two runs of the task's conversation (Alex 2026-11-09: no 「尝试」, no numbering and, as Warp shows
+ * it, no switch verb). Only where the Agent changed: the next Agent itself, its glyph and name. With the same Agent
+ * nothing divides them; where the factory goes back to fix (`stage`, when the server sends it) a small marker says so.
+ * No stage, no marker; the review is its own card.
+ */
+export type Boundary = { kind: 'agent'; harness: string } | { kind: 'stage'; text: string } | null
+export function boundary(previous: Attempt, next: Attempt): Boundary {
+  if (next.harness !== previous.harness) return { kind: 'agent', harness: next.harness }
+  const mark = next.stage ? STAGE_MARK[next.stage] : undefined
+  return mark ? { kind: 'stage', text: mark } : null
 }
+
+/** 活动 on the task's page: its creation and replaced threads, and one row per Agent's stretch, oldest first. */
+export type ActivityEntry = Exclude<TaskActivity, Attempt> | { kind: 'agent'; run: AgentRun }
+export function activityEntries(activity: readonly TaskActivity[]): ActivityEntry[] {
+  // The server sends 活动 newest first.
+  const oldestFirst = [...activity].reverse()
+  const entries: ActivityEntry[] = []
+  for (const item of oldestFirst) {
+    if (item.kind !== 'attempt') { entries.push(item); continue }
+    const last = entries.at(-1)
+    if (last?.kind === 'agent' && last.run.harness === item.harness) last.run.attempts.push(item)
+    else entries.push({ kind: 'agent', run: { harness: item.harness, attempts: [item] } })
+  }
+  return entries
+}
+
 
 /** The Agent of the newest attempt, under the task's title. */
 export const currentAgent = (segments: readonly Segment[]) => segments.length ? agent(segments[segments.length - 1]!.attempt.harness) : null

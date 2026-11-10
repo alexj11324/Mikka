@@ -4,7 +4,7 @@ import type { SavedAccount } from '../lib/server-store.ts'
 
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { promise, resolve } }
 const first: SavedAccount = { id: 'legacy', user: { id: 'same-id', name: 'A', email: 'a@example.test' }, server: {
-  url: 'https://cloud.example/mikka', name: 'Cloud', version: null, edition: 'cloud', signIn: { email: true, google: false, github: false }, mobileReady: true } }
+  url: 'https://cloud.example/mikka', name: 'Cloud', version: null, edition: 'cloud', signIn: { email: true, google: false, github: false, apple: false }, mobileReady: true } }
 const second: SavedAccount = { ...first, id: '1', server: { ...first.server, url: 'https://self.example/mikka' }, user: { ...first.user!, name: 'B' } }
 let current = first, ended = 0
 const cookie = deferred<string>()

@@ -49,7 +49,8 @@ export function factoryAuthorizationCheckpoint(tx: PoolClient): () => void {
 }
 /** Slow planning precedes fresh membership acquisition. Source/Profile locks
  * stay on tx; the real membership lease remains pinned through this COMMIT. */
-export async function commitFactoryTransaction(tx: PoolClient) {
+export async function commitFactoryTransaction(tx: PoolClient,
+  heldMembership?: { ownerId: string; workspaceId: string; check: () => Promise<void> }) {
   assertFactoryTransaction(tx);
   const profiles = [...factoryTransactions.get(tx)!.profiles.values()];
   const members: ProfileLease[] = [];
@@ -64,7 +65,16 @@ export async function commitFactoryTransaction(tx: PoolClient) {
         if (selection) await assertProfileSelection(tx, scope, selection);
         scopes.set(JSON.stringify([scope.ownerId, scope.workspaceId]), scope);
       }
-      for (const [, scope] of [...scopes.entries()].sort(([a], [b]) => a.localeCompare(b))) members.push(await acquireProfileMembership(scope));
+      for (const [, scope] of [...scopes.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+        if (heldMembership) {
+          // A composing owner may already hold these exact WS/member locks.
+          // A second lease behind a waiting deletion would deadlock its own
+          // first lease; retain and check the original through this COMMIT.
+          if (scope.ownerId !== heldMembership.ownerId || scope.workspaceId !== heldMembership.workspaceId)
+            throw new Error('factoryProfileMembershipMismatch');
+          await heldMembership.check();
+        } else members.push(await acquireProfileMembership(scope));
+      }
       for (const member of members) await member.check();
     }
     await tx.query('COMMIT');

@@ -2,6 +2,7 @@ import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { measured, readMetrics } from './helpers/read-metrics'
 import { mergeList } from '../lib/list-poll'
@@ -16,8 +17,37 @@ function successful<T>(result: ActionResult<T>): T {
   return result as T
 }
 
+async function warmIdentifierPools(pools: { app: Pool; workspace: Pool }) {
+  const capacity = Object.entries(pools).map(([name, database]) => {
+    const { max, connectionTimeoutMillis } = database.options
+    assert.ok(Number.isInteger(max) && max > 0, `${name} pool has a bounded configured capacity`)
+    assert.ok(typeof connectionTimeoutMillis === 'number' && Number.isFinite(connectionTimeoutMillis) && connectionTimeoutMillis > 0,
+      `${name} pool bounds every checkout`)
+    return { name, database, max }
+  })
+  // Hold every slot until all checkouts and probes settle. Releasing one early
+  // lets a later checkout reuse it without initializing the remaining slots.
+  const acquired = await Promise.allSettled(capacity.flatMap(({ database, max }) =>
+    Array.from({ length: max }, async () => database.connect())))
+  const clients = acquired.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
+  let ready = false
+  try {
+    const failures = acquired.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
+    if (failures.length) throw new AggregateError(failures, 'Identifier pool checkout failed')
+    const probe = { text: 'SELECT 1', query_timeout: 10_000 }
+    const queried = await Promise.allSettled(clients.map(async client => client.query(probe)))
+    const queryFailures = queried.flatMap(result => result.status === 'rejected' ? [result.reason] : [])
+    if (queryFailures.length) throw new AggregateError(queryFailures, 'Identifier pool startup probe failed')
+    ready = true
+    return Object.fromEntries(capacity.map(({ name, max }) => [name, max]))
+  } finally {
+    for (const client of clients) client.release(!ready)
+  }
+}
+
 test('detail and activity revalidate current access while returning only changed content and history summaries', { skip: !enabled }, async t => {
   const { db, pool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
   const { actAs } = await import('../lib/acting-user')
   const { getIssue, saveIssue, listIssueVersions, pollIssue, pollIssueVersionSummaries, promoteIssueToTeam } = await import('../app/actions/issues')
   const { syncCoordinatorChat } = await import('../app/actions/coordinator')
@@ -148,19 +178,51 @@ test('detail and activity revalidate current access while returning only changed
       const { ActionFailureError } = await import('../lib/action-error')
       const { listIssueConnections } = await import('../app/actions/issue-operations')
       const { citationSources } = await import('../lib/coordinator/store')
+      const { runAction } = await import('../lib/action-error')
+      // Team links only name this already-bound shared task. The Personal task
+      // above remains a separate control; unlinking never transfers ownership.
+      const id = sharedId
+      const readWorkspace = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), workspaceId) as Promise<T>
+      const sharedNumber = successful(await readWorkspace(() => getIssue(id))).issue.metadata.number
+      assert.equal(sharedNumber, 2, 'the shared task keeps its owner-allocated number')
+      const warmCitationPool = async (teamState: 'linked' | 'unlinked' | 'revoked') => {
+        // A single shape read can finish one concurrent query before the next
+        // acquires its client. It does not guarantee a fully warm pool: a later
+        // shape may still open a connection inside a steady-state budget.
+        // Hold the existing APP pool's full capacity until all checkouts finish;
+        // keep every startup byte in a separate, visible measurement.
+        const capacity = pool.options.max
+        assert.equal(capacity, 5, 'use the existing APP pool capacity, never change its configuration')
+        const warmup = await measured(async () => {
+          const acquired = await Promise.allSettled(Array.from({ length: capacity }, () => pool.connect()))
+          const clients = acquired.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
+          try {
+            for (const result of acquired) if (result.status === 'rejected') throw result.reason
+            return { capacity, clients: new Set(clients).size }
+          } finally {
+            for (const client of clients) client.release()
+          }
+        })
+        assert.equal(warmup.value.clients, capacity, 'each held checkout must use a distinct real connection')
+        assert.equal(warmup.statements, 0, 'pool startup issues no application SQL')
+        t.diagnostic(JSON.stringify({ event: 'identifier_pool_warmup', teamState,
+          scope: 'connection_startup_before_steady_state_budget', ...warmup.value, ...readMetrics(warmup) }))
+      }
       const citationAgent = randomUUID(), citationRun = randomUUID()
       await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [citationAgent, owner, 'Citation control', 'codex'])
       await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,"agentDefinition","workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8)',
         [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId } }), workspaceId])
       const issueCite = `[[issue:${id}]]`, runCite = `[[run:${citationRun}]]`
       await readWorkspace(() => listIssueConnections(id))
-      // Initialize both exact read shapes before recording their steady-state
-      // budgets. Keep the warm-up socket costs visible, including any new
-      // connections opened by concurrent run and team reads.
+      // Initialize both exact read shapes and both real pools before recording
+      // their steady-state budgets. Keep the warm-up socket costs visible,
+      // including any new connections opened by concurrent run and team reads.
+      const linkedPoolsWarm = await measured(() => warmIdentifierPools({ app: pool, workspace: workspacePool }))
       const linkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const linkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'linked',
-        scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(linkedDirectWarm),
+        scope: 'data-read-path_including_connection_startup', poolCapacity: linkedPoolsWarm.value,
+        poolStartup: readMetrics(linkedPoolsWarm), directCitation: readMetrics(linkedDirectWarm),
         runOnlyCitation: readMetrics(linkedRunWarm) }))
       const linkedConnections = await measured(() => readWorkspace(() => listIssueConnections(id)))
       const linkedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
@@ -200,24 +262,28 @@ test('detail and activity revalidate current access while returning only changed
         assert.ok(unlinkedSave.statements <= personalSave.statements + 1,
           `default issueView statements ${unlinkedSave.statements} vs personal ${personalSave.statements} plus one existing workspace verification read`)
       })
+      const unlinkedPoolsWarm = await measured(() => warmIdentifierPools({ app: pool, workspace: workspacePool }))
       const unlinkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const unlinkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'unlinked',
-        scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(unlinkedDirectWarm),
+        scope: 'data-read-path_including_connection_startup', poolCapacity: unlinkedPoolsWarm.value,
+        poolStartup: readMetrics(unlinkedPoolsWarm), directCitation: readMetrics(unlinkedDirectWarm),
         runOnlyCitation: readMetrics(unlinkedRunWarm) }))
       const unlinkedConnections = await measured(() => readWorkspace(() => listIssueConnections(id)))
       const unlinkedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const unlinkedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
 
       // Frozen same-fixture measurements on main 3c32675c: a changed linked
-      // control cannot make an upstream SQL/payload regression pass.
+      // control cannot make an upstream SQL/payload regression pass. The Task
+      // review hint adds a bounded boolean column (and its correlated SQL) to
+      // the citation reads; statement counts are unchanged.
       const originalIdentifierReadMetrics = {
         linkedConnections: { statements: 14, read: 3490, written: 5497 },
         unlinkedConnections: { statements: 14, read: 3192, written: 5346 },
-        linkedCitation: { statements: 4, read: 955, written: 1875 },
-        unlinkedCitation: { statements: 5, read: 1083, written: 2140 },
+        linkedCitation: { statements: 4, read: 1188, written: 1934 },
+        unlinkedCitation: { statements: 5, read: 1403, written: 2257 },
         linkedRunCitation: { statements: 9, read: 3157, written: 6581 },
-        unlinkedRunCitation: { statements: 10, read: 2762, written: 6564 },
+        unlinkedRunCitation: { statements: 10, read: 2708, written: 6897 },
       } as const
       for (const [label, result, statementLimit] of [
         ['linkedConnections', linkedConnections, 14],
@@ -327,11 +393,14 @@ test('detail and activity revalidate current access while returning only changed
       const beforeRevocation = (await pool.query('select "issuedIdentifier",content from issues where id=$1', [id])).rows[0]
       await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner, 'suspended'])
       assert.equal((await readWorkspace(() => getIssue(id))).error, 'issueNotFound')
-      assert.equal((await readWorkspace(() => pollIssue(id, relinked.version))).error, 'issueNotFound', 'a previously valid cursor never grants access')
-      const revokedConnections = await measured(async () => {
-        await assert.rejects(() => readWorkspace(() => listIssueConnections(id)), error => error instanceof ActionFailureError && error.code === 'issueNotFound')
-        return { error: 'issueNotFound' }
-      })
+      assert.equal((await readWorkspace(() => pollIssue(id, relinked.version))).error, 'issueNotFound')
+      await warmCitationPool('revoked')
+      const revokedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const revokedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
+      t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'revoked',
+        scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(revokedDirectWarm),
+        runOnlyCitation: readMetrics(revokedRunWarm) }))
+      const revokedConnections = await measured(() => readWorkspace(() => runAction(() => listIssueConnections(id))))
       const revokedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
       const revokedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       await t.test('revoked owners lose connections and both citation readers without rewriting history', () => {
@@ -347,9 +416,11 @@ test('detail and activity revalidate current access while returning only changed
       assert.deepEqual((await pool.query('select "issuedIdentifier",content from issues where id=$1', [id])).rows[0], beforeRevocation)
       // Captured on the same fixture against old main 3c32675c; these are
       // actual revoked-owner measurements, not inferred from the linked case.
+      // The direct citation carries the nine-byte codingReview hint from the
+      // Task review feature; its statement count is unchanged.
       for (const [label, result, statementLimit, originalTotal] of [
         ['revokedConnections', revokedConnections, 12, 7464],
-        ['revokedCitation', revokedCitation, 3, 2097],
+        ['revokedCitation', revokedCitation, 3, 2106],
         ['revokedRunCitation', revokedRunCitation, 7, 7700],
       ] as const) {
         await t.test(label + ' stays within its frozen old-source budget', () => {
@@ -445,5 +516,88 @@ test('detail and activity revalidate current access while returning only changed
     await pool.query('delete from issues where "userId"=any($1::text[])', [[owner, stranger]])
     await pool.query('delete from issue_prefixes where "userId"=any($1::text[])', [[owner, stranger]])
     await pool.query('delete from "user" where id=any($1::text[])', [[owner, stranger]])
+  }
+})
+
+test('chat readers advertise the authorized bot tenant for live delivery', { skip: !enabled }, async t => {
+  const { pool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
+  const { getCoordinatorChat, syncCoordinatorChat } = await import('../app/actions/coordinator')
+  const { botChatTargets } = await import('../lib/live/chats')
+  const owner = `chat-scope-owner-${randomUUID()}`, peer = `chat-scope-peer-${randomUUID()}`
+  const home = randomUUID(), team = randomUUID(), peerHome = randomUUID()
+  const teamBot = randomUUID(), personalBot = randomUUID(), peerBot = randomUUID()
+  const users = [owner, peer], workspaces = [home, team, peerHome], botIds = [teamBot, personalBot, peerBot]
+  const read = <T>(userId: string, workspaceId: string, work: () => Promise<T>) =>
+    withActivitySession(userId, work, workspaceId)
+  try {
+    for (const id of users) await pool.query(
+      'insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())',
+      [id, `${id}@example.invalid`],
+    )
+    await seedFixtureWorkspace(workspacePool, owner, 'personal', home)
+    await seedFixtureWorkspace(workspacePool, owner, 'team', team)
+    await seedFixtureWorkspace(workspacePool, peer, 'personal', peerHome)
+    await workspacePool.query(
+      'insert into mikka_workspace_members("workspaceId","userId",name,email,role,status) values($1,$2,$2,$3,\'member\',\'active\')',
+      [team, peer, `${peer}@example.invalid`],
+    )
+    for (const [id, userId, workspaceId] of [[teamBot, owner, team], [personalBot, owner, home], [peerBot, peer, team]]) {
+      await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,\'Chat scope fixture\')', [id, userId, workspaceId])
+      await pool.query('insert into coordinator_messages(id,"userId","botId",position,message) values($1,$2,$3,1,$4)',
+        [randomUUID(), userId, id, JSON.stringify({ role: 'assistant', content: 'Committed fixture reply' })])
+    }
+
+    await t.test('team full, cold and unchanged reads match the writer and never the personal home', async () => {
+      const [writer] = await botChatTargets(pool, workspacePool, owner, teamBot)
+      assert.deepEqual(writer.scope, { ownerId: owner, workspaceId: team })
+      const full = await read(owner, team, () => getCoordinatorChat(teamBot))
+      const cold = successful(await read(owner, team, () => syncCoordinatorChat(teamBot))).chat
+      assert.ok(!('unchanged' in cold))
+      assert.ok(cold.version)
+      const unchanged = successful(await read(owner, team, () => syncCoordinatorChat(teamBot, cold.version))).chat
+      assert.equal('unchanged' in unchanged && unchanged.unchanged, true)
+      for (const chat of [full, cold, unchanged]) {
+        assert.deepEqual({ ownerId: chat.live?.ownerId, workspaceId: chat.live?.workspaceId }, writer.scope)
+        assert.notEqual(chat.live?.workspaceId, home)
+      }
+    })
+
+    await t.test('a personal bot retains its own authorized personal channel', async () => {
+      const [writer] = await botChatTargets(pool, workspacePool, owner, personalBot)
+      assert.deepEqual(writer.scope, { ownerId: owner, workspaceId: home })
+      const full = await read(owner, home, () => getCoordinatorChat(personalBot))
+      const incremental = successful(await read(owner, home, () => syncCoordinatorChat(personalBot))).chat
+      for (const chat of [full, incremental]) {
+        assert.deepEqual({ ownerId: chat.live?.ownerId, workspaceId: chat.live?.workspaceId }, writer.scope)
+      }
+    })
+
+    await t.test('wrong workspace and another owner cannot obtain chat or live metadata', async () => {
+      for (const [userId, workspaceId, botId] of [[owner, home, teamBot], [peer, team, teamBot], [owner, team, peerBot]]) {
+        const denied = await read(userId, workspaceId, () => syncCoordinatorChat(botId))
+        assert.ok(denied.error)
+        assert.equal('chat' in denied, false)
+        await assert.rejects(() => read(userId, workspaceId, () => getCoordinatorChat(botId)))
+      }
+      assert.deepEqual(await botChatTargets(pool, workspacePool, peer, teamBot), [])
+    })
+
+    await t.test('membership revocation also rejects a previously valid chat version', async () => {
+      const before = successful(await read(owner, team, () => syncCoordinatorChat(teamBot))).chat
+      assert.ok(before.version)
+      await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [team, owner])
+      const denied = await read(owner, team, () => syncCoordinatorChat(teamBot, before.version))
+      assert.ok(denied.error)
+      assert.equal('chat' in denied, false)
+      await assert.rejects(() => read(owner, team, () => getCoordinatorChat(teamBot)))
+      assert.deepEqual(await botChatTargets(pool, workspacePool, owner, teamBot), [])
+    })
+  } finally {
+    await pool.query('delete from coordinator_messages where "botId"=any($1::uuid[])', [botIds])
+    await pool.query('delete from bots where id=any($1::uuid[])', [botIds])
+    await workspacePool.query('delete from mikka_workspace_members where "workspaceId"=any($1::uuid[])', [workspaces])
+    await workspacePool.query('delete from mikka_workspaces where id=any($1::uuid[])', [workspaces])
+    await pool.query('delete from "user" where id=any($1::text[])', [users])
   }
 })

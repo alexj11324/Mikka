@@ -23,6 +23,9 @@ export interface WorkerModelDispatch {
 }
 
 export interface WorkerDefinitionSnapshot {
+  /** Correlates a complete host-frozen review request. It grants no authority;
+   * claim resolves the immutable accepted batch for this exact queued Run. */
+  workspaceReview?: { batchId: string; fingerprint: string; sourceRunId: string }
   /** Correlation only; excluded from the frozen execution/authority digest. */
   traceContext?: RunTraceContext
   /** Trusted dispatch identity; absent on historical runs, never inferred retroactively. */

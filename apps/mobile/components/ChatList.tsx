@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
@@ -56,11 +57,11 @@ export function ChatRowContent({ row, badge }: { row: ChatRow; badge?: ReactNode
   return (
     <View style={styles.row}>
       {bot ? <BotAvatar id={bot.id} coordinator={bot.coordinator} color={bot.color} shape={bot.shape} size={AVATAR.row} />
-        : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={18} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
+        : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={18} color={colors.secondary} web={<Text style={styles.groupGlyph}>{mobileMessages.MobileCore.groupGlyph}</Text>} /></View>}
       <View style={styles.body}>
         <View style={styles.top}>
           <Text style={styles.name} numberOfLines={1}>{bot ? bot.name : group!.title}</Text>
-          {bot?.working ? <Text style={styles.when}>进行中</Text> : row.at ? <Text style={styles.when}>{shortWhen(row.at)}</Text> : null}
+          {bot?.working ? <Text style={styles.when}>{mobileMessages.Issue.status.doing}</Text> : row.at ? <Text style={styles.when}>{shortWhen(row.at)}</Text> : null}
         </View>
         {line || dot || badge ? (
           <View style={styles.top}>

@@ -7,6 +7,7 @@ import { mock, test } from 'node:test'
 import type { PoolClient } from 'pg'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedProjectTasks, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { ownLiveRuntime } from '../../tests/support/live-runtime'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedPersonalWorkspace, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('project map uses real PostgreSQL and normal HTTP PAT authorization', { skip: !dbUrl, timeout: 180_000 }, async t => {
   const live = await ownLiveRuntime(t)
@@ -49,9 +50,8 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
   const overview = await import('../../app/api/projects/[projectId]/map/overview/route')
   const source = await import('../../app/api/projects/[projectId]/map/sources/[sourceRef]/route')
   const owner = await seedUser(connection, 'map-reader'), peer = await seedUser(connection, 'map-peer')
-  const home = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }])
-  const other = await seedWorkspace(connection, peer, [{ userId: peer, role: 'admin' }])
-  await connection.query('UPDATE mikka_workspaces SET kind=\'personal\' WHERE id=ANY($1::uuid[])', [[home.id, other.id]])
+  const home = { id: await seedPersonalWorkspace(connection, owner) }
+  const other = { id: await seedPersonalWorkspace(connection, peer) }
   const projectId = await seedProject(connection, owner, []), issueId = await seedIssue(connection, owner, home.id)
   await seedProjectTasks(connection, projectId, [issueId])
   const botId = await seedBot(connection, home.id, owner), agentId = await seedAgent(connection, owner)

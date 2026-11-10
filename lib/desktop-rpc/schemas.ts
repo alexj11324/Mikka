@@ -6,6 +6,7 @@ import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullReque
 import { ISSUE_STATUS_CODES, ISSUE_PRIORITY_CODES } from '@/lib/issue-meta'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
+import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { setAppPolicyInput } from '@/lib/app-policy/apps'
@@ -166,7 +167,7 @@ export const desktopActionSchemas = {
   'coordinator.coordinatorCitationSources': tuple(z.array(uuid).min(1).max(50)),
   'coordinator.coordinatorReasoning': tuple(bot, z.array(positive).min(1).max(50)),
   'coordinator.pollBotChatSummaries': none,
-  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional(), workspace),
+  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional(), workspace, taskTitleInputSchema.optional()),
   'coordinator.welcomeCoordinator': tuple(bot.optional()),
   'coordinator.stopCoordinatorTurn': tuple(bot.optional()),
   'coordinator.retryCoordinatorTurn': tuple(bot.optional()),
@@ -269,6 +270,9 @@ export const desktopActionSchemas = {
   'teams.saveTeam': tuple(object({ id: uuid.optional(), workspaceId: uuid, name: text(120).trim().min(1), identifier: text(20).min(1), description: text(2000) })),
   'teams.listTeamMembers': tuple(uuid, workspace),
   'teams.changeTeamMember': tuple(object({ teamId: uuid, userId: id.optional(), action: z.enum(['join', 'leave', 'add', 'remove', 'owner', 'member']) })),
+  // 删除团队: the server checks the workspace admin and that the typed name equals the team's (app/actions/teams.ts).
+  'teams.getTeamDeletionImpact': tuple(uuid),
+  'teams.deleteTeam': tuple(uuid, text(120)),
   'telegram.getTelegramIntegrationStatus': none,
   'telegram.createTelegramConnectLink': none,
   'telegram.disconnectTelegram': none,

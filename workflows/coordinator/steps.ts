@@ -38,7 +38,7 @@ import { coordinatorTaskWorkspace } from '@/lib/coordinator/issue-team'
 import { addRunMessage,  readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, cachedContextLines, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
-import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
+import { withPersonalInstructionText } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import * as store from '@/lib/coordinator/store'
@@ -190,6 +190,16 @@ export async function turnSettings(userId: string, botId: string) {
   return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), agentKitEnabled: agentKitEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), coordinator, runtime: selected }
 }
 
+/** Node-only candidate, frozen by takeStartupInbox's first successful COMMIT.
+ * Current runtime() is the pure ai_sdk selection; native keeps its old path. */
+export async function hostedStartupSettings(userId: string): Promise<import('@/lib/coordinator/startup-receipt').CoordinatorStartupSettingsCandidate | null> {
+  const { runtime } = await import('./native-steps')
+  const selected = await runtime(userId)
+  if (selected.harness !== 'ai_sdk') return null
+  const { personalWritesEnabled } = await import('@/lib/operations/write-feature')
+  return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), agentKitEnabled: agentKitEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), runtime: selected }
+}
+
 /**
  * Everything a round needs between starting its execution and its first model
  * call, in one step: the mailbox catalogue, the model-switch notice and the
@@ -214,8 +224,8 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
   if (once && await store.lastEventKind(userId, botId) === kind) return
   const { quotaSwitchMessage, pointsSwitchMessage } = await import('@/lib/coordinator/message-safety')
   // 点数不足时改用 (decision 2026-11-02-1450): Mikka 默认 had no points, this turn runs on the next allowed model.
-  if (selection.data.afterPoints) await store.appendMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], null, botId)
-  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+  if (selection.data.afterPoints) await store.appendHostMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], botId)
+  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendHostMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], botId)
 }
 
 /**
@@ -224,7 +234,7 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
  * and duration. Durations and counts only. Each model call logs its own line
  * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
  */
-export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; storeTimingOrigin?: 'startup_checkpoint' | 'inbox_checkpoint'; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { startup?: number; settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
   'use step'
   try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
@@ -299,7 +309,8 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
     await factoryRuntimeForBot(botId).reconcile(userId)
   }
 
-  let { summary, memory, messages } = await store.loadConversation(userId, botId)
+  const conversation = await store.loadConversationForPrompt(userId, botId)
+  let { summary, memory, messages } = conversation
   if (messages.some(row => 'mikkaUserEvent' in row.message && typeof row.message.content === 'string' && row.message.content.includes('[mikka-file:'))) {
     const { chatFileContent } = await import('@/lib/chat-attachments/store')
     messages = await Promise.all(messages.map(async row => {
@@ -339,7 +350,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   }
   const [execution, rules, github] = await Promise.all([
     timed('execution', () => executionContextParts(userId, botId)),
-    timed('personal', () => withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
+    timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
   ])
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery

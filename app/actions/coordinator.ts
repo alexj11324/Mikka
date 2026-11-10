@@ -4,7 +4,7 @@ import { singleFlight } from '@/lib/single-flight'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { ownerListRead } from '@/lib/live/list-read-server'
-import { beginOwnerListRead } from '@/lib/live/revision-read'
+import { beginOwnerListRead, readRevisions } from '@/lib/live/revision-read'
 import type { ListLiveRead } from '@/lib/live/list-read'
 
 import { cookies, headers } from 'next/headers'
@@ -28,10 +28,12 @@ import { and, eq, sql } from 'drizzle-orm'
 import { chatBotId, type openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
 import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
+import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { NOTE_MAX, NOTES_MAX, withBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
+import { suggestionInboxChanged } from '@/lib/inbox/live'
 import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
@@ -81,6 +83,13 @@ async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string |
   return bot
 }
 
+/** ownBot has already authorized the actor in this persisted bot workspace.
+ * Match the writer's tenant channel without resolving a different personal home. */
+async function beginBotChatRead(ownerId: string, bot: { id: string; workspaceId: string }) {
+  const scope = { ownerId, workspaceId: bot.workspaceId }
+  return { scope, revisions: await readRevisions([{ kind: 'bot_chat', id: bot.id }]) }
+}
+
 /** The person's chat with their Coordinator, or with one of their bots: every bot runs on the same harness. */
 export async function getCoordinatorChat(botId: string | null = null): Promise<CoordinatorChat> {
   return withDatabaseOperation('/actions/coordinator/chat', () => readFullChat(botId))
@@ -92,9 +101,9 @@ async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
   const bot = await ownBot(user, botId)
   const enabled = await coordinatorEnabled(user.id, bot.id)
   // Before the chat: a push at this revision or below is already in what follows.
-  const begun = await beginOwnerListRead(userId, [], [{ kind: 'bot_chat', id: bot.id }])
+  const begun = await beginBotChatRead(userId, bot)
   const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
-  // The legacy/mobile full reader retains the same authorized home and
+  // The legacy/mobile full reader retains the same authorized bot tenant and
   // deadline as incremental reads; web sidebars use chat summaries instead.
   const live = await ownerListRead(userId, expiries, observedAt, begun)
   // Without a Coordinator here nothing is coming, so do not show one working.
@@ -131,9 +140,9 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   } : undefined
   const heldVersion = parsed.success ? parsed.data : undefined
   // Before the chat: a push at this revision or below is already in what follows.
-  const begun = await beginOwnerListRead(user.id, [], [{ kind: 'bot_chat', id: bot.id }])
+  const begun = await beginBotChatRead(user.id, bot)
   const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
-  // The owner's home channel says when to read again; a lease running out is the one change with no write.
+  // The bot's tenant channel says when to read again; a lease running out is the one change with no write.
   const live = await ownerListRead(user.id, expiries, observedAt, begun)
   // Each request observes the current version before joining: a deletion or a
   // new turn cannot join an older transcript still being read. Normalize only
@@ -234,7 +243,7 @@ async function readBotChatSummaries() {
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string, taskTitle?: string): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -259,7 +268,9 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (!destination.success) throw new ActionFailureError('validationGeneric')
     const profile = agentProfileReferenceSchema.optional().safeParse(profileId)
     if (!profile.success) throw new ActionFailureError('validationGeneric')
-    const taskSubmission = Boolean(destination.data || profile.data)
+    const title = taskTitleInputSchema.optional().safeParse(taskTitle)
+    if (!title.success) throw new ActionFailureError('validationGeneric')
+    const taskSubmission = Boolean(destination.data || profile.data || title.data)
     if (profile.data && profile.data !== BUILTIN_AGENT_PROFILE_ID) {
       try {
         const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
@@ -282,7 +293,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
     if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
     const reader = { id: userId, [tokenWorkspace]: bot.workspaceId, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
-    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, taskTitle: title.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
     try {
       // Already retried (a double click, two sends at once): nothing more is sent.
       if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }
@@ -311,7 +322,8 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     const chat = await chatView(session.user.id, 1, bot.id)
     if (chat.items.length || chat.working || chat.error) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
-    await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id }))
+    const event = userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id })
+    await recordCoordinatorEvent(db, { ...event, payload: { ...event.payload, source: 'coordinator_welcome' } })
     afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
     return { queued: true }
   })
@@ -367,6 +379,7 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
         // The suggestion stored its Coordinator bot row when it was made (null only on an older one).
         if (claimed) await recordPersonalSubmission(tx, userId, text, { submissionId: item.id, botId: item.botId })
         else if (!await personalSubmissionRecorded(tx, userId, text, item.id, item.botId)) throw new ActionFailureError('suggestionNotFound')
+        if (claimed) await suggestionInboxChanged(tx, userId, item.botId)
       })
     } catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')

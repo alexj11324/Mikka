@@ -1,3 +1,4 @@
+import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { TOKENS } from '../lib/tokens.ts'
@@ -32,10 +33,10 @@ test('home: pins in their order, the Coordinator first among unplaced; the list 
   ]
   const { pinned, items, hidden } = homeList(chats, { searching: false, collapsed: new Set() })
   assert.deepEqual(pinned.map(c => c.key), ['c', 'z', 'a'])
-  assert.deepEqual(items.map(i => i.kind === 'section' ? `[${i.title} ${i.count}]` : i.chat.key), ['[正在工作 1]', 'w', '[Bot 3]', 'n', 'b', 'b2', '[群聊 1]', 'g'])
+  assert.deepEqual(items.map(i => i.kind === 'section' ? `[${i.title} ${i.count}]` : i.chat.key), [`[${mobileMessages.MobileCore.working} 1]`, 'w', '[Bot 3]', 'n', 'b', 'b2', `[${mobileMessages.MobileCore.groupChats} 1]`, 'g'])
   assert.equal(hidden, 1)
   const closed = homeList(chats, { searching: false, collapsed: new Set(['groups']) })
-  assert.deepEqual(closed.items.slice(-1), [{ kind: 'section', id: 'groups', title: '群聊', count: 1, collapsed: true, unread: 3 }])
+  assert.deepEqual(closed.items.slice(-1), [{ kind: 'section', id: 'groups', title: mobileMessages.MobileCore.groupChats, count: 1, collapsed: true, unread: 3 }])
   assert.equal(homeList(chats, { searching: true, collapsed: new Set() }).pinned.length, 0)
 })
 
@@ -43,7 +44,7 @@ test('home: pins in their order, the Coordinator first among unplaced; the list 
 test('home: the bots that open the list carry no Bot header', async () => {
   const { homeList } = await import('../features/home/model/home-list.ts')
   const { items } = homeList([chat('b'), chat('g', { kind: 'group' })], { searching: false, collapsed: new Set() })
-  assert.deepEqual(items.map(i => i.kind === 'section' ? `[${i.title}]` : i.chat.key), ['b', '[群聊]', 'g'])
+  assert.deepEqual(items.map(i => i.kind === 'section' ? `[${i.title}]` : i.chat.key), ['b', `[${mobileMessages.MobileCore.groupChats}]`, 'g'])
 })
 
 test('the avatar mark: waiting outranks unread, a hand-marked chat shows a dot', async () => {

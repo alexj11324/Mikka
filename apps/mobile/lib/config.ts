@@ -2,6 +2,7 @@ import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { storageAdapter } from '@better-auth/expo/client'
 import { MobileServerStore, type MobileServer } from './server-store'
+import { CLOUD_API_URL } from './server-discovery'
 import { apiCache } from './api-cache'
 
 /**
@@ -9,12 +10,12 @@ import { apiCache } from './api-cache'
  * https://app.aspectlylabs.com/mikka. Set EXPO_PUBLIC_API_URL for a preview
  * deployment. On web the app is served next to the API, so it uses its own origin.
  */
-export const CLOUD_API_URL = 'https://app.aspectlylabs.com/mikka'
+export { CLOUD_API_URL } from './server-discovery'
 
 const initialUrl = (process.env.EXPO_PUBLIC_API_URL
   ?? (Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : CLOUD_API_URL)).replace(/\/$/, '')
 export const defaultServer: MobileServer = { url: initialUrl, name: 'Mikka Cloud', version: null,
-  edition: 'cloud', signIn: { google: true, github: true, email: true }, mobileReady: true }
+  edition: 'cloud', signIn: { google: true, github: true, apple: initialUrl === CLOUD_API_URL, email: true }, mobileReady: true }
 const storage = Platform.OS === 'web' ? {
   getItemAsync: async (key: string) => globalThis.localStorage?.getItem(key) ?? null,
   setItemAsync: async (key: string, value: string) => { globalThis.localStorage?.setItem(key, value) },

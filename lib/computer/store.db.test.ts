@@ -52,6 +52,10 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(migration); await pool.query(migration)
     await pool.query('ALTER TABLE bots ADD COLUMN IF NOT EXISTS "archivedAt" timestamptz')
     await createFixtureWorkspaceTables(pool)
+    // Replace the helper's empty non-Org link shape with the full production
+    // Org schema before any tenant is seeded; keep its real FK/check constraints.
+    await pool.query('DROP TABLE mikka_organization_workspaces')
+    await pool.query(await readFile(new URL('../../drizzle/20261109035020_organization_governance.sql', import.meta.url), 'utf8'))
     await seedFixtureWorkspace(pool, actor.userId, 'team', actor.workspaceId)
     await seedFixtureWorkspace(pool, actor.userId, 'team', otherWorkspace.workspaceId)
     await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,\'bob@example.invalid\',\'member\',\'active\')', [actor.workspaceId, bob.userId])

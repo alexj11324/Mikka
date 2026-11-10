@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { StyleSheet, View } from 'react-native'
 import { Star } from 'lucide-react-native'
 import { BotAvatar } from '@/components/icons'
@@ -27,7 +28,7 @@ function PinnedTile({ chat, actions }: { chat: HomeChat; actions: Actions }) {
         <View style={styles.tileInner}>
           <View>
             {chat.row.kind === 'bot' ? <BotAvatar id={chat.row.bot.id} coordinator={chat.row.bot.coordinator} color={chat.row.bot.color} shape={chat.row.bot.shape} size={AVATAR.pin} />
-              : <View style={styles.group}><Symbol name="person.2.fill" size={26} color={colors.secondary} web={<Text style={styles.glyph}>群</Text>} /></View>}
+              : <View style={styles.group}><Symbol name="person.2.fill" size={26} color={colors.secondary} web={<Text style={styles.glyph}>{mobileMessages.MobileCore.groupGlyph}</Text>} /></View>}
             <View style={styles.star} accessibilityElementsHidden importantForAccessibility="no">
               <Symbol name="star.fill" size={14} color={colors.orange} web={<Star size={14} color={colors.orange} fill={colors.orange} strokeWidth={0} />} />
             </View>

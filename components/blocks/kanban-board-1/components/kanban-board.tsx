@@ -28,12 +28,13 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components
 import { PriorityIcon } from '@/components/workspace/priority-icon'
 import { BOARD_COLUMNS, type AgentState, type BoardColumn, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
 import type { TaskBlock } from '@/lib/task-blocked'
+import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
 import { blockLabel } from '@/components/workspace/block-label'
 import { BoardCard, BoardColumnFrame, BoardHiddenLane } from '@ui-slot/board'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
   return <ScrollAreaPrimitive.Root data-slot="scroll-area" className="relative min-h-0 w-full min-w-0 flex-1 pb-3">
-    <ScrollAreaPrimitive.Viewport {...props} ref={viewportRef} data-slot="scroll-area-viewport" className="h-full w-full overscroll-x-contain rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+    <ScrollAreaPrimitive.Viewport {...props} ref={viewportRef} data-slot="scroll-area-viewport" className="h-full w-full overscroll-x-contain scroll-fade-x rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
       <ScrollAreaPrimitive.Content data-slot="scroll-area-content" className="h-full w-max min-w-full">{children}</ScrollAreaPrimitive.Content>
     </ScrollAreaPrimitive.Viewport>
     <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex h-2.5 touch-none flex-col p-px select-none"><ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-foreground/15" /></ScrollAreaPrimitive.Scrollbar>
@@ -83,6 +84,8 @@ export type CardHandlers = {
 export type CardContext = {
   properties: ReadonlySet<CardProperty>
   agentStates: ReadonlyMap<string, AgentState>
+  /** Each task's own state (localTaskState on its newest run), for a card's status line (decision #1864 point 6). */
+  taskStates?: ReadonlyMap<string, { state: TaskState; reason: TaskReason | null }>
   subtasks: ReadonlyMap<string, { done: number; total: number }>
   /** The Bot and coding agents working each task, from its threads. */
   owners?: ReadonlyMap<string, RunOwner>
@@ -168,31 +171,68 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
           onOpen(task.id)
         }
       }} />}>{card}</ContextMenuTrigger>
-      <ContextMenuContent className="w-56">
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={disabled}><Circle />{tCard('status')}<ContextMenuShortcut>S</ContextMenuShortcut></ContextMenuSubTrigger>
-          <ContextMenuSubContent><ContextMenuRadioGroup value={task.status} onValueChange={value => onStatusChange(task, value as IssueStatus)}>
-            {statusOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon className={option.indicatorClassName} />{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup></ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={disabled}><Flag />{tCard('priority')}<ContextMenuShortcut>P</ContextMenuShortcut></ContextMenuSubTrigger>
-          <ContextMenuSubContent><ContextMenuRadioGroup value={task.priority} onValueChange={value => onPriorityChange(task, String(value))}>
-            {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon {...option.iconProps} />{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup></ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('assignee')}><CircleUserRound />{tCard('assignee')}<ContextMenuShortcut>A</ContextMenuShortcut></ContextMenuItem>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('labels')}><Tag />{tCard('labels')}</ContextMenuItem>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('project')}><Box />{tCard('project')}</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem disabled={disabled} onClick={() => ask('pullRequests')}><Link2 />{tCard('linkPr')}</ContextMenuItem>
-        {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
-        <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
-      </ContextMenuContent>
+      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={!!block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
     </ContextMenu>
   </KanbanItem>
+}
+
+/** A card's context menu: status, priority, the metadata editors, 受阻, discuss and delete. */
+function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityChange, onDelete, onDiscuss, onBlockChange }: Pick<CardHandlers, 'onStatusChange' | 'onPriorityChange' | 'onDelete' | 'onDiscuss' | 'onBlockChange'> & {
+  task: BoardTask
+  disabled: boolean
+  block: boolean
+  ask: (target: MetadataRequest['target']) => void
+}) {
+  const tCard = useTranslations('Shell.board.card')
+  const tIssue = useTranslations('Issue')
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
+  return <>
+    <ContextMenuSub>
+      <ContextMenuSubTrigger disabled={disabled}><Circle />{tCard('status')}<ContextMenuShortcut>S</ContextMenuShortcut></ContextMenuSubTrigger>
+      <ContextMenuSubContent><ContextMenuRadioGroup value={task.status} onValueChange={value => onStatusChange(task, value as IssueStatus)}>
+        {statusOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon className={option.indicatorClassName} />{option.label}</ContextMenuRadioItem>)}
+      </ContextMenuRadioGroup></ContextMenuSubContent>
+    </ContextMenuSub>
+    <ContextMenuSub>
+      <ContextMenuSubTrigger disabled={disabled}><Flag />{tCard('priority')}<ContextMenuShortcut>P</ContextMenuShortcut></ContextMenuSubTrigger>
+      <ContextMenuSubContent><ContextMenuRadioGroup value={task.priority} onValueChange={value => onPriorityChange(task, String(value))}>
+        {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon {...option.iconProps} />{option.label}</ContextMenuRadioItem>)}
+      </ContextMenuRadioGroup></ContextMenuSubContent>
+    </ContextMenuSub>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('assignee')}><CircleUserRound />{tCard('assignee')}<ContextMenuShortcut>A</ContextMenuShortcut></ContextMenuItem>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('labels')}><Tag />{tCard('labels')}</ContextMenuItem>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('project')}><Box />{tCard('project')}</ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem disabled={disabled} onClick={() => ask('pullRequests')}><Link2 />{tCard('linkPr')}</ContextMenuItem>
+    {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
+    <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
+  </>
+}
+
+/**
+ * The same context menu around a UI layer's own card (the `board` slot's BoardScreen), with the editors it opens kept
+ * off the card. The card stays as the layer draws it: the trigger adds no box of its own.
+ */
+export function TaskContextMenu({ task, disabled, block, children, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: Omit<CardHandlers, 'onOpen'> & {
+  task: BoardTask
+  disabled: boolean
+  block: boolean
+  children: ReactNode
+}) {
+  const [request, setRequest] = useState<MetadataRequest | null>(null)
+  const ask = (target: MetadataRequest['target']) => setRequest(current => ({ target, sequence: (current?.sequence ?? 0) + 1 }))
+  return <>
+    <ContextMenu>
+      <ContextMenuTrigger render={<div className="contents" />}>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
+    </ContextMenu>
+    <div hidden><IssueMetadataControls task={task} section="all" compact disabled={disabled} request={request} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>
+  </>
 }
 
 function RememberedColumn({ stateKey, ...props }: ComponentProps<typeof KanbanColumnContent> & { stateKey: string }) {
@@ -225,7 +265,7 @@ export function KanbanBoard({ stateKey = 'board', columns, hiddenColumns: hidden
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const shown = BOARD_COLUMNS.filter(column => columns.includes(column.value))
   // R-25: every column is a fixed 300px, as Linear, sidebar open or not; when they do not fit, the board scrolls
-  // and spare width stays empty. Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
+  // and spare width stays empty; its edges fade where more columns wait (UI audit work-03). Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
   return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label={t('horizontalScroll')} aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
       <KanbanBoardPrimitive className="flex h-full min-h-0 w-max min-w-full items-stretch gap-3 pb-2">

@@ -115,11 +115,11 @@ test('Codex mailbox continues the original history in a new run and restarts wit
   await restarted.mailbox.close(); await last.mailbox.close()
 })
 
-test('Codex 0.166.0 records its actual version and resumes the same mailbox thread with the current transport', { timeout: 20000 }, async () => {
-  const f = fixture(), source = await original(f, '0.166.0'), childRunId = randomUUID(), current = transport('current')
+for (const nativeVersion of ['0.166.0', '0.167.0'] as const) test(`Codex ${nativeVersion} records its actual version and resumes the same mailbox thread with the current transport`, { timeout: 20000 }, async () => {
+  const f = fixture(), source = await original(f, nativeVersion), childRunId = randomUUID(), current = transport('current')
   assert.ok(existsSync(f.receipt(source.runId)), 'The verified native release must record resume evidence')
-  assert.equal(JSON.parse(readFileSync(f.receipt(source.runId), 'utf8')).nativeVersion, '0.166.0')
-  f.controls(childRunId, { userAgent: 'mikka/0.166.0 (Synthetic Linux)' })
+  assert.equal(JSON.parse(readFileSync(f.receipt(source.runId), 'utf8')).nativeVersion, nativeVersion)
+  f.controls(childRunId, { userAgent: `mikka/${nativeVersion} (Synthetic Linux)` })
   const continued = await f.adapter().start({ ...f.options(childRunId, current.mailbox), requireSessionResume: true,
     continueSession: { runId: source.runId, sessionId: source.sessionId, message: prompt } })
   assert.equal(continued.sessionId, source.sessionId)
@@ -128,23 +128,30 @@ test('Codex 0.166.0 records its actual version and resumes the same mailbox thre
   assert.equal(source.first.calls.length, 1)
   assert.deepEqual(f.trace(childRunId).filter(item => item.method.startsWith('thread/')), [{ method: 'thread/resume', dynamicToolsPresent: false }])
   const recorded = JSON.parse(readFileSync(f.receipt(childRunId), 'utf8'))
-  assert.equal(recorded.nativeVersion, '0.166.0')
+  assert.equal(recorded.nativeVersion, nativeVersion)
   assert.equal(recorded.runId, childRunId)
   assert.equal(recorded.threadId, source.sessionId)
   await current.mailbox.close()
 
   const restarted = transport('restarted')
-  f.controls(childRunId, { userAgent: 'mikka/0.166.0 (Synthetic Linux)', mailboxOnRestart: true })
+  f.controls(childRunId, { userAgent: `mikka/${nativeVersion} (Synthetic Linux)`, mailboxOnRestart: true })
   const resumed = await f.adapter().resume(source.sessionId, f.options(childRunId, restarted.mailbox))
   assert.equal(resumed.sessionId, source.sessionId)
   assert.ok((await drain(resumed)).includes('restarted'))
   assert.equal(restarted.calls.length, 1)
   assert.equal(current.calls.length, 1)
+  const restartedReceipt = JSON.parse(readFileSync(f.receipt(childRunId), 'utf8'))
+  assert.equal(restartedReceipt.nativeVersion, nativeVersion)
+  assert.equal(restartedReceipt.threadId, source.sessionId)
   await restarted.mailbox.close()
 })
 
 test('Codex mailbox resume rejects unverified cross-version history before thread/resume or a native turn', { timeout: 20000 }, async t => {
-  for (const [originalVersion, currentVersion] of [['0.163.0', '0.166.0'], ['0.166.0', '0.163.0']]) await t.test(originalVersion + ' to ' + currentVersion, async () => {
+  for (const [originalVersion, currentVersion] of [
+    ['0.163.0', '0.166.0'], ['0.166.0', '0.163.0'],
+    ['0.163.0', '0.167.0'], ['0.167.0', '0.163.0'],
+    ['0.166.0', '0.167.0'], ['0.167.0', '0.166.0'],
+  ]) await t.test(originalVersion + ' to ' + currentVersion, async () => {
     const f = fixture(), source = await original(f, originalVersion), nextId = randomUUID(), current = transport('current')
     assert.ok(existsSync(f.receipt(source.runId)), 'The original verified release must have a real host receipt')
     assert.equal(JSON.parse(readFileSync(f.receipt(source.runId), 'utf8')).nativeVersion, originalVersion)
@@ -159,8 +166,9 @@ test('Codex mailbox resume rejects unverified cross-version history before threa
 })
 
 test('Codex mailbox resume rejects missing or changed capability evidence before any native turn', { timeout: 30000 }, async t => {
-  for (const change of ['missing-receipt', 'catalogue', 'header-catalogue', 'header-schema', 'header-session', 'missing-history', 'receipt-path', 'receipt-run', 'receipt-session', 'receipt-version', 'history-link'] as const) await t.test(change, async () => {
-    const f = fixture(), source = await original(f), nextId = randomUUID(), current = transport('current', change === 'catalogue' ? 'mailbox_sent' : 'mailbox_inbox')
+  for (const nativeVersion of ['0.163.0', '0.167.0'] as const) for (const change of ['missing-receipt', 'catalogue', 'header-catalogue', 'header-schema', 'header-session', 'missing-history', 'receipt-path', 'receipt-run', 'receipt-session', 'receipt-version', 'history-link'] as const) await t.test(nativeVersion + ' ' + change, async () => {
+    const f = fixture(), source = await original(f, nativeVersion), nextId = randomUUID(), current = transport('current', change === 'catalogue' ? 'mailbox_sent' : 'mailbox_inbox')
+    f.controls(nextId, { userAgent: `mikka/${nativeVersion} (Synthetic Linux)` })
     const history = join(f.codexHome(source.runId), 'sessions', source.sessionId + '.jsonl')
     if (change === 'missing-receipt') rmSync(f.receipt(source.runId), { force: true })
     if (change === 'header-catalogue' || change === 'header-schema' || change === 'header-session') {
@@ -230,9 +238,9 @@ test('missing native resume evidence does not prevent an otherwise supported fre
   await later.mailbox.close()
 })
 
-test('an unverified native release keeps fresh-thread behavior but cannot resume a mailbox thread', { timeout: 20000 }, async () => {
+for (const [unverifiedVersion, malformedVersion] of [['0.164.0', '0.163.0-alpha'], ['0.168.0', '0.167.0-alpha']] as const) test(`unverified Codex ${unverifiedVersion} keeps fresh-thread behavior but cannot resume a mailbox thread`, { timeout: 20000 }, async () => {
   const f = fixture(), runId = randomUUID(), fresh = transport('fresh')
-  f.controls(runId, { userAgent: 'mikka/0.164.0 (Synthetic Linux)' })
+  f.controls(runId, { userAgent: `mikka/${unverifiedVersion} (Synthetic Linux)` })
   const session = await f.adapter().start(f.options(runId, fresh.mailbox))
   await drain(session)
   assert.equal(fresh.calls.length, 1)
@@ -240,7 +248,7 @@ test('an unverified native release keeps fresh-thread behavior but cannot resume
   await fresh.mailbox.close()
 
   const source = await original(f), nextId = randomUUID(), current = transport('current')
-  f.controls(nextId, { userAgent: 'mikka/0.163.0-alpha (Synthetic Linux)' })
+  f.controls(nextId, { userAgent: `mikka/${malformedVersion} (Synthetic Linux)` })
   await assert.rejects(f.adapter().start({ ...f.options(nextId, current.mailbox), continueSession: { runId: source.runId, sessionId: source.sessionId, message: prompt } }), /Run mailbox/)
   assert.deepEqual(f.trace(nextId), [])
   assert.equal(current.calls.length, 0)

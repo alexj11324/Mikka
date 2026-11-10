@@ -12,6 +12,7 @@ import { captureNativeResources } from './native-resources.mjs'
 import { observeAccountRelease } from './account-release-observer.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { selectBundledServer } from './native-document.mjs'
 import { continueInSystemBrowser, openAppLink } from './browser-handoff.mjs'
 import { nativeCleanupFailure, recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
@@ -133,16 +134,13 @@ try {
   assert.equal(probed.status, 'ok')
   assert.equal(probed.server.url, selfHosted.url)
   assert.equal(probed.server.name, 'Acceptance self-hosted')
-  // Main reloads the page as soon as the server changes, which can come before
-  // the call's own reply: start it without awaiting it in the page.
-  await page.evaluate(url => { void window.mikka.bundled.server.select(url).catch(() => {}) }, selfHosted.url)
-  await page.waitForFunction(url => window.mikka?.app.serverUrl === url, selfHosted.url)
+  // Main may reload before evaluate replies; bind selection to its next completed document.
+  await selectBundledServer(page, selfHosted.url, selfHosted.url)
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
   for (let attempt = 0; attempt < 100 && selfHosted.configReads() === 0; attempt++) await new Promise(done => setTimeout(done, 100))
   assert.ok(selfHosted.configReads() > 0, 'the signed-out page must read the chosen server')
   await page.screenshot({ path: join(output, 'bundled-sign-in-self-hosted.png'), animations: 'disabled' })
-  await page.evaluate(() => { void window.mikka.bundled.server.select(null).catch(() => {}) })
-  await page.waitForFunction(url => window.mikka?.app.serverUrl === url, builtIn)
+  await selectBundledServer(page, null, builtIn)
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
   check('server choice: probe states, probed-only selection, the page follows the chosen server and returns')
   browser = await chromium.launch({ headless: true })

@@ -4,9 +4,11 @@ import { z } from 'zod'
 import { projectDb, projects } from '@/lib/db/projects'
 import { projectTasks } from '@/lib/db/project-schema'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
+import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import type { IssueReader } from '@/lib/issue-visibility'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { tokenWorkspace } from '@/lib/tokens/principal'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
@@ -72,16 +74,25 @@ async function canonicalProject(reader: IssueReader, projectId: string, workspac
   if (tokenScope(reader) && tokenScope(reader) !== workspaceId) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   const [row] = await executor.select({
     workspace: { kind: workspaces.kind, userId: workspaces.userId },
+    organizationId: organizationWorkspaces.organizationId,
     project: { id: projects.id, userId: projects.userId, name: projects.name, revision: projects.revision,
       issueIds: projectTaskIds(bounded), createdAt: projects.createdAt },
   }).from(projects)
     .innerJoin(workspaces, eq(workspaces.id, projects.workspaceId))
     .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, workspaces.id),
       eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
+    .leftJoin(organizationWorkspaces, eq(organizationWorkspaces.workspaceId, workspaces.id))
     .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId),
       or(eq(workspaces.kind, 'team'), and(eq(workspaces.kind, 'personal'), eq(workspaces.userId, userId)))))
     .limit(1)
   if (!row) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+  // Enterprise policy and the authenticated principal are checked on every
+  // map read; a stale source row cannot bypass a detached organization.
+  const { filterEnterpriseWorkspaceLinks } = await import('@/lib/enterprise/access')
+  const scopedReader: IssueReader = { ...(typeof reader === 'string' ? { id: reader } : reader), [tokenWorkspace]: workspaceId,
+    [enterprisePrincipal]: typeof reader === 'string' ? undefined : reader[enterprisePrincipal] }
+  if (!(await filterEnterpriseWorkspaceLinks(scopedReader, [{ id: workspaceId, organizationId: row.organizationId }])).length)
+    throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   if (!Array.isArray(row.project.issueIds) || row.project.issueIds.some(id => !databaseUuid.test(id)))
     throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
   if (bounded && row.project.issueIds.length > MAP_NODE_LIMIT) throw new MapReadError('map_too_large', { detail: 'limit' })
@@ -92,6 +103,9 @@ async function canonicalProject(reader: IssueReader, projectId: string, workspac
 export async function resolveProjectReadScope(reader: IssueReader, projectId: string, workspaceId: string): Promise<ProjectScope> {
   const userId = readerId(reader)
   const { project, workspace } = await canonicalProject(reader, projectId, workspaceId, projectDb, true)
+  const { resourceActionAllowed } = await import('@/lib/resource-access/store')
+  if (!await resourceActionAllowed(db, userId, { kind: 'project', id: projectId, workspaceId }, 'canReadContent'))
+    throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   const scopedReader: IssueReader = { id: userId, [tokenWorkspace]: workspaceId }
   const predicate = issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [workspaceId] })
   const visible = project.issueIds.length ? await db.select({ id: issues.id }).from(issues)
@@ -104,7 +118,12 @@ export async function resolveProjectReadScope(reader: IssueReader, projectId: st
 export async function resolveProjectScope(reader: IssueReader, projectId: string, workspaceId: string, executor: WorkspaceExecutor = projectDb, authorizedIssueIds?: string[]): Promise<ProjectScope> {
   const userId = readerId(reader)
   const { project, workspace } = await canonicalProject(reader, projectId, workspaceId, executor, false)
+  const { activeTaskWorkspaces } = await import('@/lib/task-workspace')
+  const { resourceActionAllowed } = await import('@/lib/resource-access/store')
   const scopedReader: IssueReader = { id: userId, [tokenWorkspace]: workspaceId }
+  if (!(await activeTaskWorkspaces(scopedReader, workspaceId)).length
+    || !await resourceActionAllowed(db, userId, { kind: 'project', id: projectId, workspaceId }, 'canReadContent'))
+    throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
   if (authorizedIssueIds) return { reader: scopedReader, userId, workspaceId, projectId, project,
     issueIds: project.issueIds.filter(id => authorizedIssueIds.includes(id)), personalWorkspace: workspace.kind === 'personal' }
   const predicate = issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [workspaceId] })
@@ -137,6 +156,7 @@ export async function withProjectWriteScope<T>(reader: IssueReader, projectId: s
     if (!current) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
     if (current.archivedAt) throw new ProjectMapError('PROJECT_ARCHIVED', 409)
     const scope = await resolveProjectScope(reader, projectId, workspaceId, tx, observed.issueIds)
-    return operation(scope)
+    const { withResourceAccess } = await import('@/lib/resource-access/store')
+    return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, 'canSteer', () => operation(scope))
   })
 }
