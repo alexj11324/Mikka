@@ -1,0 +1,66 @@
+{
+  "schema": "issue1512-native-diagnostic-extractor-root-full-review-v1",
+  "at": "2026-11-10 05:04:28 UTC",
+  "source": {
+    "run": 42757687653,
+    "attempt": 1,
+    "job": 129635774633,
+    "head": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "tree": "23179d928269195860beaf27ad27786c7f5e7637",
+    "checkout": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "base": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "originalJobResponseBlob": "cb047bf4d57f050a982c87c4fb83540402c328a9",
+    "originalJobLogBlob": "8942610168219cb6a39271345ce4ae2109712213"
+  },
+  "artifacts": [
+    {
+      "id": 13736438755,
+      "name": "desktop-native-evidence-2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+      "size_in_bytes": 15307035,
+      "digest": "sha256:401f02cc60ab47d24e79d93f8535b3c7fd187b320882d0d74bc8ae7c960f6085",
+      "expires_at": "2026-11-17T04:57:30Z",
+      "fileCount": 314,
+      "allowPng": true,
+      "jsonMembers": [
+        "lifecycle.json",
+        "smoke.json",
+        "parity/parity.json"
+      ]
+    },
+    {
+      "id": 13736463665,
+      "name": "desktop-package-evidence-2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+      "size_in_bytes": 1597,
+      "digest": "sha256:d93790e7661d62a444c529192d99f0bb099f1746ea90509e51eaba42b83f5334",
+      "expires_at": "2026-11-17T04:57:28Z",
+      "fileCount": 2,
+      "allowPng": false,
+      "jsonMembers": [
+        "native-crypto.json",
+        "mac-acceptance-package.json"
+      ]
+    }
+  ],
+  "files": {
+    "manifest": "fe0349864c79fe8daa1e9cf4f05eb83b9ee27bda",
+    "workflow": "6e70360bb73a0311a0061165b5f9f1918a3145d6",
+    "controller": "e7762a5757960a013c4b12dc4ed2f5eb7a3681c2",
+    "closeManifest": "c5cfc1074a507035c2f853e1f3e71495e37984ac",
+    "closeWorkflow": "eb4021dc726aeba31cf32dc3cc93b470d09bf1c0"
+  },
+  "priorGuardReview": "d6bbd1ccbfe9750bfa20385483217cc5b1760204",
+  "checks": {
+    "sourceSuccess": true,
+    "requiredSteps": true,
+    "uploads": true,
+    "artifacts": true,
+    "closedManifest": true,
+    "windowValid": true
+  },
+  "decision": "Approved exact single original extraction, anchor-first and fresh CAS on owned ops branch; close entry after actual admission. No product, production or model execution.",
+  "originalsReadByRoot": 0,
+  "limitations": [
+    "Controller source exact reviewed; actual original data not yet extracted or analyzed. Source job SUCCESS does not establish formal Native SQL budget.",
+    "Direct jobs endpoint refused by connector allowlist; run jobs metadata succeeded."
+  ]
+}

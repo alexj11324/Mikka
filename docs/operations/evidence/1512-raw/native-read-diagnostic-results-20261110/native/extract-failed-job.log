@@ -1,0 +1,140 @@
+﻿2026-11-10T05:05:43.6945701Z Current runner version: '2.338.2'
+2026-11-10T05:05:43.6964027Z ##[group]Runner Image Provisioner
+2026-11-10T05:05:43.6964557Z Hosted Compute Agent
+2026-11-10T05:05:43.6964902Z Version: 20261028.624
+2026-11-10T05:05:43.6965279Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-10T05:05:43.6965699Z Build Date: 2026-10-28T21:51:42Z
+2026-11-10T05:05:43.6966077Z Worker ID: {156aec49-823a-411f-aa98-5753414ae07b}
+2026-11-10T05:05:43.6966497Z Region: centralus
+2026-11-10T05:05:43.6966815Z Cloud: Azure
+2026-11-10T05:05:43.6967152Z ##[endgroup]
+2026-11-10T05:05:43.6968117Z ##[group]Operating System
+2026-11-10T05:05:43.6968457Z Ubuntu
+2026-11-10T05:05:43.6968783Z 22.04.5
+2026-11-10T05:05:43.6969072Z LTS
+2026-11-10T05:05:43.6969373Z ##[endgroup]
+2026-11-10T05:05:43.6969696Z ##[group]Runner Image
+2026-11-10T05:05:43.6970037Z Image: ubuntu-22.04
+2026-11-10T05:05:43.6970384Z Version: 20261101.347.1
+2026-11-10T05:05:43.6971303Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261101.347/images/ubuntu/Ubuntu2204-Readme.md
+2026-11-10T05:05:43.6972378Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261101.347
+2026-11-10T05:05:43.6972924Z ##[endgroup]
+2026-11-10T05:05:43.6973621Z ##[group]GITHUB_TOKEN Permissions
+2026-11-10T05:05:43.6974927Z Actions: read
+2026-11-10T05:05:43.6975289Z Contents: write
+2026-11-10T05:05:43.6975630Z Metadata: read
+2026-11-10T05:05:43.6975952Z ##[endgroup]
+2026-11-10T05:05:43.6977337Z Secret source: Actions
+2026-11-10T05:05:43.6977873Z Cache mode: write
+2026-11-10T05:05:43.6978376Z Prepare workflow directory
+2026-11-10T05:05:43.7184453Z Prepare all required actions
+2026-11-10T05:05:43.7217065Z Getting action download info
+2026-11-10T05:05:43.9242384Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-10T05:05:44.1043933Z Complete job name: Freeze diagnostic Native ZIPs and exact five JSON members once
+2026-11-10T05:05:44.1577487Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-10T05:05:44.1578036Z with:
+2026-11-10T05:05:44.1578336Z   fetch-depth: 2
+2026-11-10T05:05:44.1578609Z   persist-credentials: false
+2026-11-10T05:05:44.1578909Z   repository: alexj11324/Mikka
+2026-11-10T05:05:44.1581183Z   token: ***
+2026-11-10T05:05:44.1581434Z   ssh-strict: true
+2026-11-10T05:05:44.1581693Z   ssh-user: git
+2026-11-10T05:05:44.1581943Z   clean: true
+2026-11-10T05:05:44.1582204Z   sparse-checkout-cone-mode: true
+2026-11-10T05:05:44.1582562Z   fetch-tags: false
+2026-11-10T05:05:44.1582826Z   show-progress: true
+2026-11-10T05:05:44.1583090Z   lfs: false
+2026-11-10T05:05:44.1583333Z   submodules: false
+2026-11-10T05:05:44.1583596Z   set-safe-directory: true
+2026-11-10T05:05:44.1583895Z   allow-unsafe-pr-checkout: false
+2026-11-10T05:05:44.1584298Z ##[endgroup]
+2026-11-10T05:05:44.2765138Z Syncing repository: alexj11324/Mikka
+2026-11-10T05:05:44.2766742Z ##[group]Getting Git version info
+2026-11-10T05:05:44.2767399Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-10T05:05:44.2768304Z [command]/usr/bin/git version
+2026-11-10T05:05:44.2768749Z git version 2.56.0
+2026-11-10T05:05:44.2770402Z ##[endgroup]
+2026-11-10T05:05:44.2774221Z Temporarily overriding HOME='/home/runner/work/_temp/554d717e-f556-43c0-b22d-833133ce4ba1' before making global git config changes
+2026-11-10T05:05:44.2775467Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-10T05:05:44.2776775Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-10T05:05:44.2795718Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-10T05:05:44.2799169Z ##[group]Initializing the repository
+2026-11-10T05:05:44.2802267Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-10T05:05:44.2883455Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-10T05:05:44.2884118Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-10T05:05:44.2884865Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-10T05:05:44.2885281Z hint: call:
+2026-11-10T05:05:44.2885515Z hint:
+2026-11-10T05:05:44.2885838Z hint: 	git config --global init.defaultBranch <name>
+2026-11-10T05:05:44.2886191Z hint:
+2026-11-10T05:05:44.2886522Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-10T05:05:44.2887039Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-10T05:05:44.2887454Z hint:
+2026-11-10T05:05:44.2887695Z hint: 	git branch -m <name>
+2026-11-10T05:05:44.2887968Z hint:
+2026-11-10T05:05:44.2888323Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-10T05:05:44.2889159Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-10T05:05:44.2894067Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-10T05:05:44.2915684Z ##[endgroup]
+2026-11-10T05:05:44.2916146Z ##[group]Disabling automatic garbage collection
+2026-11-10T05:05:44.2919207Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-10T05:05:44.2936811Z ##[endgroup]
+2026-11-10T05:05:44.2937313Z ##[group]Setting up auth
+2026-11-10T05:05:44.2942660Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-10T05:05:44.2959861Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-10T05:05:44.3173540Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-10T05:05:44.3203211Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-10T05:05:44.3319911Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-10T05:05:44.3337983Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-10T05:05:44.3441058Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-10T05:05:44.3462115Z ##[endgroup]
+2026-11-10T05:05:44.3462610Z ##[group]Fetching the repository
+2026-11-10T05:05:44.3467914Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=2 origin +073d7bbb6b7423defe0cd25aea98e08fa8c2a53c:refs/remotes/origin/ops/1512-task-runs-pg-20261110
+2026-11-10T05:05:47.9442392Z From https://github.com/alexj11324/Mikka
+2026-11-10T05:05:47.9444291Z  * [new ref]         073d7bbb6b7423defe0cd25aea98e08fa8c2a53c -> origin/ops/1512-task-runs-pg-20261110
+2026-11-10T05:05:47.9451206Z ##[endgroup]
+2026-11-10T05:05:47.9452493Z ##[group]Determining the checkout info
+2026-11-10T05:05:47.9453946Z ##[endgroup]
+2026-11-10T05:05:47.9454728Z [command]/usr/bin/git sparse-checkout disable
+2026-11-10T05:05:47.9478703Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-10T05:05:47.9495537Z ##[group]Checking out the ref
+2026-11-10T05:05:47.9498073Z [command]/usr/bin/git checkout --progress --force -B ops/1512-task-runs-pg-20261110 refs/remotes/origin/ops/1512-task-runs-pg-20261110
+2026-11-10T05:05:48.3675701Z Switched to a new branch 'ops/1512-task-runs-pg-20261110'
+2026-11-10T05:05:48.3676306Z branch 'ops/1512-task-runs-pg-20261110' set up to track 'origin/ops/1512-task-runs-pg-20261110'.
+2026-11-10T05:05:48.3688218Z ##[endgroup]
+2026-11-10T05:05:48.3717716Z [command]/usr/bin/git log -1 --format=%H
+2026-11-10T05:05:48.3731982Z 073d7bbb6b7423defe0cd25aea98e08fa8c2a53c
+2026-11-10T05:05:48.3753778Z ##[group]Removing auth
+2026-11-10T05:05:48.3754279Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-10T05:05:48.3761881Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-10T05:05:48.3884016Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-10T05:05:48.3899093Z http.https://github.com/.extraheader
+2026-11-10T05:05:48.3904702Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-10T05:05:48.3922924Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-10T05:05:48.4032755Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-10T05:05:48.4050323Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-10T05:05:48.4152076Z ##[endgroup]
+2026-11-10T05:05:48.4295625Z ##[group]Run python3 .github/ops/issue1512-native-evidence-extract/controller.py
+2026-11-10T05:05:48.4296076Z [36;1mpython3 .github/ops/issue1512-native-evidence-extract/controller.py[0m
+2026-11-10T05:05:48.4337850Z shell: /usr/bin/bash -e {0}
+2026-11-10T05:05:48.4338051Z env:
+2026-11-10T05:05:48.4339785Z   GITHUB_TOKEN: ***
+2026-11-10T05:05:48.4339960Z ##[endgroup]
+2026-11-10T05:05:54.1363984Z ISSUE1512_NATIVE_EXTRACT_ZIP_FROZEN {"blob":"c49a4729c72a61bfddc2450e77bf01d41156869a","bytes":15307035,"id":13736438755,"sha256":"401f02cc60ab47d24e79d93f8535b3c7fd187b320882d0d74bc8ae7c960f6085"}
+2026-11-10T05:05:55.4926157Z ISSUE1512_NATIVE_EXTRACT_ZIP_FROZEN {"blob":"5d50ea60dcf8c10b78b778b1bfb7669a10a4325f","bytes":1597,"id":13736463665,"sha256":"d93790e7661d62a444c529192d99f0bb099f1746ea90509e51eaba42b83f5334"}
+2026-11-10T05:05:55.9186370Z ISSUE1512_NATIVE_EXTRACT_RESULT {"cleanup":{"privateDirectoryRemoved":true},"failure":{"code":"JSON_SIZE","phase":"extract_frozen_13736438755","type":"GuardFailure"},"jsonCount":0,"receiptBlob":"06612fdf8dc5987c01fab6eb4c715bbf6b7236d6","status":"failed"}
+2026-11-10T05:05:55.9264973Z ##[error]Process completed with exit code 1.
+2026-11-10T05:05:55.9355630Z Post job cleanup.
+2026-11-10T05:05:55.9881783Z [command]/usr/bin/git version
+2026-11-10T05:05:55.9904307Z git version 2.56.0
+2026-11-10T05:05:55.9927786Z Temporarily overriding HOME='/home/runner/work/_temp/f45d2d08-6df9-46cd-8c56-81279691fd8b' before making global git config changes
+2026-11-10T05:05:55.9928646Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-10T05:05:55.9930260Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-10T05:05:55.9952138Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-10T05:05:55.9970200Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-10T05:05:56.0096438Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-10T05:05:56.0115241Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-10T05:05:56.0253069Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-10T05:05:56.0273943Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-10T05:05:56.0500745Z Cleaning up orphan processes
+2026-11-10T05:05:56.0780054Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "kind": "diagnostic-event-decoder-source-map",
+  "manifest": "2bb50b7cc74c03c5e3898d956ddf43bd5155e141",
+  "sources": {
+    "observer": "39d63bd92fbc9ed4c0b568694b67df28a49c6e65",
+    "channel": "5f43ea9f39d9354955fe60e390aa76665ce83f99",
+    "schema": "6a9eed46a4062eeebc1b0f9984f0d6fe25d8dca7"
+  },
+  "rowPrefix": [
+    "seq",
+    "performanceNowMs",
+    "event"
+  ],
+  "fresh": {
+    "event": 15,
+    "commonArguments": [
+      "cacheId",
+      "keyId",
+      "after",
+      "readIdOr0",
+      "branch"
+    ],
+    "branches": [
+      {
+        "code": 1,
+        "lines": [
+          172,
+          176
+        ],
+        "extra": [
+          "began=0",
+          "pendingDispatchAt=0"
+        ],
+        "meaning": "No latest read exists. Calls the original revalidate once."
+      },
+      {
+        "code": 2,
+        "lines": [
+          172,
+          176
+        ],
+        "extra": [
+          "began",
+          "pendingDispatchAtOr0"
+        ],
+        "meaning": "The first revalidation condition holds; an existing read is dispatchCaptured, not dispatchNotified and not received. It is an observed state only: ambiguity/revocation may also exist, so do not label this automatically a usable queued snapshot or a bug. Calls revalidate."
+      },
+      {
+        "code": 3,
+        "lines": [
+          172,
+          176
+        ],
+        "extra": [
+          "began",
+          "pendingDispatchAtOr0"
+        ],
+        "meaning": "Existing read began<=after and pendingDispatchAtOr0<=after, excluding the recorded branch2 subcase. Calls revalidate; may be an already complete older read, so do not infer in-flight."
+      },
+      {
+        "code": 4,
+        "lines": [
+          178,
+          182
+        ],
+        "extra": [
+          "began",
+          "pendingDispatchAtOr0"
+        ],
+        "meaning": "began>after. Waits on the existing read.settled, possibly already resolved; no new read is necessarily dispatched."
+      },
+      {
+        "code": 5,
+        "lines": [
+          178,
+          182
+        ],
+        "extra": [
+          "began",
+          "pendingDispatchAt"
+        ],
+        "meaning": "began<=after but the notified actual pending-dispatch barrier is >after. Waits for settled or revoked; this is not yet completed coverage."
+      },
+      {
+        "code": 6,
+        "lines": [
+          183
+        ],
+        "extra": [],
+        "meaning": "After the original await, current() is false. Returns without revalidation."
+      },
+      {
+        "code": 7,
+        "lines": [
+          184,
+          186
+        ],
+        "extra": [
+          "nextReadId"
+        ],
+        "meaning": "Pending hint revoked and another latest read exists. Continues the loop; this event is not a revalidate call."
+      },
+      {
+        "code": 8,
+        "lines": [
+          184,
+          188
+        ],
+        "extra": [],
+        "meaning": "Pending hint revoked and no distinct next read exists. Calls original revalidate."
+      },
+      {
+        "code": 9,
+        "lines": [
+          190
+        ],
+        "extra": [],
+        "meaning": "Outcome failed; propagates the same original error. No error payload is recorded and no diagnostic retry is added."
+      },
+      {
+        "code": 10,
+        "lines": [
+          191,
+          193
+        ],
+        "extra": [
+          "effectiveBegan"
+        ],
+        "meaning": "Committed, effective began>after, original read.applied() true and original accepts(data) true; returns current data. A nonzero receivedProofBarrier is separately needed to identify an actual response-dispatch proof, rather than merely the conservative original fetcher-entry lower bound."
+      },
+      {
+        "code": 11,
+        "lines": [
+          191,
+          194
+        ],
+        "extra": [
+          "effectiveBegan"
+        ],
+        "meaning": "Committed, late enough and applied, but original accepts(data) returned false. Falls through; often followed by branch12 or13. Do not count this event itself as another read or retry."
+      },
+      {
+        "code": 12,
+        "lines": [
+          198,
+          199
+        ],
+        "extra": [
+          "effectiveBegan"
+        ],
+        "meaning": "No distinct next read after unsuccessful coverage. Calls revalidate. The reason can be discarded outcome, missing/old effective proof, stale cache identity, or a prior branch11 revision rejection; do not invent a unique reason without the corresponding events."
+      },
+      {
+        "code": 13,
+        "lines": [
+          198,
+          200
+        ],
+        "extra": [
+          "nextReadId"
+        ],
+        "meaning": "A distinct latest read now exists after unsuccessful coverage. Continues the original loop; extra is a read ID, never a began timestamp."
+      }
+    ]
+  },
+  "channel": {
+    "event": 16,
+    "commonArguments": [
+      "channelId",
+      "state",
+      "generation"
+    ],
+    "states": [
+      {
+        "code": 1,
+        "line": 74,
+        "extra": [],
+        "meaning": "Constructor; typically generation0."
+      },
+      {
+        "code": 2,
+        "line": 396,
+        "extra": [],
+        "meaning": "Connect begins after ++generation. Ticket/prepare can still be pending; this is not socket open or coverage."
+      },
+      {
+        "code": 3,
+        "line": 410,
+        "extra": [],
+        "meaning": "Socket open. The subsequent event18 cause1 records the actual existing readBoundary for unconditional catch-up; open itself has no extra barrier field."
+      },
+      {
+        "code": 4,
+        "line": 428,
+        "extra": [
+          "coverageAfter"
+        ],
+        "meaning": "Validated live_ready was accepted and the original coverageAfter=readBoundary() assigned. This is a same-realm ordering barrier, not a wall-clock instant or snapshot revision."
+      },
+      {
+        "code": 5,
+        "line": 165,
+        "extra": [
+          "wasConnectedBoolean"
+        ],
+        "meaning": "closeSocket before clearing state. dispose/disconnected/visibility paths may already have incremented generation, so the close generation can be the successor of the opening generation; do not require exact open/close generation equality."
+      },
+      {
+        "code": 6,
+        "line": 357,
+        "extra": [
+          "coverageAfter"
+        ],
+        "meaning": "Existing acknowledged presence expiry updated coverageAfter. Distinct from socket ready; no new diagnostic barrier was introduced."
+      }
+    ],
+    "subscriptionCaution": "event17 first-subscribe is recorded before connect increments generation; subscriptions can survive later connection generations. Join by channelId+subscriptionId, not exact generation equality alone.",
+    "invalidation": {
+      "event": 18,
+      "arguments": [
+        "channelId",
+        "generation",
+        "keyId",
+        "incomingAfter",
+        "pendingAfter",
+        "immediate",
+        "unsupportedOnly",
+        "revisionOr0",
+        "cause"
+      ],
+      "causes": {
+        "0": "other original invalidation path",
+        "1": "onopen catch-up",
+        "2": "subscribe while already connected"
+      },
+      "note": "pendingAfter is max of this obligation and an already pending one. The flush event19 after carries this value into readFresh. A max may combine more than one source obligation."
+    },
+    "incoming": {
+      "event": 21,
+      "arguments": [
+        "channelId",
+        "generation",
+        "fixedKindCode",
+        "after",
+        "revisionOr0"
+      ],
+      "note": "Recorded even when no key subscription currently matches; this can explain a later subscribe boundary beyond ready. Kind code0 means unlisted, not no push."
+    }
+  },
+  "association": {
+    "actualProof": "event6 proofFunctionId→existing actualDispatchBarrier; event12 requestId→proofFunctionId; event13 requestId→actionId; event10 actionId→readId. event7 identifies the received proof barrier, and event2/F share cacheId+keyId. Never replace these links with nearest timestamps.",
+    "duplicates": "Phase views are nondestructive. Identical prefixes may recur. Dedupe only identical tuples under the same launch/renderer realm nonce+timeOrigin+seq; a conflicting tuple is incomplete.",
+    "windows": "authenticated-profile includes prepareNativeDevice after the original query window closed. Keep the old query window boundaries; do not attribute every exported event to login. Preserve pending reads at the stop boundary rather than awaiting them.",
+    "scope": "These are local diagnostic integers. They never confer owner scope, authorization, snapshot status, SQL attribution for unknown contexts, or business acceptance."
+  }
+}

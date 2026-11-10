@@ -1,0 +1,101 @@
+{
+  "schema": "issue1512-native-original-extraction-admission-v1",
+  "enabled": true,
+  "repository": "alexj11324/Mikka",
+  "repositoryId": 1427517699,
+  "opsBranch": "ops/1512-task-runs-pg-20261110",
+  "admissionBranch": "ops/1512-native-live-diagnostic-evidence-admission-20261110",
+  "admissionMessage": "issue1512 Native diagnostic original evidence extract admit 6e1a5e12-269f-44be-9ef5-a05d6f5088c1",
+  "workflowPath": ".github/workflows/issue1512-native-evidence-extract.yml",
+  "previousOps": "fadf04984e1c86aae3ac7bb8188e208422c39925",
+  "expiresAt": "2026-11-10T06:30:00+00:00",
+  "controllerSha256": "3d3c8f9cade54c83e5c9bdb8e8c8bef287272244bff213d034f7d35ec16efe2f",
+  "source": {
+    "run": 42757687653,
+    "attempt": 1,
+    "job": 129635774633,
+    "head": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "tree": "23179d928269195860beaf27ad27786c7f5e7637",
+    "checkout": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "base": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "originalJobResponseBlob": "cb047bf4d57f050a982c87c4fb83540402c328a9",
+    "originalJobLogBlob": "8942610168219cb6a39271345ce4ae2109712213"
+  },
+  "requiredSourceSteps": [
+    "Real packaged Apple Silicon native acceptance",
+    "Real Keychain encryption across three independent packaged processes",
+    "Audit closed package and crypto reports",
+    "Audit native evidence",
+    "Verify exact source and temporary diagnostic overlay",
+    "Verify closed diagnostic protocol before installing dependencies"
+  ],
+  "artifactUploadStep": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+  "sourceAuditBlobs": {
+    ".github/workflows/desktop.yml": "1cfd9d8be85015b639809faedc8a68fb83609399",
+    "apps/desktop/scripts/native-evidence.mjs": "9eaf48c43ba5b3013b5ccb82d58c9dd968ed888e",
+    "scripts/test-accounts/session.mjs": "4d178439f9ebdf0528f265c0682c04f27fd5e91d",
+    "scripts/test-accounts/evidence-content.mjs": "d31071e38299d318d232395886b8d09ea92dc6d4",
+    "scripts/test-accounts/cli.mjs": "8bfb15d5a6411ddf73a5ba039070b30662bc7d2f",
+    ".github/workflows/issue1512-native-live-diagnostic.yml": "5b7ea8c83aabc154f51a7f205fae0deb4eacd326",
+    ".github/issue1512-native-live-diagnostic.json": "40d8f92047dd4e61b9c1771bda028f537f15de01"
+  },
+  "forbiddenCredentials": [
+    "INFISICAL_TOKEN",
+    "INFISICAL_CLIENT_SECRET",
+    "POSTHOG_API_KEY",
+    "NEXT_PUBLIC_POSTHOG_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "VERCEL_TOKEN",
+    "NEON_API_KEY",
+    "RESEND_API_KEY"
+  ],
+  "deliveryHostSuffixes": [
+    ".blob.core.windows.net",
+    ".githubusercontent.com",
+    ".amazonaws.com"
+  ],
+  "artifacts": [
+    {
+      "id": 13736438755,
+      "name": "desktop-native-evidence-2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+      "size_in_bytes": 15307035,
+      "digest": "sha256:401f02cc60ab47d24e79d93f8535b3c7fd187b320882d0d74bc8ae7c960f6085",
+      "expires_at": "2026-11-17T04:57:30Z",
+      "fileCount": 314,
+      "allowPng": true,
+      "jsonMembers": [
+        "lifecycle.json",
+        "smoke.json",
+        "parity/parity.json"
+      ]
+    },
+    {
+      "id": 13736463665,
+      "name": "desktop-package-evidence-2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+      "size_in_bytes": 1597,
+      "digest": "sha256:d93790e7661d62a444c529192d99f0bb099f1746ea90509e51eaba42b83f5334",
+      "expires_at": "2026-11-17T04:57:28Z",
+      "fileCount": 2,
+      "allowPng": false,
+      "jsonMembers": [
+        "native-crypto.json",
+        "mac-acceptance-package.json"
+      ]
+    }
+  ],
+  "policy": {
+    "singleAttempt": true,
+    "noArtifactRetries": true,
+    "readEachOriginalZipOnce": true,
+    "freezeZipBeforeOpeningArchive": true,
+    "freezeExactJsonBeforeParsing": true,
+    "allArchiveMemberCrcRequired": true,
+    "noProductExecution": true,
+    "noDependencyInstall": true,
+    "noVmCreated": true,
+    "noProductionAccess": true,
+    "temporaryDirectoryCleanup": true,
+    "githubHostedRunnerReleasedByActions": true
+  }
+}

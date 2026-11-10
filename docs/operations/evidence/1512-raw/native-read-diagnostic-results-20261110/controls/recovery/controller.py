@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""One admitted extraction of two already-frozen Git ZIPs; no artifact downloads or product execution."""
+import base64
+import datetime as dt
+import hashlib
+import io
+import json
+import os
+from pathlib import Path, PurePosixPath
+import platform
+import re
+import shutil
+import stat
+import subprocess
+import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
+import zipfile
+
+REPO = "alexj11324/Mikka"
+API = "https://api.github.com/repos/" + REPO
+CONTROL = Path(".github/ops/issue1512-native-evidence-extract")
+MANIFEST_BYTES = (CONTROL / "manifest.json").read_bytes()
+MANIFEST = json.loads(MANIFEST_BYTES)
+TOKEN = os.environ["GITHUB_TOKEN"]
+PHASE = "admission"
+RECEIPT = {"schema": "issue1512-native-original-extraction-v1", "status": "started",
+           "artifacts": [], "cleanup": {"privateDirectoryRemoved": False},
+           "limits": {"artifactDownloadsRetried": False, "productExecuted": False,
+                      "dependencyInstalls": 0, "persistentResourcesCreated": 0,
+                      "originalJsonParsed": False, "originalArtifactDownloads": 0, "frozenGitRecovery": True}}
+
+class GuardFailure(Exception):
+    pass
+
+def require(condition, code):
+    if not condition:
+        raise GuardFailure(code)
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, message, headers, new_url):
+        return None
+
+OPENER = urllib.request.build_opener(NoRedirect)
+
+def utc():
+    return dt.datetime.now(dt.timezone.utc).isoformat()
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+def git_blob_id(data):
+    return hashlib.sha1(b"blob " + str(len(data)).encode("ascii") + b"\0" + data).hexdigest()
+
+def git(*args):
+    return subprocess.check_output(["git", *args], text=True, timeout=30).strip()
+
+def api_bytes(path, method="GET", payload=None):
+    require(path.startswith("/") and not path.startswith("//"), "API_PATH")
+    require(method == "GET" or (method == "POST" and path == "/git/blobs"), "API_METHOD")
+    data = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    request = urllib.request.Request(API + path, data=data, method=method, headers={
+        "Authorization": "Bearer " + TOKEN, "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Mikka-issue1512-original-evidence",
+        "Content-Type": "application/json",
+    })
+    with OPENER.open(request, timeout=180) as response:
+        require(response.status in (200, 201), "API_STATUS")
+        return response.read()
+
+def api(path):
+    return json.loads(api_bytes(path))
+
+def freeze(data):
+    expected = git_blob_id(data)
+    value = json.loads(api_bytes("/git/blobs", "POST", {
+        "content": base64.b64encode(data).decode("ascii"), "encoding": "base64",
+    }))
+    require(value.get("sha") == expected, "GIT_BLOB_ID")
+    return expected
+
+def emit(kind, value):
+    print("ISSUE1512_NATIVE_EXTRACT_" + kind + " " +
+          json.dumps(value, separators=(",", ":"), sort_keys=True), flush=True)
+
+def admission():
+    require(MANIFEST["enabled"] is True, "ADMISSION_CLOSED")
+    require(os.environ.get("GITHUB_REPOSITORY") == REPO, "REPOSITORY")
+    require(os.environ.get("GITHUB_EVENT_NAME") == "push", "EVENT")
+    require(os.environ.get("GITHUB_REF") == "refs/heads/" + MANIFEST["opsBranch"], "REF")
+    require(os.environ.get("GITHUB_RUN_ATTEMPT") == "1", "ATTEMPT")
+    require(os.environ.get("GITHUB_ACTIONS") == "true", "ACTIONS")
+    require(os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted", "RUNNER")
+    require(platform.system() == "Linux", "PLATFORM")
+    require(dt.datetime.now(dt.timezone.utc) <= dt.datetime.fromisoformat(MANIFEST["expiresAt"]), "EXPIRED")
+    require(digest(Path(__file__).read_bytes()) == MANIFEST["controllerSha256"], "CONTROLLER")
+    for key in MANIFEST["forbiddenCredentials"]:
+        require(not os.environ.get(key), "EXTERNAL_CREDENTIAL")
+    event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_bytes())
+    sha = os.environ["GITHUB_SHA"]
+    require(re.fullmatch(r"[0-9a-f]{40}", sha) is not None, "SHA")
+    require(event.get("after") == sha and event.get("before") == MANIFEST["previousOps"], "PUSH_TRANSITION")
+    require(event.get("head_commit", {}).get("id") == sha, "PUSH_HEAD")
+    require(event.get("head_commit", {}).get("message") == MANIFEST["admissionMessage"], "MESSAGE")
+    require(event.get("repository", {}).get("id") == MANIFEST["repositoryId"], "REPOSITORY_ID")
+    require(git("rev-parse", "HEAD") == sha, "CHECKOUT")
+    parents = [line[7:] for line in git("cat-file", "-p", "HEAD").splitlines() if line.startswith("parent ")]
+    require(parents == [MANIFEST["previousOps"], MANIFEST["source"]["head"]], "PARENTS")
+    require(git("status", "--porcelain", "--untracked-files=no") == "", "TRACKED_SOURCE_DIRTY")
+    anchor = api("/git/ref/heads/" + MANIFEST["admissionBranch"])
+    require(anchor.get("object", {}).get("sha") == sha, "EXACT_ADMISSION_SHA")
+    current = api("/actions/runs/" + os.environ["GITHUB_RUN_ID"])
+    require(current.get("head_sha") == sha and current.get("run_attempt") == 1 and current.get("event") == "push", "CURRENT_RUN")
+    require(current.get("path") == MANIFEST["workflowPath"], "CURRENT_WORKFLOW")
+    for path, blob in MANIFEST["sourceAuditBlobs"].items():
+        require(git("rev-parse", "HEAD:" + path) == blob, "AUDIT_SOURCE")
+    RECEIPT["binding"] = {
+        "repository": REPO, "opsSha": sha, "opsTree": git("rev-parse", "HEAD^{tree}"),
+        "opsRun": int(os.environ["GITHUB_RUN_ID"]), "attempt": 1,
+        "admissionRef": MANIFEST["admissionBranch"], "admissionSha": anchor["object"]["sha"],
+        "manifestBlob": git("rev-parse", "HEAD:" + str(CONTROL / "manifest.json")),
+        "controllerBlob": git("rev-parse", "HEAD:" + str(CONTROL / "controller.py")),
+        "workflowBlob": git("rev-parse", "HEAD:" + MANIFEST["workflowPath"]),
+        "source": MANIFEST["source"], "python": platform.python_version(), "startedAt": utc(),
+    }
+
+def source_guard():
+    source = MANIFEST["source"]
+    original = api_bytes("/actions/jobs/" + str(source["job"]))
+    job = json.loads(original)
+    require(job.get("id") == source["job"] and job.get("run_id") == source["run"], "SOURCE_JOB")
+    require(job.get("head_sha") == source["head"] and job.get("run_attempt") == 1, "SOURCE_JOB_REVISION")
+    require(job.get("status") == "completed" and job.get("conclusion") == "success", "SOURCE_JOB_RESULT")
+    for name in MANIFEST["requiredSourceSteps"]:
+        matches = [step for step in job["steps"] if step["name"] == name]
+        require(len(matches) == 1 and matches[0]["conclusion"] == "success", "SOURCE_AUDIT_STEP")
+    uploads = [step for step in job["steps"] if step["name"] == MANIFEST["artifactUploadStep"]]
+    require(len(uploads) == 2 and all(step["conclusion"] == "success" for step in uploads), "SOURCE_UPLOADS")
+    run = api("/actions/runs/" + str(source["run"]))
+    require(run.get("head_sha") == source["head"] and run.get("run_attempt") == 1, "SOURCE_RUN")
+    require(run.get("repository", {}).get("id") == MANIFEST["repositoryId"], "SOURCE_RUN_REPOSITORY")
+    require(source["checkout"] == source["head"], "SOURCE_DIRECT_CHECKOUT")
+    head = api("/git/commits/" + source["head"])
+    require(head["tree"]["sha"] == source["tree"], "SOURCE_TREES")
+    require([p["sha"] for p in head["parents"]] == [source["base"]], "SOURCE_CHECKOUT_PARENTS")
+    RECEIPT["sourceJobMetadataBlob"] = freeze(original)
+    RECEIPT["sourcePrivacy"] = {
+        "nativeAudit": "passed: known credentials/cookies scanned; traces and recordings forbidden",
+        "packageAudit": "passed: closed credential-free canonical reports",
+        "fixture": "MIKKA_LOCAL_TEST_ACCOUNTS=1; localhost disposable PostgreSQL and API",
+        "frozenOriginalNativeLog": MANIFEST["source"]["originalJobLogBlob"],
+        "productionAccess": False,
+    }
+
+def capture(spec, directory):
+    global PHASE
+    PHASE = "frozen_git_" + str(spec["id"])
+    require(re.fullmatch(r"[0-9a-f]{40}", spec["zipBlob"]) is not None, "FROZEN_GIT_SHA")
+    row = {"id": spec["id"], "name": spec["name"], "selected": [],
+           "sourceApiGetCount": 0, "deliveryGetCount": 0, "frozenGitGetCount": 0,
+           "priorExtractionReceipt": MANIFEST["priorExtractionReceipt"]}
+    RECEIPT["artifacts"].append(row)
+    # Read the already-preserved Git object. Never call an artifact/zip endpoint.
+    row["frozenGitGetCount"] += 1
+    frozen = api("/git/blobs/" + spec["zipBlob"])
+    require(frozen.get("sha") == spec["zipBlob"] and frozen.get("encoding") == "base64", "FROZEN_GIT_METADATA")
+    require(frozen.get("size") == spec["size_in_bytes"], "FROZEN_GIT_SIZE")
+    original = base64.b64decode("".join(frozen["content"].split()), validate=True)
+    require(len(original) == spec["size_in_bytes"], "ARTIFACT_LENGTH")
+    sha256 = digest(original)
+    require("sha256:" + sha256 == spec["digest"], "ARTIFACT_DIGEST")
+    require(git_blob_id(original) == spec["zipBlob"], "FROZEN_GIT_BYTES")
+    path = directory / (str(spec["id"]) + ".zip")
+    path.write_bytes(original)
+    row.update({"bytes": len(original), "sha256": sha256, "expectedZipBlob": spec["zipBlob"],
+                "zipBlob": spec["zipBlob"], "zipFrozenBeforeOpeningArchive": True,
+                "zipWasFrozenByPriorAdmission": True, "zipRefrozenThisRun": False})
+    emit("FROZEN_GIT_ZIP_VERIFIED", {"id": row["id"], "blob": row["zipBlob"],
+                                  "bytes": row["bytes"], "sha256": sha256})
+    return path, row
+
+def extract(spec, path, row):
+    global PHASE
+    PHASE = "extract_frozen_" + str(spec["id"])
+    # The exact original archive is now an independently addressable Git object.
+    with zipfile.ZipFile(path) as archive:
+        infos = archive.infolist()
+        names = [info.filename for info in infos]
+        require(len(names) == len(set(names)), "DUPLICATE_MEMBER")
+        files = [info for info in infos if not info.is_dir()]
+        require(len(files) == spec["fileCount"], "ARCHIVE_FILE_COUNT")
+        require(sum(info.file_size for info in infos) <= 128 * 1024 * 1024, "EXPANDED_LIMIT")
+        for info in infos:
+            name = PurePosixPath(info.filename)
+            require(not name.is_absolute() and ".." not in name.parts and "\\" not in info.filename, "MEMBER_PATH")
+            require(not (info.flag_bits & 1), "ENCRYPTED_MEMBER")
+            mode = stat.S_IFMT(info.external_attr >> 16)
+            require(mode in (0, stat.S_IFREG, stat.S_IFDIR), "MEMBER_TYPE")
+            if not info.is_dir():
+                require(info.filename in spec["jsonMembers"] or
+                        (spec["allowPng"] and info.filename.endswith(".png")), "UNEXPECTED_MEMBER")
+        require(all(name in names for name in spec["jsonMembers"]), "MISSING_JSON")
+        require(archive.testzip() is None, "ARCHIVE_CRC")
+        row["allMemberCrcPassed"] = True
+        row["members"] = [{"name": info.filename, "bytes": info.file_size,
+                           "compressedBytes": info.compress_size, "crc32": format(info.CRC, "08x")}
+                          for info in infos]
+        if "members" in spec:
+            require(row["members"] == spec["members"], "FROZEN_MEMBER_METADATA")
+        require(set(spec["jsonBounds"]) == set(spec["jsonMembers"]), "JSON_BOUND_KEYS")
+        for name in spec["jsonMembers"]:
+            info = archive.getinfo(name)
+            bounds = spec["jsonBounds"][name]
+            require(info.file_size == bounds["bytes"] and info.file_size > 0, "JSON_SIZE_EXACT")
+            if "crc32" in bounds:
+                require(format(info.CRC, "08x") == bounds["crc32"], "JSON_CRC_EXPECTED")
+            original = archive.read(info)
+            # Preserve the exact member bytes before any JSON decoding or parsing.
+            blob = freeze(original)
+            if "sha256" in bounds:
+                require(digest(original) == bounds["sha256"], "JSON_AUDIT_DIGEST")
+            selected = {"name": name, "bytes": len(original), "sha256": digest(original),
+                        "crc32": format(info.CRC, "08x"), "blob": blob}
+            row["selected"].append(selected)
+            emit("JSON_FROZEN", {"artifact": row["id"], **selected})
+
+directory = None
+exit_code = 0
+try:
+    admission()
+    PHASE = "source_guard"
+    source_guard()
+    directory = Path(tempfile.mkdtemp(prefix="issue1512-native-originals-", dir=os.environ["RUNNER_TEMP"]))
+    os.chmod(directory, 0o700)
+    captured = []
+    for spec in MANIFEST["artifacts"]:
+        path, row = capture(spec, directory)
+        captured.append((spec, path, row))
+    for spec, path, row in captured:
+        extract(spec, path, row)
+    require(sum(len(row["selected"]) for row in RECEIPT["artifacts"]) == 5, "EXACT_FIVE_JSON")
+    RECEIPT["status"] = "passed"
+except BaseException as error:
+    exit_code = 1
+    RECEIPT["status"] = "failed"
+    RECEIPT["failure"] = {"phase": PHASE, "type": type(error).__name__,
+                          "code": str(error) if isinstance(error, GuardFailure) else "EXTRACTION_FAILED"}
+finally:
+    try:
+        if directory is not None:
+            shutil.rmtree(directory)
+        RECEIPT["cleanup"]["privateDirectoryRemoved"] = directory is None or not directory.exists()
+    except BaseException:
+        exit_code = 1
+        RECEIPT["status"] = "failed"
+        RECEIPT["cleanup"]["privateDirectoryRemoved"] = False
+    RECEIPT["finishedAt"] = utc()
+    try:
+        receipt_bytes = (json.dumps(RECEIPT, indent=2, sort_keys=True) + "\n").encode("utf-8")
+        receipt_blob = freeze(receipt_bytes)
+        emit("RESULT", {"status": RECEIPT["status"], "receiptBlob": receipt_blob,
+                        "jsonCount": sum(len(row["selected"]) for row in RECEIPT["artifacts"]),
+                        "cleanup": RECEIPT["cleanup"], "failure": RECEIPT.get("failure")})
+    except BaseException as error:
+        exit_code = 1
+        emit("RESULT", {"status": "failed", "phase": "freeze_receipt", "type": type(error).__name__,
+                        "cleanup": RECEIPT["cleanup"]})
+raise SystemExit(exit_code)

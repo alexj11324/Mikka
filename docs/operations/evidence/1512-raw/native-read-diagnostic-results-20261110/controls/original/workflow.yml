@@ -1,0 +1,36 @@
+name: Issue1512 Native diagnostic original evidence extraction
+
+on:
+  push:
+    branches: [ops/1512-task-runs-pg-20261110]
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: issue1512-native-evidence-extract
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    name: Freeze diagnostic Native ZIPs and exact five JSON members once
+    if: >-
+      github.repository == 'alexj11324/Mikka' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/ops/1512-task-runs-pg-20261110' &&
+      github.event.before == 'fadf04984e1c86aae3ac7bb8188e208422c39925' &&
+      github.event.head_commit.message == 'issue1512 Native diagnostic original evidence extract admit 6e1a5e12-269f-44be-9ef5-a05d6f5088c1' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout the reviewed extraction controller only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify exact admission and preserve original artifact bytes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 .github/ops/issue1512-native-evidence-extract/controller.py

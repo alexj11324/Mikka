@@ -1,0 +1,268 @@
+{
+  "schema": "issue1512.posthog.readiness-refresh.v1",
+  "purpose": "Bounded read-only confirmation of pre-existing preparation objects; this is not issue #1512 production acceptance.",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "requestedScope": {
+    "region": "US",
+    "projectId": 670821,
+    "conversationId": "01a1bffc-8ada-7a55-8d2e-09190763024a"
+  },
+  "scopeBinding": "Existing PostHog MCP connection and conversation. No extra project enumeration was performed.",
+  "observation": {
+    "readStartedAt": "2026-11-10 05:05:49 UTC",
+    "lastReadCompletedAt": "2026-11-10 05:09:06 UTC",
+    "compiledAt": "2026-11-10 05:10:30 UTC",
+    "timestampMeaning": "Local UTC bounds around each MCP read; not a claim that all server fields were computed at that instant."
+  },
+  "workflow": {
+    "skills": [
+      "posthog:working-with-scouts",
+      "posthog:understanding-billing-usage"
+    ],
+    "earlierSessionSkills": [
+      "posthog:instrument-tracing",
+      "posthog:instrument-llm-analytics"
+    ],
+    "knowledgeSource": {
+      "businessKnowledge": "Unavailable: tool exists but is not enabled on this connection (INVALID_ARGUMENT). No bypass.",
+      "docsSearch": "One bounded documentation search completed; returned insights metadata documentation.",
+      "docsUrl": "https://posthog.com/docs/api/insights"
+    },
+    "apiCalls": [
+      {
+        "tool": "scout-metadata-get",
+        "readStartedAt": "2026-11-10 05:05:49 UTC",
+        "readCompletedAt": "2026-11-10 05:06:27 UTC",
+        "isError": false
+      },
+      {
+        "tool": "scout-config-list",
+        "readStartedAt": "2026-11-10 05:05:49 UTC",
+        "readCompletedAt": "2026-11-10 05:06:27 UTC",
+        "isError": false
+      },
+      {
+        "tool": "notebooks-list",
+        "readStartedAt": "2026-11-10 05:05:49 UTC",
+        "readCompletedAt": "2026-11-10 05:09:06 UTC",
+        "isError": false
+      },
+      {
+        "tool": "insight-get",
+        "readStartedAt": "2026-11-10 05:05:49 UTC",
+        "readCompletedAt": "2026-11-10 05:06:27 UTC",
+        "isError": false
+      },
+      {
+        "tool": "alerts-list",
+        "readStartedAt": "2026-11-10 05:05:49 UTC",
+        "readCompletedAt": "2026-11-10 05:09:06 UTC",
+        "isError": false
+      },
+      {
+        "tool": "billing-overview-get",
+        "readStartedAt": "2026-11-10 05:05:49 UTC",
+        "readCompletedAt": "2026-11-10 05:06:27 UTC",
+        "isError": false
+      }
+    ],
+    "originalResponses": "Only whitelisted closed projections retained; credentials, customer IDs, actor identities, notebook content, event/query results and inbox content were not preserved."
+  },
+  "scouts": {
+    "enrolled": true,
+    "dailyServiceRunQuota": "unknown: limits were outside the retained scalar projection",
+    "configs": [
+      {
+        "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+        "skillName": "signals-scout-ai-observability",
+        "enabled": true,
+        "status": "active",
+        "activeInterpretation": true,
+        "emit": true,
+        "outputInbox": true,
+        "emitInboxInterpretation": true,
+        "intervalMinutes": 1440,
+        "cron": null,
+        "lastRunAt": "2026-11-09T07:30:00Z",
+        "consecutiveFailureCount": 0,
+        "pauseReason": null,
+        "lastRunStatus": "unknown: no structured last_run metadata retained",
+        "lastFailureAt": "unknown",
+        "unstructuredFailureDetails": "not read or retained",
+        "interpretation": "Existing configuration and last-run metadata only; no Scout was triggered and no inbox item was read."
+      },
+      {
+        "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+        "skillName": "signals-scout-apm",
+        "enabled": true,
+        "status": "active",
+        "activeInterpretation": true,
+        "emit": true,
+        "outputInbox": true,
+        "emitInboxInterpretation": true,
+        "intervalMinutes": 1440,
+        "cron": null,
+        "lastRunAt": "2026-11-09T06:30:00Z",
+        "consecutiveFailureCount": 0,
+        "pauseReason": null,
+        "lastRunStatus": "unknown: no structured last_run metadata retained",
+        "lastFailureAt": "unknown",
+        "unstructuredFailureDetails": "not read or retained",
+        "interpretation": "Existing configuration and last-run metadata only; no Scout was triggered and no inbox item was read."
+      }
+    ]
+  },
+  "notebook": {
+    "id": "01a1b24c-17ad-0000-c8d1-5472d7a14395",
+    "short_id": "C9vQAc1L",
+    "deleted": false,
+    "created_at": "2026-11-06T19:18:13.677694Z",
+    "last_modified_at": "2026-11-06T19:43:15.134338Z",
+    "compute": null,
+    "exists": true,
+    "expectedPreviousVersion": 15,
+    "versionReverified": false,
+    "currentVersion": "unknown",
+    "expectedPreviousComputeState": "stopped",
+    "computeStateReverified": false,
+    "currentComputeState": "unknown",
+    "limitations": "Metadata list confirms the target exists and is not deleted. It does not report version or runtime state; compute:null does not prove stopped. Full notebook-get and write-capable notebooks-run-status were deliberately not called."
+  },
+  "insight": {
+    "id": 13703263,
+    "shortId": "k3M88Rs8",
+    "exists": true,
+    "deleted": false,
+    "saved": true,
+    "name": "[1324] Mikka 来源数据库小时异常",
+    "lastModifiedAt": "2026-11-07T06:11:16.416471Z",
+    "queryKind": "DataVisualizationNode / HogQLQuery",
+    "queryResultsRequested": false,
+    "definitionArtifact": {
+      "blobSha": "5bc20f3bda39b4030f8a388317a3201be7d3a24b",
+      "bytes": 11594,
+      "sha256": "cde21549844b9592ddcc981ef88e8570e43bfeb07f47b649c9a3599dfc47b449",
+      "gitBlobSha": "5bc20f3bda39b4030f8a388317a3201be7d3a24b",
+      "contents": "Exact static query definition from insight-get; no query results."
+    },
+    "closedConditions": {
+      "evaluatedPeriod": "Previous complete UTC hour: toStartOfHour(now()) - INTERVAL 1 HOUR",
+      "source": "posthog.trace_spans",
+      "service": "mikka-web",
+      "environment": "resource_attributes deployment.environment.name OR deployment.environment equals production",
+      "lookback": "Read definition selects 8 days of spans before evaluated_hour through the end of evaluated hour; baseline uses 7 days of observed covered hours before evaluated_hour.",
+      "routeGrouping": "service_name + coalesce(nullIf(mikka.route,''),'unknown')",
+      "querySpanPredicate": "startsWith(name, 'pg.query:')",
+      "weighting": "1 / coalesce(toFloatOrNull(mikka.trace.sample_rate), 0.1)",
+      "routeWarmup": "Baseline excludes each route's first partial hour. Query or byte branch requires at least 24 eligible baseline hours.",
+      "queryBreach": "covered_hours >= 24 AND current_queries > greatest(3 * median_queries, 2000)",
+      "byteBreach": "byte_covered_hours >= 24 AND current_byte_coverage >= 0.95 AND current_bytes > greatest(3 * median_bytes, 10000000)",
+      "byteBaselineEligibility": "Zero estimated queries, or >=95% weighted queries with known numeric response_bytes_approx.",
+      "noCurrentTelemetry": "row_value=NULL when no current service spans; evaluation suppressed by the query.",
+      "aggregate": "max(row_value), plus aggregate count of breaching and evaluated sources.",
+      "attributionDefinitionOnly": "Static definition includes validated request UUID, 16-hex user hash, allowlisted-shape RPC action, top-3 user/top-5 action aggregation, and unattributed counts. No rows or identifiers were queried.",
+      "byteMeaning": "Estimated JSON response bytes from span attribute, not provider egress."
+    }
+  },
+  "alert": {
+    "id": "01a1a9eb-1a3a-0000-6f0b-151446674319",
+    "name": "[1324] Mikka 来源数据库小时异常",
+    "enabled": true,
+    "state": "Not firing",
+    "created_at": "2026-11-05T04:15:19.610330Z",
+    "last_checked_at": "2026-11-10T04:45:04.465741Z",
+    "last_notified_at": "2026-11-09T23:46:42.518586Z",
+    "insight_id": 13703263,
+    "threshold_configuration": {
+      "id": "01a1a9eb-1a1e-0000-e933-780b9606c1fe",
+      "created_at": "2026-11-05T04:15:19.583095Z",
+      "name": "",
+      "configuration": {
+        "type": "absolute",
+        "bounds": {
+          "upper": 0.5
+        }
+      }
+    },
+    "detector_type": null,
+    "exists": true,
+    "thresholdMeaning": "Absolute upper bound 0.5 on the insight value; the static query emits 1 when either qualifying branch breaches.",
+    "observationMeaning": "Not firing is the existing alert state; last_checked_at is 2026-11-10T04:45:04.465741Z. No new evaluation, notification, or result read was requested."
+  },
+  "usage": {
+    "scope": "Organization aggregate from billing-overview-get; not claimed to be project 670821-only.",
+    "period": "Current billing overview at observation time; exact period boundaries were not retained by the bounded projection.",
+    "metrics": {
+      "logs_mb_ingested": {
+        "usage": 373,
+        "limit": 10000,
+        "todays_usage": 53
+      },
+      "logs_retention_30d_mb_ingested": {
+        "usage": 0,
+        "limit": null
+      },
+      "logs_retention_mb_days": {
+        "usage": 0,
+        "limit": null
+      },
+      "llm_events": {
+        "usage": 857,
+        "limit": 100000,
+        "todays_usage": 62
+      },
+      "ai_credits": {
+        "usage": 0,
+        "limit": 500,
+        "todays_usage": 0
+      },
+      "recordings": {
+        "usage": 16,
+        "limit": 5000,
+        "todays_usage": 0
+      },
+      "replay_vision_credits": {
+        "usage": 0,
+        "limit": 2500,
+        "todays_usage": 0
+      },
+      "signals_credits": {
+        "usage": 0,
+        "limit": 4500,
+        "todays_usage": 0
+      },
+      "signals_spend_credits": {
+        "usage": 0,
+        "limit": null,
+        "billing_start_date": "2026-12-10",
+        "todays_usage": 0
+      }
+    },
+    "mapping": {
+      "Logs": "logs_mb_ingested",
+      "AIAnalytics": "llm_events",
+      "PostHogAICredits": "ai_credits",
+      "WebReplay": "recordings",
+      "Vision": "replay_vision_credits",
+      "ScoutSignals": "signals_credits",
+      "ScoutSpendCredits": "signals_spend_credits"
+    },
+    "costsUsd": "unknown: no product cost projection retained; zero usage does not imply zero cost.",
+    "limitsMeaning": "Returned usage-summary limits are not asserted to be remaining credits, hard enforcement caps, or project allocations.",
+    "missingQuota": "unknown; Scout daily execution quota and billing credits are different measures.",
+    "freshness": "These are billing aggregates, not raw event counts or personal event queries."
+  },
+  "nonActions": {
+    "scoutRuns": 0,
+    "visionRuns": 0,
+    "notebookRuns": 0,
+    "notebookStatusWriteCalls": 0,
+    "eventOrQueryExecutionCalls": 0,
+    "inboxReads": 0,
+    "posthogObjectWrites": 0,
+    "repoRefWrites": 0,
+    "newVMs": 0,
+    "productionAcceptance": "Not performed by this readiness refresh."
+  }
+}

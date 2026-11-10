@@ -1,0 +1,38 @@
+{
+  "schema": "issue1512-native-frozen-git-recovery-root-review-v1",
+  "at": "2026-11-10 05:11:55 UTC",
+  "files": {
+    "manifest": "8fcddac768457d0df5d51fc3c459d41b2e852b7c",
+    "workflow": "fa3b56c9d08ca58bd3a534ddeb7fcf7a26f713c6",
+    "controller": "c294ae7298a4d382dadd4356ca7a09fdf9e7c4a3",
+    "closeManifest": "6ac4dfb47f560091362b5015e60133f095800e5c",
+    "closeWorkflow": "0108899c078230ae8255507914016b6874b80a90",
+    "delta": "88200a175779ea75518e79d6af930410cd52c3dc"
+  },
+  "source": {
+    "run": 42757687653,
+    "attempt": 1,
+    "job": 129635774633,
+    "head": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "tree": "23179d928269195860beaf27ad27786c7f5e7637",
+    "checkout": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "base": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "originalJobResponseBlob": "cb047bf4d57f050a982c87c4fb83540402c328a9",
+    "originalJobLogBlob": "8942610168219cb6a39271345ce4ae2109712213"
+  },
+  "priorFailureReceipt": "06612fdf8dc5987c01fab6eb4c715bbf6b7236d6",
+  "checks": {
+    "ctrlHash": true,
+    "unchangedSource": true,
+    "exactNativeMembers": true,
+    "artifactZipBindings": true,
+    "exactNativeJsonBounds": true,
+    "noArtifactEndpoint": true,
+    "closed": true,
+    "cryptoAudit": true,
+    "packageAudit": true
+  },
+  "review": "Root reviewed complete changed capture and extract code, unchanged admission/source/cleanup path relative e776. Only Git blobs are fetched, base64/bytes/SHA256/GitSHA1 all checked before opening; Native exact 314 member list, exact three JSON sizes+CRCs, and package two original source-audited sizes+SHA256 are bound. CRC and freeze-before-parse retained.",
+  "decision": "Approve one fixed recovery admission on own ops ref after fresh CAS/anchor checks; close after admission. No original artifact requests, Native rerun or production action.",
+  "testClaim": "Source/data-bound recovery review; not a new product test or claim of successful extraction."
+}

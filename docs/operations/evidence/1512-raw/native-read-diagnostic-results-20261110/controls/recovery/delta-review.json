@@ -1,0 +1,210 @@
+{
+  "schema": "mikka.issue1512.native-frozen-git-recovery-preparation.v1",
+  "controller": "c294ae7298a4d382dadd4356ca7a09fdf9e7c4a3",
+  "controllerSha256": "9ad54fc018965c95d5e327e19754bb485b79725d76576e962147ff9f5bdc0da4",
+  "controllerDiff": [
+    {
+      "oldLine": 2,
+      "newLine": 2,
+      "removed": [
+        "\"\"\"One admitted retrieval of two immutable Native artifacts; no product execution.\"\"\""
+      ],
+      "added": [
+        "\"\"\"One admitted extraction of two already-frozen Git ZIPs; no artifact downloads or product execution.\"\"\""
+      ]
+    },
+    {
+      "oldLine": 32,
+      "newLine": 32,
+      "removed": [
+        "                      \"originalJsonParsed\": False}}"
+      ],
+      "added": [
+        "                      \"originalJsonParsed\": False, \"originalArtifactDownloads\": 0, \"frozenGitRecovery\": True}}"
+      ]
+    },
+    {
+      "oldLine": 158,
+      "newLine": 158,
+      "removed": [
+        "    PHASE = \"artifact_metadata_\" + str(spec[\"id\"])",
+        "    metadata_bytes = api_bytes(\"/actions/artifacts/\" + str(spec[\"id\"]))",
+        "    metadata = json.loads(metadata_bytes)",
+        "    for key in (\"id\", \"name\", \"size_in_bytes\", \"digest\", \"expires_at\"):",
+        "        require(metadata.get(key) == spec[key], \"ARTIFACT_METADATA\")",
+        "    require(metadata.get(\"expired\") is False, \"ARTIFACT_EXPIRED\")",
+        "    require(metadata.get(\"workflow_run\", {}).get(\"id\") == MANIFEST[\"source\"][\"run\"], \"ARTIFACT_RUN\")",
+        "    require(metadata.get(\"workflow_run\", {}).get(\"head_sha\") == MANIFEST[\"source\"][\"head\"], \"ARTIFACT_HEAD\")",
+        "    row = {\"id\": spec[\"id\"], \"name\": spec[\"name\"], \"metadataBlob\": freeze(metadata_bytes),",
+        "           \"sourceApiGetCount\": 0, \"deliveryGetCount\": 0, \"selected\": []}"
+      ],
+      "added": [
+        "    PHASE = \"frozen_git_\" + str(spec[\"id\"])",
+        "    require(re.fullmatch(r\"[0-9a-f]{40}\", spec[\"zipBlob\"]) is not None, \"FROZEN_GIT_SHA\")",
+        "    row = {\"id\": spec[\"id\"], \"name\": spec[\"name\"], \"selected\": [],",
+        "           \"sourceApiGetCount\": 0, \"deliveryGetCount\": 0, \"frozenGitGetCount\": 0,",
+        "           \"priorExtractionReceipt\": MANIFEST[\"priorExtractionReceipt\"]}"
+      ]
+    },
+    {
+      "oldLine": 169,
+      "newLine": 164,
+      "removed": [
+        "    PHASE = \"download_\" + str(spec[\"id\"])",
+        "    request = urllib.request.Request(API + \"/actions/artifacts/\" + str(spec[\"id\"]) + \"/zip\", headers={",
+        "        \"Authorization\": \"Bearer \" + TOKEN, \"Accept\": \"application/vnd.github+json\",",
+        "        \"X-GitHub-Api-Version\": \"2022-11-28\", \"User-Agent\": \"Mikka-issue1512-original-evidence\",",
+        "    })",
+        "    row[\"sourceApiGetCount\"] += 1",
+        "    try:",
+        "        response = OPENER.open(request, timeout=60)",
+        "    except urllib.error.HTTPError as error:",
+        "        require(error.code == 302, \"ARTIFACT_REDIRECT_STATUS\")",
+        "        location = error.headers.get(\"Location\", \"\")",
+        "        error.close()",
+        "    else:",
+        "        response.close()",
+        "        raise GuardFailure(\"ARTIFACT_EXPECTED_REDIRECT\")",
+        "    target = urllib.parse.urlsplit(location)",
+        "    require(target.scheme == \"https\" and not target.username and not target.password and not target.fragment, \"ARTIFACT_DELIVERY_URL\")",
+        "    require(any(target.hostname and target.hostname.endswith(suffix) for suffix in MANIFEST[\"deliveryHostSuffixes\"]), \"ARTIFACT_DELIVERY_HOST\")",
+        "    # Never forward the repository token to the signed object-storage URL.",
+        "    delivery = urllib.request.Request(location, headers={\"User-Agent\": \"Mikka-issue1512-original-evidence\"})",
+        "    row[\"deliveryGetCount\"] += 1"
+      ],
+      "added": [
+        "    # Read the already-preserved Git object. Never call an artifact/zip endpoint.",
+        "    row[\"frozenGitGetCount\"] += 1",
+        "    frozen = api(\"/git/blobs/\" + spec[\"zipBlob\"])",
+        "    require(frozen.get(\"sha\") == spec[\"zipBlob\"] and frozen.get(\"encoding\") == \"base64\", \"FROZEN_GIT_METADATA\")",
+        "    require(frozen.get(\"size\") == spec[\"size_in_bytes\"], \"FROZEN_GIT_SIZE\")",
+        "    original = base64.b64decode(\"\".join(frozen[\"content\"].split()), validate=True)",
+        "    require(len(original) == spec[\"size_in_bytes\"], \"ARTIFACT_LENGTH\")",
+        "    sha256 = digest(original)",
+        "    require(\"sha256:\" + sha256 == spec[\"digest\"], \"ARTIFACT_DIGEST\")",
+        "    require(git_blob_id(original) == spec[\"zipBlob\"], \"FROZEN_GIT_BYTES\")"
+      ]
+    },
+    {
+      "oldLine": 191,
+      "newLine": 175,
+      "removed": [
+        "    sha256 = hashlib.sha256()",
+        "    length = 0",
+        "    with OPENER.open(delivery, timeout=180) as response, path.open(\"xb\") as out:",
+        "        require(response.status == 200, \"ARTIFACT_DELIVERY_STATUS\")",
+        "        while True:",
+        "            chunk = response.read(1024 * 1024)",
+        "            if not chunk:",
+        "                break",
+        "            length += len(chunk)",
+        "            require(length <= spec[\"size_in_bytes\"], \"ARTIFACT_TOO_LARGE\")",
+        "            sha256.update(chunk)",
+        "            out.write(chunk)",
+        "    require(length == spec[\"size_in_bytes\"], \"ARTIFACT_LENGTH\")",
+        "    require(\"sha256:\" + sha256.hexdigest() == spec[\"digest\"], \"ARTIFACT_DIGEST\")",
+        "    original = path.read_bytes()",
+        "    row.update({\"bytes\": length, \"sha256\": sha256.hexdigest(), \"expectedZipBlob\": git_blob_id(original)})",
+        "    PHASE = \"freeze_zip_\" + str(spec[\"id\"])",
+        "    row[\"zipBlob\"] = freeze(original)",
+        "    row[\"zipFrozenBeforeOpeningArchive\"] = True",
+        "    emit(\"ZIP_FROZEN\", {\"id\": row[\"id\"], \"blob\": row[\"zipBlob\"], \"bytes\": length, \"sha256\": row[\"sha256\"]})"
+      ],
+      "added": [
+        "    path.write_bytes(original)",
+        "    row.update({\"bytes\": len(original), \"sha256\": sha256, \"expectedZipBlob\": spec[\"zipBlob\"],",
+        "                \"zipBlob\": spec[\"zipBlob\"], \"zipFrozenBeforeOpeningArchive\": True,",
+        "                \"zipWasFrozenByPriorAdmission\": True, \"zipRefrozenThisRun\": False})",
+        "    emit(\"FROZEN_GIT_ZIP_VERIFIED\", {\"id\": row[\"id\"], \"blob\": row[\"zipBlob\"],",
+        "                                  \"bytes\": row[\"bytes\"], \"sha256\": sha256})"
+      ]
+    },
+    {
+      "oldLine": 239,
+      "newLine": 209,
+      "removed": [],
+      "added": [
+        "        if \"members\" in spec:",
+        "            require(row[\"members\"] == spec[\"members\"], \"FROZEN_MEMBER_METADATA\")",
+        "        require(set(spec[\"jsonBounds\"]) == set(spec[\"jsonMembers\"]), \"JSON_BOUND_KEYS\")"
+      ]
+    },
+    {
+      "oldLine": 241,
+      "newLine": 214,
+      "removed": [
+        "            require(0 < info.file_size <= 2 * 1024 * 1024, \"JSON_SIZE\")"
+      ],
+      "added": [
+        "            bounds = spec[\"jsonBounds\"][name]",
+        "            require(info.file_size == bounds[\"bytes\"] and info.file_size > 0, \"JSON_SIZE_EXACT\")",
+        "            if \"crc32\" in bounds:",
+        "                require(format(info.CRC, \"08x\") == bounds[\"crc32\"], \"JSON_CRC_EXPECTED\")"
+      ]
+    },
+    {
+      "oldLine": 245,
+      "newLine": 221,
+      "removed": [],
+      "added": [
+        "            if \"sha256\" in bounds:",
+        "                require(digest(original) == bounds[\"sha256\"], \"JSON_AUDIT_DIGEST\")"
+      ]
+    }
+  ],
+  "manifest": "8fcddac768457d0df5d51fc3c459d41b2e852b7c",
+  "workflow": "fa3b56c9d08ca58bd3a534ddeb7fcf7a26f713c6",
+  "closedManifest": "6ac4dfb47f560091362b5015e60133f095800e5c",
+  "closedWorkflow": "0108899c078230ae8255507914016b6874b80a90",
+  "reason": {
+    "priorReceipt": "06612fdf8dc5987c01fab6eb4c715bbf6b7236d6",
+    "failure": "JSON_SIZE",
+    "actualLifecycleBytes": 2814247,
+    "oldCeiling": 2097152,
+    "oldRun": 42759926625,
+    "oldJob": 129642957929
+  },
+  "bounds": [
+    {
+      "id": 13736438755,
+      "zipBlob": "c49a4729c72a61bfddc2450e77bf01d41156869a",
+      "size": 15307035,
+      "digest": "sha256:401f02cc60ab47d24e79d93f8535b3c7fd187b320882d0d74bc8ae7c960f6085",
+      "members": 314,
+      "jsonBounds": {
+        "lifecycle.json": {
+          "bytes": 2814247,
+          "crc32": "ceef6ef6"
+        },
+        "smoke.json": {
+          "bytes": 3144,
+          "crc32": "caa5aec2"
+        },
+        "parity/parity.json": {
+          "bytes": 118087,
+          "crc32": "340f440b"
+        }
+      }
+    },
+    {
+      "id": 13736463665,
+      "zipBlob": "5d50ea60dcf8c10b78b778b1bfb7669a10a4325f",
+      "size": 1597,
+      "digest": "sha256:d93790e7661d62a444c529192d99f0bb099f1746ea90509e51eaba42b83f5334",
+      "members": null,
+      "jsonBounds": {
+        "native-crypto.json": {
+          "bytes": 2868,
+          "sha256": "96d1bfe5bcb8db6451879b13eff46eb4ec3dca4b05576534ce2da0ce35a1ca29"
+        },
+        "mac-acceptance-package.json": {
+          "bytes": 957,
+          "sha256": "480c52ad57cde016d1f07d08f846ee3861a8da1106e1e9382be3f93fa00bac4d"
+        }
+      }
+    }
+  ],
+  "scope": "Read exactly the two already frozen Git ZIP blobs; original artifact endpoint code has been removed. Reverify size/SHA256/GitSHA1 before ZIP open; native314 full member metadata equality, package2 exact named audited bytes/SHA; require and measure all316 member CRCs during recovery (package CRC is still pending before execution); exact JSON Git freeze before any JSON parse; private temporary cleanup always.",
+  "notYetExecuted": true,
+  "supersedesWordingOnly": "d7bdc947dbf12d2d5a3d2606126a7545395c5cc4"
+}

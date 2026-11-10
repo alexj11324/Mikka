@@ -1,0 +1,3483 @@
+{
+  "schema": "issue1512.independent-five-snapshot-causality.v1",
+  "author": "/root/independent_final",
+  "status": "EXACT_NATIVE_DIAGNOSTIC_CAUSAL_CHAIN_CONFIRMED_NOT_ACCEPTANCE_PASS",
+  "repository": "alexj11324/Mikka",
+  "binding": {
+    "formalHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "diagnosticRevision": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "diagnosticTree": "23179d928269195860beaf27ad27786c7f5e7637",
+    "runId": 42757687653,
+    "attempt": 1,
+    "jobId": 129635774633,
+    "lifecycle": {
+      "sha": "5ea6109ead93772b5ede58170cd20cce067c2be9",
+      "bytes": 2814247,
+      "sha256": "87a1db7e0046ff44627fedc61837d792e16e9ffa48cd0633e7bd61a74ba238a0",
+      "gitHashVerified": true
+    },
+    "analyzerSource": "0717899cd752b71be1b82630bfeb1d32eb4ac5ff",
+    "derived": {
+      "sha": "a5b4c4bd1b3d71d1e9a30ff2978ece47314a18c6",
+      "bytes": 2352304,
+      "sha256": "8e168b53032cb689746e008e8b6f7fbb8ffa7db069d369dc6a5ca65250e74fc9",
+      "gitHashVerified": true
+    },
+    "analyzerReview": "bff507f5422ca778f602256628e041b136544397",
+    "extractionRecoveryReceipt": "a2c360eaa4ed317bf33bc64a8c2e53fe769bdc10"
+  },
+  "scope": "只读已冻结 Git JSON；五个已审计 snapshot RPC 的原始同 realm 数字事件关联、窗口聚合守恒及新鲜度独审。未下载原 Actions artifact/log，未执行产品、未启动资源、未改产品或 ref。",
+  "sourceContract": {
+    "observer": "39d63bd92fbc9ed4c0b568694b67df28a49c6e65",
+    "rpc": "ecd547d17c1a32cd360090621d22bc3e4e41d732",
+    "readBatch": "64038a0aaae11888d1b32ff0f21498612013dfeb",
+    "channel": "5f43ea9f39d9354955fe60e390aa76665ce83f99",
+    "useLiveKey": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+    "fixture": "bb4b1a3e28514d6cfaf811568fb6b041a3191715",
+    "eventHelper": "6a9eed46a4062eeebc1b0f9984f0d6fe25d8dca7",
+    "events": {
+      "E2": "readId/cacheId/keyId/read boundary",
+      "E4": "readId/actual pending-dispatch notification boundary",
+      "E6": "proofId/dispatch lower-bound boundary",
+      "E7": "readId/received proof/effective began",
+      "E10": "actionId/readId/action code",
+      "E12": "requestId/action code/proofId/endpoint",
+      "E13": "requestId/actionId",
+      "E15": "cacheId/keyId/after/readId/F branch/branch-dependent extras",
+      "E16": "channelId/state/generation/extra",
+      "E18": "channelId/generation/keyId/incomingAfter/pendingAfter/immediate/unsupportedOnly/revision/cause",
+      "E19": "channelId/generation/keyId/after/unconditional/waitCount"
+    },
+    "branch3": "read.began <= after 且 pendingDispatchAt <= after，因此调用原 revalidate。完成返回晚于 open 不改变已证明的早期 dispatch 边界。",
+    "physicalStatusEvent": "E14 在 fetch 返回后、response.json() 之前；不代表 bootstrap parse/decode/readBootstrap 校验或 SessionApplication stale-check 已完成。"
+  },
+  "completeness": {
+    "nativeAuthenticatedProfile": {
+      "status": "complete",
+      "reasons": [],
+      "expectedDocuments": 3,
+      "realms": [
+        {
+          "realm": [
+            2113260034,
+            2712232732
+          ],
+          "recorded": 5,
+          "current": false,
+          "dropped": 0
+        },
+        {
+          "realm": [
+            338089748,
+            538160589
+          ],
+          "recorded": 365,
+          "current": false,
+          "dropped": 0
+        },
+        {
+          "realm": [
+            1253782891,
+            345360387
+          ],
+          "recorded": 354,
+          "current": true,
+          "dropped": 0
+        }
+      ]
+    },
+    "webLogin": {
+      "status": "incomplete",
+      "reasons": [
+        11
+      ],
+      "expectedDocuments": 2,
+      "realms": 1
+    },
+    "nativeRawUnion": "每个认证 realm 的 raw dump/current 按 seq 合并，逐 tuple 与 collector realms.rows 相等、seq 连续；独立从 E10→E13→E12→E6 和 E2/E4/E7 重建，两两动作与 v3 read/action/dispatch 序号完全一致。",
+    "dataChecks": "10 个动作对均恰好 2 次 logical action；同 cache/key；旧 dispatch seq < 同 generation socket-open seq；旧 dispatch proof 与 pending notification 边界均 <= 对应 after；第二 read began > after；每个 E7 received proof 与原 E6 一致。"
+  },
+  "window": {
+    "boundary": {
+      "assignment": "requests belong to the half-open window [startedAt, finishedAt) containing their api_request_started timestamp",
+      "counts": "physical HTTP RPC requests, not logical batch items or SQL calls; all primary API requests are included, without user attribution",
+      "overlap": "completedInWindow includes carried-in requests; crossesStart/crossesEnd are confirmed by paired receipts and are not additive",
+      "statusCounts": "observed completions of requests intersecting the window, including completions after its end",
+      "unknown": "completionNotObserved means no completion in this one log snapshot, not proof the request is still running; without a start its window remains unknown",
+      "segments": "closed measurement phases partition a completed window; starts belong to one phase, while completions and crossings remain separate non-additive observations"
+    },
+    "native": {
+      "status": "complete",
+      "total": {
+        "startedAt": "2026-11-10T04:55:45.372Z",
+        "finishedAt": "2026-11-10T04:55:54.001Z",
+        "durationMs": 8629,
+        "queryCalls": 441,
+        "pgProtocolReceiveBytes": 97141,
+        "pgProtocolSendBytes": 290913,
+        "closedConnections": 0,
+        "unknownReadings": 0,
+        "queryOperations": {
+          "/api/auth/[...all]": 21,
+          "/api/desktop/begin": 1,
+          "/api/desktop/return": 2,
+          "/api/desktop/exchange": 8,
+          "/api/desktop/rpc": 83,
+          "/api/rpc": 0,
+          "/api/workspace": 20,
+          "/api/workspace/switcher": 8,
+          "/api/live/ticket": 23,
+          "/actions/coordinator/chat": 0,
+          "/actions/coordinator/poll": 89,
+          "/actions/coordinator/summaries": 31,
+          "/actions/threads/poll": 15,
+          "/actions/task-runs/read": 12,
+          "/actions/issues/poll": 27,
+          "/actions/projects/list": 2,
+          "unattributed": 99
+        },
+        "unattributedSources": {
+          "/api/agent/sessions": 4,
+          "/api/computer/events": 0,
+          "/api/conversations": 18,
+          "/api/conversations/[id]/read": 13,
+          "/api/approved-writes": 40,
+          "/api/mobile/reactions": 1,
+          "/api/pending-actions": 4,
+          "/api/settings/preferences": 0,
+          "/api/settings/model-order": 0,
+          "/api/settings/[read]": 0,
+          "/api/devices/enrollment": 7,
+          "/api/coordinator/messages": 0,
+          "/api/coordinator/stream": 0,
+          "/api/coordinator/runtime": 0,
+          "/api/coordinator/attention": 0,
+          "/api/teams/directory": 0,
+          "/api/teams/[teamId]/members": 0,
+          "/api/integrations/composio": 0,
+          "/api/frontend/oauth-consent": 0,
+          "/pages/workspace": 0,
+          "/pages/settings": 0,
+          "/v1/devices/enroll": 0,
+          "/v1/devices/register": 0,
+          "/v1/devices/[deviceId]/commands": 0,
+          "/v1/devices/[deviceId]/commands/ack": 0,
+          "/v1/devices/[deviceId]/computer": 0,
+          "/v1/devices/[deviceId]/coordinator": 0,
+          "/v1/devices/[deviceId]/fs/requests": 0,
+          "/v1/devices/[deviceId]/fs/requests/[requestId]": 0,
+          "/v1/devices/[deviceId]/gateway": 0,
+          "/v1/devices/[deviceId]/github-token": 0,
+          "/v1/devices/[deviceId]/heartbeat": 0,
+          "/v1/devices/[deviceId]/repos": 0,
+          "/v1/devices/[deviceId]/runs": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/claim": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/computer-authority": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/credentials/login": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/subscription-lease": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/subscription": 0,
+          "/v1/runs/[runId]": 0,
+          "/v1/runs/[runId]/captures": 0,
+          "/v1/runs/[runId]/captures/[captureId]": 0,
+          "/v1/runs/[runId]/captures/[captureId]/complete": 0,
+          "/v1/runs/[runId]/checkpoint": 0,
+          "/v1/runs/[runId]/complete": 0,
+          "/v1/runs/[runId]/decision": 0,
+          "/v1/runs/[runId]/events": 0,
+          "/v1/runs/[runId]/policy-snapshot": 0,
+          "/v1/runs/[runId]/screen": 0,
+          "/v1/runs/[runId]/skill-receipt": 0,
+          "/v1/runs/[runId]/tool-approval": 0,
+          "after:agent-images.revalidate": 0,
+          "after:auth-email": 0,
+          "after:composio-triggers": 0,
+          "after:composio-webhook": 0,
+          "after:coordinator-wake": 0,
+          "after:device-wake": 0,
+          "after:due-timer": 0,
+          "after:factory-dispatch-recovery": 0,
+          "after:github-webhook": 0,
+          "after:group-turn": 0,
+          "after:issue-effects": 0,
+          "after:linear-issue-sync": 0,
+          "after:linear-sync-batch": 0,
+          "after:linear-webhook": 0,
+          "after:linear-webhook-suggestions": 0,
+          "after:live-notify": 0,
+          "after:record-time-zone": 0,
+          "after:remember-locale": 0,
+          "after:run-outcome-judge": 0,
+          "after:short-title": 0,
+          "after:stop-recordings": 0,
+          "after:subagent-start": 0,
+          "after:suggestions-bootstrap": 0,
+          "after:workflow-wake": 0,
+          "otherScoped": 12,
+          "noScope": 0
+        }
+      },
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "startedAt": "2026-11-10T04:55:45.372Z",
+          "finishedAt": "2026-11-10T04:55:45.578Z",
+          "queryCalls": 21
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "startedAt": "2026-11-10T04:55:45.578Z",
+          "finishedAt": "2026-11-10T04:55:46.731Z",
+          "queryCalls": 16
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "startedAt": "2026-11-10T04:55:46.731Z",
+          "finishedAt": "2026-11-10T04:55:54.001Z",
+          "queryCalls": 404
+        }
+      ]
+    },
+    "web": {
+      "status": "complete",
+      "total": {
+        "startedAt": "2026-11-10T04:55:41.237Z",
+        "finishedAt": "2026-11-10T04:55:44.028Z",
+        "durationMs": 2791,
+        "queryCalls": 365,
+        "pgProtocolReceiveBytes": 79004,
+        "pgProtocolSendBytes": 239038,
+        "closedConnections": 1,
+        "unknownReadings": 0,
+        "queryOperations": {
+          "/api/auth/[...all]": 24,
+          "/api/desktop/begin": 0,
+          "/api/desktop/return": 0,
+          "/api/desktop/exchange": 0,
+          "/api/desktop/rpc": 0,
+          "/api/rpc": 80,
+          "/api/workspace": 15,
+          "/api/workspace/switcher": 12,
+          "/api/live/ticket": 23,
+          "/actions/coordinator/chat": 0,
+          "/actions/coordinator/poll": 73,
+          "/actions/coordinator/summaries": 24,
+          "/actions/threads/poll": 15,
+          "/actions/task-runs/read": 0,
+          "/actions/issues/poll": 22,
+          "/actions/projects/list": 4,
+          "unattributed": 73
+        },
+        "unattributedSources": {
+          "/api/agent/sessions": 4,
+          "/api/computer/events": 0,
+          "/api/conversations": 13,
+          "/api/conversations/[id]/read": 10,
+          "/api/approved-writes": 30,
+          "/api/mobile/reactions": 1,
+          "/api/pending-actions": 3,
+          "/api/settings/preferences": 0,
+          "/api/settings/model-order": 0,
+          "/api/settings/[read]": 0,
+          "/api/devices/enrollment": 0,
+          "/api/coordinator/messages": 0,
+          "/api/coordinator/stream": 0,
+          "/api/coordinator/runtime": 0,
+          "/api/coordinator/attention": 0,
+          "/api/teams/directory": 0,
+          "/api/teams/[teamId]/members": 0,
+          "/api/integrations/composio": 0,
+          "/api/frontend/oauth-consent": 0,
+          "/pages/workspace": 0,
+          "/pages/settings": 0,
+          "/v1/devices/enroll": 0,
+          "/v1/devices/register": 0,
+          "/v1/devices/[deviceId]/commands": 0,
+          "/v1/devices/[deviceId]/commands/ack": 0,
+          "/v1/devices/[deviceId]/computer": 0,
+          "/v1/devices/[deviceId]/coordinator": 0,
+          "/v1/devices/[deviceId]/fs/requests": 0,
+          "/v1/devices/[deviceId]/fs/requests/[requestId]": 0,
+          "/v1/devices/[deviceId]/gateway": 0,
+          "/v1/devices/[deviceId]/github-token": 0,
+          "/v1/devices/[deviceId]/heartbeat": 0,
+          "/v1/devices/[deviceId]/repos": 0,
+          "/v1/devices/[deviceId]/runs": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/claim": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/computer-authority": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/credentials/login": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/subscription-lease": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/subscription": 0,
+          "/v1/runs/[runId]": 0,
+          "/v1/runs/[runId]/captures": 0,
+          "/v1/runs/[runId]/captures/[captureId]": 0,
+          "/v1/runs/[runId]/captures/[captureId]/complete": 0,
+          "/v1/runs/[runId]/checkpoint": 0,
+          "/v1/runs/[runId]/complete": 0,
+          "/v1/runs/[runId]/decision": 0,
+          "/v1/runs/[runId]/events": 0,
+          "/v1/runs/[runId]/policy-snapshot": 0,
+          "/v1/runs/[runId]/screen": 0,
+          "/v1/runs/[runId]/skill-receipt": 0,
+          "/v1/runs/[runId]/tool-approval": 0,
+          "after:agent-images.revalidate": 0,
+          "after:auth-email": 0,
+          "after:composio-triggers": 0,
+          "after:composio-webhook": 0,
+          "after:coordinator-wake": 0,
+          "after:device-wake": 0,
+          "after:due-timer": 0,
+          "after:factory-dispatch-recovery": 0,
+          "after:github-webhook": 0,
+          "after:group-turn": 0,
+          "after:issue-effects": 0,
+          "after:linear-issue-sync": 0,
+          "after:linear-sync-batch": 0,
+          "after:linear-webhook": 0,
+          "after:linear-webhook-suggestions": 0,
+          "after:live-notify": 0,
+          "after:record-time-zone": 0,
+          "after:remember-locale": 0,
+          "after:run-outcome-judge": 0,
+          "after:short-title": 0,
+          "after:stop-recordings": 0,
+          "after:subagent-start": 0,
+          "after:suggestions-bootstrap": 0,
+          "after:workflow-wake": 0,
+          "otherScoped": 12,
+          "noScope": 0
+        }
+      }
+    },
+    "nativeLogicalStatus": "complete",
+    "nativeLogicalSegmentStatus": "complete",
+    "interpretation": "五类动作各 4 次、共 20 次均在后端 nativeLogin 的 workspace-selection-to-usable 段开始并完成，crossing/missing completion 均 0；完整 renderer profile 同五类动作也各 4 次。此为集合计数守恒；本诊断本地 readId/requestId 未上 wire，未把任何局部 readId 靠时间近邻绑定到具体服务器 invocation 或 SQL ordinal。"
+  },
+  "findings": [
+    {
+      "id": "S1",
+      "statement": "两认证文档各包含五类的首次读 + 五类 catch-up，共 10 个 first→second 对。closed realm 的五类均由 channel60 onopen cause1 after25触发；current realm teams/projectTeams由channel60 onopen after26，bots由channel58 onopen after28，taskRuns由channel58 late-subscribe after29，summaries由channel60 late-subscribe after27。"
+    },
+    {
+      "id": "S2",
+      "statement": "所有首次请求的真实客户端 dispatch proof 为14或23，均早于对应 open/invalidation；没有 F2(只capture未dispatch) 或 F5(pending dispatch在after之后)事件。这一实际样本不支持“已排队尚未dispatch被误当旧in-flight”为这10个额外快照的根因。"
+    },
+    {
+      "id": "S3",
+      "statement": "current realm 的五个首次结果全部在相关socket open之后才E7 receive；其中teams/projectTeams/bots在F3触发时尚未settle，taskRuns/summaries先完成后late-subscribe触发。它们仍携带旧proof14/23，不能仅凭返回晚于open跳过catch-up。"
+    },
+    {
+      "id": "S4",
+      "statement": "部分 key 的 F3 重复出现，但每family每文档只有2个 E10 action。use-live-key 原source存在外层 readFresh→tab share→内层 readFresh 路径；不能把F行数当实际RPC数。两个认证realm在最后target dispatch之前没有E21 incoming；这些特定补读的记录cause均为open或late-subscribe。"
+    },
+    {
+      "id": "S5",
+      "statement": "五类后台窗口计数 Native20、Web12；其中taskRuns4vs0，其余4类各4vs3。不能将这8个logical差额直接换算SQL，也不能假设全部Native额外SQL只来自五类。Mac另审3个delta同步调用。"
+    },
+    {
+      "id": "S6",
+      "statement": "正式H原Native441/Web331预算仍FAIL。临时诊断Native441/Web365也不满足预算，且Web缺首文档诊断；诊断fixture/job的passed不等于正式SQL或生产验收通过。"
+    }
+  ],
+  "rawIndependentProjection": {
+    "realms": [
+      {
+        "realm": [
+          338089748,
+          538160589
+        ],
+        "current": false,
+        "rawRows": 365,
+        "exactRawUnionMatchesCollector": true,
+        "allRowsContiguous": true,
+        "allFivePairsMatchAnalyzerIdsAndD": true,
+        "branchCounts": {
+          "1": 2,
+          "3": 17
+        },
+        "incomingBeforeLastTargetDispatch": [],
+        "pairs": [
+          {
+            "code": 4,
+            "action": "task-runs.pollTaskRuns",
+            "first": {
+              "readId": 17,
+              "keyId": 5,
+              "cacheId": 18,
+              "begin": [
+                18,
+                921.4000000000233,
+                2,
+                17,
+                18,
+                5,
+                1
+              ],
+              "action": [
+                36,
+                964.5,
+                10,
+                41,
+                17,
+                4
+              ],
+              "queue": [
+                [
+                  37,
+                  964.5,
+                  11,
+                  41
+                ]
+              ],
+              "proof": [
+                56,
+                975.2000000000698,
+                6,
+                51,
+                14
+              ],
+              "pending": [
+                [
+                  57,
+                  975.3000000000466,
+                  4,
+                  17,
+                  15
+                ]
+              ],
+              "dispatch": [
+                61,
+                975.3000000000466,
+                12,
+                50,
+                3,
+                51,
+                1
+              ],
+              "link": [
+                62,
+                975.3000000000466,
+                13,
+                50,
+                41
+              ],
+              "receive": [
+                133,
+                1659.3000000000466,
+                7,
+                17,
+                14,
+                14
+              ],
+              "settle": [
+                [
+                  141,
+                  1661.1000000000931,
+                  8,
+                  17,
+                  1,
+                  14,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "second": {
+              "readId": 95,
+              "keyId": 5,
+              "cacheId": 18,
+              "begin": [
+                261,
+                1925.3000000000466,
+                2,
+                95,
+                18,
+                5,
+                41
+              ],
+              "action": [
+                263,
+                1929.2000000000698,
+                10,
+                96,
+                95,
+                4
+              ],
+              "queue": [
+                [
+                  264,
+                  1929.2000000000698,
+                  11,
+                  96
+                ]
+              ],
+              "proof": [
+                281,
+                1949.8000000000466,
+                6,
+                104,
+                45
+              ],
+              "pending": [
+                [
+                  282,
+                  1949.8000000000466,
+                  4,
+                  95,
+                  46
+                ]
+              ],
+              "dispatch": [
+                284,
+                1949.9000000000233,
+                12,
+                103,
+                3,
+                104,
+                1
+              ],
+              "link": [
+                286,
+                1949.9000000000233,
+                13,
+                103,
+                96
+              ],
+              "receive": [
+                315,
+                2091.70000000007,
+                7,
+                95,
+                45,
+                45
+              ],
+              "settle": [
+                [
+                  323,
+                  2091.8000000000466,
+                  8,
+                  95,
+                  1,
+                  45,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  227,
+                  1882.8000000000466,
+                  15,
+                  18,
+                  5,
+                  25,
+                  17,
+                  3,
+                  14,
+                  15
+                ],
+                "flush": [
+                  226,
+                  1882.8000000000466,
+                  19,
+                  60,
+                  1,
+                  5,
+                  25,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    183,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    5,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  171,
+                  1779.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  189,
+                  1793.9000000000233,
+                  16,
+                  60,
+                  4,
+                  1,
+                  26
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": false,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              },
+              {
+                "fresh": [
+                  259,
+                  1925.2000000000698,
+                  15,
+                  18,
+                  5,
+                  25,
+                  17,
+                  3,
+                  14,
+                  15
+                ],
+                "flush": [
+                  226,
+                  1882.8000000000466,
+                  19,
+                  60,
+                  1,
+                  5,
+                  25,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    183,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    5,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  171,
+                  1779.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  189,
+                  1793.9000000000233,
+                  16,
+                  60,
+                  4,
+                  1,
+                  26
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": false,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          },
+          {
+            "code": 5,
+            "action": "coordinator.pollBotChatSummaries",
+            "first": {
+              "readId": 23,
+              "keyId": 7,
+              "cacheId": 18,
+              "begin": [
+                23,
+                921.6000000000931,
+                2,
+                23,
+                18,
+                7,
+                6
+              ],
+              "action": [
+                45,
+                965.2000000000698,
+                10,
+                44,
+                23,
+                5
+              ],
+              "queue": [
+                [
+                  46,
+                  965.2000000000698,
+                  11,
+                  44
+                ]
+              ],
+              "proof": [
+                56,
+                975.2000000000698,
+                6,
+                51,
+                14
+              ],
+              "pending": [
+                [
+                  60,
+                  975.3000000000466,
+                  4,
+                  23,
+                  18
+                ]
+              ],
+              "dispatch": [
+                61,
+                975.3000000000466,
+                12,
+                50,
+                3,
+                51,
+                1
+              ],
+              "link": [
+                65,
+                975.3000000000466,
+                13,
+                50,
+                44
+              ],
+              "receive": [
+                137,
+                1660.9000000000233,
+                7,
+                23,
+                14,
+                14
+              ],
+              "settle": [
+                [
+                  150,
+                  1680.6000000000931,
+                  8,
+                  23,
+                  1,
+                  14,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "second": {
+              "readId": 97,
+              "keyId": 7,
+              "cacheId": 18,
+              "begin": [
+                267,
+                1929.3000000000466,
+                2,
+                97,
+                18,
+                7,
+                42
+              ],
+              "action": [
+                269,
+                1938.2000000000698,
+                10,
+                98,
+                97,
+                5
+              ],
+              "queue": [
+                [
+                  270,
+                  1938.2000000000698,
+                  11,
+                  98
+                ]
+              ],
+              "proof": [
+                281,
+                1949.8000000000466,
+                6,
+                104,
+                45
+              ],
+              "pending": [
+                [
+                  283,
+                  1949.8000000000466,
+                  4,
+                  97,
+                  47
+                ]
+              ],
+              "dispatch": [
+                284,
+                1949.9000000000233,
+                12,
+                103,
+                3,
+                104,
+                1
+              ],
+              "link": [
+                287,
+                1949.9000000000233,
+                13,
+                103,
+                98
+              ],
+              "receive": [
+                317,
+                2091.70000000007,
+                7,
+                97,
+                45,
+                45
+              ],
+              "settle": [
+                [
+                  324,
+                  2101.70000000007,
+                  8,
+                  97,
+                  1,
+                  45,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  229,
+                  1882.8000000000466,
+                  15,
+                  18,
+                  7,
+                  25,
+                  23,
+                  3,
+                  14,
+                  18
+                ],
+                "flush": [
+                  228,
+                  1882.8000000000466,
+                  19,
+                  60,
+                  1,
+                  7,
+                  25,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    184,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    7,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  [
+                    186,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    7,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  [
+                    187,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    7,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  171,
+                  1779.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  189,
+                  1793.9000000000233,
+                  16,
+                  60,
+                  4,
+                  1,
+                  26
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": false,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              },
+              {
+                "fresh": [
+                  265,
+                  1929.3000000000466,
+                  15,
+                  18,
+                  7,
+                  25,
+                  23,
+                  3,
+                  14,
+                  18
+                ],
+                "flush": [
+                  228,
+                  1882.8000000000466,
+                  19,
+                  60,
+                  1,
+                  7,
+                  25,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    184,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    7,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  [
+                    186,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    7,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ],
+                  [
+                    187,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    7,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  171,
+                  1779.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  189,
+                  1793.9000000000233,
+                  16,
+                  60,
+                  4,
+                  1,
+                  26
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": false,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          },
+          {
+            "code": 6,
+            "action": "bots.pollBots",
+            "first": {
+              "readId": 58,
+              "keyId": 59,
+              "cacheId": 18,
+              "begin": [
+                86,
+                1578.1000000000931,
+                2,
+                58,
+                18,
+                59,
+                22
+              ],
+              "action": [
+                109,
+                1587.5,
+                10,
+                69,
+                58,
+                6
+              ],
+              "queue": [
+                [
+                  110,
+                  1587.5,
+                  11,
+                  69
+                ]
+              ],
+              "proof": [
+                116,
+                1623.9000000000233,
+                6,
+                72,
+                23
+              ],
+              "pending": [
+                [
+                  117,
+                  1623.9000000000233,
+                  4,
+                  58,
+                  24
+                ]
+              ],
+              "dispatch": [
+                118,
+                1624,
+                12,
+                71,
+                3,
+                72,
+                1
+              ],
+              "link": [
+                119,
+                1624,
+                13,
+                71,
+                69
+              ],
+              "receive": [
+                163,
+                1725.9000000000233,
+                7,
+                58,
+                23,
+                23
+              ],
+              "settle": [
+                [
+                  165,
+                  1725.9000000000233,
+                  8,
+                  58,
+                  1,
+                  23,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "second": {
+              "readId": 87,
+              "keyId": 59,
+              "cacheId": 18,
+              "begin": [
+                225,
+                1882.8000000000466,
+                2,
+                87,
+                18,
+                59,
+                35
+              ],
+              "action": [
+                241,
+                1890.5,
+                10,
+                90,
+                87,
+                6
+              ],
+              "queue": [
+                [
+                  242,
+                  1890.5,
+                  11,
+                  90
+                ]
+              ],
+              "proof": [
+                243,
+                1890.8000000000466,
+                6,
+                92,
+                36
+              ],
+              "pending": [
+                [
+                  246,
+                  1890.8000000000466,
+                  4,
+                  87,
+                  39
+                ]
+              ],
+              "dispatch": [
+                247,
+                1890.8000000000466,
+                12,
+                91,
+                3,
+                92,
+                1
+              ],
+              "link": [
+                250,
+                1890.8000000000466,
+                13,
+                91,
+                90
+              ],
+              "receive": [
+                309,
+                1978.1000000000931,
+                7,
+                87,
+                36,
+                36
+              ],
+              "settle": [
+                [
+                  311,
+                  1978.1000000000931,
+                  8,
+                  87,
+                  1,
+                  36,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  223,
+                  1882.8000000000466,
+                  15,
+                  18,
+                  59,
+                  25,
+                  58,
+                  3,
+                  23,
+                  24
+                ],
+                "flush": [
+                  222,
+                  1882.8000000000466,
+                  19,
+                  60,
+                  1,
+                  59,
+                  25,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    181,
+                    1780.9000000000233,
+                    18,
+                    60,
+                    1,
+                    59,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  171,
+                  1779.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  189,
+                  1793.9000000000233,
+                  16,
+                  60,
+                  4,
+                  1,
+                  26
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": false,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          },
+          {
+            "code": 7,
+            "action": "teams.listTeams",
+            "first": {
+              "readId": 21,
+              "keyId": 11,
+              "cacheId": 18,
+              "begin": [
+                21,
+                921.5,
+                2,
+                21,
+                18,
+                11,
+                4
+              ],
+              "action": [
+                39,
+                965.1000000000931,
+                10,
+                42,
+                21,
+                7
+              ],
+              "queue": [
+                [
+                  40,
+                  965.1000000000931,
+                  11,
+                  42
+                ]
+              ],
+              "proof": [
+                56,
+                975.2000000000698,
+                6,
+                51,
+                14
+              ],
+              "pending": [
+                [
+                  58,
+                  975.3000000000466,
+                  4,
+                  21,
+                  16
+                ]
+              ],
+              "dispatch": [
+                61,
+                975.3000000000466,
+                12,
+                50,
+                3,
+                51,
+                1
+              ],
+              "link": [
+                63,
+                975.3000000000466,
+                13,
+                50,
+                42
+              ],
+              "receive": [
+                124,
+                1638.3000000000466,
+                7,
+                21,
+                14,
+                14
+              ],
+              "settle": [
+                [
+                  130,
+                  1638.5,
+                  8,
+                  21,
+                  1,
+                  14,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "second": {
+              "readId": 85,
+              "keyId": 11,
+              "cacheId": 18,
+              "begin": [
+                215,
+                1882.4000000000233,
+                2,
+                85,
+                18,
+                11,
+                33
+              ],
+              "action": [
+                235,
+                1890.5,
+                10,
+                88,
+                85,
+                7
+              ],
+              "queue": [
+                [
+                  236,
+                  1890.5,
+                  11,
+                  88
+                ]
+              ],
+              "proof": [
+                243,
+                1890.8000000000466,
+                6,
+                92,
+                36
+              ],
+              "pending": [
+                [
+                  244,
+                  1890.8000000000466,
+                  4,
+                  85,
+                  37
+                ]
+              ],
+              "dispatch": [
+                247,
+                1890.8000000000466,
+                12,
+                91,
+                3,
+                92,
+                1
+              ],
+              "link": [
+                248,
+                1890.8000000000466,
+                13,
+                91,
+                88
+              ],
+              "receive": [
+                303,
+                1978,
+                7,
+                85,
+                36,
+                36
+              ],
+              "settle": [
+                [
+                  307,
+                  1978.1000000000931,
+                  8,
+                  85,
+                  2,
+                  36,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  213,
+                  1882.4000000000233,
+                  15,
+                  18,
+                  11,
+                  25,
+                  21,
+                  3,
+                  14,
+                  16
+                ],
+                "flush": [
+                  212,
+                  1882.4000000000233,
+                  19,
+                  60,
+                  1,
+                  11,
+                  25,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    178,
+                    1780.2000000000698,
+                    18,
+                    60,
+                    1,
+                    11,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  171,
+                  1779.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  189,
+                  1793.9000000000233,
+                  16,
+                  60,
+                  4,
+                  1,
+                  26
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": false,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          },
+          {
+            "code": 8,
+            "action": "team-relations.listProjectTeams",
+            "first": {
+              "readId": 22,
+              "keyId": 12,
+              "cacheId": 18,
+              "begin": [
+                22,
+                921.5,
+                2,
+                22,
+                18,
+                12,
+                5
+              ],
+              "action": [
+                42,
+                965.1000000000931,
+                10,
+                43,
+                22,
+                8
+              ],
+              "queue": [
+                [
+                  43,
+                  965.1000000000931,
+                  11,
+                  43
+                ]
+              ],
+              "proof": [
+                56,
+                975.2000000000698,
+                6,
+                51,
+                14
+              ],
+              "pending": [
+                [
+                  59,
+                  975.3000000000466,
+                  4,
+                  22,
+                  17
+                ]
+              ],
+              "dispatch": [
+                61,
+                975.3000000000466,
+                12,
+                50,
+                3,
+                51,
+                1
+              ],
+              "link": [
+                64,
+                975.3000000000466,
+                13,
+                50,
+                43
+              ],
+              "receive": [
+                126,
+                1638.4000000000233,
+                7,
+                22,
+                14,
+                14
+              ],
+              "settle": [
+                [
+                  131,
+                  1659,
+                  8,
+                  22,
+                  1,
+                  14,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "second": {
+              "readId": 86,
+              "keyId": 12,
+              "cacheId": 18,
+              "begin": [
+                219,
+                1882.4000000000233,
+                2,
+                86,
+                18,
+                12,
+                34
+              ],
+              "action": [
+                238,
+                1890.5,
+                10,
+                89,
+                86,
+                8
+              ],
+              "queue": [
+                [
+                  239,
+                  1890.5,
+                  11,
+                  89
+                ]
+              ],
+              "proof": [
+                243,
+                1890.8000000000466,
+                6,
+                92,
+                36
+              ],
+              "pending": [
+                [
+                  245,
+                  1890.8000000000466,
+                  4,
+                  86,
+                  38
+                ]
+              ],
+              "dispatch": [
+                247,
+                1890.8000000000466,
+                12,
+                91,
+                3,
+                92,
+                1
+              ],
+              "link": [
+                249,
+                1890.8000000000466,
+                13,
+                91,
+                89
+              ],
+              "receive": [
+                305,
+                1978,
+                7,
+                86,
+                36,
+                36
+              ],
+              "settle": [
+                [
+                  308,
+                  1978.1000000000931,
+                  8,
+                  86,
+                  2,
+                  36,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  217,
+                  1882.4000000000233,
+                  15,
+                  18,
+                  12,
+                  25,
+                  22,
+                  3,
+                  14,
+                  17
+                ],
+                "flush": [
+                  216,
+                  1882.4000000000233,
+                  19,
+                  60,
+                  1,
+                  12,
+                  25,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    179,
+                    1780.2000000000698,
+                    18,
+                    60,
+                    1,
+                    12,
+                    25,
+                    25,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  171,
+                  1779.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  189,
+                  1793.9000000000233,
+                  16,
+                  60,
+                  4,
+                  1,
+                  26
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": false,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "realm": [
+          1253782891,
+          345360387
+        ],
+        "current": true,
+        "rawRows": 354,
+        "exactRawUnionMatchesCollector": true,
+        "allRowsContiguous": true,
+        "allFivePairsMatchAnalyzerIdsAndD": true,
+        "branchCounts": {
+          "1": 2,
+          "3": 17,
+          "4": 1,
+          "10": 1
+        },
+        "incomingBeforeLastTargetDispatch": [],
+        "pairs": [
+          {
+            "code": 4,
+            "action": "task-runs.pollTaskRuns",
+            "first": {
+              "readId": 24,
+              "keyId": 5,
+              "cacheId": 25,
+              "begin": [
+                22,
+                2675.6999999999534,
+                2,
+                24,
+                25,
+                5,
+                1
+              ],
+              "action": [
+                36,
+                2776.3000000000466,
+                10,
+                41,
+                24,
+                4
+              ],
+              "queue": [
+                [
+                  37,
+                  2776.3000000000466,
+                  11,
+                  41
+                ]
+              ],
+              "proof": [
+                56,
+                2965.5999999999767,
+                6,
+                51,
+                14
+              ],
+              "pending": [
+                [
+                  57,
+                  2965.5999999999767,
+                  4,
+                  24,
+                  15
+                ]
+              ],
+              "dispatch": [
+                61,
+                2965.5999999999767,
+                12,
+                50,
+                3,
+                51,
+                1
+              ],
+              "link": [
+                62,
+                2965.5999999999767,
+                13,
+                50,
+                41
+              ],
+              "receive": [
+                205,
+                4235.5,
+                7,
+                24,
+                14,
+                14
+              ],
+              "settle": [
+                [
+                  226,
+                  4410.599999999977,
+                  8,
+                  24,
+                  1,
+                  14,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "second": {
+              "readId": 104,
+              "keyId": 5,
+              "cacheId": 25,
+              "begin": [
+                281,
+                4702.300000000047,
+                2,
+                104,
+                25,
+                5,
+                46
+              ],
+              "action": [
+                283,
+                4702.699999999953,
+                10,
+                105,
+                104,
+                4
+              ],
+              "queue": [
+                [
+                  284,
+                  4702.699999999953,
+                  11,
+                  105
+                ]
+              ],
+              "proof": [
+                319,
+                4792.5,
+                6,
+                113,
+                50
+              ],
+              "pending": [
+                [
+                  320,
+                  4792.5,
+                  4,
+                  104,
+                  51
+                ]
+              ],
+              "dispatch": [
+                322,
+                4792.5,
+                12,
+                112,
+                3,
+                113,
+                1
+              ],
+              "link": [
+                323,
+                4792.5,
+                13,
+                112,
+                105
+              ],
+              "receive": [
+                341,
+                5056.199999999953,
+                7,
+                104,
+                50,
+                50
+              ],
+              "settle": [
+                [
+                  347,
+                  5056.400000000023,
+                  8,
+                  104,
+                  1,
+                  50,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  263,
+                  4641.199999999953,
+                  15,
+                  25,
+                  5,
+                  29,
+                  24,
+                  3,
+                  14,
+                  15
+                ],
+                "flush": [
+                  262,
+                  4641.099999999977,
+                  19,
+                  58,
+                  1,
+                  5,
+                  29,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    214,
+                    4393.199999999953,
+                    18,
+                    58,
+                    1,
+                    5,
+                    29,
+                    29,
+                    1,
+                    0,
+                    0,
+                    2
+                  ]
+                ],
+                "socketOpen": [
+                  135,
+                  4040.5999999999767,
+                  16,
+                  58,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  140,
+                  4042.5,
+                  16,
+                  58,
+                  4,
+                  1,
+                  29
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": true,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              },
+              {
+                "fresh": [
+                  279,
+                  4702.099999999977,
+                  15,
+                  25,
+                  5,
+                  29,
+                  24,
+                  3,
+                  14,
+                  15
+                ],
+                "flush": [
+                  262,
+                  4641.099999999977,
+                  19,
+                  58,
+                  1,
+                  5,
+                  29,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    214,
+                    4393.199999999953,
+                    18,
+                    58,
+                    1,
+                    5,
+                    29,
+                    29,
+                    1,
+                    0,
+                    0,
+                    2
+                  ]
+                ],
+                "socketOpen": [
+                  135,
+                  4040.5999999999767,
+                  16,
+                  58,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  140,
+                  4042.5,
+                  16,
+                  58,
+                  4,
+                  1,
+                  29
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": true,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          },
+          {
+            "code": 5,
+            "action": "coordinator.pollBotChatSummaries",
+            "first": {
+              "readId": 30,
+              "keyId": 7,
+              "cacheId": 25,
+              "begin": [
+                27,
+                2675.8000000000466,
+                2,
+                30,
+                25,
+                7,
+                6
+              ],
+              "action": [
+                45,
+                2816.5999999999767,
+                10,
+                44,
+                30,
+                5
+              ],
+              "queue": [
+                [
+                  46,
+                  2816.5999999999767,
+                  11,
+                  44
+                ]
+              ],
+              "proof": [
+                56,
+                2965.5999999999767,
+                6,
+                51,
+                14
+              ],
+              "pending": [
+                [
+                  60,
+                  2965.5999999999767,
+                  4,
+                  30,
+                  18
+                ]
+              ],
+              "dispatch": [
+                61,
+                2965.5999999999767,
+                12,
+                50,
+                3,
+                51,
+                1
+              ],
+              "link": [
+                65,
+                2965.5999999999767,
+                13,
+                50,
+                44
+              ],
+              "receive": [
+                207,
+                4235.599999999977,
+                7,
+                30,
+                14,
+                14
+              ],
+              "settle": [
+                [
+                  227,
+                  4410.599999999977,
+                  8,
+                  30,
+                  1,
+                  14,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "second": {
+              "readId": 110,
+              "keyId": 7,
+              "cacheId": 25,
+              "begin": [
+                297,
+                4721.5,
+                2,
+                110,
+                25,
+                7,
+                49
+              ],
+              "action": [
+                299,
+                4745.800000000047,
+                10,
+                111,
+                110,
+                5
+              ],
+              "queue": [
+                [
+                  300,
+                  4745.800000000047,
+                  11,
+                  111
+                ]
+              ],
+              "proof": [
+                319,
+                4792.5,
+                6,
+                113,
+                50
+              ],
+              "pending": [
+                [
+                  321,
+                  4792.5,
+                  4,
+                  110,
+                  52
+                ]
+              ],
+              "dispatch": [
+                322,
+                4792.5,
+                12,
+                112,
+                3,
+                113,
+                1
+              ],
+              "link": [
+                326,
+                4792.5,
+                13,
+                112,
+                111
+              ],
+              "receive": [
+                345,
+                5056.300000000047,
+                7,
+                110,
+                50,
+                50
+              ],
+              "settle": [
+                [
+                  351,
+                  5074.900000000023,
+                  8,
+                  110,
+                  1,
+                  50,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  269,
+                  4641.400000000023,
+                  15,
+                  25,
+                  7,
+                  27,
+                  30,
+                  3,
+                  14,
+                  18
+                ],
+                "flush": [
+                  268,
+                  4641.300000000047,
+                  19,
+                  60,
+                  1,
+                  7,
+                  27,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    216,
+                    4401.699999999953,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    218,
+                    4402.099999999977,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    219,
+                    4402.099999999977,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    221,
+                    4402.199999999953,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    222,
+                    4402.199999999953,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    223,
+                    4402.199999999953,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ]
+                ],
+                "socketOpen": [
+                  125,
+                  3908.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  134,
+                  3961,
+                  16,
+                  60,
+                  4,
+                  1,
+                  27
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": true,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              },
+              {
+                "fresh": [
+                  295,
+                  4721.099999999977,
+                  15,
+                  25,
+                  7,
+                  27,
+                  30,
+                  3,
+                  14,
+                  18
+                ],
+                "flush": [
+                  268,
+                  4641.300000000047,
+                  19,
+                  60,
+                  1,
+                  7,
+                  27,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    216,
+                    4401.699999999953,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    218,
+                    4402.099999999977,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    219,
+                    4402.099999999977,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    221,
+                    4402.199999999953,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    222,
+                    4402.199999999953,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ],
+                  [
+                    223,
+                    4402.199999999953,
+                    18,
+                    60,
+                    1,
+                    7,
+                    27,
+                    27,
+                    1,
+                    0,
+                    0,
+                    2
+                  ]
+                ],
+                "socketOpen": [
+                  125,
+                  3908.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  134,
+                  3961,
+                  16,
+                  60,
+                  4,
+                  1,
+                  27
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": true,
+                "oldSettledBeforeFresh": true,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          },
+          {
+            "code": 6,
+            "action": "bots.pollBots",
+            "first": {
+              "readId": 56,
+              "keyId": 57,
+              "cacheId": 25,
+              "begin": [
+                74,
+                3024.5999999999767,
+                2,
+                56,
+                25,
+                57,
+                21
+              ],
+              "action": [
+                99,
+                3036.6999999999534,
+                10,
+                68,
+                56,
+                6
+              ],
+              "queue": [
+                [
+                  100,
+                  3036.6999999999534,
+                  11,
+                  68
+                ]
+              ],
+              "proof": [
+                116,
+                3403.3000000000466,
+                6,
+                73,
+                23
+              ],
+              "pending": [
+                [
+                  117,
+                  3403.3000000000466,
+                  4,
+                  56,
+                  24
+                ]
+              ],
+              "dispatch": [
+                118,
+                3403.3000000000466,
+                12,
+                72,
+                3,
+                73,
+                1
+              ],
+              "link": [
+                119,
+                3403.3000000000466,
+                13,
+                72,
+                68
+              ],
+              "receive": [
+                241,
+                4578.699999999953,
+                7,
+                56,
+                23,
+                23
+              ],
+              "settle": [
+                [
+                  242,
+                  4578.699999999953,
+                  8,
+                  56,
+                  2,
+                  23,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "second": {
+              "readId": 88,
+              "keyId": 57,
+              "cacheId": 25,
+              "begin": [
+                194,
+                4158.199999999953,
+                2,
+                88,
+                25,
+                57,
+                41
+              ],
+              "action": [
+                196,
+                4184.800000000047,
+                10,
+                89,
+                88,
+                6
+              ],
+              "queue": [
+                [
+                  197,
+                  4184.800000000047,
+                  11,
+                  89
+                ]
+              ],
+              "proof": [
+                250,
+                4606.599999999977,
+                6,
+                100,
+                43
+              ],
+              "pending": [
+                [
+                  251,
+                  4606.699999999953,
+                  4,
+                  88,
+                  44
+                ]
+              ],
+              "dispatch": [
+                252,
+                4606.699999999953,
+                12,
+                99,
+                6,
+                100,
+                1
+              ],
+              "link": [
+                253,
+                4606.699999999953,
+                13,
+                99,
+                89
+              ],
+              "receive": [
+                333,
+                4853.699999999953,
+                7,
+                88,
+                43,
+                43
+              ],
+              "settle": [
+                [
+                  335,
+                  4853.900000000023,
+                  8,
+                  88,
+                  1,
+                  43,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  192,
+                  4158.199999999953,
+                  15,
+                  25,
+                  57,
+                  28,
+                  56,
+                  3,
+                  21,
+                  24
+                ],
+                "flush": [
+                  191,
+                  4158.199999999953,
+                  19,
+                  58,
+                  1,
+                  57,
+                  28,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    138,
+                    4040.6999999999534,
+                    18,
+                    58,
+                    1,
+                    57,
+                    28,
+                    28,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  135,
+                  4040.5999999999767,
+                  16,
+                  58,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  140,
+                  4042.5,
+                  16,
+                  58,
+                  4,
+                  1,
+                  29
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": true,
+                "oldSettledBeforeFresh": false,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          },
+          {
+            "code": 7,
+            "action": "teams.listTeams",
+            "first": {
+              "readId": 28,
+              "keyId": 11,
+              "cacheId": 25,
+              "begin": [
+                25,
+                2675.8000000000466,
+                2,
+                28,
+                25,
+                11,
+                4
+              ],
+              "action": [
+                39,
+                2816.5999999999767,
+                10,
+                42,
+                28,
+                7
+              ],
+              "queue": [
+                [
+                  40,
+                  2816.5999999999767,
+                  11,
+                  42
+                ]
+              ],
+              "proof": [
+                56,
+                2965.5999999999767,
+                6,
+                51,
+                14
+              ],
+              "pending": [
+                [
+                  58,
+                  2965.5999999999767,
+                  4,
+                  28,
+                  16
+                ]
+              ],
+              "dispatch": [
+                61,
+                2965.5999999999767,
+                12,
+                50,
+                3,
+                51,
+                1
+              ],
+              "link": [
+                63,
+                2965.5999999999767,
+                13,
+                50,
+                42
+              ],
+              "receive": [
+                198,
+                4185.400000000023,
+                7,
+                28,
+                14,
+                14
+              ],
+              "settle": [
+                [
+                  202,
+                  4185.5,
+                  8,
+                  28,
+                  2,
+                  14,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "second": {
+              "readId": 81,
+              "keyId": 11,
+              "cacheId": 25,
+              "begin": [
+                168,
+                4116,
+                2,
+                81,
+                25,
+                11,
+                35
+              ],
+              "action": [
+                174,
+                4143.400000000023,
+                10,
+                83,
+                81,
+                7
+              ],
+              "queue": [
+                [
+                  175,
+                  4143.400000000023,
+                  11,
+                  83
+                ]
+              ],
+              "proof": [
+                179,
+                4157.599999999977,
+                6,
+                86,
+                37
+              ],
+              "pending": [
+                [
+                  180,
+                  4157.599999999977,
+                  4,
+                  81,
+                  38
+                ]
+              ],
+              "dispatch": [
+                182,
+                4157.599999999977,
+                12,
+                85,
+                3,
+                86,
+                1
+              ],
+              "link": [
+                183,
+                4157.599999999977,
+                13,
+                85,
+                83
+              ],
+              "receive": [
+                312,
+                4781.599999999977,
+                7,
+                81,
+                37,
+                37
+              ],
+              "settle": [
+                [
+                  316,
+                  4781.800000000047,
+                  8,
+                  81,
+                  1,
+                  37,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  166,
+                  4116,
+                  15,
+                  25,
+                  11,
+                  26,
+                  28,
+                  3,
+                  4,
+                  16
+                ],
+                "flush": [
+                  165,
+                  4116,
+                  19,
+                  60,
+                  1,
+                  11,
+                  26,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    131,
+                    3919.0999999999767,
+                    18,
+                    60,
+                    1,
+                    11,
+                    26,
+                    26,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  125,
+                  3908.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  134,
+                  3961,
+                  16,
+                  60,
+                  4,
+                  1,
+                  27
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": true,
+                "oldSettledBeforeFresh": false,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          },
+          {
+            "code": 8,
+            "action": "team-relations.listProjectTeams",
+            "first": {
+              "readId": 29,
+              "keyId": 12,
+              "cacheId": 25,
+              "begin": [
+                26,
+                2675.8000000000466,
+                2,
+                29,
+                25,
+                12,
+                5
+              ],
+              "action": [
+                42,
+                2816.5999999999767,
+                10,
+                43,
+                29,
+                8
+              ],
+              "queue": [
+                [
+                  43,
+                  2816.5999999999767,
+                  11,
+                  43
+                ]
+              ],
+              "proof": [
+                56,
+                2965.5999999999767,
+                6,
+                51,
+                14
+              ],
+              "pending": [
+                [
+                  59,
+                  2965.5999999999767,
+                  4,
+                  29,
+                  17
+                ]
+              ],
+              "dispatch": [
+                61,
+                2965.5999999999767,
+                12,
+                50,
+                3,
+                51,
+                1
+              ],
+              "link": [
+                64,
+                2965.5999999999767,
+                13,
+                50,
+                43
+              ],
+              "receive": [
+                199,
+                4185.400000000023,
+                7,
+                29,
+                14,
+                14
+              ],
+              "settle": [
+                [
+                  203,
+                  4185.5,
+                  8,
+                  29,
+                  2,
+                  14,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "second": {
+              "readId": 82,
+              "keyId": 12,
+              "cacheId": 25,
+              "begin": [
+                172,
+                4116.099999999977,
+                2,
+                82,
+                25,
+                12,
+                36
+              ],
+              "action": [
+                177,
+                4143.5,
+                10,
+                84,
+                82,
+                8
+              ],
+              "queue": [
+                [
+                  178,
+                  4143.5,
+                  11,
+                  84
+                ]
+              ],
+              "proof": [
+                179,
+                4157.599999999977,
+                6,
+                86,
+                37
+              ],
+              "pending": [
+                [
+                  181,
+                  4157.599999999977,
+                  4,
+                  82,
+                  39
+                ]
+              ],
+              "dispatch": [
+                182,
+                4157.599999999977,
+                12,
+                85,
+                3,
+                86,
+                1
+              ],
+              "link": [
+                184,
+                4157.599999999977,
+                13,
+                85,
+                84
+              ],
+              "receive": [
+                314,
+                4781.699999999953,
+                7,
+                82,
+                37,
+                37
+              ],
+              "settle": [
+                [
+                  317,
+                  4791.800000000047,
+                  8,
+                  82,
+                  1,
+                  37,
+                  1,
+                  0
+                ]
+              ]
+            },
+            "causes": [
+              {
+                "fresh": [
+                  170,
+                  4116,
+                  15,
+                  25,
+                  12,
+                  26,
+                  29,
+                  3,
+                  5,
+                  17
+                ],
+                "flush": [
+                  169,
+                  4116,
+                  19,
+                  60,
+                  1,
+                  12,
+                  26,
+                  1,
+                  0
+                ],
+                "matchingInvalidations": [
+                  [
+                    132,
+                    3919.0999999999767,
+                    18,
+                    60,
+                    1,
+                    12,
+                    26,
+                    26,
+                    0,
+                    0,
+                    0,
+                    1
+                  ]
+                ],
+                "socketOpen": [
+                  125,
+                  3908.5,
+                  16,
+                  60,
+                  3,
+                  1
+                ],
+                "liveReady": [
+                  134,
+                  3961,
+                  16,
+                  60,
+                  4,
+                  1,
+                  27
+                ],
+                "oldDispatchBeforeOpen": true,
+                "oldReceiveAfterOpen": true,
+                "oldSettledBeforeFresh": false,
+                "oldProofBeforeOrEqualAfter": true,
+                "newReadBeganAfter": true
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "windowAggregates": [
+      {
+        "action": "task-runs.pollTaskRuns",
+        "nativeWindow": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "task-runs.pollTaskRuns",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "webWindow": {
+          "startedInWindow": 0,
+          "completedInWindow": 0,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": []
+        },
+        "nativeWorkspaceSegment": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "task-runs.pollTaskRuns",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "rendererCount": 4,
+        "aggregateConserved": true
+      },
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "nativeWindow": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "coordinator.pollBotChatSummaries",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "webWindow": {
+          "route": "/api/rpc",
+          "rpcAction": "coordinator.pollBotChatSummaries",
+          "startedInWindow": 3,
+          "completedInWindow": 3,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 3
+            }
+          ]
+        },
+        "nativeWorkspaceSegment": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "coordinator.pollBotChatSummaries",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "rendererCount": 4,
+        "aggregateConserved": true
+      },
+      {
+        "action": "bots.pollBots",
+        "nativeWindow": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "bots.pollBots",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "webWindow": {
+          "route": "/api/rpc",
+          "rpcAction": "bots.pollBots",
+          "startedInWindow": 3,
+          "completedInWindow": 3,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 3
+            }
+          ]
+        },
+        "nativeWorkspaceSegment": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "bots.pollBots",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "rendererCount": 4,
+        "aggregateConserved": true
+      },
+      {
+        "action": "teams.listTeams",
+        "nativeWindow": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "teams.listTeams",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "webWindow": {
+          "route": "/api/rpc",
+          "rpcAction": "teams.listTeams",
+          "startedInWindow": 3,
+          "completedInWindow": 3,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 3
+            }
+          ]
+        },
+        "nativeWorkspaceSegment": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "teams.listTeams",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "rendererCount": 4,
+        "aggregateConserved": true
+      },
+      {
+        "action": "team-relations.listProjectTeams",
+        "nativeWindow": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "team-relations.listProjectTeams",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "webWindow": {
+          "route": "/api/rpc",
+          "rpcAction": "team-relations.listProjectTeams",
+          "startedInWindow": 3,
+          "completedInWindow": 3,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 3
+            }
+          ]
+        },
+        "nativeWorkspaceSegment": {
+          "route": "/api/desktop/rpc",
+          "rpcAction": "team-relations.listProjectTeams",
+          "startedInWindow": 4,
+          "completedInWindow": 4,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0,
+          "statusCounts": [
+            {
+              "status": 200,
+              "count": 4
+            }
+          ]
+        },
+        "rendererCount": 4,
+        "aggregateConserved": true
+      }
+    ]
+  },
+  "minimalCorrectCandidate": {
+    "seam": "成功 bootstrap 经 response parse/decode、readBootstrap validation 和 SessionApplication stale-generation 检查后、setBootstrap前，只在当前实际 InstalledWorkspace route 准备同一 LiveChannels；由正常 LiveProvider 接管同一实例与同一真实 scope channel。",
+    "hint": "selected仅用cacheWorkspace.workspaceId；owner-home仅同次既有membership SELECT的kind/owner投影推导恰好一个owned personal，0/多为null；只作路由hint，fresh ticket/member/Org/session验证不变。",
+    "unchanged": "不得提前满足readFresh、扩大snapshot白名单、延迟初始UI读直到ready、延长SQL窗口、改预算/轮次、增加SQL/poll或构造fake subscriptions。",
+    "falsification": "候选必须在相同窗口实测ready/coverage早于相关初始snapshot dispatch或read，且late subscription安全复用保持committed/applied/accepted与revision门禁；如ready仍晚，原补读必须照常执行，不算实现失败时可跳过的调用。",
+    "ownership": "prepare/claim必须单owner、session、server、selectedID+role、generation、route及cache对象身份；已绑定旧cache不可被新cache再次借用；late stale ticket completion须被retire；ready和无订阅incoming历史必须留在同一channel，不得在handoff重写after为connect开始。",
+    "measuredTimingLimit": "E14 bootstrap status→首R间距不是已测得的可用提前量；后续json/decode/validation延迟尚无独立事件。早连是有源码依据的最小候选，效果和110条SQL差额是否消失仍待实测。"
+  },
+  "limitations": [
+    "raw记录覆盖launch-before-window与post-window prepareNativeDevice；没有将整realm总量冒充任一SQL window或把clock projection当因果。",
+    "本报告保留原SQL checkpoint定义，只用后台原window/segment聚合计数证明五类调用在窗内；局部和服务端不存在端到端action ID桥，因此没有单read→SQL关联结论。",
+    "Web普通登录缺首doc，不能从未捕获事件推断Web无open、push或catch-up；不能用它作完整相对机制对照。",
+    "匹配E18/E19使用同realm的key/after/channel/generation及序号；多个相同after invalidation可共同作为候选，不声称唯一ancestor；此样本所有匹配candidate的cause一致。",
+    "早连策略仍需真实生命周期/StrictMode/cache-retirement/route反例测试及实际Native预算验证；本报告不是产品候选STATIC PASS、运行测试PASS或生产验收PASS。"
+  ],
+  "references": {
+    "coreReview": "cd9df0e4a42b7525381df4aa9befba378937a8c9",
+    "sourcePathMap": "ecf461ccffeb54fb9f645b0247abc7e0b72f12e4",
+    "earlierQueuedHypothesisBoundary": "c33f989cad7f330e78387ab68fa01e1096d599be"
+  }
+}

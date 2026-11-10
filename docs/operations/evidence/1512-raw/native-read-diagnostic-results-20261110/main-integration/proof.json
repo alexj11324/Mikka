@@ -1,0 +1,195 @@
+{
+  "schema": "issue1512-main-ab2-integration-preparation-v1",
+  "at": "2026-11-10 05:18:22 UTC",
+  "formalHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "priorPreparedTree": "6d5a848b2fbdbee41541e2a535ac06057cf420b1",
+  "priorPreparedProof": "9fd95ca4c8425a156fa83a2efd893454bb08343b",
+  "mainBefore": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+  "main": "ab2d00a43a79d35380b4d2db9014a3792fea63ca",
+  "mainChange": "PR1860, merged2026-11-10T05:05:23Z; four acceptance diagnostic/test paths only",
+  "candidateTree": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+  "leafCount": 6978,
+  "exactDelta": [
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ddc5e88da66a314d601e085d1afca916132aeab1"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ded31e330bef5e83f00659b4383e41b53afd1b81"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f8561bbc3ce02dd53f4ac7ae487bbb8a70da0d3f"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "06dceefec477df850087b47002266e612dddb63a"
+    }
+  ],
+  "mergeRows": [
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "bytes": 87062,
+      "sha256": "3cdba3cf25ce3481065e3d14220ad2c5bc1f4dbf99bea0d2ffa7fac4e8eb0c56",
+      "leftEdits": [],
+      "rightEdits": [
+        {
+          "start": 632,
+          "end": 633,
+          "newLines": 5
+        },
+        {
+          "start": 665,
+          "end": 666,
+          "newLines": 1
+        },
+        {
+          "start": 667,
+          "end": 667,
+          "newLines": 19
+        },
+        {
+          "start": 673,
+          "end": 673,
+          "newLines": 1
+        },
+        {
+          "start": 677,
+          "end": 678,
+          "newLines": 1
+        },
+        {
+          "start": 680,
+          "end": 680,
+          "newLines": 1
+        },
+        {
+          "start": 691,
+          "end": 692,
+          "newLines": 6
+        },
+        {
+          "start": 713,
+          "end": 713,
+          "newLines": 1
+        }
+      ],
+      "sameAsMain": true
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "bytes": 127436,
+      "sha256": "5a5066f771e153d112454456b80efc9ad57a8367d2756fffff0d6140e5e61c34",
+      "leftEdits": [],
+      "rightEdits": [
+        {
+          "start": 5,
+          "end": 6,
+          "newLines": 1
+        },
+        {
+          "start": 1735,
+          "end": 1735,
+          "newLines": 144
+        }
+      ],
+      "sameAsMain": true
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "bytes": 38129,
+      "sha256": "6dae8ef85e2b47b586eaff74af4e5dc00441ef7c4e186319f59814257d076b1c",
+      "leftEdits": [
+        {
+          "start": 10,
+          "end": 10,
+          "newLines": 1
+        },
+        {
+          "start": 49,
+          "end": 49,
+          "newLines": 12
+        },
+        {
+          "start": 50,
+          "end": 50,
+          "newLines": 16
+        },
+        {
+          "start": 111,
+          "end": 111,
+          "newLines": 1
+        },
+        {
+          "start": 156,
+          "end": 156,
+          "newLines": 1
+        }
+      ],
+      "rightEdits": [
+        {
+          "start": 81,
+          "end": 81,
+          "newLines": 27
+        },
+        {
+          "start": 108,
+          "end": 108,
+          "newLines": 2
+        },
+        {
+          "start": 157,
+          "end": 157,
+          "newLines": 1
+        }
+      ],
+      "sameAsMain": false
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "bytes": 78998,
+      "sha256": "34b918ec6946b1cd29e4aee8b30a741305abd2a3afff3dff63d5320dd3e65172",
+      "leftEdits": [
+        {
+          "start": 221,
+          "end": 221,
+          "newLines": 136
+        },
+        {
+          "start": 401,
+          "end": 401,
+          "newLines": 1
+        }
+      ],
+      "rightEdits": [
+        {
+          "start": 975,
+          "end": 975,
+          "newLines": 145
+        }
+      ],
+      "sameAsMain": false
+    }
+  ],
+  "verification": {
+    "bothSideDiffReconstruction": true,
+    "leftRightOverlap": 0,
+    "completeTreeExpectedMatch": true,
+    "unexpectedPaths": []
+  },
+  "behaviorReview": "Preserves H startupCorrelation closed-code/source bindings and ab2 liveObserver closed metadata projection. Functions and diagnostic output spreads are independent, all tests retained. cloud-startup source/tests copied byte-for-byte from actual ab2. No policy, time budget, retry or query changes.",
+  "notExecuted": [
+    "No merged-source Node tests yet; target the two changed validator functions plus cloud-startup tests with the next necessary verification run.",
+    "No actual PR/main/ops ref moved; unreferenced preparation tree only. Browser adapter and next Native product fix not yet applied."
+  ],
+  "productionCoordination": "#1503 actual05:04:35–06:28:40 source/runtime/child cleanup window retained; no claim of idle."
+}
