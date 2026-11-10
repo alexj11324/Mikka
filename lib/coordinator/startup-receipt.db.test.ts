@@ -342,7 +342,7 @@ dbTest('startup retry after a committed take keeps E1 and leaves E2 pending', { 
     assert.ok(receipts[0].settings && typeof receipts[0].settings === 'object' && !Array.isArray(receipts[0].settings))
     assert.ok(receipts[0].inbox && typeof receipts[0].inbox === 'object' && !Array.isArray(receipts[0].inbox))
     assert.deepEqual(Object.keys(receipts[0].settings).sort(), ['f', 'r'])
-    assert.deepEqual(Object.keys(receipts[0].inbox).sort(), ['a', 'f', 'k', 'p', 's'])
+    assert.deepEqual(Object.keys(receipts[0].inbox).sort(), ['a', 'f', 'k', 'o', 'p', 's'])
     assert.deepEqual(await decodeReceiptRow(receipts[0]), { holder: f.holder, round: 0, version: 1, settings: first.settings, inbox: first.inbox })
   })
 })

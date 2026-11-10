@@ -42,6 +42,8 @@ import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
 import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
+import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
+import { telegramRunOriginRef } from '@/lib/run-origin'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
 import { botChatChanged } from '../live/chats'
@@ -132,6 +134,9 @@ export interface InboxTake {
   /** Durable human handoffs already chosen by this inbox's Decision receipts. */
   attentionQuestions?: AttentionQuestion[]
   scheduledRead?: ScheduledRead
+  /** Evidence-only entry provenance of this take (lib/run-origin.ts); the workflow defaults to 'web'. */
+  origin?: RunOrigin
+  originRef?: RunOriginRef
 }
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushEvents: [], pushHidesText: false }
@@ -293,6 +298,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
     const source = due.findLast(event => event.kind === 'user_message' && event.payload.postedToChat !== true)
       ?? due.findLast(event => event.kind === 'user_message')
     let sourceEventId = scheduled ? undefined : source?.id
+    let entryPayload = source?.payload
     if (!scheduled && source?.payload.retry === true && source.payload.postedToChat === true) {
       // A retry is a wake, not another human request. Resolve server-written
       // provenance on the last actual person message, within this owned chat.
@@ -302,6 +308,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
         .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.message}->>'role' = 'user'`)).orderBy(desc(coordinatorMessages.position)).limit(1)
       if (original) {
         sourceEventId = original.id
+        entryPayload = original.payload
         if (original.payload.taskDestination !== undefined) { taskEventId = original.id; due = [source] }
       }
     }
@@ -333,11 +340,16 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       .orderBy(asc(coordinatorEvents.createdAt), asc(coordinatorEvents.id)).limit(100)
     const handoffs = events.filter(event => isHandoff(event.kind))
     const attentionQuestions = scheduledRead ? [] : attentionQuestionsFromEvents(events)
+    // The entry this take answers: a scheduled read, a Telegram chat/message,
+    // or the app. The ref carries only opaque ids, never text.
+    const entryRef = scheduled ? null : telegramRunOriginRef(entryPayload?.telegram)
     return finish({
       held: true, added: events.length,
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
       ...(scheduledRead ? { scheduledRead } : {}),
+      origin: scheduled ? 'schedule' : entryRef ? 'telegram' : 'web',
+      ...(entryRef ? { originRef: entryRef } : {}),
       ...(attentionQuestions.length ? { attentionQuestions } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),

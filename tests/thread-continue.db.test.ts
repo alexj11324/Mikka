@@ -81,6 +81,21 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
 
+  await t.test('a dispatch records its entry and a person continuation is an app entry', async () => {
+    const c = await person()
+    const originRef = { kind: 'telegram', chatId: '42', messageId: 7 }
+    const initial = await steps.dispatchRun(c.id, {
+      issueId: c.issueId, repo: 'octo/repo', requestKey: `origin:${randomUUID()}`, origin: 'telegram', originRef,
+    }, undefined, c.botId) as unknown as { runId: string }
+    const [stored] = (await pool.query('SELECT origin,"originRef" FROM agent_runs WHERE id=$1', [initial.runId])).rows
+    assert.deepEqual(stored, { origin: 'telegram', originRef })
+    await end(initial.runId, 'succeeded')
+    const next = await sendThreadMessage(c.id, initial.runId, 'Continue the same task from the app.')
+    assert.equal(next.continued, true)
+    const [continued] = (await pool.query('SELECT origin,"originRef" FROM agent_runs WHERE id=$1', [next.runId])).rows
+    assert.deepEqual(continued, { origin: 'web', originRef: null }, 'a person’s continuation is the app entry, not the old one')
+  })
+
   await t.test('a lost reply and concurrent retries reuse one owner submission, epoch, run and message', async () => {
     const b = await person()
     const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `submission:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }

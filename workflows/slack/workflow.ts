@@ -7,6 +7,7 @@ import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { coordinatorTools } from '@/workflows/coordinator/workflow'
 import { postSlackReply, slackCoordinatorBot } from './steps'
 import { coordinatorSwitches } from '@/workflows/coordinator/steps'
+import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
 
 const SLACK_INSTRUCTIONS = `${COORDINATOR_INSTRUCTIONS}
 
@@ -17,11 +18,11 @@ Use plain issue/run ids with their titles in Slack; Slack does not render Mikka 
 A dispatched run completes separately in Mikka. Do not promise automatic completion updates in Slack; the person can @mention you to check its status.
 Do not include private memories, unrelated issues, or other integration content unless the person asks for it in this request.`
 
-export async function slackTurn(userId: string, threadId: string, text: string) {
+export async function slackTurn(userId: string, threadId: string, text: string, entry?: { origin?: RunOrigin; originRef?: RunOriginRef | null }) {
   'use workflow'
   try {
     const botId = await slackCoordinatorBot(userId)
-    const agent = new WorkflowAgent({ model: new HostedWorkflowModel(userId,botId,COORDINATOR_MODEL), tools: coordinatorTools(userId, botId, undefined, { coordinator: true, switches: await coordinatorSwitches() }) })
+    const agent = new WorkflowAgent({ model: new HostedWorkflowModel(userId,botId,COORDINATOR_MODEL), tools: coordinatorTools(userId, botId, undefined, { coordinator: true, switches: await coordinatorSwitches(), origin: entry?.origin ?? 'slack', originRef: entry?.originRef ?? null }) })
     const result = await agent.generate({
       instructions: SLACK_INSTRUCTIONS,
       maxRetries: 0,

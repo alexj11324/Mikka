@@ -231,7 +231,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, { source: 'mcp', origin: 'api', originRef: { kind: 'api' } })) }),
   }))
 }
 
