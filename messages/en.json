@@ -2284,7 +2284,6 @@
       "toolsFailed": "Couldn't read the tool list",
       "readOnly": "read-only",
       "write": "can write",
-      "bot": "Bot",
       "mode": "Approval",
       "modes": {
         "ask": "By the rules",
@@ -2297,8 +2296,7 @@
         "default": "Default (Decision API)",
         "allow": "On its own",
         "ask": "Asks you first",
-        "deny": "Not allowed",
-        "eachBot": "Default (workspace setting)"
+        "deny": "Not allowed"
       },
       "run": {
         "install_dependency": "Install dependencies",
@@ -6183,11 +6181,7 @@
     "modeReadOnlyText": "Reads and reports, changes nothing",
     "unsetText": "Nothing set: an app write goes to the Decision API; an agent action follows the run policy",
     "runTitle": "Agent run permissions",
-    "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here",
-    "workspaceTitle": "Workspace writes",
-    "workspaceNote": "For every Bot in the workspace; the workspace choice is final",
-    "now": "Now: {value}",
-    "workspace": "Workspace: {value}"
+    "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here"
   },
   "HostedBoard": {
     "due": "Due {date}",

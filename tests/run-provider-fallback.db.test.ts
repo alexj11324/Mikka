@@ -587,21 +587,23 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(await recoverProviderFailure(pool, p.id, runId), null)
   })
 
-  await t.test('switching harnesses preserves the original worker permission ceiling through claim', async () => {
+  await t.test('switching harnesses preserves the original workspace permission ceiling through claim', async () => {
     const { p } = await twoModels('provider-policy-ceiling')
-    await pool.query('UPDATE agents SET cli_run_policy=$2 WHERE id=$1', [p.agents.claude_code,
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy) VALUES ($1,'allow',$2)
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [p.workspaceId,
       { approvalMode: 'read_only', permissions: { git_push: 'deny' }, networkAllow: ['api.example.invalid'] }])
     const runId = await running(p)
-    assert.equal((await row(runId)).agentDefinition.readOnly, undefined, 'the constraint originates in worker policy, not a readOnly run argument')
+    assert.equal((await row(runId)).agentDefinition.readOnly, undefined, 'the constraint originates in workspace policy, not a readOnly run argument')
     await end(p, runId, balance)
     const [continuation] = await children(runId)
     assert.ok(continuation)
     assert.equal(continuation.agentDefinition.harness, 'codex')
     assert.equal(continuation.agentDefinition.policyCeiling.readOnly, true)
-    // Even a later relaxation of the new worker cannot remove the inherited cap.
+    // Even a later relaxation of the workspace cannot remove the inherited cap.
     // Open network is network=allow without a domain ceiling; bare '*' is not
     // a valid stored networkAllow domain and would reject the policy itself.
-    await pool.query('UPDATE agents SET cli_run_policy=$2 WHERE id=$1', [p.agents.codex,
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy) VALUES ($1,'allow',$2)
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [p.workspaceId,
       { approvalMode: 'ask', permissions: { git_push: 'allow', network: 'allow' } }])
     const assignment = await claim(p, continuation.id)
     assert.equal(assignment.policy.readOnly, true)

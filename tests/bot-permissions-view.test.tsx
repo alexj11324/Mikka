@@ -12,18 +12,14 @@ const app = (id: string, overrides: Partial<BotPermissionApp> = {}): BotPermissi
   name: id === 'slack' ? 'Slack' : 'GitHub',
   account: null,
   iconUrl: null,
-  actions: [{ id, name: 'All tools', value: 'default', effective: null, choices: ['default', 'allow', 'ask', 'deny'], editable: true }],
+  actions: [{ id, name: 'All tools', value: 'default', choices: ['default', 'allow', 'ask', 'deny'], editable: true }],
   ...overrides,
 })
 
 const props = (overrides: Partial<SettingsBotPermissionsProps> = {}): SettingsBotPermissionsProps => ({
   scope: 'workspace',
-  bots: [],
-  botId: null,
-  onBot: () => {},
   apps: [],
   run: null,
-  workspace: null,
   approvalMode: null,
   onApprovalMode: () => {},
   onAction: () => {},
@@ -42,6 +38,8 @@ test('the page states the workspace scope and has no per-Bot picker', () => {
   const html = render({ apps: [app('slack')] })
   assert.match(html, /These settings apply to every Bot in this workspace\./)
   assert.doesNotMatch(html, /<select|<option/)
+  assert.doesNotMatch(html, /effective/)
+  assert.doesNotMatch(html, /write_policy/)
 })
 
 test('one row per connected app shows its catalogue count and read/write marks', () => {
@@ -70,7 +68,7 @@ test('a failed catalogue says so instead of showing a count', () => {
 test('run actions with no workspace entry show the run-policy default, not the Decision API', () => {
   const html = render({
     apps: [app('slack')],
-    run: [{ id: 'git_push', name: 'Push code', value: 'default', effective: null, choices: ['default', 'allow', 'deny'], editable: true }],
+    run: [{ id: 'git_push', name: 'Push code', value: 'default', choices: ['default', 'allow', 'deny'], editable: true }],
   })
   assert.match(html, /Push code<\/span><span class="text-muted-foreground">Default \(run policy\)/)
   // The app row above may still use the Decision API default; the run row must not.

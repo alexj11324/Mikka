@@ -199,7 +199,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const definition = { title: 'Morning brief', timezone: 'UTC', timing: { kind: 'once', at: '2030-01-01T09:00:00Z' }, task: { kind: 'reminder', text: 'x' }, misfire: 'skip', maxLatenessMinutes: 60 }
     await pool.query(`INSERT INTO user_schedules (id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at)
       VALUES ($1,$2,NULL,NULL,$3,$4,$5,$5,'active','2030-01-01T09:00:00Z')`, [schedule, p.id, event, randomUUID(), definition])
-    await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,NULL,$2)`, [p.id, JSON.stringify({ permissions: { git_push: 'deny' } })])
+    await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy,external_write_permissions) VALUES ($1,'coordinator',NULL,NULL,$2,$3)`, [p.id, JSON.stringify({ permissions: { git_push: 'deny' } }), JSON.stringify({ send_slack_message: 'deny' })])
 
     const coordinator = await bots.coordinatorBot(p.id, null)
     assert.equal(coordinator.workspaceId, p.workspaceId, 'older data has no workspace, so it moves to the personal workspace\'s Coordinator')
@@ -217,8 +217,10 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     assert.deepEqual((await pool.query('SELECT "botKey","bindingId" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: coordinator.botId, bindingId: null }])
     assert.deepEqual((await pool.query('SELECT "chatKey",muted FROM chat_preferences WHERE "userId"=$1', [p.id])).rows, [{ chatKey: coordinator.botId, muted: true }])
     assert.deepEqual((await pool.query('SELECT bot_id,workspace_id FROM user_schedules WHERE id=$1', [schedule])).rows, [{ bot_id: coordinator.botId, workspace_id: p.workspaceId }])
-    assert.deepEqual((await pool.query('SELECT bot_id,workspace_id,cli_run_policy FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=$2', [p.id, coordinator.botId])).rows,
-      [{ bot_id: coordinator.botId, workspace_id: p.workspaceId, cli_run_policy: { permissions: { git_push: 'deny' } } }], 'its run policies come with it')
+    assert.deepEqual((await pool.query('SELECT bot_id,workspace_id,cli_run_policy,external_write_permissions FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=$2', [p.id, coordinator.botId])).rows,
+      [{ bot_id: coordinator.botId, workspace_id: p.workspaceId, cli_run_policy: {}, external_write_permissions: {} }], 'the new head carries no policy')
+    assert.deepEqual((await pool.query('SELECT cli_run_policy,external_write_permissions FROM workspace_computer_policies WHERE "workspaceId"=$1', [p.workspaceId])).rows,
+      [{ cli_run_policy: { permissions: { git_push: 'deny' } }, external_write_permissions: { send_slack_message: 'deny' } }], 'the legacy restrictions are folded into the workspace')
 
     const snapshot = async () => JSON.stringify(await Promise.all([
       messageRows(p.id).then(result => result.rows),

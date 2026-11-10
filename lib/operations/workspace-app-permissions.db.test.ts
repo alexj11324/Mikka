@@ -61,16 +61,16 @@ test('workspace app permissions', { skip: !dbUrl }, async t => {
     assert.equal(appPermissionValue((await settings.readWorkspace(workspaceScope)).permissions, 'slack'), 'deny')
   })
 
-  await t.test('the GitHub gate follows the stored workspace and Bot layers', async () => {
+  await t.test('the GitHub gate follows the stored workspace layer only', async () => {
     assert.equal(await githubCallAllowed(admin, bot), true)
     await settings.setWorkspace(workspaceScope, { ...(await settings.readWorkspace(workspaceScope)).permissions, github: 'deny' }, '1')
     assert.equal(await githubCallAllowed(admin, bot), false)
     // Another workspace's policy does not govern this Bot.
     assert.equal(await githubCallAllowed(admin, otherBot), true)
-    // A Bot layer can still narrow, and an explicit deny can never become an allow.
+    // A Bot head deny cannot narrow a workspace allow.
     await pool.query('update agent_kit_heads set external_write_permissions=$3 where owner_id=$1 and bot_key=$2', [admin, bot, { github: 'deny' }])
     await settings.setWorkspace(workspaceScope, { github: 'allow' }, '2')
-    assert.equal(await githubCallAllowed(admin, bot), false)
+    assert.equal(await githubCallAllowed(admin, bot), true)
   })
 
   await t.test('the definition route rejects a member save and accepts an admin save', async () => {
@@ -100,9 +100,7 @@ test('workspace app permissions', { skip: !dbUrl }, async t => {
     assert.equal(appPermissionValue((await settings.readWorkspace(workspaceScope)).permissions, 'slack'), 'ask')
   })
 
-  await t.test('a malformed stored layer fails closed', async () => {
-    // Clear the Bot layer so only the malformed workspace layer can decide the call.
-    await pool.query('update agent_kit_heads set external_write_permissions=$3 where owner_id=$1 and bot_key=$2', [admin, bot, {}])
+  await t.test('a malformed workspace layer fails closed', async () => {
     await pool.query('update workspace_computer_policies set external_write_permissions=$2 where "workspaceId"=$1', [ws.id, { github: 'maybe' }])
     assert.equal(await githubCallDecision(admin, bot), 'unavailable')
     assert.equal(await githubCallAllowed(admin, bot), false)

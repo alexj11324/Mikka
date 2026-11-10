@@ -2284,7 +2284,6 @@
       "toolsFailed": "工具列表读取失败",
       "readOnly": "只读",
       "write": "可写",
-      "bot": "Bot",
       "mode": "审批方式",
       "modes": {
         "ask": "按规则处理",
@@ -2297,8 +2296,7 @@
         "default": "默认（由 Decision API 判断）",
         "allow": "直接做",
         "ask": "先问你",
-        "deny": "不允许",
-        "eachBot": "默认（按工作区设置）"
+        "deny": "不允许"
       },
       "run": {
         "install_dependency": "安装依赖",
@@ -6183,11 +6181,7 @@
     "modeReadOnlyText": "只读取和汇报，不做任何改动",
     "unsetText": "没有单独设置：应用写操作由 Decision API 判断；Agent 动作按运行策略",
     "runTitle": "Agent 运行权限",
-    "runNote": "云端的 Claude Code、Codex 运行时不逐条确认；这些动作按这里的设置执行",
-    "workspaceTitle": "工作区写操作",
-    "workspaceNote": "对工作区里的每个 Bot 生效；以工作区的选择为准",
-    "now": "现在：{value}",
-    "workspace": "工作区：{value}"
+    "runNote": "云端的 Claude Code、Codex 运行时不逐条确认；这些动作按这里的设置执行"
   },
   "HostedBoard": {
     "due": "截止 {date}",
