@@ -103,12 +103,21 @@ test('Linear responsibility respects current Workspace members, holds incoming l
     const personalId = await seedPersonalWorkspace(pool, owner)
     // Recreate the pre-guard historical corrupt row that the current trigger
     // would reject, then restore the guard before exercising app assignment.
-    await pool.query('ALTER TABLE mikka_workspace_members DISABLE TRIGGER mikka_personal_membership_guard')
+    // The catalog change takes ACCESS EXCLUSIVE; keep DISABLE, the insert and
+    // ENABLE in one short transaction so a concurrent suite either sees the
+    // guard or fails fast instead of waiting on a half-restored table.
+    const corrupt = await pool.connect()
     try {
-      await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [personalId, member, `${member}@example.invalid`])
-    } finally {
-      await pool.query('ALTER TABLE mikka_workspace_members ENABLE TRIGGER mikka_personal_membership_guard')
-    }
+      await corrupt.query('BEGIN')
+      await corrupt.query("SET LOCAL lock_timeout='5s'")
+      await corrupt.query('ALTER TABLE mikka_workspace_members DISABLE TRIGGER mikka_personal_membership_guard')
+      await corrupt.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [personalId, member, `${member}@example.invalid`])
+      await corrupt.query('ALTER TABLE mikka_workspace_members ENABLE TRIGGER mikka_personal_membership_guard')
+      await corrupt.query('COMMIT')
+    } catch (error) {
+      await corrupt.query('ROLLBACK')
+      throw error
+    } finally { corrupt.release() }
     const [personalTeam] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, workspaceId: personalId, linearTeamId: randomUUID(), linearTeamKey: 'LRP', linearTeamName: 'Personal fixture' }).returning()
     const peer = await createAppIssueFromLinear(personalTeam, remote(member, personalTeam))
     assert.ok(peer)
