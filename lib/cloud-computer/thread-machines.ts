@@ -286,6 +286,7 @@ export async function restoreThreadMachineFromSnapshot(pool: Pool, actor: Actor,
     if (!snapshotUnusable(error)) throw error
     await releaseUnusableSnapshot(pool, actor, runId, transition.epoch, transition.operationId)
     const replaced = await replaceGoneSandbox(pool, runId, template, leaseId)
+    // error-cause: the unusable snapshot is already recorded; this new error reports that the lease moved away
     if (!replaced) throw new ComputerError(409, 'Thread provisioning cancelled')
     const fallback = { application: 'mikka-thread', workspaceId: actor.workspaceId, runId, operationId: replaced.operationId }
     const sandbox = await provider.create(replaced.snapshotId, replaced.operationId, fallback, actor.userId)
