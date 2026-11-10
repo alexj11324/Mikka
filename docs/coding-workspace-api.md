@@ -133,10 +133,13 @@ Rename, deletion, changed bytes, changed HEAD, or a new machine generation
 requires a new selection; none is silently rebound to a newer Run.
 A folder selection is rejected with `workspace_limit_exceeded` (429) when it
 contains more than 20 candidate text files (text extension or name) or more
-than 64 KiB of selected content; `omitted` counts those candidates that read as
-binary or too large, and a non-text name is skipped before the cap. The 21st
-candidate is the 429, never an omitted file. A `resolve` or `submit` with
-several mentions is limited to 20 files in total.
+than 64 KiB of selected content. `omitted` counts selected text-classified
+paths whose content is binary or exceeds 1 MiB; non-text extensions (e.g.
+`.png`) never enter `selected` and are not counted. The 21st candidate is the
+429, never an omitted file. A `resolve` or `submit` with several mentions is
+limited to 20 entries in total; the same path in two mentions counts twice.
+A mention does not carry a `truncated` flag for large files yet; that flag is
+deferred.
 
 Submission requires a real human session and same-origin `Origin`. PATs can
 create and resolve references but cannot impersonate a human submission.
@@ -152,10 +155,10 @@ Factory attempt, Run chain, machine binding, human session and Workspace
 membership are rechecked. The existing `run_messages` table provides the
 idempotent owner message. Reusing `requestId` with different message content is
 a conflict. A submit must target the current Run chain's latest Run, the current
-Factory attempt and the current machine binding; an earlier or superseded Run
-is a `workspace_version_conflict`, while a different Run/repository authority
-is `workspace_not_found`. Device wake happens after the owning transaction
-commits.
+Factory attempt (for a Factory-bound Run) and the current machine binding; an
+earlier or superseded Run is a `workspace_version_conflict`, while a different
+Run/repository authority is `workspace_not_found`. Device wake happens after the
+owning transaction commits.
 
 ## Resource and file boundaries
 
@@ -232,7 +235,7 @@ All public responses use `Cache-Control: private, no-store` and
 | Code | HTTP | Meaning |
 | --- | --- | --- |
 | `authRequired` | 401 | Missing, expired or revoked human session/PAT |
-| `workspace_not_found` | 404 | Inaccessible or mismatched Run/Workspace/repository authority; does not disclose foreign existence |
+| `workspace_not_found` | 404 | Inaccessible or mismatched Run/Workspace/repository authority; does not disclose foreign existence; see the 403 exception below |
 | `workspace_path_unavailable` | 404 | Missing, protected, unsafe or secret-bearing source |
 | `workspace_invalid_request` | 400 | Invalid request/schema/range |
 | `workspace_limit_exceeded` | 429 | Byte, path, context, concurrency or owner quota exceeded |
@@ -248,14 +251,16 @@ new selection for stale context.
 
 The mentions endpoint returns HTTP 403 with `workspace_not_found` when a
 session request is not same-origin or when a PAT attempts `submit`; every
-other `workspace_not_found` is 404. Treat the 403 as "send from the app or its
-mobile BFF", not as missing authority.
+other `workspace_not_found` is 404. The UI may surface this as workspace
+unavailable; the person should send from the Mikka app. A mobile BFF is a later
+phase, not the current path.
 
 An expired mention is never replayed from a previous submission; the caller
-must reselect it. Deployments behind a reverse proxy must preserve the public
-request origin: this endpoint compares `Origin` with the request URL's origin
-and does not consult a separately configured application origin, so a rewritten
-internal origin is refused as 403.
+must reselect it. For session requests, deployments behind a reverse proxy must
+preserve the public request origin: this endpoint compares `Origin` with the
+request URL's origin and does not consult a separately configured application
+origin, so a rewritten internal origin is refused as 403. A PAT `create` or
+`resolve` does not run this origin check.
 
 ## Acceptance records
 
