@@ -4,11 +4,13 @@
 - Source: Alex: authorizing each Bot separately is the wrong shape; an app is
   connected once and every Bot in the workspace should inherit that choice.
 - Rule: 设置 › 应用与运行权限 authorizes the current workspace. It shows one
-  access level per connected app and the provider's real tool catalogue; a
-  Bot's own stricter layer may still narrow the workspace choice.
+  access level per connected app and the provider's real tool catalogue; the
+  workspace choice is the only app permission, and a Bot has no allow/ask/deny
+  layer.
 - Replaces: the per-Bot write-policy surface in decision 2026-10-31 (R-77) as
-  the place a person configures app access. The per-Bot storage and its
-  narrowing semantics stay for existing rows.
+  the place a person configures app access. The per-Bot storage is kept only as
+  historical rows and is no longer read for enforcement; existing rows are
+  migrated into the workspace policy.
 
 What follows:
 
@@ -24,13 +26,9 @@ What follows:
   the app key and the legacy action, so a deny stored only under the legacy
   key still blocks the newer tool.
 - The workspace's Allow is a real grant, not an absence: an app set to Allow
-  runs directly, without the Decision API. Precedence is restrictive first: a
-  deny in the Bot's or the workspace's layer wins, then an ask; only when
-  neither restricts does an allow run the call. A Bot's ask/deny narrows a
-  workspace Allow, and a workspace ask/deny narrows a Bot Allow. In particular,
-  a Bot ask never turns a workspace deny into an approval card: a workspace
-  deny is absolute. Decision API judgment applies only when no layer names the
-  app (Default).
+  runs directly, without the Decision API. Only the workspace layer decides:
+  deny wins over ask, and allow runs the call. A workspace deny is absolute.
+  Decision API judgment applies only when the workspace does not name the app.
 - The page shows the provider's real catalogue, read lazily from
   `/api/bots/:botId/app-tools`: GitHub's hosted MCP tools (with their
   read-only hints) and Composio's tools for every other store app. The old
@@ -44,16 +42,15 @@ What follows:
   Agent still use the person's own GitHub credential, so the page's line says
   "direct" rather than "never".
 - The run policy on the same page is the workspace layer
-  (`workspace_computer_policies.cli_run_policy`), not a Bot's layer. Existing
-  per-Bot and per-worker layers still narrow it at execution; the page does
-  not edit them.
+  (`workspace_computer_policies.cli_run_policy`), the only run-policy surface;
+  per-Bot and per-worker layers are retired.
 - Capy's comparable model — permissions on the MCP server plus a per-device
   access prompt — also authorizes a connection, not each agent. This decision
-  matches that shape without removing the existing enforcement layers.
+  matches that shape and removes the per-Bot enforcement layers.
 
-Cost if wrong: a team that needs per-Bot access must keep using the API or a
-future advanced surface; the current page cannot express it. The backend still
-enforces narrower Bot layers, so no existing restriction is lost.
+Cost if wrong: a team that needs per-Bot access cannot express it; the
+workspace choice applies to every Bot. Existing per-Bot rows must be migrated
+into the workspace policy before enforcement is removed.
 
 ## Follow-up (not changed here)
 

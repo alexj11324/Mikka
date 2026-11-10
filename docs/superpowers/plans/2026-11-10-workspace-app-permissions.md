@@ -23,8 +23,8 @@ Base commit: `5adf87270` on `feat/bot-permissions-surface`
 - A task that needs a database may write the test and document that CI is the
   gate if no disposable database is available.
 - Everything user-visible is in `messages/en.json` and `messages/zh-CN.json`.
-- The page authorizes a workspace, not a Bot. A Bot's stricter layer still
-  narrows; do not remove that enforcement.
+- The page authorizes a workspace, not a Bot. A Bot has no permission layer of
+  its own; do not keep or add one.
 
 ## Tasks
 
