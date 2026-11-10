@@ -200,8 +200,9 @@ test('Stripe purchased points ledger', { skip: !dbUrl }, async t => {
     const foreign = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
     const prefix = 'evt' + randomUUID().replaceAll('-', '')
     await pool.query(`insert into stripe_webhook_events (id,type) select $1||g,'customer.subscription.updated' from generate_series(1,100) g`, [prefix])
+    // Revisions are unique per Workspace, so the full batch must differ by revision.
     await pool.query(`insert into billing_entitlement_outbox ("eventId","workspaceId","subscriptionId",plan,"expiresAt",revision,"billingModel")
-      select $1||g,$2,$3,'pro',now()+interval '30 days',1,'resource_v1' from generate_series(1,100) g`, [prefix, foreign.id, id('sub')])
+      select $1||g,$2,$3,'pro',now()+interval '30 days',g,'resource_v1' from generate_series(1,100) g`, [prefix, foreign.id, id('sub')])
     const pending = async () => (await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId" like $1 and "deliveredAt" is null', [prefix + '%'])).rows[0].n
     const delivered = async () => (await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId" like $1 and "deliveredAt" is not null', [prefix + '%'])).rows[0].n
     const trigger = `synthetic_billing_${randomUUID().replaceAll('-', '')}`
