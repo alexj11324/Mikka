@@ -12,11 +12,18 @@
 
 ## 1. 硬约束（违反会返工）
 
-- 本机**禁止**运行：Next.js 的 `dev` / `start` / `build`、`pnpm build`、`pnpm typecheck`、`pnpm install`、本地 Postgres / server、本地打包。只能跑 source-only 单测（`node --test`、`node --import tsx --test`）和 node 脚本。
+- 本机**禁止**运行：`pnpm build`、`pnpm typecheck`、`pnpm install`、`pnpm dev`、`pnpm start`、本地 Postgres / server、本地打包。只能跑 source-only 单测（`node --test`、`node --import tsx --test`）和 node 脚本。
+
+  > 更正（2026-11-10）：此前这里写的是「Next.js 的 `dev` / `start` / `build`」。**应用已经没有 Next 了**，dev 与生产构建全部走 Vite + Nitro：
+  > - dev：`node apps/api/scripts/dev.mjs`（Vite 起前端、代理到 Nitro dev worker，默认 `http://localhost:3000/mikka`）
+  > - 生产：`NITRO_PRESET=node-server pnpm build:app`（`apps/frontend/vite.config.mjs` + `vite-rolldown`）→ `.output`，再 `pnpm start`
+  > - 配置在 `apps/frontend/vite.config.mjs` 与 `apps/api/nitro.config.ts`；依据 `docs/dev-workflow.md` §2
+  >
+  > 禁止的原因不变（本机跑不动完整构建/服务），只是这些命令不该再被叫成 Next 的。
 - 禁止 force push、禁止 rebase 已推送历史、禁止 squash 合并；批次用 `git merge --no-ff`，PR 合入 main 用普通 merge。
 - 不提交 secrets。凭据从本机环境变量或已授权 CLI 取，不回显。
 - 改完用户可见 UI 必须自己验证，不能说「请你试一下」。
-- 搜索用 Exa（当前 MCP 连不上），库文档优先 context7。
+- 搜索用 `tools.web.search` / `tools.web.fetch`；库文档优先 context7（若已连接）。
 - 对话与文档用简体中文；commit message 用英文。
 
 ---
