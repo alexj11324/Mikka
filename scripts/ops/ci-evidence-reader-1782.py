@@ -28,7 +28,7 @@ WORKFLOW = ".github/workflows/issue1782-ci-evidence-reader.yml"
 DRIVER = "scripts/ops/ci-evidence-reader-1782.py"
 OWN_PATHS = {DRIVER, WORKFLOW}
 # Root binds this only after the preceding private reader has an actual commit.
-READER_PARENT = "0e5b4161f29c24b7740bdcdbca822565ee8eac7d"
+READER_PARENT = "72dfcac6a64bb767fdafb2531b7c6b6ce8a6b839"
 PRODUCT = "ce6ad923bbb449023783052d0848db22e4360f1d"
 PRODUCT_TREE = "dffda64a4975b22cfc649908a8c5e19749ea8a96"
 PRODUCT_PARENTS = ["e3c0b0e050515986a8e42cc15ce0a3de15b8e88c", "ab2d00a43a79d35380b4d2db9014a3792fea63ca"]
@@ -638,12 +638,23 @@ def verify_native_cleanup(value, label):
                 and [row.get("name") for row in checks] == NATIVE_CHECKS[label]
                 and all(row.get("result") == "passed" for row in checks), "native_checks")
         stages = value.get("cleanupStages")
-        require(type(stages) is list and len(stages) > 0
-                and all(row.get("result") == "passed" for row in stages), "native_cleanup_stages")
-        required = {"browser-close", "electron-close", "daemon-drain", "native-resources", "workspace-generated-name", "lease-release"}
-        if label == "lifecycle":
+        stage_names = {"browser-close", "electron-close", "daemon-drain", "native-resources",
+                       "fixtures", "workspace-generated-name", "lease-release"}
+        require(type(stages) is list and 0 < len(stages) <= 16
+                and all(type(row) is dict and row.get("stage") in stage_names
+                        and row.get("result") in ("passed", "failed") for row in stages), "native_cleanup_stage_shape")
+        print("CI_NATIVE_CLEANUP " + json.dumps({
+            "label": label, "stages": [{"stage": row["stage"], "result": row["result"]} for row in stages],
+        }, separators=(",", ":")), flush=True)
+        require(all(row["result"] == "passed" for row in stages), "native_cleanup_stages")
+        required = {"browser-close", "daemon-drain", "native-resources", "workspace-generated-name", "lease-release"}
+        if label == "smoke":
+            required.add("electron-close")
+        else:
+            # lifecycle closes every Electron/profile before setting passed=true;
+            # its finally only records electron-close when a process remains.
             required.add("fixtures")
-        require(required <= {row.get("stage") for row in stages}, "native_cleanup_stage_set")
+        require(required <= {row["stage"] for row in stages}, "native_cleanup_stage_set")
         observation = value.get("accountObservation", {})
         require(observation.get("observed") is True and observation.get("state") == "released"
                 and observation.get("blockedReason") is None
