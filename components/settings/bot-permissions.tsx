@@ -7,6 +7,7 @@ import { BotPermissionsPage } from '@ui-slot/settings-bot-permissions'
 import { listBots } from '@/app/actions/bots'
 import { listAgents } from '@/app/actions/agents'
 import { AppTile, OWN_APPS, useAppInfo, useConnectedApps, appState } from '@/components/plugins/connected-apps'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { OWN_APP_STATES_KEY, fetchOwnAppStates } from '@/components/plugins/plugins-view'
 import { withBasePath } from '@/lib/base-path'
 import { CONFIGURABLE_ACTIONS, CONFIGURABLE_PERMISSIONS, type PermissionDecision } from '@mikka/protocol/agent-policy'
@@ -222,15 +223,16 @@ export function BotPermissionsView({ scope, apps, run, approvalMode, onLoadTools
 /** The provider's real catalogue, read on first open. A count alone already replaces the old hand-written action list. */
 function AppTools({ app, onLoadTools }: { app: BotPermissionApp; onLoadTools?: (app: string) => void }) {
   const t = useTranslations('Settings.botPermissions')
+  const [open, setOpen] = useState(false)
   if (app.tools === 'loading') return <p className="text-xs text-muted-foreground">{t('toolsLoading')}</p>
   if (app.tools && 'error' in app.tools && app.tools.error) return <p className="text-xs text-muted-foreground">{t('toolsFailed')}</p>
-  if (app.tools && 'count' in app.tools) return <details className="text-xs text-muted-foreground" onToggle={event => { if (event.currentTarget.open) onLoadTools?.(app.id) }}>
-    <summary>{t('toolsCount', { count: app.tools.count, readOnly: app.tools.readOnlyCount })}</summary>
-    <ul className="mt-1 flex flex-col gap-0.5">
-      {app.tools.tools.slice(0, 100).map(tool => <li key={tool.name}><span>{tool.displayName}</span> <span className="text-muted-foreground/70">{tool.readOnly ? t('readOnly') : t('write')}</span></li>)}
-    </ul>
-  </details>
-  return <details className="text-xs text-muted-foreground" onToggle={event => { if (event.currentTarget.open) onLoadTools?.(app.id) }}>
-    <summary>{t('tools')}</summary>
-  </details>
+  const counted = app.tools && 'count' in app.tools ? app.tools : null
+  return <Collapsible className="text-xs text-muted-foreground" open={open} onOpenChange={next => { setOpen(next); if (next) onLoadTools?.(app.id) }}>
+    <CollapsibleTrigger className="w-fit cursor-pointer text-left">{counted ? t('toolsCount', { count: counted.count, readOnly: counted.readOnlyCount }) : t('tools')}</CollapsibleTrigger>
+    {counted && <CollapsibleContent>
+      <ul className="mt-1 flex flex-col gap-0.5">
+        {counted.tools.slice(0, 100).map(tool => <li key={tool.name}><span>{tool.displayName}</span> <span className="text-muted-foreground/70">{tool.readOnly ? t('readOnly') : t('write')}</span></li>)}
+      </ul>
+    </CollapsibleContent>}
+  </Collapsible>
 }
