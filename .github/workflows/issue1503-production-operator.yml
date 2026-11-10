@@ -1,11 +1,15 @@
-name: Issue 1503 production setup operator
+# Active #1503 carrier for the unchanged legacy #1505 read-only child contract.
+# Bound to the actual f5 R7 handoff, its audited closed ordinary merge and the recorded UTC deadlines.
+# Source and shared-account admission reviewed by Root for the current bounded entry.
+# Does not revoke or renew any historical child. Cleanup must use this run's new receipt.
+name: Issue 1503 R7 read-only Smoke GitHub preparation
 on:
   push:
     branches: [ops/issue-1503-production-smoke]
     paths:
       - .github/workflows/issue1503-production-operator.yml
-      - scripts/ops/issue1503/**
-      - scripts/ops/issue1503-smoke-github*
+      - scripts/ops/issue1503/github-readonly-*.mjs
+      - scripts/ops/issue1503/github-readonly.test.mjs
 permissions:
   contents: read
 concurrency:
@@ -13,157 +17,119 @@ concurrency:
   cancel-in-progress: false
   queue: max
 jobs:
-  setup:
-    if: false
+  prepare:
+    if: true
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     concurrency:
       group: web-deploy-production
       cancel-in-progress: false
       queue: max
+    timeout-minutes: 15
+    env:
+      MIKKA_EDITION: cloud
+      MIKKA_1503_READONLY_EXPECTED_APP_SHA: f5ddb5cda60b57c1006c60fcc997cc3455d771aa
+      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-r7-20261109-v1'
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+          fetch-depth: 3
+      - name: Verify exact source, file scope, current main and bounded entry before credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import datetime,hashlib,json,os,pathlib,subprocess,re
+          def check_window():
+              entry=datetime.datetime.fromisoformat('2026-11-10T05:03:40.000Z')
+              hard=datetime.datetime.fromisoformat('2026-11-10T06:28:40.000Z')
+              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
+              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
+              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
+          root=pathlib.Path('.')
+          expected_app=os.environ.get('MIKKA_1503_READONLY_EXPECTED_APP_SHA','')
+          assert re.fullmatch('[a-f0-9]{40}',expected_app),'expected_app_unbound'
+          assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-r7-20261109-v1'
+          assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
+          assert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+          assert os.environ.get('GITHUB_REF')=='refs/heads/ops/issue-1503-production-smoke'
+          check_window()
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+          expected_parent='bb6e981c908d5ead1ec41f17aaaf6cea23dc30f2'
+          expected_parents=[expected_parent]
+          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==expected_parents
+          assert git('rev-parse',expected_parent+'^{tree}')=='a3de29b846be36555b1cd8ae1dbc51fd520c7088'
+          assert git('rev-parse','f5ddb5cda60b57c1006c60fcc997cc3455d771aa^{tree}')=='cf51377a9ef1c3d74b9b2480890fee3986698a47'
+          closed_parents=git('rev-list','--parents','-n','1',expected_parent).split()[1:]
+          assert len(closed_parents)==2 and closed_parents[1]=='f5ddb5cda60b57c1006c60fcc997cc3455d771aa','closed_base_not_normal_main_merge'
+          subprocess.run(['git','merge-base','--is-ancestor','f5ddb5cda60b57c1006c60fcc997cc3455d771aa',expected_parent],check=True)
+          expected={"scripts/ops/issue1503/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1503/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1503/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1503/github-readonly-runner.mjs":"5a94ad395caf932230e01ba0e16a7ea9b7b8e6c6067ff44e5f69d7282e1e7da5","scripts/ops/issue1503/github-readonly.test.mjs":"a52540bf17dba2faf424fa0fa321b7d8ac1cfd383a9c8599720bc8fb12b3f0e4"}
+          workflow='.github/workflows/issue1503-production-operator.yml'
+          allowed=set(expected)|{workflow}
+          assert set(git('diff','--name-only',expected_parent,'HEAD').splitlines())==allowed
+          raw=git('diff','--raw','--no-renames','--abbrev=40',expected_parent,'HEAD').splitlines()
+          entries=[line.split('\t',1) for line in raw]
+          assert len(entries)==len(allowed) and all(len(entry)==2 for entry in entries)
+          assert {entry[1] for entry in entries}==allowed
+          for header,path in entries:
+              fields=header.split()
+              assert len(fields)==5,path
+              if path==workflow:
+                  assert fields[0]==':100644' and fields[1]=='100644' and fields[4]=='M',path
+              else:
+                  assert fields[0]==':000000' and fields[1]=='100644' and fields[4]=='A',path
+          assert not git('diff','--name-only','HEAD')
+          for path,want in expected.items():
+              assert hashlib.sha256((root/path).read_bytes()).hexdigest()==want,path
+          import json,os,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+              assert response.status==200
+              actual=json.load(response)
+          assert actual['object']['sha']=='f5ddb5cda60b57c1006c60fcc997cc3455d771aa','main_changed'
+          check_window()
+          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':expected_parent,'productSource':'f5ddb5cda60b57c1006c60fcc997cc3455d771aa','expectedApp':expected_app,'appObservation':'Root-bound external admission evidence; not observed by this source guard','files':len(expected),'productDeltaFromClosedBase':False}))
+          PY
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        id: setup_node
         with:
           node-version: 24
-      - id: dependencies
+      - name: Verify the exact bounded helper before loading production credentials
+        run: node --test scripts/ops/issue1503/github-readonly.test.mjs
+      - name: Install the existing application dependencies with frozen lock and normal scripts
         run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
-      - name: Read the Vercel team token through Infisical workload identity
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          include-imports: false
-      - name: Record the normal production runtime pair before setup writes
-        id: runtime_witness
-        if: always()
+      - name: Recheck bounded entry and exact main after installation before production credentials
         env:
-          MIKKA_RUNTIME_WITNESS_PRIOR_STATUS: ${{ job.status }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          node --input-type=module - <<'JS'
-          import { createHash } from 'node:crypto'
-          import { mkdirSync, writeFileSync } from 'node:fs'
-
-          const sha = process.env.GITHUB_SHA
-          const runId = process.env.GITHUB_RUN_ID
-          const attempt = process.env.GITHUB_RUN_ATTEMPT
-          const report = {
-            version: 1, phase: 'runtime_witness', status: 'failed',
-            code: 'runtime_witness_not_completed', consistency: 'unverified',
-            sourceCommit: /^[a-f0-9]{40}$/.test(sha ?? '') ? sha : null,
-            runId: /^[1-9][0-9]*$/.test(runId ?? '') ? runId : null,
-            runAttempt: /^[1-9][0-9]*$/.test(attempt ?? '') ? attempt : null,
-            startedAt: new Date().toISOString(),
-          }
-          let code = 'runtime_witness_source_invalid'
-          try {
-            if (!report.sourceCommit || !report.runId || !report.runAttempt) throw Error()
-            code = 'runtime_witness_prerequisite_failed'
-            if (process.env.MIKKA_RUNTIME_WITNESS_PRIOR_STATUS !== 'success') throw Error()
-            code = 'runtime_witness_token_unavailable'
-            const token = process.env.VERCEL_TEAM_TOKEN
-            if (!token) throw Error()
-            code = 'runtime_witness_module_unavailable'
-            const { api, PROJECT, TEAM, TEMPLATE_ENV, runtimeConfigurationSha } =
-              await import('./scripts/e2b/publish-template-env.mjs')
-            report.projectId = PROJECT
-            report.teamId = TEAM
-            const keys = [...Object.values(TEMPLATE_ENV), 'MIKKA_CLOUD_WORKER_SHA',
-              'MIKKA_CLOUD_TEMPLATE_MODELS', 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT']
-            code = 'runtime_witness_configuration_read_failed'
-            const { envs } = await api('/v10/projects/' + PROJECT + '/env', { token, method: 'GET' })
-            if (!Array.isArray(envs)) throw Error()
-            code = 'runtime_witness_production_binding_invalid'
-            const rows = keys.map(key => {
-              const matches = envs.filter(row => row.key === key && row.target?.includes('production') && !row.gitBranch)
-              if (matches.length !== 1 || typeof matches[0].id !== 'string' || !matches[0].id) throw Error()
-              return [key, matches[0].id]
-            })
-            code = 'runtime_witness_configuration_read_failed'
-            const pairs = await Promise.all(rows.map(async ([key, id]) => [key,
-              (await api('/v1/projects/' + PROJECT + '/env/' + encodeURIComponent(id), { token, method: 'GET' })).value,
-            ]))
-            const configuration = Object.fromEntries(pairs)
-            code = 'runtime_witness_configuration_inconsistent'
-            const workerSha = runtimeConfigurationSha(configuration, { allowLegacy: false })
-            if (!workerSha) { report.consistency = 'inconsistent'; throw Error() }
-            report.runtimeSourceCommit = configuration.MIKKA_CLOUD_WORKER_SOURCE_COMMIT
-            report.workerSha = workerSha
-            report.templateIds = Object.fromEntries(Object.entries(TEMPLATE_ENV).map(([kind, key]) => [kind, configuration[key]]))
-            report.catalogueSha256 = createHash('sha256').update(configuration.MIKKA_CLOUD_TEMPLATE_MODELS).digest('hex')
-            report.consistency = 'consistent'
-            report.status = 'passed'
-            report.code = 'runtime_configuration_consistent'
-          } catch {
-            report.code = code
-            process.exitCode = 1
-          } finally {
-            report.finishedAt = new Date().toISOString()
-            mkdirSync('issue1503-report', { recursive: true, mode: 0o700 })
-            writeFileSync('issue1503-report/runtime-witness.json', JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
-            console.log(JSON.stringify({ phase: report.phase, status: report.status, code: report.code, consistency: report.consistency }))
-          }
-          JS
-      - name: Upload the actual runtime witness before setup writes
-        id: upload_runtime_witness
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: issue1503-runtime-witness
-          path: issue1503-report/runtime-witness.json
-          if-no-files-found: error
-          retention-days: 3
+          python3 - <<'PY'
+          import datetime
+          def check_window():
+              entry=datetime.datetime.fromisoformat('2026-11-10T05:03:40.000Z')
+              hard=datetime.datetime.fromisoformat('2026-11-10T06:28:40.000Z')
+              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
+              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
+              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
+          check_window()
+          import json,os,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+              assert response.status==200
+              actual=json.load(response)
+          assert actual['object']['sha']=='f5ddb5cda60b57c1006c60fcc997cc3455d771aa','main_changed'
+          check_window()
+          PY
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        id: smoke_secrets
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          recursive: false
-          include-imports: false
-      - name: Import the pinned production application database
-        id: start_database
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_DATABASE_URL
-          recursive: false
-          include-imports: false
-      - name: Import the production auth key for normal setup services
-        id: setup_auth_secret
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: BETTER_AUTH_SECRET
-          recursive: false
-          include-imports: false
-      - name: Import the pinned production workspace database
-        id: setup_workspace_database
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
           identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
@@ -174,9 +140,29 @@ jobs:
           secret-name: DATABASE_URL
           recursive: false
           include-imports: false
-      - name: Import the normal GitHub application client identifier
-        id: setup_github_client_id
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: BETTER_AUTH_SECRET
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
           identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
@@ -187,9 +173,7 @@ jobs:
           secret-name: GITHUB_CLIENT_ID
           recursive: false
           include-imports: false
-      - name: Import the normal GitHub application client secret
-        id: setup_github_client_secret
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
           identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
@@ -200,52 +184,41 @@ jobs:
           secret-name: GITHUB_CLIENT_SECRET
           recursive: false
           include-imports: false
-      - name: Validate setup configuration before application modules load
-        id: setup_configuration
+
+      - name: Recheck current source and prepare one new read-only child using the normal Owner getter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE_ENV: production
+          VERCEL_ENV: production
+          BETTER_AUTH_URL: https://app.aspectlylabs.com
+          NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
         run: |
-          node --input-type=module - <<'JS'
-          const keys = ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'BETTER_AUTH_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']
-          const missing = keys.filter(key => !process.env[key]?.trim())
-          if (missing.length) {
-            console.error(JSON.stringify({ phase: 'setup_configuration', status: 'failed', code: 'setup_configuration_missing', keys: missing }))
-            process.exitCode = 1
-          } else {
-            console.log(JSON.stringify({ phase: 'setup_configuration', status: 'passed', keys }))
-          }
-          JS
-      - name: Prepare the existing smoke workspace and a new scoped GitHub child
-        id: preflight_reentry
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/preflight-reentry.ts
-        env:
-          NODE_ENV: production
-          VERCEL_ENV: production
-          MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: "cc389d61e8a85206d17616e4326a660283a1b2bd"
-      - name: Upload the actual preflight receipt
-        id: upload_preflight
+          python3 - <<'PY'
+          import datetime
+          def check_window():
+              entry=datetime.datetime.fromisoformat('2026-11-10T05:03:40.000Z')
+              hard=datetime.datetime.fromisoformat('2026-11-10T06:28:40.000Z')
+              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
+              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
+              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
+          check_window()
+          import json,os,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          request=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',
+              headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+          with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+              assert response.status==200
+              actual=json.load(response)
+          assert actual['object']['sha']=='f5ddb5cda60b57c1006c60fcc997cc3455d771aa','main_changed'
+          check_window()
+          PY
+          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/github-readonly-runner.mjs --prepare
+      - name: Preserve the exact fresh receipt and any uncertain outcome
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-preflight-reentry
-          path: issue1503-report/preflight-reentry.json
-          if-no-files-found: error
-          retention-days: 3
-      - name: Enable the normal credit share without starting a task
-        id: credit_share_setup
-        if: success() && steps.preflight_reentry.outcome == 'success'
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/credit-share-setup.ts
-        env:
-          NODE_ENV: production
-          VERCEL_ENV: production
-          MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: "cc389d61e8a85206d17616e4326a660283a1b2bd"
-          MIKKA_1503_CREDIT_SHARE_REPORT: issue1503-report/credit-share-setup.json
-      - name: Upload the actual credit-share setup receipt
-        id: upload_credit_share
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: issue1503-credit-share-setup
-          path: issue1503-report/credit-share-setup.json
-          if-no-files-found: error
-          retention-days: 3
+          name: issue1505-github-readonly-fresh-${{ github.run_id }}-${{ github.run_attempt }}
+          path: issue1505-github-readonly-report/*.json
+          if-no-files-found: warn
+          retention-days: 14
