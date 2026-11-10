@@ -222,22 +222,21 @@ function SearchDialog({ open, onOpenChange, onOpenChangeComplete, query, onQuery
   const tCopy = useTranslations('FeatureCopy')
   const tCommon = useTranslations('Common')
 
-  function row(item: SearchRow) {
-    if (item.lead.kind === 'glyph') return <CommandItem key={item.key} value={item.key} disabled={item.disabled} onSelect={item.select} className={cn((item.busy !== undefined || item.trailing) && 'text-muted-foreground')}>
+
+  // Rows sit in their group's JSX (lint-ui composition/group).
+  const group = (section: SearchSection) => <CommandGroup key={section.id} heading={section.heading}>{section.rows.map(item => item.lead.kind === 'glyph'
+    ? <CommandItem key={item.key} value={item.key} disabled={item.disabled} onSelect={item.select} className={cn((item.busy !== undefined || item.trailing) && 'text-muted-foreground')}>
       {item.busy ? <Spinner role="presentation" aria-hidden="true" /> : <RowLead lead={item.lead} />}{item.label}
       {item.trailing && <CommandShortcut className="tracking-normal">{item.trailing}</CommandShortcut>}
     </CommandItem>
-    return <CommandItem key={item.key} value={item.key} disabled={item.disabled} onSelect={item.select} className="gap-3 py-2">
+    : <CommandItem key={item.key} value={item.key} disabled={item.disabled} onSelect={item.select} className="gap-3 py-2">
       <RowLead lead={item.lead} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-medium">{item.identifier && <><span className="text-muted-foreground tabular-nums">{item.identifier}</span> </>}{item.label}</span>
         {item.detail && <span className="truncate text-xs text-muted-foreground">{item.detail}</span>}
       </span>
       {item.status && <CommandShortcut className="tracking-normal"><Badge variant={STATUS_BADGES[item.status.tone]} size="sm">{item.status.label}</Badge></CommandShortcut>}
-    </CommandItem>
-  }
-
-  const group = (section: SearchSection) => <CommandGroup key={section.id} heading={section.heading}>{section.rows.map(row)}</CommandGroup>
+    </CommandItem>)}</CommandGroup>
 
   return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 max-md:top-[max(1rem,env(safe-area-inset-top))] sm:max-w-xl">
     {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
