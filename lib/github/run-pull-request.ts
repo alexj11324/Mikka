@@ -3,6 +3,7 @@ import { pullRequestBody } from '@mikka/protocol/orchestrator'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { bodyWithPublicationEvidence, factoryPullRequestText, validPublicationEvidence, type PublicationEvidence } from '@/lib/captures/publication-contract'
 import { maskCredentials } from '@/lib/secrets/mask'
+import { readReviewChecks } from './review-checks'
 
 import { PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
 export { PublicationError, PUBLICATION_ERRORS, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
@@ -34,6 +35,7 @@ const prSchema = z.object({
   merged_at: z.string().nullable(), body: z.string().nullable(),
   // A single PR carries its line counts; GitHub's list of PRs leaves them out.
   additions: z.number().int().nonnegative().optional(), deletions: z.number().int().nonnegative().optional(),
+  changed_files: z.number().int().nonnegative().optional(),
   head: z.object({ ref: z.string(), sha: z.string().regex(/^[a-f0-9]{40,64}$/i).optional(), repo: z.object({ id }).nullable() }),
   base: z.object({ repo: z.object({ id }) }),
 })
@@ -128,13 +130,16 @@ export async function openRunPullRequest(options: Options & {
   const writeToken = access.token
   const marker = `<!-- mikka-issue:${options.issueId} -->`
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()
-  const result = async (raw: unknown): Promise<PublishedPullRequest> => {
-    let pr = parse(prSchema, raw)
+  const verified = (raw: unknown) => {
+    const pr = parse(prSchema, raw)
     if (visualEvidence && pr.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
-    const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
     if (pr.head.ref !== options.branch || pr.head.repo?.id !== binding.repositoryId || pr.base.repo.id !== binding.repositoryId || !pr.body?.trimEnd().endsWith(marker)) throw new PublicationError('pull_request_conflict')
+    if (pr.head.sha && pr.head.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
     const expected = `https://github.com/${access.owner}/${access.repo}/pull/${pr.number}`
     if (pr.html_url.toLowerCase() !== expected.toLowerCase()) throw new PublicationError('github_request_failed')
+    return pr
+  }
+  const result = async (pr: ReturnType<typeof verified>, readChecks = true): Promise<PublishedPullRequest> => {
     let evidenceDigest: string | undefined
     if (visualEvidence) {
       const expectedBody = bodyWithPublicationEvidence(pr.body!, options.issueId, visualEvidence)
@@ -165,6 +170,19 @@ export async function openRunPullRequest(options: Options & {
       if (pr.body === bodyWithPublicationEvidence(pr.body!, options.issueId, visualEvidence)) evidenceDigest = visualEvidence.digest
       else throw new PublicationError('factory_public_evidence_required')
     }
+    const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
+    const review: Partial<PublishedPullRequest> = pr.head.sha ? { branch: pr.head.ref, headSha: pr.head.sha.toLowerCase(),
+      ...(pr.changed_files === undefined ? {} : { changedFiles: pr.changed_files }) } : {}
+    if (!readChecks) review.reviewChecks = null
+    else if (pr.head.sha) {
+      try { review.reviewChecks = await readReviewChecks(p => request(p, access.token), path, pr.head.sha) }
+      catch (error) {
+        // Optional review metadata cannot turn a successfully opened PR into a
+        // publication failure. Unknown remains explicit; no green is invented.
+        if (!(error instanceof PublicationError)) throw error
+        review.reviewChecks = null
+      }
+    }
     // A later unverified run must not leave an earlier ready-for-review PR open.
     // Only a task-marked PR may be converted; never reopen a closed/merged PR.
     if (options.draft && pr.state === 'open' && !pr.draft && !pr.merged_at) {
@@ -176,9 +194,28 @@ export async function openRunPullRequest(options: Options & {
         },
       })))
       if (converted.data.convertPullRequestToDraft.pullRequest.id !== pr.node_id) throw new PublicationError('github_request_failed')
-      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft', ...lines, ...(evidenceDigest ? { evidenceDigest } : {}) }
+      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft', ...lines, ...review, ...(evidenceDigest ? { evidenceDigest } : {}) }
     }
-    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines, ...(evidenceDigest ? { evidenceDigest } : {}) }
+    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines, ...review, ...(evidenceDigest ? { evidenceDigest } : {}) }
+  }
+  const enriched = async (raw: unknown): Promise<PublishedPullRequest> => {
+    // The original POST/list is already a complete authority receipt. Never
+    // use optional details to rescue a wrong branch, repository or task marker.
+    const original = verified(raw)
+    let detail: unknown
+    try { detail = await request(`${path}/pulls/${original.number}`, writeToken) }
+    catch (error) {
+      // One bounded enrichment attempt, not another PR creation/recovery loop.
+      // Retain known fields from the verified receipt; omitted counts/checks
+      // remain unknown. This fallback cannot swallow contradictory JSON below.
+      if (!(error instanceof PublicationError)) throw error
+      // Visual evidence publication remains mandatory inside result, including
+      // its current authority/head read and acknowledged managed-body write.
+      return result(original, false)
+    }
+    const resolved = verified(detail)
+    if (resolved.number !== original.number || (original.node_id && resolved.node_id && original.node_id !== resolved.node_id)) throw new PublicationError('pull_request_conflict')
+    return result(resolved)
   }
   const find = async () => {
     const query = new URLSearchParams({ state: 'all', head: `${access.owner}:${options.branch}`, per_page: '100', sort: 'created', direction: 'desc' })
@@ -187,13 +224,16 @@ export async function openRunPullRequest(options: Options & {
     if (!matching.length) return null
     const own = matching.find(pr => pr.body?.trimEnd().endsWith(marker))
     if (!own) throw new PublicationError('pull_request_conflict')
-    return result(own)
+    // A list omits additions/deletions/changed_files. Resolve that one already
+    // bound PR during ingestion, never from the inbox/flow read route.
+    return enriched(own)
   }
   const existing = await find()
   if (existing) return existing
   if (options.allowCreate === false) throw new PublicationError('pull_request_limit')
+  let created: z.infer<typeof prSchema>
   try {
-    return await result(await write(async () => {
+    created = parse(prSchema, await write(async () => {
       if (visualEvidence) {
         const current = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
         if (current.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
@@ -218,4 +258,7 @@ export async function openRunPullRequest(options: Options & {
     if (created) return created
     throw error
   }
+  // A successful POST's conflicts, draft mutation and optional enrichment are
+  // not ambiguous POST outcomes and must never be retried through find().
+  return enriched(created)
 }

@@ -44,4 +44,9 @@ export interface PublishedPullRequest {
   evidenceDigest?: string
   additions?: number
   deletions?: number
+  /** Review metadata synchronized during publication or a verified webhook. */
+  branch?: string
+  headSha?: string
+  changedFiles?: number
+  reviewChecks?: import('./github/review-checks').ReviewChecks | null
 }

@@ -18,7 +18,7 @@ export interface FactoryFlow {
   stages: FlowStage[]
   needsYou?: { kind: NeedsYouKind; since: string }
   completion?: 'merged' | 'accepted'
-  review: { verdict: 'passed' | 'changes_requested' | 'needs_judgment' | null; candidateId: string | null; currentCandidateReviewed: boolean } | null
+  review: { verdict: 'passed' | 'changes_requested' | 'needs_judgment' | null; candidateId: string | null; currentCandidateReviewed: boolean; summary?: import('./public-flow').FactoryReviewSummary | null } | null
   acceptance: { artifactId: string; version: number; runId: string; candidateId: string; counts: Partial<Record<'passed' | 'failed' | 'unverified', number>>; media: unknown[] } | null
   pullRequest: { url: string; state: string } | null
 }
