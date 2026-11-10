@@ -400,9 +400,11 @@ test('detail and activity revalidate current access while returning only changed
       })
       // Captured on the same fixture against old main 3c32675c; these are
       // actual revoked-owner measurements, not inferred from the linked case.
+      // The direct citation carries the nine-byte codingReview hint from the
+      // Task review feature; its statement count is unchanged.
       for (const [label, result, statementLimit, originalTotal] of [
         ['revokedConnections', revokedConnections, 12, 7464],
-        ['revokedCitation', revokedCitation, 3, 2097],
+        ['revokedCitation', revokedCitation, 3, 2106],
         ['revokedRunCitation', revokedRunCitation, 7, 7700],
       ] as const) {
         await t.test(label + ' stays within its frozen old-source budget', () => {

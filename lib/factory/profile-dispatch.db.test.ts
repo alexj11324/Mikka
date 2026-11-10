@@ -2022,7 +2022,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       { issueId, profileId: f.implement!.id, location: 'cloud', cloudPurpose: 'task' })
     const subscriptionBindingId = await bindAgentToConnection(pool, f.scope, f.agents[harness], harness, f.connections[harness], model[harness])
     const queue = (tx: import('pg').PoolClient, sourceEventId: string, idempotencyKey: string,
-      agentId = f.agents[harness], deviceRepoId = f.repoId,
+      agentId: string = f.agents[harness], deviceRepoId: string = f.repoId,
       factoryContext?: { attemptId: string; sourceEventId: string }) => queueCloudRun(pool, f.actor, {
       botId: f.botId, issueId, agentId, deviceRepoId, title: 'Review feedback fixture',
       body: 'ORIGINAL_OWNER_REQUEST must survive feedback.', model: model[harness], subscriptionBindingId,
