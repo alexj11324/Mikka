@@ -8,6 +8,7 @@ import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
 import { WorkspaceReviewError, type DiffFilePatch, type TaskReviewRef } from '@mikka/protocol/coding-workspace-review'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../../tests/helpers/factory-visual-evidence'
 import { dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { GitHubAccessError } from '../../github/user-access-error'
 import type { RequestBudget } from '../../request-budget'
@@ -130,6 +131,9 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
         return { id, sessionId, recordedAt: new Date(row!.finishedAt.getTime() + 1000).toISOString() }
       }
       const producer = await completedRun('execute'), reviewer = await completedRun('review'), verifier = await completedRun('verify')
+      // The handoff gate requires the producer's ready visual capture; these
+      // merge fixtures exercise the claim/PUT path, not evidence collection.
+      await addFactoryVisualEvidence(pool, producer.id)
       const tx = await pool.connect()
       try {
         await tx.query('BEGIN')
@@ -153,6 +157,9 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
         await tx.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, candidateId])
         await tx.query('COMMIT')
       } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+      // Same handoff gate as production: the producer declares the reviewed
+      // capture as public evidence before the owner can accept the merge.
+      await addFactoryPublicationEvidence(pool, taskId)
       const proof = await pool.connect()
       try {
         await proof.query('BEGIN')

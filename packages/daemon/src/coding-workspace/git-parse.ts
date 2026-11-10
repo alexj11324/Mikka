@@ -88,7 +88,7 @@ export function parsePorcelainV2(output: string): ParsedStatus {
   return { branch, entries: entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0) }
 }
 
-const commitFormat = '%H%x00%P%x00%an%x00%ae%x00%aI%x00%cI%x00%s%x00'
+const commitFormat = '%H%x00%P%x00%an%x00%ae%x00%aI%x00%cI%x00%s'
 export const gitLogFormat = commitFormat
 
 /** Each commit is seven NUL-terminated fields. Dates are normalized to UTC so

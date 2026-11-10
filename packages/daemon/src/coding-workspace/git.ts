@@ -256,7 +256,7 @@ async function readGitHistory(command: WorkspaceReadCommand, entry: JournalEntry
     const offset = parseHistoryCursor(request.cursor, status.commitSha)
     if (offset === null) throw conflict()
     const raw = await git(['log', `--format=${gitLogFormat}`, '-n', String(Math.min(request.limit, WORKSPACE_GIT_MAX_COMMITS) + 1),
-      `--skip=${offset}`, '--no-decorate'], STATUS_BYTES)
+      `--skip=${offset}`, '--no-decorate', '-z'], STATUS_BYTES)
     const commits = parseGitLog(raw.toString('utf8'), { headSha: status.commitSha, baseSha: entry?.baseCommit ?? null })
     const history: GitHistory = gitHistorySchema.parse({ ok: true, identity: opened.parsed.identity, kind: 'git_history',
       observedAt: new Date().toISOString(), availability: 'online', revision: status.revision, commitSha: status.commitSha,
