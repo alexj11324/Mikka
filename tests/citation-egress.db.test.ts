@@ -43,7 +43,7 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
     const workspaceId = await seedFixtureWorkspace(pool, owner)
     const identity = { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId, notes: filler }
     for (const [index, id] of runs.entries()) {
-      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error,"agentDefinition","workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error,"agentDefinition","workspaceId","promptTaskStart","promptTaskLength") values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,char_length($6))',
         // The task's newest thread (index 2) waits on the person; the older ones it cites succeeded.
         [id, owner, index === 3 ? null : issueId, agent, index === 2 ? 'waiting_input' : 'succeeded', prompts[index], reports[index] === null ? null : JSON.stringify(reports[index]), errors[index], JSON.stringify({ harness: 'codex', executionIdentity: identity }), workspaceId])
     }

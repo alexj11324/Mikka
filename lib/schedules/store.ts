@@ -7,6 +7,7 @@ import { botChatChanged } from '../live/chats'
 import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorSessionChanged } from '../live/coordinator-session'
 import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
+import { scheduleChatMessage } from './chat-result'
 
 export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: () => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
@@ -111,10 +112,10 @@ export class ScheduleStore {
   private async lockChat(tx:PoolClient,row:Schedule){await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`bot-chat:${row.owner_id}:${row.bot_id??'coordinator'}`])}
   private async retireEvent(tx:PoolClient,id:string|null){if(id)await tx.query(`UPDATE coordinator_events SET "deliveredAt"=COALESCE("deliveredAt",$2),tier='background' WHERE id=$1`,[id,this.clock()])}
   private async report(tx:PoolClient,row:Schedule,o:Occurrence,status:string,result:unknown,error:string|null,streamId?:string){
-    const text=`[Schedule ${row.id}; occurrence ${o.id}; operation ${o.operation_id}] ${o.definition.title}: ${status}\n${result===null?error??'':typeof result==='object'&&result&&'text' in result?String(result.text):JSON.stringify(result)}`
-    await this.safeMessage(tx,row.owner_id,text)
+    const message=scheduleChatMessage(o.definition.title,status,result)
+    await this.safeMessage(tx,row.owner_id,message)
     await this.lockChat(tx,row)
-    const inserted = await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{role:'assistant',content:text,...(streamId?{mikkaStreamId:streamId}:{})}])
+    const inserted = await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{...message,...(streamId?{mikkaStreamId:streamId}:{})}])
     if (inserted.rowCount) await botChatChanged(tx, row.owner_id, row.bot_id)
     if (inserted.rowCount) await coordinatorSessionChanged(tx, row.owner_id, row.bot_id)
     // A result is already in the chat. Whether it also needs the person (a failure, a skipped or cancelled run, a result they would want flagged)

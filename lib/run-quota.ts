@@ -158,11 +158,12 @@ async function continuationDefinition(run: Run, prompt: string, key: RunApiKey |
 /** A device run's continuation, in the caller's transaction, after the original ended. */
 async function queueDeviceContinuation(tx: Tx, run: Run, key: RunApiKey | null): Promise<string> {
   const id = crypto.randomUUID()
-  const prompt = quotaContinuationPrompt(run.prompt)
+  const copied = quotaContinuationPrompt(run)
+  const { prompt } = copied
   await tx.insert(agentRuns).values({
     id, userId: run.userId, workspaceId: run.workspaceId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
     agentDefinition: await continuationDefinition(run, prompt, key), deviceId: run.deviceId, deviceRepoId: run.deviceRepoId,
-    status: 'queued', kind: run.kind, baseBranch: run.baseBranch, prompt, attempt: run.attempt, retryOf: run.id,
+    status: 'queued', kind: run.kind, baseBranch: run.baseBranch, ...copied, attempt: run.attempt, retryOf: run.id,
   })
   await runListChanged(tx, id)
   await runChanged(tx, id)
@@ -208,7 +209,7 @@ export async function queueCloudQuotaContinuation(hint: Run, cloud: CloudBinding
         const repoId = target.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(run.userId, target.deviceId, target.remoteUrl, client)).id : target.repoId
         const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: target.agentId, deviceRepoId: repoId, readOnly: run.agentDefinition?.readOnly, title: issue.title, body: tiptapToText(issue.content),
           allowLocalRecovery: run.agentDefinition?.allowLocalRecovery, sourceEventId: run.agentDefinition?.allowLocalRecovery ? request?.sourceEventId : undefined,
-          note: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
+          executionNote: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
           // Preserve the selected model and credential; tenant admission grants neither.
           ...(key ? { apiKey: key, model: key.model } : { ...threadRunModel(run.agentDefinition), model: run.agentDefinition?.model ?? '' }) }, client)
         const [queued] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId), eq(agentRuns.workspaceId, workspaceId))).limit(1)

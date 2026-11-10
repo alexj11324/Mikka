@@ -151,7 +151,7 @@ export async function configureFactoryMonitorDispatch(
     "",
   ].join("\n");
   await tx.query(
-    `UPDATE agent_runs SET kind='acceptance',"baseBranch"=$2,prompt=$3 || left(prompt,$4) WHERE id=$1`,
+    `UPDATE agent_runs SET kind='acceptance',"baseBranch"=$2,prompt=$3 || left(prompt,$4),"promptTaskStart"=CASE WHEN "promptTaskStart" IS NOT NULL AND "promptTaskLength" IS NOT NULL THEN LEAST("promptTaskStart",$4)+char_length($3) END,"promptTaskLength"=CASE WHEN "promptTaskStart" IS NOT NULL AND "promptTaskLength" IS NOT NULL THEN LEAST("promptTaskLength",GREATEST(0,$4-"promptTaskStart")) END WHERE id=$1`,
     [runId, receipt.candidate.sha, prompt, 100000 - prompt.length],
   );
   await tx.query(
