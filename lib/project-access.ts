@@ -1,23 +1,26 @@
 import 'server-only'
-import { cache } from 'react'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { inArray, sql } from 'drizzle-orm'
+import { db } from '@/lib/db'
 import { projectDb, projects } from '@/lib/db/projects'
-import { teamProjects } from '@/lib/db/team-schema'
-import { workspaceMembers } from '@/lib/db/workspace-schema'
+import { activeTaskWorkspaces, taskReaderScope } from '@/lib/task-workspace'
+import type { IssueReader } from '@/lib/issue-visibility'
+import type { ResourceReference } from '@/lib/resource-access/contract'
 
 export type ProjectTransaction = Parameters<Parameters<typeof projectDb.transaction>[0]>[0]
-async function readAccessibleProjects(userId: string, tx: ProjectTransaction | typeof projectDb, workspaceId?: string) {
-  const rows = await tx.selectDistinct({ project: projects }).from(projects)
-    .leftJoin(teamProjects, eq(teamProjects.projectId, projects.id))
-    .leftJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, teamProjects.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
-    .where(or(and(eq(projects.userId, userId), isNull(teamProjects.projectId)), and(eq(workspaceMembers.userId, userId), workspaceId ? eq(teamProjects.workspaceId, workspaceId) : undefined)))
-  return rows.map(row => row.project)
+
+/** Tenant and Enterprise admission precede APP content ACLs. Source Project
+ * rows are read only after their stable IDs pass the authoritative ACL; no
+ * request cache can preserve access after a grant or membership revocation. */
+export async function accessibleProjectReferences(reader: IssueReader, workspaceId?: string): Promise<ResourceReference[]> {
+  const tenants = await activeTaskWorkspaces(reader, workspaceId)
+  if (!tenants.length) return []
+  const { rows } = await db.execute<{ id: string; workspaceId: string }>(sql`select id,"workspaceId" from resource_access_policies
+    where kind='project' and "workspaceId"=any(${sql.param(tenants.map(tenant => tenant.id))}::uuid[])
+      and mikka_resource_acl_allowed('account',${taskReaderScope(reader).userId},"workspaceId",kind,id,'canReadContent')`)
+  return rows.map(row => ({ ...row, kind: 'project' }))
 }
 
-// Reads outside a transaction are shared within one server render (React cache is per request);
-// transactions always read fresh rows under their own locks.
-const cachedAccessibleProjects = cache((userId: string, workspaceId: string) => readAccessibleProjects(userId, projectDb, workspaceId || undefined))
-
-export async function accessibleProjects(userId: string, tx: ProjectTransaction | typeof projectDb = projectDb, workspaceId?: string) {
-  return tx === projectDb ? cachedAccessibleProjects(userId, workspaceId ?? '') : readAccessibleProjects(userId, tx, workspaceId)
+export async function accessibleProjects(reader: IssueReader, tx: ProjectTransaction | typeof projectDb = projectDb, workspaceId?: string) {
+  const references = await accessibleProjectReferences(reader, workspaceId)
+  return references.length ? tx.select().from(projects).where(inArray(projects.id, references.map(row => row.id))) : []
 }

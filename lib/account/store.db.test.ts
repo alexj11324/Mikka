@@ -223,6 +223,9 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
       // Team issues of the shared workspace keep their owner column; they stay on purpose.
       if (['issues', 'issue_documents', 'mikka_team_issues', 'mikka_teams', 'mikka_workspaces'].includes(table)) continue
       if (['bots', 'agent_runs', 'agents', 'run_messages', 'artifacts'].includes(table)) continue
+      // Access evidence and the ACL of retained sources stay without turning
+      // those sources public; verify those privacy guarantees below.
+      if (['resource_access_policies', 'resource_access_events'].includes(table)) continue
       const { rowCount } = await pool.query(`select 1 from "${table}" where "${column}" = $1 limit 1`, [alice])
       if (rowCount) left.push(`${table}.${column}`)
     }
@@ -232,6 +235,10 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from issue_documents where "issueId" = $1', [personalIssue])).rowCount, 0)
     assert.equal((await pool.query('select 1 from issue_members where "memberId" = $1', [alice])).rowCount, 0)
     assert.equal((await pool.query('select 1 from artifact_shares where "createdBy" = $1', [alice])).rowCount, 0)
+    assert.equal((await pool.query('select 1 from resource_access_grants where "subjectKind"=\'account\' and "subjectId"=$1', [alice])).rowCount, 0)
+    assert.equal((await pool.query('select 1 from resource_access_policies where kind=\'task\' and id=$1', [personalIssue])).rowCount, 0)
+    assert.equal((await pool.query('select visibility from resource_access_policies where kind=\'thread\' and id=$1', [run])).rows[0].visibility, 'private')
+    assert.equal((await pool.query('select mikka_resource_acl_allowed(\'account\',$1,$2,\'thread\',$3,\'canReadContent\') as allowed', [bob, shared, run])).rows[0].allowed, false, 'account deletion does not grant administrators private history')
 
     // Her bot in the shared workspace stays, paused with no owner (「待接管」), with its threads, their messages and Artifacts and the agent they ran on.
     const [kept] = (await pool.query<{ ownerId: string | null; archivedAt: Date | null }>('select "ownerId", "archivedAt" from bots where id = $1', [bot])).rows

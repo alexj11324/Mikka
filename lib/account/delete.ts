@@ -65,6 +65,8 @@ const SKIPPED = new Map<string, string>([
   // pending delivery then records pending_link without recreating membership.
   ['enterprise_scim_user', 'organization directory'],
   ['mikka_organization_members', 'workspace database'],
+  ['resource_access_policies', 'authority follows retained source rows; source deletion triggers retire it'],
+  ['resource_access_events', 'append-only access audit; contains no content or credential values'],
 ])
 /**
  * Append-only skill-evaluation ledgers: triggers reject every DELETE
@@ -202,8 +204,15 @@ export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<
   // Task ownership is in APP, not a Team link. Freeze that retention set only
   // after these Workspace locks and the APP task row locks have been acquired.
   const keptIssueIds: string[] = []
-  const keptProjectIds = shared.length
-    ? [...new Set((await wtx.select({ id: teamProjects.projectId }).from(teamProjects).where(inArray(teamProjects.workspaceId, shared))).map(row => row.id))] : []
+  // New shared Projects need no Team link. Retention follows their persisted
+  // tenant, including a former membership, and never changes private ACLs.
+  const { pool } = await import('@/lib/db')
+  const policyProjects = await pool.query<{ id: string }>(`select id from resource_access_policies
+    where kind='project' and "ownerId"=$1 and "workspaceId" is not null and not ("workspaceId"=any($2::uuid[]))`, [userId, solo])
+  const keptProjectIds = [...new Set([
+    ...policyProjects.rows.map(row => row.id),
+    ...shared.length ? (await wtx.select({ id: teamProjects.projectId }).from(teamProjects).where(inArray(teamProjects.workspaceId, shared))).map(row => row.id) : [],
+  ])]
   return { solo, shared, keptIssueIds, keptProjectIds }
 }
 
@@ -214,6 +223,19 @@ export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<
  * provider scope or creator cannot turn a Shared/pending task into personal data.
  * A restore journal's prior keep decision is never silently discarded. */
 export async function freezeTaskRetention(client: Pick<PoolClient, 'query'>, userId: string, plan: Plan): Promise<Plan> {
+  // Match content writers: Workspace authority is already held, then ACL,
+  // then Factory/Task rows. Revoking subject grants later cannot invert this
+  // order against an in-flight edit of a retained shared Task.
+  await client.query(`select p.kind,p.id from resource_access_policies p where p."ownerId"=$1
+    or exists(select 1 from resource_access_grants g where g."resourceKind"=p.kind and g."resourceId"=p.id and g."subjectKind"='account' and g."subjectId"=$1)
+    or (p.kind='task' and (p.id=any($2::uuid[])
+      or exists(select 1 from issue_documents d where d."issueId"=p.id and d."userId"=$1)
+      or exists(select 1 from issue_versions v where v."issueId"=p.id and v."userId"=$1)
+      or exists(select 1 from issue_members m where m."issueId"=p.id and m."userId"=$1)
+      or exists(select 1 from agent_runs r where r."issueId"=p.id and r."userId"=$1)
+      or exists(select 1 from artifacts a where a."issueId"=p.id and a."userId"=$1)
+      or exists(select 1 from factory_tasks f where f."issueId"=p.id and f."userId"=$1)))
+    order by p.kind,p.id for update of p`, [userId, plan.keptIssueIds])
   // Factory writers lock their task before the issue and run. The subject's
   // durable write barrier prevents new rows while this ordered set is held.
   await client.query('select id from factory_tasks where "userId"=$1 order by id for update', [userId])
@@ -334,6 +356,10 @@ export async function deleteMainAccountData(client: PoolClient, userId: string, 
     "botId"=case when "botId" in (select id from bots where "ownerId"=$1 and not (id=any($3::uuid[]))) then null else "botId" end,
     "deliveredAt"=coalesce("deliveredAt",now()),"wakeLeaseUntil"=null
     where id=any($2::uuid[]) and "userId"=$1`, [userId, kept.events, kept.bots])
+  // Subject grants end with the account; private retained source rows never
+  // become shared or readable by an administrator through this cleanup.
+  await client.query('delete from resource_access_grants where "subjectKind"=\'account\' and "subjectId"=$1', [userId])
+  await client.query('delete from resource_access_policies where kind=\'project\' and "ownerId"=$1 and not (id=any($2::uuid[]))', [userId, plan.keptProjectIds])
   const statements = await deletionStatements(client, userId, plan, kept)
   // Complete child deletes before attempting their execution/task parents.
   // A guarded workspace also rejects the implicit UPDATE from SET NULL FKs
