@@ -10,6 +10,7 @@ import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { setAppPolicyInput } from '@/lib/app-policy/apps'
 import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
 import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-batch-contract'
+import { environmentSaveInputSchema } from '@/lib/environments/contract'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -274,6 +275,8 @@ export const desktopActionSchemas = {
   'workspace-secrets.deleteSecret': tuple(object({ id: uuid }), workspace),
   'workspace-secrets.saveE2BKey': tuple(object({ apiKey: text(1024).min(1) }), workspace),
   'workspace-secrets.deleteE2BKey': inWorkspace,
+  'environments.saveEnvironment': tuple(environmentSaveInputSchema, workspace),
+  'environments.archiveEnvironment': tuple(object({ id: uuid, revision: positive }), workspace),
   'workspace-settings.getWorkspaceGeneral': inWorkspace,
   'workspace-settings.getWorkspaceDeletionImpact': inWorkspace,
   'workspace-settings.getWorkspaceTransferTargets': inWorkspace,

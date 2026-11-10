@@ -123,7 +123,7 @@ let protocolVersion=3
 const applicationClient={release(){assert.equal(applicationLease,true,'release the checked-out claim client exactly once');applicationLease=false}}
 stub('../db/index.ts',{
  db,
- pool:{connect:async()=>{
+ pool:{query:async()=>({rows:[]}),connect:async()=>{
   assert.equal(memberLease,true,'claim checks out APP only after the Workspace lease')
   assert.equal(applicationLease,false,'claim cannot check out a second APP client')
   applicationLease=true
@@ -178,7 +178,7 @@ stub('../self-improvement/server.ts',{
 stub('../subscription-runtime.ts',{subscriptionRuntime:()=>({repository:{binding:bindingById,nativeBinding:latestBinding}})})
 let claim: typeof import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route').POST
 let queue: typeof import('../computer/queue-run').queueCloudRun
-before(async()=>{const workspaceModule = await import('../workspace-db');stub('../workspace-db.ts', { ...workspaceModule, workspaceDb:workspaceFixture, workspacePool: { query: async () => ({ rows: memberActive?[{ userId: owner }]:[] }) } });claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
+before(async()=>{const workspaceModule = await import('../workspace-db');stub('../workspace-db.ts', { ...workspaceModule, workspaceDb:workspaceFixture, workspacePool: { query: async (sql: string) => sql.includes('FROM project_environments') ? { rows: [] } : { rows: memberActive?[{ userId: owner }]:[] } } });claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
 beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;githubAccount=null;revokeDuringToken=false;memberActive=true;memberLease=false;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [modelAdmissionCheck,bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed,githubConfigured,githubCredential])fn.mock.resetCalls()})
 const request=()=>{requestedRunId=randomUUID();return claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+requestedRunId+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:requestedRunId})})}
 const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}

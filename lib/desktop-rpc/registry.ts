@@ -40,6 +40,7 @@ import * as actions32 from '@/app/actions/user-secrets'
 import * as actions33 from '@/app/actions/workspace'
 import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
+import * as actions36 from '@/app/actions/environments'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
@@ -48,6 +49,8 @@ const functions = {
   'desktop.session': desktopSession,
   'desktop.accounts': desktopAccounts,
   'desktop.workspaceLink': desktopWorkspaceLink,
+  'environments.saveEnvironment': actions36.saveEnvironment,
+  'environments.archiveEnvironment': actions36.archiveEnvironment,
   'account.updateDisplayName': actions0.updateDisplayName,
   'account.uploadAvatar': actions0.uploadAvatar,
   'account.getPasswordStatus': actions0.getPasswordStatus,

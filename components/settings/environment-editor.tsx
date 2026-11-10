@@ -130,7 +130,7 @@ export function EnvironmentEditorDialog({ workspaceId, environment, duplicate = 
             </div>
           </Field>
           <p className="text-xs text-muted-foreground">{t('revisionHint')}</p>
-          {failure && <FieldError>{t.has(`errors.${failure}`) ? t(`errors.${failure}` as never) : t('errors.generic')}</FieldError>}
+          {failure && <FieldError>{t.has(`errors.${failure}` as never) ? t(`errors.${failure}` as never) : t('errors.generic')}</FieldError>}
         </FieldGroup>
         <DialogFooter>
           <Button type="button" variant="outline" disabled={pending} onClick={onClose}>{common('cancel')}</Button>

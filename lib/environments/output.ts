@@ -15,7 +15,7 @@ export class BoundedOutput {
   private readonly bytes: Record<OutputStream, number> = { stdout: 0, stderr: 0 }
   truncated = false
 
-  constructor(private readonly limit = ENVIRONMENT_LIMITS.logBytes) {}
+  constructor(private readonly limit: number = ENVIRONMENT_LIMITS.logBytes) {}
 
   append(stream: OutputStream, text: string): void {
     if (!text) return

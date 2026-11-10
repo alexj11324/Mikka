@@ -8,7 +8,7 @@ import { e2bRunActionBackend, type RunActionBackend } from './backend'
 import { EnvironmentRequestError, type RunActionStatus } from './contract'
 import { BoundedOutput } from './output'
 import {
-  finishExecution, flushExecutionOutput, markExecutionCancelledIfQueued, markExecutionStarted,
+  finishExecution, flushExecutionOutput, markExecutionStarted,
   readExecutionById, readRunActionExecution, recordExecutionProcess,
 } from './runs'
 

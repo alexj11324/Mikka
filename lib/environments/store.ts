@@ -27,7 +27,6 @@ export type EnvironmentRow = {
 }
 
 export type EnvironmentActor = { userId: string; workspaceId: string }
-type Query = Pick<Pool | PoolClient, 'query'>
 const COLUMNS = `id,"ownerId","workspaceId","projectId",name,description,runtime,workdir,"setupScript","installScript",actions,repositories,"isDefault",revision,"archivedAt","createdAt","updatedAt"`
 
 export async function listEnvironmentRows(pool: Pick<Pool, 'query'>, workspaceId: string): Promise<EnvironmentRow[]> {

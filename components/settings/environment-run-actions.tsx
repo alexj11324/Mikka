@@ -79,7 +79,7 @@ export function EnvironmentRunActions({ workspaceId, runs }: { workspaceId: stri
           <SelectTrigger className="w-full" aria-label={t('chooseRun')}><SelectValue placeholder={t('chooseRun')} /></SelectTrigger>
           <SelectContent><SelectGroup>{runs.map(run => <SelectItem key={run.id} value={run.id}>{describeRun(run)}</SelectItem>)}</SelectGroup></SelectContent>
         </Select>
-        <Select value={actionId || undefined} disabled={!available.length} onValueChange={setActionId} items={available.map(action => ({ value: action.id, label: `${action.name} · ${t(`kinds.${action.kind}`)}` }))}>
+        <Select value={actionId || undefined} disabled={!available.length} onValueChange={value => { if (value) setActionId(value) }} items={available.map(action => ({ value: action.id, label: `${action.name} · ${t(`kinds.${action.kind}`)}` }))}>
           <SelectTrigger className="w-full" aria-label={t('chooseAction')}><SelectValue placeholder={t('chooseAction')} /></SelectTrigger>
           <SelectContent><SelectGroup>{available.map(action => <SelectItem key={action.id} value={action.id}>{action.name} · {t(`kinds.${action.kind}`)}</SelectItem>)}</SelectGroup></SelectContent>
         </Select>

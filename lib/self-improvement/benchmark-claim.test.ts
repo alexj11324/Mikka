@@ -105,6 +105,10 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       githubMachineCredential:async()=>{credentialChecks.push('credential');throw new Error('This benchmark fixture must not open GitHub credentials')},
     },
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
+    // This benchmark fixture owns frozen benchmark composition, not Run
+    // environments; the environments DB suites cover freezing.
+    '@/lib/workspace-db':{workspacePool:{query:async()=>({rows:[]})}},
+    '@/lib/environments/runs':{freezeRunEnvironment:async()=>null},
     '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token',...(options.cloud?{scopeDeviceId:'device',scopeWorkspaceId:'task-workspace'}:{})}),ownedDevice:async()=>({enabled:true,kind:options.cloud?'cloud':'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,kind:options.cloud?'cloud':'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{calls.push('token');return {token:'synthetic-test-token'}}},
