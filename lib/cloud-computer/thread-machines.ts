@@ -699,7 +699,7 @@ async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: s
   if (!identity) return unavailable()
   const { rows: [task] } = await tx.query('SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE', [identity.taskId, actor.userId])
   if (!task || task.status !== 'running') return unavailable()
-  const { rows } = await tx.query(`SELECT to_jsonb(q) AS question,to_jsonb(r) AS run,to_jsonb(origin) AS origin,e."eventId",e.request,e.result
+  const { rows } = await tx.query(`SELECT to_jsonb(q) AS question,to_jsonb(r) AS run,to_jsonb(origin.*) AS origin,e."eventId",e.request,e.result
     FROM factory_questions q
     JOIN factory_attempts a ON a.id=$4 AND a."taskId"=q."taskId" AND a.stage=$5 AND a.status='running'
     JOIN agent_runs r ON r.id=a."runId" AND r.id=q."continuationRunId" AND r."userId"=q."userId" AND r."issueId"=q."issueId"

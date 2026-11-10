@@ -6,6 +6,7 @@ import { retryWorkerDefinition } from '../../agent-kit/worker'
 import { acceptLocalRun } from '../../run-admission-store'
 import { FactoryError } from '../contract'
 import type { FactoryQueue } from '../dispatch'
+import { resolveRunOrigin } from '../../run-origin'
 
 /** Resume the answered local question's frozen worker. Ordinary admission still
  * checks today's task, policy, device, repository and credential authority. */
@@ -39,7 +40,8 @@ export async function queueLocalQuestionContinuation(
   const result = await acceptLocalRun({
     id: randomUUID(), userId, botId: origin.botId, issueId: origin.issueId,
     agentId: origin.agentId, deviceId: origin.deviceId, deviceRepoId: origin.deviceRepoId,
-    source: origin.source, ...copied, definition, continuation: true, sourceRunId: origin.id,
+    source: origin.source, ...resolveRunOrigin({ sourceRun: origin, defaultOrigin: origin.source === 'mcp' ? 'api' : 'automation' }),
+    ...copied, definition, continuation: true, sourceRunId: origin.id,
     requestEventId: definition.repositoryAdmission?.requestEventId,
   }, tx)
   const { recordFactoryDispatchFailure } = await import('../dispatch-recovery')
