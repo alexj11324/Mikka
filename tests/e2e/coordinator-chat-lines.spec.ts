@@ -40,8 +40,11 @@ test('runtime events read as lines in the person\'s language, with the thread as
   } finally { await pool.end() }
   await page.reload()
   const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
-  await expect(chat.locator('[data-event-line="runQuestion"]')).toContainText('改用 msw 还是只改这两个测试')
-  await expect(chat.locator('[data-event-line="runQuestion"]')).toContainText('在等你回答')
+  // A question is a live state above the composer, not a stored event row (decision 2026-11-10); the thread stays an
+  // inline link inside one sentence.
+  await expect(chat.locator('[data-slot="waiting-questions"]')).toContainText('在等你回答')
+  await expect(chat.locator('[data-slot="waiting-questions"]')).toContainText('改用 msw 还是只改这两个测试')
+  await expect(chat.locator('[data-event-line="runQuestion"]')).toHaveCount(0)
   await expect(chat.locator('[data-event-line="issueStatus"]')).toHaveText('「登录页在 Safari 17 上白屏」 改为评审中')
   await expect(chat.locator('[data-event-line="runRetried"]')).toContainText('换了一台机器继续')
   for (const leak of ['[Event]', 'asks the person', 'send_to_run', runId, issueId]) await expect(chat.getByText(leak, { exact: false })).toHaveCount(0)

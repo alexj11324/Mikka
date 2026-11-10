@@ -86,6 +86,7 @@ import { CloudFailureAction, FailureReason } from './failure-reason'
 import { RunErrorDetails } from '@/components/workspace/run-error-text'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { ChatEventLine } from './chat-event-line'
+import { waitingQuestionRuns } from '@/lib/coordinator/waiting-questions'
 import { RetryReplyButton } from './retry-reply-button'
 import { COMPOSER_NOTICE } from './composer-notice'
 
@@ -300,25 +301,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
 
   // A run's question is a live state, not a message: the thread card already names the run and its state badge says
   // 等待你 (decision 2026-11-10), so the chat shows one sentence above the composer instead of a stored event line.
-  // The thread stays an inline link in that sentence, never a line of its own.
-  const waitingQuestions = useMemo(() => {
-    const seen = new Set<string>()
-    const rows: { runId: string | null; title: string }[] = []
-    for (const item of [...items].reverse()) {
-      const line = item.line
-      if (!line || line.kind !== 'runQuestion' || staleEvents.has(item.position)) continue
-      const run = line.runId ? data?.sources?.[line.runId] : undefined
-      const key = line.runId ?? `position-${item.position}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      if (run && run.kind === 'run') {
-        // A run that already moved on is history, not something waiting on the person.
-        if (run.status !== 'waiting_input') continue
-        rows.push({ runId: run.id, title: runThreadName(run) })
-      } else if (line.title) rows.push({ runId: line.runId ?? null, title: line.title })
-    }
-    return rows
-  }, [items, data, staleEvents])
+  const waitingQuestions = useMemo(() => waitingQuestionRuns(items, data?.sources, staleEvents), [items, data, staleEvents])
   /** The thread cards under `item`: those whose first reply it is; a live reply only threads no stored reply has carded. */
   const cardsOf = (item: Chat['items'][number], live: boolean) => item.threads.filter(id => (live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position) && sources?.[id]?.kind === 'run')
   // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
@@ -585,10 +568,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {unanswered && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48">{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       {/* One live sentence, not a stored event line; the thread is an inline link inside it (decision 2026-11-10). */}
-      {waitingQuestions.length > 0 && <p data-slot="waiting-questions" role="status" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
+      {waitingQuestions.length > 0 && <p data-slot="waiting-questions" role="status" aria-live="polite" aria-atomic="false" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
         <CircleHelp aria-hidden="true" className="size-3.5 shrink-0 text-warning" />
         <span>{t('waitingQuestions', { count: waitingQuestions.length })}</span>
-        {waitingQuestions[0].runId && <button type="button" className="min-w-0 max-w-full truncate text-primary underline-offset-4 hover:underline focus-visible:outline-ring-inset" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}>{waitingQuestions[0].title}</button>}
+        {waitingQuestions[0].runId && <button type="button" className="inline-flex min-h-11 min-w-0 max-w-full items-center rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring md:min-h-7" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="truncate">{waitingQuestions[0].title}</span></button>}
       </p>}
       <PendingActions />
     </>
@@ -736,10 +719,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {unanswered && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48">{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       {/* One live sentence, not a stored event line; the thread is an inline link inside it (decision 2026-11-10). */}
-      {waitingQuestions.length > 0 && <p data-slot="waiting-questions" role="status" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
+      {waitingQuestions.length > 0 && <p data-slot="waiting-questions" role="status" aria-live="polite" aria-atomic="false" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
         <CircleHelp aria-hidden="true" className="size-3.5 shrink-0 text-warning" />
         <span>{t('waitingQuestions', { count: waitingQuestions.length })}</span>
-        {waitingQuestions[0].runId && <button type="button" className="min-w-0 max-w-full truncate text-primary underline-offset-4 hover:underline focus-visible:outline-ring-inset" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}>{waitingQuestions[0].title}</button>}
+        {waitingQuestions[0].runId && <button type="button" className="inline-flex min-h-11 min-w-0 max-w-full items-center rounded-sm text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring md:min-h-7" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="truncate">{waitingQuestions[0].title}</span></button>}
       </p>}
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
