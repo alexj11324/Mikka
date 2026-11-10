@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import useSWR, { useSWRConfig } from 'swr'
@@ -33,7 +33,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { SearchInput } from '@/components/ui/search-input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ConnectionsList } from '@ui-slot/settings-connections'
+import * as connectionsSlot from '@ui-slot/settings-connections'
+import type { AppPageProps } from '@/components/slots/settings-connections-contract'
 import { OwnAppsStatus, type OwnAppState, type OwnAppStates, type OwnAppsRead } from '@/components/plugins/connected-list'
 
 export const OWN_APP_STATES_KEY = 'plugin-own-app-states'
@@ -157,7 +158,16 @@ export function usePluginsView(section: 'plugins' | 'connections', linearNotice:
 }
 
 /** An app's own page (`&app=`), shared by 插件 and 设置 › 连接 and by UI layers: back goes to the list it came from. */
+// An app's own page from a UI layer (optional export, docs/ui-overlay.md), else the one below.
+const { ConnectionsList } = connectionsSlot
+const LayerAppPage = (connectionsSlot as { AppPage?: ComponentType<AppPageProps> | null }).AppPage ?? null
+
 export function PluginAppPage({ apps, app, category, rootLabel, href, go, linearNotice = null }: { apps: ConnectedApps; app: string; category: string | null; rootLabel: string; href: PluginsHref; go: PluginsGo; linearNotice?: 'connected' | 'error' | null }) {
+  if (LayerAppPage) return <LayerAppPage apps={apps} app={app} category={category} rootLabel={rootLabel} href={href} go={go} linearNotice={linearNotice} />
+  return <SharedAppPage apps={apps} app={app} category={category} rootLabel={rootLabel} href={href} go={go} linearNotice={linearNotice} />
+}
+
+function SharedAppPage({ apps, app, category, rootLabel, href, go, linearNotice }: AppPageProps) {
   const info = useAppInfo()
   const back = () => go({ category })
   const root = href({ category })
