@@ -4487,7 +4487,12 @@
       "modelUnavailable": "No default model can run",
       "loadingPlacement": "Checking run settings…",
       "quotaUnchecked": "Model allowance needs checking",
-      "workspaceDefault": "Use workspace defaults"
+      "workspaceDefault": "Use workspace defaults",
+      "machineRow": "Machine",
+      "botRow": "Hand to",
+      "details": "Details",
+      "expand": "Bigger window",
+      "collapse": "Smaller window"
     },
     "board": {
       "toolbar": "Board toolbar",

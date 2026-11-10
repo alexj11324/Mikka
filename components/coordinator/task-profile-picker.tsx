@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, SlidersHorizontal } from 'lucide-react'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { HarnessLabel } from '@/components/labels/entity-labels'
+import { HarnessLabel, harnessName } from '@/components/labels/entity-labels'
 import { InlineLoadError } from '@/components/load-error'
 import { withBasePath } from '@/lib/base-path'
 import { settingsHref } from '@/lib/settings-sections'
@@ -68,4 +68,28 @@ export function TaskProfileNotice({ value, data, error, onRetry }: { value: stri
   if (unavailable) return <p role="alert" className="text-sm text-destructive-foreground">{t(`reasons.${profileAvailabilityKey(reason)}`)}</p>
   if (value && !availability?.available && reason === 'checking') return <p role="status" className="text-sm text-muted-foreground">{t('reasons.checking')}</p>
   return null
+}
+
+/**
+ * The same choices as TaskProfilePicker's menu, as data, for a UI layer's new-task window (the new-task slot):
+ * 自动, the default Agent, each profile with its Agent and roles or why it cannot run, and 管理.
+ */
+export function useTaskProfileChoices({ workspaceId, value, data }: { workspaceId?: string; value: string | null; data?: AgentProfilesView }) {
+  const t = useTranslations('Settings.agentProfiles')
+  const profiles = data?.profiles ?? []
+  const builtin = value === BUILTIN_AGENT_PROFILE_ID
+  const selected = profiles.find(profile => profile.id === value)
+  const reason = (key?: string) => t(`reasons.${profileAvailabilityKey(key)}`)
+  const choices = [
+    { value: 'auto', label: t('automatic') },
+    { value: BUILTIN_AGENT_PROFILE_ID, label: t('defaultName'), detail: data?.defaultAvailability?.available ? t('inherit') : reason(data?.defaultAvailability?.reason), disabled: !taskProfileSelectable(BUILTIN_AGENT_PROFILE_ID, data) },
+    ...profiles.map(profile => {
+      const available = data?.availability[profile.id]
+      const detail = [profile.harness !== 'auto' ? harnessName(profile.harness) : null, !available?.available ? reason(available?.reason) : profile.roles.join(' · ')].filter(Boolean).join(' · ')
+      return { value: profile.id, label: profile.name, detail: detail || undefined, disabled: !taskProfileSelectable(profile.id, data) }
+    }),
+  ]
+  const label = !value ? t('automaticShort') : builtin ? t('defaultName') : selected?.name ?? t('selectionUnavailable')
+  const onManage = workspaceId ? () => { window.open(withBasePath(settingsHref('models', workspaceId) + '#factory-profiles-heading'), '_blank', 'noopener,noreferrer') } : undefined
+  return { choices, label, onManage }
 }
