@@ -29,12 +29,9 @@ env:
 jobs:
   postgres-regression:
     name: One PG17 job - actual RED then fresh-database GREEN
+    # Closed after the single accepted run; later pushes allocate no runner.
     if: >-
-      github.repository == 'alexj11324/Mikka' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/ops/1512-task-runs-pg-20261110' &&
-      github.run_attempt == 1 &&
-      github.event.head_commit.message == 'issue1512 task-runs PG admit 20261110'
+      false
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:

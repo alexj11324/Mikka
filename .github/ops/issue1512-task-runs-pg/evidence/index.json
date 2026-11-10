@@ -1,0 +1,360 @@
+{
+  "schema": "issue1512-task-runs-pg17-evidence-v1",
+  "verdict": "VALID_QUERY_ASSERTION_RED_AND_COMPLETE_FILE_GREEN",
+  "run": {
+    "id": 42729547296,
+    "jobId": 129543779965,
+    "attempt": 1,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42729547296",
+    "opsSha": "fa33ec67c1b89aa0251c578276b09b7c85aa5c90"
+  },
+  "source": {
+    "base": {
+      "sha": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+      "tree": "845fb6f21f3ec78c94f60888c11e38573e38e3ea"
+    },
+    "red": {
+      "sha": "01d436073027acd94fcc0d43fb75e435d2ddd7ac",
+      "tree": "028c27f1443cfb9c98564a0bed2412d467b0288f",
+      "parent": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+      "sourceBlob": "f2213c69a435b967feb8d9f335213394c2e08630",
+      "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb"
+    },
+    "green": {
+      "sha": "363065a84264e6a32134e64ef6aa2b3c690d0a02",
+      "tree": "41aff4c08572a384f15ec113f0e41add8b936b69",
+      "parent": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+      "sourceBlob": "e2c0a834f2a4ef8cb10c836302f0929f02db6051",
+      "testBlob": "96b172fcf95ec30b81b0943f15efe8dece3954fb"
+    },
+    "test": "tests/action-read-egress.db.test.ts",
+    "originalTestPrefixBytes": 37665,
+    "actualTrackedWorktreesVerifiedBeforeAndAfterEachPhase": true
+  },
+  "results": {
+    "red": {
+      "tests": 16,
+      "pass": 14,
+      "fail": 2,
+      "expectedLeaf": "the real task-run action reads no team metadata and still reads current tenant membership",
+      "expectedAssertion": "task runs consume only the predicate, never team settings or link pages",
+      "actual": 3,
+      "expected": 0,
+      "onlyOtherFailure": "subtestsFailed parent aggregation"
+    },
+    "green": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0
+    },
+    "allOldTests": 11,
+    "skip": 0,
+    "todo": 0,
+    "cancelled": 0,
+    "newAuthorizationAndPredicateChildrenPass": true
+  },
+  "database": {
+    "version": "17.11",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "role": "e2e",
+    "database": "mikka_e2e",
+    "redOid": "16384",
+    "greenOid": "30893",
+    "sameOwnedContainer": true,
+    "recreatedFromTemplate0": true,
+    "redBootstrapDatabasesRemoved": 2
+  },
+  "runtime": {
+    "node": "24.22.2",
+    "pnpm": "10.34.3",
+    "linuxJobs": 1,
+    "jobTimeoutMinutes": 30,
+    "dependencyInstalls": 1,
+    "actionsCaches": 0,
+    "compileCaches": 0,
+    "extractionVMs": 0,
+    "productionSecrets": 0,
+    "jobStartedAt": "2026-11-10T00:36:11Z",
+    "jobCompletedAt": "2026-11-10T00:38:17Z"
+  },
+  "originals": {
+    "jobLogReads": 1,
+    "artifactZipReads": 0,
+    "streamsVerified": 16,
+    "streamBytes": 57830,
+    "files": [
+      {
+        "phase": "red",
+        "label": "migration-bootstrap",
+        "stream": "stdout",
+        "file": "red-migration-bootstrap-stdout.log",
+        "bytes": 1152,
+        "sha256": "6aadc99e9a5710ba9df1b4d7cd83e03cbcc75c7cd7e5824469aff0194a7341f3",
+        "gitBlob": "e98c7d6f2348663a81a858f5ca364a3fcd8041af"
+      },
+      {
+        "phase": "red",
+        "label": "migration-bootstrap",
+        "stream": "stderr",
+        "file": "red-migration-bootstrap-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "phase": "red",
+        "label": "e2e-setup",
+        "stream": "stdout",
+        "file": "red-e2e-setup-stdout.log",
+        "bytes": 20970,
+        "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6",
+        "gitBlob": "48822312808ecf4bb1e5330acc96320eeddb0dcb"
+      },
+      {
+        "phase": "red",
+        "label": "e2e-setup",
+        "stream": "stderr",
+        "file": "red-e2e-setup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "phase": "red",
+        "label": "environment-bind",
+        "stream": "stdout",
+        "file": "red-environment-bind-stdout.log",
+        "bytes": 153,
+        "sha256": "5a4e37a1d875a77f6400ab890f1db689a88d5c170045642c8818a6d83ce1a465",
+        "gitBlob": "e0d68accce347cff1dd5c9d1a031c918624f5549"
+      },
+      {
+        "phase": "red",
+        "label": "environment-bind",
+        "stream": "stderr",
+        "file": "red-environment-bind-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "phase": "red",
+        "label": "action-read-egress",
+        "stream": "stdout",
+        "file": "red-action-read-egress-stdout.log",
+        "bytes": 7185,
+        "sha256": "08149c200abe80b0075a4642f0ab06f3dbf783aa98bbbe847d3be82f583a0d32",
+        "gitBlob": "904f858bca323e03ba7cc15139967e9604617f23"
+      },
+      {
+        "phase": "red",
+        "label": "action-read-egress",
+        "stream": "stderr",
+        "file": "red-action-read-egress-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "phase": "green",
+        "label": "migration-bootstrap",
+        "stream": "stdout",
+        "file": "green-migration-bootstrap-stdout.log",
+        "bytes": 1152,
+        "sha256": "a34e5098aad4a8245a3879b28a9b9163e65c7b6239db828040c76a6d3287e9c6",
+        "gitBlob": "b494f84fb2423e75b4aeb9311c26a71cbd65236e"
+      },
+      {
+        "phase": "green",
+        "label": "migration-bootstrap",
+        "stream": "stderr",
+        "file": "green-migration-bootstrap-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "phase": "green",
+        "label": "e2e-setup",
+        "stream": "stdout",
+        "file": "green-e2e-setup-stdout.log",
+        "bytes": 20970,
+        "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6",
+        "gitBlob": "48822312808ecf4bb1e5330acc96320eeddb0dcb"
+      },
+      {
+        "phase": "green",
+        "label": "e2e-setup",
+        "stream": "stderr",
+        "file": "green-e2e-setup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "phase": "green",
+        "label": "environment-bind",
+        "stream": "stdout",
+        "file": "green-environment-bind-stdout.log",
+        "bytes": 153,
+        "sha256": "3b8cafa3252a101b5777188ad96b4745abe828e03b79c11730ea0fb1f82b5a6c",
+        "gitBlob": "b45eb4994ecc212a4100a8386d38db063d0ea7b6"
+      },
+      {
+        "phase": "green",
+        "label": "environment-bind",
+        "stream": "stderr",
+        "file": "green-environment-bind-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "phase": "green",
+        "label": "action-read-egress",
+        "stream": "stdout",
+        "file": "green-action-read-egress-stdout.log",
+        "bytes": 6095,
+        "sha256": "3b6d5c0c9a88bf02660dbfa6a9758ccee3d0eba6caec1aaf0021349ff7f40e42",
+        "gitBlob": "4b198e7b47bab2dbfc673749477970af4f1a5aa5"
+      },
+      {
+        "phase": "green",
+        "label": "action-read-egress",
+        "stream": "stderr",
+        "file": "green-action-read-egress-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    ]
+  },
+  "cleanup": {
+    "runId": "42729547296",
+    "attempt": "1",
+    "containerName": "issue1512-taskruns-pg-42729547296-1",
+    "networkName": "issue1512-taskruns-net-42729547296-1",
+    "startedAt": "2026-11-10T00:38:08.119Z",
+    "stopped": true,
+    "containerRemoved": true,
+    "networkRemoved": true,
+    "errors": [],
+    "containerId": "132946b0c977170810a8d7d75bd25ae27fa516a8091b78da75935f311673a422",
+    "networkId": "8ad74105f6e416e954ffd4f135ef9488b01faa3a0c56e43a4deefa7f9d6f28c2",
+    "finishedAt": "2026-11-10T00:38:09.286Z"
+  },
+  "closure": {
+    "opsBranch": "ops/1512-task-runs-pg-20261110",
+    "workflowJobIf": "false",
+    "manifestEnabled": false,
+    "closingRunVerification": "to be attached after this closure commit becomes the branch head"
+  },
+  "evidence": [
+    {
+      "path": "runner-receipt.json",
+      "sha": "2a48c926303e0ee77a91e7e81cf6d6a65c5e8bc6"
+    },
+    {
+      "path": "cleanup.json",
+      "sha": "4b45c8994a07658ef19047eb6de4c1225e1d6d83"
+    },
+    {
+      "path": "database-reset.json",
+      "sha": "6ccec2d0d587d4b43790665ccf2e53d181b6d42e"
+    },
+    {
+      "path": "independent-tap-verification.json",
+      "sha": "60486797d30e628d3e9b0eae56d141a9fdddc0c5"
+    },
+    {
+      "path": "terminal-run.json",
+      "sha": "6a3a2398b0445c69651cb9b9b789d8f137468e4a"
+    },
+    {
+      "path": "terminal-jobs.json",
+      "sha": "324e81619d51e1836221fa55e4e735bc8f4e355e"
+    },
+    {
+      "path": "artifact-metadata.json",
+      "sha": "ddaf8db429ee15c009e20497e4391686632f0f8d"
+    },
+    {
+      "path": "admission-proof.json",
+      "sha": "81127ee1480f322a5d6306af9f3a06b55e708225"
+    },
+    {
+      "path": "original-job-response.json",
+      "sha": "c77ee0491f6cfce8a331edd4281119df0709d799"
+    },
+    {
+      "path": "original-job.log",
+      "sha": "8b19126197dd3beb9d013cb1f46059b8ba0bc2b8"
+    },
+    {
+      "path": "commands/red-migration-bootstrap-stdout.log",
+      "sha": "e98c7d6f2348663a81a858f5ca364a3fcd8041af"
+    },
+    {
+      "path": "commands/red-migration-bootstrap-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "commands/red-e2e-setup-stdout.log",
+      "sha": "48822312808ecf4bb1e5330acc96320eeddb0dcb"
+    },
+    {
+      "path": "commands/red-e2e-setup-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "commands/red-environment-bind-stdout.log",
+      "sha": "e0d68accce347cff1dd5c9d1a031c918624f5549"
+    },
+    {
+      "path": "commands/red-environment-bind-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "commands/red-action-read-egress-stdout.log",
+      "sha": "904f858bca323e03ba7cc15139967e9604617f23"
+    },
+    {
+      "path": "commands/red-action-read-egress-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "commands/green-migration-bootstrap-stdout.log",
+      "sha": "b494f84fb2423e75b4aeb9311c26a71cbd65236e"
+    },
+    {
+      "path": "commands/green-migration-bootstrap-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "commands/green-e2e-setup-stdout.log",
+      "sha": "48822312808ecf4bb1e5330acc96320eeddb0dcb"
+    },
+    {
+      "path": "commands/green-e2e-setup-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "commands/green-environment-bind-stdout.log",
+      "sha": "b45eb4994ecc212a4100a8386d38db063d0ea7b6"
+    },
+    {
+      "path": "commands/green-environment-bind-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "commands/green-action-read-egress-stdout.log",
+      "sha": "4b198e7b47bab2dbfc673749477970af4f1a5aa5"
+    },
+    {
+      "path": "commands/green-action-read-egress-stderr.log",
+      "sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ],
+  "scope": "This validates the exact task-runs reader change and retained authorization behavior. Native budget and deployed production acceptance remain separate pending gates; no feature/main publication was performed by this runner."
+}

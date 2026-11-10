@@ -1,0 +1,19 @@
+Created retained migration test database: bootstrap_3c282eb9f8bb4300bceedf21af4e2c67
+Created migration test schema: bootstrap_app_c2e03fc8931c4a889a8775245edfd4b4
+Verified 261 migrations from empty CI schema, current app/workspace columns, rerun ledger, and populated baseline replay (shared)
+Retained migration test schemas: bootstrap_app_c2e03fc8931c4a889a8775245edfd4b4
+✔ pnpm migrate bootstraps empty shared target and safely reruns (1729.072885ms)
+Created retained migration test database: bootstrap_54800bc5f93b4c57999170c938ada946
+Created migration test schema: bootstrap_app_233a795161a54a2c9d02a15ba8584d96
+Created migration test schema: bootstrap_ws_f8ecb7c41da44ea48e656697cf5cf74f
+Verified 261 migrations from empty CI schema, current app/workspace columns, rerun ledger, and populated baseline replay (split)
+Retained migration test schemas: bootstrap_app_233a795161a54a2c9d02a15ba8584d96, bootstrap_ws_f8ecb7c41da44ea48e656697cf5cf74f
+✔ pnpm migrate bootstraps empty separate targets and safely reruns (1640.725409ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3756.775181

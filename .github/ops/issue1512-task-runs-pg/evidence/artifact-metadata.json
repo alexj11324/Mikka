@@ -1,0 +1,23 @@
+{
+  "artifacts": [
+    {
+      "id": 13723942265,
+      "name": "issue1512-task-runs-pg-42729547296-attempt-1",
+      "size_in_bytes": 19616,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13723942265",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13723942265/zip",
+      "expired": false,
+      "created_at": "2026-11-10T00:38:10Z",
+      "expires_at": "2026-11-17T00:38:09Z",
+      "updated_at": "2026-11-10T00:38:10Z",
+      "digest": "sha256:bc213746c126a77e1bf1b1e281261c19a0e8f756a1a8efbfbd11ba312d3cbd1a",
+      "workflow_run": {
+        "id": 42729547296,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "ops/1512-task-runs-pg-20261110",
+        "head_sha": "fa33ec67c1b89aa0251c578276b09b7c85aa5c90"
+      }
+    }
+  ]
+}

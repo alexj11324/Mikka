@@ -1,6 +1,6 @@
 {
   "schema": "issue1512-task-runs-pg17-v1",
-  "enabled": true,
+  "enabled": false,
   "repository": "alexj11324/Mikka",
   "opsBranch": "ops/1512-task-runs-pg-20261110",
   "admissionMessage": "issue1512 task-runs PG admit 20261110",
@@ -69,5 +69,8 @@
     "apps/desktop/test/db-query-diagnostics.cjs": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
     "apps/desktop/test/db-query-operations.cjs": "9011b6edb7296c8872d3e311074529a49987b575",
     "apps/desktop/test/db-query-unattributed-sources.cjs": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
-  }
+  },
+  "closedReason": "Completed one actual RED/GREEN run; original command output verified and owned PostgreSQL container/network deleted",
+  "acceptedRunId": 42729547296,
+  "acceptedJobId": 129543779965
 }

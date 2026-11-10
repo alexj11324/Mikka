@@ -1,0 +1,235 @@
+{
+  "red": {
+    "cases": [
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 1,
+        "name": "task run rows keep the newest owner run and the 200-row limit without unused fields"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 2,
+        "name": "one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 3,
+        "name": "task thread lists retain exact titles, summaries and privacy while details retain full errors"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 4,
+        "name": "team link reads page through all authorized pairs and retain explicit-id scope checks"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 1,
+        "name": "identity projections are bounded and every read has a fixed action source"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 2,
+        "name": "both actions preserve owner, peer, missing and null-issue boundaries"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 3,
+        "name": "the changes result still returns valid checkpoints and rejects unreadable gzip"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 4,
+        "name": "the newest checkpoint follows only the same owner and workspace chain"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 5,
+        "name": "a cyclic chain fails before returning checkpoint content"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 6,
+        "name": "suspension and removal are read afresh, including Bot threads without an issue"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 5,
+        "name": "thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 1,
+        "name": "the existing no-links option keeps the exact real predicate and avoids two pages of unused links"
+      },
+      {
+        "indent": 4,
+        "status": "not ok",
+        "number": 2,
+        "name": "the real task-run action reads no team metadata and still reads current tenant membership"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 3,
+        "name": "token pinning and foreign-workspace denial remain on the original action path"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 4,
+        "name": "suspension and removal are fresh on every call even with trusted principal provenance"
+      },
+      {
+        "indent": 0,
+        "status": "not ok",
+        "number": 6,
+        "name": "task-run visibility skips unused team metadata without weakening fresh workspace authority"
+      }
+    ],
+    "summary": {
+      "tests": 16,
+      "pass": 14,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "failures": [
+      {
+        "indent": 4,
+        "status": "not ok",
+        "number": 2,
+        "name": "the real task-run action reads no team metadata and still reads current tenant membership"
+      },
+      {
+        "indent": 0,
+        "status": "not ok",
+        "number": 6,
+        "name": "task-run visibility skips unused team metadata without weakening fresh workspace authority"
+      }
+    ]
+  },
+  "green": {
+    "cases": [
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 1,
+        "name": "task run rows keep the newest owner run and the 200-row limit without unused fields"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 2,
+        "name": "one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 3,
+        "name": "task thread lists retain exact titles, summaries and privacy while details retain full errors"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 4,
+        "name": "team link reads page through all authorized pairs and retain explicit-id scope checks"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 1,
+        "name": "identity projections are bounded and every read has a fixed action source"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 2,
+        "name": "both actions preserve owner, peer, missing and null-issue boundaries"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 3,
+        "name": "the changes result still returns valid checkpoints and rejects unreadable gzip"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 4,
+        "name": "the newest checkpoint follows only the same owner and workspace chain"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 5,
+        "name": "a cyclic chain fails before returning checkpoint content"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 6,
+        "name": "suspension and removal are read afresh, including Bot threads without an issue"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 5,
+        "name": "thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 1,
+        "name": "the existing no-links option keeps the exact real predicate and avoids two pages of unused links"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 2,
+        "name": "the real task-run action reads no team metadata and still reads current tenant membership"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 3,
+        "name": "token pinning and foreign-workspace denial remain on the original action path"
+      },
+      {
+        "indent": 4,
+        "status": "ok",
+        "number": 4,
+        "name": "suspension and removal are fresh on every call even with trusted principal provenance"
+      },
+      {
+        "indent": 0,
+        "status": "ok",
+        "number": 6,
+        "name": "task-run visibility skips unused team metadata without weakening fresh workspace authority"
+      }
+    ],
+    "summary": {
+      "tests": 16,
+      "pass": 16,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "failures": []
+  },
+  "targetDiagnostic": "not ok 2 - the real task-run action reads no team metadata and still reads current tenant membership\n      ---\n      duration_ms: 8.174932\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:9:8786'\n      failureType: 'testCodeFailure'\n      error: |-\n        task runs consume only the predicate, never team settings or link pages\n        \n        3 !== 0\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 0\n      actual: 3\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:485:14)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/action-read-egress.db.test.ts:473:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)\n      ...",
+  "originalsVerified": 16
+}
