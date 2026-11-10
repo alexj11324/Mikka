@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "batch": 1782,
+  "sourceCommit": "ce6ad923bbb449023783052d0848db22e4360f1d",
+  "sourceTree": "dffda64a4975b22cfc649908a8c5e19749ea8a96",
+  "synthetic": "08aea3e5533412337d531ca0dc1f77fc06565f60",
+  "productParents": [
+    "e3c0b0e050515986a8e42cc15ce0a3de15b8e88c",
+    "ab2d00a43a79d35380b4d2db9014a3792fea63ca"
+  ],
+  "syntheticParents": [
+    "ab2d00a43a79d35380b4d2db9014a3792fea63ca",
+    "ce6ad923bbb449023783052d0848db22e4360f1d"
+  ],
+  "readerCommit": "d77b0c8eb27aa27b738dc0b51e253324f641756b",
+  "readerRunId": 42769106208,
+  "readerAttempt": 1,
+  "readerJobId": 129672456182,
+  "readerLog": {
+    "bytes": 109370,
+    "sha256": "11c692750674ab75bf9a279fd5b95fed37baa6b534d1b5623c49a227ecd1a375"
+  },
+  "originalClosedJson": {
+    "bytes": 95665,
+    "sha256": "10860f1046121bc74f640bfed3bc0f53b28223eac3c60083498a394a31c199f8",
+    "trailingNewline": false
+  },
+  "checks": {
+    "reviewedReaderFullSource": true,
+    "eachFixReviewedAgainstActualProducer": true,
+    "wholeTreeConservation": true,
+    "actualReaderRunAndJobSuccess": true,
+    "rawClosedJsonReadBackAndHashVerified": true,
+    "rootProjectionReplay": true,
+    "freshProductChecks": {
+      "total": 45,
+      "success": 41,
+      "originalConditionalSkips": 4
+    }
+  },
+  "archiveCount": 6,
+  "archiveBytes": 15342134,
+  "archiveMembers": 323,
+  "retainedReaderFailures": [
+    {
+      "runId": 42767660674,
+      "jobId": 129667849307,
+      "logBytes": 12982,
+      "logSha256": "cda1aa387f1208598ef9ca6eee7c7aa0308b73717673dfb07564d74c37cb865f",
+      "reason": "Fixed Vitest 5.0.5 per-assertion status is skipped; reader had incorrectly required pending."
+    },
+    {
+      "runId": 42768028245,
+      "jobId": 129669026833,
+      "logBytes": 12979,
+      "logSha256": "07a759917709518961410fe34490a8968cd057692b989645edf4c80344c36260",
+      "reason": "Reader omitted escaped-apostrophe smoke check and inferred lifecycle order from function definition placement."
+    },
+    {
+      "runId": 42768596399,
+      "jobId": 129670844756,
+      "logBytes": 12996,
+      "logSha256": "0966ae6cdcba87ec9814e61c5fc3bc8b557d9d6e14273352beaab1267f846a05",
+      "reason": "Reader incorrectly required a finally electron-close label after lifecycle had already successfully closed the process."
+    }
+  ],
+  "actualNativeCleanupProjection": {
+    "smoke": [
+      "browser-close",
+      "electron-close",
+      "daemon-drain",
+      "native-resources",
+      "workspace-generated-name",
+      "lease-release"
+    ],
+    "lifecycle": [
+      "browser-close",
+      "daemon-drain",
+      "native-resources",
+      "fixtures",
+      "workspace-generated-name",
+      "lease-release"
+    ],
+    "allPassed": true,
+    "orderIsNotAdditionalGate": true,
+    "lifecycleClosesBeforeSettingPassed": true
+  },
+  "limitations": [
+    "This fixed selected PG XML has 41 testcases including 36 required named cases; the complete 80-script/334-file PG run is separately proven by original CI logs.",
+    "Image model replies are explicitly synthetic and do not establish production subscription acceptance.",
+    "Native cold startup samples are measured, without an additional speed pass gate.",
+    "No production accounts, model APIs, provider resources or original product tests were accessed or rerun by this reader."
+  ],
+  "passed": true
+}
