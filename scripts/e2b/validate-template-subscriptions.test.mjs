@@ -65,7 +65,7 @@ const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscriptio
 }] })
 
 test('the production gate logs in as SMOKE without pinning an owner workspace or bot', async () => {
-  const workflow = await readFile(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
+  const workflow = await readFile(new URL('../../.github/workflows/e2b-runtime-release.yml', import.meta.url), 'utf8')
   assert.match(workflow, /secret-name: SMOKE_OWNER_EMAIL/)
   assert.match(workflow, /secret-name: SMOKE_OWNER_PASSWORD/)
   assert.doesNotMatch(workflow, /ACME_DEMO_|MIKKA_ACCEPTANCE_(?:WORKSPACE|BOT)_ID:/)

@@ -803,7 +803,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "83690e72095683aef1961e15b399dab4abaac18d56f67e04357e6decf722173d"
+      "sourceHash": "2b96bd139451ae1f1abdd1a92ac6cce82af51e64c15aa550f18eeba591271bc3"
     },
     {
       "path": "/mikka/api/device-tokens/[tokenId]/revoke",
