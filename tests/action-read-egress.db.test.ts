@@ -476,12 +476,12 @@ test('task-run visibility skips unused team metadata without weakening fresh wor
       assert.equal(result.value.live.ownerId, owner)
       assert.equal(result.value.live.workspaceId, selected)
       assert.deepEqual(result.value.live.revisions, revisions, 'the same pre-data Live revision still reaches the caller')
-      assert.equal(result.reads.filter(read => read.fields.join(',') === 'id,kind'
+      assert.equal(result.reads.filter(read => read.fields.join(',') === 'id,kind,organizationId'
         && read.text.includes('from "mikka_workspaces"')).length, 1, 'the operation still performs its fresh workspace-membership read')
       assert.ok(result.reads.every(read => read.route === '/actions/task-runs/read'))
       sub.diagnostic(JSON.stringify({ read: 'task-run-visibility', selectedRows: result.value.items.length,
         teamMetadataQueries: teamReads(result.reads).length, freshWorkspaceMembershipReads: result.reads.filter(read =>
-          read.fields.join(',') === 'id,kind' && read.text.includes('from "mikka_workspaces"')).length }))
+          read.fields.join(',') === 'id,kind,organizationId' && read.text.includes('from "mikka_workspaces"')).length }))
       assert.equal(teamReads(result.reads).length, 0, 'task runs consume only the predicate, never team settings or link pages')
       assert.deepEqual((await poll(personal)).items.map(row => row.runId), [personalRun])
     })
