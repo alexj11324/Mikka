@@ -1,6 +1,6 @@
 {
   "schema": "issue1512.local-node22-dispatch-request.v1",
-  "enabled": true,
+  "enabled": false,
   "requestId": "20261110-local-node22-formal-a1",
   "repository": "alexj11324/Mikka",
   "branch": "fix/1512-daemon-fixture-executable-20261109",
@@ -29,7 +29,7 @@
     "token": "Ephemeral repository GITHUB_TOKEN with contents:read/actions:write only on this job; never emitted or persisted.",
     "postAcceptedMetadataReads": 1
   },
-  "state": "Prepared executable but unreferenced. Publish only after Root review and a readback of the fixed repaired formal branch. Skip dispatch when any run already exists for this exact target.",
+  "state": "Closed dispatcher request. Do not dispatch this request again; retain the archived receipt and actual target run.",
   "sourceBoundary": "Only repository API metadata is read by this controller. It dispatches existing workflow409752684 on the verified branch; it does not modify or execute product source.",
   "closure": "After the single controller job is terminal, publish a normal closing commit with guard false, enabled false and actions write removed. Record skipped closing run. Accepted204 is not failure: record acceptance and perform one bounded discovery GET; if indexing is pending, continue external metadata inspection without another POST. The formal workflow is monitored independently.",
   "documentation": [

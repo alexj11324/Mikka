@@ -12,12 +12,11 @@ concurrency:
 jobs:
   dispatch:
     if: >-
-      ${{ github.run_attempt == 1 && startsWith(github.event.head_commit.message, 'ci: dispatch fixed issue1512 local Node22 20261110-formal-a1') }}
+      ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
-      actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
