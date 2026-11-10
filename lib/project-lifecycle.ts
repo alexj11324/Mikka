@@ -68,7 +68,11 @@ async function lockedProject<T>(reader: ProjectReader, workspaceId: string, id: 
     } catch (error) {
       // Project callers must not receive the generic Task refusal for a
       // missing or inaccessible Project policy.
-      if (error instanceof ActionFailureError && error.code === 'issueNotFound') throw new ActionFailureError('projectNotFound')
+      if (error instanceof ActionFailureError && error.code === 'issueNotFound') {
+        const missing = new ActionFailureError('projectNotFound')
+        missing.cause = error
+        throw missing
+      }
       throw error
     }
   })

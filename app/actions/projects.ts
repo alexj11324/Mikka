@@ -165,7 +165,7 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
       return db.transaction(async application => {
         await lockResourcesAccess(application, context.user.id, [
           ...projectReferences.map(reference => ({ reference: reference!, action: 'canSteer' as const })),
-          { reference: { kind: 'task' as const, id: parsed.data.issueId, workspaceId: context.workspaceId }, action: 'canManageAccess' as const },
+          { reference: { kind: 'task' as const, id: parsed.data.issueId, workspaceId: context.workspaceId }, action: 'canSteer' as const },
         ], true)
         const [task] = await application.select().from(issues).where(and(eq(issues.id, parsed.data.issueId), issueVisibilityPredicate(context.user.id, { allowedIds: [], workspaceIds: [context.workspaceId] }))).for('update')
         if (!task) throw new ActionFailureError('issueNotFound')

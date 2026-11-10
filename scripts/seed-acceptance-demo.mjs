@@ -84,6 +84,14 @@ try {
       await projects.query(`INSERT INTO workspace_projects (id,"userId","workspaceId",name,summary,description,status,priority,lead,"leadUserId",team,"startDate","targetDate",properties,"issueIds",revision)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$2,$2,'Mikka','2026-10-20','2026-11-25',$9,'[]',1)`, [id(`project-${g}`), guest.id, seedWorkspace.id, group.name, group.summary, `${group.summary}\n\n此项目为 Acceptance Guest 的可编辑演示数据。`, group.status, ['high', 'urgent', 'normal'][g], JSON.stringify(properties)])
       await projects.query('INSERT INTO workspace_project_members ("projectId","workspaceId","userId") VALUES ($1,$2,$3)', [id(`project-${g}`), seedWorkspace.id, guest.id])
+      // Projects live in the Workspace database; their content ACL is an APP
+      // row keyed by the same stable id. Seeded demo data must be readable by
+      // the same current ACL readers as a Project created through the API.
+      // This APP write is intentionally outside the WS transaction: a later WS
+      // rollback can leave only an unreachable policy, never an unguarded row.
+      await main.query(`INSERT INTO resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
+        VALUES ('project',$1,$2,$3,$4,'created') ON CONFLICT(kind,id) DO NOTHING`,
+      [id(`project-${g}`), seedWorkspace.id, guest.id, seedWorkspace.kind === 'team' ? 'shared' : 'private'])
       await projects.query('INSERT INTO workspace_project_tasks ("projectId","workspaceId","issueId") SELECT $1,$2,task FROM unnest($3::uuid[]) task', [id(`project-${g}`), seedWorkspace.id, group.tasks.map((_, i) => id(`issue-${g}-${i}`))])
       await projects.query('INSERT INTO workspace_project_events (id,"userId","projectId",message) VALUES ($1,$2,$3,$4) ON CONFLICT (id) DO NOTHING', [id(`event-${g}`), guest.id, id(`project-${g}`), '演示项目已建立，任务、里程碑与负责人已关联。'])
     }

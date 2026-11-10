@@ -38,6 +38,8 @@ test('Project archive and strict deletion preserve canonical work and frozen his
     const id = randomUUID()
     await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
       values($1,$2,$3,'Pristine','','','planned','none','','','','','[]',1)`, [id, owner, workspace.id])
+    await connection.query(`insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
+      values('project',$1,$2,$3,'shared','created')`, [id, workspace.id, owner])
     return id
   }
 

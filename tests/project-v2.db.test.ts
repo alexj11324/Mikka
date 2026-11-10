@@ -12,6 +12,7 @@ import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
 import { backfillProjectV2 } from '../scripts/project-v2-backfill.mjs'
+import { backfillProjectResourceAccess } from '../scripts/resource-acl-backfill.mjs'
 
 const url = process.env.E2E_DATABASE_URL
 if (url && !disposableDatabase()) throw new Error('Project v2 tests require a loopback *_e2e database')
@@ -141,6 +142,10 @@ test('Project v2: split database migration, canonical relationships and live ten
     await workspace.query('DELETE FROM workspace_project_tasks WHERE "issueId"=$1', [initialTasks[0]])
     await backfillProjectV2(application, workspace)
     assert.equal((await workspace.query('SELECT 1 FROM workspace_project_tasks WHERE "issueId"=$1', [initialTasks[0]])).rowCount, 0, 'retry never restores a removed canonical link from legacy JSONB')
+    // Production migrate runs the resource ACL backfill after Project v2. The
+    // fixture must apply the same step before exercising current readers; the
+    // backfill reads the canonical Workspace and relation columns above.
+    await backfillProjectResourceAccess(application, workspace)
 
     const { pool } = await import('../lib/db'); applicationModule = pool
     const { workspacePool } = await import('../lib/workspace-db'); workspaceModule = workspacePool
@@ -244,6 +249,8 @@ test('Project v2: split database migration, canonical relationships and live ten
       assert.equal((await application.query(`SELECT content->'attrs'->'mikka'->>'project' AS project FROM issues WHERE id=$1`, [initialTasks[1]])).rows[0].project, null, 'move does not recreate the retired project-name authority')
       await backfillProjectV2(application, workspace)
       assert.equal((await workspace.query('SELECT "projectId" FROM workspace_project_tasks WHERE "issueId"=$1', [initialTasks[1]])).rows[0].projectId, createdId)
+      assert.equal((await application.query(`SELECT visibility FROM resource_access_policies WHERE kind='task' AND id=$1`, [initialTasks[1]])).rows[0].visibility, 'shared',
+        'a member reorganizing shared Projects must not privatize another owner\'s shared Task')
     })
 
     await t.test('same names and stale JSON never establish membership; renames follow stable IDs', async () => {

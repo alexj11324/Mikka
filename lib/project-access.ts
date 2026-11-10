@@ -28,11 +28,15 @@ function projectMembership(reader: ProjectReader, workspaceId: string) {
  * tenant of a human who belongs to more than one. */
 export async function accessibleProjectReferences(reader: ProjectReader, workspaceId: string): Promise<ResourceReference[]> {
   if (!z.uuid().safeParse(workspaceId).success) return []
+  // A pinned token Workspace that disagrees with the caller's selected tenant
+  // is an explicit denial, never an empty listing that hides the mismatch.
+  const scope = taskReaderScope(reader)
+  if (scope.workspaceId && scope.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   const tenants = await activeTaskWorkspaces(reader, workspaceId)
   if (!tenants.length) return []
   const { rows } = await db.execute<{ id: string; workspaceId: string }>(sql`select id,"workspaceId" from resource_access_policies
     where kind='project' and "workspaceId"=any(${sql.param(tenants.map(tenant => tenant.id))}::uuid[])
-      and mikka_resource_acl_allowed('account',${taskReaderScope(reader).userId},"workspaceId",kind,id,'canReadContent')`)
+      and mikka_resource_acl_allowed('account',${scope.userId},"workspaceId",kind,id,'canReadContent')`)
   return rows.map(row => ({ ...row, kind: 'project' }))
 }
 
