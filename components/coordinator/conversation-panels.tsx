@@ -1,12 +1,12 @@
 'use client'
 
 import * as taskConversationSlot from '@ui-slot/task-conversation'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { authClient } from '@/lib/auth-client'
-import { findThreadIssue } from '@/app/actions/agents'
+import { findThreadIssue, type IssueThreadDetail } from '@/app/actions/agents'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/load-error'
 import { TaskDetailPlacementContext } from '@/components/slots/task-detail-contract'
@@ -35,12 +35,18 @@ const nothing = () => {}
 function TaskTab({ issueId, origin, onOpenTask }: { issueId: string; origin: string; onOpenTask: (id: string) => void }) {
   const t = useTranslations('Shell.panel.task')
   const { data: session } = authClient.useSession()
-  const placement = useMemo(() => ({ onExpand: () => navigate({ issue: issueId }), expandLabel: t('openPage') }), [issueId, t])
+  // Expand saves what is still being written first, as leaving the task page does; a save that fails keeps the tab.
+  const flush = useRef<(() => Promise<boolean>) | null>(null)
+  const registerFlush = useCallback((next: (() => Promise<boolean>) | null) => { flush.current = next }, [])
+  const placement = useMemo(() => ({
+    onExpand: () => { void (flush.current?.() ?? Promise.resolve(true)).then(saved => { if (saved) navigate({ issue: issueId }) }, () => {}) },
+    expandLabel: t('openPage'),
+  }), [issueId, t])
   const user = session?.user
   if (!user) return <TabLoading />
   return <TaskDetailPlacementContext value={placement}>
     <TaskDetail id={issueId} thread={null} origin={origin} user={{ id: user.id, name: user.name, email: user.email }} navigation={NO_PAGER}
-      onOpen={onOpenTask} onSaved={nothing} onDirty={nothing} onClose={nothing} onDeleted={nothing} onRegisterFlush={nothing} />
+      onOpen={onOpenTask} onSaved={nothing} onDirty={nothing} onClose={nothing} onDeleted={nothing} onRegisterFlush={registerFlush} />
   </TaskDetailPlacementContext>
 }
 
@@ -49,9 +55,10 @@ function TaskTab({ issueId, origin, onOpenTask }: { issueId: string; origin: str
  * thread's own panel, as the right column drew it (components/workspace/thread-column.tsx). ← and its task link open
  * the task's tab; a thread it names (a subagent, a review) opens a tab of its own.
  */
-function ThreadTab({ runId, issueId: known, name, onOpenTask }: { runId: string; issueId?: string | null; name?: string; onOpenTask: (id: string) => void }) {
+function ThreadTab({ runId, issueId: known, name, onOpenTask, onTitle }: { runId: string; issueId?: string | null; name?: string; onOpenTask: (id: string) => void; /** A thread the chat does not know names its tab once read. */ onTitle?: (runId: string, title: string) => void }) {
   const t = useTranslations('IssueThreads')
   const { data: looked, error, mutate } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
+  useThreadTitle(known ?? looked?.issueId ?? null, runId, onTitle)
   if (!known && looked === undefined) return error ? <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div> : <TabLoading />
   if (!known && looked === null) return <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div>
   const issueId = known ?? looked?.issueId ?? null
@@ -60,6 +67,20 @@ function ThreadTab({ runId, issueId: known, name, onOpenTask }: { runId: string;
   return TaskConversation && issueId && toTask
     ? <TaskConversation key={issueId} issueId={issueId} runId={runId} name={name} onBack={toTask} onOpenThread={openThread} onOpenTask={toTask} />
     : <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onOpenThread={openThread} onOpenTask={toTask} />
+}
+
+/**
+ * "<code> › <title>" for a thread the chat has no source for: its name from the conversation's own read of it (the
+ * panel's `issue-thread` key, read here without a fetch of its own) and its task's code.
+ */
+function useThreadTitle(issueId: string | null, runId: string, onTitle?: (runId: string, title: string) => void) {
+  const on = Boolean(onTitle && issueId)
+  const { data: thread } = useSWR<IssueThreadDetail>(on ? ['issue-thread', issueId, runId] : null, null)
+  const { data: issue } = useSWR(on ? ['work-tab-issue', issueId] : null, () => import('@/app/actions/issues').then(actions => actions.getIssue(issueId!)), { revalidateOnFocus: false })
+  const code = issue && !issue.error ? issue.issue.identifier : null
+  const name = thread?.thread.detail?.name || thread?.thread.prompt.trim() || (issue && !issue.error ? issue.issue.title : null)
+  const title = code && name ? `${code} › ${name}` : name || code
+  useEffect(() => { if (title) onTitle?.(runId, title) }, [title, runId, onTitle])
 }
 
 type Opened = { kind: 'task' | 'thread'; id: string }
@@ -82,6 +103,8 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
   }, [])
   const openTask = useCallback((id: string) => open('task', id), [open])
   const openRun = useCallback((id: string) => open('thread', id), [open])
+  const [learned, setLearned] = useState<Record<string, string>>({})
+  const learn = useCallback((runId: string, title: string) => setLearned(current => current[runId] === title ? current : { ...current, [runId]: title }), [])
   useEffect(() => {
     if (!on) return
     const release = setWorkAreaOpener({ task: openTask, thread: openRun })
@@ -100,7 +123,10 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
   const tabs = opened.map((item): ThreadPanelTab => {
     if (item.kind === 'task') return { id: `task:${item.id}`, title: names.task(item.id), content: <TaskTab key={item.id} issueId={item.id} origin={origin} onOpenTask={openTask} /> }
     const thread = names.thread(item.id)
-    return { id: `thread:${item.id}`, title: thread.title, content: <ThreadTab key={item.id} runId={item.id} issueId={thread.issueId} name={thread.name} onOpenTask={openTask} /> }
+    // A run the chat has no source for (opened from the Overview, search or another thread) learns its title once read.
+    const unknown = thread.issueId === undefined
+    return { id: `thread:${item.id}`, title: (unknown && learned[item.id]) || thread.title,
+      content: <ThreadTab key={item.id} runId={item.id} issueId={thread.issueId} name={thread.name} onOpenTask={openTask} onTitle={unknown ? learn : undefined} /> }
   })
   const work: ThreadScreenProps['work'] = on ? { tabs, ...reveal } : undefined
   return { work, openTask }
