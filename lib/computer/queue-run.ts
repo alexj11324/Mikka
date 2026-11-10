@@ -52,7 +52,9 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   /** Internal host placement grant, never a model/tool argument. The current owner source can only narrow it. */
   allowLocalRecovery?: true
   sourceEventId?: string
-  /** Evidence-only entry provenance (lib/run-origin.ts). A host continuation copies its source run's. */
+  /** Evidence-only entry provenance (lib/run-origin.ts). A host continuation
+   * copies its source run's. Every production caller passes it explicitly;
+   * lib/run-origin-writes.test.ts enumerates the call sites. */
   origin?: RunOrigin; originRef?: RunOriginRef | null
 }, existing?: PoolClient, factoryContext?: Pick<ProfileFactoryContext, 'attemptId' | 'sourceEventId'>) {
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
@@ -67,6 +69,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     throw error
   }
   // Validate the entry before taking a connection: an invalid ref must not leak one.
+  // The web default is for legacy tests; the write guard enumerates every
+  // production caller so none can rely on it silently.
   const entry = resolveRunOrigin({ explicit: input.origin ? { origin: input.origin, originRef: input.originRef } : null, defaultOrigin: 'web' })
   const client = existing ?? await pool.connect()
   try {

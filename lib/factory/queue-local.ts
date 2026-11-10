@@ -9,7 +9,9 @@ import { continuedRunPolicyCeiling } from '@/lib/computer/run-model'
 export async function queueTaskRun(userId: string, input: Parameters<typeof queueRun>[1] & { needsSpec?: boolean }, botId: string | null = null,
   execution?: Parameters<typeof queueRun>[3], sourceEventId?: string, dispatch: RunDispatchOrigin = {}) {
   // Entry provenance never enters the selection digest: a retry from another
-  // entry is the same work, not a conflict.
+  // entry is the same work, not a conflict. Production callers pass `origin`;
+  // lib/run-origin-writes.test.ts enumerates them so a new caller cannot rely
+  // on this default.
   const source = dispatch.source ?? null
   const origin = dispatch.origin ?? 'web'
   input = { ...input, policyCeiling: await continuedRunPolicyCeiling(pool, userId, input.issueId, input.threadRunId, input.policyCeiling) }
