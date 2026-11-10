@@ -17,7 +17,7 @@ const capture = (name: string) => async (...args: unknown[]) => { calls.push({na
 const forbidden = () => { throw Error('No DB, provider or device in catalogue tests') }
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
-stub('../../workflows/coordinator/steps.ts', {recordProjectDecisionStep: capture('project-decision'), composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), githubCallAllowed: async () => true, listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy'), githubMcp: capture('github'), findRepository: capture('find-repository'), getFactoryTask: capture('factory-read-legacy-id'), readFactoryTask: capture('factory-read-scoped-id')})
+stub('../../workflows/coordinator/steps.ts', {recordProjectDecisionStep: capture('project-decision'), composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), githubCallAllowed: capture('github-allowed'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy'), githubMcp: capture('github'), findRepository: capture('find-repository'), getFactoryTask: capture('factory-read-legacy-id'), readFactoryTask: capture('factory-read-scoped-id')})
 stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }) })
 let registry: typeof import('../../workflows/coordinator/tools')
 let service: typeof import('./service')
@@ -273,6 +273,8 @@ test('tools a saved version gets from the ledger keep the scheduled read-only an
   await invoke(tools, 'github_call', {name: 'get_me', arguments: {}})
   await invoke(tools, 'find_repository', {name: 'mikka'})
   assert.deepEqual(calls, [
+    // The Ask-mode gate runs before the call reaches GitHub, with the same owner and Bot.
+    {name: 'github-allowed', args: [owner, bot]},
     {name: 'github', args: [owner, {name: 'get_me', arguments: {}}, scope]},
     {name: 'find-repository', args: [owner, {name: 'mikka'}, scope]},
   ])
