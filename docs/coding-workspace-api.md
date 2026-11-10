@@ -147,6 +147,91 @@ membership are rechecked. The existing `run_messages` table provides the
 idempotent owner message. Reusing `requestId` with different message content is
 a conflict. Device wake happens after the owning transaction commits.
 
+## Git status, history and safe writes
+
+Git reads reuse the Files identity and the Diff review contracts; there is no
+second Git fact source. Status, history, revert and restore all observe the
+same checkout authorized by the existing Run/repository binding.
+
+```ts
+GET  /api/runs/{runId}/workspace/git/status?workspaceId&repoId
+GET  /api/runs/{runId}/workspace/git/history?workspaceId&repoId&cursor&limit
+GET  /api/runs/{runId}/workspace/git/checkpoints?workspaceId&repoId
+GET  /api/runs/{runId}/workspace/git/commits/{commitSha}/diff?workspaceId&repoId&baseSha&cursor&limit
+
+POST /api/runs/{runId}/workspace/git/revert/preview   { workspaceId, repoId, operationId, snapshotId, path, target }
+POST /api/runs/{runId}/workspace/git/revert           { workspaceId, repoId, operationId }
+POST /api/runs/{runId}/workspace/git/undo             { workspaceId, repoId, operationId, undoOf }
+POST /api/runs/{runId}/workspace/git/checkpoints/restore/preview { workspaceId, repoId, operationId, checkpointId }
+POST /api/runs/{runId}/workspace/git/checkpoints/restore         { workspaceId, repoId, operationId }
+```
+
+Live metadata is `git status --porcelain=v2 --branch -z --untracked-files=all`
+plus `git log`, both read through the pinned descriptor and re-checked against
+HEAD before the receipt is returned. Each status entry carries its index and
+worktree state, path/previous path, mode, size, raw content hash and an opaque
+stat fence (`workingVersion`). `binary` is `null` when the bounded observation
+could not decide; `lfs` marks Git LFS pointers. Unlike the file reader, status
+and history are read-only metadata: content hashes describe bytes, they do not
+expose them. A commit diff is the existing `diff_snapshot`/`diff_file` contract
+with `selection: {source: 'commit', baseSha, headSha}`.
+Upstream ahead/behind is reported only when the configured remote resolves to
+the same canonical repository key, so a local `origin` cannot invent a
+relationship with someone else's GitHub repository.
+
+A revert is bound to one immutable local Diff snapshot and to exactly what the
+person reviewed:
+
+1. Preview re-derives the snapshot version and the file's exact bytes on the
+   device. The server keeps the reverted bytes server-side, verifies them
+   against the snapshot's blob proofs and returns a `previewVersion` that binds
+   operation, revision, file, selected hunk fingerprints and both working-tree
+   fences. Previews live five minutes and are single-use intents.
+2. Apply recomputes `previewVersion`, re-reads HEAD and the exact content
+   fence, and only then writes. A changed HEAD, changed bytes, changed mode, a
+   retried different body or an expired preview is refused without touching the
+   worktree. Reapplying the same completed operation returns the stored result;
+   a device that already observes the confirmed result reports idempotent
+   success instead of writing twice.
+3. Hunk reverts recompute the working diff deterministically and splice only
+   the selected new-side ranges with their old side; unselected hunks cannot be
+   smuggled into the operation. Whole-file reverts restore a create's absence or
+   the base blob with its reviewed mode.
+
+Writes never touch the index, refs, checkout, branches or remotes: no commit,
+no reset, no stash, no force push. Files are written through the pinned parent
+descriptor with `O_NOFOLLOW`, an exact stat fence, and `O_EXCL` for creates, so
+a concurrent creator is never overwritten. A path that is a symlink, a hardlink,
+a device/mount escape, or outside the visible policy is refused. Creates require
+an existing directory chain; a checkpoint that would need a new directory is
+reported as a conflict instead of being half applied.
+
+The daemon captures the pre-operation bytes only for the operation it just
+applied. The server masks that capture, refuses to keep it when masking would
+alter content (`undoReason: 'secret'`), when it exceeds the bounds
+(`'too_large'`) or when the device could not prove it (`'none'`), and keeps it
+for 24 hours. Only the most recent applied operation on that Run/repository is
+undoable, one undo claim is allowed at a time, and Undo re-proves every current
+`after` state before writing, so it can never revert someone else's later edit.
+
+Checkpoint restore is a dry run first: the server inflates the retained
+`git diff --binary` bound to the reviewed checkpoint revision, and the device
+runs `git apply --binary --3way` in a throwaway detached worktree. The plan
+lists added/modified/deleted/renamed files and per-file conflicts; content,
+delete/modify, rename, submodule, binary and unavailable cases are reported as
+conflicts. A preview with any conflict is never applied. A clean plan copies
+only the exact resulting bytes, after every current file fence has been proved,
+and then re-observes HEAD and the whole status. `restorable` is false for
+checkpoints whose payload was never retained or was superseded.
+
+A stopped, released or unreachable Run does not fabricate live Git state.
+Status and history return `availability: 'offline'`, `frozen: true`, an explicit
+`reason` (`machine_unavailable`, `checkout_unavailable`, `no_live_checkout`),
+retained facts only -- the Run publication, the checkpoint review revision and
+the latest commit snapshot -- and an empty commit list with `nextCursor: null`.
+Writes, revert and restore require a live checkout and return
+`workspace_machine_unavailable`.
+
 ## Resource and file boundaries
 
 | Resource | Bound |
@@ -164,6 +249,16 @@ a conflict. Device wake happens after the owning transaction commits.
 | Unexpired mentions per owner | 100 |
 | Public POST body | 16 KiB before JSON decoding |
 | Internal device receipt body | 4 MiB before JSON decoding |
+| Git status entries per observation | 5,000; a larger checkout returns `truncated: true` and is read in path order |
+| Commits per history page | 50 maximum; `limit` default 30; cursor is bound to the observed HEAD |
+| Git read buffer | 8 MiB of porcelain/log output; at most 16 MiB of file bytes are classified per status scan |
+| One revertable/restorable file | 1 MiB of observable content; larger files are `workspace_unsupported` or a `binary` conflict |
+| Public Git POST body | 32 KiB before JSON decoding |
+| Revert preview commitment lifetime | 5 minutes; single use; `previewVersion` is SHA-256 |
+| Undo capture | At most 100 files and 1 MiB of masked content; the latest applied operation only |
+| Undo retention | 24 hours after the operation applied |
+| Checkpoint patch | 2 MiB decoded; inflated only from the Run's retained checkpoint, never from a caller patch |
+| Checkpoint plan | 5,000 action entries and 5,000 conflicts |
 
 Git-tracked files and nonignored untracked files are listed. Git ignore rules
 apply to untracked files; being tracked does not bypass the protected-path
@@ -231,6 +326,18 @@ All public responses use `Cache-Control: private, no-store` and
 | `workspace_checkout_unavailable` | 409 | No matching journal checkout or repository |
 | `workspace_version_conflict` | 409 | Changed file/HEAD/inventory/machine binding or superseded Run |
 | `workspace_request_expired` | 409 | Expired command or mention |
+| `workspace_git_revert_conflict` | 409 | The worktree no longer matches the confirmed revert preview |
+| `workspace_git_revert_unsupported` | 422 | Rename/copy, submodule, binary or oversized target cannot be reverted this way |
+| `workspace_git_restore_conflict` | 409 | The checkpoint plan has conflicts, or the checkout changed since the preview |
+| `workspace_git_restore_unavailable` | 422 | No retained, restorable payload for that checkpoint or revision |
+| `workspace_git_undo_unavailable` | 409 | No undoable operation, expired capture, already undone or claimed undo |
+| `workspace_git_operation_conflict` | 409 | Same operation ID with a different body, or an operation in an unusable state |
+| `workspace_git_operation_expired` | 409 | The confirmation token outlived its five-minute window |
+
+Git write failures are never silently retried. A conflict means the checkout
+changed; re-read status, re-preview and confirm the new diff. A preview that was
+released because the device was unreachable may be retried with the same
+operation ID, because the device still re-proves every fence before writing.
 
 Human-inbox submission also preserves the existing action conflict codes.
 Do not infer retry authority from a generic 409; use the code and require a
@@ -247,6 +354,18 @@ inventory. It runs authority/concurrency/secret tests and a real local TCP API
 through `createApiHandler`, the complete daemon and its default `HttpServerLink`.
 The latter uses retained fixture code and never starts a model. `REQUIRE_DB=1`
 fails when the isolated database is missing; a local skip is not a pass.
+
+Git porcelain/log parsing and the revert evidence/commitment arithmetic are
+source-only tests in `pnpm test:coding-workspace-diff`
+(`lib/coding-workspace/git/parse.test.ts`, `evidence.test.ts`). The Git
+acceptance in `pnpm test:coding-workspace-db`
+(`lib/coding-workspace/git/operations.db.test.ts`) runs real PostgreSQL 17,
+real Git worktrees and the complete daemon write path: live status/history,
+a file revert that survives a retry and is then undone, a rejected apply after
+the file or HEAD changed, a hunk-only revert, a clean checkpoint restore with
+Undo, a conflicting plan, and the member/stranger/other-tenant/stopped-machine
+refusals. Only the device gateway wake is replaced; authority, receipts, CAS,
+masking and the filesystem writer stay real.
 
 `Coding Workspace Files acceptance` consumes a successful canonical main E2B
 release. Before checkout or smoke credentials it verifies the actual workflow,
