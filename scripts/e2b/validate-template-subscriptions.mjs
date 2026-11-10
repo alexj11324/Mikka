@@ -108,6 +108,33 @@ function startupFailure(record) {
     ...(code === 'startup_http_error' && Number.isInteger(httpStatus) && httpStatus >= 400 && httpStatus <= 599 ? { httpStatus } : {}) }
 }
 
+/** Socket metadata only. Unknown fields and native close/error text never leave the driver. */
+function liveObserverDiagnostic(value) {
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const timestamp = value => typeof value === 'string' && value.length === 24 && Number.isFinite(Date.parse(value))
+    && new Date(value).toISOString() === value
+  const optionalTime = value => value === null || timestamp(value)
+  const count = value => Number.isSafeInteger(value) && value >= 0
+  const first = value?.firstFailure, reads = value?.detailReads
+  if (!object(value) || value.version !== 1 || !object(first) || !object(reads)
+    || !['close', 'error'].includes(first.event) || !timestamp(first.at)
+    || typeof first.scopeHash !== 'string' || !/^[a-f0-9]{16}$/.test(first.scopeHash)
+    || !(first.readyState === null || Number.isInteger(first.readyState) && first.readyState >= 0 && first.readyState <= 3)
+    || !['openedAt', 'readyAt', 'lastNotificationAt'].every(key => optionalTime(value[key])) || !timestamp(value.shutdownAt)
+    || !count(reads.started) || !count(reads.completed) || reads.completed > reads.started
+    || !optionalTime(reads.lastCompletedAt) || typeof reads.inFlightAtFailure !== 'boolean') return undefined
+  return {
+    version: 1,
+    firstFailure: { event: first.event, at: first.at, scopeHash: first.scopeHash, readyState: first.readyState,
+      ...(first.event === 'close' && Number.isInteger(first.code) && first.code >= 0 && first.code <= 65535 ? { code: first.code } : {}),
+      ...(first.event === 'close' && typeof first.wasClean === 'boolean' ? { wasClean: first.wasClean } : {}) },
+    openedAt: value.openedAt, readyAt: value.readyAt, lastNotificationAt: value.lastNotificationAt,
+    detailReads: { started: reads.started, completed: reads.completed, lastCompletedAt: reads.lastCompletedAt,
+      inFlightAtFailure: reads.inFlightAtFailure },
+    shutdownAt: value.shutdownAt,
+  }
+}
+
 /** Mirrors only the final receipt's binding predicates, never their raw inputs. */
 function bootstrapReceiptChecks(kind, proof, sample, expectedScope) {
   const harness = kind === 'claude' ? 'claude_code' : 'codex'
@@ -135,6 +162,8 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
   const sample = acceptance?.samples?.[0]
   const sampleFailure = startupFailure(sample)
   const failure = sampleFailure ?? startupFailure(acceptance)
+  const liveObserver = error && sample?.status === 'failed' && sampleFailure?.phase === 'execution_watch'
+    && sampleFailure.code === 'startup_live_disconnected' ? liveObserverDiagnostic(sample.liveObserver) : undefined
   const dispatchRefusal = error && sampleFailure?.phase === 'coordinator_stream' && sampleFailure.code === 'startup_dispatch_refused'
     ? { code: DISPATCH_REFUSAL_CODES.has(sample?.dispatchRefusal?.code) ? sample.dispatchRefusal.code : 'unavailable' } : undefined
   const harness = kind === 'claude' ? 'claude_code' : 'codex'
@@ -186,6 +215,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
     ...(error && failure ? { failure } : {}),
     ...(correlation ? { startupCorrelation: correlation } : {}),
     ...(dispatchRefusal ? { dispatchRefusal } : {}),
+    ...(liveObserver ? { liveObserver } : {}),
     cleanupErrors: [...cleanup], ...(observation ? { observation } : {}), ...(fixture ? { fixture } : {}),
     ...(cleanupFailures.length ? { cleanupFailures: cleanupFailures.slice(0, 8), cleanupFailuresTruncated: cleanupFailures.length > 8 } : {}),
     // Only the existing strict candidateReceipt can populate this proof. A

@@ -1,0 +1,274 @@
+{
+  "schema": "issue1512-native-live-routing-validation/v1",
+  "enabled": true,
+  "draft": false,
+  "opsBranch": "ops/1512-task-runs-pg-20261110",
+  "admissionMessage": "ops: issue1512 live routing GREEN validation 58275b1d-3520-445d-b6c5-23dba8a01bd6",
+  "expiresAt": "2026-11-10T07:30:00.000Z",
+  "previousOps": {
+    "sha": "a4f88bb178f893eee979bdf3f34262e0f8f661c5",
+    "tree": "8c2f71d1a87654072a939d64e6754ef22c2b19da"
+  },
+  "merge": {
+    "sha": "9238b7092a39fce7edde2e488aef516c0b544677",
+    "tree": "03712f2c1ca03ee45e61e124bd430fc9d1a377c9",
+    "parents": [
+      "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "ab2d00a43a79d35380b4d2db9014a3792fea63ca"
+    ]
+  },
+  "source": {
+    "sha": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb",
+    "tree": "7b1f2dcafc18918611938cba3716a4237d8a1f64",
+    "parents": [
+      "9238b7092a39fce7edde2e488aef516c0b544677"
+    ],
+    "files": {
+      "lib/swr/cache-scope.ts": "1c3422f77e61a2ef1cf101efaed67a13b46a81df",
+      "lib/desktop-rpc/bootstrap.ts": "76c482cdce59e211fb679c0dbfc42f21f9c67338",
+      "lib/desktop-rpc/wire.ts": "d58fd454ac8d94caecbabf7a21843fa5daf098b3",
+      "tests/read-cache-scope.db.test.ts": "bbdae2625952b475c3488384bbd48c876887a805",
+      "lib/live/channel.test.ts": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "lib/live/channels.test.ts": "91c96118f0040a4594eb57e76f58befa2150fe99",
+      "apps/desktop/src/renderer/workspace-live.test.ts": "bc2f68f44162a73e5ce9f07f0f3642b96ad4ad38",
+      "lib/desktop-rpc/wire.test.ts": "2170c999f99b2cfa2f6bbf6667b9de56296a0ada",
+      "apps/desktop/scripts/workspace-live.test.mjs": "8f687f41404290db088f508c36d2f74fdc8a4de0",
+      "apps/desktop/scripts/installed-workspace.test.mjs": "c56ad4fecacb7ae0f05ebde56a40618d1f6bb7fa",
+      "apps/desktop/scripts/renderer-startup.test.mjs": "627f02c8e027e1b9f5f1adf5289036ccf2e84e6a",
+      "apps/frontend/scripts/auth-only-bootstrap.test.mjs": "a2c0ca2e7c6cb65b29046b279422a0baa8b09eae",
+      "scripts/acceptance/cloud-startup.test.mjs": "ded31e330bef5e83f00659b4383e41b53afd1b81",
+      "scripts/e2b/validate-template-subscriptions.test.mjs": "06dceefec477df850087b47002266e612dddb63a",
+      "scripts/acceptance/run-observability-browser.mjs": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+      "scripts/acceptance/run-observability-browser.test.mjs": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+      "scripts/e2b/validate-template-subscriptions.mjs": "f8561bbc3ce02dd53f4ac7ae487bbb8a70da0d3f",
+      "package.json": "b254dbd3926832705e3710bb28b81fbbced2a12a",
+      "apps/frontend/package.json": "f304311903743e2177d2aa4d1962cd10f56773c8",
+      "apps/desktop/package.json": "733aba8cb0bfd26f2c7c7302ad02bb9a92bb0e0f",
+      "scripts/lint-ui.mjs": "9c2f44bc94cf1fbfe4fa8097caba8afc20b93268",
+      ".oxlintrc.json": "42edbae82af95c335d45f316c494091950b1b82e",
+      "apps/desktop/oxlint.json": "7706be89045f6bea033656d0ba16303164ff3ca0",
+      "apps/desktop/src/renderer/app.tsx": "cfe14be276e863cd1ffa38dff4d99c7ddf2eb737",
+      "apps/desktop/src/renderer/bootstrap.ts": "d6c6fec8c8aff2df511fc17e6ff46f679cf1f868",
+      "apps/desktop/src/renderer/installed-workspace.tsx": "ddeb2420392a0abb233bc3742cd539805424bc13",
+      "apps/desktop/src/renderer/workspace-live.ts": "58b875fdc69eb5d44524936801aaa5308cd1006e",
+      "apps/desktop/src/renderer/workspace.tsx": "25891b5f8d7dc7a5d6b3cd4688789898052855fd",
+      "hooks/use-live-key.tsx": "56a960cb5ce3c3da45126e222f92f5070a26dfdb",
+      "lib/live/channel.ts": "61cdf48b28ab9260f5567300f2411cb555b13427",
+      "lib/live/channels.ts": "c40864fe9386855994d3a4ece9480639514d85aa",
+      "lib/live/preparation.ts": "7377678b777279de0ab21717749743fcce446d73"
+    }
+  },
+  "driverSha256": "fd47b3ab2f5abef1b2fbb368135f7d0c42bbf69ad6b80c8c82072adfe739bc81",
+  "driverBlob": "39f80294ee396b8b0ceb369bf41e8da25d1efffc",
+  "workflowBlob": "ea0877277da2b470be1b52fa7411ca84f48e3d0c",
+  "closedWorkflowBlob": "4961e05d943593c68d184b330ff402f3599b09bf",
+  "controlPaths": [
+    ".github/ops/issue1512-native-live-routing-validation/driver.mjs",
+    ".github/ops/issue1512-native-live-routing-validation/manifest.json",
+    ".github/workflows/issue1512-native-live-routing-validation.yml"
+  ],
+  "productPaths": [
+    "apps/desktop/scripts/renderer-startup.test.mjs",
+    "apps/desktop/scripts/workspace-live.test.mjs",
+    "apps/desktop/src/renderer/app.tsx",
+    "apps/desktop/src/renderer/bootstrap.ts",
+    "apps/desktop/src/renderer/installed-workspace.tsx",
+    "apps/desktop/src/renderer/workspace-live.test.ts",
+    "apps/desktop/src/renderer/workspace-live.ts",
+    "apps/desktop/src/renderer/workspace.tsx",
+    "hooks/use-live-key.tsx",
+    "lib/desktop-rpc/bootstrap.ts",
+    "lib/desktop-rpc/wire.ts",
+    "lib/live/channel.ts",
+    "lib/live/channels.test.ts",
+    "lib/live/channels.ts",
+    "lib/live/preparation.ts",
+    "lib/swr/cache-scope.ts",
+    "package.json",
+    "scripts/acceptance/run-observability-browser.mjs",
+    "scripts/acceptance/run-observability-browser.test.mjs",
+    "tests/read-cache-scope.db.test.ts"
+  ],
+  "commonBlobs": {
+    "pnpm-lock.yaml": "171de02abdaf1b9c414aa19aeb07690ef692bafe",
+    "scripts/run-db-tests.mjs": "ea9a1c2092019ad82e3e796df7a4cf9816ded4cc",
+    "scripts/setup-e2e-db.mjs": "aaf8571eae3dcdb2f88b0dba5feb5a0878e8af41",
+    "scripts/test-accounts/bootstrap.mjs": "3e29dba60095fb14a3efab57cd1571c6d3a8d8cb",
+    "tests/migrate-empty-db.test.mjs": "8b77ac4fb0757735c70af1fe0bc0e2a6a2744678",
+    "tests/fixtures/activity-runtime.mjs": "1f510854af9306cfb6b73b274d73a398f2bdfa05",
+    "tests/helpers/read-metrics.ts": "5c836b5b3663ba8152319f92bc603a7fcc545b90",
+    "tests/helpers/e2e-target.mjs": "2627923cc99fe2e9c14d88e6949b59d49d5d1640",
+    "drizzle/20261101020200_personal_workspace_kind.sql": "3425bcdd9bce7dafd038d61b708795b36be71ffd"
+  },
+  "unitGroups": [
+    {
+      "label": "live-routing-ts",
+      "args": [
+        "--test-reporter=tap",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/live/channel.test.ts",
+        "lib/live/channels.test.ts",
+        "apps/desktop/src/renderer/workspace-live.test.ts",
+        "lib/desktop-rpc/wire.test.ts"
+      ]
+    },
+    {
+      "label": "renderer-bootstraps",
+      "args": [
+        "--test-reporter=tap",
+        "--test",
+        "apps/desktop/scripts/workspace-live.test.mjs",
+        "apps/desktop/scripts/installed-workspace.test.mjs",
+        "apps/desktop/scripts/renderer-startup.test.mjs",
+        "apps/frontend/scripts/auth-only-bootstrap.test.mjs"
+      ]
+    },
+    {
+      "label": "startup-and-template-validators",
+      "args": [
+        "--test-reporter=tap",
+        "--test",
+        "scripts/acceptance/cloud-startup.test.mjs",
+        "scripts/e2b/validate-template-subscriptions.test.mjs"
+      ]
+    }
+  ],
+  "typeChecks": [
+    {
+      "label": "root-types",
+      "args": [
+        "exec",
+        "tsrs",
+        "--noEmit"
+      ]
+    },
+    {
+      "label": "frontend-types",
+      "args": [
+        "--filter",
+        "@mikka/frontend",
+        "typecheck"
+      ]
+    },
+    {
+      "label": "desktop-renderer-types",
+      "args": [
+        "--filter",
+        "@mikka/desktop",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.renderer.json"
+      ]
+    }
+  ],
+  "expectedUnitTests": {
+    "live-routing-ts": 100,
+    "renderer-bootstraps": 54,
+    "startup-and-template-validators": 126
+  },
+  "testPath": "tests/read-cache-scope.db.test.ts",
+  "originalTestBlob": "4580af203f7471e7b4c2a75ad9df4fd9c8e5b1fd",
+  "originalTestBytes": 5971,
+  "expectedPgTests": 15,
+  "additionalLintPaths": [
+    "scripts/acceptance/run-observability-browser.mjs",
+    "scripts/acceptance/run-observability-browser.test.mjs",
+    "scripts/e2b/validate-template-subscriptions.mjs",
+    "scripts/e2b/validate-template-subscriptions.test.mjs"
+  ],
+  "lintPaths": [
+    "apps/desktop/scripts/renderer-startup.test.mjs",
+    "apps/desktop/scripts/workspace-live.test.mjs",
+    "apps/desktop/src/renderer/app.tsx",
+    "apps/desktop/src/renderer/bootstrap.ts",
+    "apps/desktop/src/renderer/installed-workspace.tsx",
+    "apps/desktop/src/renderer/workspace-live.test.ts",
+    "apps/desktop/src/renderer/workspace-live.ts",
+    "apps/desktop/src/renderer/workspace.tsx",
+    "hooks/use-live-key.tsx",
+    "lib/desktop-rpc/bootstrap.ts",
+    "lib/desktop-rpc/wire.ts",
+    "lib/live/channel.ts",
+    "lib/live/channels.test.ts",
+    "lib/live/channels.ts",
+    "lib/live/preparation.ts",
+    "lib/swr/cache-scope.ts",
+    "scripts/acceptance/run-observability-browser.mjs",
+    "scripts/acceptance/run-observability-browser.test.mjs",
+    "scripts/e2b/validate-template-subscriptions.mjs",
+    "scripts/e2b/validate-template-subscriptions.test.mjs",
+    "tests/read-cache-scope.db.test.ts"
+  ],
+  "packageScriptBindings": [
+    {
+      "packagePath": "package.json",
+      "script": "test:device-gateway",
+      "prefix": "node --import tsx --test ",
+      "testToken": "lib/live/channels.test.ts"
+    },
+    {
+      "packagePath": "package.json",
+      "script": "test:device-gateway",
+      "prefix": "node --import tsx --test ",
+      "testToken": "apps/desktop/src/renderer/workspace-live.test.ts"
+    }
+  ],
+  "status": "BOUND FOR ONE ISOLATED FIXED-SOURCE VALIDATION. No test success claimed; ordinary formal Native and production acceptance remain pending.",
+  "beforeEvidence": {
+    "kind": "actual instrumented Native diagnostic; no manufactured missing-export RED",
+    "source": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
+    "lifecycle": "5ea6109ead93772b5ede58170cd20cce067c2be9",
+    "fiveJsonVerification": "5fb9bd39d47f2f7ae81405a5b0d83d8ba49a7baa",
+    "snapshotCausalReview": "e993556bac59d68d013016f2938d4e3920e4f37c"
+  },
+  "candidateEvidence": {
+    "backendManifest": "9298c634e7935b3b898c5e2209dad23e43404ccf",
+    "backendIndependentReview": "9265500119ea12b3e50ee9a8f3e3b3455e8eafe0",
+    "backendRootReview": "833538e00d413a95b653a4678403edf46ab2cd7d",
+    "frontendManifest": "eaab7746ed888c6b245a47e63dfb37112faf70be",
+    "browserAdapter": {
+      "driver": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+      "tests": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+      "priorEvidenceCommit": "bddacb14ba6c96f57438bffbf8d542caae63fce4",
+      "actualNodeTests135": "PASS_ON_FIXED_ADAPTER_AND_CORE_SOURCE_AT_PRIOR_RUN"
+    },
+    "finalRootApproval": "47ecb0539adcba5673b06929a849bbba9e69ae29"
+  },
+  "scope": {
+    "runtime": {
+      "node": "24.22.1",
+      "pnpm": "10.34.3",
+      "os": "ubuntu-22.04",
+      "nodeOptions": "--max-old-space-size=4096",
+      "postgres": "postgres:17"
+    },
+    "exactlyOneDependencyInstall": true,
+    "actionsCache": false,
+    "persistentPnpmCache": false,
+    "nodeCompileCache": false,
+    "tsxCache": false,
+    "postgres": {
+      "freshDatabase": true,
+      "target": "127.0.0.1:5432/mikka_e2e",
+      "allTargetsSame": true,
+      "requireDb": true,
+      "ownership": "container+network unique run/attempt/SHA labels; no pre-existing resource adoption",
+      "cleanup": "always; stop exact owned container; rm --volumes; verify every observed volume absent; remove exact owned empty network; verify absence"
+    },
+    "originals": "Every command preserves stdout/stderr raw bytes with length+SHA256 and base64 log framing before parsing. No truncation or unknown failure relabeling.",
+    "checks": "Independent statuses; any unit/lint/type/PG/source proof failure makes final result FAIL and never suppresses ordinary remaining groups/owned cleanup.",
+    "lint": "Repository oxlint dependency only: root changed shared/backend/validator/browser paths use root config; pnpm --filter @mikka/desktop lint uses its existing complete src/scripts command and oxlint.json, with a guard that every changed desktop TS/TSX/MJS is within src/scripts. Fixed main validators/browser adapter included; existing scripts/lint-ui.mjs runs once.",
+    "noProductionCredentials": true,
+    "noNativeRerun": true,
+    "noAcceptanceWindowOrBudgetChange": true,
+    "expectedPgCountIsPrediction": true,
+    "allRuntimeResultsPending": true,
+    "sqlAndBytes": "Source contains no extra statement for the hint. Additional kind/owner projected bytes are not zero cost; original full-window SQL/bytes acceptance still required.",
+    "unitCounts": "Exact source-derived 100/54/126 counts are mandatory at admission and per complete group. Static count proof is not an execution result; real full TAP with all-pass and no skip/todo/cancel/fail remains required."
+  },
+  "expectedUnitTestsProofBlob": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e"
+}

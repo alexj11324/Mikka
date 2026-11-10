@@ -24,9 +24,6 @@ if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin &
   // Lets the page reserve room for the macOS traffic lights and draw its own drag region.
   // The preload runs before <html> exists, so wait for the document.
   // A translucent window (macOS vibrancy) also marks the page, so only its rail and list go see-through.
-  if (process.argv.includes('--mikka-1512-read-diagnostic')) {
-    try { contextBridge.exposeInMainWorld('__mikka1512ReadDiagnosticEnabled', true) } catch { /* absent diagnostics remain incomplete */ }
-  }
   const translucent = process.argv.includes('--mikka-translucent')
   const markPlatform = () => {
     document.documentElement.dataset.desktopPlatform = process.platform

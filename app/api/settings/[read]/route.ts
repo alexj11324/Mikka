@@ -17,7 +17,7 @@ import { listAuditLog } from '@/app/actions/audit-log'
 import { getModelOrder } from '@/app/actions/model-order'
 import { listBots, listWorkspaceBots } from '@/app/actions/bots'
 import { getApiKeys } from '@/app/actions/model-api-keys'
-import type { AuditFilter } from '@/lib/audit/cursor'
+import { auditScopeQuery } from '@/lib/audit/cursor'
 import type { SettingsRead } from '@/lib/settings-read'
 
 /**
@@ -50,7 +50,7 @@ const READS: Record<SettingsRead, (query: URLSearchParams) => Promise<unknown>> 
   bots: () => listBots(),
   'workspace-bots': () => listWorkspaceBots(),
   'api-keys': query => getApiKeys(workspace(query)),
-  audit: query => listAuditLog({ filter: (query.get('filter') ?? undefined) as AuditFilter | undefined, cursor: query.get('cursor') }, workspace(query)),
+  audit: query => listAuditLog({ ...auditScopeQuery(query), cursor: query.get('cursor') } as Parameters<typeof listAuditLog>[0], workspace(query)),
 }
 
 /**

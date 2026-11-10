@@ -1,48 +1,16 @@
 'use client'
 
-import { ReadResponseError } from '@/lib/swr/retry'
-import { settingsKeys } from '@/lib/swr/keys'
-import { useState } from 'react'
-import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { z } from 'zod'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { withBasePath } from '@/lib/base-path'
-import { computerPermissions, type ComputerPermission } from '@/lib/computer/permission'
 import { FieldError } from '@/components/ui/field'
+import { useComputerPolicy } from '@/hooks/settings/use-team-permissions'
 
-const stateSchema = z.discriminatedUnion('enabled', [
-  z.object({ enabled: z.literal(false) }),
-  z.object({ enabled: z.literal(true), permission: z.enum(computerPermissions), canEdit: z.boolean() }),
-])
-type State = z.infer<typeof stateSchema>
-
-const policyPath = (workspaceId: string) => withBasePath(`/api/workspaces/${encodeURIComponent(workspaceId)}/computer-policy`)
-export const computerPolicyKey = settingsKeys.computerPolicy
-export async function readComputerPolicy(workspaceId: string): Promise<State> {
-  const response = await fetch(policyPath(workspaceId), { cache: 'no-store', credentials: 'same-origin' })
-  if (!response.ok) throw new ReadResponseError(response.status)
-  return stateSchema.parse(await response.json())
-}
+export { computerPolicyKey, readComputerPolicy } from '@/hooks/settings/use-team-permissions'
 
 export function ComputerPolicySettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.computerPolicy')
-  const policy = useSWR(computerPolicyKey(workspaceId), () => readComputerPolicy(workspaceId))
-  const state = policy.data ?? null
-  const [pending, setPending] = useState(false)
-  const [changeError, setChangeError] = useState(false)
-  const error = changeError || Boolean(policy.error)
-  const path = policyPath(workspaceId)
-  const refresh = async () => { await policy.mutate() }
-  async function change(permission: ComputerPermission) {
-    setPending(true); setChangeError(false)
-    try {
-      const response = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ permission }) })
-      if (!response.ok) throw new ReadResponseError(response.status)
-      await refresh()
-    } catch { setChangeError(true); await refresh().catch(() => undefined) } finally { setPending(false) }
-  }
+  const { state, error, pending, change } = useComputerPolicy(workspaceId)
   const labels = { allow: t('allow'), deny: t('deny') }
   if (!state) return error ? <FieldError>{t('error')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
   // No cloud computer on this deployment: there is no row to set, and a line saying so would sit apart from everything below it (R-40).

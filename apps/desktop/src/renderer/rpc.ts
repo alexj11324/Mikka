@@ -1,4 +1,3 @@
-import { DE, diagRecord, diagObject, diagNext, diagAction, diagActionCode } from '@/lib/diagnostics/issue1512-native-reads.mjs'
 import { capturePendingReadDispatch, captureReadDispatch } from '@/lib/swr/read-observer'
 import { withBasePath } from '@/lib/base-path'
 import { decode, encodeArgs, DESKTOP_RPC_VERSION } from '@/lib/desktop-rpc/wire'
@@ -17,23 +16,18 @@ const workspaceSelector = () => new URLSearchParams(window.location.search).get(
 export function callAction<T = unknown>(action: string, args: unknown[], isCurrent?: () => boolean): Promise<T> {
   if (!isBatchReadAction(action)) return callRemoteAction(action, args, { ...nativeTransport, isCurrent })
   const onDispatch = isSnapshotReadAction(action) ? capturePendingReadDispatch() : undefined
-  const diagnosticAction = diagAction(action)
-  diagRecord(DE.enqueue, diagnosticAction)
   return enqueueRead(action, args, {
-    diagnosticAction,
     locale: localeOf(window.location.pathname), workspace: workspaceSelector(), currentWorkspace: workspaceSelector, isCurrent,
     ...(onDispatch ? { onDispatch } : {}),
   }, (action, args, context) => callRemoteAction(action, args, { ...nativeTransport, ...context }))
 }
 
-export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale; onDispatch?: () => void; diagnosticActions?: readonly number[] }): Promise<T> {
+export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale; onDispatch?: () => void }): Promise<T> {
   // Web supplies its existing SDK owner generation; bootstrap also fences
   // retired page phases. Native identity authorization remains in main.
   const assertCurrent = (cause?: unknown, response?: Response) => {
     if (transport.isCurrent?.(response) === false) throw new DesktopTransportError('desktop_session_changed', { status: 409, cause })
   }
-  const diagnosticActions = transport.diagnosticActions ?? [diagAction(action)]
-  const diagnosticRequest = diagNext()
   const encoded = await encodeArgs(args)
   assertCurrent()
   let response: Response
@@ -43,8 +37,6 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
   // A pending snapshot may cover the live gap before its response arrives.
   // Completion still requires that response's existing dispatch proof.
   if (prove) transport.onDispatch?.()
-  diagRecord(DE.dispatch, diagnosticRequest, diagActionCode(action), diagObject(prove), transport.endpoint === '/api/desktop/rpc' ? 1 : 2)
-  for (const diagnosticAction of diagnosticActions) diagRecord(DE.dispatchAction, diagnosticRequest, diagnosticAction)
   try {
     response = await fetch(withBasePath(transport.endpoint), {
       method: 'POST',
@@ -54,12 +46,10 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
       body: JSON.stringify({ version: DESKTOP_RPC_VERSION, action, args: encoded }),
     })
   } catch (cause) {
-    diagRecord(DE.response, diagnosticRequest, 0)
     assertCurrent(cause)
     setTransportState('offline')
     throw new DesktopTransportError('desktop_backend_unreachable', { cause })
   }
-  diagRecord(DE.response, diagnosticRequest, response.status)
   assertCurrent(undefined, response)
   if (response.status === 401) {
     setTransportState('unauthenticated')

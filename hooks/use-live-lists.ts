@@ -13,7 +13,6 @@ import { chatKeys, taskRunKeys, threadKeys } from '@/lib/swr/keys'
 import { botListKey, groupListKey, issueListKey, ListReadScopeError, listReadDeadline, listReadPresence, liveListReadOptions, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE, type ListLiveRead } from '@/lib/live/list-read'
 import { fetchScopedGroups, GroupMessagesRequestError } from '@/lib/group-messages'
 import { heldRevision } from '@/lib/live/revisions'
-import { diagCurrentRead, diagWithRead } from '@/lib/diagnostics/issue1512-native-reads.mjs'
 import { snapshotReadFetcher } from '@/lib/swr/read-observer'
 import { useLiveKey } from './use-live-key'
 
@@ -30,14 +29,13 @@ export function useLiveIssueList(ownerId: string, workspaceId: string | undefine
   const { cache } = useSWRConfig()
   const key = workspaceId ? issueListKey(ownerId, workspaceId) : null
   const result = useSWR<IssueRead>(key, async () => {
-    const diagnosticRead = diagCurrentRead()
     await waitForCacheHydration(cache)
     return observeListRead(async () => {
       const cached = cache.get(unstable_serialize(key))?.data as IssueRead | undefined
       const previous: IssueRead = cached?.live?.ownerId === ownerId && cached.live.selectedWorkspaceId === workspaceId ? cached : { items: [] }
       const held = heldListPositions(previous)
       const known = held && held.length === previous.positions?.length ? previous.version : undefined
-      const result = await diagWithRead(diagnosticRead, () => syncIssueList(known, held))
+      const result = await syncIssueList(known, held)
       if (result.error) throw new CacheReadError(result.error)
       const next = result.snapshot
       if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
@@ -70,14 +68,13 @@ export function useLiveThreadList(ownerId: string, paused = false) {
   const { cache } = useSWRConfig()
   const key = threadKeys.list(ownerId)
   const result = useSWR<ThreadRead>(key, async () => {
-    const diagnosticRead = diagCurrentRead()
     await waitForCacheHydration(cache)
     return observeListRead(async () => {
       const cached = cache.get(unstable_serialize(key))?.data as ThreadRead | undefined
       const previous: ThreadRead = cached?.live?.ownerId === ownerId ? cached : { items: [] }
       const held = heldListPositions(previous)
       const known = held && held.length === previous.positions?.length ? previous.version : undefined
-      const result = await diagWithRead(diagnosticRead, () => syncThreadList(known, held))
+      const result = await syncThreadList(known, held)
       if (result.error) throw new CacheReadError(result.error)
       const next = result.snapshot
       if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
