@@ -5,6 +5,7 @@ import type { Pool, PoolClient, QueryResultRow } from 'pg'
 import { TOOL_APPROVAL_TTL_MS, toolApprovalEffectiveStatus, type ToolApprovalMethod, type ToolApprovalState, type ToolApprovalStatus } from '@mikka/protocol/tool-approval'
 import { recordAudit } from '@/lib/audit/record'
 import { RUN_APPROVAL_CHANNEL, notifyChannel } from '@/lib/db/listen'
+import { toolApprovalsChanged } from '@/lib/live/tool-approvals'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { credentialMasker, maskDeep } from '@/lib/secrets/mask'
 import { ApprovalUnavailable, type DeviceActor } from './store'
@@ -87,6 +88,7 @@ export class RunToolApprovalStore {
         `SELECT id,"runId",status,method,tool,input,digest,"inputDigest","policyRevision","expiresAt","createdAt"
          FROM agent_tool_approvals WHERE "runId"=$1 AND "requestId"=$2 FOR UPDATE`, [runId, input.requestId])
       if (!row || row.digest !== digest || row.inputDigest !== inputDigest || row.policyRevision !== input.policyRevision) throw new ApprovalUnavailable('policy_changed')
+      await toolApprovalsChanged(client, actor.userId)
       return stateOf(row)
     }, actor.deviceId)
   }
@@ -140,6 +142,7 @@ export class RunToolApprovalStore {
         metadata: { runId, decision: desired, revision: current.revision },
       })
       await notifyChannel(client, RUN_APPROVAL_CHANNEL, [approvalId])
+      await toolApprovalsChanged(client, userId)
       return { ...stateOf(row), status: desired as ToolApprovalStatus }
     })
   }

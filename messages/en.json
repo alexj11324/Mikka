@@ -4119,6 +4119,22 @@
       "threadModeLocked": "This thread is running. Change the mode after it ends.",
       "threadModeUnavailable": "Could not change the mode. Try again."
     },
+    "approval": {
+      "title": "Needs your approval",
+      "input": "Request",
+      "allow": "Allow once",
+      "deny": "Deny",
+      "approved": "Approved. Waiting for the Agent to run it.",
+      "denied": "Denied.",
+      "expired": "Expired. Nothing ran.",
+      "decided": "Handled.",
+      "method": { "tool": "Tool", "command": "Command", "file_change": "File change", "mcp_tool": "MCP tool" },
+      "approvalAlreadyDecided": "This request was already decided.",
+      "approvalExpired": "This request expired.",
+      "approvalNoLongerApplies": "This request no longer applies.",
+      "approvalUnavailable": "This request is unavailable.",
+      "decideFailed": "Could not send the decision. Try again."
+    },
     "checkEnded": "This independent check has ended. Handle the result in Acceptance.",
     "sendFailed": "Send outcome unconfirmed. Draft kept",
     "stop": "Stop",

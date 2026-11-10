@@ -31,6 +31,7 @@ export const pollingAllowlist = {
   'lib/builtin-gateway/scheduler.ts': local('自托管 cron 调度器替代 Cloudflare cron，不是数据轮询；复用已有 due-timer 和 15 分钟 safety sweep', 1),
   // Web: SWR polling that reads our database.
   'components/workspace/issue-pull-request-link.tsx': db(web, 'a PR with no webhook of ours (linked by hand, or a repository without the app) is re-checked with GitHub every 5 min while visible; a run-delivered PR also re-reads on pull_request_status', 1),
+  'hooks/use-tool-approvals.ts': db(web, 'Ask approval cards reread every 3 s only while the run is live; the run push and the pending_actions push stop it, the timer only covers a missed push (controller ruling, #1735)', 1),
   // Server: loops that re-query our database.
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
   'app/v1/runs/[runId]/tool-approval/route.ts': db(server, 'waitForDecision fallback timer only: waits on LISTEN for the owner decision (one re-read per NOTIFY, one final read at the deadline); a 5 s timer exists only when LISTEN is unavailable', 1),
