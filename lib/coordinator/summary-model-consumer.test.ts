@@ -46,8 +46,8 @@ mock.module('ai', { namedExports: { ...actualAI,
 import { makeSnapshot } from '../agent-kit/definition'
 import { DEFAULT_AGENT_DEFINITION } from '../agent-kit/builtin'
 const id=(n:number)=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
-const selection={type:'subscription' as const,bindingId:id(3),ownerId:'owner',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'saved-model',route:'claude_cpa' as const}
-const snapshot=(subscription=true)=>makeSnapshot(id(8),1,DEFAULT_AGENT_DEFINITION,'saved instructions',subscription?{harness:'ai_sdk',model:selection.modelId,modelSelection:selection}:{harness:'ai_sdk',model:'saved-default'})
+const selection={type:'subscription' as const,bindingId:id(3),ownerId:'owner',actorId:'owner',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'saved-model',route:'claude_cpa' as const}
+const snapshot=(subscription=true)=>makeSnapshot(id(8),1,DEFAULT_AGENT_DEFINITION,'saved instructions',subscription?{harness:'ai_sdk',actorId:'owner',model:selection.modelId,modelSelection:selection}:{harness:'ai_sdk',actorId:'owner',model:'saved-default'})
 test('actual preparePrompt compacts with frozen subscription, preserves provenance, and never calls default on refusal',async()=>{
  process.env.BETTER_AUTH_SECRET='synthetic-test-provenance-secret-000000'
  const sdk=await import('../../workflows/coordinator/steps')

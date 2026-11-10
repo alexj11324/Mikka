@@ -114,7 +114,11 @@ export async function retryOrganizationPolicyOutbox(organizationId?: string) {
         returning r.id,r."deviceId",true as stopped`, [workspaceId])
         notifyStoppedPolicyRuns(pool, stopped.rows.filter(row => row.deviceId))
       }
-      if (receipt.changes.modelPolicy || receipt.changes.modelProviders && policy.allowedModelProviders !== null) await stopRunsForPolicyChange(pool, { kind: 'workspace', workspaceId })
+      if (receipt.changes.modelPolicy || receipt.changes.modelProviders && policy.allowedModelProviders !== null) {
+        await stopRunsForPolicyChange(pool, { kind: 'workspace', workspaceId })
+        const { stopHostedExecutions } = await import('@/lib/hosted-execution-revocation')
+        await stopHostedExecutions(pool, { workspaceId })
+      }
     }
     await workspacePool.query('update mikka_organization_policy_outbox set "deliveredAt"=now() where id=$1', [receipt.id])
   }

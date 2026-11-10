@@ -102,7 +102,7 @@ test('managed subscription routes authorize the existing service and native HTTP
   await t.test('same principal: allowed frozen BYOS models stream through the actual SDK; a second workspace refuses', async () => {
     for (const route of ['codex_cpa', 'claude_cpa'] as const) {
       const botId = await seedBot(pool, one.id, ownerId)
-      const scope = { ownerId, botId, workspaceId: one.id }
+      const scope = { ownerId, actorId: ownerId, botId, workspaceId: one.id }
       const bindingId = await bind(one.id, botId, route)
       const deps = { service: () => service, workspace: async (ownerId: string, workspaceId: string) => { await store.read({ ownerId, workspaceId }) } }
       const frozen = await freezeHostedModelSelection(scope, { harness: 'ai_sdk', model: null }, { type: 'subscription', bindingId }, deps)

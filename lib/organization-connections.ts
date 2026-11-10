@@ -66,7 +66,7 @@ export async function revokeOrganizationConnection(organizationId: string, actor
     await commitIdentityChange({ organizationId, actorId, action: 'organization.connection_revoked', targetId: connectionId }, async tx => {
       const found = await tx.query('SELECT 1 FROM model_api_keys WHERE id=$1 AND "organizationId"=$2 AND ownership=\'organization\' FOR UPDATE', [connectionId, organizationId])
       if (!found.rowCount) throw new GovernanceError('not_found')
-      await tx.query('UPDATE model_api_keys SET "revokedAt"=COALESCE("revokedAt",clock_timestamp()),"updatedAt"=clock_timestamp() WHERE id=$1', [connectionId])
+      await tx.query(`UPDATE model_api_keys SET "revokedAt"=COALESCE("revokedAt",clock_timestamp()),ciphertext='',iv='',"updatedAt"=clock_timestamp() WHERE id=$1`, [connectionId])
       await stopRunsUsingApiKeys(tx, { keyId: connectionId, ownerId: organizationCredentialOwner(organizationId) })
     }, { deferDelivery: true })
   })

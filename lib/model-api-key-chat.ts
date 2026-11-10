@@ -10,7 +10,7 @@ type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 
 async function open(frozen: HostedApiKeySnapshot): Promise<V4Model> {
   const { apiKey, baseUrl } = await openApiKeyForChat(pool, frozen.ownerId, frozen.workspaceId, frozen.keyId, process.env,
-    { model: frozen.modelId, credentialOwnerId: frozen.credentialOwnerId, credentialRevision: frozen.credentialRevision })
+    { actorId: frozen.actorId, model: frozen.modelId, credentialOwnerId: frozen.credentialOwnerId, credentialRevision: frozen.credentialRevision })
   const model = createOpenAICompatible({ name: 'mikka-api-key', baseURL: baseUrl, apiKey }).chatModel(frozen.modelId) as LanguageModel
   if (typeof model === 'string' || model.specificationVersion !== 'v4') throw new Error('subscription_model_unavailable')
   return model

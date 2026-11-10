@@ -37,12 +37,15 @@ export function timedTools(tools: ToolSet, timings: ToolTiming[], now: () => num
 }
 
 /** Retains the Workflow tool loop and the selected model's admission boundary. */
-export async function runHostedWorkflowTurn(runtime: HostedRuntimeSnapshot, tools: ToolSet, options: WorkflowAgentStreamOptions<ToolSet>, scope?: { ownerId:string; botId:string|null }) {
+export async function runHostedWorkflowTurn(runtime: HostedRuntimeSnapshot, tools: ToolSet, options: WorkflowAgentStreamOptions<ToolSet>, scope?: { ownerId:string; actorId:string; botId:string|null }) {
   if (runtime.harness !== 'ai_sdk' || !runtime.model) throw new Error('subscription_model_unavailable')
   if (runtime.modelSelection === undefined && !scope) throw new Error('verification_required')
   if (runtime.modelSelection !== undefined && (!runtime.modelSelection || runtime.model !== runtime.modelSelection.modelId)) throw new Error('subscription_model_unavailable')
+  if (!runtime.actorId || scope && scope.actorId !== runtime.actorId
+    || runtime.modelSelection !== undefined && runtime.modelSelection.actorId !== runtime.actorId
+    || runtime.modelSelection?.type === 'subscription' && (runtime.modelSelection.ownerId !== runtime.actorId || runtime.modelSelection.runOwnerId !== undefined)) throw new Error('verification_required')
   const model = runtime.modelSelection === undefined
-    ? new HostedWorkflowModel(scope!.ownerId,scope!.botId,runtime.model)
+    ? new HostedWorkflowModel(scope!.ownerId,scope!.botId,runtime.model,scope!.actorId)
     : new SubscriptionWorkflowModel(runtime.modelSelection)
   const toolTimings: ToolTiming[] = []
   // The SDK returns an invalid call to the same model as a tool error. Keep

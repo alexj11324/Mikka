@@ -42,12 +42,14 @@ async function reserveAgentExecution(userId: string, botId: string, holder: stri
     instructions = await botInstructions(userId,botId,personalCoordinatorInstructions())
   }
   const { personalPlugins } = await import('@/lib/plugins/runtime')
-  return refusalIsFinal(agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,() => runtime.harness === 'ai_sdk' ? freezeBotModel(scope,{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}) : Promise.resolve({harness:runtime.harness,model:'model' in runtime ? runtime.model ?? null : null}),agentKitDefaults(), client => personalPlugins.snapshot(userId,client,scope.workspaceId)))
+  // This private coordinator is reached only through its authenticated owner
+  // or a verified owner-owned schedule. Group turns pass their sender separately.
+  return refusalIsFinal(agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,() => runtime.harness === 'ai_sdk' ? freezeBotModel({...scope,actorId:userId},{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}) : Promise.resolve({harness:runtime.harness,model:'model' in runtime ? runtime.model ?? null : null}),agentKitDefaults(), client => personalPlugins.snapshot(userId,client,scope.workspaceId)))
 }
 /** Durable model selection also applies when versioned definitions are disabled. */
 export async function botRuntime(userId:string,botId:string|null) {
   'use step'
-  return refusalIsFinal(freezeBotModel({ownerId:userId,botId,workspaceId:null},{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}))
+  return refusalIsFinal(freezeBotModel({ownerId:userId,actorId:userId,botId,workspaceId:null},{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}))
 }
 export async function beforeAgentTool(userId: string, botId: string, executionId: string, callId: string, name: string, nativeScope?: NativeToolScope) {
   'use step'

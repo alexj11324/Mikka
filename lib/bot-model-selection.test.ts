@@ -5,7 +5,7 @@ import type { SubscriptionService } from './subscription-service'
 import type { BotSubscriptionChoice } from './bot-model-choice'
 
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
-const scope = { ownerId: 'alice', botId: null, workspaceId: id(2) }
+const scope = { ownerId: 'alice', actorId: 'alice', botId: null, workspaceId: id(2) }
 const binding = { id: id(3), ownerId: 'alice', consumerId: id(1), workspaceId: id(2), connectionId: id(4), connectionRevision: 7, modelId: 'subscription-model', route: 'claude_cpa' }
 let selected: string | undefined
 let available: { bindingId: string; provider?: string }[] = []
@@ -48,6 +48,7 @@ let keyChoice: { keyId: string; model: string; harness: string } | undefined
 let usableKeys: { id: string; provider: string; baseUrl: string | null; protocol: string; models: string[]; ownerId?: string; mine?: boolean; ownership?: 'organization'; organizationId?: string; organizationName?: string; revision?: number; name?: string; last4?: string }[] = []
 const chatModels: unknown[] = []
 mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports: {
+  assertHostedApiKeyAuthority: async (_query: unknown, actual: {ownerId:string;actorId:string}) => { assert.equal(actual.actorId, actual.ownerId) },
   botApiKeyChoice: async () => keyChoice,
   usableApiKeys: async () => usableKeys,
 } })
@@ -104,7 +105,7 @@ test('A bot freezes its chosen API key; a revoked or unavailable explicit choice
   keyChoice = { keyId: id(9), model: 'deepseek-chat', harness: 'claude_code' }
   usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
   const frozen = await freezeBotModel(botScope, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: 'deepseek-chat', modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat' } })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: 'deepseek-chat', actorId: 'alice', modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', actorId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat' } })
   assert.deepEqual(await resolveFrozenHostedModel(botScope, frozen, noSubscription), { modelId: 'api-key-fixture' })
   assert.equal(chatModels.length, 1)
   await assert.rejects(resolveFrozenHostedModel({ ...botScope, ownerId: 'mallory' }, frozen, noSubscription), { code: 'binding_mismatch' })
@@ -121,10 +122,19 @@ test('A bot freezes its chosen API key; a revoked or unavailable explicit choice
 
 test('Coordinator without a subscription freezes and resolves the configured hosted default', async () => {
   const frozen = await freezeBotModel({ ...scope, workspaceId: null }, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL, actorId: 'alice' })
   assert.equal(workspaceCalls, 1)
   assert.equal(await resolveFrozenHostedModel(scope, frozen, noSubscription), hostedModel)
   assert.deepEqual(hostedCalls, [[scope, COORDINATOR_MODEL]])
+})
+test('a caller without an actual actor cannot select a model, and another actor cannot use a personal choice', async () => {
+  await assert.rejects(freezeBotModel({ ...scope, actorId: undefined } as unknown as typeof scope, noSubscription), { code: 'binding_mismatch' })
+  const peer = { ...scope, actorId: 'bob' }
+  await assert.rejects(freezeBotModel(peer, noSubscription), { code: 'executionModelUnknown' })
+  keyChoice = { keyId: id(9), model: 'deepseek-chat', harness: 'claude_code' }
+  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'], ownerId: 'alice' }]
+  await assert.rejects(freezeBotModel(peer, noSubscription), { code: 'executionModelUnknown' })
+  assert.deepEqual(chatModels, [])
 })
 
 test('a saved choice whose account is gone requires a new explicit choice', async () => {
@@ -142,14 +152,14 @@ test('Mikka 默认 picked in the composer stays hosted while a subscription is b
   savedBinding = { bindingId: binding.id }
   for (const botId of [null, id(1)]) {
     const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
-    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL, actorId: 'alice' })
   }
 })
 
 test('Bot without a subscription replies on the same hosted default as the Coordinator, in its own workspace', async () => {
   const bot = { ...scope, botId: id(1) }
   const frozen = await freezeBotModel({ ...bot, workspaceId: null }, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL, actorId: 'alice' })
   assert.deepEqual(workspaceBots, [bot.botId])
   // Same hosted path as the Coordinator: the hosted model applies admission and billing for this bot's workspace.
   assert.equal(await resolveFrozenHostedModel(bot, frozen, noSubscription), hostedModel)
@@ -280,7 +290,7 @@ test('exhausted platform points never silently switch a hosted choice to BYO bil
     fallback = alternative
     usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
     savedBinding = { bindingId: binding.id }
-    assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+    assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL, actorId: 'alice' })
   }
 })
 
@@ -320,7 +330,7 @@ test('Organization connections appear with their billing owner and freeze the ex
   assert.equal(connection?.options[0].modelId, 'deepseek-chat')
   assert.equal(menu.current.credentialLabel, 'Fixture organization · Shared gateway ····test')
   const frozen = await freezeBotModel({ ...scope, botId: id(1) }, noSubscription)
-  assert.deepEqual(frozen.modelSelection, { type: 'api_key', consumerId: id(1), keyId: id(51), ownerId: 'alice',
+  assert.deepEqual(frozen.modelSelection, { type: 'api_key', consumerId: id(1), keyId: id(51), ownerId: 'alice', actorId: 'alice',
     workspaceId: scope.workspaceId, modelId: 'deepseek-chat', credentialOwnerId: `organization:${organizationId}`,
     credentialRevision: 3, organizationId })
 })

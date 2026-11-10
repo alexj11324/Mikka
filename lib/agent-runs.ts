@@ -223,6 +223,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
     if (input.model !== originalModel || input.modelDispatch?.entry?.harness !== current.agentDefinition.harness) throw new ActionFailureError('executionAccountUnavailable')
     const result = await queueAdmittedRun(userId, {
       ...input, issueId: current.issueId!, repo: repo.remoteUrl,
+      threadRunId: current.id,
       requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
       readOnly: current.agentDefinition.readOnly,
     }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId, current.source,
@@ -306,7 +307,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
       .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
   }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, threadRunId: input.threadRunId, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */

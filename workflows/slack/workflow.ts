@@ -21,7 +21,7 @@ export async function slackTurn(userId: string, threadId: string, text: string) 
   'use workflow'
   try {
     const botId = await slackCoordinatorBot(userId)
-    const agent = new WorkflowAgent({ model: new HostedWorkflowModel(userId,botId,COORDINATOR_MODEL), tools: coordinatorTools(userId, botId, undefined, { coordinator: true, switches: await coordinatorSwitches() }) })
+    const agent = new WorkflowAgent({ model: new HostedWorkflowModel(userId,botId,COORDINATOR_MODEL,userId), tools: coordinatorTools(userId, botId, undefined, { coordinator: true, switches: await coordinatorSwitches() }) })
     const result = await agent.generate({
       instructions: SLACK_INSTRUCTIONS,
       maxRetries: 0,

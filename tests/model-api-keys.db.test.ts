@@ -340,9 +340,14 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL')
     assert.deepEqual(await store.removeApiKey(pool, 'alice', local.id), { removed: false }, 'only the owner removes a key')
     assert.deepEqual(await store.removeApiKey(pool, 'bob', local.id), { removed: true })
-    // Deleting a key deletes the bot choices on it; those bots fall back to the usual order.
+    // Removing a key preserves the old choice as unavailable, preventing an implicit payer change.
     await store.removeApiKey(pool, 'alice', anthropic.id)
-    assert.equal(await store.botApiKeyChoice(pool, scope, null), undefined)
+    assert.equal((await store.botApiKeyChoice(pool, scope, null))?.keyId, anthropic.id)
+    const removedKey = (await pool.query('SELECT ciphertext,iv,"revokedAt" FROM model_api_keys WHERE id=$1', [anthropic.id])).rows[0]
+    assert.deepEqual([removedKey.ciphertext, removedKey.iv], ['', ''])
+    assert.ok(removedKey.revokedAt)
+    assert.equal((await store.listApiKeys(pool, 'alice', personal)).keys.some(item => item.id === anthropic.id), false)
+    await assert.rejects(store.openApiKeyForChat(pool, 'alice', team.id, anthropic.id, env), { code: 'apiKeyNotFound' })
     assert.ok(await store.botApiKeyChoice(pool, scope, aliceBot), 'Bob\'s gateway choice stays')
     assert.equal(await stopped(loose), true, 'deleting a key stops the run that has it')
     assert.equal(await stopped(run), true, 'removing her own Anthropic key stops its own run')

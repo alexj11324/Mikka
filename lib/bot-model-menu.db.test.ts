@@ -66,7 +66,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const settings = new ExecutionSettings(pool);
     const workspace = randomUUID(), elsewhere = randomUUID();
     await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1),($2)', [workspace, elsewhere]);
-    const alice = { ownerId: "alice", workspaceId: workspace };
+    const alice = { ownerId: "alice", actorId: "alice", workspaceId: workspace };
     const [botA, botB, bobBot] = [randomUUID(), randomUUID(), randomUUID()];
     await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active')`, [workspace]);
     await pool.query(`INSERT INTO bots VALUES ($1,'alice',$4),($2,'alice',$4),($3,'bob',$4)`, [botA, botB, bobBot, workspace]);
@@ -146,13 +146,13 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
 
     // 4. The next run freezes the pick; a run already frozen keeps its model.
     const dependencies = { service: () => ({ repository: new SubscriptionRepository(pool) }) as never, workspace: async () => {} };
-    const runA = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
+    const runA = await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.equal(runA.model, "gpt-fixture");
     assert.equal((runA.modelSelection as { connectionId?: string } | undefined)?.connectionId, codex);
-    assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), { harness: "ai_sdk", model: COORDINATOR_MODEL });
+    assert.deepEqual(await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: null, workspaceId: workspace }, dependencies), { harness: "ai_sdk", model: COORDINATOR_MODEL, actorId: "alice" });
     await settings.setBotModel(alice, botA, opus);
     assert.equal(runA.model, "gpt-fixture", "the frozen run is not switched");
-    const nextA = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
+    const nextA = await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.equal(nextA.model, "claude-opus-fixture");
     // The menu ticks the listed option even though the bot keeps its own copy of the binding.
     const picked = await botModelMenu(pool, settings, alice, botA);
@@ -163,7 +163,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await settings.setBotModel(alice, botB, gpt);
     await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE id=$1`, [codex]);
     const lost = await botModelMenu(pool, settings, alice, botB);
-    await assert.rejects(freezeBotModel({ ownerId: "alice", botId: botB, workspaceId: workspace }, dependencies), { code: "executionModelUnknown" });
+    await assert.rejects(freezeBotModel({ ownerId: "alice", actorId: "alice", botId: botB, workspaceId: workspace }, dependencies), { code: "executionModelUnknown" });
     assert.equal(lost.current.provider, "claude");
     assert.equal(lost.current.chosen, false);
     assert.equal(lost.current.fallback, "preference");
@@ -239,16 +239,16 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const { chooseBotModel } = await import("./bot-model-menu");
     keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);
     assert.deepEqual([keyMenu.current.id, keyMenu.current.kind, keyMenu.current.chosen, keyMenu.current.available], [keyOption, "apiKey", true, true]);
-    assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), {
-      harness: "ai_sdk", model: "deepseek-chat",
-      modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat", credentialOwnerId: "alice", credentialRevision: 1 },
+    assert.deepEqual(await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: null, workspaceId: workspace }, dependencies), {
+      harness: "ai_sdk", model: "deepseek-chat", actorId: "alice",
+      modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", actorId: "alice", workspaceId: workspace, modelId: "deepseek-chat", credentialOwnerId: "alice", credentialRevision: 1 },
     });
     // Mikka 默认 picked after a key model: it is what the chip shows and what the next turn runs on, not the key
     // (production, 2026-11-02: the pick saved, but the old key choice won on read and the chip went back to the key).
     const { HOSTED_CHOICE: hostedChoice } = await import("./bot-model-menu-view");
     const hostedMenu = await chooseBotModel(pool, settings, alice, null, hostedChoice);
     assert.deepEqual([hostedMenu.current.id, hostedMenu.current.kind, hostedMenu.current.chosen, hostedMenu.current.available], [hostedChoice, "hosted", true, true]);
-    assert.notEqual((await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies)).modelSelection?.type, "api_key");
+    assert.notEqual((await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: null, workspaceId: workspace }, dependencies)).modelSelection?.type, "api_key");
     assert.equal(hostedMenu.groups.find((group) => group.kind === "hosted")?.points, 98, "the points it can spend in this workspace");
     // No points in this workspace (decision 2026-11-02-1450): not listed; the pick stays, named and unavailable, so the chat says so before sending.
     hostedPoints = 0;
@@ -257,7 +257,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.deepEqual([noPoints.current.id, noPoints.current.chosen, noPoints.current.available], [hostedChoice, true, false]);
     pointsChoice = { kind: "api_key", keyId: key.id, model: "deepseek-chat" };
     const pointsMenu = await botModelMenu(pool, settings, alice, null);
-    const pointsRun = await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies);
+    const pointsRun = await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: null, workspaceId: workspace }, dependencies);
     assert.equal(pointsMenu.current.kind, "hosted");
     assert.equal(pointsMenu.current.available, false);
     assert.equal(pointsMenu.current.fallback, undefined);
@@ -288,7 +288,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     // The chip names the key's model the next turn runs on.
     assert.deepEqual([out.current.id, out.current.modelId, out.current.kind, out.current.available], [apiKeyOptionId(sameModelKey.id, "claude-opus-fixture"), "claude-opus-fixture", "apiKey", true]);
     assert.deepEqual(out.current.quota, { subscription: "claude", plan: "Max", resetsAt: FUTURE, fallback: { keyProvider: "anthropic", keyName: null, model: "claude-opus-fixture" } });
-    const switched = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
+    const switched = await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.deepEqual(switched, {
       harness: "ai_sdk", model: "claude-opus-fixture",
       modelSelection: { consumerId: botA, type: "api_key", keyId: sameModelKey.id, ownerId: "alice", workspaceId: workspace, modelId: "claude-opus-fixture", credentialOwnerId: "alice", credentialRevision: 1,
@@ -298,7 +298,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await setApiKeyAfterQuota(pool, "alice", false);
     const off = await botModelMenu(pool, settings, alice, botA);
     assert.deepEqual([off.current.modelId, off.current.available, off.current.quota?.fallback], ["claude-opus-fixture", false, null]);
-    const stays = await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies);
+    const stays = await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: botA, workspaceId: workspace }, dependencies);
     assert.equal(stays.modelSelection?.type, "subscription");
     // A teammate's key is never spent this way: Alice shares hers with the team, Bob can pick it, but his bot on his
     // exhausted subscription does not move to it.
@@ -308,11 +308,11 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await setApiKeyShare(pool, "alice", { id: workspace, kind: "team" }, key.id, true);
     assert.ok((await usableApiKeys(pool, "bob", workspace)).some((row) => row.id === key.id && !row.mine));
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [bobs, quota(1, FUTURE)]);
-    const bobsTurn = await freezeBotModel({ ownerId: "bob", botId: bobBot, workspaceId: workspace }, dependencies);
+    const bobsTurn = await freezeBotModel({ ownerId: "bob", actorId: "bob", botId: bobBot, workspaceId: workspace }, dependencies);
     assert.notEqual(bobsTurn.modelSelection?.type, "api_key");
     // Fresh provider allowance after reset: the subscription runs again.
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(0.2, FUTURE)]);
-    assert.equal((await freezeBotModel({ ownerId: "alice", botId: botA, workspaceId: workspace }, dependencies)).modelSelection?.type, "subscription");
+    assert.equal((await freezeBotModel({ ownerId: "alice", actorId: "alice", botId: botA, workspaceId: workspace }, dependencies)).modelSelection?.type, "subscription");
 
     // Shared keys identify both their owner and their masked key, then disappear on withdrawal.
     const sharedMenu = await botModelMenu(pool, settings, { ownerId: "bob", workspaceId: workspace }, bobBot);
@@ -332,11 +332,11 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await chooseBotModel(pool, settings, alice, null, keyOption);
     await pool.query(`UPDATE model_api_keys SET models='[]'::jsonb WHERE id=$1`, [key.id]);
     const lostKeyMenu = await botModelMenu(pool, settings, alice, null);
-    await assert.rejects(freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), { code: "executionModelUnknown" });
+    await assert.rejects(freezeBotModel({ ownerId: "alice", actorId: "alice", botId: null, workspaceId: workspace }, dependencies), { code: "executionModelUnknown" });
     assert.equal(lostKeyMenu.current.fallback, "preference");
 
     // Legacy grants and guessed binding ids never expose or authorize another member subscription.
-    const bob = { ownerId: "bob", workspaceId: workspace };
+    const bob = { ownerId: "bob", actorId: "bob", workspaceId: workspace };
     await assert.rejects(pool.query(`UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"='alice' AND "workspaceId"=$1`, [workspace]), { code: "23514" });
     await pool.query(`UPDATE byos_connections SET state='connected', paused=false, epoch=1, "removedAt"=NULL WHERE id=ANY($1::uuid[])`, [[claude, codex]]);
     const haiku = await binding("alice", workspace, claude, "claude-haiku-5-5", "claude_cpa");

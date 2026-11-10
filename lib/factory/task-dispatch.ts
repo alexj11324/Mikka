@@ -2,7 +2,7 @@ import { withFactoryBackgroundWorkspace } from './background-workspace'
 import 'server-only'
 import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 import { createHash, randomUUID } from 'node:crypto'
-import { escapeLiteral, type Pool, type QueryResult } from 'pg'
+import { escapeLiteral, type Pool, type PoolClient, type QueryResult } from 'pg'
 import { FactoryError } from './contract'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { factoryBinding, createFactoryDispatch, type FactoryQueue } from './dispatch'
@@ -34,6 +34,8 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
   issueId: string; botId: string | null; agentId: string; deviceRepoId: string; note?: string
   key?: string; sourceEventId?: string; previousRunId?: string; needsSpec?: boolean
   selection?: unknown
+  /** Host-only live authority check for an already committed shared run. */
+  authorizeReplay?: (query: PoolClient, runId: string) => Promise<void>
   queue: FactoryQueue
 }) {
   if (!factoryLifecycleEnabled()) throw new FactoryError('factoryLifecycleUnavailable')
@@ -56,6 +58,7 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
       if (!receipt.same) throw new FactoryError('factoryReplayMismatch')
       if (['cancelled','revoked'].includes(receipt.status)) throw new FactoryError('factoryStopped')
       await runtime.store.lockTask(tx, userId, receipt.taskId)
+      if (input.authorizeReplay) await input.authorizeReplay(tx, receipt.result.runId)
       await tx.query('COMMIT'); return receipt.result as { runId: string }
     }
     const { rows } = await tx.query<import('./store').FactoryTask>(`SELECT * FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ORDER BY "createdAt" DESC,id DESC LIMIT 1 FOR UPDATE`, [userId, input.issueId, input.botId])

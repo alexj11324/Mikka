@@ -9,6 +9,8 @@ import type { SubscriptionService } from './subscription-service'
 export const hostedSubscriptionSnapshotSchema = z.strictObject({
   coordinator: z.literal(true).optional(),
   type: z.literal('subscription'), bindingId: z.uuid(), ownerId: z.string().min(1),
+  /** Optional only to read historical records. Execution never infers a missing actor from the owner. */
+  actorId: z.string().min(1).optional(),
   consumerId: z.uuid(), workspaceId: z.uuid(), connectionId: z.uuid(),
   /** Set when the bot runs on another member's shared subscription (allowOthers): the run's owner. `ownerId` is the subscription's. */
   runOwnerId: z.string().min(1).optional(),
@@ -24,6 +26,7 @@ export type HostedSubscriptionSnapshot = z.infer<typeof hostedSubscriptionSnapsh
 export const hostedApiKeySnapshotSchema = z.strictObject({
   coordinator: z.literal(true).optional(),
   type: z.literal('api_key'), keyId: z.uuid(), ownerId: z.string().min(1),
+  actorId: z.string().min(1).optional(),
   credentialOwnerId: z.string().min(1).optional(), credentialRevision: z.number().int().positive().optional(), organizationId: z.uuid().optional(),
   consumerId: z.uuid().optional(), workspaceId: z.uuid(), modelId: z.string().min(1).max(128),
   /** 订阅额度用完后，自动改用 API Key: the subscription this turn would have used, out of quota, and the person's own key it runs on instead. */
@@ -40,30 +43,41 @@ export type HostedModelSelection = z.infer<typeof hostedModelSelectionSchema>
 export interface HostedRuntimeSnapshot {
   harness: string
   model: string | null
+  /** The authenticated trigger or the owner of a verified server-side schedule. */
+  actorId?: string
   modelSelection?: HostedModelSelection
 }
 /** The bot scope a frozen selection belongs to. */
-export const selectionScope = (selection: HostedModelSelection): HostedModelScope => ({
-  ownerId: selection.type === 'subscription' ? selection.runOwnerId ?? selection.ownerId : selection.ownerId,
-  botId: selection.coordinator ? null : selection.consumerId ?? null,
-  workspaceId: selection.workspaceId,
-})
-export interface HostedModelScope { ownerId: string; botId: string | null; workspaceId: string | null }
+export const selectionScope = (selection: HostedModelSelection): HostedModelScope => {
+  if (!selection.actorId) throw refuse()
+  return {
+    ownerId: selection.type === 'subscription' ? selection.runOwnerId ?? selection.ownerId : selection.ownerId,
+    actorId: selection.actorId,
+    botId: selection.coordinator ? null : selection.consumerId ?? null,
+    workspaceId: selection.workspaceId,
+  }
+}
+export interface HostedModelScope { ownerId: string; actorId: string; botId: string | null; workspaceId: string | null }
 export interface HostedModelDependencies {
   service(): SubscriptionService
   workspace(ownerId: string, workspaceId: string): Promise<void>
 }
 const refuse = () => new SubscriptionRefusal('binding_mismatch')
+export function assertHostedActor(scope: HostedModelScope) {
+  if (typeof scope.actorId !== 'string' || !scope.actorId.trim()) throw refuse()
+}
 function cancelled(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Model resolution cancelled', 'AbortError')
 }
 function checkScope(scope: HostedModelScope, value: HostedSubscriptionSnapshot) {
-  if (value.runOwnerId !== undefined || scope.ownerId !== value.ownerId || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
+  assertHostedActor(scope)
+  if (scope.actorId !== scope.ownerId || value.actorId !== scope.actorId || value.runOwnerId !== undefined || scope.ownerId !== value.ownerId || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
 }
 /** Called only inside first execution reservation, never before replay lookup. */
 export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies, subscriptionOwnerId = scope.ownerId): Promise<HostedRuntimeSnapshot & { modelSelection?: HostedSubscriptionSnapshot }> {
-  if (selection === undefined) return { harness: runtime.harness, model: runtime.model }
-  if (subscriptionOwnerId !== scope.ownerId) throw refuse()
+  assertHostedActor(scope)
+  if (scope.actorId !== scope.ownerId || subscriptionOwnerId !== scope.ownerId) throw refuse()
+  if (selection === undefined) return { harness: runtime.harness, model: runtime.model, actorId: scope.actorId }
   if (runtime.harness !== 'ai_sdk' || !scope.workspaceId) throw refuse()
   const requested = agentModelSourceSchema.safeParse(selection)
   if (!requested.success) throw refuse()
@@ -72,7 +86,7 @@ export async function freezeHostedModelSelection(scope: HostedModelScope, runtim
   const value = hostedSubscriptionSnapshotSchema.parse({
     ...(scope.botId === null ? {coordinator:true} : {}),
     ...(subscriptionOwnerId !== scope.ownerId ? { runOwnerId: scope.ownerId } : {}),
-    type: 'subscription', bindingId: binding.id, ownerId: binding.ownerId,
+    type: 'subscription', bindingId: binding.id, ownerId: binding.ownerId, actorId: scope.actorId,
     consumerId: binding.consumerId, workspaceId: binding.workspaceId,
     connectionId: binding.connectionId, connectionRevision: binding.connectionRevision,
     modelId: binding.modelId, route: binding.route,
@@ -82,19 +96,21 @@ export async function freezeHostedModelSelection(scope: HostedModelScope, runtim
   const connection = await service.repository.connection(value.ownerId, value.connectionId)
   // The connection is the subscription owner's, from any workspace; the binding carries the run's workspace.
   if (connection.ownerId !== value.ownerId || Number(connection.epoch) !== value.connectionRevision || connection.state !== 'connected') throw refuse()
-  return { harness: 'ai_sdk', model: value.modelId, modelSelection: value }
+  return { harness: 'ai_sdk', model: value.modelId, actorId: scope.actorId, modelSelection: value }
 }
 /** Re-check the frozen identity, not the latest/default binding, on every model call. */
 export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, dependencies: HostedModelDependencies, signal?: AbortSignal): Promise<LanguageModel> {
   cancelled(signal)
-  if (runtime.harness !== 'ai_sdk' || !runtime.model) throw refuse()
+  assertHostedActor(scope)
+  if (runtime.harness !== 'ai_sdk' || !runtime.model || runtime.actorId !== scope.actorId) throw refuse()
   if (runtime.modelSelection === undefined) {
+    if (scope.actorId !== scope.ownerId) throw refuse()
     return resolveDefaultHostedModel(scope,runtime.model)
   }
   if (runtime.modelSelection.type === 'api_key') {
     const frozen = hostedApiKeySnapshotSchema.parse(runtime.modelSelection)
     const expected = selectionScope(frozen)
-    if (expected.ownerId !== scope.ownerId || expected.botId !== scope.botId || expected.workspaceId !== scope.workspaceId || runtime.model !== frozen.modelId) throw refuse()
+    if (expected.actorId !== scope.actorId || expected.ownerId !== scope.ownerId || expected.botId !== scope.botId || expected.workspaceId !== scope.workspaceId || runtime.model !== frozen.modelId) throw refuse()
     cancelled(signal)
     const { resolveApiKeyChatModel } = await import('./model-api-key-chat')
     return resolveApiKeyChatModel(frozen)

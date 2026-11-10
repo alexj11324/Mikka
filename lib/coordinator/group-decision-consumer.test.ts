@@ -1,19 +1,24 @@
 import assert from 'node:assert/strict'
-import test, { mock } from 'node:test'
+import test, { after, before, mock } from 'node:test'
 import { createHash } from 'node:crypto'
 import { DECISION_MODEL } from './decision'
-import { invokeDecision } from './decide'
+let invokeDecision: typeof import('./decide').invokeDecision
+before(async () => { ({ invokeDecision } = await import('./decide')) })
 import { createGroupJudgment } from './group-judgment'
 import { GroupJudgmentPendingError } from './group-correction'
 import { MockLanguageModelV3 } from 'ai/test'
 import { replayGroupDecision, summarizeGroupDecisionReplay } from './group-decision-replay'
 // Explicit server/billing fixtures; the REST payload remains synthetic.
-let billingScope = { workspaceId: 'fixture-workspace', ownerId: 'fixture-owner' }
+let billingScope = { workspaceId: 'fixture-workspace', ownerId: 'fixture-owner', actorId: 'fixture-owner' }
 mock.module(new URL('../abuse/context.ts',import.meta.url).href,{namedExports:{hostedBillingScope:{getStore:()=>billingScope}}})
 mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{canUseMikkaPaid:async()=>{},hostedUsage:{reserve:async()=>{},settle:async()=>{}}}})
 mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
 mock.module(new URL('../credit-shares.ts',import.meta.url).href,{namedExports:{withSharedCredits:async(workspaceId:string,attempt:(payer:string)=>unknown)=>attempt(workspaceId)}})
 mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{}}})
+// This fixture exercises the Cloud gateway REST path; it has no connected community Cloud account.
+const priorEdition = process.env.MIKKA_EDITION
+before(() => { process.env.MIKKA_EDITION = 'cloud' })
+after(() => { if (priorEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = priorEdition })
 let groupReply: unknown
 const generationInputs: unknown[] = []
 const groupModel = new MockLanguageModelV3({ doGenerate: async options => {
@@ -132,7 +137,7 @@ test('Bot group generation reuses frozen binding references and streaming, witho
   const { groupRuntime } = await import('./group-runtime')
   const actualSnapshot = await import('../subscription-model-snapshot')
   const workspaceId = '00000000-0000-4000-8000-000000000003'
-  const scope = { ownerId: 'fixture-owner', workspaceId, botId: a }
+  const scope = { ownerId: 'fixture-owner', actorId: 'fixture-owner', workspaceId, botId: a }
   const selection = { type: 'subscription' as const, bindingId: '00000000-0000-4000-8000-000000000004', ...scope,
     consumerId: a, connectionId: '00000000-0000-4000-8000-000000000005', connectionRevision: 1, modelId: 'fixture-bot-model', route: 'openai_siwc' as const }
   // The snapshot has consumerId; botId is a host scope field, not persisted data.
@@ -155,20 +160,20 @@ test('Bot group generation reuses frozen binding references and streaming, witho
     mock.module(new URL('../bot-model-selection.ts', import.meta.url).href, { namedExports: { freezeBotModel: async (actual: unknown) => {
       assert.deepEqual(actual, scope)
       if (refusal) throw Object.assign(Error('binding required'), { code: 'binding_required' })
-      return { harness: 'ai_sdk', model: safeSelection.modelId, modelSelection: { ...safeSelection, ...(invalid ? { bearer: 'fixture-must-be-rejected' } : {}) }, secret: 'fixture-must-not-be-persisted' }
+      return { harness: 'ai_sdk', actorId: scope.actorId, model: safeSelection.modelId, modelSelection: { ...safeSelection, ...(invalid ? { bearer: 'fixture-must-be-rejected' } : {}) }, secret: 'fixture-must-not-be-persisted' }
     } } }),
     mock.module(new URL('../subscription-runtime.ts', import.meta.url).href, { namedExports: { subscriptionRuntime: () => { throw Error('No external subscription access in fixture') }, authorizeSubscriptionWorkspace: async () => {} } }),
     mock.module(new URL('../subscription-model-snapshot.ts', import.meta.url).href, { namedExports: { ...actualSnapshot, resolveFrozenHostedModel: async (actual: unknown, frozen: unknown) => {
-      assert.deepEqual(actual, scope); assert.deepEqual(frozen, { harness: 'ai_sdk', model: safeSelection.modelId, modelSelection: safeSelection }); return streamModel
+      assert.deepEqual(actual, scope); assert.deepEqual(frozen, { harness: 'ai_sdk', actorId: scope.actorId, model: safeSelection.modelId, modelSelection: safeSelection }); return streamModel
     } } }),
   ]
   const previous = billingScope
   t.after(() => { billingScope = previous; for (const handle of handles.reverse()) handle.restore() })
-  billingScope = { workspaceId, ownerId: scope.ownerId }
+  billingScope = { workspaceId, ownerId: scope.ownerId, actorId: scope.actorId }
   const bot = { ...members[0], memberType: 'bot' as const }
   const client = { query: () => { throw Error('No unbound database query in model fixture') } } as unknown as import('pg').PoolClient
-  const frozen = await groupRuntime.prepareBot!(bot, { ownerId: scope.ownerId, workspaceId }, client)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: safeSelection.modelId, modelSelection: safeSelection })
+  const frozen = await groupRuntime.prepareBot!(bot, { ownerId: scope.ownerId, actorId: scope.actorId, workspaceId }, client)
+  assert.deepEqual(frozen, { harness: 'ai_sdk', actorId: scope.actorId, model: safeSelection.modelId, modelSelection: safeSelection })
   assert.deepEqual(await groupRuntime.generate(bot, { message: { text: 'source group', mentions: [] }, earlier: [], followUp: '', members, modelRuntime: frozen }), { text: 'streamed Bot reply', mentions: [], privateTo: null })
   assert.equal(streams, 1)
   streamError = Object.assign(new Error('private provider detail'), { statusCode: 503 })
@@ -177,8 +182,8 @@ test('Bot group generation reuses frozen binding references and streaming, witho
   const callsBeforeRefusal = streams
   await assert.rejects(groupRuntime.generate(bot, { message: { text: 'source group', mentions: [] }, earlier: [], followUp: '', members }), /model_unavailable/)
   refusal = true
-  await assert.rejects(groupRuntime.prepareBot!(bot, { ownerId: scope.ownerId, workspaceId }, client), { code: 'binding_required' })
+  await assert.rejects(groupRuntime.prepareBot!(bot, { ownerId: scope.ownerId, actorId: scope.actorId, workspaceId }, client), { code: 'binding_required' })
   refusal = false; invalid = true
-  await assert.rejects(groupRuntime.prepareBot!(bot, { ownerId: scope.ownerId, workspaceId }, client))
+  await assert.rejects(groupRuntime.prepareBot!(bot, { ownerId: scope.ownerId, actorId: scope.actorId, workspaceId }, client))
   assert.equal(streams, callsBeforeRefusal, 'refusal or an invalid frozen reference never reaches a fallback model')
 })

@@ -5,5 +5,6 @@ export type EnterprisePrincipal =
   | { kind: 'pat'; tokenId: string; workspaceId: string }
   | { kind: 'delegation'; workspaceId?: string; credentialId: string; credentialKind: 'oauth' | 'run' }
   | { kind: 'admission'; runId: string; workspaceId: string }
+  | { kind: 'collaboration'; authorizationId: string; workspaceId: string }
 
 export type EnterpriseReader = { id: string; [enterprisePrincipal]?: EnterprisePrincipal }

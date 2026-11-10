@@ -25,11 +25,14 @@ export async function stopRunsUsingApiKeys(query: Query, scope: { keyId?: string
       AND ($1::uuid IS NULL OR k.id=$1) AND ($2::text IS NULL OR k."ownerId"=$2)
       AND ((to_jsonb(r)#>>'{agentDefinition,apiKey,keyId}'=k.id::text AND ($3::text IS NULL OR to_jsonb(r)->>'workspaceId'=$3))
         OR EXISTS (SELECT 1 FROM model_api_key_runs m WHERE m."runId"=r.id AND m."keyId"=k.id AND ($3::text IS NULL OR m."workspaceId"::text=$3)))
-      AND (NOT $4::boolean OR r."userId"<>k."ownerId") RETURNING r.id`,
+      AND (NOT $4::boolean OR COALESCE(to_jsonb(k)->>'ownership','personal')='personal' AND r."userId"<>k."ownerId") RETURNING r.id`,
   [scope.keyId ?? null, scope.ownerId ?? null, scope.workspaceId ?? null, scope.othersOnly ?? false])
   for (const { id } of rows) { await runListChanged(query, id); await runChanged(query, id) }
   runControlChanged(query, { runIds: rows.map(row => row.id) })
   // Their leases ended now: if the daemon never reports the stop, run recovery reclaims them (#1212).
   if (rows.length) armDueTimerAfterCommit(query, 'run-recovery')
+  const { stopHostedExecutions } = await import('./hosted-execution-revocation')
+  await stopHostedExecutions(query, { workspaceId: scope.workspaceId, ownerId: scope.ownerId, apiKeyId: scope.keyId,
+    credentialKind: 'api_key', othersOnly: scope.othersOnly })
   return rowCount ?? 0
 }

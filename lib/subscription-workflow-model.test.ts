@@ -15,7 +15,7 @@ mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url)
   },
 }})
 const id=(n:number)=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
-const selection={type:'subscription' as const,bindingId:id(3),ownerId:'alice',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'saved-model',route:'claude_cpa' as const}
+const selection={type:'subscription' as const,bindingId:id(3),ownerId:'alice',actorId:'alice',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'saved-model',route:'claude_cpa' as const}
 test('Workflow serde carries only the fixed non-secret binding descriptor',()=>{
   const first=new SubscriptionWorkflowModel(selection)
   const serialized=SubscriptionWorkflowModel[WORKFLOW_SERIALIZE](first)
@@ -24,6 +24,11 @@ test('Workflow serde carries only the fixed non-secret binding descriptor',()=>{
   assert.equal(restored.modelId,'saved-model')
   assert.deepEqual(SubscriptionWorkflowModel[WORKFLOW_SERIALIZE](restored),selection)
   assert.throws(()=>SubscriptionWorkflowModel[WORKFLOW_DESERIALIZE]({...selection,accessToken:'synthetic-canary'}))
+})
+test('Workflow replay rejects actorless, borrowed and forged subscription snapshots before any model step', () => {
+  for (const actorId of [undefined, 'another-member']) assert.throws(() => new SubscriptionWorkflowModel({ ...selection, actorId }), /verification_required/)
+  assert.throws(() => new SubscriptionWorkflowModel({ ...selection, actorId: '' }), { name: 'ZodError' })
+  assert.throws(() => new SubscriptionWorkflowModel({ ...selection, runOwnerId: 'another-member' }), /verification_required/)
 })
 test('unsupported non-streaming invocation refuses rather than calling a default provider',async()=>{
   await assert.rejects(new SubscriptionWorkflowModel(selection).doGenerate({prompt:[]}),/subscription_stream_required/)
@@ -125,7 +130,7 @@ test('only the supported Codex CPA route moves the prepared tail; Claude, API-ke
   }
   for (const [frozen, key] of [
     [selection, 'openaiCompatible'],
-    [{ type: 'api_key', keyId: id(5), ownerId: selection.ownerId, consumerId: selection.consumerId, workspaceId: selection.workspaceId, modelId: 'claude-haiku-5-5' }, 'anthropic'],
+    [{ type: 'api_key', keyId: id(5), ownerId: selection.ownerId, actorId: selection.actorId, consumerId: selection.consumerId, workspaceId: selection.workspaceId, modelId: 'claude-haiku-5-5' }, 'anthropic'],
   ] as const) {
     const result = await new SubscriptionWorkflowModel(frozen).doStream({ prompt })
     await result.stream.pipeTo(new WritableStream())

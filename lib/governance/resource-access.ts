@@ -20,6 +20,7 @@ export async function workspaceResourcePolicy(workspaceId: string, membership?: 
 
 /** Only a borrowed resource calls this helper. A person's own credentials remain their own. */
 export async function organizationResourceAllowed(workspaceId: string, kind: SharedResourceKind, resourceId: string, ownerId: string, membership?: Query) {
+  if (kind === 'subscription') return false
   const query = membership ?? (await import('@/lib/workspace-db')).workspacePool
   const policy = await workspaceResourcePolicy(workspaceId, query)
   if (!policy.organizationId) return true

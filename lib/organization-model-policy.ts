@@ -29,4 +29,11 @@ export function organizationModelAllowed(policy: OrganizationModelPolicy, model:
     || source === 'organization' && (!rule.connectionId || rule.connectionId === connectionId)))
 }
 
+/** Hosted collaboration needs a deliberate organization connection rule. A
+ * member's right to read or edit a Bot is never permission to use its owner's resources. */
+export function organizationCollaboratorModelAllowed(policy: OrganizationModelPolicy, model: string, connectionId: string) {
+  return organizationModelAllowed(policy, model, 'organization', connectionId)
+    && [policy.models['*'], policy.models[model]].some(rule => rule?.mode === 'organization_only' && rule.connectionId === connectionId)
+}
+
 export const organizationCredentialOwner = (organizationId: string) => `organization:${z.uuid().parse(organizationId)}`

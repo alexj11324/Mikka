@@ -46,10 +46,12 @@ test('enforced SSO distinguishes humans, explicit machine authorization, and rev
   const human = { kind: 'session' as const, sessionId: 'session' }
   const machine = { kind: 'pat' as const, tokenId: 'token', workspaceId: 'workspace' }
   const admission = { kind: 'admission' as const, runId: 'run', workspaceId: 'workspace' }
+  const collaboration = { kind: 'collaboration' as const, authorizationId: 'receipt', workspaceId: 'workspace' }
   assert.equal(enterpriseAccessAllowed(base, human), false)
   assert.equal(enterpriseAccessAllowed({ ...base, sessionAssured: true }, human), true)
   assert.equal(enterpriseAccessAllowed({ ...base, sessionAssured: true }, machine), false)
-  for (const principal of [machine, admission]) {
+  for (const principal of [machine, admission, collaboration]) {
+    assert.equal(enterpriseAccessAllowed(base, principal), false)
     assert.equal(enterpriseAccessAllowed({ ...base, allowMachineCredentials: true }, principal), true)
     assert.equal(enterpriseAccessAllowed({ ...base, allowMachineCredentials: true, credentialValid: false }, principal), false)
     assert.equal(enterpriseAccessAllowed({ ...base, allowMachineCredentials: true, managedRevoked: true }, principal), false)

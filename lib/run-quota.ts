@@ -85,6 +85,7 @@ async function quotaScope(query: Query, run: Run): Promise<QuotaScope | null> {
   if (harness !== 'claude_code' && harness !== 'codex') return null
   const frozen = run.agentDefinition.executionIdentity
   if (frozen && frozen.workspaceId !== run.workspaceId) return null
+  if (frozen?.actor && frozen.actor !== run.userId) return null
   // Reuse the caller's APP executor. The immutable run tenant is authoritative;
   // task, Bot and optional cloud placement must agree with it.
   const { rows: [scope] } = await query.query<{

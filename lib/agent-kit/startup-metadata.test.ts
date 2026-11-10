@@ -55,10 +55,10 @@ stub('../db/index.ts', { db: app.db, pool: app.client })
 stub('../workspace-db.ts', { workspaceDb: memberships.db, workspacePool: memberships.client })
 stub('./config.ts', { agentKitEnabled: () => true })
 stub('../cloud-computer-flag.ts', { cloudComputerRunsEnabled: () => false })
-stub('../bot-model-selection.ts', { freezeBotModel: async (scope: AgentScope) => {
-  assert.deepEqual(scope, { ownerId: owner, botId: bot, workspaceId: workspace })
+stub('../bot-model-selection.ts', { freezeBotModel: async (scope: AgentScope & {actorId:string}) => {
+  assert.deepEqual(scope, { ownerId: owner, actorId: owner, botId: bot, workspaceId: workspace })
   modelResolutions++
-  return { harness: 'ai_sdk' as const, model: 'synthetic-model' }
+  return { harness: 'ai_sdk' as const, model: 'synthetic-model', actorId: scope.actorId }
 } })
 stub('../subscription-runtime.ts', { authorizeSubscriptionWorkspace: forbidden, subscriptionRuntime: forbidden })
 stub('../coordinator/instructions.ts', { COORDINATOR_INSTRUCTIONS: base })

@@ -9,6 +9,7 @@ import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { enterprisePrincipal } from './principal'
 import { tokenWorkspace } from '../tokens/principal'
+import { freezeWorkerDefinition } from '../agent-kit/worker'
 
 const target = process.env.E2E_DATABASE_URL
 const allowed = !!target && disposableDatabase(process.env, target)
@@ -163,13 +164,14 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
     return { issueId, task: result.task }
   }
   const a = await task(alpha, alphaBot), b = await task(beta, betaBot)
+  const nativeDefinition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'Synthetic native claim; no executor', parent: null, executionId: null })
   const definition = await freezeExecutionIdentity(control, { userId, botId: alphaBot, deviceId,
-    agentDefinition: {} as NonNullable<Parameters<typeof freezeExecutionIdentity>[1]['agentDefinition']> }, undefined, alpha)
+    agentDefinition: nativeDefinition }, undefined, alpha)
   async function queuedRun(requester = userId, issueId = a.issueId) {
     const id = randomUUID()
     await control.query(`INSERT INTO agent_runs(id,"userId","workspaceId","botId","issueId","agentId","deviceId",status,prompt,"agentDefinition")
       VALUES($1,$2,$3,$4,$5,$6,$7,'queued','Synthetic native claim; no executor',$8)`,
-    [id, userId, alpha, alphaBot, issueId, agentId, deviceId, JSON.stringify({ executionIdentity: { ...definition, requester } })])
+    [id, userId, alpha, alphaBot, issueId, agentId, deviceId, JSON.stringify({ ...nativeDefinition, executionIdentity: { ...definition, requester } })])
     return id
   }
   await control.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
@@ -472,11 +474,11 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
     await control.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion") VALUES($1,$2,'Retired thread fixture','cloud',true,3)`, [retiredDevice, userId])
     const { sealSecret } = await import('../secrets/crypto')
     const sealed = sealSecret('isolated-fixture-never-sent-to-a-provider', 'enterprise-execution-fixture')
-    await control.query(`INSERT INTO model_api_keys(id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4) VALUES($1,$2,'openai','openai',$3,$4,$5,'only')`,
+    await control.query(`INSERT INTO model_api_keys(id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) VALUES($1,$2,'openai','openai',$3,$4,$5,'only',ARRAY['fixture-model'])`,
       [keyId, userId, sealed.ciphertext, sealed.iv, sealed.keyVersion])
     await control.query(`INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,'only')`,
       [userId, sealed.ciphertext, sealed.iv, sealed.keyVersion])
-    const cloudDefinition = { apiKey: { keyId } } as NonNullable<Parameters<typeof freezeExecutionIdentity>[1]['agentDefinition']>
+    const cloudDefinition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'No cloud executor or provider call', parent: null, executionId: null, apiKey: { keyId, model: 'fixture-model' } })
     const frozen = await withCron(() => freezeExecutionIdentity(control, { userId, botId: alphaBot, deviceId: retiredDevice, agentDefinition: cloudDefinition }, undefined, alpha))
     await control.query(`INSERT INTO agent_runs(id,"userId","workspaceId","botId","issueId","agentId","deviceId",status,prompt,"agentDefinition")
       VALUES($1,$2,$3,$4,$5,$6,$7,'queued','No cloud executor or provider call',$8)`,

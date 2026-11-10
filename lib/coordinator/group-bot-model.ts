@@ -10,7 +10,7 @@ export async function freezeGroupBotModel(scope: HostedModelScope, client: PoolC
     import('@/lib/bot-model-selection'), import('@/lib/subscription-runtime'), import('@/lib/db'), import('@/lib/subscription-model-snapshot'),
   ])
   const value = await withDatabaseClient(client, () => freezeBotModel(scope, { service: () => subscriptionRuntime(), workspace: authorizeSubscriptionWorkspace }))
-  return { harness: value.harness, model: value.model, ...(value.modelSelection === undefined ? {} : { modelSelection: hostedModelSelectionSchema.parse(value.modelSelection) }) }
+  return { harness: value.harness, model: value.model, actorId: value.actorId, ...(value.modelSelection === undefined ? {} : { modelSelection: hostedModelSelectionSchema.parse(value.modelSelection) }) }
 }
 
 export async function resolveGroupBotModel(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, signal: AbortSignal) {

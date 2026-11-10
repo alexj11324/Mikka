@@ -7,6 +7,7 @@ export const RUN_INVALID_REASONS = {
   taskDestinationMismatch: 'The task was sent to a different place than this device.',
   issueUnavailable: 'The task is no longer available to this person.',
   deviceUnavailable: 'The device or its execution tool is unavailable.',
+  sharedRequiresIsolatedCloud: 'Shared work requires a clean, isolated cloud environment. Use cloud execution or keep this thread private before running it on a personal computer.',
   repositoryMismatch: 'The repository does not match the device checkout.',
   botUnavailable: 'The bot that dispatched this run is unavailable.',
   sourceRunMismatch: 'An earlier run for this request does not match this dispatch.',

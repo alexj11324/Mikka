@@ -315,6 +315,14 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
       ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
   }
   if (initial.state !== 'pending') return null
+  // A shared run's bounded receipt pins one connection. Its provider failure
+  // cannot authorize discovery or preparation of the owner's private pool.
+  if (source.agentDefinition?.executionIdentity?.actor && source.agentDefinition.executionIdentity.actor !== source.userId) {
+    const card = modelUnavailableCard('unavailable')
+    card.description = 'The shared execution connection is unavailable. A new explicit resource authorization is required before changing connections.'
+    return settle(pool, source, { ...initial, state: 'blocked', card,
+      reasons: [{ choice: initial.from, reason: 'execution_authorization_required' }] })
+  }
   // The order dispatch tried (优先使用的 Agent's list first, decision 2026-11-05-0400), so what came before this run is what was tried.
   const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
   const { autoModelRouting } = stored

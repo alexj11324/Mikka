@@ -32,6 +32,8 @@ export const executionIdentitySchema = z.object({
 })
 export type ExecutionIdentity = z.infer<typeof executionIdentitySchema>
 type Query = Pick<Pool | PoolClient, 'query'>
+/** Host-only receipt; never accepted as a tool or public request argument. */
+export type CollaborativeRunAuthority = { actorId: string; threadOwnerId: string; collaborationAuthorizationId: string }
 export type RunAuthority = { userId: string; botId: string | null; deviceId: string | null; agentDefinition: WorkerDefinitionSnapshot | null; actorId?: string; threadOwnerId?: string; collaborationAuthorizationId?: string }
 
 export class ExecutionIdentityError extends Error {
@@ -77,7 +79,7 @@ export async function freezeExecutionIdentity(query: Query, run: RunAuthority, m
   const resourceBindings: ExecutionIdentity['resourceBindings'] = [{ kind: 'device', id: run.deviceId, ownerId: device.ownerId, access: 'owner' }]
   if (definition.customMcp) {
     if (definition.customMcp.workspaceId !== workspaceId) return denied()
-    const authority = await (await import('./plugins/workspace-mcp')).validateMcpAuthority(query, run.userId, definition.customMcp, membership).catch(() => denied())
+    const authority = await (await import('./plugins/workspace-mcp')).validateMcpAuthority(query, actor, definition.customMcp, membership).catch(() => denied())
     for (const grant of authority.servers) resourceBindings.push({ kind: 'mcp', id: grant.id, ownerId: grant.ownerId,
       access: grant.grantId ? 'workspace_share' : 'owner', revision: String(grant.revision),
       ...(grant.grantId ? { grantId: grant.grantId } : {}), ...(authority.workspaceId ? { workspaceId: authority.workspaceId } : {}),

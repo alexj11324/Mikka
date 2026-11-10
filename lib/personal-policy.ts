@@ -55,6 +55,9 @@ export async function stopRunsUsingSubscriptions(query: Query, scope: { ownerId?
   for (const { id } of rows) { await runListChanged(query, id); await runChanged(query, id) }
   runControlChanged(query, { runIds: rows.map(row => row.id) })
   if (rows.length) armDueTimerAfterCommit(query, 'run-recovery')
+  const { stopHostedExecutions } = await import('./hosted-execution-revocation')
+  await stopHostedExecutions(query, { workspaceId: scope.workspaceId, subscriptionOwnerId: scope.ownerId,
+    connectionId: scope.connectionId, credentialKind: 'subscription', borrowedOnly: scope.othersOnly })
   return rowCount ?? 0
 }
 

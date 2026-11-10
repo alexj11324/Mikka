@@ -116,7 +116,10 @@ export async function currentExecutionAuthority(userId: string, workspaceId: str
     // Ending a thread retires its cloud device before the after-commit Factory
     // reconciliation. Only that exact terminal run's ended machine receipt may
     // authorize cleanup; a removed device alone never becomes a credential.
-    const { rows } = await query.query(`SELECT 1 FROM agent_runs r
+    const { rows } = await query.query<{ actorId: string; authorizationId: string | null }>(`SELECT
+        coalesce(r."agentDefinition"->'executionIdentity'->>'actor',r."userId") AS "actorId",
+        r."agentDefinition"->'executionIdentity'->>'collaborationAuthorizationId' AS "authorizationId"
+      FROM agent_runs r
       JOIN issues i ON i.id=r."issueId" AND i."workspaceId"=r."workspaceId" AND i."ownershipState"='bound'
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId" AND b."workspaceId"=r."workspaceId"
       JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
@@ -125,7 +128,12 @@ export async function currentExecutionAuthority(userId: string, workspaceId: str
             AND retired."ownerId"=r."userId" AND retired."workspaceId"=r."workspaceId" AND retired."deviceId"=d.id)))
       JOIN bots computer ON computer.id=b."botId" AND computer."ownerId"=r."userId" AND computer."workspaceId"=r."workspaceId" AND computer."archivedAt" IS NULL
       WHERE r.id=$1 AND r."userId"=$2 AND r."workspaceId"=$3
-        AND r."agentDefinition"->'executionIdentity'->>'requester'=$2
+        AND ((r."agentDefinition"->'executionIdentity'->>'requester'=$2
+          AND coalesce(r."agentDefinition"->'executionIdentity'->>'actor',$2)=$2)
+          OR (r."agentDefinition"->'executionIdentity'->>'version'='2'
+            AND r."agentDefinition"->'executionIdentity'->>'requester'=r."agentDefinition"->'executionIdentity'->>'actor'
+            AND r."agentDefinition"->'executionIdentity'->>'threadOwner'=$2
+            AND r."agentDefinition"->'executionIdentity'->>'collaborationAuthorizationId' IS NOT NULL))
         AND r."agentDefinition"->'executionIdentity'->>'executionPrincipal'=$2
         AND r."agentDefinition"->'executionIdentity'->>'outputOwner'=$2
         AND r."agentDefinition"->'executionIdentity'->>'workspaceId'=$3::text
@@ -135,7 +143,14 @@ export async function currentExecutionAuthority(userId: string, workspaceId: str
         AND (r."botId" IS NULL OR EXISTS (SELECT 1 FROM bots bot WHERE bot.id=r."botId" AND bot."ownerId"=$2
           AND r."agentDefinition"->'executionIdentity'->>'botOwner'=bot."ownerId"
           AND bot."workspaceId"=$3 AND bot."archivedAt" IS NULL))`, [held.runId, userId, workspaceId])
-    return rows.length > 0
+    const proof = rows[0]
+    if (!proof) return false
+    if (proof.actorId === userId) return true
+    if (!proof.authorizationId) return false
+    const delegated = await (await import('./collaboration-authority')).collaborationExecutionProof(query,
+      { ownerId: userId, workspaceId, actorId: proof.actorId, authorizationId: proof.authorizationId, runId: held.runId })
+    return !!delegated && await (await import('./access')).enterpriseWorkspaceAllowed(delegated.actorId, workspaceId,
+      { kind: 'session', sessionId: delegated.sessionId }, undefined, query)
   }
   const runtime = await workflowRuntime()
   if (!runtime || !await registeredRuntime(runtime, 'coordinator')) return undefined

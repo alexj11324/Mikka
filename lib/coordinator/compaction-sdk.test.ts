@@ -5,8 +5,8 @@ let compactWithFrozenModel: typeof import('./compaction-model').compactWithFroze
 import type { SubscriptionService } from '../subscription-service'
 
 const id=(n:number)=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
-const scope={ownerId:'synthetic-owner',botId:id(1),workspaceId:id(2)}
-const selection={type:'subscription' as const,bindingId:id(3),ownerId:scope.ownerId,consumerId:scope.botId,workspaceId:scope.workspaceId,connectionId:id(4),connectionRevision:1,modelId:'synthetic-stream-model',route:'claude_cpa' as const}
+const scope={ownerId:'synthetic-owner',actorId:'synthetic-owner',botId:id(1),workspaceId:id(2)}
+const selection={type:'subscription' as const,bindingId:id(3),ownerId:scope.ownerId,actorId:scope.actorId,consumerId:scope.botId,workspaceId:scope.workspaceId,connectionId:id(4),connectionRevision:1,modelId:'synthetic-stream-model',route:'claude_cpa' as const}
 
 mock.module(new URL('../model-admission/runtime.ts', import.meta.url).href, { namedExports: {
  assertSubscriptionModelTransport: async (actualScope: {workspaceId:string;ownerId:string}, modelId: string, route: string) => {
@@ -46,7 +46,7 @@ test('actual SDK partial-error or unterminated streams cannot become successful 
      return {binding,connection}
     },
    },model:async()=>model} as unknown as SubscriptionService
-   const operation=()=>compactWithFrozenModel(scope,{harness:'ai_sdk',model:selection.modelId,modelSelection:selection},[{role:'user',content:'Synthetic retained pending context'}],{service:()=>service,workspace:async()=>{}})
+   const operation=()=>compactWithFrozenModel(scope,{harness:'ai_sdk',actorId:'synthetic-owner',model:selection.modelId,modelSelection:selection},[{role:'user',content:'Synthetic retained pending context'}],{service:()=>service,workspace:async()=>{}})
    if(outcome==='stop')assert.equal(await operation(),'Synthetic partial summary')
    else await assert.rejects(operation)
    assert.equal(streams,1)
