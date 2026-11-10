@@ -103,4 +103,6 @@ export type DesktopBootstrap = DesktopSession & DesktopConfig & {
   onboarding: boolean
   computer: 'none' | 'ask'
   cacheWorkspace: { workspaceId: string; role: 'admin' | 'member' } | null
+  /** Routing only; the Live ticket endpoint rechecks current authority. */
+  liveHomeWorkspaceId: string | null
 }
