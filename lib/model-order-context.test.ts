@@ -32,6 +32,8 @@ const resourcePolicySql = "select w.kind,l.\"organizationId\",p.\"modelCredentia
 stub('./workspace-db.ts', {
   workspaceDb: { select: unused, transaction: unused },
   workspacePool: { query: async (sql: string, args: unknown[]) => {
+    if (sql.includes("SELECT to_jsonb(p)->'modelPolicy'")) { assert.ok(policyWorkspaces.has(String(args[0]))); return { rows: [], rowCount: 0 } }
+    if (sql.includes('FROM mikka_organization_workspaces l JOIN mikka_organizations')) { assert.ok(policyWorkspaces.has(String(args[0]))); return { rows: [], rowCount: 0 } }
     assert.equal(sql.replace(/\s+/g, ' ').trim(), resourcePolicySql)
     assert.ok(args.length === 1 && typeof args[0] === 'string' && policyWorkspaces.has(args[0]), 'resource policy is scoped to a Workspace created by this fixture')
     // The existing trace measures the injected APP executor; the separate
@@ -58,7 +60,7 @@ function fixture(allowed: boolean, ownerId = 'owner-a') {
         assert.deepEqual(args, [scope.workspaceId, scope.ownerId]); return { rows: [] }
       }
       if (sql.startsWith('SELECT id::text AS id,"modelCatalog"')) return { rows: [{ id: connectionId, models: ['claude-haiku-5-5'] }] }
-      if (sql.includes('FROM model_api_keys WHERE "ownerId"=$1 ORDER BY')) {
+      if (sql.includes('FROM model_api_keys WHERE "ownerId"=$1')) {
         assert.deepEqual(args, [scope.ownerId]); return { rows: [key] }
       }
       if (sql.includes('FROM model_api_key_shares s JOIN model_api_keys k')) {

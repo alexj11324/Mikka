@@ -24,6 +24,7 @@ export type HostedSubscriptionSnapshot = z.infer<typeof hostedSubscriptionSnapsh
 export const hostedApiKeySnapshotSchema = z.strictObject({
   coordinator: z.literal(true).optional(),
   type: z.literal('api_key'), keyId: z.uuid(), ownerId: z.string().min(1),
+  credentialOwnerId: z.string().min(1).optional(), credentialRevision: z.number().int().positive().optional(), organizationId: z.uuid().optional(),
   consumerId: z.uuid().optional(), workspaceId: z.uuid(), modelId: z.string().min(1).max(128),
   /** 订阅额度用完后，自动改用 API Key: the subscription this turn would have used, out of quota, and the person's own key it runs on instead. */
   afterQuota: z.strictObject({
@@ -57,11 +58,12 @@ function cancelled(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Model resolution cancelled', 'AbortError')
 }
 function checkScope(scope: HostedModelScope, value: HostedSubscriptionSnapshot) {
-  if (scope.ownerId !== (value.runOwnerId ?? value.ownerId) || value.runOwnerId === value.ownerId || (value.runOwnerId !== undefined && scope.botId === null) || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
+  if (value.runOwnerId !== undefined || scope.ownerId !== value.ownerId || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
 }
 /** Called only inside first execution reservation, never before replay lookup. */
 export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies, subscriptionOwnerId = scope.ownerId): Promise<HostedRuntimeSnapshot & { modelSelection?: HostedSubscriptionSnapshot }> {
   if (selection === undefined) return { harness: runtime.harness, model: runtime.model }
+  if (subscriptionOwnerId !== scope.ownerId) throw refuse()
   if (runtime.harness !== 'ai_sdk' || !scope.workspaceId) throw refuse()
   const requested = agentModelSourceSchema.safeParse(selection)
   if (!requested.success) throw refuse()

@@ -36,7 +36,7 @@ mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: 
     return { rows: approval ? [{ status: approval }] : [], rowCount: approval ? 1 : 0 }
   } },
 } })
-const { othersMayUse } = await import('./personal-policy')
+const { othersMayUse, pooledOwners, sharedNativeBinding, setSubscriptionShare, runMayUseCredentialSql } = await import('./personal-policy')
 
 function reader(results: { allowOthers: boolean }[][], error?: Error) {
   const calls: { sql: string; values: unknown[] }[] = []
@@ -51,49 +51,65 @@ function reader(results: { allowOthers: boolean }[][], error?: Error) {
   return { query, calls }
 }
 
-test('a shared credential check returns its current authorization in one read', async () => {
+test("a historical allowOthers grant cannot authorize another person's subscription", async () => {
   const { query, calls } = reader([[{ allowOthers: true }]])
-  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
-  assert.equal(calls.length, 1)
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  assert.equal(calls.length, 0)
 })
 
 for (const [label, rows] of [['missing', []], ['refused', [{ allowOthers: false }]]] as const) {
-  test(`a ${label} share does not issue an additional read or write`, async () => {
+  test(`a ${label} subscription share grants nothing and performs no IO`, async () => {
     const { query, calls } = reader([Array.from(rows)])
     assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
-    assert.equal(calls.length, 1)
+    assert.equal(calls.length, 0)
   })
 }
 
-test('repeated permission checks observe revoke and restore without reusing an earlier grant', async () => {
+test('legacy revoke and restore never revive cross-member subscription authority', async () => {
   const { query, calls } = reader([[{ allowOthers: true }], [{ allowOthers: false }], [{ allowOthers: true }]])
-  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
   assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
-  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
-  assert.equal(calls.length, 3)
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  assert.equal(calls.length, 0)
 })
 
-test('a failed authorization read propagates its original cause without another query', async () => {
+test('unavailable policy storage cannot cause a subscription sharing fail-open', async () => {
   const error = new Error('fixture_connection_failed')
   const { query, calls } = reader([], error)
-  await assert.rejects(othersMayUse(query, 'payor', 'workspace'), cause => cause === error)
-  assert.equal(calls.length, 1)
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  assert.equal(calls.length, 0)
 })
 
 test('the same local share cannot bypass a fresh Organization deny or approval decision', async () => {
   organizationId = 'organization'
   const { query, calls } = reader(Array.from({ length: 6 }, () => [{ allowOthers: true }]))
-  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
   sharing = 'deny'
   assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
   sharing = 'approval_required'
   assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
   approval = 'approved'
-  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
   approval = 'denied'
   assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
   sharing = 'allow'
   assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
-  assert.equal(calls.length, 6, 'each local share and admin decision remains one APP read')
-  assert.equal(workspaceReads.filter(kind => kind === 'policy').length, 6, 'Organization policy is fresh on every permission check')
+  assert.equal(calls.length, 0, 'old grant rows are never admission authority')
+  assert.equal(workspaceReads.length, 0, 'an Org approval cannot override provider subscription ownership')
+})
+
+
+test('new cross-member grants fail before writing; legacy pools and automatic bindings stay empty', async () => {
+  const { query, calls } = reader([], new Error('no database IO allowed'))
+  await assert.rejects(setSubscriptionShare(query, 'payor', 'workspace', true, true), { code: 'subscriptionPersonalOnly' })
+  assert.deepEqual(await pooledOwners(query, 'borrower', 'workspace'), [])
+  assert.equal(await sharedNativeBinding(query, 'borrower', 'agent', 'codex', 'workspace'), null)
+  assert.equal(calls.length, 0)
+})
+
+test('all SQL credential gates bind the credential owner to the run actor', () => {
+  const sql = runMayUseCredentialSql('credential.owner', 'run.actor', '$3')
+  assert.match(sql, /credential\.owner=run\.actor/)
+  assert.match(sql, /\(\$3\)::text/)
+  assert.doesNotMatch(sql, /workspace_subscription_shares|allowOthers| OR /)
 })

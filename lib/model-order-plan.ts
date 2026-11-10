@@ -270,9 +270,9 @@ export function latestDefaultCandidates<T extends OrderCandidate>(candidates: re
  * - Neither: the first model anything else reported, so the list is not empty.
  * Nothing connected: an empty list.
  */
-export function defaultOrder(all: readonly OrderCandidate[], preferred: OrderHarness = 'claude_code'): OrderCandidate[] {
+export function defaultOrder(all: readonly OrderCandidate[], preferred: OrderHarness = 'claude_code', preserveSourceOrder = false): OrderCandidate[] {
   const candidates = onPreferredAgent(all, preferred)
-  const bySource = (items: readonly OrderCandidate[]) => [...items.filter(item => item.source.kind === 'subscription'), ...items.filter(item => item.source.kind !== 'subscription')]
+  const bySource = (items: readonly OrderCandidate[]) => preserveSourceOrder ? items : [...items.filter(item => item.source.kind === 'subscription'), ...items.filter(item => item.source.kind !== 'subscription')]
   const picked: OrderCandidate[] = []
   for (const preference of DEFAULT_ORDER_PREFERENCE) {
     const match = bySource(candidates).find(candidate => candidate.harness === preference.harness
@@ -289,10 +289,10 @@ export function defaultOrder(all: readonly OrderCandidate[], preferred: OrderHar
  * The untouched list: a default for each Agent, kept apart (decision 2026-11-05-0400). 优先使用的 Agent picks which
  * one the page shows and dispatch tries first; switching it never moves a stored row between them.
  */
-export function defaultOrderByAgent(all: readonly OrderCandidate[], preferred: OrderHarness = 'claude_code'): OrderCandidate[] {
+export function defaultOrderByAgent(all: readonly OrderCandidate[], preferred: OrderHarness = 'claude_code', preserveSourceOrder = false): OrderCandidate[] {
   const seen = new Set<string>()
   // A model both Agents run stays on the 优先使用的 Agent, as before; each Agent's own models fill its list.
-  return (['claude_code', 'codex'] as const).flatMap(harness => defaultOrder(onPreferredAgent(all, preferred).filter(candidate => candidate.harness === harness), harness))
+  return (['claude_code', 'codex'] as const).flatMap(harness => defaultOrder(onPreferredAgent(all, preferred).filter(candidate => candidate.harness === harness), harness, preserveSourceOrder))
     .filter(candidate => { const key = entryKey(candidate); if (seen.has(key)) return false; seen.add(key); return true })
 }
 

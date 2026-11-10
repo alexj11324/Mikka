@@ -59,7 +59,7 @@ async function updateApiKeyShareBody(input: { id: string; shared: boolean }, wor
   })
 }
 
-export async function updateApiKeyAfterQuota(on: boolean, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
+async function updateApiKeyAfterQuotaBody(on: boolean, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
   return settingsWorkspaceAction(async () => {
     const { userId, workspace } = await actor(workspaceId)
     await setApiKeyAfterQuota(pool, userId, on)
@@ -76,12 +76,12 @@ export async function listUsableApiKeys(workspaceId?: string): Promise<SettingsA
   return settingsWorkspaceAction(async () => {
     const { userId, workspace } = await actor(workspaceId)
     const keys = await usableApiKeys(pool, userId, workspace.id)
-    const owners = [...new Set(keys.filter(key => !key.mine).map(key => key.ownerId))]
+    const owners = [...new Set(keys.filter(key => !key.mine && key.ownership !== 'organization').map(key => key.ownerId))]
     const members = owners.length ? await workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspace.id), inArray(workspaceMembers.userId, owners), eq(workspaceMembers.status, 'active'))) : []
     const names = new Map(members.map(member => [member.userId, member.name]))
     // A teammate who is no longer an active member here does not lend a key.
-    return { keys: keys.filter(key => key.mine || names.has(key.ownerId)).map(key => ({ ...key, ownerName: key.mine ? null : names.get(key.ownerId)! })) }
+    return { keys: keys.filter(key => key.mine || key.ownership === 'organization' || names.has(key.ownerId)).map(key => ({ ...key, ownerName: key.ownership === 'organization' ? key.organizationName ?? null : key.mine ? null : names.get(key.ownerId)! })) }
   })
 }
 
@@ -89,3 +89,4 @@ export async function listUsableApiKeys(workspaceId?: string): Promise<SettingsA
 export async function createApiKey(...args: Parameters<typeof createApiKeyBody>) { return withFreshSession(() => createApiKeyBody(...args)) }
 export async function deleteApiKey(...args: Parameters<typeof deleteApiKeyBody>) { return withFreshSession(() => deleteApiKeyBody(...args)) }
 export async function updateApiKeyShare(...args: Parameters<typeof updateApiKeyShareBody>) { return withFreshSession(() => updateApiKeyShareBody(...args)) }
+export async function updateApiKeyAfterQuota(...args: Parameters<typeof updateApiKeyAfterQuotaBody>) { return withFreshSession(() => updateApiKeyAfterQuotaBody(...args)) }
