@@ -1,6 +1,6 @@
 # Linear two-way sync
 
-The integration maps one Linear team to one Mikka account. New issues and changes to already linked issues sync in both directions. The Neon inbox records signed webhook deliveries before responding; an outbox trigger captures app edits in the same transaction as the issue or collaboration write. The Mikka app and OAuth callback remain on Vercel; a Cloudflare Worker receives Linear webhooks and drains the durable inbox and outbox through Hyperdrive.
+The integration maps one Linear team to one Mikka account (user-scoped today; workspace-scoped is target contract). New issues and changes to already linked issues sync in both directions. The Neon inbox records signed webhook deliveries before responding; an outbox trigger captures app edits in the same transaction as the issue or collaboration write. The Mikka app and OAuth callback remain on Vercel; a Cloudflare Worker receives Linear webhooks and drains the durable inbox and outbox through Hyperdrive.
 
 ## Global PostHog switch
 

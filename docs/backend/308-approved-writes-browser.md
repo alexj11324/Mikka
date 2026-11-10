@@ -8,7 +8,7 @@ No ordinary Drizzle schema/table definition changes. Existing `db.select().from(
 
 - 20261028143920_operation_ledger.sql: generic execution ledger, bound to owner+personal workspace+persisted proposal ID.
 - 20261028143921_approved_write_binding.sql: ledger invokedAt plus pending_actions intentKey/operationBinding and owner+intent uniqueness. No new Drizzle columns on pendingActions. Historical308 names are recognized only with exact SQL hash matches, avoiding automatic replay of old applied payloads.
-- 20261029043646_agent_external_write_policy.sql and 20261029043647_workspace_external_write_policy.sql: external-action decisions and revisions on the workspace policy record. The per-Bot `agent_external_write_policy` table is retired.
+- 20261029043646_agent_external_write_policy.sql and 20261029043647_workspace_external_write_policy.sql: external-action decisions and revisions on the workspace policy record. The per-Bot columns on `agent_kit_heads` are legacy; they are not read after Phase 4.
 
 There is no separate Coordinator receipt or approval table. Coordinator tools use the existing pending action and operation ledger; native calls reuse the existing native scope fence. A required CI-only real-PG regression creates a fresh legacy-only schema, applies only the frozen old pending_actions DDL, inserts one synthetic pending email, calls the actual legacy list for owner/other-owner, and calls the actual disabled product POST. It asserts the new columns/tables are absent. The fixture refuses non-Actions/non-CI/non-required mode, other DB URLs and non-PG17. Hard caps:40query dispatches,3DDL statements,1INSERT,0UPDATE/DELETE/DROP/auth/provider. Only the ephemeral Actions mikka_e2e service at127.0.0.1:5432 is permitted; unique fixture schema and data remain until that service exits. No retained local DB is used. The suite remains registered in the current database inventory in
 `scripts/run-db-tests.mjs`; the original delivery added it to the then-existing
@@ -29,7 +29,7 @@ HTTP400invalid envelope/input,401session/Bearer rejection,403Origin,409domain/un
 
 ## Default permission (2026-10-31, R-77)
 
-App access is the workspace's rule: allow / read-only / disabled, with no per-Bot or per-person allow/ask/deny layer. The legacy `external_write_permissions` agent rows are inert; only the workspace row is read. An Allow app runs without a model call. A Read-only app refuses writes. A Disabled app refuses the call. The old judgeWrite/destructive path is not consulted for app access; pending_actions records only the call's result.
+Target contract: app access is the workspace's rule — allow / read-only / disabled — with no per-Bot or per-person allow/ask/deny layer. The legacy `external_write_permissions` agent rows become inert and only the workspace row is read. An Allow app runs without a model call. A Read-only app refuses writes. A Disabled app refuses the call. The old judgeWrite/destructive path is not consulted for app access; pending_actions records only the call's result. Until that backend change lands, the current code still reads the agent rows, calls `judgeWrite`, and records the judge result in pending_actions.
 
 ## Product approval integration
 

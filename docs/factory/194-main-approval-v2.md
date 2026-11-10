@@ -20,7 +20,7 @@ by CI success, unregistered code or this document.
 
 ## Existing authority inspected
 
-`packages/protocol/src/agent-policy.ts` records the historical per-run policy; the workspace policy in `workspace_computer_policies` is the only authorization input;
+`packages/protocol/src/agent-policy.ts` records the current per-run policy; the workspace policy in `workspace_computer_policies` is the target single authorization input (Phase 4);
 `packages/daemon/src/permissions.ts` enforces it for registered actions. Its actual
 registry includes git/network permissions, not a generic Factory deployment
 credential. `lib/computer/reviews.ts` authenticates exact computer-operation

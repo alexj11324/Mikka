@@ -10,6 +10,10 @@ implementation. The deployed API is served by the
 [Hono/Nitro runtime](operations/web-runtime.md), which reuses the handlers
 under `app/`.
 
+Target contract: MCP OAuth servers will be workspace-scoped; the current
+connection is per person. A request naming another workspace will return
+`workspaceAccessDenied` once workspace pinning lands.
+
 ## Tools
 
 `get_issue` also returns the issue's project, labels, assignee and relations.

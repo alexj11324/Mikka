@@ -30,7 +30,7 @@ The Bot computer is keyed by `bots.id`, never `agents.id`.
   (decision 2026-10-28, R-02).
 - **Full-window viewer**: starts view-only (仅观看). 取得控制权 pauses the agent
   and gives the user mouse and keyboard (你在操作); 交还给 <Bot 名> hands control back.
-- **Chat**: one 电脑 card per computer task. It shows the task sentence, a state (<Bot 名> 操作中 / 完成 / 失败) and the live screen. There is no approval step: the workspace 电脑 policy decides whether Bots may use a computer, and the person takes control when they want. There is no step list and no operation log anywhere.
+- **Chat**: Target contract: one 电脑 card per computer task. It shows the task sentence, a state (<Bot 名> 操作中 / 完成 / 失败) and the live screen. There is no approval step: the workspace 电脑 policy decides whether Bots may use a computer, and the person takes control when they want. There is no step list and no operation log anywhere. Until Phase 4, the approval card and `/api/computer/approvals` remain.
 - **Sleep**: the computer sleeps when idle and keeps its disk. It wakes
   automatically when an agent needs it, or when the user presses 唤醒.
 - **设置 › 设备** lists only machines the user connected (this Mac, SSH hosts,
@@ -295,7 +295,7 @@ thumbnail, the chat card and the full-window viewer all use `view`.
 
 ### Authorization
 
-Computer use is authorized once per workspace and device: the workspace 电脑 policy (allow / deny) and the device binding. There is no per-operation approval endpoint and no `ApprovalView`.
+Target contract: computer use is authorized once per workspace and device — the workspace 电脑 policy (allow / deny) and the device binding. There will be no per-operation approval endpoint and no `ApprovalView`. Until Phase 4, `ApprovalView`, `pendingApproval`, `/api/computer/approvals` and `local_computer_reviews` remain in the code.
 
 ### Events
 

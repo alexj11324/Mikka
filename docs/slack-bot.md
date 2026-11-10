@@ -1,6 +1,6 @@
 # Slack bot
 
-This first version handles explicit `@Mikka` mentions in one installed Slack workspace. It runs the existing Coordinator tools as the bound Mikka user, so it can list devices/agents, inspect issues, dispatch runs, send instructions, and check or stop runs. Each mention is a separate request, with its response in the same Slack thread. Include the issue/run id when following up. Run completion remains in Mikka; there are no unsolicited Slack completion messages yet.
+This first version handles explicit `@Mikka` mentions in one installed Slack workspace. It runs the existing Coordinator tools as the bound Mikka user, so it can list devices/agents, inspect issues, dispatch runs, send instructions, and check or stop runs. Each mention is a separate request, with its response in the same Slack thread. Include the issue/run id when following up. Run completion remains in Mikka; there are no unsolicited Slack completion messages yet. Target contract: the Slack entry will resolve the bound Mikka workspace and apply its app policy; until then it runs as the bound Mikka user.
 
 The Composio Slack connection is separate: it supplies user-authorized integration tools. A Slack bot needs its own installed bot token and Signing Secret. App configuration access/refresh tokens are operator credentials and must not be used as bot credentials.
 

@@ -43,7 +43,7 @@ sidebar, URL parsing and page body all read it.
 - **Personal:** Account, Security, Preferences, Notifications, Memory (记忆), Connections, Models, Logins and keys, Data and privacy, Activity, Computers (我的电脑), Developer.
 - **Workspace:** General, App & run permissions, Members, Teams, Team permissions (admins), Secrets and environment, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators).
 
-App & run permissions holds the workspace's MCP-server access (allow / disable / read-only) and run policy. Team permissions holds computer use (allow / deny) and device access. Neither holds per-Bot settings.
+Target contract: App & run permissions holds the workspace's MCP-server access (allow / disable / read-only) and run policy. Team permissions holds computer use (allow / deny) and device access. Neither holds per-Bot settings. Until Phase 4 lands, MCP-server and device access levels are not enforced, 团队权限 still holds 允许使用的应用, and per-Bot rows are still read.
 
 Account and Security hold how the person signs in, including linking Google
 to the Mikka account. Connections holds connected apps (Gmail, Calendar,

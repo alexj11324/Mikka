@@ -55,7 +55,7 @@ deleteWorkspace(id: string, confirmName: string): Promise<ActionResult<{
   - 然后删除应用库里**其余所有**以工作区为键的行（`lib/workspace-rows.ts`，决定 `2026-11-02-0231` T5）：运行时从 `information_schema` 找出带 `workspaceId` / `workspace_id` 列的表，以后新增的表自动覆盖；先删没有 `ON DELETE CASCADE` 指向这些行的行（如以该工作区 mailbox 为 `mailboxId` 的运行）。包括密钥（`workspace_secrets`）、E2B 密钥、应用策略、个人订阅策略、订阅/点数/API Key 分享、付款指定卡、免费额度与验证、执行规则、Bot 模型选择、个人访问令牌、CLI 范围策略、mailbox、日程等。
   - 例外（`KEPT_WITH_WORKSPACE`，各有理由）：工作区库的表（由下面的工作区库事务处理）；`byos_*`（属于个人账户的模型订阅，托管清理走订阅 worker）；`hosted_card_claims`（一张卡只领一次免费额度，删除工作区不释放）；`hosted_usage`（未付用量与免费用量窗口）；`workspace_audit_events`、`workspace_audit_retention`（审计证据：删除时在同一事务里写入 `workspace_deletions(id, "deletedAt")`；审计保留任务 `sweepAuditRetention` 在 `deletedAt` + 90 天时删除全部审计事件，删除前已超过 90 天的也保留到那时；删除前设置过的保留期取两者中更长的，法律保留照旧生效；最后一条事件删除后，保留设置和删除记录一并删除。未删除的工作区不受影响）；`improvement_team_skill_*`（只追加，触发器禁止 DELETE）。
 - 删除范围，工作区库（一个事务）：团队任务回执、`mikka_team_issues`、`mikka_team_projects`，只挂在这些团队下的 `workspace_projects` 及其事件，团队成员，团队，邀请，成员，slug 重定向，最后是工作区行本身。
-- 不删的数据：成员的账户；个人任务（没有团队关联的 issues）；个人模型订阅（`byos_connections / byos_bindings / byos_*`，虽然这些表上有 workspaceId，也保留）；Linear 连接与同步（`linear_connections`、`linear_team_syncs` 按个人账户归属，没有工作区维度）；GitHub App 安装（`github_repository_installations` 也按个人账户归属）。代码里没有工作区级的 Linear/GitHub 关联，所以这一类没有要删的东西。
+- 不删的数据：成员的账户；个人任务（没有团队关联的 issues）；个人模型订阅（`byos_connections / byos_bindings / byos_*`，虽然这些表上有 workspaceId，也保留）；Linear 连接与同步（`linear_connections`、`linear_team_syncs` 按个人账户归属，没有工作区维度）；GitHub App 安装（`github_repository_installations` 也按个人账户归属）。代码里没有工作区级的 Linear/GitHub 关联，所以这一类没有要删的东西。Target contract: Linear 将归工作区所有；当前存储仍是个人账户维度。
 - 切换工作区：发起删除的管理员，cookie 会改成他下一个启用中的工作区（`nextWorkspaceId`）；没有其他工作区时 cookie 会被清除，下次访问时 `loadWorkspaceContext` 会自动建一个默认工作区。其他成员的 cookie 还指向已删除的 id，但 `loadWorkspaceContext` 只会在启用中的成员资格里选，所以他们下一次请求会自动落到自己的第一个工作区。
 - 错误码：`workspaceAccessDenied`、`workspaceDeleteNameMismatch`、`workspaceHasActiveSubscription`、`validationGeneric`。
 
@@ -85,7 +85,7 @@ removeWorkspaceMember(memberId: string, options?: { transferTo?: string }): Prom
 - 接手人已经有同名 Bot（名称比较不区分大小写）时，拒绝转交（`botTransferNameConflict`）。
 - Bot 的 id、对话、线程历史、已结束的后台任务都会保留。和原主人绑定的行会被删除，接手人第一次使用时会重新创建：云桌面 `bot_desktops`、云运行时 `bot_cloud_runtimes`、`computer_run_bindings`。
 - agent kit 历史（`agent_kit_*`）在设计上不可变（有触发器拦截 UPDATE），而且它的身份里包含 owner_id，所以转交时会把它删掉，Bot 在新主人名下改用内置定义。
-- Linear 同步没有转交。`linear_team_syncs.ownerId` 引用的是个人账户，同步时用的是这个人自己的 Linear OAuth token（`linear_connections`）；它没有工作区维度。如果把归属改给别人，就会用接手人的 token 去操作另一个人连接的 Linear 组织，这个行为不安全，所以没有实现。这里需要产品确认：设计里说的「Linear 同步归属」具体指什么。
+- Linear 同步没有转交。`linear_team_syncs.ownerId` 引用的是个人账户，同步时用的是这个人自己的 Linear OAuth token（`linear_connections`）；它没有工作区维度。如果把归属改给别人，就会用接手人的 token 去操作另一个人连接的 Linear 组织，这个行为不安全，所以没有实现。这里需要产品确认：设计里说的「Linear 同步归属」具体指什么。Target contract: Linear 将归工作区所有；当前存储仍是个人账户维度。
 
 ## 团队 — `app/actions/teams.ts`
 

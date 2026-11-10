@@ -135,7 +135,7 @@ Bots and the Coordinator reach a connected store app through two generic tools
 (`lib/app-tools.ts`), not hand-written actions: `list_app_tools` lists the
 toolkit's Composio tools (with `readOnly` from `readOnlyHint`), and
 `call_app_tool` runs one, pinned to its version, in the person's own account.
-Reads run at once. A write follows the workspace app rule: allow / read-only / disabled, keyed by the toolkit and the legacy write action. There is no per-person or per-Bot setting, no write judge and no approval card. An app set to Allow runs the write directly; Read-only refuses it; Disabled refuses the call with a model-visible reason. The hand-written Gmail, Calendar, Notion, Slack and Drive tools are unchanged.
+Target contract: reads run at once. A write follows the workspace app rule — allow / read-only / disabled — keyed by the toolkit and the legacy write action. There will be no per-person or per-Bot setting, no write judge and no approval card. An app set to Allow runs the write directly; Read-only refuses it; Disabled refuses the call with a model-visible reason. Until that lands, the current code still reads the per-person and per-Bot settings, calls the write judge, and can create an approval card. The hand-written Gmail, Calendar, Notion, Slack and Drive tools are unchanged.
 
 ## Validation
 
