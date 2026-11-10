@@ -71,6 +71,8 @@ test('migration, toggles, source ownership, fresh keys, dispatch filters and row
       ADD COLUMN "responsesApi" boolean DEFAULT true;
       CREATE TABLE workspace_personal_policies ("workspaceId" text,subscriptions boolean)`)
     await pool.query('INSERT INTO workspace_personal_policies VALUES ($1,false)', [workspaceId])
+    // Use the canonical sharing schema for the real usable-key read below.
+    await pool.query(await readFile(new URL('../drizzle/20261101021000_model_api_keys.sql', import.meta.url), 'utf8'))
     assert.deepEqual((await usableApiKeys(pool, scope.ownerId, workspaceId))[0].models, ['old'])
     await changeEnabledModels(pool, scope, key, { kind: 'all', enabled: false })
     assert.deepEqual((await usableApiKeys(pool, scope.ownerId, workspaceId))[0].models, [])

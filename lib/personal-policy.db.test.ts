@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
-import { othersMayUse } from './personal-policy'
+import { readFile } from 'node:fs/promises'
+import { bindFixtureWorkspaceDatabase } from '../tests/helpers/workspace-database'
 
 const databaseURL = process.env.E2E_DATABASE_URL
 const disposable = disposableDatabase(process.env, databaseURL)
@@ -15,9 +16,15 @@ test('shared credential policy preserves scope and current revocation in one Pos
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
   const workspace = randomUUID(), otherWorkspace = randomUUID()
+  let closeWorkspace: (() => Promise<void>) | undefined
   try {
     await pool.query(`CREATE TABLE workspace_subscription_shares ("ownerId" text,"workspaceId" uuid,"allowOthers" boolean NOT NULL,PRIMARY KEY ("ownerId","workspaceId"));
-      CREATE TABLE workspace_personal_policies ("workspaceId" uuid PRIMARY KEY,subscriptions boolean NOT NULL)`)
+      CREATE TABLE workspace_personal_policies ("workspaceId" uuid PRIMARY KEY,subscriptions boolean NOT NULL);
+      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL CHECK (kind IN ('personal','team')))`)
+    await pool.query(await readFile(new URL('../drizzle/20261109035020_organization_governance.sql', import.meta.url), 'utf8'))
+    await pool.query('INSERT INTO mikka_workspaces VALUES ($1,\'team\'),($2,\'team\')', [workspace, otherWorkspace])
+    closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
+    const { othersMayUse } = await import('./personal-policy')
     let reads = 0
     const query = { query: ((sql: string, values?: unknown[]) => { reads++; return pool.query(sql, values) }) as Pool['query'] }
     const check = async (expected: boolean) => {
@@ -61,7 +68,29 @@ test('shared credential policy preserves scope and current revocation in one Pos
       await pool.query('DELETE FROM workspace_subscription_shares')
       await check(false)
     })
+    await t.test('Organization policy and resource approval remain fresh after the one-read local grant', async () => {
+      await pool.query('TRUNCATE workspace_subscription_shares,workspace_personal_policies')
+      await pool.query('INSERT INTO workspace_subscription_shares VALUES ($1,$2,true)', ['payor', workspace])
+      const organization = randomUUID(), decision = randomUUID()
+      await pool.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES ($1,\'Fixture organization\',\'payor\')', [organization])
+      await pool.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES ($1,$2)', [workspace, organization])
+      await pool.query('INSERT INTO mikka_organization_resource_policies("organizationId","modelCredentialSharing") VALUES ($1,\'allow\')', [organization])
+      await check(true)
+      await pool.query('UPDATE mikka_organization_resource_policies SET "modelCredentialSharing"=\'deny\' WHERE "organizationId"=$1', [organization])
+      await check(false)
+      await pool.query('UPDATE mikka_organization_resource_policies SET "modelCredentialSharing"=\'approval_required\' WHERE "organizationId"=$1', [organization])
+      await check(false)
+      await pool.query('INSERT INTO mikka_organization_resource_approvals(id,"organizationId","workspaceId",kind,"resourceId","ownerId",status) VALUES ($1,$2,$3,\'subscription\',\'payor\',\'payor\',\'approved\')', [decision, organization, workspace])
+      await check(true)
+      await pool.query('UPDATE mikka_organization_resource_approvals SET status=\'denied\' WHERE id=$1', [decision])
+      await check(false)
+      await pool.query('UPDATE mikka_organization_resource_policies SET "modelCredentialSharing"=\'allow\' WHERE "organizationId"=$1', [organization])
+      await check(false)
+      await pool.query('DELETE FROM mikka_organization_resource_approvals WHERE id=$1', [decision])
+      await check(true)
+    })
   } finally {
+    await closeWorkspace?.()
     await pool.end()
     await admin.query(`DROP SCHEMA ${schema} CASCADE`)
     await admin.end()
