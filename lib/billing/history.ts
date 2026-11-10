@@ -30,7 +30,7 @@ export async function workspaceCreditBillingView(actorId: string, workspaceId: s
   const { rows } = await pool.query<Omit<CreditTransaction, 'date'> & { date: Date }>(
     `SELECT id::text AS id,"createdAt" AS date,CASE WHEN reason='refund' THEN 'refund' WHEN reason='subscription' THEN 'subscription' ELSE 'topup' END AS type,
       points,"amountCents",currency,"stripeFeeCents",'succeeded' AS status,"receiptUrl"
-    FROM workspace_credit_grants WHERE "workspaceId"=$1 AND ((bucket='purchased' AND reason IN ('purchase','refund')) OR (bucket='plan' AND reason='subscription'))
+    FROM workspace_credit_grants WHERE "workspaceId"=$1 AND ((bucket='purchased' AND reason IN ('purchase','refund')) OR (bucket='plan' AND reason IN ('subscription','refund')))
     UNION ALL
     SELECT 'verification:' || v."workspaceId",v."verifiedAt",'verification',$2::int,0,'usd',NULL,'succeeded',NULL
     FROM hosted_verifications v JOIN hosted_allowances a ON a."workspaceId"=v."workspaceId"

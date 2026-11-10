@@ -15,9 +15,11 @@ import { stripeConfig, stripeGet, stripePost, StripeRequestError, type StripeCon
 import { applyPointsEvent, type PointsWebhookOptions } from './points-webhook'
 import { resourcePrice } from './resource-plan'
 import { applySubscriptionEvent } from './subscription-webhook'
+import { applyPlanRefundEvent, drainPlanRefundReceipts } from './plan-refunds'
 import { drainBillingEntitlements } from './entitlement-outbox'
 import { organizationBillingAccounts, organizationMembers } from '@/lib/db/governance-schema'
 import { requireOrganizationAdmin } from '@/lib/governance/organizations'
+import { autoRechargePolicy, type AutoRechargePolicyView } from './auto-recharge'
 
 type Env = Readonly<Record<string, string | undefined>>
 
@@ -38,6 +40,7 @@ export interface BillingView {
   hasCustomer: boolean
   planPoints: number | null
   purchasedPoints: number
+  autoRecharge?: AutoRechargePolicyView
 }
 
 async function requireAdmin(actorId: string, workspaceId: string) {
@@ -85,6 +88,7 @@ async function readBillingAccount(workspaceId: string, env: Env): Promise<Billin
     hasCustomer: Boolean(billing?.stripeCustomerId),
     planPoints: billing?.billingModel === 'resource_v1' || balance.plan > 0 ? balance.plan / MICRO_USD_PER_POINT : null,
     purchasedPoints: balance.purchased / MICRO_USD_PER_POINT,
+    autoRecharge: autoRechargePolicy(billing),
   }
 }
 
@@ -129,7 +133,7 @@ export async function planCheckoutUrl(actorId: string, workspaceId: string, back
   try { price = resourcePrice(configuredPrice, config.resourcePriceId) }
   catch (error) { throw new WorkspaceError('billingResourcePlanUnavailable', { cause: error }) }
   const session = await provider(() => stripePost<{ url: string }>(config, 'checkout/sessions', {
-    mode: 'subscription',
+    mode: 'subscription', managed_payments: { enabled: true },
     line_items: [{ price: price.id, quantity: 1 }],
     client_reference_id: workspaceId,
     ...(billing?.customer ? { customer: billing.customer } : {}),
@@ -157,11 +161,15 @@ export async function applyStripeEvent(raw: unknown, options: PointsWebhookOptio
     const inserted = await tx.insert(stripeWebhookEvents).values({ id: event.id, type: event.type }).onConflictDoNothing().returning({ id: stripeWebhookEvents.id })
     if (!inserted.length) return false
     await applyPointsEvent(tx, event.type, event.data.object, options)
+    await applyPlanRefundEvent(tx, event, options)
     await applySubscriptionEvent(tx, event, options)
     return true
   })
   // Replays also drain: APP may have committed just before a Workspace outage.
   // A non-2xx response asks Stripe to retry; success means both stores agree.
-  await drainBillingEntitlements(event.id)
+  await drainPlanRefundReceipts()
+  // A refund arriving before its invoice can project the original event's
+  // downgrade after this commit. Replays also repair that durable delivery.
+  await drainBillingEntitlements()
   return inserted
 }

@@ -64,6 +64,24 @@ Workspace 数据库不可用时 webhook 返回失败，Stripe 重试同一事件
 
 未知的供应商成本继续保留 `unknown` 收据和预留，不能结算为零。实际成本超过预留时，真实收据和欠额必须保留，后续 admission 按剩余余额拒绝调用。
 
+### 税费与退款
+
+Checkout 显式保留 Stripe Managed Payments。购买点数以服务端定价的商品小计为准；Managed Payments 加收的税款保存在实际付款收据，不转换为额外点数。购买点数退款按累计实际退款金额与原始含税付款金额的比例，向原有账本追加负数记录；最后一笔全额退款扣回剩余授额，不因整数舍入多扣或少扣。
+
+套餐授额保存 invoice 与实际 PaymentIntent 的分配关系，兼容历史单一 PaymentIntent 和当前 `invoice_payments` 多笔付款。`billing_refund_receipts` 是签名退款事件的持久收件箱，不是余额账本。退款先于 invoice 或两者并发时，提交后的有界对账会向 `workspace_credit_grants` 追加关联原授额的补偿行。原始付款、期间、用量及 Owner 均不变。
+
+部分退款按原始实际付款比例撤销套餐点数。当前付费 invoice 完全退款时，该 invoice 对应的 Stripe 付费权益降为 Free；独立运营授权仍保留。已经发生的使用记录不撤销，不向另一账户或个人购买点数桶制造退款欠额。旧 invoice 或重复 webhook 不能恢复已经退回的额度及权益。Stripe 订阅本身的取消、客户余额调整或 Credit Note 的创建仍由独立、明确授权的财务流程负责；应用不会为完成对账而执行这些付款变更。
+
+提交后对账与 outbox 投递每次最多处理 100 条；未完成的批次返回失败，由 Stripe 重试驱动，没有新增空闲轮询。送达标记必须同时匹配 event ID 和读取到的 revision，不能把并发生成的新退款投影误标为已送达。
+
+## 自动充值的提供商边界
+
+当前付款合同是 Stripe Managed Payments。其官方支持范围是 Checkout 和 Payment Links，不支持应用直接建立的 `off_session` PaymentIntent 或订阅期间之外的一次性 invoice。因此本批不伪造可执行的自动扣款入口，也不自动切换 Merchant of Record 或税务责任。
+
+`AutoRechargePolicyView` 明确返回 `state: 'provider_unsupported'`、`enabled: false` 及已保存的阈值、单次金额、月度上限和 revision。现有计费界面显示不可用原因。`saveAutoRechargePolicy` 只允许当前 Workspace Owner，或指定 Organization 账户的当前 Organization Owner 保存限制、撤销旧设置；Admin 身份不自动成为付款授权。输入采用 revision 比较更新，单次金额限 1,000 / 2,500 / 5,000 点，阈值必须低于单次金额，月上限不得低于单次金额，操作留审计。
+
+尝试启用自动充值必须显式同意，但在当前提供商合同下仍返回 `billingAutoRechargeUnavailable`，不会发出付款请求。历史 `autoRechargeEnabled` 不能视为变更提供商或新增扣款的授权。真实自动充值的实施与验收必须等受支持的提供商路径及新的明确财务授权；仅保存限制或通过合成测试不代表自动充值已完成。
+
 ## 预算与阈值
 
 `setWorkspaceBudget(actorId, workspaceId, input)` 要求当前 Workspace 管理权限，支持以下输入：
@@ -88,15 +106,17 @@ Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies`
 
 ## 迁移与回滚
 
-本合同使用四份只增迁移：`20261110020030_billing_consistency.sql`、`20261110020031_billing_entitlements.sql`、`20261110020032_plan_credit_usage.sql`、`20261110020033_resource_budgets.sql`。第一、三、四份用于 APP 数据库；第二份用于 Workspace 数据库。
+本合同使用五份只增迁移：`20261110020030_billing_consistency.sql`、`20261110020031_billing_entitlements.sql`、`20261110020032_plan_credit_usage.sql`、`20261110020033_resource_budgets.sql`、`20261110020034_billing_financial_receipts.sql`。第二份用于 Workspace 数据库，其余用于 APP 数据库。
 
 发布前保存部署 SHA 和数据库备份，并核对 `workspace_credit_grants` 的原记录数、各账户各桶金额总和、Stripe 客户/订阅 ID 及历史 `hosted_usage` 金额。发布后核对这些历史值保持不变，再检查增量授额和使用收据。
 
 回滚保留所有新增列、outbox、授额和用量收据，不能删表、删列或反向移动余额。选择保留资源 ACL、个人付款隔离和 webhook 幂等修复的安全代码版本；若只回退界面，服务端付款和访问边界继续保留。回滚前按同一套数据库验收确认旧读取代码不会重新启用自动个人扣款或重扣已消费点数。回滚操作、目标 SHA、未送达 outbox 数量和重新投递结果写入对应 PR。
 
+产生退款补偿行后，回滚版本必须保留 `parentGrantId` 关联退款的余额计算、退款收件箱及 outbox 投递逻辑。直接部署早期只读取正数套餐授额的代码会恢复已退额度，不是允许的回滚路径。需要回退其他功能时，应先将这些财务兼容修复移植到目标版本，再运行部分退款、全额退款和乱序投递验收；不能声称任意历史 SHA 可安全回滚。
+
 ## 验证依据
 
-`tests/billing.db.test.ts` 覆盖付款期间、乱序 webhook、跨库投递失败后重试、旧订阅、显式 Organization 账户以及套餐点数结算。`lib/abuse/store.db.test.ts` 覆盖真实 PostgreSQL 的并发预算、未知成本预留、期间边界和账本幂等性。`tests/governance-seats.db.test.ts` 保留 Personal 边界、配额容量以及单连接池锁顺序验收。
+`tests/billing.db.test.ts` 覆盖付款期间、乱序 webhook、跨库投递失败后重试、旧订阅、显式 Organization 账户、套餐点数结算、部分/全额退款、多笔付款、退款先到和并发对账、Owner 自动充值限制与拒绝未支持扣款。`tests/billing-points.db.test.ts` 覆盖含税购买与退款的点数/实际金额分离。`lib/abuse/store.db.test.ts` 覆盖真实 PostgreSQL 的并发预算、未知成本预留、期间边界和账本幂等性。`tests/governance-seats.db.test.ts` 保留 Personal 边界、配额容量以及单连接池锁顺序验收。
 
 上述数据库测试使用隔离数据库和合成 Stripe HTTP 响应，只证明应用和数据库行为。它们不等同于真实 Stripe、Claude Code/Codex、E2B 或生产验收。生产价格修改、真实扣款及不可逆余额转移需要另外的明确财务授权。
 
@@ -105,3 +125,5 @@ Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies`
 [Capy 计费文档](https://docs.capy.ai/admin/billing) 和 [模型与价格文档](https://docs.capy.ai/models-and-pricing) 描述 Organization 点数、容量及个人连接优先级。独立 Workspace 租户边界、历史余额不移动、双库 outbox、个人付款授权及预算数据结构是 #1849 的 Mikka 实施决定。
 
 Stripe 的 [订阅 webhook 文档](https://docs.stripe.com/billing/subscriptions/webhooks) 将已支付 invoice 与有效订阅作为权限依据；[webhook 文档](https://docs.stripe.com/webhooks) 要求处理重复和乱序事件；[Invoice 对象](https://docs.stripe.com/api/invoices/object) 要求使用 invoice 行的服务期间；[订阅项期间变更](https://docs.stripe.com/changelog/basil/2025-03-31/deprecate-subscription-current-period-start-and-end) 解释项级期间字段。本实现兼容项级期间及历史顶层期间，不以 webhook 到达时间作为付费期限。
+
+Stripe 的 [Invoice Payment 对象](https://docs.stripe.com/api/invoice-payment/object) 和 [列表接口](https://docs.stripe.com/api/invoice-payment/list) 定义实际付款分配；[Managed Payments 文档](https://docs.stripe.com/payments/managed-payments) 列出当前不支持的集成，[配置文档](https://docs.stripe.com/payments/managed-payments/set-up) 定义 Checkout 的显式启用参数。这些是提供商能力边界；退款时保留已发生用量、追加补偿账目以及不在未知外部成本上扣点，是 Mikka 的财务归属要求。

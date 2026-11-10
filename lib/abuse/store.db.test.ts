@@ -31,7 +31,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await admin.end()
   })
   await pool.query(`CREATE TABLE "user" (id text primary key,email text not null);
-    CREATE TABLE workspace_credit_grants (id uuid primary key,"workspaceId" uuid not null,points integer not null,bucket text not null,"periodStart" timestamptz,"expiresAt" timestamptz);
+    CREATE TABLE workspace_credit_grants (id uuid primary key,"workspaceId" uuid not null,points integer not null,bucket text not null,"periodStart" timestamptz,"expiresAt" timestamptz,"parentGrantId" uuid);
     CREATE TABLE workspace_settings ("workspaceId" uuid primary key,"monthlyCreditLimit" integer);
     CREATE TABLE workspace_audit_events (id uuid primary key,"workspaceId" uuid,"actorType" text,"actorName" text,action text,category text,metadata jsonb);
     CREATE TABLE mikka_workspaces(id uuid primary key,"userId" text);

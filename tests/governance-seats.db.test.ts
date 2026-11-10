@@ -167,7 +167,7 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
     await t.test('real hosted reservations enforce Pro quota without credit grants or double charges', async () => {
       await pool.query(`create table hosted_verifications ("workspaceId" uuid primary key);
         create table hosted_allowances ("workspaceId" uuid primary key,remaining bigint not null);
-        create table workspace_credit_grants (id uuid primary key,"workspaceId" uuid,points integer,bucket text,"periodStart" timestamptz,"expiresAt" timestamptz);
+        create table workspace_credit_grants (id uuid primary key,"workspaceId" uuid,points integer,bucket text,"periodStart" timestamptz,"expiresAt" timestamptz,"parentGrantId" uuid);
         create table workspace_settings ("workspaceId" uuid primary key,"monthlyCreditLimit" integer);
         create table bots (id uuid primary key,"workspaceId" uuid);
         create table coordinator_events (id uuid primary key,"botId" uuid,kind text,payload jsonb);

@@ -32,9 +32,17 @@ export async function applyPointsEvent(tx: Transaction, type: string, object: Re
   if (type === 'checkout.session.completed' || type === 'checkout.session.async_payment_succeeded') {
     if (object.mode !== 'payment' || object.payment_status !== 'paid') return
     if ((object.metadata as Record<string, unknown> | undefined)?.purpose !== 'points_purchase') return
-    const session = z.object({ id: stripeId, payment_intent: stripeId, amount_total: z.number().int(), currency: z.literal('usd'), metadata }).parse(object)
+    const session = z.object({ id: stripeId, payment_intent: stripeId, amount_total: z.number().int().positive(),
+      amount_subtotal: z.number().int().nonnegative().optional(), total_details: z.object({ amount_tax: z.number().int().nonnegative(),
+        amount_discount: z.number().int().nonnegative(), amount_shipping: z.number().int().nonnegative() }).optional(),
+      currency: z.literal('usd'), metadata }).parse(object)
     const points = Number(session.metadata.points)
-    if (!POINTS_PURCHASE_AMOUNTS.some(amount => amount * 100 === points) || session.amount_total !== points) throw new Error('Invalid points purchase amount')
+    // Managed Payments can add tax. Credit the server-priced product, retain the
+    // actual taxed receipt, and never mistake tax for extra purchased points.
+    const subtotal = session.amount_subtotal ?? session.amount_total, tax = session.total_details?.amount_tax ?? 0
+    if (!POINTS_PURCHASE_AMOUNTS.some(amount => amount * 100 === points) || subtotal !== points
+      || (session.total_details?.amount_discount ?? 0) !== 0 || (session.total_details?.amount_shipping ?? 0) !== 0
+      || ![subtotal, subtotal + tax].includes(session.amount_total)) throw new Error('Invalid points purchase amount')
     const [existing] = await tx.select({ id: workspaceCreditGrants.id }).from(workspaceCreditGrants).where(eq(workspaceCreditGrants.externalId, session.id)).limit(1)
     if (existing) return
     const payment = z.object({ latest_charge: chargeDetails.nullable() }).parse(await get(`payment_intents/${session.payment_intent}?expand%5B%5D=latest_charge.balance_transaction`))
@@ -71,10 +79,14 @@ export async function applyPointsEvent(tx: Transaction, type: string, object: Re
       if (item.status !== 'succeeded') throw new Error('Points refund is pending; retry refund')
       const [existing] = await tx.select({ id: workspaceCreditGrants.id }).from(workspaceCreditGrants).where(eq(workspaceCreditGrants.externalId, item.id)).limit(1)
       if (existing) continue
-      const [refunded] = await tx.select({ points: sql<number>`coalesce(-sum(${workspaceCreditGrants.points}), 0)::int` }).from(workspaceCreditGrants).where(and(eq(workspaceCreditGrants.stripePaymentIntentId, charge.payment_intent), eq(workspaceCreditGrants.reason, 'refund')))
-      if ((refunded?.points ?? 0) + item.amount > purchase.points) throw new Error('Refund exceeds purchased points')
+      const [refunded] = await tx.select({ points: sql<number>`coalesce(-sum(${workspaceCreditGrants.points}), 0)::int`,
+        cents: sql<number>`coalesce(-sum(coalesce(${workspaceCreditGrants.amountCents},${workspaceCreditGrants.points})), 0)::int` }).from(workspaceCreditGrants).where(and(eq(workspaceCreditGrants.stripePaymentIntentId, charge.payment_intent), eq(workspaceCreditGrants.reason, 'refund')))
+      const paidCents = purchase.amountCents ?? purchase.points, refundedCents = (refunded?.cents ?? 0) + item.amount
+      if (paidCents <= 0 || refundedCents > paidCents) throw new Error('Refund exceeds purchased points')
+      const debit = Number(BigInt(purchase.points) * BigInt(refundedCents) / BigInt(paidCents)) - (refunded?.points ?? 0)
+      if (debit < 0) throw new Error('Points refund reconciliation regressed')
       await tx.insert(workspaceCreditGrants).values({
-        id: randomUUID(), workspaceId: purchase.workspaceId, bucket: 'purchased', points: -item.amount, reason: 'refund', externalId: item.id,
+        id: randomUUID(), workspaceId: purchase.workspaceId, bucket: 'purchased', points: -debit, reason: 'refund', externalId: item.id, parentGrantId: purchase.id,
         stripePaymentIntentId: charge.payment_intent, amountCents: -item.amount, currency: item.currency, receiptUrl: purchase.receiptUrl,
       }).onConflictDoNothing({ target: workspaceCreditGrants.externalId })
       await hostedBillingChanged(tx, purchase.workspaceId)

@@ -55,6 +55,7 @@ test('each fixed USD amount creates a payment session with server-owned pricing 
     assert.deepEqual(await pointsPurchaseUrl('actor', workspaceId, amount, 'zh-CN', fake, env), { url: checkoutUrl })
     const { body } = requests.at(-1)!
     assert.equal(body.get('mode'), 'payment')
+    assert.equal(body.get('managed_payments[enabled]'), 'true')
     assert.equal(body.get('customer'), 'cus_existing')
     assert.equal(body.get('client_reference_id'), workspaceId)
     assert.equal(body.get('line_items[0][price_data][currency]'), 'usd')

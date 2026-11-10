@@ -137,8 +137,8 @@ export class HostedUsageStore {
       `WITH balances AS (SELECT
       (EXISTS(SELECT 1 FROM hosted_verifications WHERE "workspaceId"=$1) OR EXISTS(SELECT 1 FROM workspace_credit_grants WHERE "workspaceId"=$1 AND points>0 AND (bucket='purchased' OR (bucket='plan' AND ("periodStart" IS NULL OR "periodStart"<=$3) AND ("expiresAt" IS NULL OR "expiresAt">$3))))) AS verified,
       COALESCE((SELECT remaining FROM hosted_allowances WHERE "workspaceId"=$1),0) AS free,
-      COALESCE((SELECT sum(GREATEST(0,g.points::bigint*$2::bigint-COALESCE((SELECT sum((u."planAllocations"->>g.id::text)::bigint) FROM hosted_usage u WHERE u."workspaceId"=$1),0)))
-        FROM workspace_credit_grants g WHERE g."workspaceId"=$1 AND g.bucket='plan' AND (g."periodStart" IS NULL OR g."periodStart"<=$3) AND (g."expiresAt" IS NULL OR g."expiresAt">$3)),0) AS plan,
+      COALESCE((SELECT sum(GREATEST(0,(g.points::bigint+COALESCE((SELECT sum(r.points) FROM workspace_credit_grants r WHERE r."parentGrantId"=g.id),0))*$2::bigint-COALESCE((SELECT sum((u."planAllocations"->>g.id::text)::bigint) FROM hosted_usage u WHERE u."workspaceId"=$1),0)))
+        FROM workspace_credit_grants g WHERE g."workspaceId"=$1 AND g.bucket='plan' AND g."parentGrantId" IS NULL AND g.points>0 AND (g."periodStart" IS NULL OR g."periodStart"<=$3) AND (g."expiresAt" IS NULL OR g."expiresAt">$3)),0) AS plan,
       COALESCE((SELECT sum(points)*$2 FROM workspace_credit_grants WHERE "workspaceId"=$1 AND bucket='purchased'),0)-COALESCE((SELECT sum("purchasedMicroUsd"+CASE WHEN state IN ('pending','unknown') THEN "reservedPurchased" ELSE 0 END) FROM hosted_usage WHERE "workspaceId"=$1),0) AS purchased)
       SELECT verified,GREATEST(0,free+LEAST(0,purchased+plan))::float8 AS free,
         GREATEST(0,plan+LEAST(0,purchased))::float8 AS plan,GREATEST(0,purchased)::float8 AS purchased FROM balances`,
@@ -361,8 +361,8 @@ export class HostedUsageStore {
       const plan = remainingPlan
       const allocations: Record<string, number> = {}
       if (remainingPlan > 0) {
-        const grants = await tx.query<{ id: string; remaining: number }>(`SELECT g.id,GREATEST(0,g.points::bigint*$2::bigint-COALESCE((SELECT sum((u."planAllocations"->>g.id::text)::bigint) FROM hosted_usage u WHERE u."workspaceId"=$1),0))::float8 AS remaining
-          FROM workspace_credit_grants g WHERE g."workspaceId"=$1 AND g.bucket='plan' AND (g."periodStart" IS NULL OR g."periodStart"<=$3) AND (g."expiresAt" IS NULL OR g."expiresAt">$3)
+        const grants = await tx.query<{ id: string; remaining: number }>(`SELECT g.id,GREATEST(0,(g.points::bigint+COALESCE((SELECT sum(r.points) FROM workspace_credit_grants r WHERE r."parentGrantId"=g.id),0))*$2::bigint-COALESCE((SELECT sum((u."planAllocations"->>g.id::text)::bigint) FROM hosted_usage u WHERE u."workspaceId"=$1),0))::float8 AS remaining
+          FROM workspace_credit_grants g WHERE g."workspaceId"=$1 AND g.bucket='plan' AND g."parentGrantId" IS NULL AND g.points>0 AND (g."periodStart" IS NULL OR g."periodStart"<=$3) AND (g."expiresAt" IS NULL OR g."expiresAt">$3)
           ORDER BY g."expiresAt" ASC NULLS LAST,g.id`, [row.workspaceId, MICRO_USD_PER_POINT, row.createdAt])
         for (const grant of grants.rows) {
           const amount = Math.min(remainingPlan, grant.remaining)

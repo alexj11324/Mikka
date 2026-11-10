@@ -69,7 +69,7 @@ export async function pointsPurchase(actorId: string, workspaceId: string, amoun
     const successUrl = `${back.href}&session_id={CHECKOUT_SESSION_ID}`
     back.searchParams.set('topup', 'cancelled')
     const common = {
-      mode: 'payment', customer: binding.id, client_reference_id: workspaceId,
+      mode: 'payment', managed_payments: { enabled: true }, customer: binding.id, client_reference_id: workspaceId,
       line_items: [{ price_data: { currency: 'usd', unit_amount: amount * 100, product_data: { name: 'Mikka points', tax_code: POINTS_TAX_CODE } }, quantity: 1 }],
       metadata, payment_intent_data: { metadata },
     }

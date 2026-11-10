@@ -15,10 +15,10 @@ import { enqueueOrganizationAudit } from '@/lib/governance/audit'
  * transaction is assumed. Duplicate/out-of-order deliveries use the monotone
  * account revision and never replay ledger grants or audit events.
  */
-export async function drainBillingEntitlements(eventId: string): Promise<void> {
+export async function drainBillingEntitlements(eventId?: string): Promise<void> {
   const rows = await db.select().from(billingEntitlementOutbox)
-    .where(and(eq(billingEntitlementOutbox.eventId, eventId), isNull(billingEntitlementOutbox.deliveredAt)))
-    .orderBy(asc(billingEntitlementOutbox.revision))
+    .where(and(eventId ? eq(billingEntitlementOutbox.eventId, eventId) : undefined, isNull(billingEntitlementOutbox.deliveredAt)))
+    .orderBy(asc(billingEntitlementOutbox.revision)).limit(100)
   for (const receipt of rows) {
     await workspaceDb.transaction(async tx => {
       const [workspace] = await tx.select({ id: workspaces.id, kind: workspaces.kind }).from(workspaces)
@@ -54,6 +54,8 @@ export async function drainBillingEntitlements(eventId: string): Promise<void> {
           source: 'cloud', expiresAt: receipt.expiresAt?.toISOString() ?? null, revision: receipt.revision, reason: 'billing_projection' } })
     })
     await db.update(billingEntitlementOutbox).set({ deliveredAt: new Date() })
-      .where(and(eq(billingEntitlementOutbox.eventId, receipt.eventId), isNull(billingEntitlementOutbox.deliveredAt)))
+      .where(and(eq(billingEntitlementOutbox.eventId, receipt.eventId),
+        eq(billingEntitlementOutbox.revision, receipt.revision), isNull(billingEntitlementOutbox.deliveredAt)))
   }
+  if (rows.length === 100) throw new Error('billing_entitlement_delivery_backlog')
 }

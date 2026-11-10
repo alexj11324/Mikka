@@ -22,12 +22,16 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
     metadata: { mikka_billing_model: 'resource_v1', mikka_plan: 'pro', mikka_monthly_points: '1000' } }
   const requests: Array<{ url: string; body: string }> = []
   const subscriptions = new Map<string, Record<string, unknown>>(), invoices = new Map<string, Record<string, unknown>>()
+  const payments = new Map<string, { id: string; amount_received: number; currency: string; metadata: Record<string, string> }>()
+  const invoicePayments = new Map<string, Array<{ id: string; amount_paid: number; currency: string; invoice: string; status: string; payment: { type: string; payment_intent: string } }>>()
   const fake = (async (input: string, init: RequestInit = {}) => {
     const url = new URL(input); requests.push({ url: input, body: String(init.body ?? '') })
     let result: unknown
     if (url.pathname === '/v1/prices/price_resource') result = price
     else if (url.pathname.startsWith('/v1/subscriptions/')) result = subscriptions.get(url.pathname.split('/').at(-1)!)
     else if (url.pathname.startsWith('/v1/invoices/')) result = invoices.get(url.pathname.split('/').at(-1)!)
+    else if (url.pathname.startsWith('/v1/payment_intents/')) result = payments.get(url.pathname.split('/').at(-1)!)
+    else if (url.pathname === '/v1/invoice_payments') result = { has_more: false, data: invoicePayments.get(url.searchParams.get('invoice')!) ?? [] }
     else if (url.pathname === '/v1/checkout/sessions') result = { url: 'https://checkout.stripe.com/c/pay_synthetic' }
     else if (url.pathname === '/v1/billing_portal/sessions') result = { url: 'https://billing.stripe.com/p/session_synthetic' }
     return new Response(JSON.stringify(result ?? { error: 'unknown_synthetic_route' }), { status: result ? 200 : 404 })
@@ -37,8 +41,9 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
   const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
   const back = 'https://mikka.example/settings?section=billing'
   const start = Math.floor(Date.now() / 1000) - 86400, end = start + 30 * 86400
-  const subId = id('sub'), customer = id('cus'), invoiceId = id('in')
-  const invoice = { id: invoiceId, subscription: subId, status: 'paid', amount_paid: 2000, currency: 'usd', billing_reason: 'subscription_create',
+  const subId = id('sub'), customer = id('cus'), invoiceId = id('in'), paymentId = id('pi')
+  payments.set(paymentId, { id: paymentId, amount_received: 2000, currency: 'usd', metadata: {} })
+  const invoice = { id: invoiceId, customer, subscription: subId, payment_intent: paymentId, status: 'paid', amount_paid: 2000, currency: 'usd', billing_reason: 'subscription_create',
     hosted_invoice_url: 'https://invoice.stripe.com/i/synthetic', lines: { has_more: false, data: [{ price: { id: price.id }, quantity: 1, proration: false, period: { start, end } }] } }
   invoices.set(invoiceId, invoice)
   const sub = { id: subId, customer, status: 'active', metadata: { workspaceId: ws.id, billingModel: 'resource_v1' },
@@ -56,6 +61,7 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
     assert.deepEqual(await billing.planCheckoutUrl(admin, ws.id, back, fake, env), { url: 'https://checkout.stripe.com/c/pay_synthetic' })
     const request = requests.find(row => row.url.endsWith('/checkout/sessions'))!, body = new URLSearchParams(request.body)
     assert.deepEqual([body.get('mode'), body.get('line_items[0][price]'), body.get('line_items[0][quantity]'), body.get('subscription_data[metadata][workspaceId]'), body.get('subscription_data[metadata][billingModel]')], ['subscription', 'price_resource', '1', ws.id, 'resource_v1'])
+    assert.equal(body.get('managed_payments[enabled]'), 'true')
     price.active = false
     await rejects(billing.planCheckoutUrl(admin, ws.id, back, fake, env), 'billingResourcePlanUnavailable')
     price.active = true
@@ -131,14 +137,106 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
   })
 
   await t.test('legacy seat subscriptions keep their quantity and paid history but cannot cap members', async () => {
-    const legacy = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), legacySubId = id('sub'), legacyInvoice = { ...invoice, id: id('in'), subscription: legacySubId,
+    const legacy = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), legacySubId = id('sub'), legacyInvoice = { ...invoice, id: id('in'), customer: id('cus'), subscription: legacySubId,
       lines: { has_more: false, data: [{ price: { id: 'price_legacy' }, quantity: 7, proration: false, period: { start, end } }] } }
-    const old = { ...sub, id: legacySubId, customer: id('cus'), metadata: { workspaceId: legacy.id }, latest_invoice: legacyInvoice,
+    const old = { ...sub, id: legacySubId, customer: legacyInvoice.customer, metadata: { workspaceId: legacy.id }, latest_invoice: legacyInvoice,
       items: { data: [{ quantity: 7, current_period_end: end, price: { id: 'price_legacy', nickname: 'Legacy seats' } }] } }
     subscriptions.set(legacySubId, old)
     await billing.applyStripeEvent(event('customer.subscription.updated', old), options)
     const view = await billing.workspaceBillingView(admin, legacy.id, env)
     assert.deepEqual([view.billingModel, view.entitlementPlan, view.seats], ['legacy_seat', 'pro', 7])
     assert.equal((await pool.query('select count(*)::int n from workspace_credit_grants where "workspaceId"=$1', [legacy.id])).rows[0].n, 0, 'a historical price does not invent new monthly credits')
+  })
+
+  await t.test('auto-recharge limits and revocation require the owner, serialize revisions and never bypass Managed Payments', async () => {
+    const { saveAutoRechargePolicy } = await import('../lib/billing/auto-recharge')
+    const target = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'admin' }])
+    const value = { enabled: false, thresholdPoints: 100, amountPoints: 1000, monthlyCapPoints: 3000, expectedRevision: 0 }
+    const requestsBefore = requests.length
+    await rejects(saveAutoRechargePolicy(member, target.id, value), 'workspaceAccessDenied')
+    const saved = await saveAutoRechargePolicy(admin, target.id, value)
+    assert.deepEqual([saved.state, saved.enabled, saved.monthlyCapPoints, saved.revision], ['provider_unsupported', false, 3000, 1])
+    await rejects(saveAutoRechargePolicy(admin, target.id, value), 'billingPolicyChanged')
+    await assert.rejects(saveAutoRechargePolicy(admin, target.id, { ...value, expectedRevision: 1, monthlyCapPoints: 500 }))
+    await assert.rejects(saveAutoRechargePolicy(admin, target.id, { ...value, expectedRevision: 1, enabled: true }))
+    await rejects(saveAutoRechargePolicy(admin, target.id, { ...value, expectedRevision: 1, enabled: true, consent: true }), 'billingAutoRechargeUnavailable')
+    assert.equal(requests.length, requestsBefore, 'saving or refusing a policy never issues a real or synthetic payment request')
+    assert.equal((await pool.query(`select count(*)::int n from workspace_audit_events where "workspaceId"=$1 and action='billing.auto_recharge_changed'`, [target.id])).rows[0].n, 1)
+    assert.equal((await pool.query('select "autoRechargeEnabled" from workspace_billing where "workspaceId"=$1', [target.id])).rows[0].autoRechargeEnabled, false)
+    const organizationId = randomUUID()
+    await pool.query(`insert into mikka_organizations(id,name,"createdBy") values($1,'Synthetic payment authority',$2)`, [organizationId, admin])
+    await pool.query(`insert into mikka_organization_members("organizationId","userId",name,email,role) values($1,$2,'Owner','owner@example.invalid','owner'),($1,$3,'Admin','admin@example.invalid','admin')`, [organizationId, admin, member])
+    await pool.query('insert into mikka_organization_workspaces("organizationId","workspaceId") values($1,$2)', [organizationId, target.id])
+    await organizationBilling.setOrganizationBillingAccount(admin, organizationId, target.id)
+    await rejects(saveAutoRechargePolicy(member, target.id, { ...value, expectedRevision: 1 }), 'workspaceAccessDenied')
+    assert.equal((await saveAutoRechargePolicy(admin, target.id, { ...value, expectedRevision: 1, monthlyCapPoints: 2000 })).revision, 2)
+  })
+
+  await t.test('partial and full plan refunds append immutable receipts, revoke unused credits and cannot revive paid entitlements on replay', async () => {
+    const store = new HostedUsageStore(pool), before = (await store.balance(ws.id)).plan, chargeId = id('ch')
+    const first = { id: id('re'), amount: 1000, currency: 'usd', status: 'succeeded' }
+    const second = { ...first, id: id('re') }
+    const refunded = (items: typeof first[]) => event('charge.refunded', { id: chargeId, payment_intent: paymentId, currency: 'usd', refunds: { data: items, has_more: false } })
+    const partial = refunded([first])
+    await billing.applyStripeEvent(partial, options)
+    assert.equal((await store.balance(ws.id)).plan, before - 5_000_000)
+    assert.equal((await billing.workspaceBillingView(admin, ws.id, env)).entitlementPlan, 'pro')
+    await Promise.all([billing.applyStripeEvent(refunded([first, second]), options), billing.applyStripeEvent(partial, options)])
+    await billing.applyStripeEvent(event('invoice.paid', invoice), options)
+    assert.equal((await store.balance(ws.id)).plan, 0)
+    assert.equal((await store.balance(ws.id)).purchased, 0, 'a plan refund never invents a personal purchased-credit debt')
+    assert.equal((await billing.workspaceBillingView(admin, ws.id, env)).entitlementPlan, 'free')
+    const receipts = (await pool.query('select points,"amountCents",reason from workspace_credit_grants where "workspaceId"=$1 order by "createdAt",id', [ws.id])).rows
+    assert.equal(receipts.find(row => row.reason === 'subscription').points, 1000)
+    assert.equal(receipts.reduce((sum, row) => sum + row.points, 0), 0)
+    assert.equal(receipts.reduce((sum, row) => sum + row.amountCents, 0), 0)
+    const authority = (await pool.query('select plan,"billingPlan" from mikka_workspace_entitlements where "workspaceId"=$1', [ws.id])).rows[0]
+    assert.deepEqual(authority, { plan: 'enterprise', billingPlan: 'free' }, 'operator grants retain their independent signed authority')
+  })
+
+  await t.test('a refund before its invoice and a concurrent invoice/refund both reconcile without a lost debit', async () => {
+    for (const concurrent of [false, true]) {
+      const target = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), sid = id('sub'), iid = id('in'), pid = id('pi')
+      payments.set(pid, { id: pid, amount_received: 2000, currency: 'usd', metadata: {} })
+      const paid = { ...invoice, id: iid, customer: id('cus'), subscription: sid, payment_intent: pid }
+      invoices.set(iid, paid)
+      const active = { ...sub, id: sid, customer: paid.customer, metadata: { workspaceId: target.id, billingModel: 'resource_v1' }, latest_invoice: paid }
+      subscriptions.set(sid, active)
+      const returned = event('charge.refunded', { id: id('ch'), payment_intent: pid, currency: 'usd', refunds: { has_more: false, data: [{ id: id('re'), amount: 2000, currency: 'usd', status: 'succeeded' }] } })
+      const granted = event('invoice.paid', paid)
+      if (concurrent) await Promise.all([billing.applyStripeEvent(returned, options), billing.applyStripeEvent(granted, options)])
+      else {
+        await billing.applyStripeEvent(returned, options)
+        assert.equal((await pool.query('select count(*)::int n from workspace_credit_grants where "workspaceId"=$1', [target.id])).rows[0].n, 0)
+        await billing.applyStripeEvent(granted, options)
+      }
+      assert.equal((await new HostedUsageStore(pool).balance(target.id)).plan, 0)
+      assert.equal((await billing.workspaceBillingView(admin, target.id, env)).entitlementPlan, 'free')
+      assert.equal((await pool.query('select sum(points)::int n from workspace_credit_grants where "workspaceId"=$1', [target.id])).rows[0].n, 0)
+      assert.equal((await pool.query('select count(*)::int n from billing_refund_receipts where "paymentIntentId"=$1 and "reconciledAt" is null', [pid])).rows[0].n, 0)
+    }
+  })
+
+  await t.test('current Stripe invoice payments apportion multiple paid sources and retain their cumulative refund ceiling', async () => {
+    const target = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }]), sid = id('sub'), iid = id('in'), pids = [id('pi'), id('pi')]
+    for (const pid of pids) payments.set(pid, { id: pid, amount_received: 1000, currency: 'usd', metadata: {} })
+    invoicePayments.set(iid, pids.map(pid => ({ id: id('inpay'), amount_paid: 1000, currency: 'usd', invoice: iid, status: 'paid', payment: { type: 'payment_intent', payment_intent: pid } })))
+    const paid = { ...invoice, id: iid, customer: id('cus'), subscription: sid, payment_intent: null }
+    invoices.set(iid, paid)
+    const active = { ...sub, id: sid, customer: paid.customer, metadata: { workspaceId: target.id, billingModel: 'resource_v1' }, latest_invoice: paid }
+    subscriptions.set(sid, active)
+    await billing.applyStripeEvent(event('invoice.paid', paid), options)
+    const store = new HostedUsageStore(pool)
+    assert.equal((await store.balance(target.id)).plan, 10_000_000)
+    const excessive = event('charge.refunded', { id: id('ch'), payment_intent: pids[0], currency: 'usd', refunds: { has_more: false,
+      data: [{ id: id('re'), amount: 1001, currency: 'usd', status: 'succeeded' }] } })
+    await assert.rejects(billing.applyStripeEvent(excessive, options), /billing_refund_exceeds_payment/)
+    assert.equal((await pool.query('select count(*)::int n from stripe_webhook_events where id=$1', [excessive.id])).rows[0].n, 0)
+    assert.equal((await store.balance(target.id)).plan, 10_000_000)
+    for (const [index, pid] of pids.entries()) {
+      await billing.applyStripeEvent(event('charge.refunded', { id: id('ch'), payment_intent: pid, currency: 'usd', refunds: { has_more: false, data: [{ id: id('re'), amount: 1000, currency: 'usd', status: 'succeeded' }] } }), options)
+      assert.equal((await store.balance(target.id)).plan, index === 0 ? 5_000_000 : 0)
+      assert.equal((await billing.workspaceBillingView(admin, target.id, env)).entitlementPlan, index === 0 ? 'pro' : 'free')
+    }
   })
 })
