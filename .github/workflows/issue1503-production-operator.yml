@@ -1,4 +1,4 @@
-# Root-bound exact #1503 child cleanup; execution requires the recorded source, artifact and actual window.
+# Inactive #1503 cleanup carrier: entry deadline expired while queued; no cleanup success is claimed.
 name: Issue 1503 exact read-only child cleanup
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
   queue: max
 jobs:
   cleanup:
-    if: true # ROOT_BOUND_EXACT_CHILD_CLEANUP
+    if: false # CLOSED_UNEXECUTED_ENTRY_WINDOW_EXPIRED
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
