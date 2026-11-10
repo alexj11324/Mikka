@@ -1,0 +1,171 @@
+{
+  "schema": "issue1512.independent-native-live-catchup-design-review.v1",
+  "reviewer": "/root/independent_final",
+  "observedAt": "2026-11-10 04:01:19 UTC",
+  "sourceHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "sourceNote": "These paths are unchanged from source G a5027 to H5f; H only adds the previously reviewed no-thenable test comment. The subsequent cc389-to-f5ddb main delta does not touch the requested observer/channel/use-live-key/read-batch/rpc paths.",
+  "result": "NARROW_QUEUE_ONLY_DESIGN_OPPORTUNITY; NO_PROVEN_FIX_FOR_COMPLETE_NATIVE_LOGIN_BUDGET",
+  "sources": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "blob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "bytes": 8237,
+      "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "blob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "bytes": 24031,
+      "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "blob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "blob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+      "bytes": 6301,
+      "sha256": "f98ecf6e986da17aa66d8c54039f5d683dc7cfb7d2e563eec5efffeff9527bac"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "blob": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "bytes": 4726,
+      "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e"
+    },
+    {
+      "path": "apps/desktop/src/renderer/live-runtime.ts",
+      "blob": "e632451a6e9f4300159f7ff44ae74761349ab8fd",
+      "bytes": 3537,
+      "sha256": "d2561036b5b90c671a5061bc12cc3d0f7e8dcc1d509efbb578dee3ed56f35a61"
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "blob": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "bytes": 4551,
+      "sha256": "847311eb9b775d43bb9f569d6ec395aeb41475a5ed7468e17cd1826b2c73217d"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "blob": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "bytes": 9807,
+      "sha256": "da27e73ae937fed876ae463e988d4418292f9976aeb7bc95a89e786ae80e5fab"
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "blob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "bytes": 3337,
+      "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0"
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "blob": "d459548cbd8785bf2764d23543109b99ae146d18",
+      "bytes": 1580,
+      "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8"
+    },
+    {
+      "path": "apps/desktop/src/main/bundled-live.ts",
+      "blob": "7d6056ed3b623cc3366895a3ce4484bec5e65b5d",
+      "bytes": 4594,
+      "sha256": "5d70a1d96e528dd80b3287418166ebddbc526247fc18f5ef2809175538fb8647"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "blob": "30ef728a5a2d465d389916a63d40a816d13b1d4c",
+      "bytes": 84780,
+      "sha256": "2b1fb0b1d8f701d12506e950676c7acf1bb2eddd83ee13c398583af1288375b1"
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "blob": "79e3ab5574c5806f4ec0d708e0b7100b251fcdcc",
+      "bytes": 45859,
+      "sha256": "591ca7d47e4af01661817bac8466fdaeaac240858dc5cf1bac42ba3aa5da3baa"
+    }
+  ],
+  "performed": [
+    "Read exact current observer/channel/hook/native dispatch sources and relevant existing regression source.",
+    "Independent static reasoning only; no source edits, no new tests executed, no resources, no Actions originals or original acceptance JSON read, no ref update."
+  ],
+  "currentFacts": [
+    "observeSWRRead records began before middleware hydration. staleOnFocus invokes only snapshotReadFetcher-registered fetchers inside the synchronous withDispatch token, after waitForCacheHydration.",
+    "Native callAction obtains capturePendingReadDispatch only for the five audited snapshot actions, before enqueueRead. This creates dispatchCaptured and a revocation promise, not pendingDispatchAt and not completed coverage.",
+    "MessageChannel drains the current turn once; flush partitions locale/workspace/isCurrent and existing generation. resetReadBatchScope rejects retired pending items. No response cache or added delay timer exists.",
+    "callRemoteAction awaits encodeArgs, checks current scope, captures the response dispatch proof, invokes onDispatch and immediately calls fetch(cache:no-store). No await separates these final steps. Therefore pendingDispatchAt is actual pre-fetch metadata, not queue-entry time.",
+    "The response object receives a WeakMap dispatch proof; batch projection copies it only to the five audited snapshot result types. observeListRead preserves it through one shallow wrapper. Multi-read or delta-merging syncCoordinatorChat, syncIssueList and syncThreadList are excluded.",
+    "readFresh joins an old-entry read only when pendingDispatchAt is later than after; completion must still show read.began advanced by the response proof, same current applied cache object, successful onSuccess and revision acceptance. A late completion alone is not accepted.",
+    "LiveChannel.onopen and live_ready are distinct. onopen queues unconditional catch-up with a new readBoundary; capability acknowledgement establishes coverageAfter. A late supported subscription uses max(coverageAfter, matching-kind invalidationAfter); unsupported/no-presence cases retain a fresh boundary. Newer pending obligations keep max(after).",
+    "All compared boundaries are monotonic same-renderer-realm order tokens, not wall clocks or Electron-main timestamps. A request actually dispatched after that renderer observes live_ready cannot have started its remote database snapshot before the dispatch, under the existing audited fresh-snapshot transport contract.",
+    "An onopen-derived obligation is an open-gap obligation; it must not be mislabeled capability-ready coverage. This design does not move either boundary or claim an unacknowledged kind is continuously covered."
+  ],
+  "queueOnlyGap": {
+    "admissibleTimeline": [
+      "R: observer entry",
+      "Q: exactly one audited snapshot enqueue/capture",
+      "L: existing freshness obligation, e.g. authorized capability-ready boundary",
+      "F: ordinary live flush calls readFresh while still queued",
+      "D: existing queue/encoding eventually reaches actual pre-fetch proof and onDispatch",
+      "C: exact resulting object commits through SWR"
+    ],
+    "currentBehavior": "If R<=L, pendingDispatchAt is still absent at F, so readFresh immediately calls mutate. It does not mislabel the queue as sent, but it cannot join this genuinely not-yet-dispatched snapshot. This is a theoretical redundant-read window.",
+    "candidateMinimalChange": "Only widen readFresh's permission to wait, not its permission to return data: a latest nonreceived/nonsuperseded read with dispatchCaptured===true, dispatchNotified!==true, dispatchAmbiguous!==true and its existing pendingRevoked promise may await the original settled/revoked race. Do not set began or pendingDispatchAt at enqueue. Keep final proof/applied/revisions/current checks unchanged.",
+    "reason": "At F the audited send has not occurred; any subsequent real dispatch is later than L. Waiting does not itself certify completion. If no final dispatch proof arrives, use ordinary revalidation; original failures propagate; ambiguity or supersession wakes the existing revocation path.",
+    "scope": "No scheduler/timer/network/auth/cache lifetime change; no action added to the audited whitelist. This is a design proposal, not an implemented or tested patch.",
+    "causalLimit": "No exported receipt read in this review proves F occurred between Q and D in the failing run. It cannot be credited as eliminating any measured SQL, and cannot cover the principal Coordinator/Issue/Thread delta-reader excess."
+  },
+  "counterexamples": [
+    {
+      "sequence": [
+        "D: original HTTP dispatched",
+        "S: old DB snapshot starts",
+        "W: external change commits before connection coverage",
+        "L: socket/capability ready",
+        "C: old response completes"
+      ],
+      "required": "Catch-up must still issue a new authorized read. C>L is insufficient because S<L; the original cannot contain W."
+    },
+    {
+      "sequence": [
+        "L: ready",
+        "D: original snapshot dispatch",
+        "P: newer push/deadline obligation",
+        "C: original response completes"
+      ],
+      "required": "D<P, so a later read remains required unless the already existing explicit revision-coverage contract proves it. Do not let the original pending hint erase P."
+    },
+    {
+      "sequence": [
+        "Q: snapshot pending",
+        "L: ready",
+        "X: owner/workspace/cache/generation retired",
+        "C: old result returns"
+      ],
+      "required": "Retired lifetime must neither adopt old data nor start a departed-scope revalidation. Preserve current(), transport generation and exact owner/workspace result checks."
+    },
+    {
+      "sequence": [
+        "Q1: capture",
+        "Q2: second capture or second dispatch from404 fallback"
+      ],
+      "required": "Ambiguous hint is revoked. Never certify a merged or fallback response by replacing its original identity with an enqueue timestamp."
+    }
+  ],
+  "minimumFalsificationMatrix": [
+    "Force existing queued snapshot to remain un-dispatched through live flush, then release normal dispatch after L: new logic may wait but cannot report coverage before C; exactly one ordinary logical fetch may suffice only after valid proof and SWR commit.",
+    "Dispatch before L, hold response until after L: ordinary catch-up must still dispatch while old response is pending; final late completion must not suppress it.",
+    "Push/deadline after actual D and before C: preserve the newer after and trailing fresh read; multiple pre-D obligations may only join a dispatch later than their maximum boundary.",
+    "Queued read fails, becomes ambiguous, is superseded, or returns an unproven result: preserve original failure/no hidden retry, wake revocation, follow newer read or ordinary fallback.",
+    "Owner/workspace/cache retirement or hidden lifetime: no old-object adoption and no old-scope revalidation.",
+    "Retain existing single/batch post-ready cases, before-ready cases, two workspace array readers, 404 fallback revocation, comparator/discarded result and revision acceptance tests. The current pending-observer tests call notify before readFresh and do not directly cover F-before-D."
+  ],
+  "notAnAllowedShortcut": [
+    "Do not replace dispatch/snapshot ordering with completion timestamps or requestedAt/render timestamps.",
+    "Do not delay onopen invalidation, increase the100ms flush/coalescing interval, disable fallback, or suppress legitimate push/deadline/visibility obligations.",
+    "Do not mark delta-merging readers snapshotReadFetcher or carry another read's proof without a separate full semantic audit.",
+    "Do not reuse an authorization SELECT after dispatch or across requests/executors/users/sessions/pins/principals/transactions/after scopes.",
+    "Do not preconnect an owner-home channel by guessing from selected workspace; ownerListWorkspace obtains an authorized owned home from a matching response, and the unresolved placeholder deliberately has null transport."
+  ],
+  "recommendation": "No full Native441<=Web331 fix is justified by this static live audit alone. Keep the acceptance failed. The narrow queued-only design is falsifiable but needs actual occurrence/benefit evidence before attributing it to the failing budget. When initial HTTP is already before ticket/open, retain catch-up; a broader early-channel design needs a separately authorized scope source and must not delay the ordinary read."
+}

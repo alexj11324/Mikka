@@ -1,0 +1,198 @@
+{
+  "schema": "mikka.issue1512.browser-hosted-adapter-node24-verification.v1",
+  "recordedAt": "2026-11-10 03:55:25 UTC",
+  "source": {
+    "base": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "driver": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+    "tests": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+    "inputManifest": "1bbb9f015719e643687c2a931eb7e7ffb1da7d98",
+    "runner": "e0a5d2aa32e4ce1ef94c5457e27aee6a652d477f",
+    "controller": "295be4c6b5f405c0d35cebdcb3f8411d14701b36",
+    "controllerTests": "d691eae014652646df2cfef2f8d1015b6118c2f7"
+  },
+  "environment": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "arch": "x64",
+    "vm": "sbx_pcrANhcaSb1J6mEZJ3WKxzX4U2RP",
+    "vcpus": 1,
+    "memoryMb": 2048,
+    "dependencyInstall": false,
+    "externalApplicationOrModelCalls": false,
+    "actualBrowserLaunched": false,
+    "networkPolicy": "provider default; child environment restricted and all runtime/browser/network seams supplied synthetic fixtures"
+  },
+  "results": {
+    "red": {
+      "tests": 61,
+      "pass": 54,
+      "fail": 7,
+      "failedIndices": [
+        44,
+        45,
+        57,
+        58,
+        59,
+        60,
+        61
+      ],
+      "old43TestsAllPassed": true,
+      "reason": "Four hosted success/fallback tests cannot reach the new controls, cross-account label guard lacks expected refusal, and the two unknown-submit tests cannot reach their paid-click seam with old selectors."
+    },
+    "green": {
+      "tests": 135,
+      "pass": 135,
+      "fail": 0,
+      "browser": 61,
+      "core": 74
+    },
+    "controller": {
+      "tests": 37,
+      "pass": 37,
+      "fail": 0
+    },
+    "all": {
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "evidence": {
+    "runResponse": "6069cbeb914f616b9e24ce8e7f0257fd97bf740d",
+    "logResponse": "e83323e0d23d5bd62a4c66237fa41271312c9ec1",
+    "rawPartResponses": [
+      {
+        "index": 0,
+        "gitBlob": "60d41bafa128aae4ea04c941ab162dcd19f064e8"
+      },
+      {
+        "index": 1,
+        "gitBlob": "dc223fc3cb3cbd478cb45ff7cbc39e7bbdc8db5d"
+      },
+      {
+        "index": 2,
+        "gitBlob": "884e2dfe5f17c43a3348c1ef1ec395cb58814169"
+      },
+      {
+        "index": 3,
+        "gitBlob": "43643067d363ea70ce33a49f8c8d69ef75ffb77b"
+      },
+      {
+        "index": 4,
+        "gitBlob": "33c5f95e76024935c2fe217c7f13663afe29c372"
+      },
+      {
+        "index": 5,
+        "gitBlob": "23c3a2055bc48a6911750b2de922af9c30bdfa02"
+      },
+      {
+        "index": 6,
+        "gitBlob": "ff41c72025982bc8fb71e83cd0040bf838ddda83"
+      },
+      {
+        "index": 7,
+        "gitBlob": "ce6d7db15bdebbae9276916a290c5a2133face8e"
+      },
+      {
+        "index": 8,
+        "gitBlob": "2d5ddbe9e3cde1486ae0121c5d9f63dae46292b0"
+      },
+      {
+        "index": 9,
+        "gitBlob": "581de7e31517a706d51122464db5f5734fa7c2da"
+      },
+      {
+        "index": 10,
+        "gitBlob": "e670dd29208f09cabf869506d7ba609cda6486d1"
+      },
+      {
+        "index": 11,
+        "gitBlob": "b50f15f210d96b9d9046a4b29ee151ef4b2129f4"
+      },
+      {
+        "index": 12,
+        "gitBlob": "34ec8c59298c6693f9fedeeb1fd9b94513d36f5a"
+      },
+      {
+        "index": 13,
+        "gitBlob": "af0cf4f87b523e569c919115957795078e1e6b05"
+      },
+      {
+        "index": 14,
+        "gitBlob": "c3d93eb5a9c3e8fb363d90e2f258c1071feee2c4"
+      },
+      {
+        "index": 15,
+        "gitBlob": "406ae8c7af2217ad5c07cec2f49b5d80c2d78e9a"
+      },
+      {
+        "index": 16,
+        "gitBlob": "4abd5e2871a6ecf1b3a2e901e1e085b7ccbe3f15"
+      }
+    ],
+    "gzip": "47d43c4172fea663062e3290dc4b2b21e2b2e625",
+    "bundle": "45a31487a7431d5a9c2304942ed24c0aab47183f",
+    "streams": [
+      {
+        "case": "browser_red_old_driver_new_tests",
+        "stream": "stdout",
+        "bytes": 20586,
+        "sha256": "272d7a39dd11d07344c731637d38235498d9c9fef737f4e5c48fd5488558add2",
+        "gitBlob": "1cca865c94503a8e5a83f5514b0837ceb1bf4969"
+      },
+      {
+        "case": "browser_red_old_driver_new_tests",
+        "stream": "stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "case": "browser_and_core_green",
+        "stream": "stdout",
+        "bytes": 33113,
+        "sha256": "5ea82e6ed73b652c7458efb18197b0ad29523533465f5ba9b05fefc383ceb5c3",
+        "gitBlob": "8ba001f1c0bbb28bab3174f991d39de647a498f4"
+      },
+      {
+        "case": "browser_and_core_green",
+        "stream": "stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      {
+        "case": "production_dispatch_controller",
+        "stream": "stdout",
+        "bytes": 5347,
+        "sha256": "13f70e5fd76493964948ea8d58b5eeae676dce33b9fe07203a982e6f1396fb4f",
+        "gitBlob": "f0648676de1a4305ea4c533dfff81e4259096d69"
+      },
+      {
+        "case": "production_dispatch_controller",
+        "stream": "stderr",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    ]
+  },
+  "setups": {
+    "networkPolicyValidationRejected": "f4129816e7975e561fd4a756d4274da2445462ce",
+    "node22Created": "9b975df91f5548c3f5b31048098a74d17b536ec9",
+    "node22RefusalLogs": "2d5f12a3e39771b451033d99557b8fa5f03307e2",
+    "node22Cleanup": "82e01f531c232afd8712c54da1c83f7e605156f0",
+    "node22TestsExecuted": 0,
+    "node24Created": "2ca8ab1aef521054c1161c5635eda06a71f304c3"
+  },
+  "cleanup": {
+    "node24": "198922848d4435c411609018187cdff27f5b5be9",
+    "bothInstancesStoppedDeletedAndGet404": true,
+    "activeVmCount": 0
+  },
+  "limits": [
+    "Actual Node tests use synthetic locator/API/subprocess seams and do not prove real production DOM/Replay ingestion/model or trace completeness.",
+    "Source adapter remains unpushed while Native complete-login query budget is failing (441 vs331). No formal source, main or production dispatcher ref moved by these tests.",
+    "37 controller tests establish offline request/receipt/guard behavior; no production workflow was dispatched."
+  ]
+}

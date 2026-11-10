@@ -1,0 +1,115 @@
+{
+  "schema": "issue1512.hosted-browser-selector-compatibility.v1",
+  "reviewer": "independent_final",
+  "verdict": "CURRENT_DRIVER_REQUIRES_AUTOMATION_ONLY_ADAPTATION_BEFORE_FINAL_HOSTED_ACCEPTANCE",
+  "sources": {
+    "formal": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "driver": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+    "tests": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+    "main": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "mainDirectCommitChangedFiles": 80,
+    "cc389ToMainChangedFiles": 90,
+    "hostedPR": 61,
+    "hostedMainAndMergedCommit": "fe20f19bcf82e6541430b62c450920ba42c95fb0",
+    "hostedTree": "b202384d3b0730eb5160a502eedbd9b439f1e210",
+    "hostedPRChangedFiles": 49
+  },
+  "files": [
+    {
+      "repository": "alexj11324/mikka-hosted-ui",
+      "path": "slots/new-task.tsx",
+      "blob": "99c66cc83c022c6b6c9a2d31220b69b2d0f31465",
+      "bytes": 6488,
+      "sha256": "11bc7023cded5b57716ab595e956c675f9cd35eb76658f9ff1b26e09bbd6c849",
+      "gitBlobVerified": true
+    },
+    {
+      "repository": "alexj11324/mikka-hosted-ui",
+      "path": "slots/search.tsx",
+      "blob": "ec5fc51f262cd541a08256c4081e76dca41df11c",
+      "bytes": 5115,
+      "sha256": "3aeb559ce621858a2e31ef19b03ca9eb02ec9faac7b81ce858104f8f9aa7549e",
+      "gitBlobVerified": true
+    },
+    {
+      "repository": "alexj11324/mikka-hosted-ui",
+      "path": "slots/app-frame.tsx",
+      "blob": "cd80ca86865b7c9b8e294d629495f71c8ce9c35c",
+      "bytes": 17407,
+      "sha256": "05df8dbf511a51a7c24fde5140f93096723e34f92b9769098d7fff158e22c2fb",
+      "gitBlobVerified": true
+    },
+    {
+      "repository": "alexj11324/mikka-hosted-ui",
+      "path": "components/mikka/create-window.tsx",
+      "blob": "a420adfcf85029714bcb22495a3171034819aa83",
+      "bytes": 1629,
+      "sha256": "4011ed34d2f4b20dcd86b6a15b5f2c6f57c1b7f01f51eb72d57c833e0724cb13",
+      "gitBlobVerified": true
+    },
+    {
+      "repository": "alexj11324/mikka-hosted-ui",
+      "path": "components/app-shell.tsx",
+      "blob": "43f2c91ee96ee5a099ef7e2d7ed6869dc7a22621",
+      "bytes": 359557,
+      "sha256": "cfe5724b0f11cd10bc2c58682ce5b61cff9862e2bdc3afc6b1d037e08e7b3ac9",
+      "gitBlobVerified": true
+    },
+    {
+      "repository": "alexj11324/mikka-hosted-ui",
+      "path": "components/kanban.tsx",
+      "blob": "985ed5a93c7ffd50cb1d811ffcb187b41ec7fa20",
+      "bytes": 78538,
+      "sha256": "430d6b0da5dbc215675473dab5390247447fea386723b3feb3de4573a9fe07e1",
+      "gitBlobVerified": true
+    },
+    {
+      "repository": "alexj11324/mikka-hosted-ui",
+      "path": "components/ui/command-menu-clean.tsx",
+      "blob": "aef3f2b98a4219725f9feb9f7c4e151a68f04449",
+      "bytes": 37535,
+      "sha256": "b7c0973f3a09b812f8766c50d9caea92554a5b2c3bdba6cc1bbf00b2dbcb3228",
+      "gitBlobVerified": true
+    }
+  ],
+  "contract": [
+    {
+      "surface": "workspace",
+      "old": "button exact Workspace menu; named menu; account group; menuitem exact workspace",
+      "hosted": "AppShell .ui-as-ws-menu button[aria-haspopup=menu], flat role menu, checked choices are menuitemradio. Workspace label is dynamic and account email appears only on the first choice of each account.",
+      "required": "Use the observed unique hosted trigger and checked-choice role; prove target workspace name is unique across all returned account choices before using the flat menu. Retain owner/account/Personal membership and document navigation readback checks."
+    },
+    {
+      "surface": "search",
+      "old": "button exact Search everything",
+      "hosted": "FRAME_OWNS_HEADER=true removes the old global search header. ShellFrame passes onSearch and Search… to AppShell; button.ui-as-side__search includes its shortcut, then SearchPalette is a named Search everything dialog.",
+      "required": "Support the exact hosted button class/aria-haspopup contract as an alternative to the old accessible button. The internal New task quick action is still role option and its shortcut is aria-hidden."
+    },
+    {
+      "surface": "new-task identity",
+      "old": "named New task dialog",
+      "hosted": "CreateWindow role=dialog, aria-modal=true, aria-labelledby=hosted-new-task-title; CreateWindowLayer portals into the owned shell.",
+      "required": "Continue requiring exactly one named New task dialog; do not scope by a generic modal or use a hidden fallback."
+    },
+    {
+      "surface": "machine and bot",
+      "old": "combobox exact Machine / Bot to hand it to; options",
+      "hosted": "Buttons expose aria-label Machine: <current> / Bot to hand it to: <current>. Shared Dropdown has role menu, MenuList checked items are menuitemradio, and onSelect changes the same shared NewTaskDialog state.",
+      "required": "Select exactly Mikka Cloud and Coordinator via the actual role, then verify the trigger's visible selected value. Empty bot choices alone means Coordinator is the only handler; a present Hand to row with an absent picker must fail."
+    },
+    {
+      "surface": "profile",
+      "old": "combobox exact Agent profile",
+      "hosted": "CreateRow div.ui-kb-create__row contains a span Agent profile and its one button. Button has current profile label/title but no Agent profile aria-label. Choices are menuitemradio, can include description text; only the exact fixture marker is acceptable.",
+      "required": "Bind the unique Agent profile row to its unique button, select the exact marker within the unique menu, then verify selected marker. Missing/ambiguous row or choice must fail before the paid click."
+    },
+    {
+      "surface": "description and submit",
+      "old": "label exact Task description; button exact Create task",
+      "hosted": "Task description remains an enclosing label and textarea; CreateWindow button contains Create task plus non-hidden kbd ⌘↵.",
+      "required": "Keep exact Task description. Recognize the hosted exact full Create task+shortcut accessible name while preserving the original exact Create task path. Do not select a broad substring or generic primary button."
+    }
+  ],
+  "fallback": "Mikka default new-task/search slots are null and retain original role contracts. In the actual hosted fe20 source those slots exist and export non-null components; uiOverlay selects them by file presence, so default fallback cannot justify current production actor compatibility.",
+  "scope": "No frontend/hosted product changes required; adapt acceptance automation and targeted regressions only. No credentials, production browser/API session, dispatch, CI trigger or product execution performed. Final deployed runtime remains gated on the scheduled UI window and eventual merged source."
+}

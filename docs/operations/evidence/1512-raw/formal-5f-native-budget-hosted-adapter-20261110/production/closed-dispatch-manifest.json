@@ -1,0 +1,32 @@
+{
+  "schema": "issue1512.production-dispatch-request.v1",
+  "repository": "alexj11324/Mikka",
+  "opsBranch": "ops/1512-git-transport",
+  "controller": {
+    "path": "scripts/ops/issue1512-production-dispatch.mjs",
+    "sha256": "83faf224b41e1dd2714ba4db2450aa996f4ca4970beab54f1480bcfcfaa206a4"
+  },
+  "enabled": false,
+  "requestId": null,
+  "activationCommitMessage": null,
+  "controlWorkflowBlob": "dec440a7513273d4bd155d40a423c97d63663212",
+  "target": {
+    "branch": "main",
+    "commit": null,
+    "tree": null,
+    "workflowId": 410611055,
+    "workflowPath": ".github/workflows/run-trace-acceptance.yml",
+    "workflowBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4"
+  },
+  "inputs": {
+    "mode": "preflight",
+    "expected-deployment-sha": null,
+    "model-case": "all",
+    "prepare": "false",
+    "browser-submit": "false",
+    "export-target": "dashboard",
+    "export-id": "",
+    "session-id": "",
+    "trace-id": ""
+  }
+}

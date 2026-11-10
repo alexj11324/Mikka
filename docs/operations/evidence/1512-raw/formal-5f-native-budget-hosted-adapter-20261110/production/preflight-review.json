@@ -1,0 +1,247 @@
+{
+  "schema": "issue1512.readonly-production-entry-preparation.v1",
+  "reviewer": "independent_final",
+  "reviewedAt": "2026-11-10 03:24:04 UTC",
+  "scope": "Static and public-metadata preparation only. No dispatch, production authentication, credential read, browser session, production write, resource allocation or window reservation.",
+  "source": {
+    "formalHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "formalTree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "workflowId": 410611055,
+    "workflowPath": ".github/workflows/run-trace-acceptance.yml",
+    "fiveFWorkflow": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+    "freshMainObserved": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "freshMainWorkflow": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23",
+    "mainDifference": "Fresh main lacks only the 62-byte recovery.json upload path present in the 5f workflow; the rest of these two workflow texts matches.",
+    "nextSourceBoundary": "Use the final merged main SHA that is actually served by /mikka/api/version. Neither 5f nor the fresh-main observation is a pre-authorized final deployment value."
+  },
+  "sourceReadManifest": [
+    {
+      "key": "workflow",
+      "blob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+      "computedGitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "matched": true
+    },
+    {
+      "key": "guide",
+      "blob": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "bytes": 19730,
+      "sha256": "b7440f5402350d0c3513576dbddc60978bb7b37d701632e1247b73725d93aa1a",
+      "computedGitBlob": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "matched": true
+    },
+    {
+      "key": "workflowDriver",
+      "blob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+      "bytes": 11693,
+      "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a",
+      "computedGitBlob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+      "matched": true
+    },
+    {
+      "key": "driver",
+      "blob": "104075571c73b97a985458f206dba310e4894490",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "computedGitBlob": "104075571c73b97a985458f206dba310e4894490",
+      "matched": true
+    },
+    {
+      "key": "browserDriver",
+      "blob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "bytes": 25516,
+      "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606",
+      "computedGitBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "matched": true
+    },
+    {
+      "key": "posthogExport",
+      "blob": "a986e913cc0f5b79386f5bf50cef8fbefae6ac0e",
+      "bytes": 11762,
+      "sha256": "94282fae71b089bfe7154b907c1ebd45fc5c352e16c3369e184b64a1374b8045",
+      "computedGitBlob": "a986e913cc0f5b79386f5bf50cef8fbefae6ac0e",
+      "matched": true
+    },
+    {
+      "key": "posthogReplay",
+      "blob": "fe28b5927b8df35d42bce2984a95dcfdd50e6965",
+      "bytes": 13579,
+      "sha256": "4df87f17ee6175a0b3498652f9af4ac61afec35dea022c116d81050396a0bddf",
+      "computedGitBlob": "fe28b5927b8df35d42bce2984a95dcfdd50e6965",
+      "matched": true
+    },
+    {
+      "key": "opsWorkflow",
+      "blob": "7429381cee94f6188303ac997cb4e0c89906672a",
+      "bytes": 7630,
+      "sha256": "610dc8cc67aff5e6cb7cd7c778be9fc4cf8d2ab4b69b4ed170ccc79853ad7b8a",
+      "computedGitBlob": "7429381cee94f6188303ac997cb4e0c89906672a",
+      "matched": true
+    },
+    {
+      "key": "opsDispatch",
+      "blob": "4bbf01d4a1401d6756c26a0ea31342ca4ce95ee6",
+      "bytes": 362,
+      "sha256": "bafc34be2469b84a9d0c3ba69d7b2cff5cdd6414ff97d821ffdfdbc2ac948568",
+      "computedGitBlob": "4bbf01d4a1401d6756c26a0ea31342ca4ce95ee6",
+      "matched": true
+    }
+  ],
+  "ops": {
+    "ref": "refs/heads/ops/1512-git-transport",
+    "head": "a0dd581c5b573e9809ef7cc362da93f1429dee13",
+    "tree": "5b5ea341c2536cdafee58f0dea6ae0a356340fb0",
+    "workflowBlob": "7429381cee94f6188303ac997cb4e0c89906672a",
+    "dispatchBlob": "4bbf01d4a1401d6756c26a0ea31342ca4ce95ee6",
+    "currentOperation": {
+      "requestId": "ff0c7964-6603-4bb5-8f7d-740cf9e1899d",
+      "inputs": {
+        "mode": "controlled-failure",
+        "expected-deployment-sha": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "model-case": "all",
+        "prepare": "false",
+        "browser-submit": "false",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      }
+    },
+    "latestTipRun": {
+      "id": 42552029222,
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "state": "Existing branch and prefix-gated import/dispatch/cleanup jobs remain present. The latest tip run is terminal. This is not a disabled one-shot entry.",
+    "futureDispatch": "After final source/deployment verification, create one new immutable .github/issue1512-dispatch.json operation with a fresh UUID and publish once using the existing issue1512:dispatch prefix. The dispatch job rejects an out-of-allowlist input, non-main expected SHA or served-build mismatch, then POSTs exactly once to run-trace-acceptance.yml on main.",
+    "limits": "Legacy dispatcher accepts HTTP 204 and has one POST per invocation, but no run_attempt==1 or request-ID deduplication guard. Do not rerun an old operation or repeat a POST after an unknown outcome. Read exact-source workflow metadata to reconcile. Request ID is a syntax-checked label, not a server-side idempotency token.",
+    "closure": "When this transport is no longer needed, the existing issue1512:cleanup prefix deletes only ops/1512-source-objects and ops/1512-git-transport. Do not delete while it is still needed for separately authorized final evidence steps."
+  },
+  "authorizationAndAccount": {
+    "issue": "The actual issue1512 body names ACME_DEMO_EMAIL / ACME_DEMO_PASSWORD in Infisical prod:/ for production verification.",
+    "guide": "scripts/acceptance/run-observability.md explicitly documents the issue-specific admin-owned Personal workspace and distinguishes ordinary shared SMOKE acceptance. No account or workspace substitution within a case.",
+    "runtime": "Driver verifies ordinary login identity; exactly one Personal workspace choice; admin role; exactly one active admin member equal to owner. If current workspace is a team, verify Personal first then switch only the newly created session and re-read implicit workspace before Coordinator reads. Browser has its own independent UI login/workspace selection.",
+    "credentials": "The workflow loads only the two existing account fields through its existing Infisical OIDC identity after source/offline/browser-install guards. Nothing was read during this preparation."
+  },
+  "parameterTemplates": {
+    "placeholderWarning": "These are review templates only, not executable dispatch manifests. Resolve the SHA after merge/deployment; use a different fresh UUID for each actual operation.",
+    "preflight": {
+      "mode": "preflight",
+      "model-case": "all",
+      "prepare": "false",
+      "browser-submit": "false",
+      "expected-deployment-sha": "FINAL_MERGED_AND_SERVED_MAIN_SHA",
+      "export-target": "dashboard",
+      "export-id": "",
+      "session-id": "",
+      "trace-id": ""
+    },
+    "claude": {
+      "mode": "execute",
+      "model-case": "claude",
+      "prepare": "true",
+      "browser-submit": "true",
+      "expected-deployment-sha": "FINAL_MERGED_AND_SERVED_MAIN_SHA",
+      "export-target": "dashboard",
+      "export-id": "",
+      "session-id": "",
+      "trace-id": ""
+    },
+    "codex": {
+      "mode": "execute",
+      "model-case": "codex",
+      "prepare": "true",
+      "browser-submit": "true",
+      "expected-deployment-sha": "FINAL_MERGED_AND_SERVED_MAIN_SHA",
+      "export-target": "dashboard",
+      "export-id": "",
+      "session-id": "",
+      "trace-id": ""
+    },
+    "export": {
+      "mode": "export",
+      "model-case": "all",
+      "prepare": "false",
+      "browser-submit": "false",
+      "expected-deployment-sha": "FINAL_MERGED_AND_SERVED_MAIN_SHA",
+      "export-target": "VERIFIED_dashboard_OR_insight",
+      "export-id": "ACTUAL_POSITIVE_NUMERIC_OBJECT_ID",
+      "session-id": "ACTUAL_BROWSER_SESSION_UUID_OR_EMPTY",
+      "trace-id": "MATCHED_NONZERO_32_HEX_TRACE_ID_OR_EMPTY"
+    },
+    "modelMap": [
+      {
+        "case": "claude",
+        "model": "claude-haiku-5-5",
+        "harness": "claude_code",
+        "source": "the owner's unique available subscription"
+      },
+      {
+        "case": "codex",
+        "model": "gpt-6-luna",
+        "harness": "codex",
+        "source": "the owner's unique available subscription"
+      }
+    ],
+    "ordering": "Complete and inspect each case's business and browser cleanup before the next case. Global workflow concurrency is run-trace-production-acceptance with cancel-in-progress:false and queue:max. Do not pre-queue a replacement run after an uncertain result.",
+    "preparationMeaning": "prepare=true authorizes only the existing normal-API temporary setting/profile preparation after the documented idle/source/cloud/live gates. If no preparation is needed, false is sufficient. Preflight itself cannot set prepare/browser-submit=true."
+  },
+  "exactSourceAndSingleSubmission": [
+    "Workflow jobs require repository alexj11324/Mikka and refs/heads/main; expected-deployment-sha must be a 40-hex SHA equal to GITHUB_SHA before credentials.",
+    "The legacy ops dispatcher separately checks current main ref and the official /mikka/api/version served build before the dispatch POST. Acceptance driver pins the served build before login, before each case, before paid submission and again at completion; browser actor checks source context and served version before login and immediately before submit.",
+    "Runner browser additionally requires execute + browser-submit + exactly one case, a real workflow_dispatch/main context and exact expected SHA. Chromium uses a clean independent context; no copied cookie, storageState, fabricated trace/session or direct task-submission API.",
+    "Driver derives a deterministic temporary Profile per deployment/model and rejects a previous fixture. The actor records one submit click before click and never retries after uncertainty. The driver validates one actual new human message and exact task/Profile/identity/model/native-stage/Artifact/acceptance receipts.",
+    "Per-case default deadline is 480000 ms; permitted range 60000..600000. Flow v2 expects distinct execute + review, legacy adds verify. Attempt overrun stops on observation; no atomic spend fence or hard-dollar guarantee is claimed.",
+    "Browser progress comment explicitly says the runner submits automatically and manual submission must not duplicate it."
+  ],
+  "recoveryAndCleanup": [
+    "CLI wires onRecoveryCheckpoint to writeRecoveryJournal. Journal is a complete safe metadata snapshot: private wx 0600 temporary file, file fsync, rename to recovery.json, then directory fsync.",
+    "Journal checkpoints record mutation intent before fallback/Profile/model writes and acknowledged version/digest or temporarySelection receipt after success. A failed checkpoint blocks new work and marks final result blocked, while already-required cleanup remains allowed.",
+    "Full private Profile definitions remain in RAM. Journal retains scope IDs, old enabled/version/digest and exact model identity/restoration receipt, not prompt/account contents.",
+    "Settings restoration checks owner-wide visible idle state and existing acknowledged values. Profile restore uses current version/digest and CAS; implicit model restoration uses returned binding/revision. Explicit composer and fallback booleans have optimistic checks, not an atomic ABA-proof guarantee.",
+    "Cleanup only cancels owned unfinished Factory work and active threads, then ends every owned native run's machine including success cases. Ended requires exact HTTP 200 run/state receipt; 404 requires fresh terminal own run plus explicit null machine. A state read alone is not termination proof.",
+    "Temporary Profile archive and original composer restoration occur only when owned work is quiet; concurrent edits are preserved. Incomplete cleanup stops later cases and makes status blocked.",
+    "Browser first closes its page to prevent pending UI clicks, signs out using retained context, reads anonymous session, then closes context/browser with its own bounded cleanup deadline. Helper waits for both owned lifecycles.",
+    "Driver session is signed out in finally. A process kill that prevents finally cannot guarantee automatic restoration; inspect retained recovery.json and receipts before any new case. The 5f workflow now uploads report.json, recovery.json and browser-actor.receipt.json under always()."
+  ],
+  "posthogInterface": {
+    "origin": "https://us.posthog.com",
+    "projectId": 670821,
+    "export": "Existing personal key from prod:/platform, scopes export:write/read. One POST /api/projects/670821/exports/ with exactly a numeric dashboard OR insight and export_format:image/png; bounded status reads; direct /<export_id>/content/ download; target/format/export-ID checks, PNG signature/dimensions/byte SHA receipt; no invented renderer/export_context or redirects.",
+    "replay": "Optional paired session-id + trace-id only in export mode. Existing session_recording:read key. Three bounded GETs: exact recording metadata, snapshot sources?blob_v2=true, one latest source blob_key with decompress=true. JSONL pair format [windowId,event]. Raw snapshots/event.data never persisted; receipt is counts/hash/timestamps.",
+    "currentPublicDocs": [
+      {
+        "url": "https://posthog.com/docs/api/exports",
+        "ref": "turn130view0",
+        "check": "Current official docs retain create/status/content paths, numeric target and export scopes."
+      },
+      {
+        "url": "https://posthog.com/docs/session-replay/snapshot-api",
+        "ref": "turn130view1",
+        "check": "Current official docs retain blob_v2 source query, blob_key selection, decompressed JSONL and [windowId,event] format."
+      }
+    ],
+    "sourceCompatibility": "Workflow arguments match both scripts and current public API documentation. No live credential scope, backend response, PNG or Replay was tested here.",
+    "evidenceBoundary": "Export job directly checks expected SHA == GITHUB_SHA but does not itself re-read production /api/version; that served-build gate is in the existing ops dispatcher. Saved dashboard/insight numeric ID must be independently verified against the actual production trace/source before export. A PNG is not automatic trace provenance.",
+    "replayBoundary": "Replay receipt explicitly says proof_scope:one_recording_segment, trace_correlation:requires_apm_match, playback_verified:false. Browser SDK readiness leaves uploadAcknowledged unknown. Separate PostHog APM/AI/Logs/session correlation and real playback are still required."
+  },
+  "mainAdvance": {
+    "from": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+    "to": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "ahead": 33,
+    "behind": 0,
+    "changedPaths": 90,
+    "notable": "New #1847 shell and #1854 UI slots affect Search/New task surfaces. Read the actual New task/profile/search deltas and default slot files.",
+    "defaultSlotFinding": "Default new-task and search slots are null; fallback New task dialog roles/selectors and submit behavior remain, and global search still uses a CommandDialog with Search everything and New task quick action. Existing acceptance input-wrapper translation keys are unchanged in the shown translation diff.",
+    "unresolvedBoundary": "A hosted UI layer can supply its own new-task/search slots. Do not treat the default-source check or old 5f CI as proof of the final merged deployed UI. Rebind final source and inspect the actual deployed browser path before its single paid click."
+  },
+  "blockersAndNextSteps": [
+    "5f is a formal candidate, not the observed main deployment. Do not dispatch paid production acceptance until Root has a final merged main SHA, fresh deployment match and completed required formal gates.",
+    "Current old ops JSON is controlled-failure@1d1261; it must not be reused as a new execution request. Preserve prior isolated benchmark/control evidence rather than repeating it merely for a new SHA.",
+    "No static incompatibility found among the 5f acceptance workflow, helper, driver, browser actor or PostHog export/replay argument interfaces.",
+    "Subscription readiness, exact production account idle state, deployed hosted UI selection, project-key scopes and real PostHog ingestion remain runtime facts, not established by this read-only review."
+  ],
+  "connectorNotes": "GitHub fetch blocks workflow-list/detail URLs with INVALID_ARGUMENT; this is a connector endpoint allowlist result, not a missing workflow. Existing actual run42552094175 establishes workflow410611055/path and successful historical execution; immutable contents and Git tree reads establish current code. No browser fallback was used."
+}

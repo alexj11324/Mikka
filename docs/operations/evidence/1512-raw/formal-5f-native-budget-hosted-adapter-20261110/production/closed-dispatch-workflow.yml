@@ -1,0 +1,42 @@
+name: Issue 1512 one-shot production dispatch
+on:
+  push:
+    branches: [ops/1512-git-transport]
+    paths:
+      - '.github/workflows/issue1512-git-transport.yml'
+      - '.github/issue1512-dispatch.json'
+      - 'scripts/ops/issue1512-production-dispatch.mjs'
+      - 'scripts/ops/issue1512-production-dispatch.test.mjs'
+permissions:
+  contents: read
+jobs:
+  dispatch:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: issue1512-one-shot-production-transport
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify bounded dispatcher protocol without credentials or network
+        run: node --test scripts/ops/issue1512-production-dispatch.test.mjs
+      - name: Submit the exact admitted request once
+        run: node scripts/ops/issue1512-production-dispatch.mjs
+      - name: Preserve only the safe dispatch receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-production-dispatch-${{ github.run_id }}
+          path: artifacts/issue1512-production-dispatch/receipt.safe.json
+          retention-days: 7
+          if-no-files-found: warn

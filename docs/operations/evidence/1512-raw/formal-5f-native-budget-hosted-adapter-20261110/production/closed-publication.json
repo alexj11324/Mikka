@@ -1,0 +1,74 @@
+{
+  "schema": "mikka.issue1512.production-transport-closed-publication.v1",
+  "at": "2026-11-10 04:06:21 UTC",
+  "previous": "a0dd581c5b573e9809ef7cc362da93f1429dee13",
+  "current": "ca6fe6dc65f9528c10401f17c764d0ff86f36ed2",
+  "tree": "71ef70a8be2eb8c454053264897a80039bf33e23",
+  "independentReview": "29c6ccdf9c2b774af5cdf5cea44fa1e6b2bad415",
+  "actualNode37PassProof": "52ff52acd15c54941721252da4c3bd7b212d5825",
+  "changedFiles": [
+    {
+      "path": ".github/issue1512-dispatch.json",
+      "status": "modified"
+    },
+    {
+      "path": ".github/workflows/issue1512-git-transport.yml",
+      "status": "modified"
+    },
+    {
+      "path": "scripts/ops/issue1512-production-dispatch.mjs",
+      "status": "added"
+    },
+    {
+      "path": "scripts/ops/issue1512-production-dispatch.test.mjs",
+      "status": "added"
+    }
+  ],
+  "update": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "success": true
+    },
+    "isError": false
+  },
+  "readback": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "content": "{\"ref\":\"refs/heads/ops/1512-git-transport\",\"node_id\":\"REF_kwDOVRYxA9oAIXJlZnMvaGVhZHMvb3BzLzE1MTItZ2l0LXRyYW5zcG9ydA\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-git-transport\",\"object\":{\"sha\":\"ca6fe6dc65f9528c10401f17c764d0ff86f36ed2\",\"type\":\"commit\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/ca6fe6dc65f9528c10401f17c764d0ff86f36ed2\"}}",
+      "title": "1512-git-transport",
+      "modified_date": null,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-git-transport",
+      "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-git-transport",
+      "display_title": "1512-git-transport",
+      "structuredContent": {
+        "title": "1512-git-transport",
+        "content": "{\"ref\":\"refs/heads/ops/1512-git-transport\",\"node_id\":\"REF_kwDOVRYxA9oAIXJlZnMvaGVhZHMvb3BzLzE1MTItZ2l0LXRyYW5zcG9ydA\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-git-transport\",\"object\":{\"sha\":\"ca6fe6dc65f9528c10401f17c764d0ff86f36ed2\",\"type\":\"commit\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/ca6fe6dc65f9528c10401f17c764d0ff86f36ed2\"}}",
+        "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/ops/1512-git-transport"
+      }
+    },
+    "isError": false
+  },
+  "closed": {
+    "workflowIfFalse": true,
+    "enabled": false,
+    "actionsWrite": false,
+    "tokenEnv": false,
+    "oldImportJobRemoved": true,
+    "oldCleanupJobRemoved": true,
+    "productionPost": false
+  },
+  "limits": [
+    "Closed push workflow terminal state must be observed separately.",
+    "Activation remains blocked on actual Native query budget and final merged/deployed source."
+  ]
+}

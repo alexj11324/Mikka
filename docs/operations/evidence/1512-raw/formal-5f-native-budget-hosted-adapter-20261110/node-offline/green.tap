@@ -1,0 +1,820 @@
+TAP version 13
+# Subtest: one actual UI submit stays open, uses no API submission, and closes its own session once
+ok 1 - one actual UI submit stays open, uses no API submission, and closes its own session once
+  ---
+  duration_ms: 19.307026
+  type: 'test'
+  ...
+# Subtest: refuses actions before launching or typing credentials
+ok 2 - refuses actions before launching or typing credentials
+  ---
+  duration_ms: 0.748885
+  type: 'test'
+  ...
+# Subtest: refuses event before launching or typing credentials
+ok 3 - refuses event before launching or typing credentials
+  ---
+  duration_ms: 0.286038
+  type: 'test'
+  ...
+# Subtest: refuses repository before launching or typing credentials
+ok 4 - refuses repository before launching or typing credentials
+  ---
+  duration_ms: 0.260815
+  type: 'test'
+  ...
+# Subtest: refuses ref before launching or typing credentials
+ok 5 - refuses ref before launching or typing credentials
+  ---
+  duration_ms: 0.505138
+  type: 'test'
+  ...
+# Subtest: refuses sha before launching or typing credentials
+ok 6 - refuses sha before launching or typing credentials
+  ---
+  duration_ms: 0.254177
+  type: 'test'
+  ...
+# Subtest: refuses expiry before launching or typing credentials
+ok 7 - refuses expiry before launching or typing credentials
+  ---
+  duration_ms: 0.600245
+  type: 'test'
+  ...
+# Subtest: refuses fixture before launching or typing credentials
+ok 8 - refuses fixture before launching or typing credentials
+  ---
+  duration_ms: 0.355834
+  type: 'test'
+  ...
+# Subtest: refuses extra-ready before launching or typing credentials
+ok 9 - refuses extra-ready before launching or typing credentials
+  ---
+  duration_ms: 0.924542
+  type: 'test'
+  ...
+# Subtest: refuses debug before launching or typing credentials
+ok 10 - refuses debug before launching or typing credentials
+  ---
+  duration_ms: 0.697054
+  type: 'test'
+  ...
+# Subtest: workspace switch waits for the new HOME document, not the old HOME URL or hidden menu
+ok 11 - workspace switch waits for the new HOME document, not the old HOME URL or hidden menu
+  ---
+  duration_ms: 26.405686
+  type: 'test'
+  ...
+# Subtest: rejects ambiguousWorkspace without submitting and closes allocated resources
+ok 12 - rejects ambiguousWorkspace without submitting and closes allocated resources
+  ---
+  duration_ms: 2.056036
+  type: 'test'
+  ...
+# Subtest: rejects otherOwner without submitting and closes allocated resources
+ok 13 - rejects otherOwner without submitting and closes allocated resources
+  ---
+  duration_ms: 1.384736
+  type: 'test'
+  ...
+# Subtest: rejects ambiguousProfile without submitting and closes allocated resources
+ok 14 - rejects ambiguousProfile without submitting and closes allocated resources
+  ---
+  duration_ms: 6.677501
+  type: 'test'
+  ...
+# Subtest: rejects disabledSubmit without submitting and closes allocated resources
+ok 15 - rejects disabledSubmit without submitting and closes allocated resources
+  ---
+  duration_ms: 2.5476
+  type: 'test'
+  ...
+# Subtest: rejects buildChange without submitting and closes allocated resources
+ok 16 - rejects buildChange without submitting and closes allocated resources
+  ---
+  duration_ms: 2.55345
+  type: 'test'
+  ...
+# Subtest: rejects foreignSignIn without submitting and closes allocated resources
+ok 17 - rejects foreignSignIn without submitting and closes allocated resources
+  ---
+  duration_ms: 1.390063
+  type: 'test'
+  ...
+# Subtest: rejects foreignBusiness without submitting and closes allocated resources
+ok 18 - rejects foreignBusiness without submitting and closes allocated resources
+  ---
+  duration_ms: 1.398248
+  type: 'test'
+  ...
+# Subtest: checks expireBeforeSubmit after filling but before the paid side effect
+ok 19 - checks expireBeforeSubmit after filling but before the paid side effect
+  ---
+  duration_ms: 7.02608
+  type: 'test'
+  ...
+# Subtest: checks abortBeforeSubmit after filling but before the paid side effect
+ok 20 - checks abortBeforeSubmit after filling but before the paid side effect
+  ---
+  duration_ms: 5.477675
+  type: 'test'
+  ...
+# Subtest: no renderer business response cannot be replaced by the independent version API check
+ok 21 - no renderer business response cannot be replaced by the independent version API check
+  ---
+  duration_ms: 11.449628
+  type: 'test'
+  ...
+# Subtest: an already aborted signal creates no browser or session
+ok 22 - an already aborted signal creates no browser or session
+  ---
+  duration_ms: 0.46285
+  type: 'test'
+  ...
+# Subtest: never retries a submission with submitThrows and retains its unknown outcome
+ok 23 - never retries a submission with submitThrows and retains its unknown outcome
+  ---
+  duration_ms: 5.906673
+  type: 'test'
+  ...
+# Subtest: never retries a submission with submitUnknown and retains its unknown outcome
+ok 24 - never retries a submission with submitUnknown and retains its unknown outcome
+  ---
+  duration_ms: 3.669816
+  type: 'test'
+  ...
+# Subtest: abort cancels a pending actionable click before any logout await
+ok 25 - abort cancels a pending actionable click before any logout await
+  ---
+  duration_ms: 2.618215
+  type: 'test'
+  ...
+# Subtest: logout failure still closes every owned resource and makes idempotent close fail
+ok 26 - logout failure still closes every owned resource and makes idempotent close fail
+  ---
+  duration_ms: 10.210438
+  type: 'test'
+  ...
+# Subtest: report sink failure does not leak a page, context or browser
+ok 27 - report sink failure does not leak a page, context or browser
+  ---
+  duration_ms: 2.38809
+  type: 'test'
+  ...
+# Subtest: a resource that arrives after bounded abort cleanup is closed, never reported as already closed
+ok 28 - a resource that arrives after bounded abort cleanup is closed, never reported as already closed
+  ---
+  duration_ms: 6.43093
+  type: 'test'
+  ...
+# Subtest: a page-close failure stops the browser before any further cleanup wait can release a late click
+ok 29 - a page-close failure stops the browser before any further cleanup wait can release a late click
+  ---
+  duration_ms: 12.413174
+  type: 'test'
+  ...
+# Subtest: the actual workflow awaits actual actor session cleanup with no progress token in its environment
+ok 30 - the actual workflow awaits actual actor session cleanup with no progress token in its environment
+  ---
+  duration_ms: 15.009991
+  type: 'test'
+  ...
+# Subtest: Replay becomes ready before the one paid click and reports no upload acknowledgement
+ok 31 - Replay becomes ready before the one paid click and reports no upload acknowledgement
+  ---
+  duration_ms: 4.258034
+  type: 'test'
+  ...
+# Subtest: Replay missing bridge fails closed before paid submission and cleans owned resources
+ok 32 - Replay missing bridge fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 3.934634
+  type: 'test'
+  ...
+# Subtest: Replay SDK exception fails closed before paid submission and cleans owned resources
+ok 33 - Replay SDK exception fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 3.623995
+  type: 'test'
+  ...
+# Subtest: Replay no SDK fails closed before paid submission and cleans owned resources
+ok 34 - Replay no SDK fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 3.472092
+  type: 'test'
+  ...
+# Subtest: Replay unstarted recording fails closed before paid submission and cleans owned resources
+ok 35 - Replay unstarted recording fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 3.663422
+  type: 'test'
+  ...
+# Subtest: Replay no snapshot fails closed before paid submission and cleans owned resources
+ok 36 - Replay no snapshot fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 14.664673
+  type: 'test'
+  ...
+# Subtest: Replay malformed true fails closed before paid submission and cleans owned resources
+ok 37 - Replay malformed true fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 3.511454
+  type: 'test'
+  ...
+# Subtest: Replay invalid session fails closed before paid submission and cleans owned resources
+ok 38 - Replay invalid session fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 2.675945
+  type: 'test'
+  ...
+# Subtest: Replay last-moment session change fails closed before paid submission and cleans owned resources
+ok 39 - Replay last-moment session change fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 2.753947
+  type: 'test'
+  ...
+# Subtest: Replay pending abort cannot submit after a late ready result
+ok 40 - Replay pending abort cannot submit after a late ready result
+  ---
+  duration_ms: 2.337882
+  type: 'test'
+  ...
+# Subtest: Replay pending timeout cannot submit after a late ready result
+ok 41 - Replay pending timeout cannot submit after a late ready result
+  ---
+  duration_ms: 8.673247
+  type: 'test'
+  ...
+# Subtest: acceptance marker is installed before the first document and stays on the official top-level app
+ok 42 - acceptance marker is installed before the first document and stays on the official top-level app
+  ---
+  duration_ms: 7.848948
+  type: 'test'
+  ...
+# Subtest: an acceptance marker installation failure submits nothing and closes the allocated context
+ok 43 - an acceptance marker installation failure submits nothing and closes the allocated context
+  ---
+  duration_ms: 0.519309
+  type: 'test'
+  ...
+# Subtest: hosted shell and create window select the exact Personal, Coordinator, Cloud and fixture Profile before one click
+ok 44 - hosted shell and create window select the exact Personal, Coordinator, Cloud and fixture Profile before one click
+  ---
+  duration_ms: 8.733137
+  type: 'test'
+  ...
+# Subtest: hosted create window omits Hand to only when the Coordinator is the sole handler
+ok 45 - hosted create window omits Hand to only when the Coordinator is the sole handler
+  ---
+  duration_ms: 3.093389
+  type: 'test'
+  ...
+# Subtest: hosted mixed picker surfaces fails before the paid click and closes owned resources
+ok 46 - hosted mixed picker surfaces fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.27141
+  type: 'test'
+  ...
+# Subtest: hosted missing bot picker with a Hand to row fails before the paid click and closes owned resources
+ok 47 - hosted missing bot picker with a Hand to row fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.220898
+  type: 'test'
+  ...
+# Subtest: hosted missing Profile row fails before the paid click and closes owned resources
+ok 48 - hosted missing Profile row fails before the paid click and closes owned resources
+  ---
+  duration_ms: 5.465831
+  type: 'test'
+  ...
+# Subtest: hosted ambiguous Profile row fails before the paid click and closes owned resources
+ok 49 - hosted ambiguous Profile row fails before the paid click and closes owned resources
+  ---
+  duration_ms: 2.876322
+  type: 'test'
+  ...
+# Subtest: hosted ambiguous Profile choice fails before the paid click and closes owned resources
+ok 50 - hosted ambiguous Profile choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.511987
+  type: 'test'
+  ...
+# Subtest: hosted missing Cloud choice fails before the paid click and closes owned resources
+ok 51 - hosted missing Cloud choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.116483
+  type: 'test'
+  ...
+# Subtest: hosted missing fixture Profile choice fails before the paid click and closes owned resources
+ok 52 - hosted missing fixture Profile choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.551764
+  type: 'test'
+  ...
+# Subtest: hosted unapplied Coordinator choice fails before the paid click and closes owned resources
+ok 53 - hosted unapplied Coordinator choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.193973
+  type: 'test'
+  ...
+# Subtest: hosted unapplied Cloud choice fails before the paid click and closes owned resources
+ok 54 - hosted unapplied Cloud choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.40495
+  type: 'test'
+  ...
+# Subtest: hosted unapplied Profile choice fails before the paid click and closes owned resources
+ok 55 - hosted unapplied Profile choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.514436
+  type: 'test'
+  ...
+# Subtest: hosted Profile changes while Replay becomes ready fails before the paid click and closes owned resources
+ok 56 - hosted Profile changes while Replay becomes ready fails before the paid click and closes owned resources
+  ---
+  duration_ms: 4.868066
+  type: 'test'
+  ...
+# Subtest: a flat hosted workspace label shared by another account is refused before opening its menu
+ok 57 - a flat hosted workspace label shared by another account is refused before opening its menu
+  ---
+  duration_ms: 1.01749
+  type: 'test'
+  ...
+# Subtest: the hosted Create task shortcut button is never retried after submitThrows
+ok 58 - the hosted Create task shortcut button is never retried after submitThrows
+  ---
+  duration_ms: 3.132413
+  type: 'test'
+  ...
+# Subtest: the hosted Create task shortcut button is never retried after submitUnknown
+ok 59 - the hosted Create task shortcut button is never retried after submitUnknown
+  ---
+  duration_ms: 3.088369
+  type: 'test'
+  ...
+# Subtest: hosted shell with the default task dialog retains the independent slot fallbacks and one submission
+ok 60 - hosted shell with the default task dialog retains the independent slot fallbacks and one submission
+  ---
+  duration_ms: 5.762102
+  type: 'test'
+  ...
+# Subtest: default shell with the hosted task window retains the independent slot fallbacks and one submission
+ok 61 - default shell with the hosted task window retains the independent slot fallbacks and one submission
+  ---
+  duration_ms: 2.182537
+  type: 'test'
+  ...
+# Subtest: preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+ok 62 - preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+  ---
+  duration_ms: 48.939478
+  type: 'test'
+  ...
+# Subtest: preflight excludes only a version-bound Factory task proven to belong to another workspace
+ok 63 - preflight excludes only a version-bound Factory task proven to belong to another workspace
+  ---
+  duration_ms: 6.008268
+  type: 'test'
+  ...
+# Subtest: preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+ok 64 - preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+  ---
+  duration_ms: 39.828181
+  type: 'test'
+  ...
+# Subtest: preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+ok 65 - preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+  ---
+  duration_ms: 6.304258
+  type: 'test'
+  ...
+# Subtest: preflight does not request scope details for already settled Factory tasks
+ok 66 - preflight does not request scope details for already settled Factory tasks
+  ---
+  duration_ms: 18.26929
+  type: 'test'
+  ...
+# Subtest: foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+ok 67 - foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+  ---
+  duration_ms: 18.30916
+  type: 'test'
+  ...
+# Subtest: a default team switches only this login session to its verified personal workspace before reading Coordinator
+ok 68 - a default team switches only this login session to its verified personal workspace before reading Coordinator
+  ---
+  duration_ms: 3.217966
+  type: 'test'
+  ...
+# Subtest: workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+ok 69 - workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+  ---
+  duration_ms: 26.070334
+  type: 'test'
+  ...
+# Subtest: workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+ok 70 - workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+  ---
+  duration_ms: 2.737159
+  type: 'test'
+  ...
+# Subtest: unsafe configuration blocks before any model call and reports only closed failure codes
+ok 71 - unsafe configuration blocks before any model call and reports only closed failure codes
+  ---
+  duration_ms: 6.734649
+  type: 'test'
+  ...
+# Subtest: two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+ok 72 - two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+  ---
+  duration_ms: 22.768335
+  type: 'test'
+  ...
+# Subtest: successful terminal runs close only their own machines and retain task evidence
+ok 73 - successful terminal runs close only their own machines and retain task evidence
+  ---
+  duration_ms: 9.803884
+  type: 'test'
+  ...
+# Subtest: a missing machine requires a fresh owned run and an explicit null machine read
+ok 74 - a missing machine requires a fresh owned run and an explicit null machine read
+  ---
+  duration_ms: 12.488366
+  type: 'test'
+  ...
+# Subtest: machine failures never turn a completed task green and do not prevent closing another owned machine
+ok 75 - machine failures never turn a completed task green and do not prevent closing another owned machine
+  ---
+  duration_ms: 110.368042
+  type: 'test'
+  ...
+# Subtest: legacy Factory tasks still require review and verify before the normal deliverable acceptance
+ok 76 - legacy Factory tasks still require review and verify before the normal deliverable acceptance
+  ---
+  duration_ms: 9.075796
+  type: 'test'
+  ...
+# Subtest: missing, failed or stale Factory checks never reach approval, including legacy verify
+ok 77 - missing, failed or stale Factory checks never reach approval, including legacy verify
+  ---
+  duration_ms: 34.360558
+  type: 'test'
+  ...
+# Subtest: deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+ok 78 - deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+  ---
+  duration_ms: 26.923906
+  type: 'test'
+  ...
+# Subtest: uncertain mutation responses never resubmit and still reconcile own temporary settings
+ok 79 - uncertain mutation responses never resubmit and still reconcile own temporary settings
+  ---
+  duration_ms: 9.039916
+  type: 'test'
+  ...
+# Subtest: wrong provider/model and an extra native attempt stop the case without retrying
+ok 80 - wrong provider/model and an extra native attempt stop the case without retrying
+  ---
+  duration_ms: 13.323215
+  type: 'test'
+  ...
+# Subtest: pure source and budget guards reject shared credentials, inherited model choices and retries
+ok 81 - pure source and budget guards reject shared credentials, inherited model choices and retries
+  ---
+  duration_ms: 0.480238
+  type: 'test'
+  ...
+# Subtest: cleanup preserves a concurrent model edit and reports incomplete restoration
+ok 82 - cleanup preserves a concurrent model edit and reports incomplete restoration
+  ---
+  duration_ms: 7.348
+  type: 'test'
+  ...
+# Subtest: prepare is explicit, requires execution and restores only its acknowledged settings
+ok 83 - prepare is explicit, requires execution and restores only its acknowledged settings
+  ---
+  duration_ms: 32.111764
+  type: 'test'
+  ...
+# Subtest: prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings
+ok 84 - prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings
+  ---
+  duration_ms: 8.127088
+  type: 'test'
+  ...
+# Subtest: a blocked case does not prevent preparation and execution of another available model
+ok 85 - a blocked case does not prevent preparation and execution of another available model
+  ---
+  duration_ms: 12.079046
+  type: 'test'
+  ...
+# Subtest: preparation failures restore acknowledged writes but never guess after a lost response
+ok 86 - preparation failures restore acknowledged writes but never guess after a lost response
+  ---
+  duration_ms: 19.060376
+  type: 'test'
+  ...
+# Subtest: restoration failures and concurrent edits remain visible without overwriting them
+ok 87 - restoration failures and concurrent edits remain visible without overwriting them
+  ---
+  duration_ms: 56.459637
+  type: 'test'
+  ...
+# Subtest: issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+ok 88 - issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+  ---
+  duration_ms: 1.762088
+  type: 'test'
+  ...
+# Subtest: browser submission requires one executed case and does not authenticate on invalid options
+ok 89 - browser submission requires one executed case and does not authenticate on invalid options
+  ---
+  duration_ms: 0.256195
+  type: 'test'
+  ...
+# Subtest: browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+ok 90 - browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+  ---
+  duration_ms: 29.391084
+  type: 'test'
+  ...
+# Subtest: browser waiting times out or blocks changed UI text without sending or repeating a task
+ok 91 - browser waiting times out or blocks changed UI text without sending or repeating a task
+  ---
+  duration_ms: 6.05735
+  type: 'test'
+  ...
+# Subtest: live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+ok 92 - live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+  ---
+  duration_ms: 2.584335
+  type: 'test'
+  ...
+# Subtest: implicit default preflight requires server absence evidence and never writes a preference
+ok 93 - implicit default preflight requires server absence evidence and never writes a preference
+  ---
+  duration_ms: 2.795475
+  type: 'test'
+  ...
+# Subtest: implicit default restores absence with the stored binding and revision, not the catalogue option
+ok 94 - implicit default restores absence with the stored binding and revision, not the catalogue option
+  ---
+  duration_ms: 6.362358
+  type: 'test'
+  ...
+# Subtest: implicit default never overwrites a preference created after preflight
+ok 95 - implicit default never overwrites a preference created after preflight
+  ---
+  duration_ms: 4.46424
+  type: 'test'
+  ...
+# Subtest: implicit default stops after a lost or incomplete first selection receipt without guessing ownership
+ok 96 - implicit default stops after a lost or incomplete first selection receipt without guessing ownership
+  ---
+  duration_ms: 3.99029
+  type: 'test'
+  ...
+# Subtest: implicit default preserves a same-value concurrent rewrite when the revision no longer matches
+ok 97 - implicit default preserves a same-value concurrent rewrite when the revision no longer matches
+  ---
+  duration_ms: 10.568461
+  type: 'test'
+  ...
+# Subtest: implicit default checks absence once after a lost restoration response and does not repeat deletion
+ok 98 - implicit default checks absence once after a lost restoration response and does not repeat deletion
+  ---
+  duration_ms: 6.486071
+  type: 'test'
+  ...
+# Subtest: all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first
+ok 99 - all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first
+  ---
+  duration_ms: 57.08764
+  type: 'test'
+  ...
+# Subtest: Factory authority refusals remain failures without retrying an implicit workspace
+ok 100 - Factory authority refusals remain failures without retrying an implicit workspace
+  ---
+  duration_ms: 4.327058
+  type: 'test'
+  ...
+# Subtest: Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere
+ok 101 - Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere
+  ---
+  duration_ms: 27.155088
+  type: 'test'
+  ...
+# Subtest: malformed or foreign personal workspace selection stops before any Factory call
+ok 102 - malformed or foreign personal workspace selection stops before any Factory call
+  ---
+  duration_ms: 21.355305
+  type: 'test'
+  ...
+# Subtest: workspace A idle cannot hide workspace B activity in either scoped reader
+ok 103 - workspace A idle cannot hide workspace B activity in either scoped reader
+  ---
+  duration_ms: 11.370921
+  type: 'test'
+  ...
+# Subtest: idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic
+ok 104 - idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic
+  ---
+  duration_ms: 18.773514
+  type: 'test'
+  ...
+# Subtest: workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings
+ok 105 - workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings
+  ---
+  duration_ms: 14.052822
+  type: 'test'
+  ...
+# Subtest: a changed workspace inventory cannot turn an incomplete scan into an idle proof
+ok 106 - a changed workspace inventory cannot turn an incomplete scan into an idle proof
+  ---
+  duration_ms: 1.367606
+  type: 'test'
+  ...
+# Subtest: scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope
+ok 107 - scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope
+  ---
+  duration_ms: 41.765277
+  type: 'test'
+  ...
+# Subtest: fresh authorization failures in another workspace and during restoration remain visible
+ok 108 - fresh authorization failures in another workspace and during restoration remain visible
+  ---
+  duration_ms: 12.252336
+  type: 'test'
+  ...
+# Subtest: the scan rejects a 30-day row expiry at or during the scan and never filters it away
+ok 109 - the scan rejects a 30-day row expiry at or during the scan and never filters it away
+  ---
+  duration_ms: 5.327843
+  type: 'test'
+  ...
+# Subtest: one overall scan deadline and backwards time fail closed without extending the scan per workspace
+ok 110 - one overall scan deadline and backwards time fail closed without extending the scan per workspace
+  ---
+  duration_ms: 3.967445
+  type: 'test'
+  ...
+# Subtest: a real request AbortSignal expires within the remaining scan deadline and closes the login session
+ok 111 - a real request AbortSignal expires within the remaining scan deadline and closes the login session
+  ---
+  duration_ms: 46.399554
+  type: 'test'
+  ...
+# Subtest: the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read
+ok 112 - the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read
+  ---
+  duration_ms: 84.072171
+  type: 'test'
+  ...
+# Subtest: profile preflight refuses workspace admission denied instead of treating any 404 as absence
+ok 113 - profile preflight refuses workspace admission denied instead of treating any 404 as absence
+  ---
+  duration_ms: 1.781591
+  type: 'test'
+  ...
+# Subtest: profile cleanup refuses workspace admission denied without falsely marking an existing profile archived
+ok 114 - profile cleanup refuses workspace admission denied without falsely marking an existing profile archived
+  ---
+  duration_ms: 6.305294
+  type: 'test'
+  ...
+# Subtest: profile preflight refuses profile scope denied instead of treating any 404 as absence
+ok 115 - profile preflight refuses profile scope denied instead of treating any 404 as absence
+  ---
+  duration_ms: 1.314744
+  type: 'test'
+  ...
+# Subtest: profile cleanup refuses profile scope denied without falsely marking an existing profile archived
+ok 116 - profile cleanup refuses profile scope denied without falsely marking an existing profile archived
+  ---
+  duration_ms: 12.240769
+  type: 'test'
+  ...
+# Subtest: profile preflight refuses unknown error instead of treating any 404 as absence
+ok 117 - profile preflight refuses unknown error instead of treating any 404 as absence
+  ---
+  duration_ms: 2.510161
+  type: 'test'
+  ...
+# Subtest: profile cleanup refuses unknown error without falsely marking an existing profile archived
+ok 118 - profile cleanup refuses unknown error without falsely marking an existing profile archived
+  ---
+  duration_ms: 9.926146
+  type: 'test'
+  ...
+# Subtest: profile preflight refuses nested not-found code instead of treating any 404 as absence
+ok 119 - profile preflight refuses nested not-found code instead of treating any 404 as absence
+  ---
+  duration_ms: 1.370831
+  type: 'test'
+  ...
+# Subtest: profile cleanup refuses nested not-found code without falsely marking an existing profile archived
+ok 120 - profile cleanup refuses nested not-found code without falsely marking an existing profile archived
+  ---
+  duration_ms: 5.381269
+  type: 'test'
+  ...
+# Subtest: profile preflight refuses malformed JSON instead of treating any 404 as absence
+ok 121 - profile preflight refuses malformed JSON instead of treating any 404 as absence
+  ---
+  duration_ms: 1.32527
+  type: 'test'
+  ...
+# Subtest: profile cleanup refuses malformed JSON without falsely marking an existing profile archived
+ok 122 - profile cleanup refuses malformed JSON without falsely marking an existing profile archived
+  ---
+  duration_ms: 5.300239
+  type: 'test'
+  ...
+# Subtest: profile absence preflight accepts only the normal authorized missing-profile response
+ok 123 - profile absence preflight accepts only the normal authorized missing-profile response
+  ---
+  duration_ms: 7.070826
+  type: 'test'
+  ...
+# Subtest: profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry
+ok 124 - profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry
+  ---
+  duration_ms: 13.909761
+  type: 'test'
+  ...
+# Subtest: recovery journal refuses each new setting write when its preceding checkpoint fails
+ok 125 - recovery journal refuses each new setting write when its preceding checkpoint fails
+  ---
+  duration_ms: 7.115435
+  type: 'test'
+  ...
+# Subtest: recovery journal failure after a model acknowledgement still restores explicit and implicit selections
+ok 126 - recovery journal failure after a model acknowledgement still restores explicit and implicit selections
+  ---
+  duration_ms: 10.932296
+  type: 'test'
+  ...
+# Subtest: recovery journal failure after each preparation acknowledgement does not prevent restoration
+ok 127 - recovery journal failure after each preparation acknowledgement does not prevent restoration
+  ---
+  duration_ms: 6.953984
+  type: 'test'
+  ...
+# Subtest: persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case
+ok 128 - persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case
+  ---
+  duration_ms: 12.413807
+  type: 'test'
+  ...
+# Subtest: recovery journal retains only validated recovery metadata and isolates callback mutation
+ok 129 - recovery journal retains only validated recovery metadata and isolates callback mutation
+  ---
+  duration_ms: 13.455559
+  type: 'test'
+  ...
+# Subtest: failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing
+ok 130 - failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing
+  ---
+  duration_ms: 12.215781
+  type: 'test'
+  ...
+# Subtest: a lost temporary selection response records intent without inventing a binding receipt
+ok 131 - a lost temporary selection response records intent without inventing a binding receipt
+  ---
+  duration_ms: 2.084014
+  type: 'test'
+  ...
+# Subtest: an unresolved profile restore retains only the exact acknowledged version and digest
+ok 132 - an unresolved profile restore retains only the exact acknowledged version and digest
+  ---
+  duration_ms: 24.376373
+  type: 'test'
+  ...
+# Subtest: actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails
+ok 133 - actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails
+  ---
+  duration_ms: 288.215073
+  type: 'test'
+  ...
+# Subtest: the existing safe artifact includes only the fixed recovery filename alongside the reports
+ok 134 - the existing safe artifact includes only the fixed recovery filename alongside the reports
+  ---
+  duration_ms: 1.181548
+  type: 'test'
+  ...
+# Subtest: recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice
+ok 135 - recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice
+  ---
+  duration_ms: 8.658996
+  type: 'test'
+  ...
+1..135
+# tests 135
+# suites 0
+# pass 135
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1988.135843

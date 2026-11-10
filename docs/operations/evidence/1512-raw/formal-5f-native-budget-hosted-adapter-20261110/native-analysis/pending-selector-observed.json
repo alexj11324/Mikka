@@ -1,0 +1,2948 @@
+{
+  "schema": "issue1512-workspace-choice-observed-query-structure-v1",
+  "currentSource": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "previousSource": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "sqlStructure": {
+    "sql": "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"name\", \"mikka_workspaces\".\"kind\", \"mikka_workspace_members\".\"role\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and (\"mikka_workspaces\".\"kind\" = $3 or \"mikka_workspaces\".\"userId\" = $4)) order by \"mikka_workspaces\".\"createdAt\" asc",
+    "id": "b06a5f1b2df0",
+    "index": 23,
+    "matching": true
+  },
+  "mappingBasis": "Reconstructed exact literal-free Drizzle SELECT from frozen workspace-access.ts projection/join/predicate/order; SHA256/12 equals the observed structure b06a5f1b2df0 with four parameters. Parameter values are not exported and are not inferred.",
+  "summary": [
+    {
+      "source": "previous",
+      "window": "nativeLogin",
+      "count": 43,
+      "byAction": {
+        "<unknown-context>": 3,
+        "/api/workspace/switcher": 4,
+        "/api/workspace": 4,
+        "execution-settings.getBotModelMenu": 2,
+        "task-runs.pollTaskRuns": 4,
+        "task-runs.syncThreadList": 4,
+        "coordinator.pollBotChatSummaries": 4,
+        "coordinator.syncCoordinatorChat": 4,
+        "teams.listTeams": 4,
+        "projects.listProjects": 2,
+        "bots.pollBots": 4,
+        "issues.syncIssueList": 4
+      }
+    },
+    {
+      "source": "previous",
+      "window": "webLogin",
+      "count": 39,
+      "byAction": {
+        "<unknown-context>": 3,
+        "/api/workspace/switcher": 4,
+        "/api/workspace": 4,
+        "teams.listTeams": 4,
+        "coordinator.pollBotChatSummaries": 4,
+        "projects.listProjects": 2,
+        "execution-settings.getBotModelMenu": 2,
+        "task-runs.syncThreadList": 4,
+        "coordinator.syncCoordinatorChat": 4,
+        "bots.pollBots": 4,
+        "issues.syncIssueList": 4
+      }
+    },
+    {
+      "source": "previous",
+      "window": "startup-bundled",
+      "count": 16,
+      "byAction": {
+        "<unknown-context>": 1,
+        "/api/workspace/switcher": 1,
+        "/api/workspace": 1,
+        "execution-settings.getBotModelMenu": 1,
+        "task-runs.pollTaskRuns": 1,
+        "bots.pollBots": 2,
+        "task-runs.syncThreadList": 2,
+        "coordinator.pollBotChatSummaries": 1,
+        "coordinator.syncCoordinatorChat": 2,
+        "teams.listTeams": 1,
+        "projects.listProjects": 1,
+        "issues.syncIssueList": 2
+      }
+    },
+    {
+      "source": "previous",
+      "window": "startup-hosted",
+      "count": 22,
+      "byAction": {
+        "<unknown-context>": 2,
+        "/api/workspace/switcher": 2,
+        "/api/workspace": 2,
+        "teams.listTeams": 2,
+        "task-runs.pollTaskRuns": 2,
+        "coordinator.pollBotChatSummaries": 2,
+        "projects.listProjects": 1,
+        "bots.pollBots": 2,
+        "execution-settings.getBotModelMenu": 1,
+        "coordinator.syncCoordinatorChat": 2,
+        "issues.syncIssueList": 2,
+        "task-runs.syncThreadList": 2
+      }
+    },
+    {
+      "source": "current",
+      "window": "nativeLogin",
+      "count": 33,
+      "byAction": {
+        "/api/workspace/switcher": 4,
+        "/api/workspace": 4,
+        "task-runs.pollTaskRuns": 4,
+        "coordinator.pollBotChatSummaries": 3,
+        "<unknown-context>": 3,
+        "execution-settings.getBotModelMenu": 2,
+        "bots.pollBots": 4,
+        "coordinator.syncCoordinatorChat": 3,
+        "issues.syncIssueList": 4,
+        "teams.listTeams": 2
+      }
+    },
+    {
+      "source": "current",
+      "window": "webLogin",
+      "count": 28,
+      "byAction": {
+        "<unknown-context>": 3,
+        "/api/workspace/switcher": 3,
+        "/api/workspace": 3,
+        "teams.listTeams": 3,
+        "coordinator.pollBotChatSummaries": 2,
+        "projects.listProjects": 2,
+        "execution-settings.getBotModelMenu": 2,
+        "task-runs.syncThreadList": 2,
+        "coordinator.syncCoordinatorChat": 2,
+        "bots.pollBots": 4,
+        "issues.syncIssueList": 2
+      }
+    },
+    {
+      "source": "current",
+      "window": "startup-bundled",
+      "count": 16,
+      "byAction": {
+        "<unknown-context>": 2,
+        "/api/workspace/switcher": 2,
+        "/api/workspace": 2,
+        "execution-settings.getBotModelMenu": 1,
+        "task-runs.pollTaskRuns": 2,
+        "coordinator.pollBotChatSummaries": 2,
+        "issues.syncIssueList": 2,
+        "bots.pollBots": 1,
+        "task-runs.syncThreadList": 1,
+        "coordinator.syncCoordinatorChat": 1
+      }
+    },
+    {
+      "source": "current",
+      "window": "startup-hosted",
+      "count": 21,
+      "byAction": {
+        "<unknown-context>": 1,
+        "/api/workspace/switcher": 2,
+        "/api/workspace": 2,
+        "teams.listTeams": 2,
+        "task-runs.pollTaskRuns": 2,
+        "coordinator.pollBotChatSummaries": 2,
+        "projects.listProjects": 1,
+        "bots.pollBots": 2,
+        "execution-settings.getBotModelMenu": 1,
+        "coordinator.syncCoordinatorChat": 2,
+        "issues.syncIssueList": 2,
+        "task-runs.syncThreadList": 2
+      }
+    }
+  ],
+  "currentNativeBatchGroups": [
+    {
+      "id": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+      "startedAt": "2026-11-10T03:29:24.350Z",
+      "completedAt": "2026-11-10T03:29:24.528Z",
+      "logicalCount": 6,
+      "actions": [
+        "team-relations.listProjectTeams",
+        "task-runs.pollTaskRuns",
+        "coordinator.pollBotChatSummaries",
+        "task-runs.syncThreadList",
+        "teams.listTeams",
+        "projects.listProjects"
+      ],
+      "observedChoiceSelects": 2,
+      "selectsByAction": [
+        {
+          "action": "task-runs.pollTaskRuns",
+          "count": 1
+        },
+        {
+          "action": "coordinator.pollBotChatSummaries",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "589744ab-e319-402f-8d24-78b11e64e630",
+      "startedAt": "2026-11-10T03:29:25.308Z",
+      "completedAt": "2026-11-10T03:29:25.377Z",
+      "logicalCount": 3,
+      "actions": [
+        "bots.pollBots",
+        "coordinator.syncCoordinatorChat",
+        "issues.syncIssueList"
+      ],
+      "observedChoiceSelects": 3,
+      "selectsByAction": [
+        {
+          "action": "bots.pollBots",
+          "count": 1
+        },
+        {
+          "action": "coordinator.syncCoordinatorChat",
+          "count": 1
+        },
+        {
+          "action": "issues.syncIssueList",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+      "startedAt": "2026-11-10T03:29:25.586Z",
+      "completedAt": "2026-11-10T03:29:25.624Z",
+      "logicalCount": 3,
+      "actions": [
+        "team-relations.listProjectTeams",
+        "bots.pollBots",
+        "teams.listTeams"
+      ],
+      "observedChoiceSelects": 2,
+      "selectsByAction": [
+        {
+          "action": "bots.pollBots",
+          "count": 1
+        },
+        {
+          "action": "teams.listTeams",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+      "startedAt": "2026-11-10T03:29:25.728Z",
+      "completedAt": "2026-11-10T03:29:25.763Z",
+      "logicalCount": 4,
+      "actions": [
+        "task-runs.pollTaskRuns",
+        "coordinator.pollBotChatSummaries",
+        "issues.syncIssueList",
+        "task-runs.syncThreadList"
+      ],
+      "observedChoiceSelects": 3,
+      "selectsByAction": [
+        {
+          "action": "task-runs.pollTaskRuns",
+          "count": 1
+        },
+        {
+          "action": "coordinator.pollBotChatSummaries",
+          "count": 1
+        },
+        {
+          "action": "issues.syncIssueList",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "2d4df4ad-dc06-481b-b6a2-142268356438",
+      "startedAt": "2026-11-10T03:29:29.328Z",
+      "completedAt": "2026-11-10T03:29:30.018Z",
+      "logicalCount": 7,
+      "actions": [
+        "team-relations.listProjectTeams",
+        "task-runs.pollTaskRuns",
+        "coordinator.pollBotChatSummaries",
+        "teams.listTeams",
+        "projects.listProjects",
+        "coordinator.syncCoordinatorChat",
+        "task-runs.syncThreadList"
+      ],
+      "observedChoiceSelects": 2,
+      "selectsByAction": [
+        {
+          "action": "task-runs.pollTaskRuns",
+          "count": 1
+        },
+        {
+          "action": "coordinator.pollBotChatSummaries",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "900cb348-a08e-439a-8992-4ccf69aaf064",
+      "startedAt": "2026-11-10T03:29:29.877Z",
+      "completedAt": "2026-11-10T03:29:30.042Z",
+      "logicalCount": 2,
+      "actions": [
+        "bots.pollBots",
+        "issues.syncIssueList"
+      ],
+      "observedChoiceSelects": 2,
+      "selectsByAction": [
+        {
+          "action": "bots.pollBots",
+          "count": 1
+        },
+        {
+          "action": "issues.syncIssueList",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+      "startedAt": "2026-11-10T03:29:30.411Z",
+      "completedAt": "2026-11-10T03:29:30.426Z",
+      "logicalCount": 3,
+      "actions": [
+        "team-relations.listProjectTeams",
+        "bots.pollBots",
+        "teams.listTeams"
+      ],
+      "observedChoiceSelects": 2,
+      "selectsByAction": [
+        {
+          "action": "bots.pollBots",
+          "count": 1
+        },
+        {
+          "action": "teams.listTeams",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "id": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+      "startedAt": "2026-11-10T03:29:30.518Z",
+      "completedAt": "2026-11-10T03:29:30.624Z",
+      "logicalCount": 5,
+      "actions": [
+        "task-runs.pollTaskRuns",
+        "coordinator.syncCoordinatorChat",
+        "issues.syncIssueList",
+        "task-runs.syncThreadList",
+        "coordinator.pollBotChatSummaries"
+      ],
+      "observedChoiceSelects": 3,
+      "selectsByAction": [
+        {
+          "action": "task-runs.pollTaskRuns",
+          "count": 1
+        },
+        {
+          "action": "coordinator.syncCoordinatorChat",
+          "count": 1
+        },
+        {
+          "action": "issues.syncIssueList",
+          "count": 1
+        }
+      ]
+    }
+  ],
+  "allObservedRows": [
+    {
+      "source": "previous",
+      "window": "nativeLogin",
+      "count": 43,
+      "queries": [
+        {
+          "ordinal": 33503,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33507,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "5792b6b3-5f73-4103-b1af-6c56a8af91bb",
+            "invocationId": "5792b6b3-5f73-4103-b1af-6c56a8af91bb",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33508,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d99a6f74-534d-4f0b-90fc-e5676a42d34d",
+            "invocationId": "d99a6f74-534d-4f0b-90fc-e5676a42d34d",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33517,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "0089b131-593a-4e90-a0ab-cc2d73f9310a",
+            "invocationId": "0089b131-593a-4e90-a0ab-cc2d73f9310a",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33520,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a8d94246-c065-4769-b18f-2df0ff05b11b",
+            "invocationId": "7822448b-b54d-4b01-81c2-7ba42dc3033d",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 33522,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a8d94246-c065-4769-b18f-2df0ff05b11b",
+            "invocationId": "1aa3bb79-546c-440d-8837-3734ea9203d6",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 33523,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a8d94246-c065-4769-b18f-2df0ff05b11b",
+            "invocationId": "1e43e379-771a-46a5-97d0-76ab5799d9ea",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33524,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a8d94246-c065-4769-b18f-2df0ff05b11b",
+            "invocationId": "baae2f7a-e39a-42ed-b002-cc689383cb4b",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33526,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a8d94246-c065-4769-b18f-2df0ff05b11b",
+            "invocationId": "a8f78642-6d8d-4a4b-bb81-dfc8f47e5d62",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33527,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a8d94246-c065-4769-b18f-2df0ff05b11b",
+            "invocationId": "a11394e1-a250-4ed6-9ccf-d83c5dd75a03",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 33607,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ae7fd471-5cda-4427-a59f-580294b11e10",
+            "invocationId": "428d5d99-44e8-457d-ad7b-acc65ab87b5b",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33608,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ae7fd471-5cda-4427-a59f-580294b11e10",
+            "invocationId": "baa628a9-25a3-4a38-af44-bf511a7cbb33",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33635,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "3ab385da-7b10-4445-85be-8625585e3ffb",
+            "invocationId": "3ab385da-7b10-4445-85be-8625585e3ffb",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33637,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c0860283-d332-4826-8e8e-ccb147f1eb9e",
+            "invocationId": "e13030e0-425c-44f5-95d5-877e45ce127d",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33638,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c0860283-d332-4826-8e8e-ccb147f1eb9e",
+            "invocationId": "5533f2ba-c97a-4f7c-9efd-3212f18a2d49",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33639,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "de876aab-c2f5-4cb4-a3b8-9e3fc4dbbf55",
+            "invocationId": "de876aab-c2f5-4cb4-a3b8-9e3fc4dbbf55",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33653,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b510f05b-e9b8-4dc9-ad64-b49171ed33da",
+            "invocationId": "525479e2-1f31-4a71-87d6-cc06267f0235",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 33654,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b510f05b-e9b8-4dc9-ad64-b49171ed33da",
+            "invocationId": "ec194de3-efd8-466a-9b2c-ec343f6683fd",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 33655,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b510f05b-e9b8-4dc9-ad64-b49171ed33da",
+            "invocationId": "c7ef9247-5739-42bb-bc63-e4486bac92fc",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33656,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b510f05b-e9b8-4dc9-ad64-b49171ed33da",
+            "invocationId": "6019ba40-c6dc-49fe-9a11-428314f292f4",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33657,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b510f05b-e9b8-4dc9-ad64-b49171ed33da",
+            "invocationId": "0513ac1e-8aea-4abc-b8ce-ab4064ae9345",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33706,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33708,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ff3e2028-30a9-4fa2-9b65-625b357721d3",
+            "invocationId": "ff3e2028-30a9-4fa2-9b65-625b357721d3",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33710,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "41613c95-966a-4074-a85c-7a69ee66882f",
+            "invocationId": "41613c95-966a-4074-a85c-7a69ee66882f",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33717,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "76a1721c-099b-4bba-8c48-3d6b203ba176",
+            "invocationId": "76a1721c-099b-4bba-8c48-3d6b203ba176",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33725,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ceb27afc-c0ac-45ba-93e7-03f1b3f1aca0",
+            "invocationId": "11d84384-db5e-4e49-a977-86bfd2a3630b",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 33727,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ceb27afc-c0ac-45ba-93e7-03f1b3f1aca0",
+            "invocationId": "8500bdb1-68e6-43b5-bdab-da768985114e",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 33728,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ceb27afc-c0ac-45ba-93e7-03f1b3f1aca0",
+            "invocationId": "56d5ec9c-d8c3-4735-b0bc-b4498f5d7b5c",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33729,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ceb27afc-c0ac-45ba-93e7-03f1b3f1aca0",
+            "invocationId": "daa67259-a5f3-45d8-bd15-1b7fbd1d5f27",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33731,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ceb27afc-c0ac-45ba-93e7-03f1b3f1aca0",
+            "invocationId": "75f48f93-090b-4944-858c-fa12aafa0879",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33732,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ceb27afc-c0ac-45ba-93e7-03f1b3f1aca0",
+            "invocationId": "b8556996-1a71-44b8-8ca0-c3baf48797fd",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 33803,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "f8023201-8e79-4622-be74-47e5d5b20b13",
+            "invocationId": "95718958-2ced-499e-8eec-4469758a5bc2",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33804,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "f8023201-8e79-4622-be74-47e5d5b20b13",
+            "invocationId": "77ee87ab-fe54-4c48-895a-f66e8feec7a6",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33840,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33848,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "cd63f765-2e23-4a1c-b1a2-3e29501c3b3d",
+            "invocationId": "cd63f765-2e23-4a1c-b1a2-3e29501c3b3d",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33849,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "e4dcc6a3-8846-4622-bced-4d8db0055462",
+            "invocationId": "e4dcc6a3-8846-4622-bced-4d8db0055462",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33865,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "57e23ef2-6c0d-4c2c-a183-06114dc8e229",
+            "invocationId": "62cac926-e49d-41a0-bc87-d007848b9340",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33866,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "57e23ef2-6c0d-4c2c-a183-06114dc8e229",
+            "invocationId": "2a588121-363b-44c8-9f00-d395bcbe197d",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33873,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2db3ece9-c1ed-451d-9c54-21baf65156d9",
+            "invocationId": "e934985f-6735-4658-bd55-af66255651c3",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 33874,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2db3ece9-c1ed-451d-9c54-21baf65156d9",
+            "invocationId": "2ae26aae-82da-4a95-8c96-0d0483ec1c2a",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 33875,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2db3ece9-c1ed-451d-9c54-21baf65156d9",
+            "invocationId": "7bfbe625-dae0-49c5-9790-4e9dd2b08ca0",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33876,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2db3ece9-c1ed-451d-9c54-21baf65156d9",
+            "invocationId": "2b742c17-ce9d-4a12-b92b-d1a167ec0e48",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33877,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2db3ece9-c1ed-451d-9c54-21baf65156d9",
+            "invocationId": "9ee7af38-1f37-47fb-905f-885e598322fb",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        }
+      ]
+    },
+    {
+      "source": "previous",
+      "window": "webLogin",
+      "count": 39,
+      "queries": [
+        {
+          "ordinal": 33053,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33057,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "083894ca-53bb-4ca4-9d21-686e1ec8981a",
+            "invocationId": "083894ca-53bb-4ca4-9d21-686e1ec8981a",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33058,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "fb7460ab-dbf7-473e-852e-d872ff2401f5",
+            "invocationId": "fb7460ab-dbf7-473e-852e-d872ff2401f5",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33064,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "fcc8743f-99ae-42f2-9abb-d55e42c2051a",
+            "invocationId": "fcc8743f-99ae-42f2-9abb-d55e42c2051a",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33072,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "9504d23f-35af-4fc5-b45a-3972385237ab",
+            "invocationId": "9504d23f-35af-4fc5-b45a-3972385237ab",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33073,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "9655b278-b122-4377-8e49-8c0598c483fa",
+            "invocationId": "9655b278-b122-4377-8e49-8c0598c483fa",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 33075,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "f242aba5-52a2-4c49-aff3-a831a4b08a3b",
+            "invocationId": "f242aba5-52a2-4c49-aff3-a831a4b08a3b",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33079,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "dadd85e2-f29d-40c0-a79e-34ed95803dfd",
+            "invocationId": "dadd85e2-f29d-40c0-a79e-34ed95803dfd",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 33080,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c50d8f1b-934d-4f6d-a037-fa07159119e7",
+            "invocationId": "c50d8f1b-934d-4f6d-a037-fa07159119e7",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33138,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "4e293a9b-44d5-4c5b-bd8f-c3b9e5b0c35d",
+            "invocationId": "4e293a9b-44d5-4c5b-bd8f-c3b9e5b0c35d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33139,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "3d8a609d-a0d5-4f45-a145-9eaf210fbc7d",
+            "invocationId": "3d8a609d-a0d5-4f45-a145-9eaf210fbc7d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33178,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "63c8bf74-d04f-45db-ba6f-e11e25afbeb5",
+            "invocationId": "63c8bf74-d04f-45db-ba6f-e11e25afbeb5",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33181,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b9fb6be6-3f94-4d01-9c4c-64459d2c2e65",
+            "invocationId": "b9fb6be6-3f94-4d01-9c4c-64459d2c2e65",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33182,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b6cfcc79-0197-40ba-a532-a701f145656c",
+            "invocationId": "b6cfcc79-0197-40ba-a532-a701f145656c",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33198,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "51113a8c-b874-4277-b28a-e428b8acf754",
+            "invocationId": "51113a8c-b874-4277-b28a-e428b8acf754",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33204,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "f49cde91-f5b2-4d71-bb2a-971142d87739",
+            "invocationId": "f49cde91-f5b2-4d71-bb2a-971142d87739",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33208,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a7b775aa-2192-4aa3-a177-6a7f5d5e2d5b",
+            "invocationId": "a7b775aa-2192-4aa3-a177-6a7f5d5e2d5b",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 33213,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "631e316d-0e5b-4738-81bf-50ff4d63120d",
+            "invocationId": "631e316d-0e5b-4738-81bf-50ff4d63120d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33214,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "11c4e805-25f8-4966-826c-dacbdf1fa04a",
+            "invocationId": "11c4e805-25f8-4966-826c-dacbdf1fa04a",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33256,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33258,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "f4349ddc-8bf7-4ee6-9787-72c8546b8679",
+            "invocationId": "f4349ddc-8bf7-4ee6-9787-72c8546b8679",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33260,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "303394d5-e47d-457c-8e70-d2adb49cfc54",
+            "invocationId": "303394d5-e47d-457c-8e70-d2adb49cfc54",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33261,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c15db8bb-dd9b-43c1-81cb-7593742eb029",
+            "invocationId": "c15db8bb-dd9b-43c1-81cb-7593742eb029",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 33262,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d2e703bb-dada-47ea-bc06-7d539e952de0",
+            "invocationId": "d2e703bb-dada-47ea-bc06-7d539e952de0",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33275,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b7209063-0dec-473d-add4-e157cdca0195",
+            "invocationId": "b7209063-0dec-473d-add4-e157cdca0195",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33279,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "03c419f3-30bf-4365-8e97-0eaffdf416c9",
+            "invocationId": "03c419f3-30bf-4365-8e97-0eaffdf416c9",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33292,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "7ff75557-08fd-4777-94f3-44ef331fcf5f",
+            "invocationId": "7ff75557-08fd-4777-94f3-44ef331fcf5f",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 33298,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "915d0532-42e4-4ecd-80f0-400457896dfa",
+            "invocationId": "915d0532-42e4-4ecd-80f0-400457896dfa",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33343,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a978e217-ecd2-409a-a847-1ddb9b78006d",
+            "invocationId": "a978e217-ecd2-409a-a847-1ddb9b78006d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33344,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "7e71fb30-7672-42ed-9869-5f91f023e1b0",
+            "invocationId": "7e71fb30-7672-42ed-9869-5f91f023e1b0",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33391,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33398,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "53091805-c8c4-4ccd-9323-dd97d131753d",
+            "invocationId": "53091805-c8c4-4ccd-9323-dd97d131753d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33400,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "0b3015d8-7102-4316-8444-131bf7c7f402",
+            "invocationId": "0b3015d8-7102-4316-8444-131bf7c7f402",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33401,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "bf47b5b3-71ee-421f-bc23-5905b6490a39",
+            "invocationId": "bf47b5b3-71ee-421f-bc23-5905b6490a39",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33418,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a5adbcea-03fe-4487-8565-f42b75c0d973",
+            "invocationId": "a5adbcea-03fe-4487-8565-f42b75c0d973",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 33426,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "19cb5a24-3e58-458a-abca-09795e4e984e",
+            "invocationId": "19cb5a24-3e58-458a-abca-09795e4e984e",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33429,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6586c21d-a4b7-4d5f-8e52-d2b23f4b6bdc",
+            "invocationId": "6586c21d-a4b7-4d5f-8e52-d2b23f4b6bdc",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33441,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "e008da9c-59d3-4283-ac10-ff1706290c54",
+            "invocationId": "e008da9c-59d3-4283-ac10-ff1706290c54",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 33442,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "9aed8059-d8fa-48c1-951c-dd617ef8cdc3",
+            "invocationId": "9aed8059-d8fa-48c1-951c-dd617ef8cdc3",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        }
+      ]
+    },
+    {
+      "source": "previous",
+      "window": "startup-bundled",
+      "count": 16,
+      "queries": [
+        {
+          "ordinal": 34532,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 34552,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "fd697514-78bb-41a2-b7eb-274a8695c580",
+            "invocationId": "fd697514-78bb-41a2-b7eb-274a8695c580",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 34554,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "94cbb3f4-e27e-409c-becd-4a384a5acf41",
+            "invocationId": "94cbb3f4-e27e-409c-becd-4a384a5acf41",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 34578,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6f4d329b-ffea-40b1-93ff-0dab975f0c9a",
+            "invocationId": "6f4d329b-ffea-40b1-93ff-0dab975f0c9a",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 34580,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6d5458a9-5ce4-4651-a795-7439400d048c",
+            "invocationId": "202bd02f-e4f1-40de-a32c-8bcf956946e3",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 34581,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6d5458a9-5ce4-4651-a795-7439400d048c",
+            "invocationId": "b5244fc8-18fb-4125-834a-cb56c6f849d1",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 34582,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6d5458a9-5ce4-4651-a795-7439400d048c",
+            "invocationId": "aafd7093-d0c7-4ceb-9166-e3b9c6b9c268",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 34585,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6d5458a9-5ce4-4651-a795-7439400d048c",
+            "invocationId": "69fccb82-017d-468e-860b-8ccbb4d1ebcc",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 34587,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6d5458a9-5ce4-4651-a795-7439400d048c",
+            "invocationId": "01074fed-6852-4b41-b1ae-49245317b7b4",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 34588,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6d5458a9-5ce4-4651-a795-7439400d048c",
+            "invocationId": "884ea0fc-4da5-4b21-9ce7-bb373f1e64d7",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 34589,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6d5458a9-5ce4-4651-a795-7439400d048c",
+            "invocationId": "c2731968-7bd2-4a9e-a6c4-8dc7bb3bb1d3",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 34591,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6d5458a9-5ce4-4651-a795-7439400d048c",
+            "invocationId": "20880b1f-36f4-4060-9daf-515a8e6591c7",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 34607,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "60da67f2-19a7-4e47-b804-83833c69e18c",
+            "invocationId": "60da67f2-19a7-4e47-b804-83833c69e18c",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 34616,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d0f710fe-776f-4ad3-b345-6ba55b8e8a9a",
+            "invocationId": "36ea9cdf-d07f-4d02-a22b-e7fdfd05350a",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 34617,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d0f710fe-776f-4ad3-b345-6ba55b8e8a9a",
+            "invocationId": "8791038b-814e-413a-97b0-c8096bb67c8b",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 34619,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d0f710fe-776f-4ad3-b345-6ba55b8e8a9a",
+            "invocationId": "f0e948ff-1b3b-4c1b-b380-fd9d42e119fd",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        }
+      ]
+    },
+    {
+      "source": "previous",
+      "window": "startup-hosted",
+      "count": 22,
+      "queries": [
+        {
+          "ordinal": 34762,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 34767,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "fe65e69b-dbf3-4924-b346-378a211f66c1",
+            "invocationId": "fe65e69b-dbf3-4924-b346-378a211f66c1",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 34771,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d13e5341-3772-4e28-aaeb-166fdf52344c",
+            "invocationId": "d13e5341-3772-4e28-aaeb-166fdf52344c",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 34795,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "f7bc54f0-5509-4861-8362-ea78aa1891ba",
+            "invocationId": "f7bc54f0-5509-4861-8362-ea78aa1891ba",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34798,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d3946907-5b18-4f42-9165-3e44ea80c557",
+            "invocationId": "d3946907-5b18-4f42-9165-3e44ea80c557",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 34799,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "1794b43f-be18-4538-b125-951a45d01d26",
+            "invocationId": "1794b43f-be18-4538-b125-951a45d01d26",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 34800,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d627f06e-8345-499b-8227-4f97058003c8",
+            "invocationId": "d627f06e-8345-499b-8227-4f97058003c8",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 34804,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "e90fd244-ae05-4095-a26f-06b9cc3cb1d0",
+            "invocationId": "e90fd244-ae05-4095-a26f-06b9cc3cb1d0",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34805,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2d0674c1-a0fb-45fa-963e-ca5fe46f5e91",
+            "invocationId": "2d0674c1-a0fb-45fa-963e-ca5fe46f5e91",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34810,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "e8f09f74-15a6-4e34-b939-8c5c9d95496f",
+            "invocationId": "e8f09f74-15a6-4e34-b939-8c5c9d95496f",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 34820,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "8d0db061-17d9-447f-a26b-fe5885565a53",
+            "invocationId": "8d0db061-17d9-447f-a26b-fe5885565a53",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 34824,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c26aa0e1-ae7e-4d2c-907a-fa70eac5e859",
+            "invocationId": "c26aa0e1-ae7e-4d2c-907a-fa70eac5e859",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 34886,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ef349f58-e178-4699-9ee2-cf743736224b",
+            "invocationId": "ef349f58-e178-4699-9ee2-cf743736224b",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 34890,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 34897,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "053dabe6-7d78-402f-90c7-e255add765b7",
+            "invocationId": "053dabe6-7d78-402f-90c7-e255add765b7",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 34898,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "bd984ded-52df-431a-bbb8-8d3fa78fd4ae",
+            "invocationId": "bd984ded-52df-431a-bbb8-8d3fa78fd4ae",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 34900,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2ed8ea95-ef21-48d7-b020-01fcefd7bf9e",
+            "invocationId": "2ed8ea95-ef21-48d7-b020-01fcefd7bf9e",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34913,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "99e01f8b-36d8-464d-8eaa-ecd261b27df5",
+            "invocationId": "99e01f8b-36d8-464d-8eaa-ecd261b27df5",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34917,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "cd253ebc-c628-4b1a-831e-e02f00eccc41",
+            "invocationId": "cd253ebc-c628-4b1a-831e-e02f00eccc41",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 34933,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "298671fe-45d9-4788-bba2-99005a4f87b0",
+            "invocationId": "298671fe-45d9-4788-bba2-99005a4f87b0",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 34934,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "0ca521b3-b63f-457a-bd56-4dc61909928d",
+            "invocationId": "0ca521b3-b63f-457a-bd56-4dc61909928d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 34935,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "b1a1c8d4-1ece-4a33-9fcb-811bae994aeb",
+            "invocationId": "b1a1c8d4-1ece-4a33-9fcb-811bae994aeb",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        }
+      ]
+    },
+    {
+      "source": "current",
+      "window": "nativeLogin",
+      "count": 33,
+      "queries": [
+        {
+          "ordinal": 33002,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+            "invocationId": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33003,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "77bdd690-15e0-49a7-bc60-31f10951e950",
+            "invocationId": "77bdd690-15e0-49a7-bc60-31f10951e950",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33009,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+            "invocationId": "709217bd-8060-44f3-9968-5d4f8d640824",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 33010,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+            "invocationId": "07443bb7-e101-4ed9-81dc-f70562df3a85",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33029,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33034,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+            "invocationId": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33076,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+            "invocationId": "fd69ce83-9f62-4a12-897d-e4146e72c5ad",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33077,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+            "invocationId": "380b5ca1-f985-4166-8879-ba4dbf3574d8",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33078,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+            "invocationId": "60ebf993-1411-40cb-9597-257d756dcd0e",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33125,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+            "invocationId": "7d697dd8-fe4e-494d-b475-491e20211edc",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33126,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+            "invocationId": "ec447a83-e9aa-46f2-a6f6-16b65065d21c",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33132,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+            "invocationId": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33136,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+            "invocationId": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33149,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+            "invocationId": "65b7b86a-2fad-4536-b0a4-97fec425d83e",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 33150,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+            "invocationId": "c8bd9a8e-0fbf-4691-b4d1-c2fae354b0c9",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33151,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+            "invocationId": "d7e69923-ab9f-4159-80fb-70bfbd64fa7e",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33167,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+            "invocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33201,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33208,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "31e970a3-845b-4f66-9007-43e0e07698b8",
+            "invocationId": "31e970a3-845b-4f66-9007-43e0e07698b8",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33209,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+            "invocationId": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33214,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "9306d7cc-90ac-49c1-8c9c-eef0c5a99a15",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 33215,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "c0669ce6-c661-4748-8c9a-afdde043312c",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 33216,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+            "invocationId": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33310,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "900cb348-a08e-439a-8992-4ccf69aaf064",
+            "invocationId": "d1b339e1-cb6e-4e64-b22c-80ccacd04658",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33311,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "900cb348-a08e-439a-8992-4ccf69aaf064",
+            "invocationId": "b2006e3d-46b9-463d-8a0c-3fb25feb3b81",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 33342,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+            "invocationId": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 33343,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "1d436f32-12d1-4795-ba30-8256f29dd398",
+            "invocationId": "1d436f32-12d1-4795-ba30-8256f29dd398",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 33353,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 33363,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+            "invocationId": "a295182f-5462-43a4-8231-69c166e1ee79",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33364,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+            "invocationId": "2c342753-eeaf-48f9-a4da-392ee4fa15a9",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 33367,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+            "invocationId": "6cf8dede-29ae-454f-88fe-df4cdcccb45b",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 33368,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+            "invocationId": "47c416eb-7ab7-4936-a9d7-9ceeace6a3e6",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 33369,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+            "invocationId": "b3b99688-276f-4c04-9390-4e42f45f7481",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        }
+      ]
+    },
+    {
+      "source": "current",
+      "window": "webLogin",
+      "count": 28,
+      "queries": [
+        {
+          "ordinal": 32658,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 32661,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+            "invocationId": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 32662,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a407cc5a-a066-4954-84ab-947556b43774",
+            "invocationId": "a407cc5a-a066-4954-84ab-947556b43774",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 32663,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+            "invocationId": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 32677,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+            "invocationId": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 32678,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+            "invocationId": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 32679,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+            "invocationId": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 32681,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+            "invocationId": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 32682,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "221811f5-3e24-4999-940c-45af76c5d1d2",
+            "invocationId": "221811f5-3e24-4999-940c-45af76c5d1d2",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 32764,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "5609cd47-4e64-47ee-a124-63c23bea875c",
+            "invocationId": "5609cd47-4e64-47ee-a124-63c23bea875c",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 32765,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "07150752-9253-4114-a8e8-d0e284beea83",
+            "invocationId": "07150752-9253-4114-a8e8-d0e284beea83",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 32789,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+            "invocationId": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 32790,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+            "invocationId": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 32792,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "af0deefd-313c-487d-8065-81ca89e5318e",
+            "invocationId": "af0deefd-313c-487d-8065-81ca89e5318e",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 32807,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+            "invocationId": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 32818,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "8cf621ad-44f3-4fac-b43b-064986beb776",
+            "invocationId": "8cf621ad-44f3-4fac-b43b-064986beb776",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 32819,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+            "invocationId": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 32827,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+            "invocationId": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 32832,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+            "invocationId": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 32833,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+            "invocationId": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 32834,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "07136100-1374-4919-969f-6b7ebb3c28c8",
+            "invocationId": "07136100-1374-4919-969f-6b7ebb3c28c8",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 32847,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 32863,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+            "invocationId": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 32864,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+            "invocationId": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 32869,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+            "invocationId": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 32870,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+            "invocationId": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 32951,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 32957,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+            "invocationId": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        }
+      ]
+    },
+    {
+      "source": "current",
+      "window": "startup-bundled",
+      "count": 16,
+      "queries": [
+        {
+          "ordinal": 34024,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 34039,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "4ef516b7-6c83-4439-a5b8-cd9c35a11d6b",
+            "invocationId": "4ef516b7-6c83-4439-a5b8-cd9c35a11d6b",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 34040,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "e6d6ad7c-63b9-430b-b606-86561ad5cd87",
+            "invocationId": "e6d6ad7c-63b9-430b-b606-86561ad5cd87",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 34063,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d8ce323f-21c2-4277-9317-96c3e27d0c3d",
+            "invocationId": "d8ce323f-21c2-4277-9317-96c3e27d0c3d",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 34088,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+            "invocationId": "2af012d7-a54b-4d92-904e-d7ccfc760ee3",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 34089,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+            "invocationId": "3d608c44-a834-4ed5-8597-7e6e6663d0da",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 34090,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+            "invocationId": "d17c12a1-f201-49f9-b81f-8dc9a7360e33",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 34153,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 34158,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2d21a6d6-53b5-4160-ac49-6c0741197cc4",
+            "invocationId": "2d21a6d6-53b5-4160-ac49-6c0741197cc4",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/desktop/rpc"
+        },
+        {
+          "ordinal": 34162,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "699e637b-4737-439b-8e32-9be96bc9b530",
+            "invocationId": "699e637b-4737-439b-8e32-9be96bc9b530",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 34164,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "77ea7c07-2d42-44d9-9888-3a7aa8e7fb0f",
+            "invocationId": "77ea7c07-2d42-44d9-9888-3a7aa8e7fb0f",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 34170,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "83168c61-5c1d-4f32-8128-7d591dbc07c2",
+            "invocationId": "b1306d5a-c827-4804-b8be-e9529778276a",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 34171,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "83168c61-5c1d-4f32-8128-7d591dbc07c2",
+            "invocationId": "c8be8641-2a9d-49dc-95d4-108414bba82a",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 34172,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "83168c61-5c1d-4f32-8128-7d591dbc07c2",
+            "invocationId": "3cc1e1bd-c343-413c-9e3a-0af9ea1c5fec",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 34210,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6f8fdd56-9804-4a1b-86f1-995653931408",
+            "invocationId": "6f8fdd56-9804-4a1b-86f1-995653931408",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 34218,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "3320a1ee-4f58-466c-9500-b6304dbdebe5",
+            "invocationId": "3320a1ee-4f58-466c-9500-b6304dbdebe5",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        }
+      ]
+    },
+    {
+      "source": "current",
+      "window": "startup-hosted",
+      "count": 21,
+      "queries": [
+        {
+          "ordinal": 34245,
+          "context": {
+            "status": "unknown"
+          },
+          "scope": "/api/conversations/[id]/read"
+        },
+        {
+          "ordinal": 34249,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "2ad1377a-d52f-47f3-93a4-bb9f6e988dcc",
+            "invocationId": "2ad1377a-d52f-47f3-93a4-bb9f6e988dcc",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 34250,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "d368a95c-561e-4b69-8f75-193e3487bae1",
+            "invocationId": "d368a95c-561e-4b69-8f75-193e3487bae1",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 34277,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c115b574-c67f-497f-805b-dd9f34c919b9",
+            "invocationId": "c115b574-c67f-497f-805b-dd9f34c919b9",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34280,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "71251c59-62a5-4e5c-9ba9-780ccf35ea2b",
+            "invocationId": "71251c59-62a5-4e5c-9ba9-780ccf35ea2b",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 34281,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "365dbb86-0ae6-4882-aa80-c5a50bc576df",
+            "invocationId": "365dbb86-0ae6-4882-aa80-c5a50bc576df",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        },
+        {
+          "ordinal": 34286,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "c3da2005-3289-4d63-b99b-9b07c59c9c87",
+            "invocationId": "c3da2005-3289-4d63-b99b-9b07c59c9c87",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects"
+          },
+          "scope": "/actions/projects/list"
+        },
+        {
+          "ordinal": 34291,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "6caa5654-ae04-42e6-a1a6-595347c54362",
+            "invocationId": "6caa5654-ae04-42e6-a1a6-595347c54362",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34292,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "5ed45a9d-7068-44d3-84d0-174ce7049d99",
+            "invocationId": "5ed45a9d-7068-44d3-84d0-174ce7049d99",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34297,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "25fc4a93-064a-4f78-ba50-0f694100dc47",
+            "invocationId": "25fc4a93-064a-4f78-ba50-0f694100dc47",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 34307,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "aa0c25dd-f02b-4af7-a16f-808c7e78786a",
+            "invocationId": "aa0c25dd-f02b-4af7-a16f-808c7e78786a",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 34308,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "485ac65f-7c04-4207-9272-aba362d56027",
+            "invocationId": "485ac65f-7c04-4207-9272-aba362d56027",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 34369,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "7db31883-8340-4464-9837-76f8e8f6bf4d",
+            "invocationId": "7db31883-8340-4464-9837-76f8e8f6bf4d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34377,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "fd441cd3-e4be-4650-a4a4-6e11caad3611",
+            "invocationId": "fd441cd3-e4be-4650-a4a4-6e11caad3611",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams"
+          },
+          "scope": "/api/rpc"
+        },
+        {
+          "ordinal": 34379,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "9f84e059-11df-4b1c-8903-0b6d618fc701",
+            "invocationId": "9f84e059-11df-4b1c-8903-0b6d618fc701",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace/switcher"
+        },
+        {
+          "ordinal": 34383,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "26e09b8d-e6c1-4ecb-80eb-008731e09eaa",
+            "invocationId": "26e09b8d-e6c1-4ecb-80eb-008731e09eaa",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null
+          },
+          "scope": "/api/workspace"
+        },
+        {
+          "ordinal": 34398,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "a9155ece-2eef-4d88-aab8-ada7fbba939d",
+            "invocationId": "a9155ece-2eef-4d88-aab8-ada7fbba939d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList"
+          },
+          "scope": "/actions/threads/poll"
+        },
+        {
+          "ordinal": 34399,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "62457650-fe3f-4c38-b9f7-aea1f9158f42",
+            "invocationId": "62457650-fe3f-4c38-b9f7-aea1f9158f42",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList"
+          },
+          "scope": "/actions/issues/poll"
+        },
+        {
+          "ordinal": 34400,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "5e26b61f-0a24-4db9-aaed-859de9a6b50c",
+            "invocationId": "5e26b61f-0a24-4db9-aaed-859de9a6b50c",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat"
+          },
+          "scope": "/actions/coordinator/poll"
+        },
+        {
+          "ordinal": 34407,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "38c262c3-3e26-4ade-8ac2-9c75820bc5d4",
+            "invocationId": "38c262c3-3e26-4ade-8ac2-9c75820bc5d4",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns"
+          },
+          "scope": "/actions/task-runs/read"
+        },
+        {
+          "ordinal": 34429,
+          "context": {
+            "status": "known",
+            "httpInvocationId": "1bb0fc8c-a348-4283-addd-931e9a5d9bad",
+            "invocationId": "1bb0fc8c-a348-4283-addd-931e9a5d9bad",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries"
+          },
+          "scope": "/actions/coordinator/summaries"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Different runs are not a controlled counterfactual; exact fingerprints prove SQL structure, not parameter equivalence or redundant authorization.",
+    "No undispatched admission timestamps are exported; SELECT counts and batch membership are actual observations, not fabricated queue hit telemetry.",
+    "Pending-only coalescer safety remains the previously isolated RED/GREEN proof; no lifetime widening is proposed."
+  ]
+}

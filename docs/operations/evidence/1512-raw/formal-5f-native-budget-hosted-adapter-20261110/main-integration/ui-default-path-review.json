@@ -1,0 +1,1003 @@
+{
+  "schema_version": 1,
+  "kind": "issue1512-main-ui-native-startup-readonly-review",
+  "created_at_utc": "2026-11-10 03:31:22 UTC",
+  "reviewer": "/root/mac_inprocess_diag",
+  "repository": "alexj11324/Mikka",
+  "source": {
+    "base": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+    "head": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "head_tree": "cf51377a9ef1c3d74b9b2480890fee3986698a47",
+    "comparison": {
+      "ahead": 33,
+      "behind": 0,
+      "changed_file_count": 90,
+      "merge_base": "cc389d61e8a85206d17616e4326a660283a1b2bd"
+    }
+  },
+  "scope": "cc389 → f5ddb (#1854) public main source, ordinary Native login/first authenticated startup, optional UI mount adapters and lifecycle fixture. This is a source review, not execution of the new hosted UI.",
+  "conclusion": {
+    "public_adapter_blocker_identified": false,
+    "newtask_startup_read_added": false,
+    "native_fixture_byte_identical": true,
+    "private_overlay_mount_and_rendering_proven": false,
+    "sql_count_claim": null,
+    "rerun_started": false
+  },
+  "findings": [
+    {
+      "id": "new-task-read-gates",
+      "finding": "NewTaskDialog remains mounted with creating initially false, while all existing reads remain gated by open. The new useTaskProfileChoices maps the already loaded AgentProfilesView and translations; it does not fetch, use SWR, call server actions, or run an effect. Its onManage opens settings only when invoked. NewTask itself is rendered only under open &&. Creating a React element for notices/keyDialogNode does not itself mount that component.",
+      "witnesses": [
+        "components/workspace/issue-workspace.tsx:326,593",
+        "components/coordinator/new-task-dialog.tsx:89,96,101-104,115,176-198",
+        "components/coordinator/task-profile-picker.tsx:77-95",
+        "components/settings/factory-profiles-data.ts:62-67"
+      ],
+      "equality": "factory-profiles-data.ts is byte-identical at both source commits; the NewTask diff preserves all read gates."
+    },
+    {
+      "id": "closed-neighbour-slots",
+      "finding": "The adjacent new-bot slot is open-only. Search starts with searchOpen=false and usePresence(false).value=null; IssueWorkspace mounts GlobalSearch only when search.value is truthy. The refactored search data hook still calls the same useSiteSearch(query, workspaceId); no new initial-workspace search mount is introduced. Settings content is created as JSX but rendered only in the settingsShown branch; new members/audit screens do not thereby mount on the ordinary conversation startup path.",
+      "witnesses": [
+        "components/nav/new-bot-dialog.tsx:59-61",
+        "components/workspace/issue-workspace.tsx:236,328-329,598-602,633-644",
+        "lib/use-presence.ts:10-19",
+        "components/nav/global-search.tsx:92-105",
+        "components/settings/settings-view.tsx:97-116,144-145"
+      ],
+      "limit": "Once Search is opened, a private SearchPalette may remain mounted during its exit presence; this review does not characterize private slot effects."
+    },
+    {
+      "id": "frame-panel-ownership",
+      "finding": "FRAME_OWNS_PANEL=true changes actual mount ownership for the ordinary coordinator conversation. IssueWorkspace forms overview/context and browser React elements in panels.tabs, passes them through ConversationPanels.Provider, and suppresses the old side BrowserPane, ContextPanel and Sheet via !panelsInFrame. Thus there is no unconditional double-render of the old and new panel paths. Whether and when the supplied tab content actually mounts is determined by the private ThreadScreen. The public adapter alone cannot prove request equivalence, lower SQL counts, or hidden-tab unmounting.",
+      "witnesses": [
+        "components/workspace/issue-workspace.tsx:548,576-586,651,659,664,673",
+        "components/coordinator/conversation-panels.tsx:1-11",
+        "components/coordinator/coordinator-chat.tsx:478-480,552"
+      ],
+      "defaults": "Public default FRAME_OWNS_PANEL=false, FRAME_OWNS_HEADER=false, ThreadScreen=null. These defaults do not prove the official hosted UI behavior.",
+      "detail": "BrowserPane's only diff adds inTab and changes its root wrapper from ResizablePane to section when true; its existing hooks are unchanged. ContextPanel is not changed by this main diff."
+    },
+    {
+      "id": "header-address-and-compact-chat",
+      "finding": "FRAME_OWNS_HEADER=true adds a redirect only when threadsView is present: it removes the legacy threads query and, with no threadId, selects tasks. This can alter a legacy bookmarked startup route; it is not an unconditional ordinary /mikka redirect. CoordinatorChat now allows a non-null ThreadScreen for compact chats too, while embedded chats retain the old path; compact screens receive panels=undefined. Normal noncompact chats already used a non-null ThreadScreen before this change.",
+      "witnesses": [
+        "components/workspace/issue-workspace.tsx:258-263,642-649",
+        "components/coordinator/coordinator-chat.tsx:476-480,552"
+      ],
+      "limit": "Actual UI renderer mounting/layout must be evaluated with the selected overlay; public JSX objects are not evidence that supplied children have mounted."
+    },
+    {
+      "id": "native-fixture-exact",
+      "finding": "apps/desktop/test/lifecycle.mjs is byte-identical at base and head: Git blob 8251fc9aa56103614d1ddff944668930d1da937c, 32029 bytes, SHA256 d81a2b7c0fcc3675f9bfc6a30213428d7dfee95880583ec19898cd85cd69ca46. The same blob was identified for the repaired formal H fixture. It waits for the seeded message, then visible editable textarea[data-chat-composer] wider than 100px, fills a draft and checks viewport. Workspace selection still waits for a fresh domcontentloaded when switching documents.",
+      "witnesses": [
+        "apps/desktop/test/lifecycle.mjs:36,46-47,141-170"
+      ],
+      "windows": "Web login begins before owner.reauthenticate, navigates /mikka and ends after selectFixture/usable (308-318). Native login begins before reauthenticate and signInBundledAccount then ends after selectFixture/usable (324-331). First startup window begins before launch for pair 1 and ends after usable (355-361). Five paired fresh processes, alternating order, remain unchanged. These readiness paths do not open NewTask."
+    },
+    {
+      "id": "native-selectors",
+      "finding": "Both English Nav.workspaceMenu='Workspace menu' and Chinese Nav.workspaceMenu='工作区菜单' are unchanged. The public WorkspaceMenu retains its accessible trigger label and menuitems with aria-current. Public default ChatComposer still writes data-chat-composer on the normal textarea. Existing lifecycle selectors and their assertions were not relaxed.",
+      "witnesses": [
+        "messages/en.json:Nav.workspaceMenu",
+        "messages/zh-CN.json:Nav.workspaceMenu",
+        "components/workspace-menu.tsx:71-80,95-99",
+        "components/slots/chat-composer.tsx:48",
+        "apps/desktop/test/lifecycle.mjs:141-169"
+      ],
+      "limit": "ChatComposer is a UI slot; AppFrame/IconRail/ThreadScreen can also be supplied by the private overlay. Consequently default source and unchanged fixture do not constitute a pass of the actual #61 DOM or layout."
+    },
+    {
+      "id": "desktop-rpc-boundary",
+      "finding": "The only changed lib/desktop-rpc entries add teams.getTeamDeletionImpact and teams.deleteTeam to the registry and argument schemas. These are dispatch mappings/schema definitions, not startup invocations. No apps/desktop source file appears in the 90-file main comparison, and the directly read lifecycle source is equal. package.json only adds lib/audit/read-failure.test.ts to test:settings-backend; it changes no dependencies or desktop startup command.",
+      "witnesses": [
+        "lib/desktop-rpc/registry.ts:211-212",
+        "lib/desktop-rpc/schemas.ts:253-255",
+        "package.json:60"
+      ],
+      "scope": "No new team-deletion operation was invoked during this review."
+    },
+    {
+      "id": "overlay-source-boundary",
+      "finding": "uiOverlay selects components/slots by default, then substitutes private slots/<name>.tsx when MIKKA_UI_OVERLAY_DIR is configured. Shared Next/Vite resolution is documented in the file. New app-frame named exports require the actual selected overlay to export both FRAME_OWNS_HEADER and FRAME_OWNS_PANEL. NewTask/Search/NewBot optional namespace members fall back when absent.",
+      "witnesses": [
+        "lib/ui-overlay.mjs:1-5,12-23,84-97",
+        "components/app-shell.tsx:18",
+        "components/slots/app-frame.tsx:8-15",
+        "docs/ui-overlay.md"
+      ],
+      "limit": "The ongoing hosted #61 source was deliberately left to Root and the production-selector reviewer. This report does not freeze or approve that private overlay."
+    }
+  ],
+  "formal_mac_gate": {
+    "run_id": 42748069074,
+    "attempt": 1,
+    "source": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "status": "success",
+    "archive_commit": "e388da67c8a581d00cdfe465b9d24d691d886b8f",
+    "index_blob": "00d2f536ccf310f820a9e7376f5aaaff0baf2ff1",
+    "result_blob": "3f19f525b9b30ba9c5bde4f7fa6696533486398f",
+    "review_action": "No dispatch or rerun. This review does not re-label H's successful run as execution of new main/hosted UI. Root may associate unchanged installer source through Git when assembling the final head.",
+    "historical_failure": "Original formal 5852 bootstrap EIO5 cause remains unknown; both diagnostic passes and H formal pass do not erase that history."
+  },
+  "limits": [
+    "No browser/runtime execution, no PostHog/SQL query, no request-count estimate.",
+    "No change to product, formal branch, workflows, fixtures, or user-facing selectors.",
+    "All prior owned Mac/dispatcher entries remain disabled and archived; no original Actions logs or ZIPs were re-read during this review.",
+    "Full source blobs listed below are already reachable from their respective commits. The report itself is immutable evidence; it does not alter those source trees."
+  ],
+  "source_catalog": [
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "blob_sha": "c5691916503f0140aa2a919ec88d2a04ace055aa",
+      "bytes": 17396,
+      "sha256": "ab9ac90a2fc5cb3e7b4443ef28ef5fc8f227a29eaa1d3a96640c5df0f2b2052f"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "blob_sha": "54e76d1279888b16b03c51ad322a0d12e9ce8e7d",
+      "bytes": 20087,
+      "sha256": "1bbc3968caec30a90fe788e4c51644c35be89d5e61371d8b08291f91dff8e043"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/coordinator/task-profile-picker.tsx",
+      "blob_sha": "c4d4f834a3574fa30fbe20d0b83a7bcbe34ebf2a",
+      "bytes": 5147,
+      "sha256": "d069b15ee5062684180d354d6f7797e2237dcdef7dc1a1a24389c8f312f49c10"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/coordinator/task-profile-picker.tsx",
+      "blob_sha": "6bfd61a4d48b6580d854dfdfa2baa607e968ffb9",
+      "bytes": 6897,
+      "sha256": "aaf82e7fd08bad681ccc1d52c178022f9dc36e74e827260d710f34b05d62a9d9"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/app-shell.tsx",
+      "blob_sha": "331428506cfa0fb674cdc08ebe8b10a1f47937d8",
+      "bytes": 7249,
+      "sha256": "d4bdec0532de003eca03312d6b38cc6581046a8109897834f38f09dbbb084aa2"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/app-shell.tsx",
+      "blob_sha": "ab5830c28936e1d0eb9b602970550a7400ea09c3",
+      "bytes": 7286,
+      "sha256": "b1dc6d703c2d9219cced0c97a2316d006bc407726eae1bc5b9674e1feaba55a8"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/slots/app-frame.tsx",
+      "blob_sha": "e2497e74f5000e1c3626ed4730674adae6ec09dd",
+      "bytes": 521,
+      "sha256": "bd4649e2e38d157ffc9e81392ca1af1294d2d4699a1f02cc40dcc02a2e841890"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/slots/app-frame.tsx",
+      "blob_sha": "aad2963fccf661760922c22f8c9005443eb0daa2",
+      "bytes": 760,
+      "sha256": "e7f50cc889303e2e80885a949ede9bd70a9c438a7880dea69af7b9d951e5195d"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "blob_sha": "8eb580a57b83c952a87f4be7251ebaea4b417724",
+      "bytes": 58786,
+      "sha256": "0a08f40ee2430fdae1eec6165a8bb3af36b85d886ce69327d4eb1ebd45d0f5b0"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "blob_sha": "c8fb0a27458cff1ffe08f6d63af786665eef35e8",
+      "bytes": 59145,
+      "sha256": "83c15148565a5473312c38e7f1f2764df06b005ea53f709a605d8d52a4d6db7f"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/slots/app-frame-contract.ts",
+      "blob_sha": "75152a9f76ee99ea731f74f3648027a8748f32f8",
+      "bytes": 1145,
+      "sha256": "f5495ec060dac7ec76681a0ea6a3439e78c9a1fe35463b1e49bb293547d435eb"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/slots/app-frame-contract.ts",
+      "blob_sha": "56b643ce9c46c7814683ab7eea784f09a847de30",
+      "bytes": 1618,
+      "sha256": "b7ef6b93dad4f38240fbd13805fc6606219a55205eaa3967530a315408bd7401"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/workspace/issue-workspace.tsx",
+      "blob_sha": "6f031756fc13de69dc87fc011bb3696b5a15aa52",
+      "bytes": 58558,
+      "sha256": "17d7ad42bfd7d0f54c0f5326a289291268ff8c27f392fb45c593ce64bab58111"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/workspace/issue-workspace.tsx",
+      "blob_sha": "42c12755e979aac981bd61271d44aea78136b8c5",
+      "bytes": 61429,
+      "sha256": "68c900d070acb84d4c205efa976e39c254f9abc827f2e565e828306c6037949f"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/slots/new-task.tsx",
+      "blob_sha": "0f2891b7fc83da5f8b1aeafa4144d9db7e56201a",
+      "bytes": 336,
+      "sha256": "04b09bf101a32813f51884916286f4ffdb05c3e9dd4673f2220844f5c8431c1d"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/slots/thread.tsx",
+      "blob_sha": "3c3002f3b70d7d35b537872862d736d2a8877246",
+      "bytes": 363,
+      "sha256": "d48dcd3bf58978a35e789e732a4916af3363f494c8a20061160f48076c54e926"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/coordinator/conversation-panels.tsx",
+      "blob_sha": "e70d3b518591274ec024388a938aafdbed881e46",
+      "bytes": 520,
+      "sha256": "95ec61a7be03febf6ccfac3ea93db52ac4ad0d5d3c7465c1c0774f7acb06be44"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "lib/ui-overlay.mjs",
+      "blob_sha": "c3a048c7c74a1c8bf632a558873595f86032de35",
+      "bytes": 6321,
+      "sha256": "47b2ddd6b4c1a94287349ffe567cd93684c8680cb461ce188c11dcdad41ddbad"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "docs/ui-overlay.md",
+      "blob_sha": "9731a8a00d595754ebb1a2c3803e41dfb3d09bff",
+      "bytes": 27245,
+      "sha256": "41c7745ac18a00934917949423022790bbc52f414821d74a564f0c1850dc7406"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/settings/factory-profiles-data.ts",
+      "blob_sha": "717b2e2a1cc0c75eb99c41da8c7225071930cc43",
+      "bytes": 4506,
+      "sha256": "b831f9da22e7f5f2740aa407ffea5104f7976a696d4446cc4f05e1d08a2aced8"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/settings/factory-profiles-data.ts",
+      "blob_sha": "717b2e2a1cc0c75eb99c41da8c7225071930cc43",
+      "bytes": 4506,
+      "sha256": "b831f9da22e7f5f2740aa407ffea5104f7976a696d4446cc4f05e1d08a2aced8"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "blob_sha": "8251fc9aa56103614d1ddff944668930d1da937c",
+      "bytes": 32029,
+      "sha256": "d81a2b7c0fcc3675f9bfc6a30213428d7dfee95880583ec19898cd85cd69ca46"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "blob_sha": "8251fc9aa56103614d1ddff944668930d1da937c",
+      "bytes": 32029,
+      "sha256": "d81a2b7c0fcc3675f9bfc6a30213428d7dfee95880583ec19898cd85cd69ca46"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/browser/browser-pane.tsx",
+      "blob_sha": "fdd12e03cc375b8165c7084998fd9fb9ba0b4444",
+      "bytes": 17272,
+      "sha256": "b1e72066288f0486b461a2bd4929a9687dbde0e843ff493147c0420844f784b5"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/browser/browser-pane.tsx",
+      "blob_sha": "6e67a6a86e7c2daf27ed68e5ab19771b8088673a",
+      "bytes": 17613,
+      "sha256": "d8e1cc026ece719a4a9a8693fe8eb809165ea0c91e6bc18e4c055fd86dc46446"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "lib/desktop-rpc/registry.ts",
+      "blob_sha": "816e5de3ba6f234658a819c1de0c17900e8a25c9",
+      "bytes": 14931,
+      "sha256": "808356cbea97ba67f2dfb29d71a1d93deb53b65ec78d5066e9a6f5a15a071c56"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "lib/desktop-rpc/registry.ts",
+      "blob_sha": "d995a432fdc69ac501045a4bd8b04740ba001ed3",
+      "bytes": 15041,
+      "sha256": "c8ce52db77fa56d654196c5b3ae83f87267c391af66e6d4a78e8f977c264f610"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "lib/desktop-rpc/schemas.ts",
+      "blob_sha": "1d14ee9b3af4896a813d103f31dd4017b10f425f",
+      "bytes": 21175,
+      "sha256": "278fd188be7893dda0a4fcd61ce76fc03a7f332f6a38d8a02e3a3496a3f95e64"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "lib/desktop-rpc/schemas.ts",
+      "blob_sha": "b04c0fb2e0bfd30c8711b53d133b162cf200b332",
+      "bytes": 21390,
+      "sha256": "8e5c3ebe282c6e9d4d7344a9c310ab6b764ca093a5b572417f98a46df8c6208e"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/nav/global-search.tsx",
+      "blob_sha": "a5248f4e3f70e113ed19b21542bdb81df67b45d4",
+      "bytes": 18440,
+      "sha256": "53929e6ee3388bfd6186abf77a964952f889fe88be0b6f6b84a5257df379e897"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/nav/global-search.tsx",
+      "blob_sha": "1ea77be84006fe9ee77a2c4b1114a1be4c1449f4",
+      "bytes": 18960,
+      "sha256": "94961c4e7c5d43159f1c27f3c540200cc6a676901128da982bffd0afb4da15f6"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/nav/new-bot-dialog.tsx",
+      "blob_sha": "6adbb19c177a5a0096f89493845fa91712416b92",
+      "bytes": 4176,
+      "sha256": "730d09c37073434cadb5b697281a4249e369f7f3a65fee7948443091316452d6"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/nav/new-bot-dialog.tsx",
+      "blob_sha": "cecb1db95854a6ba5008f25e593f6910f066fec5",
+      "bytes": 4667,
+      "sha256": "6b5342c17050c8eb1bb665fbfe14e45a3892ce16af4161e06773f1b9e14e69a2"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "components/settings/settings-view.tsx",
+      "blob_sha": "52337a2eb36be2b1520dcbf34feb1e57c8b59569",
+      "bytes": 11296,
+      "sha256": "31dcc941d054771c7c63a8692f368e587d0c8f2e2537f4389097c7b88846fe3c"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/settings/settings-view.tsx",
+      "blob_sha": "736c43c1bf31246e812091fa0ba212cdcd414172",
+      "bytes": 12542,
+      "sha256": "9540947ad7b4962823359642608a24e3cbb4e3923c98204f0f9ebf943ffb24c0"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/coordinator/chat-composer.tsx",
+      "blob_sha": "106eca83f096db9eaab219d0e2838f54758b3d14",
+      "bytes": 231,
+      "sha256": "dc54eaee84bbddab65d908db372fb5971fbcee0a5b91419a903b43cd7b5497c6"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/nav/icon-rail-view.tsx",
+      "blob_sha": "2b247da5c035c2aba52603e5f560fc5304898be2",
+      "bytes": 3742,
+      "sha256": "d3d080744fc27f5116fac7bcfa4c42df00f7626cdb698809f3c7dbe357a85b1a"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "messages/en.json",
+      "blob_sha": "37719ecebb0b7e84cbac31620e52d4e7b92318cf",
+      "bytes": 265272,
+      "sha256": "d0e7ddabd2eab69f01edfdd56a843ad711d7186a9af8901728425f3ba7034302"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "messages/en.json",
+      "blob_sha": "fc33ff4787f45e22b9bf4f7ef36c1b20e4b1ddcf",
+      "bytes": 269725,
+      "sha256": "887995bda331f7e690fdfcec2f3b949d6cb7e900900b41de9aa2cc679127613a"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "messages/zh-CN.json",
+      "blob_sha": "541426000d8d5ef5b25cae1d99a28f2ff05f65cc",
+      "bytes": 255602,
+      "sha256": "fa73159633c48ebbb8a45a7f38fcad8b42632c7e7116b9244808490b6d137160"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "messages/zh-CN.json",
+      "blob_sha": "24b31a9ca3e0256da525fedce16e354b695726f3",
+      "bytes": 259984,
+      "sha256": "7e050f25ae6d9abe8348bc1005e1b11f29599dff9ee28c36f3a711c524012554"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "lib/use-presence.ts",
+      "blob_sha": "7989aac7e80f8c9ce3db622b6fe4a27cf0d848f2",
+      "bytes": 937,
+      "sha256": "5b19ac69a4e3fcf14dde7fc5e401d5c024bcd2f7af323e48f6f1da71c8b75100"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/slots/chat-composer.tsx",
+      "blob_sha": "089a346503865dfa958e6ca5073d7187e1370c4a",
+      "bytes": 5110,
+      "sha256": "ebab7fa3f4d71067595da8eb9fe08bf01172c5c7ec28565b36b9dfa30a3f89ef"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/workspace-menu.tsx",
+      "blob_sha": "19641a2f4dfe60310c545f4e4bbcb3315cd0bc7e",
+      "bytes": 7622,
+      "sha256": "62e9397fb7ebbdbf93b5862818068ebdcbae2b72b2d376e12cd41d030bd334f0"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "components/nav/context-panel.tsx",
+      "blob_sha": "4335088ccfd1331a6d6ddbb4422044cbbe3054d4",
+      "bytes": 18935,
+      "sha256": "23703b344a6a6f6a397d69eb7fcd552e04c5fe78e9efcd63fe298f945052a939"
+    },
+    {
+      "ref": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+      "path": "package.json",
+      "blob_sha": "4b0b4d88bfa19cc2fe9a792a415d89a247a27e56",
+      "bytes": 81761,
+      "sha256": "d5a1833dee7a538f31a895b23af0cdb0988109f555e25af92f929c42176ca16a"
+    },
+    {
+      "ref": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+      "path": "package.json",
+      "blob_sha": "677ab7d4849cbefe1b7dd33ebbc998b17e69ce09",
+      "bytes": 81792,
+      "sha256": "d180836e31aa9a317e7d22973f4c88c6f3935d737402df6c6f14aef322eac59a"
+    }
+  ],
+  "comparison_files": [
+    {
+      "path": "app/actions/audit-log.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "app/api/settings/[read]/route.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "app/api/workspaces/[workspaceId]/audit-log/route.ts",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 5
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "components/app-shell.tsx",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "components/browser/browser-pane.tsx",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 3
+    },
+    {
+      "path": "components/coordinator/conversation-panels.tsx",
+      "status": "added",
+      "additions": 11,
+      "deletions": 0
+    },
+    {
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 2
+    },
+    {
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "status": "modified",
+      "additions": 30,
+      "deletions": 3
+    },
+    {
+      "path": "components/coordinator/task-profile-picker.tsx",
+      "status": "modified",
+      "additions": 25,
+      "deletions": 1
+    },
+    {
+      "path": "components/nav/global-search.tsx",
+      "status": "modified",
+      "additions": 127,
+      "deletions": 100
+    },
+    {
+      "path": "components/nav/new-bot-dialog.tsx",
+      "status": "modified",
+      "additions": 10,
+      "deletions": 2
+    },
+    {
+      "path": "components/nav/rail-items.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "components/plugins/connected-apps.tsx",
+      "status": "modified",
+      "additions": 54,
+      "deletions": 28
+    },
+    {
+      "path": "components/plugins/github-app-settings.tsx",
+      "status": "modified",
+      "additions": 28,
+      "deletions": 10
+    },
+    {
+      "path": "components/plugins/github-settings.tsx",
+      "status": "modified",
+      "additions": 38,
+      "deletions": 9
+    },
+    {
+      "path": "components/plugins/plugins-view.tsx",
+      "status": "modified",
+      "additions": 102,
+      "deletions": 60
+    },
+    {
+      "path": "components/settings/audit-log-settings.tsx",
+      "status": "modified",
+      "additions": 20,
+      "deletions": 63
+    },
+    {
+      "path": "components/settings/computer-policy-settings.tsx",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 35
+    },
+    {
+      "path": "components/settings/linear-settings.tsx",
+      "status": "modified",
+      "additions": 11,
+      "deletions": 1
+    },
+    {
+      "path": "components/settings/settings-shell.tsx",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "components/settings/settings-view.tsx",
+      "status": "modified",
+      "additions": 12,
+      "deletions": 2
+    },
+    {
+      "path": "components/settings/team-permissions-settings.tsx",
+      "status": "modified",
+      "additions": 27,
+      "deletions": 62
+    },
+    {
+      "path": "components/settings/telegram-settings.tsx",
+      "status": "modified",
+      "additions": 9,
+      "deletions": 3
+    },
+    {
+      "path": "components/slots/app-frame-contract.ts",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/app-frame.tsx",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/new-bot-contract.ts",
+      "status": "added",
+      "additions": 18,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/new-bot.tsx",
+      "status": "added",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/new-task-contract.ts",
+      "status": "added",
+      "additions": 61,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/new-task.tsx",
+      "status": "added",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/plugins-contract.ts",
+      "status": "added",
+      "additions": 4,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/plugins.tsx",
+      "status": "added",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/search-contract.ts",
+      "status": "added",
+      "additions": 60,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/search.tsx",
+      "status": "added",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/settings-audit-contract.ts",
+      "status": "added",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/settings-audit.tsx",
+      "status": "added",
+      "additions": 7,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/settings-connections-contract.ts",
+      "status": "modified",
+      "additions": 19,
+      "deletions": 2
+    },
+    {
+      "path": "components/slots/settings-connections.tsx",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/settings-members-contract.ts",
+      "status": "added",
+      "additions": 14,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/settings-members.tsx",
+      "status": "added",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/settings-permissions-contract.ts",
+      "status": "added",
+      "additions": 13,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/settings-permissions.tsx",
+      "status": "added",
+      "additions": 7,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/task-detail-contract.ts",
+      "status": "added",
+      "additions": 156,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/task-detail.tsx",
+      "status": "added",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "components/slots/thread-contract.ts",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 0
+    },
+    {
+      "path": "components/teams/issue-team-control.tsx",
+      "status": "modified",
+      "additions": 22,
+      "deletions": 12
+    },
+    {
+      "path": "components/workspace/issue-activity-feed.tsx",
+      "status": "modified",
+      "additions": 21,
+      "deletions": 8
+    },
+    {
+      "path": "components/workspace/issue-activity.tsx",
+      "status": "modified",
+      "additions": 18,
+      "deletions": 12
+    },
+    {
+      "path": "components/workspace/issue-detail-actions.tsx",
+      "status": "modified",
+      "additions": 90,
+      "deletions": 41
+    },
+    {
+      "path": "components/workspace/issue-detail-properties.tsx",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "components/workspace/issue-editor.tsx",
+      "status": "modified",
+      "additions": 32,
+      "deletions": 11
+    },
+    {
+      "path": "components/workspace/issue-metadata-controls.tsx",
+      "status": "modified",
+      "additions": 41,
+      "deletions": 29
+    },
+    {
+      "path": "components/workspace/issue-pull-request-link.tsx",
+      "status": "modified",
+      "additions": 31,
+      "deletions": 10
+    },
+    {
+      "path": "components/workspace/issue-relations.tsx",
+      "status": "modified",
+      "additions": 27,
+      "deletions": 16
+    },
+    {
+      "path": "components/workspace/issue-scope-control.tsx",
+      "status": "modified",
+      "additions": 16,
+      "deletions": 7
+    },
+    {
+      "path": "components/workspace/issue-threads.tsx",
+      "status": "modified",
+      "additions": 11,
+      "deletions": 5
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "status": "modified",
+      "additions": 33,
+      "deletions": 11
+    },
+    {
+      "path": "components/workspace/task-detail-frame.tsx",
+      "status": "added",
+      "additions": 260,
+      "deletions": 0
+    },
+    {
+      "path": "components/workspace/task-detail.tsx",
+      "status": "modified",
+      "additions": 45,
+      "deletions": 11
+    },
+    {
+      "path": "docs/design/decisions/2026-11-09-2330-overview-as-work-area-tab.md",
+      "status": "added",
+      "additions": 19,
+      "deletions": 0
+    },
+    {
+      "path": "docs/design/rules.md",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "docs/ui-overlay.md",
+      "status": "modified",
+      "additions": 11,
+      "deletions": 3
+    },
+    {
+      "path": "hooks/settings/use-audit-log.ts",
+      "status": "added",
+      "additions": 107,
+      "deletions": 0
+    },
+    {
+      "path": "hooks/settings/use-invite-members.ts",
+      "status": "added",
+      "additions": 126,
+      "deletions": 0
+    },
+    {
+      "path": "hooks/settings/use-team-directory.ts",
+      "status": "added",
+      "additions": 214,
+      "deletions": 0
+    },
+    {
+      "path": "hooks/settings/use-team-permissions.ts",
+      "status": "added",
+      "additions": 116,
+      "deletions": 0
+    },
+    {
+      "path": "hooks/settings/use-workspace-members.ts",
+      "status": "added",
+      "additions": 95,
+      "deletions": 0
+    },
+    {
+      "path": "lib/audit/categories.ts",
+      "status": "added",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "lib/audit/cursor.test.ts",
+      "status": "modified",
+      "additions": 16,
+      "deletions": 1
+    },
+    {
+      "path": "lib/audit/cursor.ts",
+      "status": "modified",
+      "additions": 39,
+      "deletions": 1
+    },
+    {
+      "path": "lib/audit/events.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "lib/audit/export.ts",
+      "status": "modified",
+      "additions": 7,
+      "deletions": 7
+    },
+    {
+      "path": "lib/audit/integrity.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "lib/audit/query.ts",
+      "status": "modified",
+      "additions": 11,
+      "deletions": 5
+    },
+    {
+      "path": "lib/audit/read-failure.test.ts",
+      "status": "added",
+      "additions": 13,
+      "deletions": 0
+    },
+    {
+      "path": "lib/audit/read-failure.ts",
+      "status": "added",
+      "additions": 15,
+      "deletions": 0
+    },
+    {
+      "path": "lib/desktop-rpc/handler.test.ts",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "lib/desktop-rpc/registry.ts",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "lib/desktop-rpc/schemas.ts",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "lib/ui-overlay.mjs",
+      "status": "modified",
+      "additions": 10,
+      "deletions": 2
+    },
+    {
+      "path": "messages/en.json",
+      "status": "modified",
+      "additions": 123,
+      "deletions": 6
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "status": "modified",
+      "additions": 123,
+      "deletions": 6
+    },
+    {
+      "path": "package.json",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1
+    },
+    {
+      "path": "scripts/issue-readonly-dom.test.tsx",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/navigation-policy.mjs",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 1
+    },
+    {
+      "path": "scripts/task-detail-live.test.tsx",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/audit-query.db.test.ts",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 0
+    },
+    {
+      "path": "tests/read-retry-toasts.test.tsx",
+      "status": "modified",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "path": "tests/settings-backend-routes.test.ts",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 0
+    }
+  ]
+}

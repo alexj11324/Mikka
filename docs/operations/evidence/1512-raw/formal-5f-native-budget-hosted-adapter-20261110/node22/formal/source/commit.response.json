@@ -1,0 +1,22 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "content": "{\"sha\":\"5f3598029033b83ee72c88ea6c49955205eecab2\",\"node_id\":\"C_kwDOVRYxA9oAKDVmMzU5ODAyOTAzM2I4M2VlNzJjODhlYTZjNDk5NTUyMDVlZWNhYjI\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/5f3598029033b83ee72c88ea6c49955205eecab2\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/5f3598029033b83ee72c88ea6c49955205eecab2\",\"author\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\",\"date\":\"2026-11-10T03:05:26Z\"},\"committer\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\",\"date\":\"2026-11-10T03:05:26Z\"},\"tree\":{\"sha\":\"b2559ddd822059f1b69fa711d037f654a790fd2a\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/trees/b2559ddd822059f1b69fa711d037f654a790fd2a\"},\"message\":\"test: document intentional Drizzle thenable fixture\\n\\nKeep the exact deferred-query assimilation regression and all assertions. Scope unicorn/no-thenable suppression to the deliberately constructed PromiseLike method, following the existing database test fixtures.\",\"parents\":[{\"sha\":\"a5027a36fdd73229db1a22bde6ab3ec68ce63364\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/a5027a36fdd73229db1a22bde6ab3ec68ce63364\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/a5027a36fdd73229db1a22bde6ab3ec68ce63364\"}],\"verification\":{\"verified\":false,\"reason\":\"unsigned\",\"signature\":null,\"payload\":null,\"verified_at\":null}}",
+    "title": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "modified_date": null,
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/5f3598029033b83ee72c88ea6c49955205eecab2",
+    "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/5f3598029033b83ee72c88ea6c49955205eecab2",
+    "display_title": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "structuredContent": {
+      "title": "5f3598029033b83ee72c88ea6c49955205eecab2",
+      "content": "{\"sha\":\"5f3598029033b83ee72c88ea6c49955205eecab2\",\"node_id\":\"C_kwDOVRYxA9oAKDVmMzU5ODAyOTAzM2I4M2VlNzJjODhlYTZjNDk5NTUyMDVlZWNhYjI\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/5f3598029033b83ee72c88ea6c49955205eecab2\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/5f3598029033b83ee72c88ea6c49955205eecab2\",\"author\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\",\"date\":\"2026-11-10T03:05:26Z\"},\"committer\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\",\"date\":\"2026-11-10T03:05:26Z\"},\"tree\":{\"sha\":\"b2559ddd822059f1b69fa711d037f654a790fd2a\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/trees/b2559ddd822059f1b69fa711d037f654a790fd2a\"},\"message\":\"test: document intentional Drizzle thenable fixture\\n\\nKeep the exact deferred-query assimilation regression and all assertions. Scope unicorn/no-thenable suppression to the deliberately constructed PromiseLike method, following the existing database test fixtures.\",\"parents\":[{\"sha\":\"a5027a36fdd73229db1a22bde6ab3ec68ce63364\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits/a5027a36fdd73229db1a22bde6ab3ec68ce63364\",\"html_url\":\"https://github.com/alexj11324/Mikka/commit/a5027a36fdd73229db1a22bde6ab3ec68ce63364\"}],\"verification\":{\"verified\":false,\"reason\":\"unsigned\",\"signature\":null,\"payload\":null,\"verified_at\":null}}",
+      "display_url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/5f3598029033b83ee72c88ea6c49955205eecab2"
+    }
+  },
+  "isError": false
+}

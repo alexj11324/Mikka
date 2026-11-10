@@ -1,0 +1,919 @@
+{
+  "schema": "issue1512-native-5852-to-H-preserved-window-delta-v2",
+  "previous": {
+    "formal": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "checkout": "9faa0e581b370237fe541ce3087c28a334ddb798",
+    "blob": "16c6f5fc542c369f4cb9769c047fa1d492f1c57a",
+    "bytes": 693516,
+    "sha256": "d408d1ba3710d5d7da9a43e41a0b6cef4a5cdbcb7b08dc73c8d923dc5d099b3c"
+  },
+  "current": {
+    "formal": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "checkout": "c8ebffc19c788fa1db9cc441ac71a09f99dbb4a8",
+    "blob": "45ea8ea2279daecbf4d5024f39548a28be3e4511"
+  },
+  "tables": {
+    "history": {
+      "webLogin": [
+        {
+          "actionOrRoute": "coordinator.syncCoordinatorChat",
+          "old": 92,
+          "current": 50,
+          "delta": -42
+        },
+        {
+          "actionOrRoute": "<unknown-context>",
+          "old": 87,
+          "current": 69,
+          "delta": -18
+        },
+        {
+          "actionOrRoute": "coordinator.pollBotChatSummaries",
+          "old": 32,
+          "current": 16,
+          "delta": -16
+        },
+        {
+          "actionOrRoute": "issues.syncIssueList",
+          "old": 29,
+          "current": 16,
+          "delta": -13
+        },
+        {
+          "actionOrRoute": "task-runs.syncThreadList",
+          "old": 19,
+          "current": 11,
+          "delta": -8
+        },
+        {
+          "actionOrRoute": "/api/workspace",
+          "old": 20,
+          "current": 15,
+          "delta": -5
+        },
+        {
+          "actionOrRoute": "/api/workspace/switcher",
+          "old": 16,
+          "current": 12,
+          "delta": -4
+        },
+        {
+          "actionOrRoute": "teams.listTeams",
+          "old": 8,
+          "current": 6,
+          "delta": -2
+        },
+        {
+          "actionOrRoute": "bots.pollBots",
+          "old": 8,
+          "current": 10,
+          "delta": 2
+        },
+        {
+          "actionOrRoute": "team-relations.listProjectTeams",
+          "old": 4,
+          "current": 3,
+          "delta": -1
+        },
+        {
+          "actionOrRoute": "/api/auth/[...all]",
+          "old": 26,
+          "current": 26,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "desktop.bootstrap",
+          "old": 6,
+          "current": 6,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/agent/sessions",
+          "old": 4,
+          "current": 4,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "projects.listProjects",
+          "old": 4,
+          "current": 4,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "execution-settings.getBotModelMenu",
+          "old": 53,
+          "current": 53,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/live/ticket",
+          "old": 23,
+          "current": 23,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "workspace.switchWorkspace",
+          "old": 6,
+          "current": 6,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/mobile/reactions",
+          "old": 1,
+          "current": 1,
+          "delta": 0
+        }
+      ],
+      "nativeLogin": [
+        {
+          "actionOrRoute": "<unknown-context>",
+          "old": 91,
+          "current": 94,
+          "delta": 3
+        },
+        {
+          "actionOrRoute": "task-runs.syncThreadList",
+          "old": 18,
+          "current": 15,
+          "delta": -3
+        },
+        {
+          "actionOrRoute": "teams.listTeams",
+          "old": 8,
+          "current": 6,
+          "delta": -2
+        },
+        {
+          "actionOrRoute": "projects.listProjects",
+          "old": 4,
+          "current": 2,
+          "delta": -2
+        },
+        {
+          "actionOrRoute": "task-runs.pollTaskRuns",
+          "old": 13,
+          "current": 12,
+          "delta": -1
+        },
+        {
+          "actionOrRoute": "coordinator.pollBotChatSummaries",
+          "old": 32,
+          "current": 31,
+          "delta": -1
+        },
+        {
+          "actionOrRoute": "coordinator.syncCoordinatorChat",
+          "old": 92,
+          "current": 91,
+          "delta": -1
+        },
+        {
+          "actionOrRoute": "/api/auth/[...all]",
+          "old": 23,
+          "current": 23,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/desktop/begin",
+          "old": 1,
+          "current": 1,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/desktop/exchange",
+          "old": 8,
+          "current": 8,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "desktop.bootstrap",
+          "old": 6,
+          "current": 6,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/workspace/switcher",
+          "old": 8,
+          "current": 8,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/workspace",
+          "old": 20,
+          "current": 20,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/agent/sessions",
+          "old": 4,
+          "current": 4,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "execution-settings.getBotModelMenu",
+          "old": 53,
+          "current": 53,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "team-relations.listProjectTeams",
+          "old": 4,
+          "current": 4,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/live/ticket",
+          "old": 23,
+          "current": 23,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "bots.pollBots",
+          "old": 8,
+          "current": 8,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "issues.syncIssueList",
+          "old": 25,
+          "current": 25,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "workspace.switchWorkspace",
+          "old": 6,
+          "current": 6,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/mobile/reactions",
+          "old": 1,
+          "current": 1,
+          "delta": 0
+        }
+      ],
+      "startup-bundled": [
+        {
+          "actionOrRoute": "coordinator.syncCoordinatorChat",
+          "old": 9,
+          "current": 45,
+          "delta": 36
+        },
+        {
+          "actionOrRoute": "<unknown-context>",
+          "old": 36,
+          "current": 53,
+          "delta": 17
+        },
+        {
+          "actionOrRoute": "execution-settings.getBotModelMenu",
+          "old": 7,
+          "current": 22,
+          "delta": 15
+        },
+        {
+          "actionOrRoute": "coordinator.pollBotChatSummaries",
+          "old": 7,
+          "current": 16,
+          "delta": 9
+        },
+        {
+          "actionOrRoute": "/api/workspace",
+          "old": 5,
+          "current": 10,
+          "delta": 5
+        },
+        {
+          "actionOrRoute": "issues.syncIssueList",
+          "old": 9,
+          "current": 14,
+          "delta": 5
+        },
+        {
+          "actionOrRoute": "task-runs.pollTaskRuns",
+          "old": 3,
+          "current": 7,
+          "delta": 4
+        },
+        {
+          "actionOrRoute": "/api/workspace/switcher",
+          "old": 2,
+          "current": 4,
+          "delta": 2
+        },
+        {
+          "actionOrRoute": "team-relations.listProjectTeams",
+          "old": 1,
+          "current": 2,
+          "delta": 1
+        },
+        {
+          "actionOrRoute": "bots.pollBots",
+          "old": 4,
+          "current": 3,
+          "delta": -1
+        },
+        {
+          "actionOrRoute": "projects.listProjects",
+          "old": 2,
+          "current": 1,
+          "delta": -1
+        },
+        {
+          "actionOrRoute": "desktop.bootstrap",
+          "old": 3,
+          "current": 3,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/live/ticket",
+          "old": 16,
+          "current": 16,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/agent/sessions",
+          "old": 2,
+          "current": 2,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/mobile/reactions",
+          "old": 1,
+          "current": 1,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "task-runs.syncThreadList",
+          "old": 7,
+          "current": 7,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "teams.listTeams",
+          "old": 2,
+          "current": 2,
+          "delta": 0
+        }
+      ],
+      "startup-hosted": [
+        {
+          "actionOrRoute": "coordinator.syncCoordinatorChat",
+          "old": 46,
+          "current": 54,
+          "delta": 8
+        },
+        {
+          "actionOrRoute": "<unknown-context>",
+          "old": 53,
+          "current": 48,
+          "delta": -5
+        },
+        {
+          "actionOrRoute": "issues.syncIssueList",
+          "old": 16,
+          "current": 18,
+          "delta": 2
+        },
+        {
+          "actionOrRoute": "/api/auth/[...all]",
+          "old": 3,
+          "current": 2,
+          "delta": -1
+        },
+        {
+          "actionOrRoute": "desktop.bootstrap",
+          "old": 3,
+          "current": 3,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/live/ticket",
+          "old": 16,
+          "current": 16,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/workspace/switcher",
+          "old": 8,
+          "current": 8,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/workspace",
+          "old": 10,
+          "current": 10,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/agent/sessions",
+          "old": 2,
+          "current": 2,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "/api/mobile/reactions",
+          "old": 1,
+          "current": 1,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "teams.listTeams",
+          "old": 4,
+          "current": 4,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "team-relations.listProjectTeams",
+          "old": 2,
+          "current": 2,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "task-runs.pollTaskRuns",
+          "old": 8,
+          "current": 8,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "coordinator.pollBotChatSummaries",
+          "old": 16,
+          "current": 16,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "projects.listProjects",
+          "old": 2,
+          "current": 2,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "bots.pollBots",
+          "old": 4,
+          "current": 4,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "execution-settings.getBotModelMenu",
+          "old": 22,
+          "current": 22,
+          "delta": 0
+        },
+        {
+          "actionOrRoute": "task-runs.syncThreadList",
+          "old": 8,
+          "current": 8,
+          "delta": 0
+        }
+      ]
+    },
+    "currentNativeVersusWeb": [
+      {
+        "actionOrRoute": "coordinator.syncCoordinatorChat",
+        "web": 50,
+        "native": 91,
+        "delta": 41
+      },
+      {
+        "actionOrRoute": "<unknown-context>",
+        "web": 69,
+        "native": 94,
+        "delta": 25
+      },
+      {
+        "actionOrRoute": "coordinator.pollBotChatSummaries",
+        "web": 16,
+        "native": 31,
+        "delta": 15
+      },
+      {
+        "actionOrRoute": "task-runs.pollTaskRuns",
+        "web": 0,
+        "native": 12,
+        "delta": 12
+      },
+      {
+        "actionOrRoute": "issues.syncIssueList",
+        "web": 16,
+        "native": 25,
+        "delta": 9
+      },
+      {
+        "actionOrRoute": "/api/desktop/exchange",
+        "web": 0,
+        "native": 8,
+        "delta": 8
+      },
+      {
+        "actionOrRoute": "/api/workspace",
+        "web": 15,
+        "native": 20,
+        "delta": 5
+      },
+      {
+        "actionOrRoute": "/api/workspace/switcher",
+        "web": 12,
+        "native": 8,
+        "delta": -4
+      },
+      {
+        "actionOrRoute": "task-runs.syncThreadList",
+        "web": 11,
+        "native": 15,
+        "delta": 4
+      },
+      {
+        "actionOrRoute": "/api/auth/[...all]",
+        "web": 26,
+        "native": 23,
+        "delta": -3
+      },
+      {
+        "actionOrRoute": "projects.listProjects",
+        "web": 4,
+        "native": 2,
+        "delta": -2
+      },
+      {
+        "actionOrRoute": "bots.pollBots",
+        "web": 10,
+        "native": 8,
+        "delta": -2
+      },
+      {
+        "actionOrRoute": "team-relations.listProjectTeams",
+        "web": 3,
+        "native": 4,
+        "delta": 1
+      },
+      {
+        "actionOrRoute": "/api/desktop/begin",
+        "web": 0,
+        "native": 1,
+        "delta": 1
+      },
+      {
+        "actionOrRoute": "desktop.bootstrap",
+        "web": 6,
+        "native": 6,
+        "delta": 0
+      },
+      {
+        "actionOrRoute": "teams.listTeams",
+        "web": 6,
+        "native": 6,
+        "delta": 0
+      },
+      {
+        "actionOrRoute": "/api/agent/sessions",
+        "web": 4,
+        "native": 4,
+        "delta": 0
+      },
+      {
+        "actionOrRoute": "execution-settings.getBotModelMenu",
+        "web": 53,
+        "native": 53,
+        "delta": 0
+      },
+      {
+        "actionOrRoute": "/api/live/ticket",
+        "web": 23,
+        "native": 23,
+        "delta": 0
+      },
+      {
+        "actionOrRoute": "workspace.switchWorkspace",
+        "web": 6,
+        "native": 6,
+        "delta": 0
+      },
+      {
+        "actionOrRoute": "/api/mobile/reactions",
+        "web": 1,
+        "native": 1,
+        "delta": 0
+      }
+    ]
+  },
+  "totals": {
+    "webLogin": {
+      "previous": 438,
+      "current": 331,
+      "delta": -107
+    },
+    "nativeLogin": {
+      "previous": 448,
+      "current": 441,
+      "delta": -7
+    },
+    "startup-bundled": {
+      "previous": 116,
+      "current": 208,
+      "delta": 92
+    },
+    "startup-hosted": {
+      "previous": 224,
+      "current": 228,
+      "delta": 4
+    }
+  },
+  "logicalChanges": {
+    "nativeLogin": [
+      {
+        "action": "<null-action>",
+        "previous": 1,
+        "current": 0,
+        "delta": -1
+      },
+      {
+        "action": "bots.pollBots",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "desktop.bootstrap",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "execution-settings.getBotModelMenu",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "issues.syncIssueList",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "projects.listProjects",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "task-runs.pollTaskRuns",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "task-runs.syncThreadList",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "team-relations.listProjectTeams",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "teams.listTeams",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "workspace.switchWorkspace",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      },
+      {
+        "action": "desktop.session",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      }
+    ],
+    "webLogin": [
+      {
+        "action": "bots.pollBots",
+        "previous": 4,
+        "current": 4,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "previous": 4,
+        "current": 2,
+        "delta": -2
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "previous": 4,
+        "current": 2,
+        "delta": -2
+      },
+      {
+        "action": "desktop.bootstrap",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "execution-settings.getBotModelMenu",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "issues.syncIssueList",
+        "previous": 4,
+        "current": 2,
+        "delta": -2
+      },
+      {
+        "action": "projects.listProjects",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "task-runs.syncThreadList",
+        "previous": 4,
+        "current": 2,
+        "delta": -2
+      },
+      {
+        "action": "team-relations.listProjectTeams",
+        "previous": 4,
+        "current": 3,
+        "delta": -1
+      },
+      {
+        "action": "teams.listTeams",
+        "previous": 4,
+        "current": 3,
+        "delta": -1
+      },
+      {
+        "action": "workspace.switchWorkspace",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      }
+    ],
+    "startup-bundled": [
+      {
+        "action": "bots.pollBots",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "previous": 1,
+        "current": 2,
+        "delta": 1
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "desktop.bootstrap",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      },
+      {
+        "action": "execution-settings.getBotModelMenu",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      },
+      {
+        "action": "issues.syncIssueList",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "projects.listProjects",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      },
+      {
+        "action": "task-runs.pollTaskRuns",
+        "previous": 1,
+        "current": 2,
+        "delta": 1
+      },
+      {
+        "action": "task-runs.syncThreadList",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "team-relations.listProjectTeams",
+        "previous": 1,
+        "current": 2,
+        "delta": 1
+      },
+      {
+        "action": "teams.listTeams",
+        "previous": 1,
+        "current": 2,
+        "delta": 1
+      }
+    ],
+    "startup-hosted": [
+      {
+        "action": "bots.pollBots",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "desktop.bootstrap",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      },
+      {
+        "action": "execution-settings.getBotModelMenu",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      },
+      {
+        "action": "issues.syncIssueList",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "projects.listProjects",
+        "previous": 1,
+        "current": 1,
+        "delta": 0
+      },
+      {
+        "action": "task-runs.pollTaskRuns",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "task-runs.syncThreadList",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "team-relations.listProjectTeams",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      },
+      {
+        "action": "teams.listTeams",
+        "previous": 2,
+        "current": 2,
+        "delta": 0
+      }
+    ]
+  },
+  "limitations": [
+    "Differences describe these two recorded runs, without claiming a causal counterfactual or subtracting unknown SQL.",
+    "Previous first bundled startup had seven known completions crossing its unchanged window end; current first startup has none. 116 versus 208 is not evidence by itself of 92 extra logical invocations.",
+    "Closed timestamped receipts selected for known SQL contexts are exported; they are not all raw RPC receipts (zero-SQL desktop.session is absent). Mixed backend stdout is not exported."
+  ],
+  "supersedes": "20c7c8ad253a5d05a46991493aff1d8164dc0c46"
+}

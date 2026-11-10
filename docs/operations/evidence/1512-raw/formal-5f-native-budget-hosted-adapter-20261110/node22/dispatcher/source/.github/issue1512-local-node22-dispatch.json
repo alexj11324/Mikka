@@ -1,0 +1,39 @@
+{
+  "schema": "issue1512.local-node22-dispatch-request.v1",
+  "enabled": true,
+  "requestId": "20261110-local-node22-formal-a1",
+  "repository": "alexj11324/Mikka",
+  "branch": "fix/1512-daemon-fixture-executable-20261109",
+  "workflowId": 409752684,
+  "workflowPath": ".github/workflows/local-device-node22.yml",
+  "target": {
+    "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "workflowBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+    "fixtureBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+    "serviceBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355"
+  },
+  "controller": {
+    "path": "scripts/ops/issue1512-local-node22-dispatch.mjs",
+    "gitBlob": "f0771b6511579496f16afbee501d5e4fe29e3abe",
+    "bytes": 10877,
+    "sha256": "ce9abfd18d15d56591d1776590551065bd383797efcf9d01b681f59519ab15fb"
+  },
+  "limits": {
+    "workflowDispatchPosts": 1,
+    "workflowReruns": 0,
+    "requestRetries": 0,
+    "requestTimeoutMs": 15000,
+    "maxResponseBytes": 131072,
+    "productionCredentials": false,
+    "token": "Ephemeral repository GITHUB_TOKEN with contents:read/actions:write only on this job; never emitted or persisted.",
+    "postAcceptedMetadataReads": 1
+  },
+  "state": "Prepared executable but unreferenced. Publish only after Root review and a readback of the fixed repaired formal branch. Skip dispatch when any run already exists for this exact target.",
+  "sourceBoundary": "Only repository API metadata is read by this controller. It dispatches existing workflow409752684 on the verified branch; it does not modify or execute product source.",
+  "closure": "After the single controller job is terminal, publish a normal closing commit with guard false, enabled false and actions write removed. Record skipped closing run. Accepted204 is not failure: record acceptance and perform one bounded discovery GET; if indexing is pending, continue external metadata inspection without another POST. The formal workflow is monitored independently.",
+  "documentation": [
+    "https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow",
+    "https://docs.github.com/en/rest/actions/workflows#create-a-workflow-dispatch-event"
+  ]
+}

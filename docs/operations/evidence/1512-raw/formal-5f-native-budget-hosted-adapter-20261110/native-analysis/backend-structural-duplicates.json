@@ -1,0 +1,236 @@
+{
+  "schema": 1,
+  "kind": "backend-chat-repeated-structure-observation",
+  "sourceHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "sourceTree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+  "sourceRun": 42747213108,
+  "sourceJob": 129604738491,
+  "sourceLifecycleBlob": "45ea8ea2279daecbf4d5024f39548a28be3e4511",
+  "derivedWaveBlob": "d9f81f77c8cd696c4f624b84b7351e00d6d7fe15",
+  "sqls": [
+    {
+      "index": 57,
+      "source": {
+        "path": "lib/coordinator/store.ts",
+        "blob": "251018f9b612d7332d37bdfb1e639d33a84b555b",
+        "function": "chatReader"
+      },
+      "sql": "select \"workspaceId\" from \"bots\" where (\"bots\".\"id\" = $1 and \"bots\".\"ownerId\" = $2) limit $3",
+      "computedStructureId": "27e48780a2a1",
+      "observedStatement": {
+        "status": "known",
+        "normalizedStructureId": "27e48780a2a1",
+        "command": "SELECT",
+        "parameterCount": 3
+      }
+    },
+    {
+      "index": 40,
+      "source": {
+        "path": "lib/task-workspace.ts",
+        "blob": "d7bb0250c4174540eb0c4661a4998a5cfbd6cfd2",
+        "function": "activeTaskWorkspaces -> membership"
+      },
+      "sql": "select \"w\".\"id\", \"w\".\"kind\", \"o\".\"organizationId\" from \"mikka_workspaces\" \"w\" inner join \"mikka_workspace_members\" \"m\" on \"m\".\"workspaceId\" = \"w\".\"id\" left join \"mikka_organization_workspaces\" \"o\" on \"o\".\"workspaceId\" = \"w\".\"id\" where (\"m\".\"userId\" = $1 and \"m\".\"status\" = $2 and \"w\".\"id\" = $3 and (\"w\".\"kind\" = $4 or (\"w\".\"kind\" = $5 and \"w\".\"userId\" = $6))) order by \"w\".\"createdAt\" asc",
+      "computedStructureId": "4b3f987fefbb",
+      "observedStatement": {
+        "status": "known",
+        "normalizedStructureId": "4b3f987fefbb",
+        "command": "SELECT",
+        "parameterCount": 6
+      }
+    }
+  ],
+  "contexts": [
+    {
+      "index": 60,
+      "status": "known",
+      "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+      "invocationId": "380b5ca1-f985-4166-8879-ba4dbf3574d8",
+      "route": "/api/desktop/rpc",
+      "method": "POST",
+      "rpcAction": "coordinator.syncCoordinatorChat",
+      "queries": 27,
+      "selectedAuthRows": [
+        [
+          33105,
+          60,
+          57,
+          10
+        ],
+        [
+          33106,
+          60,
+          40,
+          10
+        ],
+        [
+          33108,
+          60,
+          57,
+          10
+        ],
+        [
+          33109,
+          60,
+          40,
+          10
+        ]
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+        "invocationId": "380b5ca1-f985-4166-8879-ba4dbf3574d8",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedAt": "2026-11-10T03:29:25.314Z",
+        "completedAt": "2026-11-10T03:29:25.377Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "index": 71,
+      "status": "known",
+      "httpInvocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+      "invocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+      "route": "/api/desktop/rpc",
+      "method": "POST",
+      "rpcAction": "coordinator.syncCoordinatorChat",
+      "queries": 23,
+      "selectedAuthRows": [
+        [
+          33187,
+          71,
+          57,
+          10
+        ],
+        [
+          33188,
+          71,
+          40,
+          10
+        ]
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+        "invocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedAt": "2026-11-10T03:29:25.778Z",
+        "completedAt": "2026-11-10T03:29:25.813Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "index": 83,
+      "status": "known",
+      "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+      "invocationId": "abec62d9-ac62-42cc-9127-4da7eeb49d60",
+      "route": "/api/desktop/rpc",
+      "method": "POST",
+      "rpcAction": "coordinator.syncCoordinatorChat",
+      "queries": 22,
+      "selectedAuthRows": [
+        [
+          33291,
+          83,
+          57,
+          10
+        ],
+        [
+          33296,
+          83,
+          40,
+          10
+        ],
+        [
+          33303,
+          83,
+          57,
+          10
+        ],
+        [
+          33305,
+          83,
+          40,
+          10
+        ]
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+        "invocationId": "abec62d9-ac62-42cc-9127-4da7eeb49d60",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedAt": "2026-11-10T03:29:29.481Z",
+        "completedAt": "2026-11-10T03:29:30.017Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "index": 96,
+      "status": "known",
+      "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+      "invocationId": "47c416eb-7ab7-4936-a9d7-9ceeace6a3e6",
+      "route": "/api/desktop/rpc",
+      "method": "POST",
+      "rpcAction": "coordinator.syncCoordinatorChat",
+      "queries": 19,
+      "selectedAuthRows": [
+        [
+          33401,
+          96,
+          57,
+          10
+        ],
+        [
+          33402,
+          96,
+          40,
+          10
+        ]
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+        "invocationId": "47c416eb-7ab7-4936-a9d7-9ceeace6a3e6",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedAt": "2026-11-10T03:29:30.536Z",
+        "completedAt": "2026-11-10T03:29:30.605Z",
+        "httpStatus": 200
+      }
+    }
+  ],
+  "callPath": {
+    "action": {
+      "path": "app/actions/coordinator.ts",
+      "blob": "23179358e0af9db78d084973ecc197f0fb749e91",
+      "function": "readCoordinatorChat"
+    },
+    "steps": [
+      "Each invocation gets its own authenticated user and ownBot workspace/owner check.",
+      "beginBotChatRead obtains live revision before chat data.",
+      "chatVersionState calls chatReader, which reads bot workspace then requireTaskWorkspace -> activeTaskWorkspaces.",
+      "When heldVersion differs or requires metadata restoration, chatUpdate can read chatViewState, whose independent chatReader performs the same two authorization statements again.",
+      "Matched-version calls retain a single version-stage chatReader; their full Native recorded totals are 23 and 19, versus 27 and 22 for first reads."
+    ]
+  },
+  "conclusion": "Two repeated structures in the first Native chat invocations are concrete fresh authorization reads at distinct version/body data stages. No direct removal or authorization cache expansion is justified by the diagnostic projection.",
+  "limitations": [
+    "Diagnostic structure IDs omit parameter values. Matching structure is not proof of equal parameters, identical snapshots, or safely redundant work.",
+    "The diagnostic collector deliberately labels unsupported SQL syntax unknown; unknown queries remain in the total441 and are not excluded.",
+    "These observations do not establish a solution to Native441 > Web331.",
+    "A possible combined query/refactor would require independent authority/freshness design and validation; none is implemented here."
+  ],
+  "resources": {
+    "newCompute": 0,
+    "productEdits": 0,
+    "formalRefWrites": 0
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "schema": "mikka.issue1512.runtime-input-scope.v1",
+  "algorithmSource": "0da00d8772987e7caa4da8760902ab84e27ab057",
+  "workflow": "2aa85fdd0cb12727621b774ab5886804be486605",
+  "patterns": [
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "packages/daemon/**",
+    "packages/protocol/**",
+    "packages/config/**",
+    "patches/**",
+    "scripts/e2b/**",
+    "scripts/e2b/publish-template-env.mjs",
+    "lib/computer/official-runtime.ts",
+    ".github/workflows/e2b-official-runtime.yml",
+    ".github/workflows/e2b-template.yml",
+    ".github/workflows/e2b-runtime-release.yml",
+    "scripts/e2b/validate-template-subscriptions.mjs",
+    "scripts/e2b/cleanup-template-candidates.py",
+    "scripts/e2b/runtime-report.mjs",
+    "scripts/e2b/acceptance-daemon.mts",
+    "scripts/e2b/acceptance-bootstrap.mts",
+    "lib/captures/bootstrap-evidence.ts",
+    "app/api/runs/[runId]/evidence/route.ts",
+    "app/api/runs/**/evidence/route.ts",
+    "lib/computer/claude-startup-hint.ts",
+    "lib/computer/codex-startup-hint.ts",
+    "scripts/acceptance/cloud-startup.mjs",
+    "scripts/acceptance/cloud-startup.test.mjs",
+    "scripts/acceptance/cloud-startup-evidence.mjs",
+    "scripts/acceptance/team-workspace.mjs",
+    "scripts/acceptance/team-workspace.test.mjs",
+    "lib/smoke-account.ts",
+    ".github/workflows/web-deploy.yml",
+    "scripts/release/web-deploy.mjs",
+    "scripts/release/build-vercel.mjs",
+    "scripts/release/web-deploy.test.mjs",
+    ".github/workflows/model-provider-fallback-acceptance.yml",
+    "scripts/acceptance/model-provider-fallback.mjs",
+    "scripts/acceptance/model-provider-fallback.test.mjs",
+    ".github/workflows/project-decisions-acceptance.yml",
+    "scripts/acceptance/project-decisions.mjs",
+    "scripts/acceptance/project-decisions.test.mjs"
+  ],
+  "base": {
+    "sha": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+    "digest": "c6e5ae4f1e53fcf3fdedbd9dba46f866bbe45445265ac5698101076764b70338",
+    "files": 549
+  },
+  "head": {
+    "sha": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "digest": "ddfcc0256e9e22bb1e1a685692ec2f8d31c665b9e409730b55c5248e75a8d895",
+    "files": 549
+  },
+  "main": {
+    "sha": "f5ddb5cda60b57c1006c60fcc997cc3455d771aa",
+    "digest": "a706a705866297801bcda030638fe4aba5c0fed341c83415978a6d9a5deaf2ca",
+    "files": 549
+  },
+  "candidate": {
+    "tree": "6d5a848b2fbdbee41541e2a535ac06057cf420b1",
+    "digest": "4946ea2f336739ffd0d98c6b0fdefc6c3fd24f7c17131ff5c028c598bda797d0",
+    "files": 549
+  },
+  "headChanged": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "281c7dc61a7522a66291cf9496d80a41274e1319"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ccc3d2ab527e9051f8261e3ad0909434d4be38ab"
+    }
+  ],
+  "scope": "Source-derived digest, not a runtime release result or failed-history query. Final actual workflow decision and release proof remain required."
+}

@@ -1,0 +1,5962 @@
+{
+  "webLogin": {
+    "logical": [
+      {
+        "route": "/api/rpc",
+        "rpcAction": "bots.pollBots",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "issues.syncIssueList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "projects.listProjects",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "task-runs.syncThreadList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedInWindow": 3,
+        "completedInWindow": 3,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 3
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "teams.listTeams",
+        "startedInWindow": 3,
+        "completedInWindow": 3,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 3
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "workspace.switchWorkspace",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "physical": [
+      {
+        "route": "/api/rpc",
+        "rpcAction": "bots.pollBots",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "issues.syncIssueList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "projects.listProjects",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "task-runs.syncThreadList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedInWindow": 3,
+        "completedInWindow": 3,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 3
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "teams.listTeams",
+        "startedInWindow": 3,
+        "completedInWindow": 3,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 3
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "workspace.switchWorkspace",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "contexts": [
+      {
+        "index": 0,
+        "count": 69,
+        "context": {
+          "status": "unknown"
+        }
+      },
+      {
+        "index": 12,
+        "count": 31,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+          "invocationId": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "execution-settings.getBotModelMenu"
+        }
+      },
+      {
+        "index": 14,
+        "count": 27,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "221811f5-3e24-4999-940c-45af76c5d1d2",
+          "invocationId": "221811f5-3e24-4999-940c-45af76c5d1d2",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 37,
+        "count": 23,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+          "invocationId": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 35,
+        "count": 22,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+          "invocationId": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "execution-settings.getBotModelMenu"
+        }
+      },
+      {
+        "index": 1,
+        "count": 19,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "9ca5386f-d295-41ef-a661-add24b2c770a",
+          "invocationId": "9ca5386f-d295-41ef-a661-add24b2c770a",
+          "route": "/api/auth/[...all]",
+          "method": "POST",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 34,
+        "count": 9,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2c9ee9cd-4668-4c94-8822-ea865cdf9863",
+          "invocationId": "2c9ee9cd-4668-4c94-8822-ea865cdf9863",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 38,
+        "count": 9,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+          "invocationId": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 10,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+          "invocationId": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 31,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+          "invocationId": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 15,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "fd21c645-bb8f-41da-8f8b-96f67806d774",
+          "invocationId": "fd21c645-bb8f-41da-8f8b-96f67806d774",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 17,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "07150752-9253-4114-a8e8-d0e284beea83",
+          "invocationId": "07150752-9253-4114-a8e8-d0e284beea83",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 39,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "63e4a4e8-84a3-4562-8081-832dcd4dccbc",
+          "invocationId": "63e4a4e8-84a3-4562-8081-832dcd4dccbc",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 18,
+        "count": 6,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "32f598ff-ce0e-4778-9b99-cffe2915f435",
+          "invocationId": "32f598ff-ce0e-4778-9b99-cffe2915f435",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "workspace.switchWorkspace"
+        }
+      },
+      {
+        "index": 33,
+        "count": 6,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "07136100-1374-4919-969f-6b7ebb3c28c8",
+          "invocationId": "07136100-1374-4919-969f-6b7ebb3c28c8",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 6,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "a407cc5a-a066-4954-84ab-947556b43774",
+          "invocationId": "a407cc5a-a066-4954-84ab-947556b43774",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 13,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+          "invocationId": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 20,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+          "invocationId": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 27,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+          "invocationId": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 5,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+          "invocationId": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 19,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+          "invocationId": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 21,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "af0deefd-313c-487d-8065-81ca89e5318e",
+          "invocationId": "af0deefd-313c-487d-8065-81ca89e5318e",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 26,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "8cf621ad-44f3-4fac-b43b-064986beb776",
+          "invocationId": "8cf621ad-44f3-4fac-b43b-064986beb776",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 3,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "ad319daf-0f65-45ad-b669-2774333dc31f",
+          "invocationId": "ad319daf-0f65-45ad-b669-2774333dc31f",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "desktop.bootstrap"
+        }
+      },
+      {
+        "index": 4,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "b9533556-c7a4-4a34-b5ad-07c4278e6ee9",
+          "invocationId": "b9533556-c7a4-4a34-b5ad-07c4278e6ee9",
+          "route": "/api/auth/[...all]",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 25,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "82093d95-4d41-4588-85ca-9cabee95be0f",
+          "invocationId": "82093d95-4d41-4588-85ca-9cabee95be0f",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "desktop.bootstrap"
+        }
+      },
+      {
+        "index": 2,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "66b9eeef-9752-4782-a6bf-f167ad34c886",
+          "invocationId": "66b9eeef-9752-4782-a6bf-f167ad34c886",
+          "route": "/api/auth/[...all]",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 7,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+          "invocationId": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 8,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "d68a3b76-d0e8-4fb4-aeb8-18f723acf65d",
+          "invocationId": "d68a3b76-d0e8-4fb4-aeb8-18f723acf65d",
+          "route": "/api/agent/sessions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 11,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+          "invocationId": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "projects.listProjects"
+        }
+      },
+      {
+        "index": 16,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "5609cd47-4e64-47ee-a124-63c23bea875c",
+          "invocationId": "5609cd47-4e64-47ee-a124-63c23bea875c",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 22,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+          "invocationId": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 24,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "e40d3459-69e4-49c0-98e2-932e5269f436",
+          "invocationId": "e40d3459-69e4-49c0-98e2-932e5269f436",
+          "route": "/api/auth/[...all]",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 28,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "b2d946e3-24f2-485f-94eb-d18bc65008fd",
+          "invocationId": "b2d946e3-24f2-485f-94eb-d18bc65008fd",
+          "route": "/api/agent/sessions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 29,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+          "invocationId": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 32,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+          "invocationId": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "projects.listProjects"
+        }
+      },
+      {
+        "index": 36,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+          "invocationId": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 41,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+          "invocationId": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 9,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "f59747f8-e54d-4272-a958-1801922647a4",
+          "invocationId": "f59747f8-e54d-4272-a958-1801922647a4",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 23,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "29653ce8-e550-4d74-83d2-bd2cf26235b3",
+          "invocationId": "29653ce8-e550-4d74-83d2-bd2cf26235b3",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 30,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "8824dfb7-74f7-4353-a3a9-bfa1a65d309f",
+          "invocationId": "8824dfb7-74f7-4353-a3a9-bfa1a65d309f",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 40,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "652a90d9-2046-48b7-9367-c27623dabf36",
+          "invocationId": "652a90d9-2046-48b7-9367-c27623dabf36",
+          "route": "/api/mobile/reactions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      }
+    ],
+    "statements": [
+      {
+        "index": 0,
+        "count": 92,
+        "statement": {
+          "status": "unknown"
+        }
+      },
+      {
+        "index": 23,
+        "count": 28,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b06a5f1b2df0",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 12,
+        "count": 11,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1b6dae6d78fb",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 40,
+        "count": 9,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4b3f987fefbb",
+          "command": "SELECT",
+          "parameterCount": 6
+        }
+      },
+      {
+        "index": 59,
+        "count": 9,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c9eaa606782f",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 11,
+        "count": 8,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8fa591ff58d0",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 37,
+        "count": 8,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9f0fe8477a06",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 50,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "79663c1d3b43",
+          "command": "COMMIT",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 51,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a6d8d51b1b0b",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 52,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1365a978dee8",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 7,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e6f07d43b5c2",
+          "command": "BEGIN",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 10,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9505cacb7c71",
+          "command": "COMMIT",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 44,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8c83d6692147",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 46,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "390156ca90d2",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 58,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a8402858d4f1",
+          "command": "BEGIN",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 1,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "98991733a073",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 20,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e5114ae888d8",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 36,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "66cde7eead86",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 39,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a130e5d92ffc",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 45,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "23d0664babd6",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 47,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "cfc5423a080d",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 48,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b27c6e931d1b",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 57,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "27e48780a2a1",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 60,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4c80688f4aac",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 2,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "52265e03ddf0",
+          "command": "UPDATE",
+          "parameterCount": 9
+        }
+      },
+      {
+        "index": 24,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a09916b7f683",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 28,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "bc0fa4bad86f",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 29,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0fea95b4a686",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 30,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ca5780bf570b",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 32,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "f5196718ef49",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 33,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "38096b93488e",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 34,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "fcb49b74a39e",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 53,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9f5aec55f127",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 54,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e20f5fbb8309",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 55,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0f220c251daf",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 56,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a125321ddabb",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 61,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9d1db4039555",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 62,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "64e0260f381c",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 9,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ad30d71053a1",
+          "command": "INSERT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 18,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "d47f41b71036",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 19,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9029c62c8369",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 25,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9e3aaf8271c6",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 26,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8b77c8bed756",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 27,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "66c910cf027a",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 35,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0dead3c976e0",
+          "command": "SELECT",
+          "parameterCount": 5
+        }
+      },
+      {
+        "index": 38,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "460892a596aa",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 41,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8535cda4110e",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 49,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8faa2a73d8b1",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 63,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "3a287aa80050",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 66,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0c247d8ed988",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 3,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "244dea12fc5b",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 4,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "eae3d0127857",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 5,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "90843a6e75d1",
+          "command": "INSERT",
+          "parameterCount": 8
+        }
+      },
+      {
+        "index": 6,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0141f510f9b8",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 8,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "6d487f2218af",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 13,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1535cd951679",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 14,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "af72d3967f7f",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 15,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a7bb7891baab",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 16,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4e2561ff518d",
+          "command": "DELETE",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 17,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0c67c2a7dce2",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 21,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "723d33f911fc",
+          "command": "UPDATE",
+          "parameterCount": 7
+        }
+      },
+      {
+        "index": 22,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b3dd6254c834",
+          "command": "DELETE",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 31,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "bcece0718fe9",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 42,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4ff9b9f0bf82",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 43,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "47ed260c993f",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 64,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "339d5b49dae6",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 65,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "033cd26b1e63",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 67,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ecd6dcc0d383",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 68,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9b349af498e9",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 69,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "60bbb490fb1b",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 70,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c1454f6b0c22",
+          "command": "INSERT",
+          "parameterCount": 4
+        }
+      }
+    ],
+    "operationBuckets": {
+      "/api/auth/[...all]": 24,
+      "/api/desktop/begin": 0,
+      "/api/desktop/return": 0,
+      "/api/desktop/exchange": 0,
+      "/api/desktop/rpc": 0,
+      "/api/rpc": 84,
+      "/api/workspace": 15,
+      "/api/workspace/switcher": 12,
+      "/api/live/ticket": 23,
+      "/actions/coordinator/chat": 0,
+      "/actions/coordinator/poll": 50,
+      "/actions/coordinator/summaries": 16,
+      "/actions/threads/poll": 11,
+      "/actions/task-runs/read": 0,
+      "/actions/issues/poll": 16,
+      "/actions/projects/list": 4,
+      "unattributed": 76
+    },
+    "sourceBuckets": {
+      "/api/agent/sessions": 4,
+      "/api/computer/events": 0,
+      "/api/conversations": 17,
+      "/api/conversations/[id]/read": 13,
+      "/api/approved-writes": 26,
+      "/api/mobile/reactions": 1,
+      "/api/pending-actions": 3,
+      "/api/settings/preferences": 0,
+      "/api/settings/model-order": 0,
+      "/api/settings/[read]": 0,
+      "/api/devices/enrollment": 0,
+      "/api/coordinator/messages": 0,
+      "/api/coordinator/stream": 0,
+      "/api/coordinator/runtime": 0,
+      "/api/coordinator/attention": 0,
+      "/api/teams/directory": 0,
+      "/api/teams/[teamId]/members": 0,
+      "/api/integrations/composio": 0,
+      "/api/frontend/oauth-consent": 0,
+      "/pages/workspace": 0,
+      "/pages/settings": 0,
+      "/v1/devices/enroll": 0,
+      "/v1/devices/register": 0,
+      "/v1/devices/[deviceId]/commands": 0,
+      "/v1/devices/[deviceId]/commands/ack": 0,
+      "/v1/devices/[deviceId]/computer": 0,
+      "/v1/devices/[deviceId]/coordinator": 0,
+      "/v1/devices/[deviceId]/fs/requests": 0,
+      "/v1/devices/[deviceId]/fs/requests/[requestId]": 0,
+      "/v1/devices/[deviceId]/gateway": 0,
+      "/v1/devices/[deviceId]/github-token": 0,
+      "/v1/devices/[deviceId]/heartbeat": 0,
+      "/v1/devices/[deviceId]/repos": 0,
+      "/v1/devices/[deviceId]/runs": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/claim": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/computer-authority": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/credentials/login": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/subscription-lease": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/subscription": 0,
+      "/v1/runs/[runId]": 0,
+      "/v1/runs/[runId]/captures": 0,
+      "/v1/runs/[runId]/captures/[captureId]": 0,
+      "/v1/runs/[runId]/captures/[captureId]/complete": 0,
+      "/v1/runs/[runId]/checkpoint": 0,
+      "/v1/runs/[runId]/complete": 0,
+      "/v1/runs/[runId]/decision": 0,
+      "/v1/runs/[runId]/events": 0,
+      "/v1/runs/[runId]/policy-snapshot": 0,
+      "/v1/runs/[runId]/screen": 0,
+      "/v1/runs/[runId]/skill-receipt": 0,
+      "/v1/runs/[runId]/tool-approval": 0,
+      "after:agent-images.revalidate": 0,
+      "after:auth-email": 0,
+      "after:composio-triggers": 0,
+      "after:composio-webhook": 0,
+      "after:coordinator-wake": 0,
+      "after:device-wake": 0,
+      "after:due-timer": 0,
+      "after:factory-dispatch-recovery": 0,
+      "after:github-webhook": 0,
+      "after:group-turn": 0,
+      "after:issue-effects": 0,
+      "after:linear-issue-sync": 0,
+      "after:linear-sync-batch": 0,
+      "after:linear-webhook": 0,
+      "after:linear-webhook-suggestions": 0,
+      "after:live-notify": 0,
+      "after:record-time-zone": 0,
+      "after:remember-locale": 0,
+      "after:run-outcome-judge": 0,
+      "after:short-title": 0,
+      "after:stop-recordings": 0,
+      "after:subagent-start": 0,
+      "after:suggestions-bootstrap": 0,
+      "after:workflow-wake": 0,
+      "otherScoped": 12,
+      "noScope": 0
+    }
+  },
+  "nativeLogin": {
+    "logical": [
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "bots.pollBots",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "issues.syncIssueList",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "projects.listProjects",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "task-runs.pollTaskRuns",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "task-runs.syncThreadList",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "teams.listTeams",
+        "startedInWindow": 4,
+        "completedInWindow": 4,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 4
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "workspace.switchWorkspace",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "desktop.session",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "physical": [
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.readBatch",
+        "startedInWindow": 8,
+        "completedInWindow": 8,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 8
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "workspace.switchWorkspace",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "desktop.session",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "contexts": [
+      {
+        "index": 0,
+        "count": 94,
+        "context": {
+          "status": "unknown"
+        }
+      },
+      {
+        "index": 57,
+        "count": 31,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+          "invocationId": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "execution-settings.getBotModelMenu"
+        }
+      },
+      {
+        "index": 60,
+        "count": 27,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+          "invocationId": "380b5ca1-f985-4166-8879-ba4dbf3574d8",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 71,
+        "count": 23,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+          "invocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 80,
+        "count": 22,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+          "invocationId": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "execution-settings.getBotModelMenu"
+        }
+      },
+      {
+        "index": 83,
+        "count": 22,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+          "invocationId": "abec62d9-ac62-42cc-9127-4da7eeb49d60",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 42,
+        "count": 19,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "bb107311-704a-4fb7-bd8a-60e319e0d2f3",
+          "invocationId": "bb107311-704a-4fb7-bd8a-60e319e0d2f3",
+          "route": "/api/auth/[...all]",
+          "method": "POST",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 96,
+        "count": 19,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+          "invocationId": "47c416eb-7ab7-4936-a9d7-9ceeace6a3e6",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 85,
+        "count": 9,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "ec2950aa-9041-4a92-b566-fca2860ee3b0",
+          "invocationId": "ec2950aa-9041-4a92-b566-fca2860ee3b0",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 88,
+        "count": 9,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "900cb348-a08e-439a-8992-4ccf69aaf064",
+          "invocationId": "b2006e3d-46b9-463d-8a0c-3fb25feb3b81",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 46,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "16f034cb-0110-4f79-ba76-2a882690feef",
+          "invocationId": "16f034cb-0110-4f79-ba76-2a882690feef",
+          "route": "/api/desktop/exchange",
+          "method": "POST",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 53,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+          "invocationId": "07443bb7-e101-4ed9-81dc-f70562df3a85",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 68,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+          "invocationId": "c8bd9a8e-0fbf-4691-b4d1-c2fae354b0c9",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 79,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+          "invocationId": "c0669ce6-c661-4748-8c9a-afdde043312c",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 58,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "12249dff-df10-4912-9b7f-f903ea9fa029",
+          "invocationId": "12249dff-df10-4912-9b7f-f903ea9fa029",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 61,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+          "invocationId": "60ebf993-1411-40cb-9597-257d756dcd0e",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 86,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "07d165d8-d235-4edb-8a02-92fe6ead8756",
+          "invocationId": "07d165d8-d235-4edb-8a02-92fe6ead8756",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 99,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+          "invocationId": "b106b03f-c270-422e-8f62-aea6889ce699",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 72,
+        "count": 6,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "38a4db2c-7385-449a-8448-f13c9b0e98f8",
+          "invocationId": "38a4db2c-7385-449a-8448-f13c9b0e98f8",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "workspace.switchWorkspace"
+        }
+      },
+      {
+        "index": 49,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "77bdd690-15e0-49a7-bc60-31f10951e950",
+          "invocationId": "77bdd690-15e0-49a7-bc60-31f10951e950",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 66,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+          "invocationId": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 75,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+          "invocationId": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 84,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+          "invocationId": "aa8069fa-d17a-469a-8b0e-9124e1256467",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 91,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "1d436f32-12d1-4795-ba30-8256f29dd398",
+          "invocationId": "1d436f32-12d1-4795-ba30-8256f29dd398",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 97,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+          "invocationId": "b3b99688-276f-4c04-9390-4e42f45f7481",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 54,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+          "invocationId": "a49667a8-1bd3-42eb-a006-3825f6ad8a84",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 69,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+          "invocationId": "d7e69923-ab9f-4159-80fb-70bfbd64fa7e",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 47,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "1a0593d5-af91-4412-a2cc-6750cedb89fb",
+          "invocationId": "1a0593d5-af91-4412-a2cc-6750cedb89fb",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "desktop.bootstrap"
+        }
+      },
+      {
+        "index": 52,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+          "invocationId": "709217bd-8060-44f3-9968-5d4f8d640824",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.pollTaskRuns"
+        }
+      },
+      {
+        "index": 67,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+          "invocationId": "65b7b86a-2fad-4536-b0a4-97fec425d83e",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.pollTaskRuns"
+        }
+      },
+      {
+        "index": 70,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+          "invocationId": "0619e773-5781-4d37-909e-36d79c6be590",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 73,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "60f18b0e-3e22-4a50-9b46-cf47adf8020e",
+          "invocationId": "60f18b0e-3e22-4a50-9b46-cf47adf8020e",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "desktop.bootstrap"
+        }
+      },
+      {
+        "index": 78,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+          "invocationId": "9306d7cc-90ac-49c1-8c9c-eef0c5a99a15",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.pollTaskRuns"
+        }
+      },
+      {
+        "index": 95,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+          "invocationId": "6cf8dede-29ae-454f-88fe-df4cdcccb45b",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.pollTaskRuns"
+        }
+      },
+      {
+        "index": 98,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+          "invocationId": "3551e0b3-ebe9-4126-a0b6-775ecba16f87",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 43,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "e0cf8620-2cff-4d3a-b068-2b38ee16b662",
+          "invocationId": "e0cf8620-2cff-4d3a-b068-2b38ee16b662",
+          "route": "/api/auth/[...all]",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 45,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "22b0fbfe-2ff5-4ed1-b910-2221bd88fb7c",
+          "invocationId": "22b0fbfe-2ff5-4ed1-b910-2221bd88fb7c",
+          "route": "/api/auth/[...all]",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 48,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+          "invocationId": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 50,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "816f55d8-347e-436b-aaaf-baaa22ce04f9",
+          "invocationId": "816f55d8-347e-436b-aaaf-baaa22ce04f9",
+          "route": "/api/agent/sessions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 59,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+          "invocationId": "fd69ce83-9f62-4a12-897d-e4146e72c5ad",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 63,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+          "invocationId": "7d697dd8-fe4e-494d-b475-491e20211edc",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 64,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+          "invocationId": "ec447a83-e9aa-46f2-a6f6-16b65065d21c",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 65,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+          "invocationId": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 74,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "31e970a3-845b-4f66-9007-43e0e07698b8",
+          "invocationId": "31e970a3-845b-4f66-9007-43e0e07698b8",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 76,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "350dfd3d-034b-40a8-8917-7ce9d13a84c2",
+          "invocationId": "350dfd3d-034b-40a8-8917-7ce9d13a84c2",
+          "route": "/api/agent/sessions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 87,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "900cb348-a08e-439a-8992-4ccf69aaf064",
+          "invocationId": "d1b339e1-cb6e-4e64-b22c-80ccacd04658",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 90,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+          "invocationId": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 93,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+          "invocationId": "a295182f-5462-43a4-8231-69c166e1ee79",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 94,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+          "invocationId": "2c342753-eeaf-48f9-a4da-392ee4fa15a9",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 44,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "bd2bfa4d-f9bc-454f-9826-b4392a0b689a",
+          "invocationId": "bd2bfa4d-f9bc-454f-9826-b4392a0b689a",
+          "route": "/api/desktop/begin",
+          "method": "POST",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 51,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+          "invocationId": "78ae038e-05f4-462f-8fa5-55ab80a65408",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 55,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+          "invocationId": "ec0706e9-2a12-49a1-985a-75318184c66d",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 56,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+          "invocationId": "7e3cdd78-b4b9-46af-a8c7-a4f0e562f393",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "projects.listProjects"
+        }
+      },
+      {
+        "index": 62,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+          "invocationId": "f49992df-e234-4b93-b013-e1ffde878ed7",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 77,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+          "invocationId": "85ee159d-6f9a-4fd7-b955-9a7eb592aeff",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 81,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+          "invocationId": "7fb7a755-aa8f-4e48-9434-183882bd2f28",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 82,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+          "invocationId": "a814912a-b94f-46f8-9e2a-772246d1810a",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "projects.listProjects"
+        }
+      },
+      {
+        "index": 89,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "be6a5782-cbe3-416f-b179-765908898619",
+          "invocationId": "be6a5782-cbe3-416f-b179-765908898619",
+          "route": "/api/mobile/reactions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 92,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+          "invocationId": "687e739f-aeb1-4a2e-b1f8-0727f0a7a11b",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      }
+    ],
+    "statements": [
+      {
+        "index": 0,
+        "count": 129,
+        "statement": {
+          "status": "unknown"
+        }
+      },
+      {
+        "index": 23,
+        "count": 33,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b06a5f1b2df0",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 40,
+        "count": 17,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4b3f987fefbb",
+          "command": "SELECT",
+          "parameterCount": 6
+        }
+      },
+      {
+        "index": 37,
+        "count": 14,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9f0fe8477a06",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 11,
+        "count": 13,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8fa591ff58d0",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 12,
+        "count": 13,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1b6dae6d78fb",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 59,
+        "count": 9,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c9eaa606782f",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 50,
+        "count": 9,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "79663c1d3b43",
+          "command": "COMMIT",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 51,
+        "count": 8,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a6d8d51b1b0b",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 52,
+        "count": 8,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1365a978dee8",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 44,
+        "count": 8,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8c83d6692147",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 46,
+        "count": 8,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "390156ca90d2",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 7,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e6f07d43b5c2",
+          "command": "BEGIN",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 10,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9505cacb7c71",
+          "command": "COMMIT",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 36,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "66cde7eead86",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 39,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a130e5d92ffc",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 47,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "cfc5423a080d",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 45,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "23d0664babd6",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 48,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b27c6e931d1b",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 57,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "27e48780a2a1",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 58,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a8402858d4f1",
+          "command": "BEGIN",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 20,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e5114ae888d8",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 28,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "bc0fa4bad86f",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 29,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0fea95b4a686",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 34,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "fcb49b74a39e",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 30,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ca5780bf570b",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 41,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8535cda4110e",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 32,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "f5196718ef49",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 53,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9f5aec55f127",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 54,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e20f5fbb8309",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 55,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0f220c251daf",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 56,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a125321ddabb",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 38,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "460892a596aa",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 60,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4c80688f4aac",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 63,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "3a287aa80050",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 1,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "98991733a073",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 2,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "52265e03ddf0",
+          "command": "UPDATE",
+          "parameterCount": 9
+        }
+      },
+      {
+        "index": 24,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a09916b7f683",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 61,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9d1db4039555",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 62,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "64e0260f381c",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 9,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ad30d71053a1",
+          "command": "INSERT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 18,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "d47f41b71036",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 19,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9029c62c8369",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 26,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8b77c8bed756",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 27,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "66c910cf027a",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 31,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "bcece0718fe9",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 35,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0dead3c976e0",
+          "command": "SELECT",
+          "parameterCount": 5
+        }
+      },
+      {
+        "index": 42,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4ff9b9f0bf82",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 43,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "47ed260c993f",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 25,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9e3aaf8271c6",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 49,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8faa2a73d8b1",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 66,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0c247d8ed988",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 67,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ecd6dcc0d383",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 68,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9b349af498e9",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 3,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "244dea12fc5b",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 4,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "eae3d0127857",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 5,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "90843a6e75d1",
+          "command": "INSERT",
+          "parameterCount": 8
+        }
+      },
+      {
+        "index": 6,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0141f510f9b8",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 8,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "6d487f2218af",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 13,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1535cd951679",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 14,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "af72d3967f7f",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 15,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a7bb7891baab",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 16,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4e2561ff518d",
+          "command": "DELETE",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 17,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0c67c2a7dce2",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 71,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ae1aa898f282",
+          "command": "INSERT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 72,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "f9ece194f262",
+          "command": "INSERT",
+          "parameterCount": 6
+        }
+      },
+      {
+        "index": 73,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "333258e3e5be",
+          "command": "UPDATE",
+          "parameterCount": 8
+        }
+      },
+      {
+        "index": 74,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "6245a63f4f0b",
+          "command": "WITH",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 75,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "6d5c0bdd2055",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 76,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "010dadd721b5",
+          "command": "DELETE",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 77,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b9910260c205",
+          "command": "DELETE",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 64,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "339d5b49dae6",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 69,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "60bbb490fb1b",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 70,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c1454f6b0c22",
+          "command": "INSERT",
+          "parameterCount": 4
+        }
+      }
+    ],
+    "operationBuckets": {
+      "/api/auth/[...all]": 21,
+      "/api/desktop/begin": 1,
+      "/api/desktop/return": 2,
+      "/api/desktop/exchange": 8,
+      "/api/desktop/rpc": 83,
+      "/api/rpc": 0,
+      "/api/workspace": 20,
+      "/api/workspace/switcher": 8,
+      "/api/live/ticket": 23,
+      "/actions/coordinator/chat": 0,
+      "/actions/coordinator/poll": 91,
+      "/actions/coordinator/summaries": 31,
+      "/actions/threads/poll": 15,
+      "/actions/task-runs/read": 12,
+      "/actions/issues/poll": 25,
+      "/actions/projects/list": 2,
+      "unattributed": 99
+    },
+    "sourceBuckets": {
+      "/api/agent/sessions": 4,
+      "/api/computer/events": 0,
+      "/api/conversations": 18,
+      "/api/conversations/[id]/read": 13,
+      "/api/approved-writes": 40,
+      "/api/mobile/reactions": 1,
+      "/api/pending-actions": 4,
+      "/api/settings/preferences": 0,
+      "/api/settings/model-order": 0,
+      "/api/settings/[read]": 0,
+      "/api/devices/enrollment": 7,
+      "/api/coordinator/messages": 0,
+      "/api/coordinator/stream": 0,
+      "/api/coordinator/runtime": 0,
+      "/api/coordinator/attention": 0,
+      "/api/teams/directory": 0,
+      "/api/teams/[teamId]/members": 0,
+      "/api/integrations/composio": 0,
+      "/api/frontend/oauth-consent": 0,
+      "/pages/workspace": 0,
+      "/pages/settings": 0,
+      "/v1/devices/enroll": 0,
+      "/v1/devices/register": 0,
+      "/v1/devices/[deviceId]/commands": 0,
+      "/v1/devices/[deviceId]/commands/ack": 0,
+      "/v1/devices/[deviceId]/computer": 0,
+      "/v1/devices/[deviceId]/coordinator": 0,
+      "/v1/devices/[deviceId]/fs/requests": 0,
+      "/v1/devices/[deviceId]/fs/requests/[requestId]": 0,
+      "/v1/devices/[deviceId]/gateway": 0,
+      "/v1/devices/[deviceId]/github-token": 0,
+      "/v1/devices/[deviceId]/heartbeat": 0,
+      "/v1/devices/[deviceId]/repos": 0,
+      "/v1/devices/[deviceId]/runs": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/claim": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/computer-authority": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/credentials/login": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/subscription-lease": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/subscription": 0,
+      "/v1/runs/[runId]": 0,
+      "/v1/runs/[runId]/captures": 0,
+      "/v1/runs/[runId]/captures/[captureId]": 0,
+      "/v1/runs/[runId]/captures/[captureId]/complete": 0,
+      "/v1/runs/[runId]/checkpoint": 0,
+      "/v1/runs/[runId]/complete": 0,
+      "/v1/runs/[runId]/decision": 0,
+      "/v1/runs/[runId]/events": 0,
+      "/v1/runs/[runId]/policy-snapshot": 0,
+      "/v1/runs/[runId]/screen": 0,
+      "/v1/runs/[runId]/skill-receipt": 0,
+      "/v1/runs/[runId]/tool-approval": 0,
+      "after:agent-images.revalidate": 0,
+      "after:auth-email": 0,
+      "after:composio-triggers": 0,
+      "after:composio-webhook": 0,
+      "after:coordinator-wake": 0,
+      "after:device-wake": 0,
+      "after:due-timer": 0,
+      "after:factory-dispatch-recovery": 0,
+      "after:github-webhook": 0,
+      "after:group-turn": 0,
+      "after:issue-effects": 0,
+      "after:linear-issue-sync": 0,
+      "after:linear-sync-batch": 0,
+      "after:linear-webhook": 0,
+      "after:linear-webhook-suggestions": 0,
+      "after:live-notify": 0,
+      "after:record-time-zone": 0,
+      "after:remember-locale": 0,
+      "after:run-outcome-judge": 0,
+      "after:short-title": 0,
+      "after:stop-recordings": 0,
+      "after:subagent-start": 0,
+      "after:suggestions-bootstrap": 0,
+      "after:workflow-wake": 0,
+      "otherScoped": 12,
+      "noScope": 0
+    }
+  },
+  "startup-bundled": {
+    "logical": [
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "bots.pollBots",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "issues.syncIssueList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "projects.listProjects",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "task-runs.pollTaskRuns",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "task-runs.syncThreadList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "teams.listTeams",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "physical": [
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "bots.pollBots",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.readBatch",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/desktop/rpc",
+        "rpcAction": "task-runs.pollTaskRuns",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "contexts": [
+      {
+        "index": 0,
+        "count": 53,
+        "context": {
+          "status": "unknown"
+        }
+      },
+      {
+        "index": 174,
+        "count": 26,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "6d2e38cc-a967-4ae4-a636-9089af4045dc",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 165,
+        "count": 22,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "d8ce323f-21c2-4277-9317-96c3e27d0c3d",
+          "invocationId": "d8ce323f-21c2-4277-9317-96c3e27d0c3d",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "execution-settings.getBotModelMenu"
+        }
+      },
+      {
+        "index": 180,
+        "count": 19,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "83168c61-5c1d-4f32-8128-7d591dbc07c2",
+          "invocationId": "c8be8641-2a9d-49dc-95d4-108414bba82a",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 159,
+        "count": 9,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c12f3764-e710-4524-9bcc-ad0a82cb4469",
+          "invocationId": "c12f3764-e710-4524-9bcc-ad0a82cb4469",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 168,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "3d608c44-a834-4ed5-8597-7e6e6663d0da",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 183,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "6f8fdd56-9804-4a1b-86f1-995653931408",
+          "invocationId": "6f8fdd56-9804-4a1b-86f1-995653931408",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 160,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "8d3acf75-da1f-4500-b516-7c8fb4dd6736",
+          "invocationId": "8d3acf75-da1f-4500-b516-7c8fb4dd6736",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 169,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "d17c12a1-f201-49f9-b81f-8dc9a7360e33",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 181,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "83168c61-5c1d-4f32-8128-7d591dbc07c2",
+          "invocationId": "3cc1e1bd-c343-413c-9e3a-0af9ea1c5fec",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 162,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "e6d6ad7c-63b9-430b-b606-86561ad5cd87",
+          "invocationId": "e6d6ad7c-63b9-430b-b606-86561ad5cd87",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 177,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "77ea7c07-2d42-44d9-9888-3a7aa8e7fb0f",
+          "invocationId": "77ea7c07-2d42-44d9-9888-3a7aa8e7fb0f",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 179,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "83168c61-5c1d-4f32-8128-7d591dbc07c2",
+          "invocationId": "b1306d5a-c827-4804-b8be-e9529778276a",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 184,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "3320a1ee-4f58-466c-9500-b6304dbdebe5",
+          "invocationId": "3320a1ee-4f58-466c-9500-b6304dbdebe5",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.pollTaskRuns"
+        }
+      },
+      {
+        "index": 158,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "889e9381-6eb3-458c-a512-d2e1eb3384f8",
+          "invocationId": "889e9381-6eb3-458c-a512-d2e1eb3384f8",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "desktop.bootstrap"
+        }
+      },
+      {
+        "index": 167,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "2af012d7-a54b-4d92-904e-d7ccfc760ee3",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.pollTaskRuns"
+        }
+      },
+      {
+        "index": 170,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "419493f1-4593-4981-ac29-a312d19f2480",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 161,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4ef516b7-6c83-4439-a5b8-cd9c35a11d6b",
+          "invocationId": "4ef516b7-6c83-4439-a5b8-cd9c35a11d6b",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 163,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "7ad8ce3c-af95-4bbf-87d6-cc9b0379d72a",
+          "invocationId": "7ad8ce3c-af95-4bbf-87d6-cc9b0379d72a",
+          "route": "/api/agent/sessions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 175,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2d21a6d6-53b5-4160-ac49-6c0741197cc4",
+          "invocationId": "2d21a6d6-53b5-4160-ac49-6c0741197cc4",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 176,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "699e637b-4737-439b-8e32-9be96bc9b530",
+          "invocationId": "699e637b-4737-439b-8e32-9be96bc9b530",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 164,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "34f421a3-3a88-42fa-9213-22447919777d",
+          "invocationId": "34f421a3-3a88-42fa-9213-22447919777d",
+          "route": "/api/mobile/reactions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 166,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "e2c7a61a-11ec-4603-8433-c380a9e87bff",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 171,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "77e592de-90b4-41d4-a00d-de28408b9633",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 172,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "752cdd78-3a6f-418a-99fe-883a3d7b1ee6",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 173,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "295bf2a7-4d04-4a81-adca-c26180075e0e",
+          "invocationId": "63ce76f3-75f6-4b3a-a854-6172d2019caa",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "projects.listProjects"
+        }
+      },
+      {
+        "index": 178,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "83168c61-5c1d-4f32-8128-7d591dbc07c2",
+          "invocationId": "10f76f64-074f-4844-96fc-c06dde7e5c31",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 182,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "83168c61-5c1d-4f32-8128-7d591dbc07c2",
+          "invocationId": "e85cb34f-b4af-4352-b4ac-ef66563ba94e",
+          "route": "/api/desktop/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      }
+    ],
+    "statements": [
+      {
+        "index": 0,
+        "count": 69,
+        "statement": {
+          "status": "unknown"
+        }
+      },
+      {
+        "index": 23,
+        "count": 16,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b06a5f1b2df0",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 40,
+        "count": 10,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4b3f987fefbb",
+          "command": "SELECT",
+          "parameterCount": 6
+        }
+      },
+      {
+        "index": 37,
+        "count": 8,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9f0fe8477a06",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 59,
+        "count": 7,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c9eaa606782f",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 11,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8fa591ff58d0",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 12,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1b6dae6d78fb",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 50,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "79663c1d3b43",
+          "command": "COMMIT",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 51,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a6d8d51b1b0b",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 52,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1365a978dee8",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 57,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "27e48780a2a1",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 44,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8c83d6692147",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 46,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "390156ca90d2",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 58,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a8402858d4f1",
+          "command": "BEGIN",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 36,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "66cde7eead86",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 39,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a130e5d92ffc",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 47,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "cfc5423a080d",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 45,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "23d0664babd6",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 48,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b27c6e931d1b",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 20,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e5114ae888d8",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 7,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e6f07d43b5c2",
+          "command": "BEGIN",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 61,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9d1db4039555",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 24,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a09916b7f683",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 62,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "64e0260f381c",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 10,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9505cacb7c71",
+          "command": "COMMIT",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 28,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "bc0fa4bad86f",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 29,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0fea95b4a686",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 66,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0c247d8ed988",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 32,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "f5196718ef49",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 34,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "fcb49b74a39e",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 60,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4c80688f4aac",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 30,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ca5780bf570b",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 38,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "460892a596aa",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 63,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "3a287aa80050",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 41,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8535cda4110e",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 67,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ecd6dcc0d383",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 68,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9b349af498e9",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 18,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "d47f41b71036",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 19,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9029c62c8369",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 25,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9e3aaf8271c6",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 26,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8b77c8bed756",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 27,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "66c910cf027a",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 49,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8faa2a73d8b1",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 35,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0dead3c976e0",
+          "command": "SELECT",
+          "parameterCount": 5
+        }
+      },
+      {
+        "index": 69,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "60bbb490fb1b",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 70,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c1454f6b0c22",
+          "command": "INSERT",
+          "parameterCount": 4
+        }
+      }
+    ],
+    "operationBuckets": {
+      "/api/auth/[...all]": 0,
+      "/api/desktop/begin": 0,
+      "/api/desktop/return": 0,
+      "/api/desktop/exchange": 0,
+      "/api/desktop/rpc": 32,
+      "/api/rpc": 0,
+      "/api/workspace": 10,
+      "/api/workspace/switcher": 4,
+      "/api/live/ticket": 16,
+      "/actions/coordinator/chat": 0,
+      "/actions/coordinator/poll": 45,
+      "/actions/coordinator/summaries": 16,
+      "/actions/threads/poll": 7,
+      "/actions/task-runs/read": 7,
+      "/actions/issues/poll": 14,
+      "/actions/projects/list": 1,
+      "unattributed": 56
+    },
+    "sourceBuckets": {
+      "/api/agent/sessions": 2,
+      "/api/computer/events": 0,
+      "/api/conversations": 10,
+      "/api/conversations/[id]/read": 9,
+      "/api/approved-writes": 20,
+      "/api/mobile/reactions": 1,
+      "/api/pending-actions": 2,
+      "/api/settings/preferences": 0,
+      "/api/settings/model-order": 0,
+      "/api/settings/[read]": 0,
+      "/api/devices/enrollment": 2,
+      "/api/coordinator/messages": 0,
+      "/api/coordinator/stream": 0,
+      "/api/coordinator/runtime": 0,
+      "/api/coordinator/attention": 0,
+      "/api/teams/directory": 0,
+      "/api/teams/[teamId]/members": 0,
+      "/api/integrations/composio": 0,
+      "/api/frontend/oauth-consent": 0,
+      "/pages/workspace": 0,
+      "/pages/settings": 0,
+      "/v1/devices/enroll": 0,
+      "/v1/devices/register": 0,
+      "/v1/devices/[deviceId]/commands": 0,
+      "/v1/devices/[deviceId]/commands/ack": 0,
+      "/v1/devices/[deviceId]/computer": 0,
+      "/v1/devices/[deviceId]/coordinator": 0,
+      "/v1/devices/[deviceId]/fs/requests": 0,
+      "/v1/devices/[deviceId]/fs/requests/[requestId]": 0,
+      "/v1/devices/[deviceId]/gateway": 0,
+      "/v1/devices/[deviceId]/github-token": 0,
+      "/v1/devices/[deviceId]/heartbeat": 0,
+      "/v1/devices/[deviceId]/repos": 0,
+      "/v1/devices/[deviceId]/runs": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/claim": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/computer-authority": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/credentials/login": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/subscription-lease": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/subscription": 0,
+      "/v1/runs/[runId]": 0,
+      "/v1/runs/[runId]/captures": 0,
+      "/v1/runs/[runId]/captures/[captureId]": 0,
+      "/v1/runs/[runId]/captures/[captureId]/complete": 0,
+      "/v1/runs/[runId]/checkpoint": 0,
+      "/v1/runs/[runId]/complete": 0,
+      "/v1/runs/[runId]/decision": 0,
+      "/v1/runs/[runId]/events": 0,
+      "/v1/runs/[runId]/policy-snapshot": 0,
+      "/v1/runs/[runId]/screen": 0,
+      "/v1/runs/[runId]/skill-receipt": 0,
+      "/v1/runs/[runId]/tool-approval": 0,
+      "after:agent-images.revalidate": 0,
+      "after:auth-email": 0,
+      "after:composio-triggers": 0,
+      "after:composio-webhook": 0,
+      "after:coordinator-wake": 0,
+      "after:device-wake": 0,
+      "after:due-timer": 0,
+      "after:factory-dispatch-recovery": 0,
+      "after:github-webhook": 0,
+      "after:group-turn": 0,
+      "after:issue-effects": 0,
+      "after:linear-issue-sync": 0,
+      "after:linear-sync-batch": 0,
+      "after:linear-webhook": 0,
+      "after:linear-webhook-suggestions": 0,
+      "after:live-notify": 0,
+      "after:record-time-zone": 0,
+      "after:remember-locale": 0,
+      "after:run-outcome-judge": 0,
+      "after:short-title": 0,
+      "after:stop-recordings": 0,
+      "after:subagent-start": 0,
+      "after:suggestions-bootstrap": 0,
+      "after:workflow-wake": 0,
+      "otherScoped": 10,
+      "noScope": 0
+    }
+  },
+  "startup-hosted": {
+    "logical": [
+      {
+        "route": "/api/rpc",
+        "rpcAction": "bots.pollBots",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "issues.syncIssueList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "projects.listProjects",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "task-runs.pollTaskRuns",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "task-runs.syncThreadList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "teams.listTeams",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "physical": [
+      {
+        "route": "/api/rpc",
+        "rpcAction": "bots.pollBots",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "issues.syncIssueList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "projects.listProjects",
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 1
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "task-runs.pollTaskRuns",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "task-runs.syncThreadList",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      },
+      {
+        "route": "/api/rpc",
+        "rpcAction": "teams.listTeams",
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "statusCounts": [
+          {
+            "status": 200,
+            "count": 2
+          }
+        ]
+      }
+    ],
+    "contexts": [
+      {
+        "index": 0,
+        "count": 48,
+        "context": {
+          "status": "unknown"
+        }
+      },
+      {
+        "index": 200,
+        "count": 27,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "25fc4a93-064a-4f78-ba50-0f694100dc47",
+          "invocationId": "25fc4a93-064a-4f78-ba50-0f694100dc47",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 210,
+        "count": 27,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "5e26b61f-0a24-4db9-aaed-859de9a6b50c",
+          "invocationId": "5e26b61f-0a24-4db9-aaed-859de9a6b50c",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.syncCoordinatorChat"
+        }
+      },
+      {
+        "index": 199,
+        "count": 22,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "5ed45a9d-7068-44d3-84d0-174ce7049d99",
+          "invocationId": "5ed45a9d-7068-44d3-84d0-174ce7049d99",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "execution-settings.getBotModelMenu"
+        }
+      },
+      {
+        "index": 187,
+        "count": 9,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "3d6f916c-9548-4ca1-a17b-8a77008912d8",
+          "invocationId": "3d6f916c-9548-4ca1-a17b-8a77008912d8",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 201,
+        "count": 9,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "aa0c25dd-f02b-4af7-a16f-808c7e78786a",
+          "invocationId": "aa0c25dd-f02b-4af7-a16f-808c7e78786a",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 209,
+        "count": 9,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "62457650-fe3f-4c38-b9f7-aea1f9158f42",
+          "invocationId": "62457650-fe3f-4c38-b9f7-aea1f9158f42",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "issues.syncIssueList"
+        }
+      },
+      {
+        "index": 196,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "365dbb86-0ae6-4882-aa80-c5a50bc576df",
+          "invocationId": "365dbb86-0ae6-4882-aa80-c5a50bc576df",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 212,
+        "count": 8,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "1bb0fc8c-a348-4283-addd-931e9a5d9bad",
+          "invocationId": "1bb0fc8c-a348-4283-addd-931e9a5d9bad",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "coordinator.pollBotChatSummaries"
+        }
+      },
+      {
+        "index": 188,
+        "count": 7,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "8618aab9-6f77-4304-bc0b-ca571e625945",
+          "invocationId": "8618aab9-6f77-4304-bc0b-ca571e625945",
+          "route": "/api/live/ticket",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 190,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "d368a95c-561e-4b69-8f75-193e3487bae1",
+          "invocationId": "d368a95c-561e-4b69-8f75-193e3487bae1",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 207,
+        "count": 5,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "26e09b8d-e6c1-4ecb-80eb-008731e09eaa",
+          "invocationId": "26e09b8d-e6c1-4ecb-80eb-008731e09eaa",
+          "route": "/api/workspace",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 189,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "2ad1377a-d52f-47f3-93a4-bb9f6e988dcc",
+          "invocationId": "2ad1377a-d52f-47f3-93a4-bb9f6e988dcc",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 195,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "71251c59-62a5-4e5c-9ba9-780ccf35ea2b",
+          "invocationId": "71251c59-62a5-4e5c-9ba9-780ccf35ea2b",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.pollTaskRuns"
+        }
+      },
+      {
+        "index": 202,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "485ac65f-7c04-4207-9272-aba362d56027",
+          "invocationId": "485ac65f-7c04-4207-9272-aba362d56027",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 205,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "9f84e059-11df-4b1c-8903-0b6d618fc701",
+          "invocationId": "9f84e059-11df-4b1c-8903-0b6d618fc701",
+          "route": "/api/workspace/switcher",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 208,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "a9155ece-2eef-4d88-aab8-ada7fbba939d",
+          "invocationId": "a9155ece-2eef-4d88-aab8-ada7fbba939d",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.syncThreadList"
+        }
+      },
+      {
+        "index": 211,
+        "count": 4,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "38c262c3-3e26-4ade-8ac2-9c75820bc5d4",
+          "invocationId": "38c262c3-3e26-4ade-8ac2-9c75820bc5d4",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "task-runs.pollTaskRuns"
+        }
+      },
+      {
+        "index": 185,
+        "count": 3,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "db893bfa-d00a-48b7-b6ed-c5b3dc8a957d",
+          "invocationId": "db893bfa-d00a-48b7-b6ed-c5b3dc8a957d",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "desktop.bootstrap"
+        }
+      },
+      {
+        "index": 186,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "4782b104-0b75-42cc-b2b6-15a92743348c",
+          "invocationId": "4782b104-0b75-42cc-b2b6-15a92743348c",
+          "route": "/api/auth/[...all]",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 191,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "a74c59bf-ae64-4be9-9ea1-6f5ebf94b0b0",
+          "invocationId": "a74c59bf-ae64-4be9-9ea1-6f5ebf94b0b0",
+          "route": "/api/agent/sessions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 193,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c115b574-c67f-497f-805b-dd9f34c919b9",
+          "invocationId": "c115b574-c67f-497f-805b-dd9f34c919b9",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 197,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "c3da2005-3289-4d63-b99b-9b07c59c9c87",
+          "invocationId": "c3da2005-3289-4d63-b99b-9b07c59c9c87",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "projects.listProjects"
+        }
+      },
+      {
+        "index": 198,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "6caa5654-ae04-42e6-a1a6-595347c54362",
+          "invocationId": "6caa5654-ae04-42e6-a1a6-595347c54362",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 203,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "7db31883-8340-4464-9837-76f8e8f6bf4d",
+          "invocationId": "7db31883-8340-4464-9837-76f8e8f6bf4d",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "bots.pollBots"
+        }
+      },
+      {
+        "index": 204,
+        "count": 2,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "fd441cd3-e4be-4650-a4a4-6e11caad3611",
+          "invocationId": "fd441cd3-e4be-4650-a4a4-6e11caad3611",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "teams.listTeams"
+        }
+      },
+      {
+        "index": 192,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "9fd76723-2d34-48e1-92b4-35aeeab28453",
+          "invocationId": "9fd76723-2d34-48e1-92b4-35aeeab28453",
+          "route": "/api/mobile/reactions",
+          "method": "GET",
+          "rpcAction": null
+        }
+      },
+      {
+        "index": 194,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "fe7c53be-6198-41c6-b405-784cbdd51cf4",
+          "invocationId": "fe7c53be-6198-41c6-b405-784cbdd51cf4",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      },
+      {
+        "index": 206,
+        "count": 1,
+        "context": {
+          "status": "known",
+          "httpInvocationId": "6cd796c8-c570-45cf-8e56-2d94fc36850e",
+          "invocationId": "6cd796c8-c570-45cf-8e56-2d94fc36850e",
+          "route": "/api/rpc",
+          "method": "POST",
+          "rpcAction": "team-relations.listProjectTeams"
+        }
+      }
+    ],
+    "statements": [
+      {
+        "index": 0,
+        "count": 75,
+        "statement": {
+          "status": "unknown"
+        }
+      },
+      {
+        "index": 23,
+        "count": 21,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b06a5f1b2df0",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 40,
+        "count": 12,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4b3f987fefbb",
+          "command": "SELECT",
+          "parameterCount": 6
+        }
+      },
+      {
+        "index": 37,
+        "count": 10,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9f0fe8477a06",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 12,
+        "count": 7,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1b6dae6d78fb",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 59,
+        "count": 7,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "c9eaa606782f",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 57,
+        "count": 6,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "27e48780a2a1",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 11,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8fa591ff58d0",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 50,
+        "count": 5,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "79663c1d3b43",
+          "command": "COMMIT",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 51,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a6d8d51b1b0b",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 52,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "1365a978dee8",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 44,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8c83d6692147",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 46,
+        "count": 4,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "390156ca90d2",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 58,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a8402858d4f1",
+          "command": "BEGIN",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 36,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "66cde7eead86",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 39,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a130e5d92ffc",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 47,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "cfc5423a080d",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 45,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "23d0664babd6",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 48,
+        "count": 3,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "b27c6e931d1b",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 20,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e5114ae888d8",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 7,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "e6f07d43b5c2",
+          "command": "BEGIN",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 61,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9d1db4039555",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 62,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "64e0260f381c",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 10,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9505cacb7c71",
+          "command": "COMMIT",
+          "parameterCount": 0
+        }
+      },
+      {
+        "index": 28,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "bc0fa4bad86f",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      },
+      {
+        "index": 29,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0fea95b4a686",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 66,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0c247d8ed988",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 33,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "38096b93488e",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 32,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "f5196718ef49",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 30,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ca5780bf570b",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 34,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "fcb49b74a39e",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 41,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8535cda4110e",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 60,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "4c80688f4aac",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 67,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "ecd6dcc0d383",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 68,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9b349af498e9",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 38,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "460892a596aa",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 63,
+        "count": 2,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "3a287aa80050",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 18,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "d47f41b71036",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 19,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9029c62c8369",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 1,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "98991733a073",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 2,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "52265e03ddf0",
+          "command": "UPDATE",
+          "parameterCount": 9
+        }
+      },
+      {
+        "index": 24,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "a09916b7f683",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 25,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "9e3aaf8271c6",
+          "command": "SELECT",
+          "parameterCount": 2
+        }
+      },
+      {
+        "index": 26,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8b77c8bed756",
+          "command": "SELECT",
+          "parameterCount": 4
+        }
+      },
+      {
+        "index": 27,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "66c910cf027a",
+          "command": "SELECT",
+          "parameterCount": 3
+        }
+      },
+      {
+        "index": 35,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "0dead3c976e0",
+          "command": "SELECT",
+          "parameterCount": 5
+        }
+      },
+      {
+        "index": 49,
+        "count": 1,
+        "statement": {
+          "status": "known",
+          "normalizedStructureId": "8faa2a73d8b1",
+          "command": "SELECT",
+          "parameterCount": 1
+        }
+      }
+    ],
+    "operationBuckets": {
+      "/api/auth/[...all]": 2,
+      "/api/desktop/begin": 0,
+      "/api/desktop/return": 0,
+      "/api/desktop/exchange": 0,
+      "/api/desktop/rpc": 0,
+      "/api/rpc": 35,
+      "/api/workspace": 10,
+      "/api/workspace/switcher": 8,
+      "/api/live/ticket": 16,
+      "/actions/coordinator/chat": 0,
+      "/actions/coordinator/poll": 54,
+      "/actions/coordinator/summaries": 16,
+      "/actions/threads/poll": 8,
+      "/actions/task-runs/read": 8,
+      "/actions/issues/poll": 18,
+      "/actions/projects/list": 2,
+      "unattributed": 51
+    },
+    "sourceBuckets": {
+      "/api/agent/sessions": 2,
+      "/api/computer/events": 0,
+      "/api/conversations": 10,
+      "/api/conversations/[id]/read": 4,
+      "/api/approved-writes": 20,
+      "/api/mobile/reactions": 1,
+      "/api/pending-actions": 2,
+      "/api/settings/preferences": 0,
+      "/api/settings/model-order": 0,
+      "/api/settings/[read]": 0,
+      "/api/devices/enrollment": 2,
+      "/api/coordinator/messages": 0,
+      "/api/coordinator/stream": 0,
+      "/api/coordinator/runtime": 0,
+      "/api/coordinator/attention": 0,
+      "/api/teams/directory": 0,
+      "/api/teams/[teamId]/members": 0,
+      "/api/integrations/composio": 0,
+      "/api/frontend/oauth-consent": 0,
+      "/pages/workspace": 0,
+      "/pages/settings": 0,
+      "/v1/devices/enroll": 0,
+      "/v1/devices/register": 0,
+      "/v1/devices/[deviceId]/commands": 0,
+      "/v1/devices/[deviceId]/commands/ack": 0,
+      "/v1/devices/[deviceId]/computer": 0,
+      "/v1/devices/[deviceId]/coordinator": 0,
+      "/v1/devices/[deviceId]/fs/requests": 0,
+      "/v1/devices/[deviceId]/fs/requests/[requestId]": 0,
+      "/v1/devices/[deviceId]/gateway": 0,
+      "/v1/devices/[deviceId]/github-token": 0,
+      "/v1/devices/[deviceId]/heartbeat": 0,
+      "/v1/devices/[deviceId]/repos": 0,
+      "/v1/devices/[deviceId]/runs": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/claim": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/computer-authority": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/credentials/login": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/subscription-lease": 0,
+      "/v1/devices/[deviceId]/runs/[runId]/subscription": 0,
+      "/v1/runs/[runId]": 0,
+      "/v1/runs/[runId]/captures": 0,
+      "/v1/runs/[runId]/captures/[captureId]": 0,
+      "/v1/runs/[runId]/captures/[captureId]/complete": 0,
+      "/v1/runs/[runId]/checkpoint": 0,
+      "/v1/runs/[runId]/complete": 0,
+      "/v1/runs/[runId]/decision": 0,
+      "/v1/runs/[runId]/events": 0,
+      "/v1/runs/[runId]/policy-snapshot": 0,
+      "/v1/runs/[runId]/screen": 0,
+      "/v1/runs/[runId]/skill-receipt": 0,
+      "/v1/runs/[runId]/tool-approval": 0,
+      "after:agent-images.revalidate": 0,
+      "after:auth-email": 0,
+      "after:composio-triggers": 0,
+      "after:composio-webhook": 0,
+      "after:coordinator-wake": 0,
+      "after:device-wake": 0,
+      "after:due-timer": 0,
+      "after:factory-dispatch-recovery": 0,
+      "after:github-webhook": 0,
+      "after:group-turn": 0,
+      "after:issue-effects": 0,
+      "after:linear-issue-sync": 0,
+      "after:linear-sync-batch": 0,
+      "after:linear-webhook": 0,
+      "after:linear-webhook-suggestions": 0,
+      "after:live-notify": 0,
+      "after:record-time-zone": 0,
+      "after:remember-locale": 0,
+      "after:run-outcome-judge": 0,
+      "after:short-title": 0,
+      "after:stop-recordings": 0,
+      "after:subagent-start": 0,
+      "after:suggestions-bootstrap": 0,
+      "after:workflow-wake": 0,
+      "otherScoped": 10,
+      "noScope": 0
+    }
+  }
+}

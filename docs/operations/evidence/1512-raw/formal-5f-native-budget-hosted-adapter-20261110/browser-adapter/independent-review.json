@@ -1,0 +1,89 @@
+{
+  "schema": "issue1512.hosted-browser-adapter-second-review.v1",
+  "reviewer": "/root/mac_inprocess_diag",
+  "verdict": "STATIC_NO_CONCRETE_BLOCKER_IDENTIFIED",
+  "formalBase": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "hostedSource": "fe20f19bcf82e6541430b62c450920ba42c95fb0",
+  "candidateDriver": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+  "candidateTests": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+  "contractEvidence": "95b49ada6bca5abb3f0e6786892b196dd970e0b1",
+  "findings": [
+    "Compared complete candidate driver diff against formal H. Changes are control resolution, explicit hosted pickers, and post-Replay selection rechecks. Existing authentication, source, workspace ownership, cloud backend proof, Replay, paid click and cleanup gates are preserved.",
+    "Independently read exact hosted NewTask, CreateWindowLayer, MenuList/Dropdown, CreateWindow/CreateRow definitions. Hosted Machine/Bot accessible-name prefixes, row/profile hierarchy, menuitemradio role, named New task dialog, label-wrapped Task description, and full Create task plus non-hidden shortcut match candidate selectors.",
+    "Hosted workspace selector targets the Dropdown wrapper's direct button; the flat radio choice additionally requires target workspace label uniqueness across all account choices. Existing owner/Personal/admin and new-document selection readbacks remain.",
+    "controlFor enforces one default-or-hosted control and rejects mixed surfaces. pickHosted scopes to one visible menu, then requires exact nested choice text; default combobox paths remain. Independent search/task slot combinations have explicit regressions.",
+    "NewTask profile choices can lack onSelect when disabled while the shared menu still closes. Candidate therefore correctly checks selected Coordinator/Cloud/fixture marker after each choice and again after Replay readiness, before the sole paid click.",
+    "The entire driver tail starting at report.submitClicks = 1; report.submissionOutcome = 'unknown' is byte-identical to H. There is exactly one submit.click callsite. No API task-submission path or retry was added.",
+    "All original test source beginning at function safeFailure remains a byte-identical contiguous substring of the new tests. Fake controls were extended above that boundary; additional regressions cover hosted selection, missing/mixed/ambiguous controls, unapplied choices, late profile drift, shared workspace label, partial slot fallbacks, and unknown-click no-retry."
+  ],
+  "preserved": {
+    "paidSubmissionAndCleanupTailByteEqual": true,
+    "submitClickCallsites": 1,
+    "originalTestTailContainedByteEqual": true,
+    "productFilesModified": false,
+    "productionActionsPerformed": false
+  },
+  "limits": [
+    "This reviewer performed only source inspection; no native Node, Playwright DOM, browser login, production submission, account mutation or VM was used.",
+    "Root is independently executing the agreed offline Node RED/GREEN/core tests in one shared VM. This source review does not label those results or production behavior as passed.",
+    "Final actual deployment and selected hosted overlay must retain the exact contracts; default fallback source alone is not hosted runtime proof."
+  ],
+  "sourceCatalog": [
+    {
+      "key": "baseDriver",
+      "repository": "alexj11324/Mikka",
+      "blob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "bytes": 25516,
+      "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606"
+    },
+    {
+      "key": "baseTests",
+      "repository": "alexj11324/Mikka",
+      "blob": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "bytes": 29638,
+      "sha256": "b9b3eb221835ec336089e89974e9fd2bbc873277a6602c285c96e087c2bca9e4"
+    },
+    {
+      "key": "driver",
+      "repository": "alexj11324/Mikka",
+      "blob": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+      "bytes": 29150,
+      "sha256": "f89d826441bf5317231087a4e04b9ae72ba900337058a1a4644f3424861253eb"
+    },
+    {
+      "key": "tests",
+      "repository": "alexj11324/Mikka",
+      "blob": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+      "bytes": 40049,
+      "sha256": "4a5b27fc6429ee958526fc92e57cdf99daa2f2b7c348a9e14ab42cac44814a70"
+    },
+    {
+      "key": "hostedNewTask",
+      "repository": "alexj11324/mikka-hosted-ui",
+      "blob": "99c66cc83c022c6b6c9a2d31220b69b2d0f31465",
+      "bytes": 6488,
+      "sha256": "11bc7023cded5b57716ab595e956c675f9cd35eb76658f9ff1b26e09bbd6c849"
+    },
+    {
+      "key": "hostedCreateWindow",
+      "repository": "alexj11324/mikka-hosted-ui",
+      "blob": "a420adfcf85029714bcb22495a3171034819aa83",
+      "bytes": 1629,
+      "sha256": "4011ed34d2f4b20dcd86b6a15b5f2c6f57c1b7f01f51eb72d57c833e0724cb13"
+    },
+    {
+      "key": "hostedAppShell",
+      "repository": "alexj11324/mikka-hosted-ui",
+      "blob": "43f2c91ee96ee5a099ef7e2d7ed6869dc7a22621",
+      "bytes": 359557,
+      "sha256": "cfe5724b0f11cd10bc2c58682ce5b61cff9862e2bdc3afc6b1d037e08e7b3ac9"
+    },
+    {
+      "key": "hostedKanban",
+      "repository": "alexj11324/mikka-hosted-ui",
+      "blob": "985ed5a93c7ffd50cb1d811ffcb187b41ec7fa20",
+      "bytes": 78538,
+      "sha256": "430d6b0da5dbc215675473dab5390247447fea386723b3feb3de4573a9fe07e1"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "artifacts": [
+      {
+        "id": 13732122092,
+        "name": "issue1512-local-node22-dispatch",
+        "size_in_bytes": 1562,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13732122092",
+        "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13732122092/zip",
+        "expired": false,
+        "created_at": "2026-11-10T03:14:00Z",
+        "expires_at": "2026-11-17T03:13:59Z",
+        "updated_at": "2026-11-10T03:14:00Z",
+        "digest": "sha256:b35181ce892ed368fc420c3b0a6dbc1ccf144cba356355b373548ca8abcb13e4",
+        "workflow_run": {
+          "id": 42748046897,
+          "repository_id": 1427517699,
+          "head_repository_id": 1427517699,
+          "head_branch": "ops/1512-local-node22-dispatch-20261110",
+          "head_sha": "2415588c436eb1de3f8e38b0fde5db201e354b58"
+        }
+      }
+    ]
+  },
+  "isError": false
+}

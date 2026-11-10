@@ -1,0 +1,61 @@
+{
+  "schema": "issue1512.hosted-browser-adapter-candidate.v1",
+  "preparedAt": "2026-11-10 03:40:59 UTC",
+  "author": "independent_final",
+  "base": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "contractEvidence": "95b49ada6bca5abb3f0e6786892b196dd970e0b1",
+  "files": [
+    {
+      "kind": "driver",
+      "sha": "4bdae74793e3042d38f7a6ed9af4aa0f904da4d0",
+      "bytes": 29150,
+      "sha256": "f89d826441bf5317231087a4e04b9ae72ba900337058a1a4644f3424861253eb"
+    },
+    {
+      "kind": "tests",
+      "sha": "a880eb029e0cbb5fc4ba563e4150fe8fbca841af",
+      "bytes": 40049,
+      "sha256": "4a5b27fc6429ee958526fc92e57cdf99daa2f2b7c348a9e14ab42cac44814a70"
+    }
+  ],
+  "paths": {
+    "driver": "scripts/acceptance/run-observability-browser.mjs",
+    "tests": "scripts/acceptance/run-observability-browser.test.mjs"
+  },
+  "scope": "Only acceptance browser automation and its offline regression fixture. No product UI, backend, deployment, credential, paid-setting or formal ref change.",
+  "changes": [
+    "Recognize one of the two actual control surfaces, refusing absent or mixed controls; retain original named button/combobox paths.",
+    "Hosted workspace uses its unique visible shell trigger and flat menuitemradio, after refusing a workspace label shared by another account; original owner/Personal/admin membership and new-document navigation readback remain.",
+    "Hosted search uses the observed exact shell button contract, retaining the named Search everything dialog and exact New task option.",
+    "Hosted New task requires its create-window form; bot picker count must match its Hand to row. Explicit Coordinator/Mikka Cloud/exact fixture Profile menu choices are acknowledged in the trigger text.",
+    "Bind Profile to the unique Agent profile row and its unique button; select within the unique menu by exact fixture marker. No blind default.",
+    "Hosted submit selector matches the complete Create task plus shortcut accessible name; legacy exact Create task remains.",
+    "Immediately after Replay readiness and before the sole submit click, recheck bot picker presence and exact Coordinator/Cloud/Profile selected values."
+  ],
+  "regressionCoverage": [
+    "Original test bodies beginning at safeFailure and all existing test definitions remain byte-identical.",
+    "Fake hosted controls expose actual role/label differences and retain state, so unapplied choices or late Profile drift fail.",
+    "Added complete hosted flow, absent bot picker with no Hand to row, mixed task surfaces, missing/ambiguous rows/choices, unacknowledged choices, Replay-time selection drift, cross-account workspace label ambiguity, unknown submission no-retry, and independent partial slot fallback cases."
+  ],
+  "preserved": {
+    "originalTestBodies": true,
+    "originalPaidSubmissionAndCleanupTail": true,
+    "submitClickCallsites": 1,
+    "taskSubmissionAPICallsAdded": 0,
+    "credentialsOrTokenHandlingUnchanged": true,
+    "sourceAndReplayGatesUnchanged": true
+  },
+  "staticChecks": {
+    "utf8HashesFrozen": true,
+    "mainEnglishLabelsVerifiedFrom": "fc33ff4787f45e22b9bf4f7ef36c1b20e4b1ddcf",
+    "v8SyntaxCompilationWithModuleImportsRemoved": "passed for both files; no function/test executed"
+  },
+  "notYetVerified": [
+    "No Node test run yet.",
+    "No actual Playwright/Chromium DOM execution yet.",
+    "No production login or paid task was performed.",
+    "Second independent source review requested from mac_inprocess_diag."
+  ],
+  "suggestedNarrowCommand": "node --test scripts/acceptance/run-observability-browser.test.mjs",
+  "disposition": "Root to review/integrate and choose the narrow actual Node validation before any formal publication. Keep current main/hosted source window boundaries."
+}

@@ -1,0 +1,232 @@
+TAP version 13
+# Subtest: 200: prior completed mode is allowed; direct returned ID binds the new run
+ok 1 - 200: prior completed mode is allowed; direct returned ID binds the new run
+  ---
+  duration_ms: 33.40531
+  type: 'test'
+  ...
+# Subtest: 204: acceptance with no indexed new run is pending, not retried or reported as failed
+ok 2 - 204: acceptance with no indexed new run is pending, not retried or reported as failed
+  ---
+  duration_ms: 2.236023
+  type: 'test'
+  ...
+# Subtest: 204: one new source-correct run remains explicitly a metadata candidate
+ok 3 - 204: one new source-correct run remains explicitly a metadata candidate
+  ---
+  duration_ms: 2.049782
+  type: 'test'
+  ...
+# Subtest: 204: two new run IDs are ambiguous and never cause another POST
+ok 4 - 204: two new run IDs are ambiguous and never cause another POST
+  ---
+  duration_ms: 1.774974
+  type: 'test'
+  ...
+# Subtest: unknown POST timeout retains unknown outcome and still reads main/public version after
+ok 5 - unknown POST timeout retains unknown outcome and still reads main/public version after
+  ---
+  duration_ms: 2.121089
+  type: 'test'
+  ...
+# Subtest: 200 malformed response is still accepted but requires inspection without retry
+ok 6 - 200 malformed response is still accepted but requires inspection without retry
+  ---
+  duration_ms: 1.615397
+  type: 'test'
+  ...
+# Subtest: HTTP non-success remains inspection; raw error body is not emitted
+ok 7 - HTTP non-success remains inspection; raw error body is not emitted
+  ---
+  duration_ms: 3.162232
+  type: 'test'
+  ...
+# Subtest: disabled manifest
+ok 8 - disabled manifest
+  ---
+  duration_ms: 0.2335
+  type: 'test'
+  ...
+# Subtest: attempt two
+ok 9 - attempt two
+  ---
+  duration_ms: 0.73717
+  type: 'test'
+  ...
+# Subtest: wrong event message
+ok 10 - wrong event message
+  ---
+  duration_ms: 0.492561
+  type: 'test'
+  ...
+# Subtest: forced push
+ok 11 - forced push
+  ---
+  duration_ms: 0.271068
+  type: 'test'
+  ...
+# Subtest: local checkout mismatch
+ok 12 - local checkout mismatch
+  ---
+  duration_ms: 0.160586
+  type: 'test'
+  ...
+# Subtest: local commit message mismatch
+ok 13 - local commit message mismatch
+  ---
+  duration_ms: 0.148462
+  type: 'test'
+  ...
+# Subtest: control ref moved
+ok 14 - control ref moved
+  ---
+  duration_ms: 0.308765
+  type: 'test'
+  ...
+# Subtest: controller hash mismatch
+ok 15 - controller hash mismatch
+  ---
+  duration_ms: 0.633271
+  type: 'test'
+  ...
+# Subtest: workflow hash mismatch
+ok 16 - workflow hash mismatch
+  ---
+  duration_ms: 0.193979
+  type: 'test'
+  ...
+# Subtest: tree mismatch
+ok 17 - tree mismatch
+  ---
+  duration_ms: 0.457319
+  type: 'test'
+  ...
+# Subtest: workflow ID-to-path mismatch
+ok 18 - workflow ID-to-path mismatch
+  ---
+  duration_ms: 0.394097
+  type: 'test'
+  ...
+# Subtest: target workflow blob mismatch
+ok 19 - target workflow blob mismatch
+  ---
+  duration_ms: 0.451461
+  type: 'test'
+  ...
+# Subtest: public version mismatch before
+ok 20 - public version mismatch before
+  ---
+  duration_ms: 0.739053
+  type: 'test'
+  ...
+# Subtest: main mismatch before
+ok 21 - main mismatch before
+  ---
+  duration_ms: 0.794403
+  type: 'test'
+  ...
+# Subtest: main moved after
+ok 22 - main moved after
+  ---
+  duration_ms: 1.23685
+  type: 'test'
+  ...
+# Subtest: public version changed after
+ok 23 - public version changed after
+  ---
+  duration_ms: 1.094068
+  type: 'test'
+  ...
+# Subtest: active target run
+ok 24 - active target run
+  ---
+  duration_ms: 1.008755
+  type: 'test'
+  ...
+# Subtest: truncated baseline
+ok 25 - truncated baseline
+  ---
+  duration_ms: 0.705751
+  type: 'test'
+  ...
+# Subtest: wrong returned source
+ok 26 - wrong returned source
+  ---
+  duration_ms: 0.909488
+  type: 'test'
+  ...
+# Subtest: returned attempt two
+ok 27 - returned attempt two
+  ---
+  duration_ms: 1.904932
+  type: 'test'
+  ...
+# Subtest: unverified returned URL
+ok 28 - unverified returned URL
+  ---
+  duration_ms: 0.975853
+  type: 'test'
+  ...
+# Subtest: unexpected input key
+ok 29 - unexpected input key
+  ---
+  duration_ms: 0.175821
+  type: 'test'
+  ...
+# Subtest: preflight cannot prepare
+ok 30 - preflight cannot prepare
+  ---
+  duration_ms: 0.135822
+  type: 'test'
+  ...
+# Subtest: browser submit cannot use all
+ok 31 - browser submit cannot use all
+  ---
+  duration_ms: 0.121217
+  type: 'test'
+  ...
+# Subtest: export needs numeric ID
+ok 32 - export needs numeric ID
+  ---
+  duration_ms: 0.143841
+  type: 'test'
+  ...
+# Subtest: nil Replay session UUID
+ok 33 - nil Replay session UUID
+  ---
+  duration_ms: 0.216745
+  type: 'test'
+  ...
+# Subtest: half replay pair
+ok 34 - half replay pair
+  ---
+  duration_ms: 0.202277
+  type: 'test'
+  ...
+# Subtest: isolated mode case guard
+ok 35 - isolated mode case guard
+  ---
+  duration_ms: 0.131427
+  type: 'test'
+  ...
+# Subtest: original modes and optional Replay/export inputs retain intended allowed combinations
+ok 36 - original modes and optional Replay/export inputs retain intended allowed combinations
+  ---
+  duration_ms: 0.707882
+  type: 'test'
+  ...
+# Subtest: export mode itself dispatches only the existing workflow with exact validated inputs
+ok 37 - export mode itself dispatches only the existing workflow with exact validated inputs
+  ---
+  duration_ms: 1.256902
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 169.239259

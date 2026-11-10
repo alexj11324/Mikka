@@ -1,0 +1,111 @@
+{
+  "schema": "issue1512-native-original-log-index-v1",
+  "source": {
+    "run": 42747213108,
+    "attempt": 1,
+    "job": 129604738491,
+    "head": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "checkout": "c8ebffc19c788fa1db9cc441ac71a09f99dbb4a8",
+    "base": "cc389d61e8a85206d17616e4326a660283a1b2bd",
+    "originalJobResponseBlob": "62f7549dd68fb45562ed63f8a49dbd59a8ed4bcd",
+    "originalJobLogBlob": "a2e0a0300d59db6e290c5f4eb2185d438d96c8d1"
+  },
+  "jobMetadataBlob": "cd05301961185594fb4d6105802cdd80e8a23596",
+  "jobConclusion": "success",
+  "originalResponseBlob": "62f7549dd68fb45562ed63f8a49dbd59a8ed4bcd",
+  "originalDecodedLog": {
+    "blob": "a2e0a0300d59db6e290c5f4eb2185d438d96c8d1",
+    "bytes": 260236,
+    "sha256": "410ac618a029c9c15ce73579a0fa8b89110455443ba2956749b8d617fdbd1a2e"
+  },
+  "artifactMetadataResponseBlobs": [
+    "c7a2ed8c3dfc8886cd1d79fb11823fa2801489ff",
+    "30282e29a704cdf71f06509d5ec42362ce05fa29"
+  ],
+  "artifactsReadByTools": 0,
+  "artifactRetrieval": "pending single admitted Actions extractor; no download tool call and no VM",
+  "sourceAudits": {
+    "packageLine": "2026-11-10T03:30:54.8144000Z {\"status\":\"audited\",\"files\":[{\"name\":\"mac-acceptance-package.json\",\"bytes\":957,\"sha256\":\"1553a993fee29ab446a4e3e173e72829846df15a6734627e5a4d97c67b1163d6\"},{\"name\":\"native-crypto.json\",\"bytes\":2868,\"sha256\":\"b8318404afc9ac1dea2c4160bd15f14c48991ce53410f3945a65fcb58217b8d7\"}]}",
+    "native": [
+      "2026-11-10T03:30:57.5511090Z {",
+      "2026-11-10T03:30:57.5511750Z   \"files\": 314,",
+      "2026-11-10T03:30:57.5512850Z   \"archives\": 0,",
+      "2026-11-10T03:30:57.5513500Z   \"archiveEntries\": 0,",
+      "2026-11-10T03:30:57.5514030Z   \"decodedBytes\": 0,",
+      "2026-11-10T03:30:57.5514290Z   \"result\": \"passed\",",
+      "2026-11-10T03:30:57.5514890Z   \"checked\": \"known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden\"",
+      "2026-11-10T03:30:57.5515430Z }"
+    ],
+    "fixtureEvidence": [
+      "2026-11-10T03:30:57.5630760Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1",
+      "2026-11-10T03:30:57.5632650Z   BETTER_AUTH_URL: http://localhost:3000"
+    ]
+  },
+  "observedColdLines": [
+    {
+      "line": 2702,
+      "pair": 1,
+      "mode": "bundled",
+      "milliseconds": 2489.15
+    },
+    {
+      "line": 2703,
+      "pair": 1,
+      "mode": "hosted",
+      "milliseconds": 2078.26
+    },
+    {
+      "line": 2704,
+      "pair": 2,
+      "mode": "hosted",
+      "milliseconds": 5214.11
+    },
+    {
+      "line": 2705,
+      "pair": 2,
+      "mode": "bundled",
+      "milliseconds": 4146.29
+    },
+    {
+      "line": 2706,
+      "pair": 3,
+      "mode": "bundled",
+      "milliseconds": 3211.57
+    },
+    {
+      "line": 2707,
+      "pair": 3,
+      "mode": "hosted",
+      "milliseconds": 3013.98
+    },
+    {
+      "line": 2708,
+      "pair": 4,
+      "mode": "hosted",
+      "milliseconds": 4137.19
+    },
+    {
+      "line": 2709,
+      "pair": 4,
+      "mode": "bundled",
+      "milliseconds": 2849.29
+    },
+    {
+      "line": 2710,
+      "pair": 5,
+      "mode": "bundled",
+      "milliseconds": 2868.48
+    },
+    {
+      "line": 2711,
+      "pair": 5,
+      "mode": "hosted",
+      "milliseconds": 3057.28
+    }
+  ],
+  "limitations": [
+    "Original five JSON members have not yet been read; no SQL budget or lifecycle report verdict is inferred from job success or these timing lines.",
+    "Job log was fetched once and frozen in full before parsing."
+  ]
+}

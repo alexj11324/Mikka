@@ -1,0 +1,1 @@
+{"platform":"darwin","arch":"arm64","node":"18.20.8","npmStarted":false,"registrations":0,"heartbeats":0,"enrollments":0,"socketPathBytes":73,"states":[{"step":"check","status":"running"},{"step":"check","status":"running"},{"step":"check","status":"failed","cause":"node_required"}],"result":"check/node_required"}

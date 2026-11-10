@@ -1,0 +1,298 @@
+{
+  "schema": "issue1512.local-node22-formal-evidence-index.v1",
+  "repository": "alexj11324/Mikka",
+  "branch": "ops/1512-local-node22-dispatch-20261110",
+  "archivePath": "docs/operations/evidence/1512-raw/local-node22-formal-5f359-20261110",
+  "archiveParent": "9ddc5bbffb384ca711861dc798028344f33f1ad0",
+  "formalHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "formalTree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+  "formalRun": {
+    "id": 42748069074,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "dispatcherRun": {
+    "id": 42748046897,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "closureRun": {
+    "id": 42748159157,
+    "attempt": 1,
+    "conclusion": "skipped"
+  },
+  "reader": "/root/mac_inprocess_diag",
+  "filesIndexed": 36,
+  "totalIndexedBytes": 486372,
+  "selfExclusion": "Index excluded from its own byte/hash inventory; its blob and final archive commit are the external entry points.",
+  "verification": "Every indexed text payload's UTF8 bytes, Git blob SHA1 and SHA256 were checked before archive construction.",
+  "interpretation": "Independent formal acceptance on repaired head5f359802 with original service/fixture; the cause of historical5852 bootstrap5 remains unknown. No production acceptance is asserted.",
+  "downloads": {
+    "controllerJobLog": 1,
+    "packageJobLog": 1,
+    "mac22JobLog": 1,
+    "mac18JobLog": 1,
+    "node22UnitJobLog": 0,
+    "artifactZips": 0,
+    "historicalActionsLogs": 0
+  },
+  "resources": {
+    "ownedActiveVMs": 0,
+    "createdExtractionVMs": 0,
+    "formalWorkflowReruns": 0
+  },
+  "files": [
+    {
+      "path": "dispatcher/source/scripts/ops/issue1512-local-node22-dispatch.mjs",
+      "gitBlob": "f0771b6511579496f16afbee501d5e4fe29e3abe",
+      "bytes": 10877,
+      "sha256": "ce9abfd18d15d56591d1776590551065bd383797efcf9d01b681f59519ab15fb",
+      "origin": "exact executed dispatcher source"
+    },
+    {
+      "path": "dispatcher/source/.github/workflows/issue1512-local-node22-dispatch.yml",
+      "gitBlob": "a559026235f1d2a3677fc1b34d62d1cdeb87b21e",
+      "bytes": 1380,
+      "sha256": "eed29df87f55074a16d8c13a5af43d2918370bfaf8874cd9675e8ef6787ead3e",
+      "origin": "exact executed dispatcher source"
+    },
+    {
+      "path": "dispatcher/source/.github/issue1512-local-node22-dispatch.json",
+      "gitBlob": "74458f72fb4b784478e661a8899577a3153c48a5",
+      "bytes": 2261,
+      "sha256": "0be69bebed4e788f4ec18fbcc5bdbcd4606426447e351232fe8ca5376caa4c61",
+      "origin": "exact executed dispatcher source"
+    },
+    {
+      "path": "dispatcher/static/preparation.safe.json",
+      "gitBlob": "ad87ffe922ccb57aa9d51ffa9bde7fc137e2d835",
+      "bytes": 8215,
+      "sha256": "f67715fc8b42efdeaa24b5abb2a9d75ddcf3fe4f239d873eb9ab75c0e767e304",
+      "origin": "static preparation and modeled boundary checks"
+    },
+    {
+      "path": "dispatcher/static/independent-review.safe.json",
+      "gitBlob": "3010f6b7f55b42181701f9f780b5ae547292f5c9",
+      "bytes": 6075,
+      "sha256": "f35598f941132a9f662d2197d3fdccc829cfce0e560a7048a4773c4854bfd580",
+      "origin": "independent static review"
+    },
+    {
+      "path": "dispatcher/originals/job.response.json",
+      "gitBlob": "b33afb4651e8a4723b62bad1943669aef84763d7",
+      "bytes": 19542,
+      "sha256": "def21ae6abd46a0bdcbd31739847d8c5cc5e052838784f811cba7f8394cf73bc",
+      "origin": "unchanged one-read job-log tool response"
+    },
+    {
+      "path": "dispatcher/originals/job.log",
+      "gitBlob": "209aa024478df9490de126d030b62cf38ec95dd5",
+      "bytes": 18732,
+      "sha256": "25111708c74f0c2a75e2672b032dee76176430ce226533648d6aa49b72a8fe97",
+      "origin": "exact decoded job log string"
+    },
+    {
+      "path": "dispatcher/derived/receipt.from-log.json",
+      "gitBlob": "e6c147230d017dad0577c00e47c97cfa7b666952",
+      "bytes": 3846,
+      "sha256": "f1a48fdf708c11fcdc19bbe416964e7f40836b7187a3214e50cbfc43dcd09528",
+      "origin": "JSON payload extracted from frozen job log, not an artifact member"
+    },
+    {
+      "path": "dispatcher/closure/workflow.disabled.yml",
+      "gitBlob": "f1dcb46498bc41816e0870bfa61c3bd13e1997fd",
+      "bytes": 1229,
+      "sha256": "159e87b77f236868f034d09eae2c4ff02324a22572f9df172b0bcef4316e5202",
+      "origin": "normal closing commit source"
+    },
+    {
+      "path": "dispatcher/closure/manifest.disabled.json",
+      "gitBlob": "65dc04c4fe1618a9c4aa7c18b1c68da1a48a3629",
+      "bytes": 2190,
+      "sha256": "2dd0d890324ff3954a2a98fdd1c2d2420560fbc9dfce4de858f297c94176ca8d",
+      "origin": "normal closing commit source"
+    },
+    {
+      "path": "dispatcher/metadata/actual-run.response.json",
+      "gitBlob": "da3cf2c73db390a7872c9796adfe9afdfda40e8f",
+      "bytes": 26617,
+      "sha256": "59a8b3a20a5ecc2375d58427d1ca9aeed11f41938f02d73bf4835ed7b53888b4",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "dispatcher/metadata/actual-jobs.response.json",
+      "gitBlob": "d93f07a603cc7cee5f6eae187b4175e49daf7635",
+      "bytes": 5208,
+      "sha256": "c231ef42ea1d29509a2ff714e7c86c5262ec90c4d64f573971befb22d838ab25",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "dispatcher/closure/update-ref.response.json",
+      "gitBlob": "bc792cbeafd69869c1bb177d2380534078196a99",
+      "bytes": 161,
+      "sha256": "0aad31566ba642e38c47f18ab55ad16470654eade0b74575427dd592d966998e",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "dispatcher/closure/ref-readback.response.json",
+      "gitBlob": "3b2e3749e8cf281caedfd1b960830803bf8c55a3",
+      "bytes": 1716,
+      "sha256": "4958c85d831536e787af13e3f6f33d2adc177590d5efd43929afdb257a975e46",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "dispatcher/closure/runs.response.json",
+      "gitBlob": "dbdc72ee16a4ca629e06e5711340e6becc5acd94",
+      "bytes": 26155,
+      "sha256": "89da6d865bb56470ffccae4d4334849a0c01a7fc0bcdf46da5f71a3c581caa58",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "dispatcher/closure/jobs.response.json",
+      "gitBlob": "9a8708cfd713863eb4c74fb5e7f2397854777768",
+      "bytes": 2650,
+      "sha256": "33f36dbe27f94eec2200d00cc3e7eb9346e4bc649eb6fc68b25df4f9f7a9ce9f",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "formal/source/commit.response.json",
+      "gitBlob": "f3c7536faa0321adc57ed314e2b72989da153f35",
+      "bytes": 3650,
+      "sha256": "4e5b130fad286fc2d13fcfa5dcf716c7015210ad5c3996e9d2106b95ac8079ef",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "formal/source/.github/workflows/local-device-node22.yml",
+      "gitBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+      "bytes": 3548,
+      "sha256": "c90f7c1a31cdfc33a8e397b234945b5580859bdb7d70270119ff62f155d4ba69",
+      "origin": "exact unmodified formal target source"
+    },
+    {
+      "path": "formal/source/scripts/acceptance/local-installer-macos.ts",
+      "gitBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+      "bytes": 9689,
+      "sha256": "eb6b97e018e194d5fadbbe2ef14810952f7421bbf77fa87982ef1d3e6ec4a680",
+      "origin": "exact unmodified formal target source"
+    },
+    {
+      "path": "formal/source/packages/daemon/src/service.ts",
+      "gitBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+      "bytes": 6054,
+      "sha256": "5834bcddac2a5437157279930ecaf1aa5d30641c2f49535944fdbaa6c9ea563d",
+      "origin": "exact unmodified formal target source"
+    },
+    {
+      "path": "formal/originals/package-job.response.json",
+      "gitBlob": "c8ee19b28a0274bc82937647def5522037bafffb",
+      "bytes": 35567,
+      "sha256": "219000fd914bd66160d25686d401eec166cb2f4cd3bd4fab3e625ce71e2120e5",
+      "origin": "unchanged one-read job-log tool response"
+    },
+    {
+      "path": "formal/originals/package-job.log",
+      "gitBlob": "6de36f9677d28f57d55c1960d34be3fc57d26f4a",
+      "bytes": 34817,
+      "sha256": "56e17cec6a929ffe6246c3d1695a63c91e5f0a1e1e20d3ef92f70a0fd677e348",
+      "origin": "exact decoded job log string"
+    },
+    {
+      "path": "formal/derived/package-source.from-log.safe.json",
+      "gitBlob": "f52b7876fb0ded881a7e111194f1c2925dada406",
+      "bytes": 1852,
+      "sha256": "a4e62e872966e494f9755acfcf19188b9687615cfbac786c33113613a79f04a9",
+      "origin": "source/package witnesses extracted from frozen package job log"
+    },
+    {
+      "path": "formal/originals/macos-22-job.response.json",
+      "gitBlob": "9ae6486a80fb8e24924b4230c38145cb653c553d",
+      "bytes": 42331,
+      "sha256": "518a9538d4caecf6307cc8029b7bcb4f52f7cd1fe43dec2f70721334fe5673d4",
+      "origin": "unchanged one-read original tool response"
+    },
+    {
+      "path": "formal/originals/macos-22-job.log",
+      "gitBlob": "275bcda26c65f311741a4cf7027e3754e85cb401",
+      "bytes": 41450,
+      "sha256": "ca74e4f71f5154d288b23d91ea7fb5c1f2c880eba30f8a3de87508820999b942",
+      "origin": "exact decoded job log"
+    },
+    {
+      "path": "formal/derived/node-22.from-log.json",
+      "gitBlob": "d8fa7ef81eab458c2d14cadb99c13d35f70aab19",
+      "bytes": 539,
+      "sha256": "a6c25a48d47b5962dca01a4e67f739cf298cee5ae5424e48d31a8bc01f251eb8",
+      "origin": "actual result JSON extracted from frozen job log, not an artifact member"
+    },
+    {
+      "path": "formal/originals/macos-18-job.response.json",
+      "gitBlob": "f1a5d0d23fc782197e6abb43f1a6877b17add720",
+      "bytes": 45514,
+      "sha256": "07a65a28e5ed24b5261a2390f4a0627cc6b8424d84be4fe4d956981c8f57adc3",
+      "origin": "unchanged one-read original tool response"
+    },
+    {
+      "path": "formal/originals/macos-18-job.log",
+      "gitBlob": "0482340002138ea050f99e2f7dd9f97e1a4bdcc0",
+      "bytes": 44630,
+      "sha256": "4df85f62b65204136a329fde64eff5767e0e2a62ba2186c12e1d1efeb273f8e1",
+      "origin": "exact decoded job log"
+    },
+    {
+      "path": "formal/derived/node-18.from-log.json",
+      "gitBlob": "298aa283ff4230cc0e1b295bcfcda5a976109f24",
+      "bytes": 316,
+      "sha256": "f477f3bac942fe57596e2eddf5b3e33f8499e507c3b7a562aee611bd553c0cbf",
+      "origin": "actual result JSON extracted from frozen job log, not an artifact member"
+    },
+    {
+      "path": "formal/metadata/run.response.json",
+      "gitBlob": "1b1ef9a84a69825ae9c5d18cbbe9e61422f4b854",
+      "bytes": 27959,
+      "sha256": "6afd4ed009e11efdd6f2c7d77e71a7f92ff01753df056e4649c6fc733ab891c3",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "formal/metadata/jobs.response.json",
+      "gitBlob": "e139c2c0d957277b2e6def46c8faad3639fe569d",
+      "bytes": 30740,
+      "sha256": "af8e642455dd5fc261ebec497e28a9820f6a90862311a47dbb08656107690e01",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "formal/metadata/artifacts.response.json",
+      "gitBlob": "6f7dd9425c8b08f1631f8fc656af32447a290086",
+      "bytes": 2752,
+      "sha256": "29982aaa10022b74a85f3e68ef69c01f86aed3af5e65a1c62f812f7a58b7925c",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "dispatcher/metadata/artifacts.response.json",
+      "gitBlob": "cfde5ed5acd3844c2d4c6bb22da43ad74d8f28a1",
+      "bytes": 1038,
+      "sha256": "4adc586f8bc9f696d0a109340593cd652bcb43dd9afe0d2a374d150479f18f2c",
+      "origin": "unchanged GitHub tool response"
+    },
+    {
+      "path": "formal/derived/source-binding.from-logs.safe.json",
+      "gitBlob": "e80b8d378bbbd30396e006790f57f387b7858705",
+      "bytes": 2144,
+      "sha256": "9c3e11eda8aeec75ab872a44896cf31e8be25474fac777f2d562fc421b6d64db",
+      "origin": "bounded evidence and interpretation"
+    },
+    {
+      "path": "result.safe.json",
+      "gitBlob": "3f19f525b9b30ba9c5bde4f7fa6696533486398f",
+      "bytes": 10012,
+      "sha256": "64f5a7f3e56641a95e04613e1a3e8f9143e4df842e0838ac5a7cdbed2da15347",
+      "origin": "bounded evidence and interpretation"
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "c683f5f24c799e420b2bd4345b97f743aeb17651",
+      "bytes": 4916,
+      "sha256": "a9ffc5c273071fc9d783edb16e40976437e2b9dca7d5a58435de791d99a930c5",
+      "origin": "human-readable evidence guide"
+    }
+  ]
+}

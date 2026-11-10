@@ -1,0 +1,4035 @@
+{
+  "schema": "issue1512-native-h-request-sql-waves-v2",
+  "sourceBlob": "45ea8ea2279daecbf4d5024f39548a28be3e4511",
+  "supersedes": "93c7d6c1638aa5e6a955600bb5c645635c89cd41",
+  "meaning": "Known SQL rows grouped by physical HTTP/logical invocation, joined to the original exported closed timestamped receipts. Receipts are selected for known query contexts and do not enumerate all zero-query RPC calls. Unknown context SQL remains in full counts.",
+  "groups": [
+    {
+      "window": "nativeLogin",
+      "id": "bb107311-704a-4fb7-bd8a-60e319e0d2f3",
+      "firstOrdinal": 32963,
+      "lastOrdinal": 32981,
+      "queryCalls": 19,
+      "logical": [
+        {
+          "context": 42,
+          "action": null,
+          "route": "/api/auth/[...all]",
+          "firstOrdinal": 32963,
+          "lastOrdinal": 32981,
+          "queries": 19,
+          "statementCounts": {
+            "0": 1,
+            "1": 1,
+            "2": 1,
+            "3": 1,
+            "4": 1,
+            "5": 1,
+            "6": 1,
+            "7": 1,
+            "8": 1,
+            "9": 2,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "13": 1,
+            "14": 1,
+            "15": 1,
+            "16": 1,
+            "17": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "bb107311-704a-4fb7-bd8a-60e319e0d2f3",
+            "invocationId": "bb107311-704a-4fb7-bd8a-60e319e0d2f3",
+            "route": "/api/auth/[...all]",
+            "method": "POST",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:22.515Z",
+            "completedAt": "2026-11-10T03:29:22.682Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "bb107311-704a-4fb7-bd8a-60e319e0d2f3",
+        "invocationId": "bb107311-704a-4fb7-bd8a-60e319e0d2f3",
+        "route": "/api/auth/[...all]",
+        "method": "POST",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:22.515Z",
+        "completedAt": "2026-11-10T03:29:22.682Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "e0cf8620-2cff-4d3a-b068-2b38ee16b662",
+      "firstOrdinal": 32982,
+      "lastOrdinal": 32983,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 43,
+          "action": null,
+          "route": "/api/auth/[...all]",
+          "firstOrdinal": 32982,
+          "lastOrdinal": 32983,
+          "queries": 2,
+          "statementCounts": {
+            "1": 1,
+            "2": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "e0cf8620-2cff-4d3a-b068-2b38ee16b662",
+            "invocationId": "e0cf8620-2cff-4d3a-b068-2b38ee16b662",
+            "route": "/api/auth/[...all]",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:22.693Z",
+            "completedAt": "2026-11-10T03:29:22.701Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "e0cf8620-2cff-4d3a-b068-2b38ee16b662",
+        "invocationId": "e0cf8620-2cff-4d3a-b068-2b38ee16b662",
+        "route": "/api/auth/[...all]",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:22.693Z",
+        "completedAt": "2026-11-10T03:29:22.701Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "bd2bfa4d-f9bc-454f-9826-b4392a0b689a",
+      "firstOrdinal": 32984,
+      "lastOrdinal": 32984,
+      "queryCalls": 1,
+      "logical": [
+        {
+          "context": 44,
+          "action": null,
+          "route": "/api/desktop/begin",
+          "firstOrdinal": 32984,
+          "lastOrdinal": 32984,
+          "queries": 1,
+          "statementCounts": {
+            "71": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "bd2bfa4d-f9bc-454f-9826-b4392a0b689a",
+            "invocationId": "bd2bfa4d-f9bc-454f-9826-b4392a0b689a",
+            "route": "/api/desktop/begin",
+            "method": "POST",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:22.768Z",
+            "completedAt": "2026-11-10T03:29:22.771Z",
+            "httpStatus": 204
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "bd2bfa4d-f9bc-454f-9826-b4392a0b689a",
+        "invocationId": "bd2bfa4d-f9bc-454f-9826-b4392a0b689a",
+        "route": "/api/desktop/begin",
+        "method": "POST",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:22.768Z",
+        "completedAt": "2026-11-10T03:29:22.771Z",
+        "httpStatus": 204
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "22b0fbfe-2ff5-4ed1-b910-2221bd88fb7c",
+      "firstOrdinal": 32985,
+      "lastOrdinal": 32986,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 45,
+          "action": null,
+          "route": "/api/auth/[...all]",
+          "firstOrdinal": 32985,
+          "lastOrdinal": 32986,
+          "queries": 2,
+          "statementCounts": {
+            "1": 1,
+            "2": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "22b0fbfe-2ff5-4ed1-b910-2221bd88fb7c",
+            "invocationId": "22b0fbfe-2ff5-4ed1-b910-2221bd88fb7c",
+            "route": "/api/auth/[...all]",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:23.212Z",
+            "completedAt": "2026-11-10T03:29:23.218Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "22b0fbfe-2ff5-4ed1-b910-2221bd88fb7c",
+        "invocationId": "22b0fbfe-2ff5-4ed1-b910-2221bd88fb7c",
+        "route": "/api/auth/[...all]",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:23.212Z",
+        "completedAt": "2026-11-10T03:29:23.218Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "16f034cb-0110-4f79-ba76-2a882690feef",
+      "firstOrdinal": 32989,
+      "lastOrdinal": 32996,
+      "queryCalls": 8,
+      "logical": [
+        {
+          "context": 46,
+          "action": null,
+          "route": "/api/desktop/exchange",
+          "firstOrdinal": 32989,
+          "lastOrdinal": 32996,
+          "queries": 8,
+          "statementCounts": {
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "74": 1,
+            "75": 1,
+            "76": 1,
+            "77": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "16f034cb-0110-4f79-ba76-2a882690feef",
+            "invocationId": "16f034cb-0110-4f79-ba76-2a882690feef",
+            "route": "/api/desktop/exchange",
+            "method": "POST",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:23.414Z",
+            "completedAt": "2026-11-10T03:29:23.441Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "16f034cb-0110-4f79-ba76-2a882690feef",
+        "invocationId": "16f034cb-0110-4f79-ba76-2a882690feef",
+        "route": "/api/desktop/exchange",
+        "method": "POST",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:23.414Z",
+        "completedAt": "2026-11-10T03:29:23.441Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "1a0593d5-af91-4412-a2cc-6750cedb89fb",
+      "firstOrdinal": 32997,
+      "lastOrdinal": 32999,
+      "queryCalls": 3,
+      "logical": [
+        {
+          "context": 47,
+          "action": "desktop.bootstrap",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 32997,
+          "lastOrdinal": 32999,
+          "queries": 3,
+          "statementCounts": {
+            "18": 1,
+            "19": 1,
+            "20": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "1a0593d5-af91-4412-a2cc-6750cedb89fb",
+            "invocationId": "1a0593d5-af91-4412-a2cc-6750cedb89fb",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "desktop.bootstrap",
+            "startedAt": "2026-11-10T03:29:23.811Z",
+            "completedAt": "2026-11-10T03:29:23.818Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "1a0593d5-af91-4412-a2cc-6750cedb89fb",
+        "invocationId": "1a0593d5-af91-4412-a2cc-6750cedb89fb",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.bootstrap",
+        "startedAt": "2026-11-10T03:29:23.811Z",
+        "completedAt": "2026-11-10T03:29:23.818Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+      "firstOrdinal": 33002,
+      "lastOrdinal": 33011,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 48,
+          "action": null,
+          "route": "/api/workspace/switcher",
+          "firstOrdinal": 33002,
+          "lastOrdinal": 33011,
+          "queries": 2,
+          "statementCounts": {
+            "0": 1,
+            "23": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+            "invocationId": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:24.343Z",
+            "completedAt": "2026-11-10T03:29:24.488Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+        "invocationId": "d1252634-7b64-4ff2-b77a-9610af18c6b5",
+        "route": "/api/workspace/switcher",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:24.343Z",
+        "completedAt": "2026-11-10T03:29:24.488Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "77bdd690-15e0-49a7-bc60-31f10951e950",
+      "firstOrdinal": 33003,
+      "lastOrdinal": 33013,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 49,
+          "action": null,
+          "route": "/api/workspace",
+          "firstOrdinal": 33003,
+          "lastOrdinal": 33013,
+          "queries": 5,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "28": 1,
+            "29": 1,
+            "31": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "77bdd690-15e0-49a7-bc60-31f10951e950",
+            "invocationId": "77bdd690-15e0-49a7-bc60-31f10951e950",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:24.347Z",
+            "completedAt": "2026-11-10T03:29:24.490Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "77bdd690-15e0-49a7-bc60-31f10951e950",
+        "invocationId": "77bdd690-15e0-49a7-bc60-31f10951e950",
+        "route": "/api/workspace",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:24.347Z",
+        "completedAt": "2026-11-10T03:29:24.490Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "816f55d8-347e-436b-aaaf-baaa22ce04f9",
+      "firstOrdinal": 33004,
+      "lastOrdinal": 33005,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 50,
+          "action": null,
+          "route": "/api/agent/sessions",
+          "firstOrdinal": 33004,
+          "lastOrdinal": 33005,
+          "queries": 2,
+          "statementCounts": {
+            "26": 1,
+            "27": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "816f55d8-347e-436b-aaaf-baaa22ce04f9",
+            "invocationId": "816f55d8-347e-436b-aaaf-baaa22ce04f9",
+            "route": "/api/agent/sessions",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:24.348Z",
+            "completedAt": "2026-11-10T03:29:24.477Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "816f55d8-347e-436b-aaaf-baaa22ce04f9",
+        "invocationId": "816f55d8-347e-436b-aaaf-baaa22ce04f9",
+        "route": "/api/agent/sessions",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:24.348Z",
+        "completedAt": "2026-11-10T03:29:24.477Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+      "firstOrdinal": 33008,
+      "lastOrdinal": 33028,
+      "queryCalls": 18,
+      "logical": [
+        {
+          "context": 51,
+          "action": "team-relations.listProjectTeams",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33008,
+          "lastOrdinal": 33008,
+          "queries": 1,
+          "statementCounts": {
+            "34": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+            "invocationId": "78ae038e-05f4-462f-8fa5-55ab80a65408",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "team-relations.listProjectTeams",
+            "startedAt": "2026-11-10T03:29:24.464Z",
+            "completedAt": "2026-11-10T03:29:24.480Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 52,
+          "action": "task-runs.pollTaskRuns",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33009,
+          "lastOrdinal": 33020,
+          "queries": 3,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "40": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+            "invocationId": "709217bd-8060-44f3-9968-5d4f8d640824",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns",
+            "startedAt": "2026-11-10T03:29:24.463Z",
+            "completedAt": "2026-11-10T03:29:24.518Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 53,
+          "action": "coordinator.pollBotChatSummaries",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33010,
+          "lastOrdinal": 33028,
+          "queries": 8,
+          "statementCounts": {
+            "0": 2,
+            "23": 1,
+            "37": 1,
+            "40": 1,
+            "41": 1,
+            "42": 1,
+            "43": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+            "invocationId": "07443bb7-e101-4ed9-81dc-f70562df3a85",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries",
+            "startedAt": "2026-11-10T03:29:24.464Z",
+            "completedAt": "2026-11-10T03:29:24.527Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 54,
+          "action": "task-runs.syncThreadList",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33015,
+          "lastOrdinal": 33026,
+          "queries": 4,
+          "statementCounts": {
+            "0": 3,
+            "37": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+            "invocationId": "a49667a8-1bd3-42eb-a006-3825f6ad8a84",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList",
+            "startedAt": "2026-11-10T03:29:24.464Z",
+            "completedAt": "2026-11-10T03:29:24.527Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 55,
+          "action": "teams.listTeams",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33016,
+          "lastOrdinal": 33016,
+          "queries": 1,
+          "statementCounts": {
+            "30": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+            "invocationId": "ec0706e9-2a12-49a1-985a-75318184c66d",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams",
+            "startedAt": "2026-11-10T03:29:24.464Z",
+            "completedAt": "2026-11-10T03:29:24.507Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 56,
+          "action": "projects.listProjects",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33017,
+          "lastOrdinal": 33017,
+          "queries": 1,
+          "statementCounts": {
+            "35": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+            "invocationId": "7e3cdd78-b4b9-46af-a8c7-a4f0e562f393",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects",
+            "startedAt": "2026-11-10T03:29:24.464Z",
+            "completedAt": "2026-11-10T03:29:24.511Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+        "invocationId": "c17fa1ad-3d8c-49c2-bda9-a032db80dc5e",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.readBatch",
+        "startedAt": "2026-11-10T03:29:24.350Z",
+        "completedAt": "2026-11-10T03:29:24.528Z",
+        "httpStatus": 200,
+        "rpcItemCount": 6
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+      "firstOrdinal": 33034,
+      "lastOrdinal": 33075,
+      "queryCalls": 31,
+      "logical": [
+        {
+          "context": 57,
+          "action": "execution-settings.getBotModelMenu",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33034,
+          "lastOrdinal": 33075,
+          "queries": 31,
+          "statementCounts": {
+            "0": 12,
+            "23": 1,
+            "36": 1,
+            "39": 1,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "49": 1,
+            "51": 2,
+            "52": 2,
+            "53": 2,
+            "54": 2,
+            "55": 2,
+            "56": 2
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+            "invocationId": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu",
+            "startedAt": "2026-11-10T03:29:25.091Z",
+            "completedAt": "2026-11-10T03:29:25.183Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+        "invocationId": "ad756627-3ca7-44ea-8b71-9c376ac3d564",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedAt": "2026-11-10T03:29:25.091Z",
+        "completedAt": "2026-11-10T03:29:25.183Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "12249dff-df10-4912-9b7f-f903ea9fa029",
+      "firstOrdinal": 33047,
+      "lastOrdinal": 33066,
+      "queryCalls": 7,
+      "logical": [
+        {
+          "context": 58,
+          "action": null,
+          "route": "/api/live/ticket",
+          "firstOrdinal": 33047,
+          "lastOrdinal": 33066,
+          "queries": 7,
+          "statementCounts": {
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "40": 1,
+            "61": 1,
+            "62": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "12249dff-df10-4912-9b7f-f903ea9fa029",
+            "invocationId": "12249dff-df10-4912-9b7f-f903ea9fa029",
+            "route": "/api/live/ticket",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:25.119Z",
+            "completedAt": "2026-11-10T03:29:25.148Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "12249dff-df10-4912-9b7f-f903ea9fa029",
+        "invocationId": "12249dff-df10-4912-9b7f-f903ea9fa029",
+        "route": "/api/live/ticket",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:25.119Z",
+        "completedAt": "2026-11-10T03:29:25.148Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "589744ab-e319-402f-8d24-78b11e64e630",
+      "firstOrdinal": 33076,
+      "lastOrdinal": 33111,
+      "queryCalls": 36,
+      "logical": [
+        {
+          "context": 59,
+          "action": "bots.pollBots",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33076,
+          "lastOrdinal": 33080,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "60": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+            "invocationId": "fd69ce83-9f62-4a12-897d-e4146e72c5ad",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots",
+            "startedAt": "2026-11-10T03:29:25.314Z",
+            "completedAt": "2026-11-10T03:29:25.323Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 60,
+          "action": "coordinator.syncCoordinatorChat",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33077,
+          "lastOrdinal": 33111,
+          "queries": 27,
+          "statementCounts": {
+            "0": 9,
+            "23": 1,
+            "36": 1,
+            "37": 1,
+            "38": 1,
+            "39": 1,
+            "40": 2,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "51": 1,
+            "52": 1,
+            "53": 1,
+            "54": 1,
+            "55": 1,
+            "56": 1,
+            "57": 2
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+            "invocationId": "380b5ca1-f985-4166-8879-ba4dbf3574d8",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat",
+            "startedAt": "2026-11-10T03:29:25.314Z",
+            "completedAt": "2026-11-10T03:29:25.377Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 61,
+          "action": "issues.syncIssueList",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33078,
+          "lastOrdinal": 33093,
+          "queries": 7,
+          "statementCounts": {
+            "0": 4,
+            "23": 1,
+            "37": 1,
+            "63": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+            "invocationId": "60ebf993-1411-40cb-9597-257d756dcd0e",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList",
+            "startedAt": "2026-11-10T03:29:25.315Z",
+            "completedAt": "2026-11-10T03:29:25.343Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+        "invocationId": "589744ab-e319-402f-8d24-78b11e64e630",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.readBatch",
+        "startedAt": "2026-11-10T03:29:25.308Z",
+        "completedAt": "2026-11-10T03:29:25.377Z",
+        "httpStatus": 200,
+        "rpcItemCount": 3
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+      "firstOrdinal": 33124,
+      "lastOrdinal": 33131,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 62,
+          "action": "team-relations.listProjectTeams",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33124,
+          "lastOrdinal": 33124,
+          "queries": 1,
+          "statementCounts": {
+            "34": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+            "invocationId": "f49992df-e234-4b93-b013-e1ffde878ed7",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "team-relations.listProjectTeams",
+            "startedAt": "2026-11-10T03:29:25.597Z",
+            "completedAt": "2026-11-10T03:29:25.604Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 63,
+          "action": "bots.pollBots",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33125,
+          "lastOrdinal": 33130,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "60": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+            "invocationId": "7d697dd8-fe4e-494d-b475-491e20211edc",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots",
+            "startedAt": "2026-11-10T03:29:25.597Z",
+            "completedAt": "2026-11-10T03:29:25.623Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 64,
+          "action": "teams.listTeams",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33126,
+          "lastOrdinal": 33131,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "30": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+            "invocationId": "ec447a83-e9aa-46f2-a6f6-16b65065d21c",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams",
+            "startedAt": "2026-11-10T03:29:25.597Z",
+            "completedAt": "2026-11-10T03:29:25.606Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+        "invocationId": "4a1f7d5c-7e4c-42c7-816b-8cee3948313c",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.readBatch",
+        "startedAt": "2026-11-10T03:29:25.586Z",
+        "completedAt": "2026-11-10T03:29:25.624Z",
+        "httpStatus": 200,
+        "rpcItemCount": 3
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+      "firstOrdinal": 33132,
+      "lastOrdinal": 33137,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 65,
+          "action": null,
+          "route": "/api/workspace/switcher",
+          "firstOrdinal": 33132,
+          "lastOrdinal": 33137,
+          "queries": 2,
+          "statementCounts": {
+            "0": 1,
+            "23": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+            "invocationId": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:25.592Z",
+            "completedAt": "2026-11-10T03:29:25.645Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+        "invocationId": "fa7045e9-a89c-43ac-8c34-c67d77db06c0",
+        "route": "/api/workspace/switcher",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:25.592Z",
+        "completedAt": "2026-11-10T03:29:25.645Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+      "firstOrdinal": 33136,
+      "lastOrdinal": 33144,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 66,
+          "action": null,
+          "route": "/api/workspace",
+          "firstOrdinal": 33136,
+          "lastOrdinal": 33144,
+          "queries": 5,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "28": 1,
+            "29": 1,
+            "31": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+            "invocationId": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:25.595Z",
+            "completedAt": "2026-11-10T03:29:25.658Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+        "invocationId": "7c8ec89c-b931-4399-a1bc-c855f576c41f",
+        "route": "/api/workspace",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:25.595Z",
+        "completedAt": "2026-11-10T03:29:25.658Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+      "firstOrdinal": 33149,
+      "lastOrdinal": 33166,
+      "queryCalls": 18,
+      "logical": [
+        {
+          "context": 67,
+          "action": "task-runs.pollTaskRuns",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33149,
+          "lastOrdinal": 33156,
+          "queries": 3,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "40": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+            "invocationId": "65b7b86a-2fad-4536-b0a4-97fec425d83e",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns",
+            "startedAt": "2026-11-10T03:29:25.742Z",
+            "completedAt": "2026-11-10T03:29:25.757Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 68,
+          "action": "coordinator.pollBotChatSummaries",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33150,
+          "lastOrdinal": 33166,
+          "queries": 8,
+          "statementCounts": {
+            "0": 2,
+            "23": 1,
+            "37": 1,
+            "40": 1,
+            "41": 1,
+            "42": 1,
+            "43": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+            "invocationId": "c8bd9a8e-0fbf-4691-b4d1-c2fae354b0c9",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries",
+            "startedAt": "2026-11-10T03:29:25.742Z",
+            "completedAt": "2026-11-10T03:29:25.762Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 69,
+          "action": "issues.syncIssueList",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33151,
+          "lastOrdinal": 33164,
+          "queries": 4,
+          "statementCounts": {
+            "0": 2,
+            "23": 1,
+            "63": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+            "invocationId": "d7e69923-ab9f-4159-80fb-70bfbd64fa7e",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList",
+            "startedAt": "2026-11-10T03:29:25.739Z",
+            "completedAt": "2026-11-10T03:29:25.761Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 70,
+          "action": "task-runs.syncThreadList",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33153,
+          "lastOrdinal": 33158,
+          "queries": 3,
+          "statementCounts": {
+            "0": 2,
+            "37": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+            "invocationId": "0619e773-5781-4d37-909e-36d79c6be590",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList",
+            "startedAt": "2026-11-10T03:29:25.743Z",
+            "completedAt": "2026-11-10T03:29:25.757Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+        "invocationId": "c153f31f-ba2c-45a0-957c-c8d580195cb1",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.readBatch",
+        "startedAt": "2026-11-10T03:29:25.728Z",
+        "completedAt": "2026-11-10T03:29:25.763Z",
+        "httpStatus": 200,
+        "rpcItemCount": 4
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+      "firstOrdinal": 33167,
+      "lastOrdinal": 33189,
+      "queryCalls": 23,
+      "logical": [
+        {
+          "context": 71,
+          "action": "coordinator.syncCoordinatorChat",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33167,
+          "lastOrdinal": 33189,
+          "queries": 23,
+          "statementCounts": {
+            "0": 7,
+            "23": 1,
+            "36": 1,
+            "37": 1,
+            "38": 1,
+            "39": 1,
+            "40": 1,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "51": 1,
+            "52": 1,
+            "53": 1,
+            "54": 1,
+            "55": 1,
+            "56": 1,
+            "57": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+            "invocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat",
+            "startedAt": "2026-11-10T03:29:25.778Z",
+            "completedAt": "2026-11-10T03:29:25.813Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+        "invocationId": "c118af6d-7990-4b7f-91c5-02cb54581c09",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedAt": "2026-11-10T03:29:25.778Z",
+        "completedAt": "2026-11-10T03:29:25.813Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "38a4db2c-7385-449a-8448-f13c9b0e98f8",
+      "firstOrdinal": 33190,
+      "lastOrdinal": 33195,
+      "queryCalls": 6,
+      "logical": [
+        {
+          "context": 72,
+          "action": "workspace.switchWorkspace",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33190,
+          "lastOrdinal": 33195,
+          "queries": 6,
+          "statementCounts": {
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "20": 1,
+            "64": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "38a4db2c-7385-449a-8448-f13c9b0e98f8",
+            "invocationId": "38a4db2c-7385-449a-8448-f13c9b0e98f8",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "workspace.switchWorkspace",
+            "startedAt": "2026-11-10T03:29:26.157Z",
+            "completedAt": "2026-11-10T03:29:26.197Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "38a4db2c-7385-449a-8448-f13c9b0e98f8",
+        "invocationId": "38a4db2c-7385-449a-8448-f13c9b0e98f8",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "workspace.switchWorkspace",
+        "startedAt": "2026-11-10T03:29:26.157Z",
+        "completedAt": "2026-11-10T03:29:26.197Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "60f18b0e-3e22-4a50-9b46-cf47adf8020e",
+      "firstOrdinal": 33196,
+      "lastOrdinal": 33198,
+      "queryCalls": 3,
+      "logical": [
+        {
+          "context": 73,
+          "action": "desktop.bootstrap",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33196,
+          "lastOrdinal": 33198,
+          "queries": 3,
+          "statementCounts": {
+            "18": 1,
+            "19": 1,
+            "20": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "60f18b0e-3e22-4a50-9b46-cf47adf8020e",
+            "invocationId": "60f18b0e-3e22-4a50-9b46-cf47adf8020e",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "desktop.bootstrap",
+            "startedAt": "2026-11-10T03:29:26.653Z",
+            "completedAt": "2026-11-10T03:29:26.665Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "60f18b0e-3e22-4a50-9b46-cf47adf8020e",
+        "invocationId": "60f18b0e-3e22-4a50-9b46-cf47adf8020e",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.bootstrap",
+        "startedAt": "2026-11-10T03:29:26.653Z",
+        "completedAt": "2026-11-10T03:29:26.665Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "31e970a3-845b-4f66-9007-43e0e07698b8",
+      "firstOrdinal": 33208,
+      "lastOrdinal": 33232,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 74,
+          "action": null,
+          "route": "/api/workspace/switcher",
+          "firstOrdinal": 33208,
+          "lastOrdinal": 33232,
+          "queries": 2,
+          "statementCounts": {
+            "0": 1,
+            "23": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "31e970a3-845b-4f66-9007-43e0e07698b8",
+            "invocationId": "31e970a3-845b-4f66-9007-43e0e07698b8",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:29.311Z",
+            "completedAt": "2026-11-10T03:29:29.605Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "31e970a3-845b-4f66-9007-43e0e07698b8",
+        "invocationId": "31e970a3-845b-4f66-9007-43e0e07698b8",
+        "route": "/api/workspace/switcher",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:29.311Z",
+        "completedAt": "2026-11-10T03:29:29.605Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+      "firstOrdinal": 33209,
+      "lastOrdinal": 33235,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 75,
+          "action": null,
+          "route": "/api/workspace",
+          "firstOrdinal": 33209,
+          "lastOrdinal": 33235,
+          "queries": 5,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "28": 1,
+            "29": 1,
+            "66": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+            "invocationId": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:29.314Z",
+            "completedAt": "2026-11-10T03:29:29.618Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+        "invocationId": "bff1b492-23e7-4c8e-aed1-c0de8f093250",
+        "route": "/api/workspace",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:29.314Z",
+        "completedAt": "2026-11-10T03:29:29.618Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "350dfd3d-034b-40a8-8917-7ce9d13a84c2",
+      "firstOrdinal": 33210,
+      "lastOrdinal": 33211,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 76,
+          "action": null,
+          "route": "/api/agent/sessions",
+          "firstOrdinal": 33210,
+          "lastOrdinal": 33211,
+          "queries": 2,
+          "statementCounts": {
+            "26": 1,
+            "27": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "350dfd3d-034b-40a8-8917-7ce9d13a84c2",
+            "invocationId": "350dfd3d-034b-40a8-8917-7ce9d13a84c2",
+            "route": "/api/agent/sessions",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:29.319Z",
+            "completedAt": "2026-11-10T03:29:29.505Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "350dfd3d-034b-40a8-8917-7ce9d13a84c2",
+        "invocationId": "350dfd3d-034b-40a8-8917-7ce9d13a84c2",
+        "route": "/api/agent/sessions",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:29.319Z",
+        "completedAt": "2026-11-10T03:29:29.505Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "2d4df4ad-dc06-481b-b6a2-142268356438",
+      "firstOrdinal": 33213,
+      "lastOrdinal": 33316,
+      "queryCalls": 41,
+      "logical": [
+        {
+          "context": 77,
+          "action": "team-relations.listProjectTeams",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33213,
+          "lastOrdinal": 33213,
+          "queries": 1,
+          "statementCounts": {
+            "34": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "85ee159d-6f9a-4fd7-b955-9a7eb592aeff",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "team-relations.listProjectTeams",
+            "startedAt": "2026-11-10T03:29:29.480Z",
+            "completedAt": "2026-11-10T03:29:29.535Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 78,
+          "action": "task-runs.pollTaskRuns",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33214,
+          "lastOrdinal": 33231,
+          "queries": 3,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "40": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "9306d7cc-90ac-49c1-8c9c-eef0c5a99a15",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns",
+            "startedAt": "2026-11-10T03:29:29.479Z",
+            "completedAt": "2026-11-10T03:29:29.611Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 79,
+          "action": "coordinator.pollBotChatSummaries",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33215,
+          "lastOrdinal": 33252,
+          "queries": 8,
+          "statementCounts": {
+            "0": 2,
+            "23": 1,
+            "37": 1,
+            "40": 1,
+            "41": 1,
+            "67": 1,
+            "68": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "c0669ce6-c661-4748-8c9a-afdde043312c",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries",
+            "startedAt": "2026-11-10T03:29:29.480Z",
+            "completedAt": "2026-11-10T03:29:29.739Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 81,
+          "action": "teams.listTeams",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33220,
+          "lastOrdinal": 33220,
+          "queries": 1,
+          "statementCounts": {
+            "30": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "7fb7a755-aa8f-4e48-9434-183882bd2f28",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams",
+            "startedAt": "2026-11-10T03:29:29.479Z",
+            "completedAt": "2026-11-10T03:29:29.598Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 82,
+          "action": "projects.listProjects",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33221,
+          "lastOrdinal": 33221,
+          "queries": 1,
+          "statementCounts": {
+            "35": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "a814912a-b94f-46f8-9e2a-772246d1810a",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects",
+            "startedAt": "2026-11-10T03:29:29.480Z",
+            "completedAt": "2026-11-10T03:29:29.598Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 83,
+          "action": "coordinator.syncCoordinatorChat",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33222,
+          "lastOrdinal": 33316,
+          "queries": 22,
+          "statementCounts": {
+            "0": 9,
+            "36": 1,
+            "37": 1,
+            "38": 1,
+            "39": 1,
+            "40": 2,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "51": 1,
+            "52": 1,
+            "57": 2
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "abec62d9-ac62-42cc-9127-4da7eeb49d60",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat",
+            "startedAt": "2026-11-10T03:29:29.481Z",
+            "completedAt": "2026-11-10T03:29:30.017Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 84,
+          "action": "task-runs.syncThreadList",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33225,
+          "lastOrdinal": 33240,
+          "queries": 5,
+          "statementCounts": {
+            "0": 4,
+            "37": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+            "invocationId": "aa8069fa-d17a-469a-8b0e-9124e1256467",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList",
+            "startedAt": "2026-11-10T03:29:29.480Z",
+            "completedAt": "2026-11-10T03:29:29.720Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+        "invocationId": "2d4df4ad-dc06-481b-b6a2-142268356438",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.readBatch",
+        "startedAt": "2026-11-10T03:29:29.328Z",
+        "completedAt": "2026-11-10T03:29:30.018Z",
+        "httpStatus": 200,
+        "rpcItemCount": 7
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+      "firstOrdinal": 33216,
+      "lastOrdinal": 33312,
+      "queryCalls": 22,
+      "logical": [
+        {
+          "context": 80,
+          "action": "execution-settings.getBotModelMenu",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33216,
+          "lastOrdinal": 33312,
+          "queries": 22,
+          "statementCounts": {
+            "0": 11,
+            "23": 1,
+            "36": 1,
+            "39": 1,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "49": 1,
+            "51": 2,
+            "52": 2
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+            "invocationId": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu",
+            "startedAt": "2026-11-10T03:29:29.339Z",
+            "completedAt": "2026-11-10T03:29:29.905Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+        "invocationId": "8efc1599-eb17-498e-bbd0-2fe3fc637ef9",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedAt": "2026-11-10T03:29:29.339Z",
+        "completedAt": "2026-11-10T03:29:29.905Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "ec2950aa-9041-4a92-b566-fca2860ee3b0",
+      "firstOrdinal": 33256,
+      "lastOrdinal": 33302,
+      "queryCalls": 9,
+      "logical": [
+        {
+          "context": 85,
+          "action": null,
+          "route": "/api/live/ticket",
+          "firstOrdinal": 33256,
+          "lastOrdinal": 33302,
+          "queries": 9,
+          "statementCounts": {
+            "0": 1,
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "20": 1,
+            "40": 1,
+            "61": 1,
+            "62": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "ec2950aa-9041-4a92-b566-fca2860ee3b0",
+            "invocationId": "ec2950aa-9041-4a92-b566-fca2860ee3b0",
+            "route": "/api/live/ticket",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:29.697Z",
+            "completedAt": "2026-11-10T03:29:29.891Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "ec2950aa-9041-4a92-b566-fca2860ee3b0",
+        "invocationId": "ec2950aa-9041-4a92-b566-fca2860ee3b0",
+        "route": "/api/live/ticket",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:29.697Z",
+        "completedAt": "2026-11-10T03:29:29.891Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "07d165d8-d235-4edb-8a02-92fe6ead8756",
+      "firstOrdinal": 33257,
+      "lastOrdinal": 33297,
+      "queryCalls": 7,
+      "logical": [
+        {
+          "context": 86,
+          "action": null,
+          "route": "/api/live/ticket",
+          "firstOrdinal": 33257,
+          "lastOrdinal": 33297,
+          "queries": 7,
+          "statementCounts": {
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "40": 1,
+            "61": 1,
+            "62": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "07d165d8-d235-4edb-8a02-92fe6ead8756",
+            "invocationId": "07d165d8-d235-4edb-8a02-92fe6ead8756",
+            "route": "/api/live/ticket",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:29.700Z",
+            "completedAt": "2026-11-10T03:29:29.881Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "07d165d8-d235-4edb-8a02-92fe6ead8756",
+        "invocationId": "07d165d8-d235-4edb-8a02-92fe6ead8756",
+        "route": "/api/live/ticket",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:29.700Z",
+        "completedAt": "2026-11-10T03:29:29.881Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "900cb348-a08e-439a-8992-4ccf69aaf064",
+      "firstOrdinal": 33310,
+      "lastOrdinal": 33325,
+      "queryCalls": 11,
+      "logical": [
+        {
+          "context": 87,
+          "action": "bots.pollBots",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33310,
+          "lastOrdinal": 33313,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "60": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "900cb348-a08e-439a-8992-4ccf69aaf064",
+            "invocationId": "d1b339e1-cb6e-4e64-b22c-80ccacd04658",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots",
+            "startedAt": "2026-11-10T03:29:29.899Z",
+            "completedAt": "2026-11-10T03:29:29.907Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 88,
+          "action": "issues.syncIssueList",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33311,
+          "lastOrdinal": 33325,
+          "queries": 9,
+          "statementCounts": {
+            "0": 6,
+            "23": 1,
+            "37": 1,
+            "63": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "900cb348-a08e-439a-8992-4ccf69aaf064",
+            "invocationId": "b2006e3d-46b9-463d-8a0c-3fb25feb3b81",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList",
+            "startedAt": "2026-11-10T03:29:29.899Z",
+            "completedAt": "2026-11-10T03:29:30.042Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "900cb348-a08e-439a-8992-4ccf69aaf064",
+        "invocationId": "900cb348-a08e-439a-8992-4ccf69aaf064",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.readBatch",
+        "startedAt": "2026-11-10T03:29:29.877Z",
+        "completedAt": "2026-11-10T03:29:30.042Z",
+        "httpStatus": 200,
+        "rpcItemCount": 2
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "be6a5782-cbe3-416f-b179-765908898619",
+      "firstOrdinal": 33333,
+      "lastOrdinal": 33333,
+      "queryCalls": 1,
+      "logical": [
+        {
+          "context": 89,
+          "action": null,
+          "route": "/api/mobile/reactions",
+          "firstOrdinal": 33333,
+          "lastOrdinal": 33333,
+          "queries": 1,
+          "statementCounts": {
+            "0": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "be6a5782-cbe3-416f-b179-765908898619",
+            "invocationId": "be6a5782-cbe3-416f-b179-765908898619",
+            "route": "/api/mobile/reactions",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:30.258Z",
+            "completedAt": "2026-11-10T03:29:30.290Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "be6a5782-cbe3-416f-b179-765908898619",
+        "invocationId": "be6a5782-cbe3-416f-b179-765908898619",
+        "route": "/api/mobile/reactions",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:30.258Z",
+        "completedAt": "2026-11-10T03:29:30.290Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+      "firstOrdinal": 33342,
+      "lastOrdinal": 33349,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 90,
+          "action": null,
+          "route": "/api/workspace/switcher",
+          "firstOrdinal": 33342,
+          "lastOrdinal": 33349,
+          "queries": 2,
+          "statementCounts": {
+            "0": 1,
+            "23": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+            "invocationId": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:30.376Z",
+            "completedAt": "2026-11-10T03:29:30.398Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+        "invocationId": "17cb281c-74e3-4b50-bccf-11d7bceeae24",
+        "route": "/api/workspace/switcher",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:30.376Z",
+        "completedAt": "2026-11-10T03:29:30.398Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "1d436f32-12d1-4795-ba30-8256f29dd398",
+      "firstOrdinal": 33343,
+      "lastOrdinal": 33351,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 91,
+          "action": null,
+          "route": "/api/workspace",
+          "firstOrdinal": 33343,
+          "lastOrdinal": 33351,
+          "queries": 5,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "28": 1,
+            "29": 1,
+            "66": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "1d436f32-12d1-4795-ba30-8256f29dd398",
+            "invocationId": "1d436f32-12d1-4795-ba30-8256f29dd398",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:30.377Z",
+            "completedAt": "2026-11-10T03:29:30.406Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "1d436f32-12d1-4795-ba30-8256f29dd398",
+        "invocationId": "1d436f32-12d1-4795-ba30-8256f29dd398",
+        "route": "/api/workspace",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:30.377Z",
+        "completedAt": "2026-11-10T03:29:30.406Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+      "firstOrdinal": 33362,
+      "lastOrdinal": 33366,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 92,
+          "action": "team-relations.listProjectTeams",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33362,
+          "lastOrdinal": 33362,
+          "queries": 1,
+          "statementCounts": {
+            "34": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+            "invocationId": "687e739f-aeb1-4a2e-b1f8-0727f0a7a11b",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "team-relations.listProjectTeams",
+            "startedAt": "2026-11-10T03:29:30.422Z",
+            "completedAt": "2026-11-10T03:29:30.425Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 93,
+          "action": "bots.pollBots",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33363,
+          "lastOrdinal": 33365,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "60": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+            "invocationId": "a295182f-5462-43a4-8231-69c166e1ee79",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots",
+            "startedAt": "2026-11-10T03:29:30.422Z",
+            "completedAt": "2026-11-10T03:29:30.425Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 94,
+          "action": "teams.listTeams",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33364,
+          "lastOrdinal": 33366,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "30": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+            "invocationId": "2c342753-eeaf-48f9-a4da-392ee4fa15a9",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams",
+            "startedAt": "2026-11-10T03:29:30.422Z",
+            "completedAt": "2026-11-10T03:29:30.426Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+        "invocationId": "4c331241-dcdf-420e-aeee-c71077dc0ebc",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.readBatch",
+        "startedAt": "2026-11-10T03:29:30.411Z",
+        "completedAt": "2026-11-10T03:29:30.426Z",
+        "httpStatus": 200,
+        "rpcItemCount": 3
+      }
+    },
+    {
+      "window": "nativeLogin",
+      "id": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+      "firstOrdinal": 33367,
+      "lastOrdinal": 33403,
+      "queryCalls": 37,
+      "logical": [
+        {
+          "context": 95,
+          "action": "task-runs.pollTaskRuns",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33367,
+          "lastOrdinal": 33375,
+          "queries": 3,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "40": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+            "invocationId": "6cf8dede-29ae-454f-88fe-df4cdcccb45b",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.pollTaskRuns",
+            "startedAt": "2026-11-10T03:29:30.536Z",
+            "completedAt": "2026-11-10T03:29:30.577Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 96,
+          "action": "coordinator.syncCoordinatorChat",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33368,
+          "lastOrdinal": 33403,
+          "queries": 19,
+          "statementCounts": {
+            "0": 7,
+            "23": 1,
+            "36": 1,
+            "37": 1,
+            "38": 1,
+            "39": 1,
+            "40": 1,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "51": 1,
+            "52": 1,
+            "57": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+            "invocationId": "47c416eb-7ab7-4936-a9d7-9ceeace6a3e6",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat",
+            "startedAt": "2026-11-10T03:29:30.536Z",
+            "completedAt": "2026-11-10T03:29:30.605Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 97,
+          "action": "issues.syncIssueList",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33369,
+          "lastOrdinal": 33388,
+          "queries": 5,
+          "statementCounts": {
+            "0": 3,
+            "23": 1,
+            "63": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+            "invocationId": "b3b99688-276f-4c04-9390-4e42f45f7481",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList",
+            "startedAt": "2026-11-10T03:29:30.536Z",
+            "completedAt": "2026-11-10T03:29:30.593Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 98,
+          "action": "task-runs.syncThreadList",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33371,
+          "lastOrdinal": 33378,
+          "queries": 3,
+          "statementCounts": {
+            "0": 2,
+            "37": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+            "invocationId": "3551e0b3-ebe9-4126-a0b6-775ecba16f87",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList",
+            "startedAt": "2026-11-10T03:29:30.536Z",
+            "completedAt": "2026-11-10T03:29:30.578Z",
+            "httpStatus": 200
+          }
+        },
+        {
+          "context": 99,
+          "action": "coordinator.pollBotChatSummaries",
+          "route": "/api/desktop/rpc",
+          "firstOrdinal": 33373,
+          "lastOrdinal": 33390,
+          "queries": 7,
+          "statementCounts": {
+            "0": 2,
+            "37": 1,
+            "40": 1,
+            "41": 1,
+            "67": 1,
+            "68": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+            "invocationId": "b106b03f-c270-422e-8f62-aea6889ce699",
+            "route": "/api/desktop/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries",
+            "startedAt": "2026-11-10T03:29:30.537Z",
+            "completedAt": "2026-11-10T03:29:30.593Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+        "invocationId": "975f94d8-294e-4983-a4d6-3c544b8de1ad",
+        "route": "/api/desktop/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.readBatch",
+        "startedAt": "2026-11-10T03:29:30.518Z",
+        "completedAt": "2026-11-10T03:29:30.624Z",
+        "httpStatus": 200,
+        "rpcItemCount": 5
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "9ca5386f-d295-41ef-a661-add24b2c770a",
+      "firstOrdinal": 32631,
+      "lastOrdinal": 32649,
+      "queryCalls": 19,
+      "logical": [
+        {
+          "context": 1,
+          "action": null,
+          "route": "/api/auth/[...all]",
+          "firstOrdinal": 32631,
+          "lastOrdinal": 32649,
+          "queries": 19,
+          "statementCounts": {
+            "0": 1,
+            "1": 1,
+            "2": 1,
+            "3": 1,
+            "4": 1,
+            "5": 1,
+            "6": 1,
+            "7": 1,
+            "8": 1,
+            "9": 2,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "13": 1,
+            "14": 1,
+            "15": 1,
+            "16": 1,
+            "17": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "9ca5386f-d295-41ef-a661-add24b2c770a",
+            "invocationId": "9ca5386f-d295-41ef-a661-add24b2c770a",
+            "route": "/api/auth/[...all]",
+            "method": "POST",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:18.050Z",
+            "completedAt": "2026-11-10T03:29:18.140Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "9ca5386f-d295-41ef-a661-add24b2c770a",
+        "invocationId": "9ca5386f-d295-41ef-a661-add24b2c770a",
+        "route": "/api/auth/[...all]",
+        "method": "POST",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:18.050Z",
+        "completedAt": "2026-11-10T03:29:18.140Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "66b9eeef-9752-4782-a6bf-f167ad34c886",
+      "firstOrdinal": 32650,
+      "lastOrdinal": 32651,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 2,
+          "action": null,
+          "route": "/api/auth/[...all]",
+          "firstOrdinal": 32650,
+          "lastOrdinal": 32651,
+          "queries": 2,
+          "statementCounts": {
+            "1": 1,
+            "2": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "66b9eeef-9752-4782-a6bf-f167ad34c886",
+            "invocationId": "66b9eeef-9752-4782-a6bf-f167ad34c886",
+            "route": "/api/auth/[...all]",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:18.146Z",
+            "completedAt": "2026-11-10T03:29:18.150Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "66b9eeef-9752-4782-a6bf-f167ad34c886",
+        "invocationId": "66b9eeef-9752-4782-a6bf-f167ad34c886",
+        "route": "/api/auth/[...all]",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:18.146Z",
+        "completedAt": "2026-11-10T03:29:18.150Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "ad319daf-0f65-45ad-b669-2774333dc31f",
+      "firstOrdinal": 32652,
+      "lastOrdinal": 32654,
+      "queryCalls": 3,
+      "logical": [
+        {
+          "context": 3,
+          "action": "desktop.bootstrap",
+          "route": "/api/rpc",
+          "firstOrdinal": 32652,
+          "lastOrdinal": 32654,
+          "queries": 3,
+          "statementCounts": {
+            "18": 1,
+            "19": 1,
+            "20": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "ad319daf-0f65-45ad-b669-2774333dc31f",
+            "invocationId": "ad319daf-0f65-45ad-b669-2774333dc31f",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "desktop.bootstrap",
+            "startedAt": "2026-11-10T03:29:18.568Z",
+            "completedAt": "2026-11-10T03:29:18.573Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "ad319daf-0f65-45ad-b669-2774333dc31f",
+        "invocationId": "ad319daf-0f65-45ad-b669-2774333dc31f",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.bootstrap",
+        "startedAt": "2026-11-10T03:29:18.568Z",
+        "completedAt": "2026-11-10T03:29:18.573Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "b9533556-c7a4-4a34-b5ad-07c4278e6ee9",
+      "firstOrdinal": 32655,
+      "lastOrdinal": 32657,
+      "queryCalls": 3,
+      "logical": [
+        {
+          "context": 4,
+          "action": null,
+          "route": "/api/auth/[...all]",
+          "firstOrdinal": 32655,
+          "lastOrdinal": 32657,
+          "queries": 3,
+          "statementCounts": {
+            "1": 1,
+            "21": 1,
+            "22": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "b9533556-c7a4-4a34-b5ad-07c4278e6ee9",
+            "invocationId": "b9533556-c7a4-4a34-b5ad-07c4278e6ee9",
+            "route": "/api/auth/[...all]",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:18.572Z",
+            "completedAt": "2026-11-10T03:29:18.576Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "b9533556-c7a4-4a34-b5ad-07c4278e6ee9",
+        "invocationId": "b9533556-c7a4-4a34-b5ad-07c4278e6ee9",
+        "route": "/api/auth/[...all]",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:18.572Z",
+        "completedAt": "2026-11-10T03:29:18.576Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+      "firstOrdinal": 32661,
+      "lastOrdinal": 32675,
+      "queryCalls": 4,
+      "logical": [
+        {
+          "context": 5,
+          "action": null,
+          "route": "/api/workspace/switcher",
+          "firstOrdinal": 32661,
+          "lastOrdinal": 32675,
+          "queries": 4,
+          "statementCounts": {
+            "0": 1,
+            "12": 1,
+            "23": 1,
+            "33": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+            "invocationId": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:19.243Z",
+            "completedAt": "2026-11-10T03:29:19.279Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+        "invocationId": "33bedfe1-9084-47a4-8ab2-fdbc5d689299",
+        "route": "/api/workspace/switcher",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:19.243Z",
+        "completedAt": "2026-11-10T03:29:19.279Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "a407cc5a-a066-4954-84ab-947556b43774",
+      "firstOrdinal": 32662,
+      "lastOrdinal": 32671,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 6,
+          "action": null,
+          "route": "/api/workspace",
+          "firstOrdinal": 32662,
+          "lastOrdinal": 32671,
+          "queries": 5,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "28": 1,
+            "29": 1,
+            "31": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "a407cc5a-a066-4954-84ab-947556b43774",
+            "invocationId": "a407cc5a-a066-4954-84ab-947556b43774",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:19.244Z",
+            "completedAt": "2026-11-10T03:29:19.268Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "a407cc5a-a066-4954-84ab-947556b43774",
+        "invocationId": "a407cc5a-a066-4954-84ab-947556b43774",
+        "route": "/api/workspace",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:19.244Z",
+        "completedAt": "2026-11-10T03:29:19.268Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+      "firstOrdinal": 32663,
+      "lastOrdinal": 32669,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 7,
+          "action": "teams.listTeams",
+          "route": "/api/rpc",
+          "firstOrdinal": 32663,
+          "lastOrdinal": 32669,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "30": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+            "invocationId": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams",
+            "startedAt": "2026-11-10T03:29:19.246Z",
+            "completedAt": "2026-11-10T03:29:19.264Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+        "invocationId": "8a86ed76-1c70-4f9f-b12d-6c2419d66e4d",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "teams.listTeams",
+        "startedAt": "2026-11-10T03:29:19.246Z",
+        "completedAt": "2026-11-10T03:29:19.264Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "d68a3b76-d0e8-4fb4-aeb8-18f723acf65d",
+      "firstOrdinal": 32664,
+      "lastOrdinal": 32665,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 8,
+          "action": null,
+          "route": "/api/agent/sessions",
+          "firstOrdinal": 32664,
+          "lastOrdinal": 32665,
+          "queries": 2,
+          "statementCounts": {
+            "26": 1,
+            "27": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "d68a3b76-d0e8-4fb4-aeb8-18f723acf65d",
+            "invocationId": "d68a3b76-d0e8-4fb4-aeb8-18f723acf65d",
+            "route": "/api/agent/sessions",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:19.246Z",
+            "completedAt": "2026-11-10T03:29:19.264Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "d68a3b76-d0e8-4fb4-aeb8-18f723acf65d",
+        "invocationId": "d68a3b76-d0e8-4fb4-aeb8-18f723acf65d",
+        "route": "/api/agent/sessions",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:19.246Z",
+        "completedAt": "2026-11-10T03:29:19.264Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "f59747f8-e54d-4272-a958-1801922647a4",
+      "firstOrdinal": 32676,
+      "lastOrdinal": 32676,
+      "queryCalls": 1,
+      "logical": [
+        {
+          "context": 9,
+          "action": "team-relations.listProjectTeams",
+          "route": "/api/rpc",
+          "firstOrdinal": 32676,
+          "lastOrdinal": 32676,
+          "queries": 1,
+          "statementCounts": {
+            "34": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "f59747f8-e54d-4272-a958-1801922647a4",
+            "invocationId": "f59747f8-e54d-4272-a958-1801922647a4",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "team-relations.listProjectTeams",
+            "startedAt": "2026-11-10T03:29:19.270Z",
+            "completedAt": "2026-11-10T03:29:19.292Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "f59747f8-e54d-4272-a958-1801922647a4",
+        "invocationId": "f59747f8-e54d-4272-a958-1801922647a4",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedAt": "2026-11-10T03:29:19.270Z",
+        "completedAt": "2026-11-10T03:29:19.292Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+      "firstOrdinal": 32677,
+      "lastOrdinal": 32702,
+      "queryCalls": 8,
+      "logical": [
+        {
+          "context": 10,
+          "action": "coordinator.pollBotChatSummaries",
+          "route": "/api/rpc",
+          "firstOrdinal": 32677,
+          "lastOrdinal": 32702,
+          "queries": 8,
+          "statementCounts": {
+            "0": 2,
+            "23": 1,
+            "37": 1,
+            "40": 1,
+            "41": 1,
+            "42": 1,
+            "43": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+            "invocationId": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries",
+            "startedAt": "2026-11-10T03:29:19.271Z",
+            "completedAt": "2026-11-10T03:29:19.348Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+        "invocationId": "ed1cd9bf-a465-4aad-afd0-7debee82a8d3",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedAt": "2026-11-10T03:29:19.271Z",
+        "completedAt": "2026-11-10T03:29:19.348Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+      "firstOrdinal": 32678,
+      "lastOrdinal": 32683,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 11,
+          "action": "projects.listProjects",
+          "route": "/api/rpc",
+          "firstOrdinal": 32678,
+          "lastOrdinal": 32683,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "35": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+            "invocationId": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects",
+            "startedAt": "2026-11-10T03:29:19.272Z",
+            "completedAt": "2026-11-10T03:29:19.299Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+        "invocationId": "873d8fab-64d6-41aa-bb6a-06e404eeaa29",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "projects.listProjects",
+        "startedAt": "2026-11-10T03:29:19.272Z",
+        "completedAt": "2026-11-10T03:29:19.299Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+      "firstOrdinal": 32679,
+      "lastOrdinal": 32758,
+      "queryCalls": 31,
+      "logical": [
+        {
+          "context": 12,
+          "action": "execution-settings.getBotModelMenu",
+          "route": "/api/rpc",
+          "firstOrdinal": 32679,
+          "lastOrdinal": 32758,
+          "queries": 31,
+          "statementCounts": {
+            "0": 12,
+            "23": 1,
+            "36": 1,
+            "39": 1,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "49": 1,
+            "51": 2,
+            "52": 2,
+            "53": 2,
+            "54": 2,
+            "55": 2,
+            "56": 2
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+            "invocationId": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu",
+            "startedAt": "2026-11-10T03:29:19.278Z",
+            "completedAt": "2026-11-10T03:29:19.368Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+        "invocationId": "99b4c2f7-8a8d-4034-9686-5e5b4737970d",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedAt": "2026-11-10T03:29:19.278Z",
+        "completedAt": "2026-11-10T03:29:19.368Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+      "firstOrdinal": 32681,
+      "lastOrdinal": 32705,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 13,
+          "action": "task-runs.syncThreadList",
+          "route": "/api/rpc",
+          "firstOrdinal": 32681,
+          "lastOrdinal": 32705,
+          "queries": 5,
+          "statementCounts": {
+            "0": 3,
+            "23": 1,
+            "37": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+            "invocationId": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList",
+            "startedAt": "2026-11-10T03:29:19.283Z",
+            "completedAt": "2026-11-10T03:29:19.351Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+        "invocationId": "c956b7d9-9e34-48ec-9b9b-35bcf460c817",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "task-runs.syncThreadList",
+        "startedAt": "2026-11-10T03:29:19.283Z",
+        "completedAt": "2026-11-10T03:29:19.351Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "221811f5-3e24-4999-940c-45af76c5d1d2",
+      "firstOrdinal": 32682,
+      "lastOrdinal": 32761,
+      "queryCalls": 27,
+      "logical": [
+        {
+          "context": 14,
+          "action": "coordinator.syncCoordinatorChat",
+          "route": "/api/rpc",
+          "firstOrdinal": 32682,
+          "lastOrdinal": 32761,
+          "queries": 27,
+          "statementCounts": {
+            "0": 9,
+            "23": 1,
+            "36": 1,
+            "37": 1,
+            "38": 1,
+            "39": 1,
+            "40": 2,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "51": 1,
+            "52": 1,
+            "53": 1,
+            "54": 1,
+            "55": 1,
+            "56": 1,
+            "57": 2
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "221811f5-3e24-4999-940c-45af76c5d1d2",
+            "invocationId": "221811f5-3e24-4999-940c-45af76c5d1d2",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat",
+            "startedAt": "2026-11-10T03:29:19.286Z",
+            "completedAt": "2026-11-10T03:29:19.383Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "221811f5-3e24-4999-940c-45af76c5d1d2",
+        "invocationId": "221811f5-3e24-4999-940c-45af76c5d1d2",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedAt": "2026-11-10T03:29:19.286Z",
+        "completedAt": "2026-11-10T03:29:19.383Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "fd21c645-bb8f-41da-8f8b-96f67806d774",
+      "firstOrdinal": 32759,
+      "lastOrdinal": 32775,
+      "queryCalls": 7,
+      "logical": [
+        {
+          "context": 15,
+          "action": null,
+          "route": "/api/live/ticket",
+          "firstOrdinal": 32759,
+          "lastOrdinal": 32775,
+          "queries": 7,
+          "statementCounts": {
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "40": 1,
+            "61": 1,
+            "62": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "fd21c645-bb8f-41da-8f8b-96f67806d774",
+            "invocationId": "fd21c645-bb8f-41da-8f8b-96f67806d774",
+            "route": "/api/live/ticket",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:19.368Z",
+            "completedAt": "2026-11-10T03:29:19.403Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "fd21c645-bb8f-41da-8f8b-96f67806d774",
+        "invocationId": "fd21c645-bb8f-41da-8f8b-96f67806d774",
+        "route": "/api/live/ticket",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:19.368Z",
+        "completedAt": "2026-11-10T03:29:19.403Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "5609cd47-4e64-47ee-a124-63c23bea875c",
+      "firstOrdinal": 32764,
+      "lastOrdinal": 32768,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 16,
+          "action": "bots.pollBots",
+          "route": "/api/rpc",
+          "firstOrdinal": 32764,
+          "lastOrdinal": 32768,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "60": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "5609cd47-4e64-47ee-a124-63c23bea875c",
+            "invocationId": "5609cd47-4e64-47ee-a124-63c23bea875c",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots",
+            "startedAt": "2026-11-10T03:29:19.378Z",
+            "completedAt": "2026-11-10T03:29:19.401Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "5609cd47-4e64-47ee-a124-63c23bea875c",
+        "invocationId": "5609cd47-4e64-47ee-a124-63c23bea875c",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "bots.pollBots",
+        "startedAt": "2026-11-10T03:29:19.378Z",
+        "completedAt": "2026-11-10T03:29:19.401Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "07150752-9253-4114-a8e8-d0e284beea83",
+      "firstOrdinal": 32765,
+      "lastOrdinal": 32779,
+      "queryCalls": 7,
+      "logical": [
+        {
+          "context": 17,
+          "action": "issues.syncIssueList",
+          "route": "/api/rpc",
+          "firstOrdinal": 32765,
+          "lastOrdinal": 32779,
+          "queries": 7,
+          "statementCounts": {
+            "0": 4,
+            "23": 1,
+            "37": 1,
+            "63": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "07150752-9253-4114-a8e8-d0e284beea83",
+            "invocationId": "07150752-9253-4114-a8e8-d0e284beea83",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList",
+            "startedAt": "2026-11-10T03:29:19.379Z",
+            "completedAt": "2026-11-10T03:29:19.407Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "07150752-9253-4114-a8e8-d0e284beea83",
+        "invocationId": "07150752-9253-4114-a8e8-d0e284beea83",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "issues.syncIssueList",
+        "startedAt": "2026-11-10T03:29:19.379Z",
+        "completedAt": "2026-11-10T03:29:19.407Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "32f598ff-ce0e-4778-9b99-cffe2915f435",
+      "firstOrdinal": 32780,
+      "lastOrdinal": 32785,
+      "queryCalls": 6,
+      "logical": [
+        {
+          "context": 18,
+          "action": "workspace.switchWorkspace",
+          "route": "/api/rpc",
+          "firstOrdinal": 32780,
+          "lastOrdinal": 32785,
+          "queries": 6,
+          "statementCounts": {
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "20": 1,
+            "64": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "32f598ff-ce0e-4778-9b99-cffe2915f435",
+            "invocationId": "32f598ff-ce0e-4778-9b99-cffe2915f435",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "workspace.switchWorkspace",
+            "startedAt": "2026-11-10T03:29:19.696Z",
+            "completedAt": "2026-11-10T03:29:19.705Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "32f598ff-ce0e-4778-9b99-cffe2915f435",
+        "invocationId": "32f598ff-ce0e-4778-9b99-cffe2915f435",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "workspace.switchWorkspace",
+        "startedAt": "2026-11-10T03:29:19.696Z",
+        "completedAt": "2026-11-10T03:29:19.705Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+      "firstOrdinal": 32789,
+      "lastOrdinal": 32806,
+      "queryCalls": 4,
+      "logical": [
+        {
+          "context": 19,
+          "action": null,
+          "route": "/api/workspace/switcher",
+          "firstOrdinal": 32789,
+          "lastOrdinal": 32806,
+          "queries": 4,
+          "statementCounts": {
+            "0": 1,
+            "12": 1,
+            "23": 1,
+            "33": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+            "invocationId": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:19.799Z",
+            "completedAt": "2026-11-10T03:29:19.843Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+        "invocationId": "95af690e-819c-4f45-a1e1-c762c2d6cba1",
+        "route": "/api/workspace/switcher",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:19.799Z",
+        "completedAt": "2026-11-10T03:29:19.843Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+      "firstOrdinal": 32790,
+      "lastOrdinal": 32808,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 20,
+          "action": null,
+          "route": "/api/workspace",
+          "firstOrdinal": 32790,
+          "lastOrdinal": 32808,
+          "queries": 5,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "28": 1,
+            "29": 1,
+            "66": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+            "invocationId": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:19.800Z",
+            "completedAt": "2026-11-10T03:29:19.850Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+        "invocationId": "f3f9a9a4-3860-4bea-9255-57c1d6f7e095",
+        "route": "/api/workspace",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:19.800Z",
+        "completedAt": "2026-11-10T03:29:19.850Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "af0deefd-313c-487d-8065-81ca89e5318e",
+      "firstOrdinal": 32792,
+      "lastOrdinal": 32805,
+      "queryCalls": 4,
+      "logical": [
+        {
+          "context": 21,
+          "action": "bots.pollBots",
+          "route": "/api/rpc",
+          "firstOrdinal": 32792,
+          "lastOrdinal": 32805,
+          "queries": 4,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "60": 1,
+            "65": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "af0deefd-313c-487d-8065-81ca89e5318e",
+            "invocationId": "af0deefd-313c-487d-8065-81ca89e5318e",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots",
+            "startedAt": "2026-11-10T03:29:19.801Z",
+            "completedAt": "2026-11-10T03:29:19.839Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "af0deefd-313c-487d-8065-81ca89e5318e",
+        "invocationId": "af0deefd-313c-487d-8065-81ca89e5318e",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "bots.pollBots",
+        "startedAt": "2026-11-10T03:29:19.801Z",
+        "completedAt": "2026-11-10T03:29:19.839Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+      "firstOrdinal": 32807,
+      "lastOrdinal": 32810,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 22,
+          "action": "teams.listTeams",
+          "route": "/api/rpc",
+          "firstOrdinal": 32807,
+          "lastOrdinal": 32810,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "30": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+            "invocationId": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams",
+            "startedAt": "2026-11-10T03:29:19.826Z",
+            "completedAt": "2026-11-10T03:29:19.849Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+        "invocationId": "ccef0e4e-eff2-4f61-8880-c278102364b2",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "teams.listTeams",
+        "startedAt": "2026-11-10T03:29:19.826Z",
+        "completedAt": "2026-11-10T03:29:19.849Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "29653ce8-e550-4d74-83d2-bd2cf26235b3",
+      "firstOrdinal": 32812,
+      "lastOrdinal": 32812,
+      "queryCalls": 1,
+      "logical": [
+        {
+          "context": 23,
+          "action": "team-relations.listProjectTeams",
+          "route": "/api/rpc",
+          "firstOrdinal": 32812,
+          "lastOrdinal": 32812,
+          "queries": 1,
+          "statementCounts": {
+            "34": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "29653ce8-e550-4d74-83d2-bd2cf26235b3",
+            "invocationId": "29653ce8-e550-4d74-83d2-bd2cf26235b3",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "team-relations.listProjectTeams",
+            "startedAt": "2026-11-10T03:29:19.853Z",
+            "completedAt": "2026-11-10T03:29:19.864Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "29653ce8-e550-4d74-83d2-bd2cf26235b3",
+        "invocationId": "29653ce8-e550-4d74-83d2-bd2cf26235b3",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedAt": "2026-11-10T03:29:19.853Z",
+        "completedAt": "2026-11-10T03:29:19.864Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "e40d3459-69e4-49c0-98e2-932e5269f436",
+      "firstOrdinal": 32813,
+      "lastOrdinal": 32814,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 24,
+          "action": null,
+          "route": "/api/auth/[...all]",
+          "firstOrdinal": 32813,
+          "lastOrdinal": 32814,
+          "queries": 2,
+          "statementCounts": {
+            "1": 1,
+            "2": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "e40d3459-69e4-49c0-98e2-932e5269f436",
+            "invocationId": "e40d3459-69e4-49c0-98e2-932e5269f436",
+            "route": "/api/auth/[...all]",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:19.934Z",
+            "completedAt": "2026-11-10T03:29:19.939Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "e40d3459-69e4-49c0-98e2-932e5269f436",
+        "invocationId": "e40d3459-69e4-49c0-98e2-932e5269f436",
+        "route": "/api/auth/[...all]",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:19.934Z",
+        "completedAt": "2026-11-10T03:29:19.939Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "82093d95-4d41-4588-85ca-9cabee95be0f",
+      "firstOrdinal": 32815,
+      "lastOrdinal": 32817,
+      "queryCalls": 3,
+      "logical": [
+        {
+          "context": 25,
+          "action": "desktop.bootstrap",
+          "route": "/api/rpc",
+          "firstOrdinal": 32815,
+          "lastOrdinal": 32817,
+          "queries": 3,
+          "statementCounts": {
+            "18": 1,
+            "19": 1,
+            "20": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "82093d95-4d41-4588-85ca-9cabee95be0f",
+            "invocationId": "82093d95-4d41-4588-85ca-9cabee95be0f",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "desktop.bootstrap",
+            "startedAt": "2026-11-10T03:29:19.931Z",
+            "completedAt": "2026-11-10T03:29:19.939Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "82093d95-4d41-4588-85ca-9cabee95be0f",
+        "invocationId": "82093d95-4d41-4588-85ca-9cabee95be0f",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "desktop.bootstrap",
+        "startedAt": "2026-11-10T03:29:19.931Z",
+        "completedAt": "2026-11-10T03:29:19.939Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "8cf621ad-44f3-4fac-b43b-064986beb776",
+      "firstOrdinal": 32818,
+      "lastOrdinal": 32829,
+      "queryCalls": 4,
+      "logical": [
+        {
+          "context": 26,
+          "action": null,
+          "route": "/api/workspace/switcher",
+          "firstOrdinal": 32818,
+          "lastOrdinal": 32829,
+          "queries": 4,
+          "statementCounts": {
+            "0": 1,
+            "12": 1,
+            "23": 1,
+            "33": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "8cf621ad-44f3-4fac-b43b-064986beb776",
+            "invocationId": "8cf621ad-44f3-4fac-b43b-064986beb776",
+            "route": "/api/workspace/switcher",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:20.448Z",
+            "completedAt": "2026-11-10T03:29:20.557Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "8cf621ad-44f3-4fac-b43b-064986beb776",
+        "invocationId": "8cf621ad-44f3-4fac-b43b-064986beb776",
+        "route": "/api/workspace/switcher",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:20.448Z",
+        "completedAt": "2026-11-10T03:29:20.557Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+      "firstOrdinal": 32819,
+      "lastOrdinal": 32824,
+      "queryCalls": 5,
+      "logical": [
+        {
+          "context": 27,
+          "action": null,
+          "route": "/api/workspace",
+          "firstOrdinal": 32819,
+          "lastOrdinal": 32824,
+          "queries": 5,
+          "statementCounts": {
+            "0": 1,
+            "23": 1,
+            "28": 1,
+            "29": 1,
+            "66": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+            "invocationId": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+            "route": "/api/workspace",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:20.453Z",
+            "completedAt": "2026-11-10T03:29:20.536Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+        "invocationId": "db84acb3-99f1-4ca8-a78c-b1e19be7a909",
+        "route": "/api/workspace",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:20.453Z",
+        "completedAt": "2026-11-10T03:29:20.536Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "b2d946e3-24f2-485f-94eb-d18bc65008fd",
+      "firstOrdinal": 32825,
+      "lastOrdinal": 32826,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 28,
+          "action": null,
+          "route": "/api/agent/sessions",
+          "firstOrdinal": 32825,
+          "lastOrdinal": 32826,
+          "queries": 2,
+          "statementCounts": {
+            "26": 1,
+            "27": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "b2d946e3-24f2-485f-94eb-d18bc65008fd",
+            "invocationId": "b2d946e3-24f2-485f-94eb-d18bc65008fd",
+            "route": "/api/agent/sessions",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:20.464Z",
+            "completedAt": "2026-11-10T03:29:20.540Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "b2d946e3-24f2-485f-94eb-d18bc65008fd",
+        "invocationId": "b2d946e3-24f2-485f-94eb-d18bc65008fd",
+        "route": "/api/agent/sessions",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:20.464Z",
+        "completedAt": "2026-11-10T03:29:20.540Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+      "firstOrdinal": 32827,
+      "lastOrdinal": 32830,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 29,
+          "action": "teams.listTeams",
+          "route": "/api/rpc",
+          "firstOrdinal": 32827,
+          "lastOrdinal": 32830,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "30": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+            "invocationId": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "teams.listTeams",
+            "startedAt": "2026-11-10T03:29:20.473Z",
+            "completedAt": "2026-11-10T03:29:20.554Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+        "invocationId": "9cc7b42d-90fd-4bb8-8739-70c30b839b4f",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "teams.listTeams",
+        "startedAt": "2026-11-10T03:29:20.473Z",
+        "completedAt": "2026-11-10T03:29:20.554Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "8824dfb7-74f7-4353-a3a9-bfa1a65d309f",
+      "firstOrdinal": 32831,
+      "lastOrdinal": 32831,
+      "queryCalls": 1,
+      "logical": [
+        {
+          "context": 30,
+          "action": "team-relations.listProjectTeams",
+          "route": "/api/rpc",
+          "firstOrdinal": 32831,
+          "lastOrdinal": 32831,
+          "queries": 1,
+          "statementCounts": {
+            "34": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "8824dfb7-74f7-4353-a3a9-bfa1a65d309f",
+            "invocationId": "8824dfb7-74f7-4353-a3a9-bfa1a65d309f",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "team-relations.listProjectTeams",
+            "startedAt": "2026-11-10T03:29:20.484Z",
+            "completedAt": "2026-11-10T03:29:20.552Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "8824dfb7-74f7-4353-a3a9-bfa1a65d309f",
+        "invocationId": "8824dfb7-74f7-4353-a3a9-bfa1a65d309f",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "team-relations.listProjectTeams",
+        "startedAt": "2026-11-10T03:29:20.484Z",
+        "completedAt": "2026-11-10T03:29:20.552Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+      "firstOrdinal": 32832,
+      "lastOrdinal": 32849,
+      "queryCalls": 8,
+      "logical": [
+        {
+          "context": 31,
+          "action": "coordinator.pollBotChatSummaries",
+          "route": "/api/rpc",
+          "firstOrdinal": 32832,
+          "lastOrdinal": 32849,
+          "queries": 8,
+          "statementCounts": {
+            "0": 2,
+            "23": 1,
+            "37": 1,
+            "40": 1,
+            "41": 1,
+            "67": 1,
+            "68": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+            "invocationId": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.pollBotChatSummaries",
+            "startedAt": "2026-11-10T03:29:20.522Z",
+            "completedAt": "2026-11-10T03:29:20.644Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+        "invocationId": "cad1f11a-3035-45c5-a8ca-cc164f8bdc52",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.pollBotChatSummaries",
+        "startedAt": "2026-11-10T03:29:20.522Z",
+        "completedAt": "2026-11-10T03:29:20.644Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+      "firstOrdinal": 32833,
+      "lastOrdinal": 32836,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 32,
+          "action": "projects.listProjects",
+          "route": "/api/rpc",
+          "firstOrdinal": 32833,
+          "lastOrdinal": 32836,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "35": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+            "invocationId": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "projects.listProjects",
+            "startedAt": "2026-11-10T03:29:20.559Z",
+            "completedAt": "2026-11-10T03:29:20.572Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+        "invocationId": "afe311e4-3fee-47bf-ad8d-a114e0370bda",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "projects.listProjects",
+        "startedAt": "2026-11-10T03:29:20.559Z",
+        "completedAt": "2026-11-10T03:29:20.572Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "07136100-1374-4919-969f-6b7ebb3c28c8",
+      "firstOrdinal": 32834,
+      "lastOrdinal": 32850,
+      "queryCalls": 6,
+      "logical": [
+        {
+          "context": 33,
+          "action": "task-runs.syncThreadList",
+          "route": "/api/rpc",
+          "firstOrdinal": 32834,
+          "lastOrdinal": 32850,
+          "queries": 6,
+          "statementCounts": {
+            "0": 4,
+            "23": 1,
+            "37": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "07136100-1374-4919-969f-6b7ebb3c28c8",
+            "invocationId": "07136100-1374-4919-969f-6b7ebb3c28c8",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "task-runs.syncThreadList",
+            "startedAt": "2026-11-10T03:29:20.561Z",
+            "completedAt": "2026-11-10T03:29:20.648Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "07136100-1374-4919-969f-6b7ebb3c28c8",
+        "invocationId": "07136100-1374-4919-969f-6b7ebb3c28c8",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "task-runs.syncThreadList",
+        "startedAt": "2026-11-10T03:29:20.561Z",
+        "completedAt": "2026-11-10T03:29:20.648Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "2c9ee9cd-4668-4c94-8822-ea865cdf9863",
+      "firstOrdinal": 32843,
+      "lastOrdinal": 32876,
+      "queryCalls": 9,
+      "logical": [
+        {
+          "context": 34,
+          "action": null,
+          "route": "/api/live/ticket",
+          "firstOrdinal": 32843,
+          "lastOrdinal": 32876,
+          "queries": 9,
+          "statementCounts": {
+            "0": 1,
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "20": 1,
+            "40": 1,
+            "61": 1,
+            "62": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "2c9ee9cd-4668-4c94-8822-ea865cdf9863",
+            "invocationId": "2c9ee9cd-4668-4c94-8822-ea865cdf9863",
+            "route": "/api/live/ticket",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:20.583Z",
+            "completedAt": "2026-11-10T03:29:20.758Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "2c9ee9cd-4668-4c94-8822-ea865cdf9863",
+        "invocationId": "2c9ee9cd-4668-4c94-8822-ea865cdf9863",
+        "route": "/api/live/ticket",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:20.583Z",
+        "completedAt": "2026-11-10T03:29:20.758Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+      "firstOrdinal": 32863,
+      "lastOrdinal": 32935,
+      "queryCalls": 22,
+      "logical": [
+        {
+          "context": 35,
+          "action": "execution-settings.getBotModelMenu",
+          "route": "/api/rpc",
+          "firstOrdinal": 32863,
+          "lastOrdinal": 32935,
+          "queries": 22,
+          "statementCounts": {
+            "0": 11,
+            "23": 1,
+            "36": 1,
+            "39": 1,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "49": 1,
+            "51": 2,
+            "52": 2
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+            "invocationId": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "execution-settings.getBotModelMenu",
+            "startedAt": "2026-11-10T03:29:20.666Z",
+            "completedAt": "2026-11-10T03:29:20.894Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+        "invocationId": "5e3c2fdd-64a4-4333-9ce2-35bb6c4be1de",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "execution-settings.getBotModelMenu",
+        "startedAt": "2026-11-10T03:29:20.666Z",
+        "completedAt": "2026-11-10T03:29:20.894Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+      "firstOrdinal": 32864,
+      "lastOrdinal": 32868,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 36,
+          "action": "bots.pollBots",
+          "route": "/api/rpc",
+          "firstOrdinal": 32864,
+          "lastOrdinal": 32868,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "60": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+            "invocationId": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots",
+            "startedAt": "2026-11-10T03:29:20.670Z",
+            "completedAt": "2026-11-10T03:29:20.735Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+        "invocationId": "4877d2da-b43d-491b-86b5-9ee615ba1225",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "bots.pollBots",
+        "startedAt": "2026-11-10T03:29:20.670Z",
+        "completedAt": "2026-11-10T03:29:20.735Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+      "firstOrdinal": 32869,
+      "lastOrdinal": 32939,
+      "queryCalls": 23,
+      "logical": [
+        {
+          "context": 37,
+          "action": "coordinator.syncCoordinatorChat",
+          "route": "/api/rpc",
+          "firstOrdinal": 32869,
+          "lastOrdinal": 32939,
+          "queries": 23,
+          "statementCounts": {
+            "0": 9,
+            "23": 1,
+            "36": 1,
+            "37": 1,
+            "38": 1,
+            "39": 1,
+            "40": 2,
+            "45": 1,
+            "47": 1,
+            "48": 1,
+            "51": 1,
+            "52": 1,
+            "57": 2
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+            "invocationId": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "coordinator.syncCoordinatorChat",
+            "startedAt": "2026-11-10T03:29:20.684Z",
+            "completedAt": "2026-11-10T03:29:20.928Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+        "invocationId": "1ea2e980-4d14-4e92-b149-23db89dfb0f4",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "startedAt": "2026-11-10T03:29:20.684Z",
+        "completedAt": "2026-11-10T03:29:20.928Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+      "firstOrdinal": 32870,
+      "lastOrdinal": 32906,
+      "queryCalls": 9,
+      "logical": [
+        {
+          "context": 38,
+          "action": "issues.syncIssueList",
+          "route": "/api/rpc",
+          "firstOrdinal": 32870,
+          "lastOrdinal": 32906,
+          "queries": 9,
+          "statementCounts": {
+            "0": 6,
+            "23": 1,
+            "37": 1,
+            "63": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+            "invocationId": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "issues.syncIssueList",
+            "startedAt": "2026-11-10T03:29:20.686Z",
+            "completedAt": "2026-11-10T03:29:20.853Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+        "invocationId": "f193529d-22ec-423b-8a7e-ac5826d1ae63",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "issues.syncIssueList",
+        "startedAt": "2026-11-10T03:29:20.686Z",
+        "completedAt": "2026-11-10T03:29:20.853Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "63e4a4e8-84a3-4562-8081-832dcd4dccbc",
+      "firstOrdinal": 32879,
+      "lastOrdinal": 32909,
+      "queryCalls": 7,
+      "logical": [
+        {
+          "context": 39,
+          "action": null,
+          "route": "/api/live/ticket",
+          "firstOrdinal": 32879,
+          "lastOrdinal": 32909,
+          "queries": 7,
+          "statementCounts": {
+            "7": 1,
+            "10": 1,
+            "11": 1,
+            "12": 1,
+            "40": 1,
+            "61": 1,
+            "62": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "63e4a4e8-84a3-4562-8081-832dcd4dccbc",
+            "invocationId": "63e4a4e8-84a3-4562-8081-832dcd4dccbc",
+            "route": "/api/live/ticket",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:20.746Z",
+            "completedAt": "2026-11-10T03:29:20.857Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "63e4a4e8-84a3-4562-8081-832dcd4dccbc",
+        "invocationId": "63e4a4e8-84a3-4562-8081-832dcd4dccbc",
+        "route": "/api/live/ticket",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:20.746Z",
+        "completedAt": "2026-11-10T03:29:20.857Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "652a90d9-2046-48b7-9367-c27623dabf36",
+      "firstOrdinal": 32950,
+      "lastOrdinal": 32950,
+      "queryCalls": 1,
+      "logical": [
+        {
+          "context": 40,
+          "action": null,
+          "route": "/api/mobile/reactions",
+          "firstOrdinal": 32950,
+          "lastOrdinal": 32950,
+          "queries": 1,
+          "statementCounts": {
+            "0": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "652a90d9-2046-48b7-9367-c27623dabf36",
+            "invocationId": "652a90d9-2046-48b7-9367-c27623dabf36",
+            "route": "/api/mobile/reactions",
+            "method": "GET",
+            "rpcAction": null,
+            "startedAt": "2026-11-10T03:29:21.010Z",
+            "completedAt": "2026-11-10T03:29:21.014Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "652a90d9-2046-48b7-9367-c27623dabf36",
+        "invocationId": "652a90d9-2046-48b7-9367-c27623dabf36",
+        "route": "/api/mobile/reactions",
+        "method": "GET",
+        "rpcAction": null,
+        "startedAt": "2026-11-10T03:29:21.010Z",
+        "completedAt": "2026-11-10T03:29:21.014Z",
+        "httpStatus": 200
+      }
+    },
+    {
+      "window": "webLogin",
+      "id": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+      "firstOrdinal": 32957,
+      "lastOrdinal": 32959,
+      "queryCalls": 2,
+      "logical": [
+        {
+          "context": 41,
+          "action": "bots.pollBots",
+          "route": "/api/rpc",
+          "firstOrdinal": 32957,
+          "lastOrdinal": 32959,
+          "queries": 2,
+          "statementCounts": {
+            "23": 1,
+            "60": 1
+          },
+          "receipt": {
+            "status": "known",
+            "httpInvocationId": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+            "invocationId": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+            "route": "/api/rpc",
+            "method": "POST",
+            "rpcAction": "bots.pollBots",
+            "startedAt": "2026-11-10T03:29:21.107Z",
+            "completedAt": "2026-11-10T03:29:21.118Z",
+            "httpStatus": 200
+          }
+        }
+      ],
+      "receipt": {
+        "status": "known",
+        "httpInvocationId": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+        "invocationId": "c5d146bc-90cc-49f5-8bd9-cd8be331ca97",
+        "route": "/api/rpc",
+        "method": "POST",
+        "rpcAction": "bots.pollBots",
+        "startedAt": "2026-11-10T03:29:21.107Z",
+        "completedAt": "2026-11-10T03:29:21.118Z",
+        "httpStatus": 200
+      }
+    }
+  ]
+}

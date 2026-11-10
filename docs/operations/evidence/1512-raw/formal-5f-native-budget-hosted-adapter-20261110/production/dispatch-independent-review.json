@@ -1,0 +1,111 @@
+{
+  "schema": "issue1512.independent-production-dispatch-static-review.v1",
+  "reviewer": "/root/independent_final",
+  "observedAt": "2026-11-10 03:49:37 UTC",
+  "result": "STATIC_NO_BLOCKER_FOR_CLOSED_STAGING_AND_REVIEWED_ACTIVATION_TEMPLATE",
+  "candidate": {
+    "commit": "ca6fe6dc65f9528c10401f17c764d0ff86f36ed2",
+    "tree": "71ef70a8be2eb8c454053264897a80039bf33e23",
+    "parents": [
+      "a0dd581c5b573e9809ef7cc362da93f1429dee13"
+    ],
+    "changedFiles": [
+      {
+        "path": ".github/issue1512-dispatch.json",
+        "sha": "21263f3d992bcd494137bbec4db7bc4460bfe561",
+        "status": "modified"
+      },
+      {
+        "path": ".github/workflows/issue1512-git-transport.yml",
+        "sha": "dec440a7513273d4bd155d40a423c97d63663212",
+        "status": "modified"
+      },
+      {
+        "path": "scripts/ops/issue1512-production-dispatch.mjs",
+        "sha": "295be4c6b5f405c0d35cebdcb3f8411d14701b36",
+        "status": "added"
+      },
+      {
+        "path": "scripts/ops/issue1512-production-dispatch.test.mjs",
+        "sha": "d691eae014652646df2cfef2f8d1015b6118c2f7",
+        "status": "added"
+      }
+    ]
+  },
+  "sourceBytesVerified": [
+    {
+      "name": "controller",
+      "gitBlob": "295be4c6b5f405c0d35cebdcb3f8411d14701b36",
+      "actualGitBlob": "295be4c6b5f405c0d35cebdcb3f8411d14701b36",
+      "bytes": 18304,
+      "sha256": "83faf224b41e1dd2714ba4db2450aa996f4ca4970beab54f1480bcfcfaa206a4"
+    },
+    {
+      "name": "tests",
+      "gitBlob": "d691eae014652646df2cfef2f8d1015b6118c2f7",
+      "actualGitBlob": "d691eae014652646df2cfef2f8d1015b6118c2f7",
+      "bytes": 14158,
+      "sha256": "8125bfef1c2fb722e5af677a665cb56994ad20f3176c40ba105b694c595b61d0"
+    },
+    {
+      "name": "closedWorkflow",
+      "gitBlob": "dec440a7513273d4bd155d40a423c97d63663212",
+      "actualGitBlob": "dec440a7513273d4bd155d40a423c97d63663212",
+      "bytes": 1525,
+      "sha256": "8fba3c31c8e568b42214c262773fac2fd36ed6dada99686bf37fead4da897f24"
+    },
+    {
+      "name": "closedManifest",
+      "gitBlob": "21263f3d992bcd494137bbec4db7bc4460bfe561",
+      "actualGitBlob": "21263f3d992bcd494137bbec4db7bc4460bfe561",
+      "bytes": 940,
+      "sha256": "9fa4571441693ed87da697efd18fdd4fc5f187812c1d1d526e809f434a0df7f4"
+    },
+    {
+      "name": "activeWorkflowTemplate",
+      "gitBlob": "14f990f1a424decdb6d768ae925d55c6424f2cc0",
+      "actualGitBlob": "14f990f1a424decdb6d768ae925d55c6424f2cc0",
+      "bytes": 1871,
+      "sha256": "08055aaf276b41c5d2f35ed314a2137919a83f3fe1c152358da5565b5fe93687"
+    },
+    {
+      "name": "activeManifestTemplate",
+      "gitBlob": "2b76876397be4a688377cbeb2e0f66be581fe976",
+      "actualGitBlob": "2b76876397be4a688377cbeb2e0f66be581fe976",
+      "bytes": 1185,
+      "sha256": "949430c873196850868ed359fd7bce1e2ae6d9d9b12e480c77476c258abe1e79"
+    }
+  ],
+  "scope": [
+    "Read controller and offline tests in full, both closed files and both activation templates. Verified each decoded source byte length, SHA-256 and Git blob SHA independently in V8.",
+    "Read remote candidate commit and compare. Exactly four transport files changed from a0dd581; one parent, one commit; no product or application workflow change.",
+    "Static review only: no Node tests, YAML execution, Actions dispatch, credential reads, account creation, production resource reservation or formal ref update performed by reviewer."
+  ],
+  "findings": [
+    "Closed workflow has literal false job guard and contents:read only; closed manifest enabled=false, null request/deployment fields. No active Actions write token is exposed by closed staging.",
+    "Activation template narrows push to exact repository/ops ref, attempt 1 and full mode+request UUID commit message. Controller independently verifies event head/after, checkout HEAD/message, current control ref, own SHA-256 and materialized control workflow Git blob.",
+    "Only fixed workflow 410611055/path run-trace-acceptance.yml/blob ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4 on main can be targeted. Target commit/tree and workflow metadata/state are verified before any POST. Source and public served build are checked before and after POST.",
+    "Fixed job concurrency group uses queue:max and cancel-in-progress:false. Official current GitHub documentation accepts this combination, serializes dispatch jobs and does not cancel an in-progress job on newer queued activations.",
+    "Exactly one dispatch POST maximum, with validated closed input set and string booleans. Timeout/invalid/non-success outcome retains inspection status and never retries. 200 response uses server-returned fresh run ID and exact API/html URLs; 204 uses at most one metadata discovery read and labels it candidate, never proof of inputs.",
+    "Nil Replay session UUID was a concrete gap in 8c583; latest controller now rejects it before POST and latest tests include a zero-POST regression. Nonzero trace and paired session/trace remain export-only.",
+    "GitHub token is confined to fixed api.github.com requests; public version endpoint receives no Authorization. No response body or raw exception message is emitted, only bounded metadata and hashes. Receipt path is fixed, directory mode0700/file0600.",
+    "Controller offline tests import built-in Node modules plus controller and read exactly controller bytes by new URL. Their injected fetch/read/git dependencies prevent credential/network/git side effects. Their actual Node execution is owned by Root and is still pending at this review.",
+    "Main public build binding does not pin hosted overlay; overlaySha is recorded only. One-shot refers to one maximum POST in this admitted attempt, not permanent deduplication across independently authored future activation commits.",
+    "After one admitted activation, Root must use closed workflow+disabled manifest and verify terminal/closing metadata as part of existing resource cleanup. Controller does not mutate its own branch or cancel/clean target application resources; target workflow owns its recovery journal and application cleanup."
+  ],
+  "activationMaterialization": [
+    "Resolve all activation placeholders to concrete final deployed main commit/tree, fresh request UUID, reviewed mode/case and exact inputs.",
+    "Recompute the materialized workflow Git blob and insert it into manifest; preserve controller hash and exact activation commit message in both source and Git commit.",
+    "Re-read actual main and deployed build/overlay before admission. This static review does not authorize claiming production acceptance, and current Native full-login gate remains failed at441 versus Web331."
+  ],
+  "officialDocs": [
+    {
+      "url": "https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency",
+      "checked": "Current docs allow queue:max with cancel-in-progress:false, up to100 pending and one running per group."
+    },
+    {
+      "url": "https://docs.github.com/en/rest/actions/workflows?apiVersion=2026-03-10",
+      "checked": "2026-03-10 dispatch documents Actions write, ref/inputs and HTTP200 workflow_run_id/run_url/html_url. Controller also accepts older204 response without retry. return_run_details is a compatibility extra and is not needed to infer acceptance beyond actual status/metadata."
+    }
+  ]
+}

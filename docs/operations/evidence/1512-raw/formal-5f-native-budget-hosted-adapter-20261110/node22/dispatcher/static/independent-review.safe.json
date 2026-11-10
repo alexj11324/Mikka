@@ -1,0 +1,89 @@
+{
+  "schema": "issue1512.independent-local-node22-dispatch-review.v1",
+  "reviewedAt": "2026-11-10 03:13:47 UTC",
+  "reviewer": "independent_final",
+  "verdict": "PASS_STATIC_REVIEW",
+  "candidate": {
+    "commit": "2415588c436eb1de3f8e38b0fde5db201e354b58",
+    "tree": "d8592fbc497a1127a39143a7ee3b944ae437eb79",
+    "parents": [
+      "2064a57803381338c159fef82a447f47615d4286"
+    ]
+  },
+  "files": [
+    {
+      "kind": "controller",
+      "blob": "f0771b6511579496f16afbee501d5e4fe29e3abe",
+      "bytes": 10877,
+      "sha256": "ce9abfd18d15d56591d1776590551065bd383797efcf9d01b681f59519ab15fb",
+      "computedGitBlob": "f0771b6511579496f16afbee501d5e4fe29e3abe"
+    },
+    {
+      "kind": "workflow",
+      "blob": "a559026235f1d2a3677fc1b34d62d1cdeb87b21e",
+      "bytes": 1380,
+      "sha256": "eed29df87f55074a16d8c13a5af43d2918370bfaf8874cd9675e8ef6787ead3e",
+      "computedGitBlob": "a559026235f1d2a3677fc1b34d62d1cdeb87b21e"
+    },
+    {
+      "kind": "manifest",
+      "blob": "74458f72fb4b784478e661a8899577a3153c48a5",
+      "bytes": 2261,
+      "sha256": "0be69bebed4e788f4ec18fbcc5bdbcd4606426447e351232fe8ca5376caa4c61",
+      "computedGitBlob": "74458f72fb4b784478e661a8899577a3153c48a5"
+    }
+  ],
+  "actualCompareFiles": [
+    {
+      "path": ".github/issue1512-local-node22-dispatch.json",
+      "sha": "74458f72fb4b784478e661a8899577a3153c48a5",
+      "status": "added",
+      "additions": 39,
+      "deletions": 0
+    },
+    {
+      "path": ".github/workflows/issue1512-local-node22-dispatch.yml",
+      "sha": "a559026235f1d2a3677fc1b34d62d1cdeb87b21e",
+      "status": "added",
+      "additions": 38,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/ops/issue1512-local-node22-dispatch.mjs",
+      "sha": "f0771b6511579496f16afbee501d5e4fe29e3abe",
+      "status": "added",
+      "additions": 183,
+      "deletions": 0
+    }
+  ],
+  "target": {
+    "repository": "alexj11324/Mikka",
+    "branch": "fix/1512-daemon-fixture-executable-20261109",
+    "commit": "5f3598029033b83ee72c88ea6c49955205eecab2",
+    "tree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+    "workflowId": 409752684,
+    "workflowPath": ".github/workflows/local-device-node22.yml",
+    "workflowBlob": "d195f389292e1a84967fd9864063ac536b91bbaf",
+    "fixtureBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+    "serviceBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355"
+  },
+  "checks": [
+    "Read all three candidate blobs and independently recomputed their UTF-8 byte counts, SHA-256 and Git blob IDs; every result matches the manifest and remote compare.",
+    "Read remote git commit and compare: exactly one parent 2064a57803381338c159fef82a447f47615d4286; expected candidate tree; exactly three added operational files and no product changes.",
+    "Read existing target workflow d195f389292e1a84967fd9864063ac536b91bbaf. It explicitly supports workflow_dispatch and preserves the existing package, real Node 22 unit, and macOS Node 22/18 fixture matrix. No assertions or fixture/product source are changed by this entry.",
+    "Entry only runs on its dedicated ops push branch with an explicit commit-message prefix and run_attempt 1. Controller additionally verifies repository, event, complete ops ref, attempt, checkout HEAD equals event SHA, manifest scope and controller SHA-256.",
+    "Before submitting, requires zero existing runs for the exact target SHA; validates target commit/tree, workflow/service/fixture blobs and the formal branch ref. The branch is read again after the POST attempt, including on POST errors.",
+    "The only allowed mutation is one POST to the hardcoded repository/workflow dispatch endpoint; no rerun/ref/source APIs, no retries. Source branch is fixed in the submitted body. API requests reject redirects and use a 15-second abort and 131072-byte response bound.",
+    "A 200 result must contain exactly bound run URLs and a positive run ID before GET verification. A standard 204 is accepted and followed by one bounded metadata discovery GET. Zero indexed runs remains dispatch_accepted_run_pending; multiple runs or binding mismatches fail. Both paths validate workflow ID, target SHA, formal branch, workflow_dispatch event and attempt 1 when a run is available.",
+    "A POST timeout, invalid response, post-ref mismatch or unknown outcome retains an inspection-required receipt and does not retry. Accepted dispatch is explicitly separate from test success.",
+    "Workflow-level permissions are empty; the sole dispatcher job temporarily gets contents:read/actions:write and a short-lived GITHUB_TOKEN. Checkout persistence is false. Token stays in memory/environment and is never emitted or included in the receipt.",
+    "Receipt fields are fixed identifiers, closed error codes, timestamps, lengths/hashes and selected run metadata; raw API/error bodies are not emitted. Receipt is written in finally with mode 0600 under a 0700 directory, and upload-artifact uses always()."
+  ],
+  "limitations": [
+    "This is a source review only; I did not dispatch a workflow, mutate a ref, execute Node, read original Mac job logs, or observe the new formal Mac result.",
+    "The branch-before/after checks detect ordinary ref movement; the returned/discovered run's exact head binding is the decisive acceptance condition. An accepted POST with indexing pending requires external read-only metadata inspection, never another POST.",
+    "The current entry contains enabled:true and an active one-shot guard. Closure is an explicit Root follow-up after the controller is terminal: normal closing commit with guard false, enabled false and actions:write removed, plus observed skipped closing run.",
+    "Existing-workflow execution may succeed or fail independently. A non-reproduction of the historical launchctl failure is not evidence that this dispatcher fixed product behavior."
+  ],
+  "disposition": "No blocking static defect found. Publish under the existing user authorization, preserve the receipt and actual run identity, monitor the existing formal workflow separately, then close this operational entry."
+}

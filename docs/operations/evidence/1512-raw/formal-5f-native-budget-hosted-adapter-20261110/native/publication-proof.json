@@ -1,0 +1,71 @@
+{
+  "schema": "issue1512-native-extractor-publication-proof-v1",
+  "admission": {
+    "sha": "4ba0efb132c4b166dea0555d9e5542a02e97beca",
+    "tree": "7ef3875e85351f8d79af84d9f71c8fdf91046422",
+    "parents": [
+      "3e440c2ff6808dd7c18bdedbf274373801f8583c",
+      "5f3598029033b83ee72c88ea6c49955205eecab2"
+    ]
+  },
+  "closure": {
+    "sha": "a09f7e3722ebfc0b1c1a503def05cf1884539638",
+    "tree": "1406a0cd2921f2b4ac18b32bb3713206462fc11f",
+    "parents": [
+      "4ba0efb132c4b166dea0555d9e5542a02e97beca"
+    ]
+  },
+  "sourceHead": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "sourceTree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+  "delta": [
+    {
+      "path": ".github/ops/issue1512-native-evidence-extract/controller.py",
+      "before": null,
+      "after": "9322b3f874f46cd036b67046a44b6b9297ea8d60"
+    },
+    {
+      "path": ".github/ops/issue1512-native-evidence-extract/manifest.json",
+      "before": null,
+      "after": "904e76857f0139a6bb4f0429493566a2c17d087c"
+    },
+    {
+      "path": ".github/workflows/issue1512-native-evidence-extract.yml",
+      "before": null,
+      "after": "a3d8cd5414ec5ee5bbfa4c45f270ff582c6f037a"
+    }
+  ],
+  "closureDelta": [
+    {
+      "path": ".github/ops/issue1512-native-evidence-extract/manifest.json",
+      "before": "904e76857f0139a6bb4f0429493566a2c17d087c",
+      "after": "5369ea3c64664b4d0e6b106ce23822d3a9379900"
+    },
+    {
+      "path": ".github/workflows/issue1512-native-evidence-extract.yml",
+      "before": "a3d8cd5414ec5ee5bbfa4c45f270ff582c6f037a",
+      "after": "7ae2dc0a42fbb26767cb2213eed867efc310ac46"
+    }
+  ],
+  "oldOpsReadback": {
+    "ref": "refs/heads/ops/1512-task-runs-pg-20261110",
+    "node_id": "REF_kwDOVRYxA9oAKXJlZnMvaGVhZHMvb3BzLzE1MTItdGFzay1ydW5zLXBnLTIwMjYxMTEw",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-task-runs-pg-20261110",
+    "object": {
+      "sha": "3e440c2ff6808dd7c18bdedbf274373801f8583c",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/3e440c2ff6808dd7c18bdedbf274373801f8583c"
+    }
+  },
+  "triggerAudit": {
+    "priorBlob": "45d53be337bab4972ef118766560b494576b9e38",
+    "all43ExistingWorkflowBlobsIdentical": true,
+    "oldOpsWorkflowAbsent": true,
+    "onlyNewPushWorkflow": ".github/workflows/issue1512-native-evidence-extract.yml",
+    "activeBranch": "ops/1512-task-runs-pg-20261110",
+    "anchorBranch": "ops/1512-native-evidence-admission-20261110",
+    "anchorDoesNotMatchAnyWorkflow": true,
+    "newWorkflowRunName": "Issue1512 Native original evidence extraction",
+    "existingWorkflowRunConsumersDoNotMatchNewName": true
+  },
+  "resourcesStarted": 0
+}

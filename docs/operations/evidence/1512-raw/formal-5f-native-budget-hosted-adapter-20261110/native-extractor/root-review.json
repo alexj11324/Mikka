@@ -1,0 +1,35 @@
+{
+  "schema": "mikka.issue1512.native-extractor-root-review.v1",
+  "reviewer": "root",
+  "reviewedAt": "2026-11-10 03:44:19 UTC",
+  "verdict": "no-blocker-for-one-admitted-extraction",
+  "source": {
+    "controller": "9322b3f874f46cd036b67046a44b6b9297ea8d60",
+    "controllerSha256": "c5d61ecf8fea25d76ccadcb60a9d6880b6b531667b03b4ef3b1735498252d3e4",
+    "manifest": "904e76857f0139a6bb4f0429493566a2c17d087c",
+    "workflow": "a3d8cd5414ec5ee5bbfa4c45f270ff582c6f037a"
+  },
+  "binding": {
+    "candidate": "4ba0efb132c4b166dea0555d9e5542a02e97beca",
+    "tree": "7ef3875e85351f8d79af84d9f71c8fdf91046422",
+    "parents": [
+      "3e440c2ff6808dd7c18bdedbf274373801f8583c",
+      "5f3598029033b83ee72c88ea6c49955205eecab2"
+    ],
+    "closePrepared": "a09f7e3722ebfc0b1c1a503def05cf1884539638"
+  },
+  "checked": [
+    "Read full controller, manifest and workflow; recomputed controller SHA256 and compared five privacy-audit source blobs against H complete tree.",
+    "Exact repository/branch/push before/head/message/parents/A1/expiry and immutable admission ref; no production/application credentials.",
+    "Source job and upload success, source head/synthetic same tree; original privacy audit uses local disposable fixture.",
+    "Only one authenticated artifact GET and one anonymous signed-delivery GET per immutable archive; no artifact retry or token forwarded to storage.",
+    "Match fixed metadata, size and SHA256; freeze full ZIP with calculated Git SHA1 before archive parsing; enforce bounded expansion/paths/types/member set/CRC; freeze five exact JSON members before JSON parse.",
+    "Failure receipts preserve completed original writes and closed error code/type; no arbitrary error string, URL or token output. Finally removes private temporary directory.",
+    "A single GitHub-hosted runner; no VM, DB, dependency install, product or paid model execution. Closure removes executable permission and sets guard/manifest closed."
+  ],
+  "limits": [
+    "Review is not actual extraction success or Native query-budget arithmetic.",
+    "No claim that archive expiry alone is permanent preservation; raw ZIP and JSON Git blobs must be linked into an evidence commit after extraction.",
+    "Closing and observed skipped run remain required after admission."
+  ]
+}

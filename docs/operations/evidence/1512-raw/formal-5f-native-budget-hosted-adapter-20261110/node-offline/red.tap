@@ -1,0 +1,483 @@
+TAP version 13
+# Subtest: one actual UI submit stays open, uses no API submission, and closes its own session once
+ok 1 - one actual UI submit stays open, uses no API submission, and closes its own session once
+  ---
+  duration_ms: 18.8967
+  type: 'test'
+  ...
+# Subtest: refuses actions before launching or typing credentials
+ok 2 - refuses actions before launching or typing credentials
+  ---
+  duration_ms: 0.739117
+  type: 'test'
+  ...
+# Subtest: refuses event before launching or typing credentials
+ok 3 - refuses event before launching or typing credentials
+  ---
+  duration_ms: 0.280667
+  type: 'test'
+  ...
+# Subtest: refuses repository before launching or typing credentials
+ok 4 - refuses repository before launching or typing credentials
+  ---
+  duration_ms: 0.255381
+  type: 'test'
+  ...
+# Subtest: refuses ref before launching or typing credentials
+ok 5 - refuses ref before launching or typing credentials
+  ---
+  duration_ms: 0.368457
+  type: 'test'
+  ...
+# Subtest: refuses sha before launching or typing credentials
+ok 6 - refuses sha before launching or typing credentials
+  ---
+  duration_ms: 0.246064
+  type: 'test'
+  ...
+# Subtest: refuses expiry before launching or typing credentials
+ok 7 - refuses expiry before launching or typing credentials
+  ---
+  duration_ms: 0.651047
+  type: 'test'
+  ...
+# Subtest: refuses fixture before launching or typing credentials
+ok 8 - refuses fixture before launching or typing credentials
+  ---
+  duration_ms: 0.305278
+  type: 'test'
+  ...
+# Subtest: refuses extra-ready before launching or typing credentials
+ok 9 - refuses extra-ready before launching or typing credentials
+  ---
+  duration_ms: 0.834564
+  type: 'test'
+  ...
+# Subtest: refuses debug before launching or typing credentials
+ok 10 - refuses debug before launching or typing credentials
+  ---
+  duration_ms: 0.509134
+  type: 'test'
+  ...
+# Subtest: workspace switch waits for the new HOME document, not the old HOME URL or hidden menu
+ok 11 - workspace switch waits for the new HOME document, not the old HOME URL or hidden menu
+  ---
+  duration_ms: 26.277176
+  type: 'test'
+  ...
+# Subtest: rejects ambiguousWorkspace without submitting and closes allocated resources
+ok 12 - rejects ambiguousWorkspace without submitting and closes allocated resources
+  ---
+  duration_ms: 2.644984
+  type: 'test'
+  ...
+# Subtest: rejects otherOwner without submitting and closes allocated resources
+ok 13 - rejects otherOwner without submitting and closes allocated resources
+  ---
+  duration_ms: 1.158363
+  type: 'test'
+  ...
+# Subtest: rejects ambiguousProfile without submitting and closes allocated resources
+ok 14 - rejects ambiguousProfile without submitting and closes allocated resources
+  ---
+  duration_ms: 2.638216
+  type: 'test'
+  ...
+# Subtest: rejects disabledSubmit without submitting and closes allocated resources
+ok 15 - rejects disabledSubmit without submitting and closes allocated resources
+  ---
+  duration_ms: 6.341835
+  type: 'test'
+  ...
+# Subtest: rejects buildChange without submitting and closes allocated resources
+ok 16 - rejects buildChange without submitting and closes allocated resources
+  ---
+  duration_ms: 2.031132
+  type: 'test'
+  ...
+# Subtest: rejects foreignSignIn without submitting and closes allocated resources
+ok 17 - rejects foreignSignIn without submitting and closes allocated resources
+  ---
+  duration_ms: 1.137512
+  type: 'test'
+  ...
+# Subtest: rejects foreignBusiness without submitting and closes allocated resources
+ok 18 - rejects foreignBusiness without submitting and closes allocated resources
+  ---
+  duration_ms: 1.415469
+  type: 'test'
+  ...
+# Subtest: checks expireBeforeSubmit after filling but before the paid side effect
+ok 19 - checks expireBeforeSubmit after filling but before the paid side effect
+  ---
+  duration_ms: 3.605285
+  type: 'test'
+  ...
+# Subtest: checks abortBeforeSubmit after filling but before the paid side effect
+ok 20 - checks abortBeforeSubmit after filling but before the paid side effect
+  ---
+  duration_ms: 7.319462
+  type: 'test'
+  ...
+# Subtest: no renderer business response cannot be replaced by the independent version API check
+ok 21 - no renderer business response cannot be replaced by the independent version API check
+  ---
+  duration_ms: 17.28699
+  type: 'test'
+  ...
+# Subtest: an already aborted signal creates no browser or session
+ok 22 - an already aborted signal creates no browser or session
+  ---
+  duration_ms: 0.593483
+  type: 'test'
+  ...
+# Subtest: never retries a submission with submitThrows and retains its unknown outcome
+ok 23 - never retries a submission with submitThrows and retains its unknown outcome
+  ---
+  duration_ms: 3.657081
+  type: 'test'
+  ...
+# Subtest: never retries a submission with submitUnknown and retains its unknown outcome
+ok 24 - never retries a submission with submitUnknown and retains its unknown outcome
+  ---
+  duration_ms: 3.598793
+  type: 'test'
+  ...
+# Subtest: abort cancels a pending actionable click before any logout await
+ok 25 - abort cancels a pending actionable click before any logout await
+  ---
+  duration_ms: 2.503885
+  type: 'test'
+  ...
+# Subtest: logout failure still closes every owned resource and makes idempotent close fail
+ok 26 - logout failure still closes every owned resource and makes idempotent close fail
+  ---
+  duration_ms: 2.249603
+  type: 'test'
+  ...
+# Subtest: report sink failure does not leak a page, context or browser
+ok 27 - report sink failure does not leak a page, context or browser
+  ---
+  duration_ms: 3.360057
+  type: 'test'
+  ...
+# Subtest: a resource that arrives after bounded abort cleanup is closed, never reported as already closed
+ok 28 - a resource that arrives after bounded abort cleanup is closed, never reported as already closed
+  ---
+  duration_ms: 19.202408
+  type: 'test'
+  ...
+# Subtest: a page-close failure stops the browser before any further cleanup wait can release a late click
+ok 29 - a page-close failure stops the browser before any further cleanup wait can release a late click
+  ---
+  duration_ms: 3.239072
+  type: 'test'
+  ...
+# Subtest: the actual workflow awaits actual actor session cleanup with no progress token in its environment
+ok 30 - the actual workflow awaits actual actor session cleanup with no progress token in its environment
+  ---
+  duration_ms: 9.497796
+  type: 'test'
+  ...
+# Subtest: Replay becomes ready before the one paid click and reports no upload acknowledgement
+ok 31 - Replay becomes ready before the one paid click and reports no upload acknowledgement
+  ---
+  duration_ms: 4.382291
+  type: 'test'
+  ...
+# Subtest: Replay missing bridge fails closed before paid submission and cleans owned resources
+ok 32 - Replay missing bridge fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 2.107721
+  type: 'test'
+  ...
+# Subtest: Replay SDK exception fails closed before paid submission and cleans owned resources
+ok 33 - Replay SDK exception fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 4.253921
+  type: 'test'
+  ...
+# Subtest: Replay no SDK fails closed before paid submission and cleans owned resources
+ok 34 - Replay no SDK fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 3.457416
+  type: 'test'
+  ...
+# Subtest: Replay unstarted recording fails closed before paid submission and cleans owned resources
+ok 35 - Replay unstarted recording fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 2.03863
+  type: 'test'
+  ...
+# Subtest: Replay no snapshot fails closed before paid submission and cleans owned resources
+ok 36 - Replay no snapshot fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 1.832464
+  type: 'test'
+  ...
+# Subtest: Replay malformed true fails closed before paid submission and cleans owned resources
+ok 37 - Replay malformed true fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 2.08554
+  type: 'test'
+  ...
+# Subtest: Replay invalid session fails closed before paid submission and cleans owned resources
+ok 38 - Replay invalid session fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 3.16451
+  type: 'test'
+  ...
+# Subtest: Replay last-moment session change fails closed before paid submission and cleans owned resources
+ok 39 - Replay last-moment session change fails closed before paid submission and cleans owned resources
+  ---
+  duration_ms: 1.924703
+  type: 'test'
+  ...
+# Subtest: Replay pending abort cannot submit after a late ready result
+ok 40 - Replay pending abort cannot submit after a late ready result
+  ---
+  duration_ms: 5.745759
+  type: 'test'
+  ...
+# Subtest: Replay pending timeout cannot submit after a late ready result
+ok 41 - Replay pending timeout cannot submit after a late ready result
+  ---
+  duration_ms: 10.201136
+  type: 'test'
+  ...
+# Subtest: acceptance marker is installed before the first document and stays on the official top-level app
+ok 42 - acceptance marker is installed before the first document and stays on the official top-level app
+  ---
+  duration_ms: 7.196597
+  type: 'test'
+  ...
+# Subtest: an acceptance marker installation failure submits nothing and closes the allocated context
+ok 43 - an acceptance marker installation failure submits nothing and closes the allocated context
+  ---
+  duration_ms: 0.482806
+  type: 'test'
+  ...
+# Subtest: hosted shell and create window select the exact Personal, Coordinator, Cloud and fixture Profile before one click
+not ok 44 - hosted shell and create window select the exact Personal, Coordinator, Cloud and fixture Profile before one click
+  ---
+  duration_ms: 0.92911
+  type: 'test'
+  location: '/vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:587:1'
+  failureType: 'testCodeFailure'
+  error: 'browser_ui_failed'
+  code: 'browser_ui_failed'
+  stack: |-
+    refusal (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:24:25)
+    check (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:25:60)
+    unique (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:148:5)
+    async click (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:152:5)
+    async startObservabilityBrowser (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:308:7)
+    async TestContext.<anonymous> (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:590:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: hosted create window omits Hand to only when the Coordinator is the sole handler
+not ok 45 - hosted create window omits Hand to only when the Coordinator is the sole handler
+  ---
+  duration_ms: 0.795416
+  type: 'test'
+  location: '/vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:610:1'
+  failureType: 'testCodeFailure'
+  error: 'browser_ui_failed'
+  code: 'browser_ui_failed'
+  stack: |-
+    refusal (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:24:25)
+    check (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:25:60)
+    unique (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:148:5)
+    async click (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:152:5)
+    async startObservabilityBrowser (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:334:5)
+    async TestContext.<anonymous> (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:612:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: hosted mixed picker surfaces fails before the paid click and closes owned resources
+ok 46 - hosted mixed picker surfaces fails before the paid click and closes owned resources
+  ---
+  duration_ms: 0.850436
+  type: 'test'
+  ...
+# Subtest: hosted missing bot picker with a Hand to row fails before the paid click and closes owned resources
+ok 47 - hosted missing bot picker with a Hand to row fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.146119
+  type: 'test'
+  ...
+# Subtest: hosted missing Profile row fails before the paid click and closes owned resources
+ok 48 - hosted missing Profile row fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.258802
+  type: 'test'
+  ...
+# Subtest: hosted ambiguous Profile row fails before the paid click and closes owned resources
+ok 49 - hosted ambiguous Profile row fails before the paid click and closes owned resources
+  ---
+  duration_ms: 2.74892
+  type: 'test'
+  ...
+# Subtest: hosted ambiguous Profile choice fails before the paid click and closes owned resources
+ok 50 - hosted ambiguous Profile choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.245494
+  type: 'test'
+  ...
+# Subtest: hosted missing Cloud choice fails before the paid click and closes owned resources
+ok 51 - hosted missing Cloud choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 0.952327
+  type: 'test'
+  ...
+# Subtest: hosted missing fixture Profile choice fails before the paid click and closes owned resources
+ok 52 - hosted missing fixture Profile choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 0.852357
+  type: 'test'
+  ...
+# Subtest: hosted unapplied Coordinator choice fails before the paid click and closes owned resources
+ok 53 - hosted unapplied Coordinator choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 0.697792
+  type: 'test'
+  ...
+# Subtest: hosted unapplied Cloud choice fails before the paid click and closes owned resources
+ok 54 - hosted unapplied Cloud choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 1.046876
+  type: 'test'
+  ...
+# Subtest: hosted unapplied Profile choice fails before the paid click and closes owned resources
+ok 55 - hosted unapplied Profile choice fails before the paid click and closes owned resources
+  ---
+  duration_ms: 0.83911
+  type: 'test'
+  ...
+# Subtest: hosted Profile changes while Replay becomes ready fails before the paid click and closes owned resources
+ok 56 - hosted Profile changes while Replay becomes ready fails before the paid click and closes owned resources
+  ---
+  duration_ms: 0.660329
+  type: 'test'
+  ...
+# Subtest: a flat hosted workspace label shared by another account is refused before opening its menu
+not ok 57 - a flat hosted workspace label shared by another account is refused before opening its menu
+  ---
+  duration_ms: 1.214491
+  type: 'test'
+  location: '/vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:643:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'browser_ui_failed'
+    - 'browser_workspace_ambiguous'
+               ^
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'browser_workspace_ambiguous'
+  actual: 'browser_ui_failed'
+  operator: 'strictEqual'
+  stack: |-
+    Object.<anonymous> (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:646:43)
+    expectedException (node:assert:578:17)
+    expectsError (node:assert:703:21)
+    strict.rejects (node:assert:769:3)
+    async TestContext.<anonymous> (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:645:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: the hosted Create task shortcut button is never retried after submitThrows
+not ok 58 - the hosted Create task shortcut button is never retried after submitThrows
+  ---
+  duration_ms: 0.9141
+  type: 'test'
+  location: '/vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:655:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:658:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: the hosted Create task shortcut button is never retried after submitUnknown
+not ok 59 - the hosted Create task shortcut button is never retried after submitUnknown
+  ---
+  duration_ms: 0.88456
+  type: 'test'
+  location: '/vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:655:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:658:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: hosted shell with the default task dialog retains the independent slot fallbacks and one submission
+not ok 60 - hosted shell with the default task dialog retains the independent slot fallbacks and one submission
+  ---
+  duration_ms: 0.74109
+  type: 'test'
+  location: '/vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:669:3'
+  failureType: 'testCodeFailure'
+  error: 'browser_ui_failed'
+  code: 'browser_ui_failed'
+  stack: |-
+    refusal (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:24:25)
+    check (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:25:60)
+    unique (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:148:5)
+    async click (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:152:5)
+    async startObservabilityBrowser (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:334:5)
+    async TestContext.<anonymous> (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:671:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: default shell with the hosted task window retains the independent slot fallbacks and one submission
+not ok 61 - default shell with the hosted task window retains the independent slot fallbacks and one submission
+  ---
+  duration_ms: 1.031215
+  type: 'test'
+  location: '/vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:669:3'
+  failureType: 'testCodeFailure'
+  error: 'browser_ui_failed'
+  code: 'browser_ui_failed'
+  stack: |-
+    refusal (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:24:25)
+    check (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:25:60)
+    unique (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:148:5)
+    async click (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:152:5)
+    async startObservabilityBrowser (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.mjs:351:5)
+    async TestContext.<anonymous> (file:///vercel/sandbox/issue1512-offline/red/scripts/acceptance/run-observability-browser.test.mjs:671:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..61
+# tests 61
+# suites 0
+# pass 54
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 395.065445
