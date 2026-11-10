@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 
-/** The only run outcomes a Linear comment may name. Anything else never reaches a comment. */
+/** The only run outcomes a Linear comment may name. Anything else renders the safe fallback. */
 export const LINEAR_RUN_STATUS_TEXT = {
   succeeded: { en: 'Done', 'zh-CN': '完成' },
   failed: { en: 'Failed', 'zh-CN': '失败' },
@@ -15,6 +15,8 @@ export type LinearRunCommentLocale = 'en' | 'zh-CN'
 
 /** Longest title in the header, in code points: one line, about 100 Latin characters. */
 export const RUN_COMMENT_TITLE_MAX = 100
+/** The whole message stays inside this budget whenever the deep link allows it. */
+export const RUN_COMMENT_MAX = 400
 
 export type LinearRunCommentInput = {
   /** `taskIdentifiers` output such as `MIK-42`; empty when the task has no identifier. */
@@ -28,7 +30,14 @@ export type LinearRunCommentInput = {
   deepLink: string
 }
 
+const PREFIX = 'Mikka: '
+const SEPARATOR = ' — '
+const LINK_LABEL = 'Open in Mikka'
+const ELLIPSIS = '…'
+/** The closing parenthesis would end the Markdown link early. */
+const HTTP_URL = /^https?:\/\/[^\s)]+$/
 const EMPTY_SUBJECT: Record<LinearRunCommentLocale, string> = { en: 'your run', 'zh-CN': '你的任务' }
+const STATUS_UNAVAILABLE: Record<LinearRunCommentLocale, string> = { en: 'Status unavailable', 'zh-CN': '状态不可用' }
 
 /** Missing or unknown locales read English; Chinese only on an explicit `zh-CN`. */
 export function linearRunCommentLocale(value: string | null | undefined): LinearRunCommentLocale {
@@ -38,25 +47,50 @@ export function linearRunCommentLocale(value: string | null | undefined): Linear
 /** Task text is display text, never a second line: newlines and controls become spaces. */
 const oneLine = (value: string) => value.replace(/[\s\p{Cc}]+/gu, ' ').trim()
 
+/** Collapse whitespace and cap the value without splitting a surrogate pair. */
+function truncatePoints(value: string, max: number): string {
+  const points = Array.from(value)
+  if (max <= 0) return ''
+  if (points.length <= max) return points.join('')
+  if (max === 1) return ELLIPSIS
+  return `${points.slice(0, max - 1).join('')}${ELLIPSIS}`
+}
+
 /** Collapse whitespace and cap the title without splitting a surrogate pair. */
 export function truncateCommentTitle(title: string, max = RUN_COMMENT_TITLE_MAX): string {
-  const points = Array.from(oneLine(title))
-  return points.length <= max ? points.join('') : `${points.slice(0, Math.max(0, max - 1)).join('')}…`
+  return truncatePoints(oneLine(title), max)
+}
+
+/** Keep the identifier when the title must shrink; never invent a second line. */
+function boundedSubject(identifier: string, title: string, room: number, fallback: string): string {
+  if (room <= 0) return ''
+  const whole = [identifier, title].filter(Boolean).join(' ') || fallback
+  if (Array.from(whole).length <= room) return whole
+  const idLength = Array.from(identifier).length
+  if (identifier && room > idLength + 1) {
+    const bounded = truncatePoints(title, room - idLength - 1)
+    return [identifier, bounded].filter(Boolean).join(' ')
+  }
+  return truncatePoints(whole, room)
 }
 
 /**
  * `Mikka: <identifier> <title> — <status>` on one line, then the deep link.
  * Deliberately reads only these five fields: stopReason, error, failureDetails,
  * report, prompt, credentials, paths and names have no way into the body.
+ * Unknown statuses render an explicit label instead of a prototype member.
  */
 export function linearRunCommentBody(input: LinearRunCommentInput): string {
-  const copy = LINEAR_RUN_STATUS_TEXT[input.status]
-  if (!copy) throw new Error('Unsupported Linear run status')
   const locale = linearRunCommentLocale(input.locale)
-  const title = truncateCommentTitle(input.title)
-  const subject = [oneLine(input.identifier), title].filter(Boolean).join(' ') || EMPTY_SUBJECT[locale]
-  const status = copy[locale]
-  return `Mikka: ${subject} — ${status}\n[Open in Mikka](${input.deepLink})`
+  const label = Object.hasOwn(LINEAR_RUN_STATUS_TEXT, input.status)
+    ? LINEAR_RUN_STATUS_TEXT[input.status][locale]
+    : STATUS_UNAVAILABLE[locale]
+  const deepLink = input.deepLink.trim()
+  if (!HTTP_URL.test(deepLink)) throw new TypeError('deep link must be an http(s) URL without whitespace or a closing parenthesis')
+  const linkLine = `[${LINK_LABEL}](${deepLink})`
+  const fixed = `${PREFIX}${SEPARATOR}${label}\n${linkLine}`
+  const subject = boundedSubject(oneLine(input.identifier), truncateCommentTitle(input.title), RUN_COMMENT_MAX - fixed.length, EMPTY_SUBJECT[locale])
+  return `${PREFIX}${subject ? `${subject}${SEPARATOR}` : ''}${label}\n${linkLine}`
 }
 
 export type LinearRunDeepLinkInput = {
@@ -70,8 +104,16 @@ export type LinearRunDeepLinkInput = {
 
 /** `workspaceLink` names the task and thread; only their opaque ids reach the URL. */
 export function linearRunDeepLink({ issueId, runId, origin, basePath = BASE_PATH }: LinearRunDeepLinkInput): string {
+  let parsed: URL
+  try {
+    parsed = new URL(origin)
+  } catch (error) {
+    throw new TypeError('origin must be an http(s) origin', { cause: error })
+  }
+  if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || parsed.pathname !== '/' || parsed.search
+    || parsed.hash || parsed.username || parsed.password) throw new TypeError('origin must be an http(s) origin')
   const path = withBasePath(workspaceLink({ ...(issueId ? { issue: issueId } : {}), thread: runId }), basePath)
-  return `${origin.replace(/\/+$/, '')}${path}`
+  return `${parsed.origin}${path}`
 }
 
 /**

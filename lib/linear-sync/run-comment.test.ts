@@ -5,6 +5,7 @@ import {
   LINEAR_RUN_STATUS_TEXT,
   linearRunCommentBody,
   linearRunDeepLink,
+  RUN_COMMENT_MAX,
   RUN_COMMENT_TITLE_MAX,
   type LinearRunCommentInput,
 } from './run-comment'
@@ -102,11 +103,63 @@ test('task text cannot open a second line or forge the link line', () => {
   assert.ok(lines[0].startsWith('Mikka: MIK-42 Mikka: forged line one line two https://evil.example'))
 })
 
-test('an unsupported status is refused instead of rendered', () => {
-  assert.throws(
-    () => linearRunCommentBody({ identifier: 'MIK-42', title: 'x', status: 'paused' as never, locale: 'en', deepLink: DEEP_LINK }),
-    /Unsupported Linear run status/,
+test('a status outside the fixed four renders an explicit safe label, never a prototype member', () => {
+  for (const status of ['paused', 'provider_failure', 'constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    const body = linearRunCommentBody({ identifier: 'MIK-42', title: 'Fix login redirect', status: status as never, locale: 'en', deepLink: DEEP_LINK })
+    assert.equal(body, `Mikka: MIK-42 Fix login redirect — Status unavailable\n[Open in Mikka](${DEEP_LINK})`, status)
+    assert.ok(!body.includes('undefined'), status)
+    assert.ok(!body.includes('function'), status)
+  }
+  assert.equal(
+    linearRunCommentBody({ identifier: 'MIK-42', title: 'Fix login redirect', status: 'constructor' as never, locale: 'zh-CN', deepLink: DEEP_LINK }).split('\n')[0],
+    'Mikka: MIK-42 Fix login redirect — 状态不可用',
   )
+})
+
+test('a deep link that is not one http(s) URL is refused, never spliced into Markdown', () => {
+  for (const deepLink of [
+    `https://app.example.com/x\nhttps://evil.example`,
+    'javascript:alert(1)',
+    '   ',
+    'https://app.example.com/x)',
+    'https://app.example.com/x y',
+    'file:///tmp/app',
+  ]) {
+    assert.throws(
+      () => linearRunCommentBody({ identifier: 'MIK-42', title: 'Fix login redirect', status: 'succeeded', locale: 'en', deepLink }),
+      /deep link/,
+      JSON.stringify(deepLink),
+    )
+  }
+})
+
+test('the whole message stays within the 400-character budget when the link allows it', () => {
+  const body = linearRunCommentBody({ identifier: 'MIK-42', title: 'A'.repeat(400), status: 'succeeded', locale: 'en', deepLink: DEEP_LINK })
+  const [header, link, ...rest] = body.split('\n')
+  assert.deepEqual(rest, [], 'exactly two lines')
+  assert.equal(link, `[Open in Mikka](${DEEP_LINK})`, 'the link is never truncated')
+  assert.ok(body.length <= RUN_COMMENT_MAX, `${body.length} characters`)
+  assert.ok(header.endsWith('… — Done'))
+})
+
+test('a longer link shrinks the title first and keeps the identifier and the whole link', () => {
+  const deepLink = `${ORIGIN}/mikka?issue=${'a'.repeat(280)}`
+  const body = linearRunCommentBody({ identifier: 'MIK-42', title: 'B'.repeat(200), status: 'failed', locale: 'en', deepLink })
+  const [header, link] = body.split('\n')
+  assert.ok(body.length <= RUN_COMMENT_MAX, `${body.length} characters`)
+  assert.ok(header.startsWith('Mikka: MIK-42 '), 'the identifier survives')
+  assert.ok(header.endsWith('… — Failed'), 'only the title gives way')
+  assert.equal(link, `[Open in Mikka](${deepLink})`)
+})
+
+test('a link that alone exceeds the budget stays whole and keeps the two-line structure', () => {
+  const deepLink = `${ORIGIN}/mikka?issue=${'a'.repeat(500)}`
+  const body = linearRunCommentBody({ identifier: 'MIK-42', title: 'Fix login redirect', status: 'succeeded', locale: 'en', deepLink })
+  const lines = body.split('\n')
+  assert.equal(lines.length, 2)
+  assert.ok(body.length > RUN_COMMENT_MAX, 'the intact link may exceed the copy budget')
+  assert.equal(lines[0], 'Mikka: Done', 'no subject fits beside the oversized link')
+  assert.equal(lines[1], `[Open in Mikka](${deepLink})`)
 })
 
 test('the comment id is a stable RFC 4122 UUID per run', () => {
@@ -134,4 +187,14 @@ test('the deep link carries only opaque ids, prefixing origin and base path', ()
   const link = linearRunDeepLink({ issueId: ISSUE, runId: RUN, origin: ORIGIN, basePath: '/mikka' })
   assert.ok(!link.includes('Fix login redirect'))
   assert.ok(!link.includes('MIK-42'))
+})
+
+test('the deep link origin must be a bare http(s) origin', () => {
+  for (const origin of ['', 'https://app.example.com/mikka', 'file:///tmp/app', 'https://user:pass@app.example.com', 'https://app.example.com/?workspace=1']) {
+    assert.throws(
+      () => linearRunDeepLink({ issueId: ISSUE, runId: RUN, origin, basePath: '' }),
+      /origin/,
+      JSON.stringify(origin),
+    )
+  }
 })
