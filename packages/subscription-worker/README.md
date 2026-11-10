@@ -77,6 +77,45 @@ routine rotation preserves bot bindings, reconnect/disconnect advance the epoch.
 New turns refuse unavailable publications. Native refresh waits recognize their
 own transient publication while still enforcing owner, epoch and binding.
 
+## Model catalogue and Codex priority
+
+The owner-scoped `models` custody read uses Codex's
+`/backend-api/codex/models?client_version=0.167.0` endpoint. Each Codex model can
+include an optional `prioritySupported` boolean alongside its ID and name.
+This projection follows the official
+[service-tier capability check](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/protocol/src/openai_models.rs#L1115-L1130):
+a valid `service_tiers` array advertises support only through an exact
+`id: "priority"`. An empty array or one without that ID yields false. Missing,
+null, or malformed data, including any member without a nonempty string ID,
+leaves support unknown and omits the field. Display metadata is ignored;
+`additional_speed_tiers` is not evidence. Claude omits this field. The existing
+ID/name validation, response limits, and epoch/state check after the read remain.
+
+The existing `ensureCatalogues` path upgrades a Codex catalogue without
+`priorityVersion: 1` after a successful account read. It saves the boolean
+`prioritySupport` map in the existing `modelCatalog` transaction, fenced to the
+same connection epoch. Requests use that catalogue through the existing fresh
+access read; priority selection adds no per-turn `GET /models` or SQL query.
+
+Non-scheduled hosted chats handled by `coordinatorTurn`, including the built-in
+Coordinator and named Bots, receive the internal priority policy on the Codex
+subscription path. This includes the function's `sourceEventId` and
+`taskEventId` turns. Scheduled reads and dispatched Agent executions receive
+no such policy. A current-epoch catalogue must advertise support for the
+selected model before the request includes `service_tier: "priority"`. Unknown
+or unsupported capability omits the field on the same single request, without
+retry. Provider options cannot enable this policy. Model, reasoning effort,
+prompt, tools, and authorization checks retain their existing behavior.
+
+Fast can consume additional subscription allowance or credits; see the official
+[speed guide](https://learn.chatgpt.com/docs/agent-configuration/speed) and
+[pricing guide](https://learn.chatgpt.com/docs/pricing) for applicable rates.
+See [Codex priority evidence](../../docs/operations/tracing.md#codex-priority-evidence)
+to distinguish intent, the filtered request field, and the provider's native
+response.
+Provider acceptance and improved first-text latency require separate
+revision-bound evidence.
+
 ## Backend credential boundary
 
 Custody children acquire/refresh grants and publish two immutable artifacts: the

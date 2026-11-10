@@ -1,4 +1,5 @@
 import { reconcileSubscriptionModels, type ModelSettings } from './enabled-models-policy'
+import type { SubscriptionCatalogueModel } from './subscription-service-tier'
 import "server-only";
 import { ActionFailureError } from "./action-error";
 import { createHash } from "node:crypto";
@@ -150,7 +151,8 @@ export class ExecutionSettings {
   async connectedSubscriptions(ownerId: string, missingOnly = false): Promise<string[]> {
     return (await this.pool.query<{ id: string }>(
       `SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false AND "removedAt" IS NULL
-       AND ($2::boolean=false OR "modelCatalog" IS NULL OR "modelCatalog"->>'revision'<>epoch::text) ORDER BY id`,
+       AND ($2::boolean=false OR "modelCatalog" IS NULL OR "modelCatalog"->>'revision'<>epoch::text
+         OR (provider='codex' AND "modelCatalog"->>'priorityVersion' IS DISTINCT FROM '1')) ORDER BY id`,
       [ownerId, missingOnly])).rows.map((row) => row.id);
   }
   /**
@@ -158,7 +160,7 @@ export class ExecutionSettings {
    * Each connected subscription with none for its current revision asks its account once; one that
    * does not answer in time is asked again on the next read. Never throws.
    */
-  async ensureCatalogues(scope: ExecutionSettingsScope, timeoutMs = 8000, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
+  async ensureCatalogues(scope: ExecutionSettingsScope, timeoutMs = 8000, discover?: (ownerId: string, connectionId: string) => Promise<SubscriptionCatalogueModel[]>) {
     const missing = await this.connectedSubscriptions(scope.ownerId, true);
     await Promise.allSettled(missing.map((connectionId) => Promise.race([
       // The reason only (a refusal code or error name), never what the provider answered.
@@ -169,13 +171,13 @@ export class ExecutionSettings {
       new Promise((resolve) => setTimeout(resolve, timeoutMs).unref?.()),
     ])));
   }
-  async refreshBotModels(scope: ExecutionSettingsScope, connectionId: string, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
+  async refreshBotModels(scope: ExecutionSettingsScope, connectionId: string, discover?: (ownerId: string, connectionId: string) => Promise<SubscriptionCatalogueModel[]>) {
     if (!z.uuid().safeParse(connectionId).success) throw new ActionFailureError("executionAccountUnavailable");
     const connection = (await this.pool.query(
       `SELECT id,epoch,provider,"workspaceId" FROM byos_connections WHERE id=$1 AND "ownerId"=$2 AND state='connected' AND paused=false`,
       [connectionId, scope.ownerId])).rows[0];
     if (!connection) throw new ActionFailureError("executionAccountUnavailable");
-    let models: {id: string; name?: string}[];
+    let models: SubscriptionCatalogueModel[];
     try {
       models = await (discover ?? (async (ownerId, id) => (await import("./subscription-runtime")).subscriptionRuntime().models(ownerId,id)))(scope.ownerId, connectionId);
     } catch { throw new ActionFailureError("executionAccountUnavailable"); }
@@ -193,7 +195,7 @@ export class ExecutionSettings {
         const id = `${hash.slice(0,8)}-${hash.slice(8,12)}-4${hash.slice(13,16)}-8${hash.slice(17,20)}-${hash.slice(20,32)}`;
         await client.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (id) DO NOTHING`, [id,scope.ownerId,connection.workspaceId,id,connectionId,connection.epoch,route,model.id]);
       }
-      await client.query(`UPDATE byos_connections SET "modelCatalog"=$2::jsonb,"modelSettings"=$3::jsonb WHERE id=$1`, [connectionId,JSON.stringify({revision:String(connection.epoch),models:unique.map(model=>model.id)}), JSON.stringify({ ...reconcileSubscriptionModels(unique.map(model => model.id), current.rows[0].modelSettings as ModelSettings | null), refreshedAt: new Date().toISOString() })]);
+      await client.query(`UPDATE byos_connections SET "modelCatalog"=$2::jsonb,"modelSettings"=$3::jsonb WHERE id=$1`, [connectionId,JSON.stringify({revision:String(connection.epoch),models:unique.map(model=>model.id),...(connection.provider === 'codex' ? {priorityVersion:1,prioritySupport:Object.fromEntries(unique.filter(model=>typeof model.prioritySupported === 'boolean').map(model=>[model.id,model.prioritySupported]))} : {})}), JSON.stringify({ ...reconcileSubscriptionModels(unique.map(model => model.id), current.rows[0].modelSettings as ModelSettings | null), refreshedAt: new Date().toISOString() })]);
       await client.query('COMMIT');
     } catch(error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
     const options = (await this.botModels(scope)).filter(row => row.connectionId === connectionId && unique.some(model => model.id === row.modelId));

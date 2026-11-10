@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { SubscriptionModelCatalogue } from './subscription-service-tier'
 import type { Pool } from 'pg'
 import { quotaSnapshotSchema, type QuotaSnapshot } from '@mikka/protocol'
 import { subscriptionBindingSchema, type SubscriptionRoute, SubscriptionRefusal } from '@mikka/protocol/subscription'
@@ -6,7 +7,7 @@ import type { CredentialScope } from '../packages/daemon/src/subscription-worker
 import { runMayUseCredentialSql } from './personal-policy'
 import { quotaDisplayKey } from './subscription-quota'
 
-export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null; paused?: boolean; modelCatalog?: { revision: number | string; models: string[] } | null }
+export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null; paused?: boolean; modelCatalog?: SubscriptionModelCatalogue | null }
 export class SubscriptionRepository {
   constructor(readonly pool: Pick<Pool, 'query'> & Partial<Pick<Pool, 'connect'>>) {}
   /** Serialize allocation only: provider calls happen after this short transaction.

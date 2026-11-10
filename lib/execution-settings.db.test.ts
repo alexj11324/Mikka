@@ -208,9 +208,26 @@ test(
       assert.equal(option.accountLabel, 'Claude Max'); assert.equal(option.plan, 'Max');
       const refreshed = await settings.refreshBotModels(alice, connection, async (owner, id) => {
         assert.equal(owner, 'alice'); assert.equal(id, connection);
-        return [{id:'provider-model'}, {id:'provider-model'}, {id:'second-provider-model'}];
+        return [{id:'provider-model',prioritySupported:false}, {id:'provider-model',prioritySupported:false}, {id:'second-provider-model',prioritySupported:true}];
       });
       assert.deepEqual(refreshed.map(row=>row.modelId).sort(), ['provider-model','second-provider-model']);
+      assert.deepEqual((await pool.query('SELECT "modelCatalog" FROM byos_connections WHERE id=$1',[connection])).rows[0].modelCatalog, {
+        revision:'1',models:['provider-model','second-provider-model'],priorityVersion:1,
+        prioritySupport:{'provider-model':false,'second-provider-model':true},
+      });
+      assert.equal((await settings.connectedSubscriptions('alice',true)).includes(connection),false);
+      // A legacy current-epoch catalogue refreshes once through the existing
+      // menu path. Unknown capability is recorded without repeatedly probing.
+      await pool.query(`UPDATE byos_connections SET "modelCatalog"="modelCatalog"-'priorityVersion'-'prioritySupport' WHERE id=$1`,[connection]);
+      assert.equal((await settings.connectedSubscriptions('alice',true)).includes(connection),true);
+      let catalogueReads=0;
+      const unknownCapability = async () => { catalogueReads++; return [{id:'provider-model'},{id:'second-provider-model'}] };
+      await settings.ensureCatalogues(alice,8000,unknownCapability);
+      await settings.ensureCatalogues(alice,8000,unknownCapability);
+      assert.equal(catalogueReads,1);
+      assert.equal((await settings.connectedSubscriptions('alice',true)).includes(connection),false);
+      assert.deepEqual((await pool.query('SELECT "modelCatalog" FROM byos_connections WHERE id=$1',[connection])).rows[0].modelCatalog.prioritySupport,{});
+
       await assert.rejects(settings.refreshBotModels(bob, connection, async () => { throw new Error('must not discover foreign account') }), { code: 'executionAccountUnavailable' });
       // A subscription belongs to the account: its owner refreshes it from any workspace (decision 2026-10-31-2130).
       await settings.refreshBotModels(other, connection, async () => []);

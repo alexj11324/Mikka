@@ -2,6 +2,7 @@ import { HostedWorkflowModel } from './abuse/workflow-model'
 import { WorkflowAgent, type WorkflowAgentStreamOptions } from '@ai-sdk/workflow'
 import type { StopCondition, ToolSet } from 'ai'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
+import type { SubscriptionModelRequestPolicy } from './subscription-service-tier'
 import type { HostedRuntimeSnapshot } from './subscription-model-snapshot'
 import { getWorkflowMetadata } from 'workflow'
 import { GENERATION_FAILURES, generationFailureDetails } from './subscription-generation-diagnostics'
@@ -37,13 +38,13 @@ export function timedTools(tools: ToolSet, timings: ToolTiming[], now: () => num
 }
 
 /** Retains the Workflow tool loop and the selected model's admission boundary. */
-export async function runHostedWorkflowTurn(runtime: HostedRuntimeSnapshot, tools: ToolSet, options: WorkflowAgentStreamOptions<ToolSet>, scope?: { ownerId:string; botId:string|null }) {
+export async function runHostedWorkflowTurn(runtime: HostedRuntimeSnapshot, tools: ToolSet, options: WorkflowAgentStreamOptions<ToolSet>, scope?: { ownerId:string; botId:string|null }, requestPolicy?: SubscriptionModelRequestPolicy) {
   if (runtime.harness !== 'ai_sdk' || !runtime.model) throw new Error('subscription_model_unavailable')
   if (runtime.modelSelection === undefined && !scope) throw new Error('verification_required')
   if (runtime.modelSelection !== undefined && (!runtime.modelSelection || runtime.model !== runtime.modelSelection.modelId)) throw new Error('subscription_model_unavailable')
   const model = runtime.modelSelection === undefined
     ? new HostedWorkflowModel(scope!.ownerId,scope!.botId,runtime.model)
-    : new SubscriptionWorkflowModel(runtime.modelSelection)
+    : new SubscriptionWorkflowModel(runtime.modelSelection, requestPolicy)
   const toolTimings: ToolTiming[] = []
   // The SDK returns an invalid call to the same model as a tool error. Keep
   // that correction path, but stop after the second invalid step even when

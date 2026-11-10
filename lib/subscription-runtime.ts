@@ -1,4 +1,5 @@
 import 'server-only'
+import type { SubscriptionModelRequestPolicy } from './subscription-service-tier'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { othersMayUse } from './personal-policy'
 import { z } from 'zod'
@@ -42,7 +43,7 @@ export async function authorizeSubscriptionUse(userId: string, workspaceId: stri
     if (bot && (bot.ownerId === null || (bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))))) throw new SubscriptionRefusal('account_unavailable')
   }
 }
-export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean } = {}): SubscriptionService {
+export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean; modelRequestPolicy?: SubscriptionModelRequestPolicy } = {}): SubscriptionService {
   if (!byosEnabled() && !(custodyOnly && byosEnrollmentEnabled())) throw new SubscriptionRefusal('backend_unavailable')
   const binary = process.env.MIKKA_BYOS_WORKER_BINARY ?? join(process.cwd(), 'packages/subscription-worker/bin/mikka-subscription-worker')
   // pool is request-scoped; never send a preview worker to the production DB.
@@ -100,5 +101,5 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
     // The private device route also requires a server allow-list and the hosted
     // runner capability. This never enables raw nativeAuth credential export.
     nativeIsolation: nativeBroker ? 'verified_runtime' : 'none'
-  }, undefined, authorizeSubscriptionUse, undefined, authorizeSubscriptionWorkspace)
+  }, undefined, authorizeSubscriptionUse, undefined, authorizeSubscriptionWorkspace, options.modelRequestPolicy)
 }

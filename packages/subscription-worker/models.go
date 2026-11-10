@@ -13,10 +13,11 @@ import (
 )
 
 // ModelOption is the only provider catalogue data sent to the web process.
-// Credentials, descriptions, capabilities and provider error bodies stay here.
+// Credentials, descriptions, other capabilities and provider error bodies stay here.
 type ModelOption struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	PrioritySupported *bool  `json:"prioritySupported,omitempty"`
 }
 
 var modelIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
@@ -35,7 +36,7 @@ func (w *Worker) Models(ctx context.Context, epoch int64) ([]ModelOption, error)
 	// The query pins the catalogue protocol compatibility, not a model name.
 	// Sources: openai/codex codex-rs/codex-api/src/endpoint/models.rs;
 	// anthropics/anthropic-sdk-typescript src/resources/models.ts.
-	endpoint := "https://chatgpt.com/backend-api/codex/models?client_version=0.159.0"
+	endpoint := "https://chatgpt.com/backend-api/codex/models?client_version=0.167.0"
 	if w.Scope.Provider == "claude" {
 		endpoint = "https://api.anthropic.com/v1/models?limit=100"
 	} else if w.Scope.Provider != "codex" {
@@ -76,9 +77,10 @@ func (w *Worker) Models(ctx context.Context, epoch int64) ([]ModelOption, error)
 		}
 		var body struct {
 			Models []struct {
-				Slug       string `json:"slug"`
-				Name       string `json:"display_name"`
-				Visibility string `json:"visibility"`
+				Slug         string          `json:"slug"`
+				Name         string          `json:"display_name"`
+				Visibility   string          `json:"visibility"`
+				ServiceTiers json.RawMessage `json:"service_tiers"`
 			} `json:"models"`
 			Data []struct {
 				ID   string `json:"id"`
@@ -97,7 +99,7 @@ func (w *Worker) Models(ctx context.Context, epoch int64) ([]ModelOption, error)
 			}
 			for _, m := range body.Models {
 				if m.Visibility == "" || m.Visibility == "list" {
-					entries = append(entries, ModelOption{m.Slug, m.Name})
+					entries = append(entries, ModelOption{ID: m.Slug, Name: m.Name, PrioritySupported: codexPrioritySupported(m.ServiceTiers)})
 				}
 			}
 		} else {
@@ -105,7 +107,7 @@ func (w *Worker) Models(ctx context.Context, epoch int64) ([]ModelOption, error)
 				return nil, ErrProvider
 			}
 			for _, m := range body.Data {
-				entries = append(entries, ModelOption{m.ID, m.Name})
+				entries = append(entries, ModelOption{ID: m.ID, Name: m.Name})
 			}
 		}
 		if len(entries) > 500 {
@@ -122,7 +124,8 @@ func (w *Worker) Models(ctx context.Context, epoch int64) ([]ModelOption, error)
 			if len(name) == 0 || len(name) > 200 || strings.ContainsFunc(name, unicode.IsControl) {
 				name = m.ID
 			}
-			options = append(options, ModelOption{m.ID, name})
+			m.Name = name
+			options = append(options, m)
 			seen[m.ID] = true
 			if len(options) > 500 {
 				return nil, ErrProvider
@@ -143,4 +146,22 @@ func (w *Worker) Models(ctx context.Context, epoch int64) ([]ModelOption, error)
 		return nil, ErrUnavailable
 	}
 	return options, nil
+}
+
+// codexPrioritySupported projects only the account's current model catalogue.
+// Missing or malformed capability data is unknown, never evidence of support.
+func codexPrioritySupported(raw json.RawMessage) *bool {
+	var tiers []map[string]json.RawMessage
+	if json.Unmarshal(raw, &tiers) != nil || tiers == nil {
+		return nil
+	}
+	supported := false
+	for _, tier := range tiers {
+		var id string
+		if json.Unmarshal(tier["id"], &id) != nil || id == "" {
+			return nil
+		}
+		supported = supported || id == "priority"
+	}
+	return &supported
 }

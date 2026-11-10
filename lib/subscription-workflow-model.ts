@@ -1,6 +1,13 @@
 import type { LanguageModel } from 'ai'
+import { z } from 'zod'
+import { subscriptionModelRequestPolicySchema, type SubscriptionModelRequestPolicy } from './subscription-service-tier'
 import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
 import { hostedModelSelectionSchema, type HostedModelSelection } from './subscription-model-snapshot'
+
+const serializedSelectionSchema = z.union([hostedModelSelectionSchema, z.strictObject({
+  selection: hostedModelSelectionSchema,
+  requestPolicy: subscriptionModelRequestPolicySchema,
+})])
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 /** Only non-secret frozen references cross Workflow steps. Custody is resolved
@@ -11,12 +18,19 @@ export class SubscriptionWorkflowModel implements V4Model {
   readonly supportedUrls = {}
   readonly modelId: string
   private readonly selection: HostedModelSelection
-  constructor(selection: HostedModelSelection) {
+  private readonly requestPolicy?: SubscriptionModelRequestPolicy
+  constructor(selection: HostedModelSelection, requestPolicy?: SubscriptionModelRequestPolicy) {
     this.selection = hostedModelSelectionSchema.parse(selection)
+    this.requestPolicy = requestPolicy === undefined ? undefined : subscriptionModelRequestPolicySchema.parse(requestPolicy)
     this.modelId = this.selection.modelId
   }
-  static [WORKFLOW_SERIALIZE](value: SubscriptionWorkflowModel) { return { ...value.selection } }
-  static [WORKFLOW_DESERIALIZE](value: unknown) { return new SubscriptionWorkflowModel(hostedModelSelectionSchema.parse(value)) }
+  static [WORKFLOW_SERIALIZE](value: SubscriptionWorkflowModel) {
+    return value.requestPolicy === undefined ? { ...value.selection } : { selection: { ...value.selection }, requestPolicy: { ...value.requestPolicy } }
+  }
+  static [WORKFLOW_DESERIALIZE](value: unknown) {
+    const parsed = serializedSelectionSchema.parse(value)
+    return 'selection' in parsed ? new SubscriptionWorkflowModel(parsed.selection, parsed.requestPolicy) : new SubscriptionWorkflowModel(parsed)
+  }
   async doGenerate(_options: Parameters<V4Model['doGenerate']>[0]): Promise<Awaited<ReturnType<V4Model['doGenerate']>>> {
     throw new Error('subscription_stream_required')
   }
@@ -45,11 +59,11 @@ export class SubscriptionWorkflowModel implements V4Model {
     // Model resolution may prepare credentials and probe quota before requestedAt.
     // Observe those workers too; setup and provider-request timings keep their origins.
     const result = await workflowFailureStream(() => withSubscriptionTiming(subscriptionTiming, async () => {
-      const model = await resolveSubscriptionWorkflowModel(this.selection, options.abortSignal)
+      const model = await resolveSubscriptionWorkflowModel(this.selection, options.abortSignal, codex ? this.requestPolicy : undefined)
       if (typeof model === 'string' || model.specificationVersion !== 'v4') throw new Error('subscription_model_unavailable')
       requestedAt = Date.now()
       return model.doStream(request)
     }), { runId: identity.workflowRunId, appVersion: APP_BUILD, credential: this.selection.type, requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } })
-    return timedModelStream(result, { route: 'subscription', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, prefix, subscriptionTiming, ...(codex ? { codexLayoutApplied: prompt !== options.prompt } : {}), ...identity })
+    return timedModelStream(result, { route: 'subscription', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, prefix, subscriptionTiming, ...(codex ? { codexLayoutApplied: prompt !== options.prompt, observeServiceTier: true as const } : {}), ...identity })
   }
 }
