@@ -301,7 +301,9 @@ await daemon.stop()
 void pending
 client.close()
 assert.ok(started.broker,'the late setup reached listen')
-const url=new URL(started.broker.socketPath)
+// broker.d.mts keeps the live socket field internal; listen() rewrites it for
+// tcp, so this white-box check reads the post-listen value from the instance.
+const url=new URL((started.broker as ComputerBroker & {socketPath:string}).socketPath)
 const refused=await new Promise<NodeJS.ErrnoException>((resolve,reject)=>{
  const socket=connect({host:url.hostname,port:Number(url.port)})
  socket.once('error',resolve)
