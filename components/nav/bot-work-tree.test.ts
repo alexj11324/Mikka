@@ -1,11 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readIssueMetadata } from '@/lib/issue-metadata'
 import { botWorkTree } from './bot-work-tree'
 
-const issue = (id: string, status = 'doing') =>
-  ({ id, status, identifier: `MIK-${id}`, title: `Task ${id}`, metadata: { pullRequests: [] } }) as Parameters<typeof botWorkTree>[3][number]
-const run = (id: string, issueId: string | null, botId: string | null = 'bot', status = 'running', createdAt = id, source: 'mcp' | null = null) =>
-  ({ id, botId, issueId, status, createdAt, source, outcome: null, agentName: 'Codex', harness: 'codex', prompt: 'Standalone work\nPrivate detail' }) as never
+type Issue = Parameters<typeof botWorkTree>[3][number]
+type Thread = Parameters<typeof botWorkTree>[2][number]
+const issue = (id: string, status = 'doing'): Issue => ({
+  id, status, identifier: `MIK-${id}`, title: `Task ${id}`, shortTitle: null,
+  ownerId: 'owner', ownerName: 'Owner', ownerImage: null, teamId: null,
+  scope: 'personal', priority: 'normal', revision: 1,
+  createdAt: new Date('2026-11-10T00:00:00Z'), updatedAt: new Date('2026-11-10T00:00:00Z'),
+  metadata: readIssueMetadata({ type: 'doc', content: [] }),
+  checklist: { total: 0, checked: 0, percentage: 0 },
+})
+const run = (id: string, issueId: string | null, botId: string | null = 'bot', status: Thread['status'] = 'running', createdAt = id, source: Thread['source'] = null): Thread => ({
+  id, botId, issueId, status, createdAt, updatedAt: createdAt, source, outcome: null,
+  agentName: 'Codex', harness: 'codex', prompt: 'Standalone work\nPrivate detail', lastReply: null, lastReplyAt: null,
+})
 
 test('a Bot contains one row per task, and the latest run decides its own task state', () => {
   const tree = botWorkTree('workspace', ['bot'], [run('1', 'a'), run('2', 'a', 'bot', 'waiting_input')], [issue('a')])
@@ -51,7 +62,7 @@ test('a closed task stays closed while its run is active', () => {
 test('sidebar task names use the existing short title and bound pending/manual titles; standalone runs are bounded too', () => {
   const generated = { ...issue('a'), title: '完整的任务需求原文不应该出现在紧凑的导航里面', shortTitle: '登录回调修复' }
   const pending = { ...issue('b'), title: '这是一个超过十二字限制的任务标题需要收短', shortTitle: null }
-  const standalone = { ...run('c', null) as Parameters<typeof botWorkTree>[2][number], prompt: 'one two three four five six seven eight' }
+  const standalone = { ...run('c', null), prompt: 'one two three four five six seven eight' }
   const rows = botWorkTree('workspace', ['bot'], [run('a', 'a'), run('b', 'b'), standalone], [generated, pending]).get('bot')!
   assert.equal(rows[0].name, 'MIK-a 登录回调修复')
   assert.equal(rows[0].fullName, 'MIK-a 完整的任务需求原文不应该出现在紧凑的导航里面')
