@@ -1,4 +1,5 @@
 import type { RunAgentProfile } from '@/lib/agent-runs'
+import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
@@ -361,14 +362,21 @@ export async function failRecording(id: string, error: string) {
  */
 export async function runEvidence(userId: string, runId: string) {
   const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status, issueId: agentRuns.issueId, botId: agentRuns.botId,
+    // Evidence-only entry provenance (lib/run-origin.ts): owner-only acceptance
+    // reads may see it; lists, chat, events, logs and analytics never do.
+    origin: agentRuns.origin, originRef: agentRuns.originRef,
     harness: sql<string | null>`${agentRuns.agentDefinition}->>'harness'`,
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
     modelRouting: sql<unknown>`${agentRuns.agentDefinition}->'modelDispatch'->'routing'`,
-    agentProfile: sql<RunAgentProfile | null>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
+    // The mark is presentation, not part of the frozen receipt: the Profile's current one, else derived from the frozen public summary.
+    agentProfile: sql<RunAgentProfileMarkRow | null>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
       'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId','name',${agentRuns.agentDefinition}->'agentProfile'->'name',
       'version',${agentRuns.agentDefinition}->'agentProfile'->'version','digest',${agentRuns.agentDefinition}->'agentProfile'->'digest',
-      'source',${agentRuns.agentDefinition}->'agentProfile'->'source','reason',${agentRuns.agentDefinition}->'agentProfile'->'reason') end`,
+      'source',${agentRuns.agentDefinition}->'agentProfile'->'source','reason',${agentRuns.agentDefinition}->'agentProfile'->'reason',
+      'roles',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'roles','description',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'description',
+      'icon',(select p.icon from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId}),
+      'color',(select p.color from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId})) end`,
     credentialType: sql<'subscription' | 'api_key' | 'unknown'>`CASE WHEN ${agentRuns.agentDefinition}->'apiKey' IS NOT NULL AND ${agentRuns.agentDefinition}->'apiKey'<>'null'::jsonb THEN 'api_key' WHEN ${agentRuns.agentDefinition}->'subscription' IS NOT NULL AND ${agentRuns.agentDefinition}->'subscription'<>'null'::jsonb THEN 'subscription' ELSE 'unknown' END`,
     subscriptionRoute: sql<string | null>`${agentRuns.agentDefinition}->'subscription'->>'route'` })
     .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
@@ -385,11 +393,23 @@ export async function runEvidence(userId: string, runId: string) {
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
   return {
-    run: { ...run, executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null },
+    run: { ...run, agentProfile: profileWithMark(run.agentProfile), executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null },
     recording: recording.length > 0,
     captures: captures.map(captureView),
     artifacts: documents.map(document => ({ ...document, createdAt: document.createdAt.toISOString() })),
   }
+}
+
+type RunAgentProfileMarkRow = RunAgentProfile & { roles?: unknown; description?: unknown; icon?: unknown; color?: unknown }
+function profileWithMark(row: RunAgentProfileMarkRow | null) {
+  if (!row) return null
+  const { roles, description, icon, color, ...profile } = row
+  const mark = profile.profileId === 'default' ? DEFAULT_PROFILE_MARK : resolveProfileMark({
+    name: typeof profile.name === 'string' ? profile.name : '',
+    roles: Array.isArray(roles) ? roles.filter((role): role is string => typeof role === 'string') : [],
+    description: typeof description === 'string' ? description : '',
+  }, { icon, color })
+  return { ...profile, ...mark }
 }
 
 async function fileOf(row: Pick<Row, 'storageKey' | 'inlineContent'>): Promise<Uint8Array<ArrayBuffer> | null> {

@@ -60,6 +60,6 @@ test('the prompt records where its task ends, and the thread shows only the task
   // Factory guidance prepended in SQL shifts the start by its char_length (code points).
   const preamble = 'Factory implementation owns validation. 🔍\n\n'
   assert.deepEqual(threadPromptView(preamble + prompt, [...preamble].length, taskLength), view)
-  // A run without the range shows its whole prompt, as before.
-  assert.deepEqual(threadPromptView(prompt, null, null), { task: prompt, hasInstructions: false })
+  // Missing provenance never turns the full execution instructions into a user message.
+  assert.deepEqual(threadPromptView(prompt, null, null), { task: '', hasInstructions: true })
 })

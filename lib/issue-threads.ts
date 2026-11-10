@@ -1,6 +1,8 @@
 import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
 import { runIsActive, runSummaryView } from './issue-run-conversation'
 import type { RunChain } from './run-chain'
+import { BUILTIN_AGENT_PROFILE_ID } from './factory/agent-profile-reference'
+import { resolveProfileMark, type ProfileMarkValue } from './factory/agent-profile-mark'
 
 /**
  * A thread is one agent run on an issue, and its content is its owner's alone (R-62):
@@ -23,7 +25,7 @@ export interface IssueThread {
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
   /** `bot`: the dispatching Bot's own bloub look, so every copy of it matches the bot list (R-36); null for the Coordinator's own runs. */
-  detail: { name: string; agentName: string; harness: string; summary: string | null; /** Only full owner reads carry the summary's persisted source. */ summarySource?: 'report' | 'error' | null; bot?: { color: string; shape: string } | null } | null
+  detail: { name: string; agentName: string; harness: string; summary: string | null; /** Only full owner reads carry the summary's persisted source. */ summarySource?: 'report' | 'error' | null; bot?: { color: string; shape: string } | null; /** A custom Agent Profile that did the run; absent for Default and runs before Profiles. */ profile?: ThreadProfile | null } | null
   /**
    * BE-18 run chain (GitHub Actions run_id + run_attempt): a question continuation is a new
    * run in the same thread. `id` is the root run (attempt 1); stop, status and send act on
@@ -131,6 +133,8 @@ export interface IssueThreadRow {
   /** agent_runs.kind: `implement` and `plan` are the conversation; `acceptance` is a Factory check. */
   kind?: string | null
   botColor?: string | null; botShape?: string | null
+  /** The run's frozen Agent Profile summary with its current mark (app/actions/agents.ts); read by threadProfile. */
+  profile?: unknown
 }
 
 /** The list has already projected the same name and summary in PostgreSQL. */
@@ -178,7 +182,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null }
+        ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null, ...(row.profile !== undefined ? { profile: threadProfile(row.profile) } : {}) }
         : null,
       rootRunId: row.id, latestRunId: row.id,
       attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],
@@ -186,23 +190,35 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
     }))
 }
 
+export type ThreadProfile = { id: string; name: string } & ProfileMarkValue
+
+/** A custom Profile's name and mark from the read's projection; null for Default, a run without one, or a malformed value. */
+export function threadProfile(value: unknown): ThreadProfile | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  if (typeof row.profileId !== 'string' || row.profileId === BUILTIN_AGENT_PROFILE_ID || typeof row.name !== 'string') return null
+  const roles = Array.isArray(row.roles) ? row.roles.filter((role): role is string => typeof role === 'string') : []
+  return { id: row.profileId, name: row.name, ...resolveProfileMark({ name: row.name, roles, description: typeof row.description === 'string' ? row.description : '' }, { icon: row.icon, color: row.color }) }
+}
+
 /** A run that is part of the task's conversation: implement or plan. A read without kinds counts every run. */
 export const isConversationRun = (thread: { kind?: string }) => !thread.kind || thread.kind === 'implement' || thread.kind === 'plan'
 
 /**
- * One conversation per task (decision 2026-11-09-0045): consecutive threads by the same Agent are one
- * stretch. Oldest first; a stretch opens at its first thread and reads as its last. A thread whose
+ * One conversation per task (decision 2026-11-09-0045): consecutive threads by the same Agent and the
+ * same custom Agent 配置 are one stretch (Alex, 2026-11-10: the Profile is who does the work).
+ * `profile` is the custom Profile's id, null for Default and runs before Profiles. Oldest first; a stretch opens at its first thread and reads as its last. A thread whose
  * detail the reader cannot see has no Agent and stands alone unless the one before is hidden too.
  */
-export function agentStretches<T extends { id: string; kind?: string; createdAt: Date | string; detail: { harness: string } | null }>(threads: readonly T[]): { agent: string | null; first: T; last: T; ids: string[] }[] {
-  const out: { agent: string | null; first: T; last: T; ids: string[] }[] = []
+export function agentStretches<T extends { id: string; kind?: string; createdAt: Date | string; detail: { harness: string; profile?: { id: string } | null } | null }>(threads: readonly T[]): { agent: string | null; profile: string | null; first: T; last: T; ids: string[] }[] {
+  const out: { agent: string | null; profile: string | null; first: T; last: T; ids: string[] }[] = []
   // Only the conversation's own runs make stretches; a Factory check (review, verify) is its result card on the
   // task page (2026-11-04-2200), never a 「换 Codex」 row.
   for (const thread of [...threads].filter(isConversationRun).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
-    const agent = thread.detail?.harness ?? null
+    const agent = thread.detail?.harness ?? null, profile = thread.detail?.profile?.id ?? null
     const previous = out.at(-1)
-    if (previous && previous.agent === agent) { previous.last = thread; previous.ids.push(thread.id) }
-    else out.push({ agent, first: thread, last: thread, ids: [thread.id] })
+    if (previous && previous.agent === agent && previous.profile === profile) { previous.last = thread; previous.ids.push(thread.id) }
+    else out.push({ agent, profile, first: thread, last: thread, ids: [thread.id] })
   }
   return out
 }

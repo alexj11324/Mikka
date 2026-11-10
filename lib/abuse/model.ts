@@ -93,7 +93,10 @@ export async function hostedModel(
     if (provider) throw new ModelAdmissionError('modelRouteDenied')
     return observedModel(selfHostedDefaultModel(scope), { ...metadata, userId: scope.ownerId, route: 'self_hosted' })
   }
-  await withSharedCredits(workspaceId, billingAdapter?.admit ?? canUseMikkaPaid)
+  const billingPrincipal = await withSharedCredits(workspaceId, async payer => {
+    await (billingAdapter?.admit ?? canUseMikkaPaid)(payer)
+    return { payer, organizationId: hostedBillingScope.getStore()?.billingOrganizationId ?? null }
+  })
   const zeroCat = isZeroCatModel(modelId)
   // The default model's fallback is its own Gateway route; a caller may hand in
   // only the trusted Gateway transport for it, never an arbitrary provider.
@@ -126,7 +129,7 @@ export async function hostedModel(
     )
     if (promptBytes > 16 * 1024 * 1024)
       throw new PaidResourceError('usage_cost_unavailable')
-    await withSharedCredits(workspaceId, payer => hostedUsage.reserve(payer, modelId, id, process.env))
+    await withSharedCredits(workspaceId, payer => hostedUsage.reserve(payer, modelId, id, process.env), billingPrincipal)
   }
   const bounded = (value: CallArgs, signals: AbortSignal[] = []) => ({
     maxOutputTokens: Math.min(value.maxOutputTokens ?? 4096, 4096),

@@ -23,8 +23,9 @@ let members: Member[] = []
 let actor = OWNER // the signed-in user returned by requireIssueAccess
 let workspaceMembers = new Set([OWNER, MEMBER])
 let workspaceLease = false
+let deniedResources = new Set<string>()
 let writes: { id: string; metadata: IssueMetadata }[] = []
-const reset = (next: Row[]) => { rows = next; members = []; actor = OWNER; workspaceMembers = new Set([OWNER, MEMBER]); workspaceLease = false; writes = [] }
+const reset = (next: Row[]) => { rows = next; members = []; actor = OWNER; workspaceMembers = new Set([OWNER, MEMBER]); workspaceLease = false; deniedResources = new Set(); writes = [] }
 
 const row = (rowId: string, meta: Partial<IssueMetadata> = {}, extra: Partial<Row> = {}): Row => ({
   id: rowId, userId: OWNER, workspaceId: WORKSPACE, ownershipState: 'bound', scope: 'workspace', scopeVersion: 1, revision: 1, title: rowId, status: 'todo', priority: 'none',
@@ -96,7 +97,7 @@ before(async () => {
       update,
     }
     return fn(tx)
-  } } } })
+  } }, withDatabaseTransaction: (_tx: unknown, work: () => unknown) => work() } })
   // Access was granted at lookup time. The action must acquire its workspace
   // lease before this fixture's APP transaction; the actual cross-DB locks and
   // revocation races are exercised in issue-scope-detachment.db.test.ts.
@@ -107,12 +108,26 @@ before(async () => {
   }
   mock.module(file('./issue-access.ts'), { namedExports: { requireIssueAccess: access, requireIssueAccessWithoutBody: access } })
   mock.module(file('./task-workspace.ts'), { namedExports: {
+    taskReaderScope: (reader: string | { id: string }) => ({ userId: typeof reader === 'string' ? reader : reader.id }),
     withTaskWorkspace: async (reader: string | { id: string }, workspaceId: string, work: (workspace: { id: string; kind: 'team' }) => Promise<unknown>) => {
       const userId = typeof reader === 'string' ? reader : reader.id
       if (workspaceId !== WORKSPACE || !workspaceMembers.has(userId)) throw new ActionFailureError('workspaceAccessDenied')
       workspaceLease = true
       try { return await work({ id: workspaceId, kind: 'team' }) }
       finally { workspaceLease = false }
+    },
+  } })
+  mock.module(file('./resource-access/store.ts'), { namedExports: {
+    lockResourcesAccess: async (_tx: unknown, userId: string, requests: Array<{ reference: { kind: string; id: string; workspaceId: string }; action: string }>) => {
+      assert.equal(workspaceLease, true, 'resource locks follow the Workspace lease')
+      assert.equal(userId, actor)
+      for (const { reference, action } of requests) {
+        assert.equal(reference.kind, 'task')
+        assert.equal(reference.workspaceId, WORKSPACE)
+        assert.equal(action, 'canSteer', 'both relation endpoints require write authority')
+        if (deniedResources.has(reference.id)) throw new ActionFailureError('issueNotFound')
+      }
+      return []
     },
   } })
   mock.module(file('./issue-numbering.ts'), { namedExports: { allocateIssueNumbers: async () => 1 } })
@@ -129,6 +144,13 @@ before(async () => {
 
 const relate = (from: string, kind: 'parent' | 'child' | 'blocks' | 'blockedBy' | 'duplicate' | 'related', targetId: string | null, remove = false, revision = 1) =>
   updateIssueRelation({ id: from, revision, targetId, kind, remove }) as Promise<{ error?: string; issue?: unknown }>
+
+test('a revoked resource endpoint is refused before any relation write', async () => {
+  reset([row(A), row(B)])
+  deniedResources.add(B)
+  assert.equal((await relate(A, 'related', B)).error, 'issueNotFound')
+  assert.deepEqual(writes, [])
+})
 
 test('self-reference is rejected for every relation kind', async () => {
   reset([row(A)])

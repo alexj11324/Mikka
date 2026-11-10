@@ -247,6 +247,14 @@ acceptance('prepare/acquire/real owner-peer HTTP/clean release safely reuses the
     await database.query('delete from agent_runs where id=$1 and "userId"=$2 and "agentId"=$3', [runRecordId, first.owner.userId, agentId])
     await database.query('delete from agents where id=$1 and "userId"=$2', [agentId, first.owner.userId])
     for (const resource of resources) await first.markResourceCleaned(resource)
+    const retainedAudit = await database.query(`SELECT a.record_id,a.fingerprint,e.id,
+      encode(sha256(convert_to(to_jsonb(e)::text,'UTF8')),'hex') AS observed
+      FROM mikka_test_accounts.retained_audit a JOIN resource_access_events e ON e.id::text=a.record_id
+      WHERE a.lease_id=$1 AND a.table_name='resource_access_events'`,[first.lease.id])
+    assert.ok(retainedAudit.rowCount>0,'synthetic resource audit is retained with an explicit lease receipt')
+    for (const row of retainedAudit.rows) assert.equal(row.fingerprint,row.observed)
+    await assert.rejects(database.query('DELETE FROM resource_access_events WHERE id=$1',[retainedAudit.rows[0].id]),
+      error=>error.code==='23514','test cleanup cannot delete immutable application audit')
     fixturesClean = true
 
     const ids = [first.owner.userId, first.peer.userId]

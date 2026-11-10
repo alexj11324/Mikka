@@ -73,6 +73,7 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
   const own = menu.data ? ownSubscriptionOption(menu.data) : null
   const Icon = transient ? Info : code === 'verification_required' ? CreditCard : code === 'platform_paused' ? Pause : Info
   const title = transient || code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable' ? t('unavailable')
+    : code === 'usage_budget_exhausted' || code === 'billing_authorization_revoked' ? t(code)
     : billing ? t('teamNoPoints')
     : trialUsed ? t('trialUsed')
     : code === 'verification_required'
@@ -84,7 +85,7 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
     <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
       {retry}
       {(transient || billing) && own && <UseSubscriptionButton botId={botId} option={own.option} label={t('useSubscription', { name: subscriptionName(own.provider, own.plan) })} onQueued={onQueued} />}
-      {billing && (share.data && !share.data.error && share.data.canShare && !share.data.mine
+      {billing && (code !== 'usage_budget_exhausted' && code !== 'billing_authorization_revoked' && share.data && !share.data.error && share.data.canShare && !share.data.mine
         ? <ShareMyPointsButton botId={botId} label={t('useMyPoints')} onQueued={onQueued} onShared={() => share.mutate()} />
         : <Button size="sm" variant="outline" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('openBilling')}</Button>)}
       {topUp && <TopUpInPlace botId={botId} label={t('topUp')} onPaid={afterPayment} />}

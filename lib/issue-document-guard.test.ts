@@ -26,8 +26,9 @@ mock.module(new URL('./issue-scope-authorization.ts', import.meta.url).href, { n
     assert.equal(row.workspaceId, WORKSPACE); assert.equal(userId, 'owner'); assert.equal(version, 1); assert.equal(workspaceId, WORKSPACE)
   },
   requireCurrentIssueWorkspace: async (reader: { id: string }, workspaceId: string) => { assert.equal(reader.id, 'owner'); assert.equal(workspaceId, WORKSPACE) },
-  withIssueWorkspace: async (reader: { id: string }, workspaceId: string, work: () => Promise<unknown>) => {
-    assert.equal(reader.id, 'owner'); assert.equal(workspaceId, WORKSPACE); return work()
+  withIssueWorkspace: async (reader: { id: string }, workspaceId: string, access: { issueId: string; action: string }, work: () => Promise<unknown>) => {
+    assert.equal(reader.id, 'owner'); assert.equal(workspaceId, WORKSPACE)
+    assert.deepEqual(access, { issueId: ISSUE, action: 'canSteer' }); return work()
   },
 } })
 mock.module(new URL('./issue-numbering.ts', import.meta.url).href, { namedExports: { allocateIssueNumbers: async () => { throw new Error('not reached') } } })

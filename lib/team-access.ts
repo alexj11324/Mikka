@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 import 'server-only'
 import { and, eq, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
@@ -8,17 +9,19 @@ import { teams, teamMembers } from '@/lib/db/team-schema'
 import { WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 
 export type TeamScope = { id: string; workspaceId: string }
+const scopeTeam = alias(teams, 't')
+const scopeMember = alias(workspaceMembers, 'm')
 
 /** Permission identity for reads that do not display team settings. */
 export async function accessibleTeamScopes(userId: string, workspaceId?: string): Promise<TeamScope[]> {
-  return workspaceDb.select({ id: teams.id, workspaceId: teams.workspaceId }).from(teams)
-    .innerJoin(workspaceMembers, and(
-      eq(workspaceMembers.workspaceId, teams.workspaceId),
-      eq(workspaceMembers.userId, userId),
-      eq(workspaceMembers.status, 'active'),
+  return workspaceDb.select({ id: scopeTeam.id, workspaceId: scopeTeam.workspaceId }).from(scopeTeam)
+    .innerJoin(scopeMember, and(
+      eq(scopeMember.workspaceId, scopeTeam.workspaceId),
+      eq(scopeMember.userId, userId),
+      eq(scopeMember.status, 'active'),
     ))
-    .where(workspaceId ? eq(teams.workspaceId, workspaceId) : undefined)
-    .orderBy(teams.createdAt)
+    .where(workspaceId ? eq(scopeTeam.workspaceId, workspaceId) : undefined)
+    .orderBy(scopeTeam.createdAt)
 }
 
 export async function accessibleTeams(userId: string, workspaceId?: string) {

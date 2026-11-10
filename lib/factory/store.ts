@@ -1131,7 +1131,7 @@ export function createFactoryStore(
             const monitor = attempt.output.monitorDispatch;
             if (providerRetry && task.stage === "monitor" && (!monitor || typeof monitor !== "object" || Array.isArray(monitor) ||
               (monitor as Record<string, unknown>).deviceRepoId !== prior.deviceRepoId)) fail("factoryRunMismatch");
-            await tx.query(`UPDATE agent_runs SET "retryOf"=NULL,"sessionId"=NULL,prompt=$2,"agentDefinition"=jsonb_set("agentDefinition",'{promptDigest}',to_jsonb($3::text)) WHERE id=$1`, [retry.id, prior.prompt, (await import('../agent-kit/worker')).retryWorkerDefinition(retry.agentDefinition, prior.prompt)!.promptDigest]);
+            await tx.query(`UPDATE agent_runs SET "retryOf"=NULL,"sessionId"=NULL,prompt=$2,"agentDefinition"=jsonb_set("agentDefinition",'{promptDigest}',to_jsonb($3::text)),"promptTaskStart"=$4,"promptTaskLength"=$5 WHERE id=$1`, [retry.id, prior.prompt, (await import('../agent-kit/worker')).retryWorkerDefinition(retry.agentDefinition, prior.prompt)!.promptDigest, prior.promptTaskStart, prior.promptTaskLength]);
             const check = attempt.output.check;
             if (providerRetry && task.stage !== "monitor" && (!check || typeof check !== "object" || Array.isArray(check))) fail("factoryRunMismatch");
             const assignment = task.stage === "monitor" ? { monitorDispatch: monitor }

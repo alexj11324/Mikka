@@ -36,7 +36,20 @@ const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [{ type: "paragraph"
 const EMPTY_THREADS: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadIndex = {}
 
 export { createEditorExtensions, createDocumentSeed } from './issue-editor-schema'
-export function IssueEditor({ issueId, content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false }: { issueId?: string; content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean }) {
+
+/** A task's discussions (comments on the task and on selected text, kept in its document) and what can be done with them. */
+export type IssueDiscussions = {
+  issueId: string
+  author: string
+  threads: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadRecord[]
+  anchors: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").CommentAnchor[]
+  onComment: (body: string) => void
+  onReply: (id: string, body: string) => void
+  onResolve: (id: string, resolved: boolean) => void
+  /** Selects the text a discussion is about. */
+  onSelect: (id: string) => void
+}
+export function IssueEditor({ issueId, content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false, renderActivity }: { issueId?: string; content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean; /** Draws 活动 in place of IssueActivity, with the same discussions and actions (task-detail slot). */ renderActivity?: (activity: IssueDiscussions) => ReactNode }) {
   const t = useTranslations('Editor')
   const tCommon = useTranslations('Common')
   const author = authorProp ?? t('draftAuthor')
@@ -155,6 +168,23 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
   const threadList = Object.values(threads)
   const openCount = threadList.filter(thread => !thread.resolved).length
 
+  const discussions: Omit<IssueDiscussions, 'issueId'> = {
+    author, threads: threadList, anchors,
+    onComment: body => {
+      const now = new Date().toISOString()
+      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
+    },
+    onReply: (id, body) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() }) },
+    onResolve: (id, resolved) => { setThreadResolved(threadDoc, id, resolved) },
+    onSelect: id => {
+      if (!editor) return
+      let from: number | undefined
+      let to = 0
+      editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === 'comment' && mark.attrs.id === id)) { from ??= pos; to = pos + node.nodeSize } })
+      if (from !== undefined) editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
+    },
+  }
+
   if (compact || layout === 'description' || layout === 'issue') return <TooltipProvider delay={300}>
     <section aria-label={t('editorAria', { label })} className="flex min-w-0 flex-col gap-2">
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
@@ -175,16 +205,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       </div>}</>}
     </section>
     {layout === 'issue' && !compact && afterDescription}
-    {layout === 'issue' && !compact && issueId && <IssueActivity issueId={issueId} author={author} threads={threadList} anchors={anchors} events={activity} onComment={body => {
-      const now = new Date().toISOString()
-      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
-    }} onReply={(id, body) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() }) }} onResolve={(id, resolved) => { setThreadResolved(threadDoc, id, resolved) }} onSelect={id => {
-      if (!editor) return
-      let from: number | undefined
-      let to = 0
-      editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === 'comment' && mark.attrs.id === id)) { from ??= pos; to = pos + node.nodeSize } })
-      if (from !== undefined) editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
-    }} />}
+    {layout === 'issue' && !compact && issueId && (renderActivity ? renderActivity({ issueId, ...discussions }) : <IssueActivity issueId={issueId} events={activity} {...discussions} />)}
     <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
   </TooltipProvider>
 

@@ -187,7 +187,7 @@ test('In a chat, BeCitations leaves its links to the reply\'s one sources toggle
   assert.doesNotMatch(html, /OpenUI docs/)
 })
 
-test('A task or run chip is boxed with no underline and only its title; a source chip keeps its unboxed underline (R-15)', () => {
+test('A task chip is boxed with its state icon and code; a thread is its title in the link colour; a source chip keeps its unboxed underline (R-15)', () => {
   const task = '00000000-0000-4000-8000-000000000043'
   const run = '00000000-0000-4000-8000-0000000000a1'
   const sources = {
@@ -202,28 +202,63 @@ test('A task or run chip is boxed with no underline and only its title; a source
   const chips = starts.map((start, index) => html.slice(start, starts[index + 1] ?? html.length))
   assert.equal(chips.length, 3)
   const [taskChip, runChip, sourceChip] = chips
-  for (const chip of [taskChip, runChip]) {
-    assert.match(chip, /^<span[^>]*role="button"[^>]*tabindex="0"/, 'an object chip is an inline span that acts as a button')
-    const className = chip.match(/class="([^"]*)"/)?.[1] ?? ''
-    assert.match(chip, /data-variant="object"/)
-    assert.ok(className.split(' ').includes('bg-object-chip'), 'object chip has a fill')
-    assert.ok(className.split(' ').includes('rounded-md'), 'object chip is rounded')
-    assert.ok(className.split(' ').includes('no-underline'), 'object chip title is not underlined')
-    assert.ok(!className.split(' ').includes('underline'), 'object chip has no underline')
-    assert.ok(className.split(' ').includes('inline') && className.split(' ').includes('box-decoration-clone'), 'object chip wraps like a word, each line keeping its fill (R-15)')
-    assert.ok(!className.split(' ').some(name => /^h-\d/.test(name)), 'object chip takes the text\'s own height')
-    assert.ok(className.split(' ').includes('text-object-chip-foreground'), 'object chip title is in the accent')
-  }
+  for (const chip of [taskChip, runChip]) assert.match(chip, /^<span[^>]*role="button"[^>]*tabindex="0"/, 'a task or thread reference is an inline span that acts as a button')
+  const classes = (chip: string) => (chip.match(/class="([^"]*)"/)?.[1] ?? '').split(' ')
+  const taskClass = classes(taskChip)
+  assert.match(taskChip, /data-variant="object"/)
+  assert.ok(taskClass.includes('bg-object-chip'), 'task chip has a fill')
+  assert.ok(taskClass.includes('rounded-md'), 'task chip is rounded')
+  assert.ok(taskClass.includes('no-underline') && !taskClass.includes('underline'), 'task chip is not underlined')
+  assert.ok(taskClass.includes('text-object-chip-foreground'), 'task chip is in the accent')
+  assert.ok(!taskClass.some(name => /^h-\d/.test(name)), 'task chip takes the text\'s own height')
+  const runClass = classes(runChip)
+  assert.ok(runClass.includes('text-object-chip-foreground') && runClass.includes('bg-transparent'), 'a thread is in the citation link colour with no fill')
+  assert.doesNotMatch(runChip, /<svg/, 'a thread has no icon')
   const text = (chip: string) => chip.replace(/<[^>]+>/g, '')
-  assert.match(text(taskChip), /^Move the chat to OpenUI/)
-  assert.doesNotMatch(taskChip, /MIK-43/)
-  // A thread chip carries the thread's own name, the same as its row and header: task identifier and title (D9).
-  assert.match(text(runChip), /^MIK-43 Move the chat to OpenUI/)
-  assert.match(taskChip, /data-slot="chip-head"[^>]*><span data-slot="chip-icon"[^>]*><svg[^>]*>.*?<\/svg><\/span>M<\/span>/, 'the icon and the first character never part across lines')
+  assert.match(text(taskChip), /^MIK-43/)
+  assert.match(taskChip, /<svg/, 'a task chip has its state icon')
+  // A thread is the task's title without its code, so the code never repeats beside the task chip.
+  assert.match(text(runChip), /^Move the chat to OpenUI/)
+  assert.doesNotMatch(text(runChip), /MIK-43/)
   const sourceClass = sourceChip.match(/class="([^"]*)"/)?.[1] ?? ''
   assert.match(sourceChip, /data-variant="source"/)
   assert.ok(sourceClass.split(' ').includes('underline'), 'source chip keeps its underline')
   assert.ok(!sourceClass.split(' ').includes('bg-object-chip'), 'source chip has no box')
+})
+
+test('saved OpenUI, citation markers and oldest bare UUID references all use the current compact task and thread renderers', () => {
+  const task = '00000000-0000-4000-8000-000000000045'
+  const run = '00000000-0000-4000-8000-000000000046'
+  const title = '修复登录后的工作区前缀和查询参数丢失问题'
+  const sources = {
+    [task]: { kind: 'issue', id: task, number: 45, identifier: 'ALEX-45', title, status: 'doing', priority: 'normal', run: { status: 'waiting_input', outcome: null } },
+    [run]: { kind: 'run', id: run, agentName: 'Worker', harness: 'codex', status: 'waiting_input', issue: { id: task, number: 45, identifier: 'ALEX-45', title }, name: title, summary: null, steps: 1, createdAt: '2026-11-01T00:00:00Z', finishedAt: null },
+  } as const
+  // These are the saved producer grammars, with synthetic IDs; no model text or stored record is rewritten.
+  const saved = [
+    `root = InlineText(["旧消息 ", TaskChip("${task}"), " / ", RunChip("${run}"), "：已开始运行，等待回答。"] )`,
+    `旧消息 [[issue:${task}]] / [[run:${run}]]：已开始运行，等待回答。`,
+    `旧消息 ${task} / ${run}：已开始运行，等待回答。`,
+  ]
+  for (const response of saved) {
+    const html = renderToStaticMarkup(<NextIntlClientProvider locale="zh-CN" messages={chineseMessages}><AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: () => {}, carded: new Set([run]) }}>
+      <AgentGenerativeUI response={response} isStreaming={false} onAction={() => {}} />
+    </AgentCitationsContext></NextIntlClientProvider>)
+    const starts = [...html.matchAll(/<span[^>]*data-slot="inline-citation-trigger"/g)].map(match => match.index)
+    assert.equal(starts.length, 2, response)
+    const taskChip = html.slice(starts[0], starts[1])
+    const runLink = html.slice(starts[1])
+    const visible = (value: string) => value.replace(/<[^>]+>/g, '')
+    assert.match(visible(taskChip), /^ALEX-45/)
+    assert.ok(!visible(taskChip).includes(title), 'the old long title is absent from the task chip')
+    assert.match(taskChip, /data-task-chip="waiting"/)
+    assert.match(runLink, /data-thread-link=""/)
+    assert.match(runLink, /text-object-chip-foreground/)
+    assert.match(runLink, /bg-transparent/)
+    assert.doesNotMatch(runLink, /<svg|data-citation-carded/)
+    assert.ok(visible(runLink).startsWith(title))
+    assert.ok(visible(html).includes('已开始运行，等待回答。'), 'historical model prose stays verbatim')
+  }
 })
 
 test('Text inside an OpenUI card is part of the card, not a chat bubble', () => {

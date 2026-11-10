@@ -4,7 +4,7 @@ import { SETTINGS_SECTIONS, isSettingsSectionParam, resolveSettingsSection, sett
 
 test('every v4 nav item has exactly one section, in Figma order (Bot 权限 after 连接, 2026-11-09)', () => {
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal').map(s => s.id), ['account', 'security', 'preferences', 'notifications', 'memory', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'developer'])
-  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace').map(s => s.id), ['general', 'members', 'teams', 'permissions', 'secrets', 'audit', 'usage', 'billing', 'cloud'])
+  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace').map(s => s.id), ['general', 'members', 'teams', 'permissions', 'secrets', 'audit', 'organization', 'usage', 'billing', 'cloud'])
 })
 
 test('old links keep landing on the page that now holds their content', () => {
@@ -29,6 +29,8 @@ test('hrefs keep the workspace and use the routed paths for members and teams', 
 })
 
 const UNBUILT = ['developer']
+// 组织 shows only where a UI layer draws it (`organization: true`); the open-source UI has none.
+const LAYER_ONLY = ['organization']
 
 test('members do not see admin-only sections; admins see every built one', () => {
   const member = visibleSettingsSections({ admin: false }).map(s => s.id)
@@ -37,7 +39,7 @@ test('members do not see admin-only sections; admins see every built one', () =>
   // 密钥与环境: members see every entry and write repository ones (decision 2026-11-02-2120).
   for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing', 'secrets']) assert.equal(member.includes(id), true, id)
   for (const id of ['audit']) assert.equal(member.includes(id), false, id)
-  assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && s.id !== 'cloud').map(s => s.id))
+  assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !LAYER_ONLY.includes(s.id) && s.id !== 'cloud').map(s => s.id))
 })
 
 test('cloud server settings require the explicit server administrator capability', () => {
@@ -46,7 +48,14 @@ test('cloud server settings require the explicit server administrator capability
     assert.equal(visibleSettingsSections({ admin, cloudAdmin: false }).some(s => s.id === 'cloud'), false)
     assert.equal(visibleSettingsSections({ admin, cloudAdmin: true }).some(s => s.id === 'cloud'), true)
   }
-  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
+  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !LAYER_ONLY.includes(s.id)).map(s => s.id))
+})
+
+test('组织 shows only when a UI layer draws it, and never in a personal workspace', () => {
+  for (const admin of [false, true]) assert.equal(visibleSettingsSections({ admin }).some(s => s.id === 'organization'), false)
+  assert.equal(visibleSettingsSections({ admin: true, organization: true }).some(s => s.id === 'organization'), true)
+  assert.equal(visibleSettingsSections({ admin: true, organization: true, personal: true }).some(s => s.id === 'organization'), false)
+  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true, organization: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
 })
 
 test('sections without a page body are hidden until their UI lands, and their links open preferences', () => {

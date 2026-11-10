@@ -257,6 +257,7 @@ interface ActiveRun {
   lastCheckpointAt?: number
   /** Tree of the last checkpoint taken; unchanged trees are not sent. */
   lastCheckpointTree?: string
+  lastCheckpointHead?: string | null
 }
 
 /** A run with no tool call in this long still gets a checkpoint when it changed. */
@@ -389,11 +390,13 @@ export class RunSupervisor {
           // A terminal upload also refreshes an unchanged/empty snapshot. A
           // much older identical tree would fail the server's freshness gate.
           lastTree: force ? undefined : run.lastCheckpointTree,
+          lastHead: force ? undefined : run.lastCheckpointHead,
+          repoId: entry.assignment.repoId,
         })
         const masker = this.maskers.get(runId)
         const checkpoint = taken?.checkpoint ? masker ? masker.checkpoint(taken.checkpoint) : taken.checkpoint : undefined
         if (checkpoint) await save(runId, checkpoint)
-        if (taken) run.lastCheckpointTree = taken.tree
+        if (taken) { run.lastCheckpointTree = taken.tree; run.lastCheckpointHead = taken.head }
         run.checkpointDue = false
         run.lastCheckpointAt = now
         return checkpoint ? !checkpoint.unavailableReason : !force

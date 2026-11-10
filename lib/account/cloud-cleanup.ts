@@ -70,8 +70,12 @@ export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool,
   // DELETE of a known owned object is idempotent; no mapping disappears first.
   const sources = (await database.query<{ workspaceId: string; sandboxId: string }>(`SELECT "workspaceId","sandboxId" FROM cloud_machines WHERE "ownerId"=$1 AND "sandboxId" IS NOT NULL
     UNION SELECT "workspaceId","sandboxId" FROM thread_machines WHERE "ownerId"=$1 AND "sandboxId" IS NOT NULL`, [ownerId])).rows
+  // `thread_machines."snapshotId"` is the template/image a machine was created
+  // from, not a provider snapshot. Deleting it would target shared template
+  // IDs such as 'claude' or 'codex'. Only owner-created filesystem snapshots
+  // of this task machine are deleted here.
   const snapshots = (await database.query<{ workspaceId: string; snapshotId: string }>(`SELECT "workspaceId","snapshotId" FROM workspace_snapshots WHERE "ownerId"=$1
-    UNION SELECT "workspaceId","snapshotId" FROM thread_machines WHERE "ownerId"=$1 AND "snapshotId"<>'pending'`, [ownerId])).rows
+    UNION SELECT "workspaceId","filesystemSnapshotId" FROM thread_machines WHERE "ownerId"=$1 AND "filesystemSnapshotId" IS NOT NULL`, [ownerId])).rows
   const owned = new Map(snapshots.map(row => [`${row.workspaceId}:${row.snapshotId}`, row]))
   for (const source of sources) {
     try { for (const snapshotId of await runtime.snapshots(source.workspaceId, source.sandboxId)) owned.set(`${source.workspaceId}:${snapshotId}`, { workspaceId: source.workspaceId, snapshotId }) }

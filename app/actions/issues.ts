@@ -189,7 +189,7 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
     return db.transaction(async tx => {
       const [locked] = await tx.select({ ...issueSummaryColumns, content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-      await requireCurrentIssueWorkspace(user, issue.workspaceId)
+      await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // Same unavailable task as the entry ACL, when deletion committed before
       // this lock. A cursor never turns a deleted task into an unchanged result.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
@@ -208,7 +208,7 @@ async function readIssue(id: string) {
   return db.transaction(async tx => {
     const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-    await requireCurrentIssueWorkspace(user, issue.workspaceId)
+    await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
     return issueView(locked, tx, teamId === null ? new Map() : undefined)
   })
@@ -261,7 +261,7 @@ export async function saveIssue(input: { id?: string; revision?: number; workspa
         await issueRelationsChanged(tx, [id])
         return { issue: await issueView(issue, tx) }
       })
-      const result = existing ? await withIssueWorkspace(user, context.workspace.id, save) : await withTaskWorkspace(user, context.workspace.id, save)
+      const result = existing ? await withIssueWorkspace(user, context.workspace.id, { issueId: existing.id, action: 'canSteer' }, save) : await withTaskWorkspace(user, context.workspace.id, save)
       if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       if (statusEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
@@ -345,7 +345,7 @@ export async function listIssueVersions(id: string) {
   const versions = await db.transaction(async tx => {
     const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-    await requireCurrentIssueWorkspace(user, issue.workspaceId)
+    await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     return tx.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
   })
   return enrichActivityActors(versions, userId)
@@ -362,7 +362,7 @@ export async function pollIssueVersionSummaries(id: string, known?: string, prev
     const result = await db.transaction(async tx => {
       const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-      await requireCurrentIssueWorkspace(user, issue.workspaceId)
+      await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // The same deleted-task refusal as pollIssue, after taking the shared lock.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
       const summaries = tx.select({ ...versionSummaryColumns, content: sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issueVersions.content}->'attrs')`.as('content') })

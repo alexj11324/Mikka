@@ -34,18 +34,26 @@ not on the dispatching bot's machine (`cloud-computer-backend.md` § 2).
 | **Account** | 账号 | The person: 账户, security, 偏好, 通知, profile memory (个人资料类记忆), 密钥与登录, 设备 and 「模型与订阅」. The same in every workspace. |
 | **Personal workspace** | 个人工作区 | One per person. Only that person's bots, chats, tasks, threads and their memory; personal 计费 and 用量; no team settings. |
 | **Shared workspace** | 共享工作区 | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
+| **Organization** | 组织 | Manages membership, organization connections, policies and billing across attached Workspaces. Each Workspace remains an independent tenant; an Organization role does not confer private content access. |
+| **Resource owner** | 所有者 | Manages a Project, Task, Thread, Bot or Artifact's access and controlled ownership transfer. Ownership does not bypass a private ancestor or a revoked Workspace membership. |
+| **Actor** | 操作者 | The authenticated person or service principal responsible for a message or operation. Kept separately from the Thread Owner, execution identity, credential owner and payer. |
 
 Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md).
+Collaboration and financial authority: [2026-11-10-0017](decisions/2026-11-10-0017-collaboration-governance.md).
 
 ## Rules for designs
 
-- The left column is the **bot list**: bots and group chats only. The right
-  column is the **task list** (since 2026-11-07: no list shows threads; a
-  thread opens only from inside its task,
-  [decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)). There is no "conversation list".
-- The bot list holds bots and group chats only. A thread name ("#66 …",
-  "MIK-11 …") is never a left-column row. A bot row's preview line may quote
-  the latest message, which may mention a thread, but the row is the bot.
+- The left column is the **bot list**. In the hosted shell a Bot expands
+  its dispatched tasks and Agent work below its own row, like Capy's Captains
+  ([2026-11-10](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
+  Bot and group rows keep their own avatars. A child is named for its work;
+  a task carries its own state, and the Agent's mark identifies its executor.
+  This navigation does not change the distinction between dispatching Bot,
+  task and executing Agent.
+- Task lists continue to show one row per task, with its threads inside
+  ([2026-11-07](decisions/2026-11-07-2045-tasks-only-threads-inside.md)).
+  A standalone Agent run already visible to its dispatching Bot can be a
+  child of that Bot in the hosted sidebar; it is not a global thread list.
 - The right panel's 概览 header is the selected bot (the same avatar and
   name as its left row), followed by the tabs 详情 / 任务 / PR / 电脑. A
   task's title appears in its task row and detail, never as that
@@ -91,11 +99,14 @@ Decided by Alex, 2026-10-28.
 | --- | --- | --- |
 | **Artifact** | Artifact | Something a thread produces for the person to look at or accept, such as an acceptance (验收), a PR, a document or a web page. The word is never translated (not 产物, 工件 or 成果). Lives on the Artifact rail page (R-56). An open thread's header always has an Artifact button, and the message that finishes a thread carries its Artifact card (Alex, 2026-11-06). |
 | **Agent** | Agent | The coding agent that runs a thread: Claude Code, Codex, Cursor (`agents` table, a harness). It does the coding work; a bot never does. Shown by its own brand mark wherever a thread or run has an icon (R-78). Never called harness or 执行器 in the UI (R-43). |
-| **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
+| **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. Has its own mark (a glyph and colour), the main mark of its Agent stretches (R-78). It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
 | **Library** | 资料库 | A bot's files, listed under 概览 › 详情; the person can delete their own (R-51). Files are added with the composer's 「+」. |
 | **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an Agent stretch in the task's 活动); no list or tab is named 线程. |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
 | **Computer** | 电脑 | A bot's cloud computer: its own desktop (X display) on its owner's bot machine, which is one per person per workspace (`cloud_machines` keyed by `workspaceId`, `ownerId`; `bot_desktops` keyed by `botId`). Used by that bot only; a thread that needs a desktop gets its own machine ([0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)). Shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
+| **Bot machine** | Bot 机器 | The E2B sandbox that hosts one person's bot desktops in a workspace. One per person per workspace, not one per bot. |
+| **Thread machine** | thread 机器 | The E2B sandbox one cloud thread runs on, from the verified official-derived template. Separate from the bot machine. |
+| **Workspace policy** | 工作区策略 | Target contract (Capy parity): the only authorization surface — MCP servers (allow / read-only / disabled), devices (allow), computer use (allow / deny). Never per Bot. Current builds still carry per-Bot rows until the workspace rule lands. |
 
 ## Words to avoid
 
@@ -180,7 +191,7 @@ _Avoid_: Agent, assistant, 机器人.
 **Agent**:
 As defined above: the coding worker (Claude Code, Codex) that runs a thread.
 Which Agent a person's bots use is the person's choice per workspace
-(Bot 与 Agents).
+(模型与订阅).
 _Owner_: the account (Agent aggregate).
 _Avoid_: harness, 执行器, bot.
 
@@ -214,10 +225,12 @@ Agents. The UI calls it daemon in both languages, with no 「Mikka」 in front:
 _Avoid_: Mikka 客户端, Mikka client, 客户端 (reads as the desktop app).
 
 **Connection (连接)**:
-The person's authorised link to an outside app (Gmail, GitHub, Linear,
-Telegram…), used only by their own bots unless a workspace policy says
-otherwise.
-_Owner_: the account (Connection aggregate).
+An authorized link to an outside provider. Personal app connections (Gmail,
+GitHub, Linear, Telegram…) and Claude Code/Codex subscriptions belong to the
+account. Organization model connections are API keys, gateways or custom
+endpoints owned by the organization. Sharing content never shares a connection.
+_Owner_: the account or organization (Connection aggregate); a Subscription
+connection is always account-owned and never a public member resource pool.
 _Avoid_: integration, plugin (a 插件 is the store item, the connection is
 what linking it creates), binding.
 
@@ -228,7 +241,9 @@ Sensitive third-party API values follow the scoped capability boundary in
 `lib/secrets/runtime.ts` separates ordinary env and explicit direct delivery
 from protected HTTP capabilities, which the claim route seals for the run.
 Deployed protection requires the decision's runtime canaries and evidence.
-_Owner_: the workspace (Secret aggregate).
+_Owner_: the account for Personal secrets, or the Workspace/Project for Shared
+secrets. Thread scope narrows delivery to authorized work; it does not change
+ownership or authorize delivery of someone else's Personal secret.
 _Avoid_: credential (a model credential is the account's), token, 环境变量 as
 a separate thing (an environment variable is a kind of secret).
 
@@ -238,6 +253,10 @@ allowance is the credits a new workspace starts with once its owner is
 verified. A model subscription's quota (订阅额度) is the subscription owner's,
 never the workspace's.
 _Owner_: the workspace (Billing aggregate); 订阅额度 belongs to the account.
+An Organization can explicitly designate an attached Workspace's existing
+billing account for its platform resources. Existing balances keep their
+owner and ledger history. External API keys, subscriptions and E2B bills remain
+external; an unavailable provider amount is **Unknown**, never zero.
 _Avoid_: bare 额度 (say 免费额度 or 订阅额度), balance, quota for credits.
 ## Known naming debt
 

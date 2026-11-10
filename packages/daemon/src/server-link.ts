@@ -43,6 +43,7 @@ import type { RunChunk } from "./chunks"
 import type { RunControlMode, ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
 import type { ServerDecide } from './server-decision'
+import type { WorkspaceReadCommand, WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
 import type { ChatFileDownload } from '@mikka/protocol/chat-attachments'
 import type { NativeBrokerContext, NativeBrokerRequest, NativeLease } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
@@ -150,6 +151,7 @@ export interface ServerLink {
     waitSeconds: number,
     options?: FetchCommandsOptions
   ): Promise<RunCommand[]>
+  answerWorkspaceRead?(deviceId: string, requestId: string, receipt: WorkspaceReadReceipt, options: { expiresAt: string; signal?: AbortSignal }): Promise<void>
   /**
    * A short-lived ticket for the device's push socket. Absent on a link
    * that only long-polls, and null when this server has no gateway.
@@ -178,6 +180,8 @@ export interface ServerLink {
 
 export interface FetchCommandsOptions {
   signal?: AbortSignal
+  workspaceSkip?: readonly string[]
+  onWorkspaceRequests?: (requests: WorkspaceReadCommand[]) => void
   skipRuns?: readonly string[]
   onQueuedRuns?: (runIds: string[]) => void
   /**

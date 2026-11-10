@@ -17,6 +17,7 @@ import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source
 import { cloudTaskTarget } from './cloud-task-target'
 import { runListChanged } from '@/lib/live/lists'
 import { runChanged } from '@/lib/live/panels'
+import { resolveRunOrigin, type RunOrigin, type RunOriginRef } from '@/lib/run-origin'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
  * together so the cloud worker never observes an unbound queued run. The
@@ -27,6 +28,8 @@ import { runChanged } from '@/lib/live/panels'
  * recovery admission independently of the parent computer's current state. */
 export async function queueCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, input: {
   botId: string; issueId: string; agentId: string; deviceRepoId: string; title: string; body: string; note?: string
+  /** Host recovery guidance belongs to execution instructions, never the person's run note. */
+  executionNote?: string
   /** The run keeps no bot of its own, like the run it continues (an MCP client's): it still runs on `botId`'s computer. */
   withoutBot?: boolean
   /** Required (lib/computer/run-model.ts): a new run's from 优先使用的模型, a thread's next run its own. Never 'auto' or empty. */
@@ -49,6 +52,10 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   /** Internal host placement grant, never a model/tool argument. The current owner source can only narrow it. */
   allowLocalRecovery?: true
   sourceEventId?: string
+  /** Evidence-only entry provenance (lib/run-origin.ts). A host continuation
+   * copies its source run's. Every production caller passes it explicitly;
+   * lib/run-origin-writes.test.ts enumerates the call sites. */
+  origin?: RunOrigin; originRef?: RunOriginRef | null
 }, existing?: PoolClient, factoryContext?: Pick<ProfileFactoryContext, 'attemptId' | 'sourceEventId'>) {
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
   if (input.subscriptionBindingId !== undefined && (!z.uuid().safeParse(input.subscriptionBindingId).success || input.apiKeyId || input.apiKey)) throw new ComputerError(400, 'Invalid task request')
@@ -61,6 +68,10 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     console.error(JSON.stringify({ msg: 'cloud_run_model_missing', runId, threadRunId: input.threadRunId ?? null, issueId: input.issueId, agentId: input.agentId }))
     throw error
   }
+  // Validate the entry before taking a connection: an invalid ref must not leak one.
+  // The web default is for legacy tests; the write guard enumerates every
+  // production caller so none can rely on it silently.
+  const entry = resolveRunOrigin({ explicit: input.origin ? { origin: input.origin, originRef: input.originRef } : null, defaultOrigin: 'web' })
   const client = existing ?? await pool.connect()
   try {
     if (!existing) await client.query('BEGIN')
@@ -74,7 +85,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
     const target = await cloudTaskTarget(client, actor, input)
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
-    const instructions = [target.instructions, input.agentProfile?.instructions].filter(Boolean).join('\n\n')
+    const instructions = [target.instructions, input.agentProfile?.instructions, input.executionNote].filter(Boolean).join('\n\n')
     const { prompt, taskLength: promptTaskLength } = runPromptParts(input.title, input.body, instructions, input.note)
     if (digest) {
       const priorRun = (await client.query(`SELECT r."userId",r."issueId",r."agentId",r."deviceId",r."deviceRepoId",r.prompt,r."agentDefinition",r."dispatchFingerprint",r."botId" AS "runBotId",b."botId",b."workspaceId"
@@ -111,8 +122,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const agentDefinition = push ? { ...frozen, repositoryAdmission: push.admission } : frozen
     const traceContext = captureTraceContext({ runId, threadId: input.threadRunId ?? runId, taskId: input.issueId, posthogDistinctId: actor.userId, ...(push?.publication.identifier ? { taskNumber: push.publication.identifier } : {}) })
     if (traceContext) agentDefinition.traceContext = traceContext
-    await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength","workspaceId")
-      VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12,$13)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, runBotId,JSON.stringify(agentDefinition), digest ? selectionFingerprint : null, promptTaskLength, actor.workspaceId])
+    await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength","workspaceId",origin,"originRef")
+      VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12,$13,$14,$15)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, runBotId,JSON.stringify(agentDefinition), digest ? selectionFingerprint : null, promptTaskLength, actor.workspaceId, entry.origin, entry.originRef ? JSON.stringify(entry.originRef) : null])
     if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`, [runId, push.publication.userId, push.publication.issueId, push.publication.scopeVersion, push.publication.issueTitle, push.publication.remoteUrl, push.publication.remoteKey, push.publication.identifier, push.publication.branch, push.publication.baseBranch])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])

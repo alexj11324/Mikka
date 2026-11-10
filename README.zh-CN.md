@@ -47,7 +47,8 @@ claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
 - **在你的环境中执行。** 通过 Mikka Daemon 连接自己的电脑和 SSH 服务器，也可以使用已配置的云端执行环境。符合条件的并行任务使用独立的 Git Worktree 或任务沙盒。
 - **让工作可追踪、可审阅。** 查看任务进度、回答 Agent 的问题、检查运行结果，并通过 Factory 的检查与验收流程审阅符合条件的 Pull Request。
 - **提供云端桌面。** 在已正确配置的 Mikka Cloud 账号中，Bot 可以使用可实时查看、接管并交还控制权的云端桌面。直接使用 E2B 时，需要桌面所有者自己的 Key。
-- **连接现有工具。** 通过 MCP 在 Claude Code 或 Codex 中操作 Mikka，也可以通过 Telegram 和 Slack 联系 Mikka。已连接应用中的操作遵循相应权限与审批策略。
+- **连接现有工具。** 通过 MCP 在 Claude Code 或 Codex 中操作 Mikka，也可以通过 Telegram 和 Slack 联系 Mikka。已连接应用中的操作遵循工作区为每个应用设置的访问档位。
+- **在工作区统一授权。** 工作区是唯一的授权层：管理员可以允许、禁用或将每个 MCP server 设为只读，并允许每台设备。Bot 没有自己的权限设置，没有 allow/ask/deny 层，也没有逐动作审批。
 - **使用你已有的订阅（Bring your own subscriptions）。** 可将现有 Claude 或 ChatGPT/Codex 订阅用于受支持的编码 Agent；适用场景下也支持模型 API Key。
 - **支持个人与团队协作。** 通过个人和团队工作区组织任务、Bot 与活动，并控制已连接资源的访问权限。
 

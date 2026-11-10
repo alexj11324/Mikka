@@ -373,7 +373,9 @@ function screens(fixture) {
     // This parity environment is the cloud edition (desktop.yml). The Mikka
     // cloud connection page exists only for community server administrators;
     // its real component states are captured by self-hosting-ui.yml instead.
-    ...Object.entries(messages.Settings.sections).filter(([id]) => id !== 'developer' && id !== 'cloud').map(([id, section]) => ({
+    // 组织 (organization) is drawn only by a UI layer; the open-source package
+    // under test has no such page (tests/settings-sections.test.mjs LAYER_ONLY).
+    ...Object.entries(messages.Settings.sections).filter(([id]) => id !== 'developer' && id !== 'cloud' && id !== 'organization').map(([id, section]) => ({
       name: `settings-${id}`,
       open: async target => {
         if (id === 'audit') {

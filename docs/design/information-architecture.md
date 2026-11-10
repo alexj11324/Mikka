@@ -36,8 +36,8 @@ re-checked for this page.
 Members, invitations, teams, roles and 团队权限, member audit, shared credits,
 card designation and seats, 分享给团队成员, bots of people who left, and
 transfer are team-only (T2). Anything a single person needs to run their own
-bots and threads (secrets and environment, Bot 与 Agents, devices, models and
-API keys, connections, usage, billing) is present in a personal workspace too.
+bots and threads (secrets and environment, models and subscriptions, devices,
+connections, usage, billing) is present in a personal workspace too.
 Alex stated this for settings in 2026-11-02-0216 (PR #895).
 
 ## 1. Object model
@@ -65,10 +65,10 @@ referenced by id (DDD).
 | Workspace | The tenant (T1) | Workspace · owner account | `mikka_workspaces.userId`, `kind` personal/team (`lib/db/workspace-schema.ts:4-14`) | Personal: on first use (`lib/personal-workspace.ts:16-26`); team: 创建工作区 (`app/actions/workspace.ts:49`) | 设置 › 常规 | Account menu, the only switcher (R-75, R-79) |
 | Member | An account's place in a workspace | Workspace · workspace | `mikka_workspace_members (workspaceId, userId, role, status)` (`workspace-schema.ts:16-24`) | Invitation, team only (`app/actions/workspace.ts:91`, refuses personal at `:100`) | 设置 › 成员 | 设置 › 成员 |
 | Team (团队) | A group inside a shared workspace | Team · workspace | `mikka_teams.workspaceId` (`lib/db/team-schema.ts:3-9`) | 设置 › 团队 › 创建团队 (`app/actions/teams.ts:47`) | 设置 › 团队 | 看板 (R-82); 设置 › 你的团队 |
-| Bot | Chats, dispatches threads | Bot · workspace, held by owner | `bots (ownerId, workspaceId, archivedAt)` (`schema.ts:95-115`) | 新建 Bot (`app/actions/bots.ts:45` → `lib/bot-create.ts:14`) | 概览 header (name, look; R-51); defaults in 设置 › Bot 与 Agents | Bot list (R-01); ⌘K |
+| Bot | Chats, dispatches threads | Bot · workspace, held by owner | `bots (ownerId, workspaceId, archivedAt)` (`schema.ts:95-115`) | 新建 Bot (`app/actions/bots.ts:45` → `lib/bot-create.ts:14`) | 概览 header (name, look; R-51); defaults in 设置 › 模型与订阅 | Bot list (R-01); ⌘K |
 | Coordinator | The person's ordinary bot in a workspace (R-06) | Bot · workspace, one per person | `coordinator_bots (ownerId, workspaceId) → bots` (`schema.ts:117-122`; `lib/coordinator/coordinator-bot.ts:5-16`) | On first use | As any bot | Bot list, pinned |
 | Group chat | Chat with several bots and people | Conversation · workspace | `conversations.workspaceId`, `createdBy`; `conversation_members` (`schema.ts:822-836`) | Bot list 「+」 › 新建群聊 | Group panel | Bot list; ⌘K |
-| Agent | Coding worker that runs a thread | Agent · account | `agents.userId`, `deviceId` (`schema.ts:321-328`); choice per person per workspace in `execution_rules (ownerId, workspaceId)` (`schema.ts:126-131`) | Detected on a device | 设置 › Bot 与 Agents | Its mark on 全部线程 rows (R-78) |
+| Agent | Coding worker that runs a thread | Agent · account | `agents.userId`, `deviceId` (`schema.ts:321-328`); choice per person per workspace in `execution_rules (ownerId, workspaceId)` (`schema.ts:126-131`) | Detected on a device | 设置 › 模型与订阅 | Its mark on 全部线程 rows (R-78) |
 | Agent Profile | Reusable logical coding role, model policy, private instructions and controlled Skills | Execution · person in workspace | `factory_agent_profiles` and immutable profile versions | Settings › Models and subscriptions | Factory Agent Profiles section, beside Preferred models | New task selector; frozen Profile in the thread execution identity dialog; [spec](factory-agent-profiles.md) |
 | Thread (run chain) | Work a bot dispatched; a root run and the runs that resume, retry or continue it (`lib/run-chain.ts`) | Thread · workspace where it was dispatched (run by an Agent; the bot only dispatches it) | `agent_runs.userId`, `botId`, `issueId` (`schema.ts:338-398`); no `workspaceId`, reached through `bots.workspaceId` | Dispatched from chat | Its column: 对话, 验收 | 概览 › 线程; 全部线程; chat card; task's 线程 (R-82) |
 | Task (issue) | Work to be done (`MIK-xx`) | Task · workspace (team: its team) | `issues.userId`, `scope` (`schema.ts:30-45`); team tasks in `mikka_team_issues (teamId, workspaceId)` (`team-schema.ts:15-18`) | By a bot in chat, or 新建任务 (R-22) | Task page | 看板; ⌘K; chat chips (R-15) |
@@ -116,7 +116,7 @@ per AGENTS.md triage is in brackets.
 
 | # | Where | Model says | Code does | Impact | Change | Sev |
 | --- | --- | --- | --- | --- | --- | --- |
-| M1 | `lib/settings-sections.ts:94` | Bot 与 Agents, 常规, 密钥与环境 are workspace-level (T2; 0203, 0216) | `TEAM_ONLY_SECTIONS` hides them in a personal workspace | A single person cannot set run secrets or bot defaults [9×7] | Fixed by #890 (Bot 与 Agents) and #895 (常规, 密钥与环境) | P0 |
+| M1 | `lib/settings-sections.ts:94` | Bot 与 Agents (now 模型与订阅), 常规, 密钥与环境 are workspace-level (T2; 0203, 0216) | `TEAM_ONLY_SECTIONS` hides them in a personal workspace | A single person cannot set run secrets or bot defaults [9×7] | Fixed by #890 (Bot 与 Agents) and #895 (常规, 密钥与环境) | P0 |
 | M2 | `lib/account/delete.ts:17-21`, `:180` | Bots of people who leave a team are paused for takeover (T2; 2225 rule 6) | Account deletion deletes the person's bots and their threads in shared workspaces | Team loses bots and run history on team tasks, irreversibly [3×8] | Before the sweep, run `releaseDepartingMember` for shared workspaces and keep bots and runs there | P1 |
 | M3 | `lib/workspace-admin/general.ts:170-213` | Deleting a tenant deletes everything keyed by it (T5) | `deleteAppData` leaves secrets, E2B keys, policies, shares, payment designations, allowances, execution rules, PATs | Encrypted secret values outlive their workspace [4×7, credential retention] | Delete every main-DB table with a `workspaceId` column; a test that lists them from `information_schema` as `delete.ts` does | P1 |
 | M4 | `lib/account/delete.ts:32`, `:180` | Deleting an account deletes its personal workspace (T1, T5) | Main-DB rows keyed only by `workspaceId` (or `createdBy`) stay | Same retention as M3 for every deleted account [5×7] | Run the M3 deletion for each solo workspace in the account plan | P1 |
@@ -348,7 +348,7 @@ to `/task/:id?attempt=:runId`, then the task conversation
 
 | # | Gap | Where | Sev | Breaks | Change | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| G1 | Bot 与 Agents, 常规, 密钥与环境 hidden in a personal workspace | `lib/settings-sections.ts:94` | P0 | P1, P3; T2, T5 | Remove from `TEAM_ONLY_SECTIONS` | #890, #895 |
+| G1 | Bot 与 Agents (now 模型与订阅), 常规, 密钥与环境 hidden in a personal workspace | `lib/settings-sections.ts:94` | P0 | P1, P3; T2, T5 | Remove from `TEAM_ONLY_SECTIONS` | #890, #895 |
 | G2 | Phone web cannot open the right column: no 概览, no 全部线程, no threads a bot dispatched, PR or 电脑 | `issue-workspace.tsx:180`, `:448`; window bar hidden below `md` | P1 | P9; PM:`persistent-nav` | A header button on phones, as the iOS app's bot page; verify in a browser at < 768px (found from code only) | Open |
 | G3 | 全部线程 sits inside one bot's panel | `context-panel.tsx:171` | P1 | P4, P5; NAV | Top-bar global entry | In progress (another session) |
 | G4 | ⌘K finds no threads, Artifacts or settings sections | `lib/site-search.ts:14-16`, `global-search.tsx` | P1 | P6; IA-5 | Add the three sources | Open |

@@ -113,6 +113,16 @@ test('web auth routing preserves real PKCE, refused handoff, account addition an
   location.searchParams.append('desktop_state', 'duplicate-refused')
   assert.equal(webAuthentication(location).desktopFlow, null)
   assert.equal(authenticatedReturn(new URL('https://app.example/mikka/en/sign-in?next=https://foreign.example')), '/mikka/en/')
+  // A refused company SSO sign-in brings its own notice (auth-sso slot); other errors keep the OAuth one.
+  assert.equal(webAuthentication(new URL('https://app.example/mikka/en/sign-in?sso=failed&error=ENTERPRISE_DIRECTORY_INACTIVE')).oauthFailed, false)
+  assert.equal(webAuthentication(new URL('https://app.example/mikka/en/sign-in?error=access_denied')).oauthFailed, true)
+  // sso=failed alone is forgeable; without the server-issued code the generic notice stays on.
+  assert.equal(webAuthentication(new URL('https://app.example/mikka/en/sign-in?sso=failed&error=access_denied')).oauthFailed, true)
+  assert.equal(webAuthentication(new URL('https://app.example/mikka/en/sign-in?oauth=failed&sso=failed')).oauthFailed, true)
+  // A refused handoff keeps its refusal even when the SSO notice also applies.
+  const refusedHandoff = new URL('https://app.example/mikka/en/sign-in?desktop=1&desktop_state=abcdefghijklmnop&desktop_callback=http://localhost:4567/auth/callback&oauth=failed&sso=failed&error=ENTERPRISE_DIRECTORY_INACTIVE')
+  assert.equal(webAuthentication(refusedHandoff).oauthFailed, true)
+  assert.equal(webAuthentication(refusedHandoff).desktopRefused, true)
   const oauth = new URL('https://app.example/mikka/sign-in?sig=signed&client_id=client&scope=a&scope=b&ba_context=hidden&exp=123&prompt=login')
   const continuation = new URL(authenticatedReturn(oauth), oauth)
   assert.equal(continuation.pathname, '/mikka/api/auth/oauth2/authorize')

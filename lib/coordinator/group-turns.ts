@@ -280,11 +280,13 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
                 return
               }
               const runId = randomUUID()
-              // #102 reads owner-filtered, live agent_runs. No device, prompt,
-              // transcript or group/member IDs enter that shared status contract.
-              // Provider calls time out after 20s; the 60s lease bounds stale UI
-              // status if the process dies before its finally/recovery path.
-              await client.query(`INSERT INTO agent_runs (id,"userId","agentId","workspaceId",kind,status,"startedAt","leaseExpiresAt") VALUES ($1,$2,$3,$4,'group_chat','running',now(),now()+interval '60 seconds')`, [runId, root.createdBy, id, root.workspaceId])
+              // A group-chat turn is the app's own entry; the status row never
+              // exposes opaque ids. #102 reads owner-filtered, live agent_runs.
+              // No device, prompt, transcript or group/member IDs enter that
+              // shared status contract. Provider calls time out after 20s; the
+              // 60s lease bounds stale UI status if the process dies before its
+              // finally/recovery path.
+              await client.query(`INSERT INTO agent_runs (id,"userId","agentId","workspaceId",kind,status,"startedAt","leaseExpiresAt",origin) VALUES ($1,$2,$3,$4,'group_chat','running',now(),now()+interval '60 seconds','web')`, [runId, root.createdBy, id, root.workspaceId])
               await client.query('UPDATE group_turns SET "agentId"=$2,"activeRunId"=$3,"botId"=NULL,"updatedAt"=now() WHERE "messageId"=$1', [messageId, id, runId])
               armDueTimerAfterCommit(client, 'run-recovery')
             } else {

@@ -32,6 +32,7 @@ import messages from '@/messages/zh-CN.json'
 import { armDueTimerSoon } from '@/lib/due-timer'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
+import { resolveRunOrigin } from '@/lib/run-origin'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -277,7 +278,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   }
   const retryId = crypto.randomUUID()
   const where = bound || cloud ? 'moved to the cloud' : 'handed to another device'
-  const recovery = await (await import('@/lib/factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run.prompt, outcome.attempt))
+  const recovery = await (await import('@/lib/factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run, outcome.attempt))
   if (recovery.blocked) {
     const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status: 'failed', error: recovery.blocked }, now, true)
     if (ended) await announceEnd({ ...run, status: 'failed' })
@@ -294,9 +295,12 @@ async function reclaimLostRun(run: Run, now: Date) {
     if (cloud) return true
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
+      // A device retry continues the same entry; a legacy source keeps the
+      // host's automatic recovery as its origin rather than guessing 'web'.
+      ...resolveRunOrigin({ sourceRun: run, defaultOrigin: 'automation' }),
       agentDefinition: retryWorkerDefinition(target ? await rebindExecutionDevice(pool, run, target.deviceId) : run.agentDefinition, recovery.prompt),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
-      prompt: recovery.prompt, attempt: outcome.attempt, retryOf: run.id,
+      prompt: recovery.prompt, promptTaskStart: recovery.promptTaskStart, promptTaskLength: recovery.promptTaskLength, attempt: outcome.attempt, retryOf: run.id,
     })
     await runListChanged(tx, retryId)
     await runChanged(tx, retryId)
@@ -373,7 +377,10 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     const { queueCloudRun } = await import('@/lib/computer/queue-run')
     const repo = await ensureDeviceRepository(run.userId, cloud.deviceId, cloud.remoteUrl)
     const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: cloud.agentId, deviceRepoId: repo.id, title: issue.title, body: tiptapToText(issue.content),
-      note: retryNote(attempt) + handoff, withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
+      // Moving the lost run to the cloud keeps its entry; a legacy run keeps
+      // the host's automatic recovery as its origin rather than guessing 'web'.
+      ...resolveRunOrigin({ sourceRun: run, defaultOrigin: 'automation' }),
+      executionNote: retryNote(attempt) + handoff, withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
     await db.update(agentRuns).set({ retryOf: run.id, attempt, updatedAt: now }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
     await recordCoordinatorEvent(db, runRetriedEvent(run, { runId, attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedTo: { kind: 'cloud' } }))
     await startThreadMachine(actor, runId)

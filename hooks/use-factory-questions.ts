@@ -42,6 +42,14 @@ async function readQuestions(): Promise<FactoryQuestionItem[]> {
 }
 
 /**
+ * The `version` 收件箱 reads its questions at: the live thread list's ids and states, so a task that moves reads them
+ * again. The rail's count (hooks/use-inbox-count.ts) passes the same one and shares the read.
+ */
+export function factoryQuestionsVersion(threads: readonly { id: string; status: string }[]) {
+  return threads.map(thread => `${thread.id}:${thread.status}`).join(',')
+}
+
+/**
  * The person's pending Factory questions, and answering one. No timer reads them (#1212): `version` is something that
  * changes when they may have (the chat's own version, the task list), and a change reads them again.
  */

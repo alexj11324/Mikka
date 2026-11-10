@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 
-const PHASES = new Set(['create_requested', 'created', 'resume_requested', 'resumed', 'provisioning', 'active', 'waiting', 'handoff',
+const PHASES = new Set(['create_requested', 'created', 'resume_requested', 'resumed', 'restore_requested', 'provisioning', 'active', 'waiting', 'handoff',
   'pause_requested', 'paused', 'pause_failed', 'retire_requested', 'retire_failed', 'retired', 'needs_reconciliation'])
 const REASONS = new Set(['created', 'resumed', 'manual_pause', 'manual_end', 'stage_handoff', 'run_ended', 'unclaimed_idle', 'active_run',
   'provisioning', 'retirement', 'retention_elapsed', 'paused_retention', 'checkpoint_unverified', 'native_archive_unverified', 'retirement_guard_refused',
