@@ -2297,7 +2297,8 @@
         "default": "Default (Decision API)",
         "allow": "On its own",
         "ask": "Asks you first",
-        "deny": "Not allowed"
+        "deny": "Not allowed",
+        "eachBot": "Default (workspace setting)"
       },
       "run": {
         "install_dependency": "Install dependencies",

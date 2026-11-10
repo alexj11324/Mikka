@@ -2297,7 +2297,8 @@
         "default": "默认（由 Decision API 判断）",
         "allow": "直接做",
         "ask": "先问你",
-        "deny": "不允许"
+        "deny": "不允许",
+        "eachBot": "默认（按工作区设置）"
       },
       "run": {
         "install_dependency": "安装依赖",
