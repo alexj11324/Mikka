@@ -32,9 +32,10 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
     getTool: slug => client.tools.getRawComposioToolBySlug(slug) as Promise<AppTool>,
     execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId),
     setting: async (tool, toolkit) => {
-      // Unreadable settings name nothing; the Decisions judge then decides, not a fixed ask.
+      // Unreadable settings fail closed: a malformed workspace policy must not
+      // fall through to the Decisions judge, which can allow when it is down.
       // The lookup covers the tool's slug, its app key and its legacy write action (send_slack_message).
-      try { return appCallSetting(await readWriteSettingLayers(db, userId, botId), tool, toolkit) } catch { return null }
+      try { return appCallSetting(await readWriteSettingLayers(db, userId, botId), tool, toolkit) } catch (error) { throw new Error('integrationPolicyUnavailable', { cause: error }) }
     },
     judge: serverWriteJudge(userId, botId),
     recordStart: async (call, accountId) => {

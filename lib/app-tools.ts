@@ -54,14 +54,14 @@ export const appToolCallSchema = z.object({
 export type AppToolExecution = { successful: boolean; data?: Record<string, unknown>; error?: string | null; logId?: string }
 
 export type AppToolDeps = {
-  /** 团队权限 › 允许使用的应用 for a named Bot; the person's own Coordinator is always allowed. */
+  /** 团队权限 › 允许使用的应用 for the workspace; checked for this Bot's call. The person's own Coordinator is always allowed. */
   appAllowed: (toolkit: string) => Promise<boolean>
   resolveAccount: (toolkit: string, selected?: string) => Promise<{ accountId: string | null; accounts: ComposioAccountChoice[] }>
   listTools: (toolkit: string, query?: string) => Promise<AppTool[]>
   getTool: (slug: string) => Promise<AppTool>
   /** `accountId` is null only for an app that needs no connection (its tools run on the person's id alone). */
   execute: (call: AppToolCall, accountId: string | null) => Promise<AppToolExecution>
-  /** The person's or admin's explicit setting for this tool or app, or null when none names it. */
+  /** The workspace's explicit setting for this tool or app, or null when none names it. */
   setting: (tool: string, toolkit: string) => Promise<AppToolDecision | null>
   /** The shared R-77 judge: `ask` for a destructive, unjudged or refused call. */
   judge: WriteJudge
@@ -84,15 +84,14 @@ const layer = z.record(z.string(), decision).nullable().optional()
  * names the call; settings that cannot be read throw, and the caller decides
  * how to fail.
  */
-export function explicitSetting(row: { agent: unknown; workspace: unknown } | null, keys: readonly string[]): AppToolDecision | null {
+export function explicitSetting(row: { workspace: unknown } | null, keys: readonly string[]): AppToolDecision | null {
   if (!row) return null
-  const agent = layer.parse(row.agent) ?? {}, workspace = layer.parse(row.workspace) ?? {}
-  const choices = (source: Record<string, AppToolDecision>) => keys.flatMap(key => Object.hasOwn(source, key) ? [source[key]] : [])
-  return permissionDecision([...choices(agent), ...choices(workspace)])
+  const workspace = layer.parse(row.workspace) ?? {}
+  return permissionDecision(keys.flatMap(key => Object.hasOwn(workspace, key) ? [workspace[key]] : []))
 }
 
 /** One app tool call's explicit setting: its own slug, then its app key and legacy write action. */
-export function appCallSetting(row: { agent: unknown; workspace: unknown } | null, tool: string, toolkit: string): AppToolDecision | null {
+export function appCallSetting(row: { workspace: unknown } | null, tool: string, toolkit: string): AppToolDecision | null {
   return explicitSetting(row, appCallSettingKeys(tool, toolkit))
 }
 
