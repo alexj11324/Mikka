@@ -10,7 +10,7 @@ import type { LinearIssueSnapshot } from '../lib/linear-sync/client'
  * GraphQL receiver. No provider account, application/WS ACL or writer is mocked. */
 test('Linear responsibility respects current Workspace members, holds incoming leases and preserves history', { skip: !dbUrl, timeout: 120_000 }, async t => {
   const { db, pool } = await import('../lib/db')
-  const { workspacePool } = await import('../lib/workspace-db')
+  const { workspaceDb, workspacePool } = await import('../lib/workspace-db')
   const { linearTeamSyncs } = await import('../lib/db/schema')
   const { createAppIssueFromLinear, applyLinearIssueToApp, syncAppIssueToLinear } = await import('../lib/linear-sync/issue-sync')
   const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
@@ -101,14 +101,50 @@ test('Linear responsibility respects current Workspace members, holds incoming l
 
   await t.test('a corrupt extra membership cannot assign a peer inside a personal Workspace', async () => {
     const personalId = await seedPersonalWorkspace(pool, owner)
-    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [personalId, member, `${member}@example.invalid`])
+    const insertPeer = 'INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')'
+    await assert.rejects(pool.query(insertPeer, [personalId, member, `${member}@example.invalid`]), {
+      code: '23514', message: 'personal workspace admits only its owner',
+    })
     const [personalTeam] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, workspaceId: personalId, linearTeamId: randomUUID(), linearTeamKey: 'LRP', linearTeamName: 'Personal fixture' }).returning()
-    const peer = await createAppIssueFromLinear(personalTeam, remote(member, personalTeam))
-    assert.ok(peer)
-    assert.equal(readIssueMetadata(peer.content).assignee, null)
-    const own = await createAppIssueFromLinear(personalTeam, remote(owner, personalTeam))
-    assert.ok(own)
-    assert.equal(readIssueMetadata(own.content).assignee?.id, owner)
+    await workspaceDb.transaction(async () => {
+      // Keep the old active corrupt row to exercise the Personal read fence,
+      // rather than making it suspended and testing only the status filter.
+      // This copy is private to the held real Workspace connection; no public
+      // guard is disabled, and the real guard is attached after legacy seeding.
+      await workspacePool.query('SET LOCAL search_path=pg_temp,public')
+      await workspacePool.query('CREATE TEMP TABLE mikka_workspace_members (LIKE public.mikka_workspace_members INCLUDING ALL) ON COMMIT DROP')
+      await workspacePool.query('INSERT INTO pg_temp.mikka_workspace_members SELECT * FROM public.mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [[personalId, alpha.id]])
+      await workspacePool.query(insertPeer, [personalId, member, `${member}@example.invalid`])
+      await workspacePool.query(`CREATE TRIGGER mikka_personal_membership_guard BEFORE INSERT OR UPDATE ON pg_temp.mikka_workspace_members
+        FOR EACH ROW EXECUTE FUNCTION public.mikka_guard_personal_membership()`)
+      const guarded = (text: string, values: unknown[]) => workspaceDb.transaction(() => workspacePool.query(text, values))
+      await assert.rejects(guarded(insertPeer, [personalId, foreign, `${foreign}@example.invalid`]), {
+        code: '23514', message: 'personal workspace admits only its owner',
+      })
+      await assert.rejects(guarded('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [personalId, member]), {
+        code: '23514', message: 'personal workspace admits only its owner',
+      })
+      assert.equal((await workspacePool.query('SELECT status FROM pg_temp.mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [personalId, member])).rows[0].status, 'active')
+      // A real import sees a Team membership present only in this connection.
+      // This proves the assignee lookup did not silently use the public pool.
+      assert.equal((await pool.query('SELECT count(*)::int n FROM public.mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [alpha.id, foreign])).rows[0].n, 0)
+      await workspacePool.query(insertPeer, [alpha.id, foreign, `${foreign}@example.invalid`])
+      const pinned = await createAppIssueFromLinear(team, remote(foreign))
+      assert.ok(pinned)
+      assert.equal(readIssueMetadata(pinned.content).assignee?.id, foreign)
+      // The outer lease must also see revocation on that same connection.
+      await workspacePool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [personalId, owner])
+      await assert.rejects(createAppIssueFromLinear(personalTeam, remote(owner, personalTeam)), { code: 'workspaceAccessDenied' })
+      await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [personalId, owner])
+      const peer = await createAppIssueFromLinear(personalTeam, remote(member, personalTeam))
+      assert.ok(peer)
+      assert.equal(readIssueMetadata(peer.content).assignee, null)
+      const own = await createAppIssueFromLinear(personalTeam, remote(owner, personalTeam))
+      assert.ok(own)
+      assert.equal(readIssueMetadata(own.content).assignee?.id, owner)
+    })
+    assert.equal((await pool.query('SELECT count(*)::int n FROM public.mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[])', [personalId, [member, foreign]])).rows[0].n, 0,
+      'the historical fixture must not add any public Personal membership')
   })
 
   await t.test('incoming synchronization keeps the target membership locked until the APP write commits', async () => {

@@ -337,9 +337,9 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
       await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
     } })
     try {
-      await assert.rejects(actAs(session.user, () => withFactoryMembership(owner, () => store.create({ ownerId: owner, workspaceId: alpha }, {
+      await assert.rejects(run(request('/api/factory/agent-profiles?workspaceId=' + alpha, alpha), () => actAs(session.user, () => withFactoryMembership(owner, () => store.create({ ownerId: owner, workspaceId: alpha }, {
         name: 'Rollback after Enterprise policy change', harness: 'auto', model: { mode: 'inherit' }, roles: [], skills: [], instructions: '',
-      }, profileId))), error => code(error) === 'agentProfileScopeNotFound'
+      }, profileId)))), error => code(error) === 'agentProfileScopeNotFound'
         && !!error && typeof error === 'object' && 'cause' in error && code(error.cause) === 'workspaceAccessDenied')
       assert.equal((await controls.query('SELECT id FROM factory_agent_profiles WHERE id=$1', [profileId])).rowCount, 0)
       assert.equal((await controls.query('SELECT "profileId" FROM factory_agent_profile_versions WHERE "profileId"=$1', [profileId])).rowCount, 0)

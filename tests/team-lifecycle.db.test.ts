@@ -14,7 +14,7 @@ test('Team lifecycle preserves canonical workspace objects and their history', {
   const { WorkspaceError } = await import('../lib/workspace-access')
   const { accessibleTeams, accessibleTeamScopes, lockTeamRelations, requireActiveTeam } = await import('../lib/team-access')
   const { pool: appPool } = await import('../lib/db')
-  const { workspacePool } = await import('../lib/workspace-db')
+  const { workspaceDb, workspacePool } = await import('../lib/workspace-db')
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
   const rejects = (promise: Promise<unknown>, code: string) => assert.rejects(promise, (error: unknown) => error instanceof WorkspaceError && error.code === code)
   const admin = await seedUser(pool, 'lifecycle-admin'), member = await seedUser(pool, 'lifecycle-member'), foreignAdmin = await seedUser(pool, 'lifecycle-foreign')
@@ -52,18 +52,40 @@ test('Team lifecycle preserves canonical workspace objects and their history', {
 
   await t.test('legacy Personal Teams stay repairable but cannot receive new grouping or members', async () => {
     const legacyOwner = await seedUser(pool, 'legacy-personal-team')
-    const legacyWorkspace = await seedWorkspace(pool, legacyOwner, [{ userId: legacyOwner, role: 'admin' }])
-    const legacyTeam = await seedTeam(pool, legacyWorkspace.id, legacyOwner, 'Legacy Personal Team')
-    // A pre-migration record: never synthesize a new Team in a personal tenant.
-    await pool.query('update mikka_workspaces set kind=\'personal\' where id=$1', [legacyWorkspace.id])
-    assert.deepEqual(await accessibleTeams(legacyOwner, legacyWorkspace.id, { includeArchived: true }), [])
+    const legacyWorkspace = { id: await seedPersonalWorkspace(pool, legacyOwner) }
+    await assert.rejects(pool.query('update mikka_workspaces set kind=\'team\' where id=$1', [legacyWorkspace.id]), {
+      code: '23514', message: 'workspace kind and personal ownership are immutable',
+    })
     const personalTask = await seedIssue(pool, legacyOwner, legacyWorkspace.id)
-    await assert.rejects(pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [personalTask, legacyTeam.id, legacyWorkspace.id, legacyOwner]), /teamPersonalWorkspace/)
-    await assert.rejects(pool.query('insert into mikka_team_projects("projectId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [randomUUID(), legacyTeam.id, legacyWorkspace.id, legacyOwner]), /teamPersonalWorkspace/)
-    await assert.rejects(pool.query('insert into mikka_team_members("teamId","userId") values($1,$2)', [legacyTeam.id, member]), /teamPersonalWorkspace/)
-    await lifecycle.archiveTeamData(legacyOwner, legacyTeam.id)
-    await lifecycle.restoreTeamData(legacyOwner, legacyTeam.id)
-    await lifecycle.removeTeamGroupingData(legacyOwner, legacyTeam.id, legacyTeam.name)
+    // Like the model-order migration fixture, create historical rows only in
+    // connection-private copies, before attaching the real current guards.
+    // The public tables and their guards stay enabled throughout this case.
+    await workspaceDb.transaction(async () => {
+      await workspacePool.query('SET LOCAL search_path=pg_temp,public')
+      await workspacePool.query('CREATE TEMP TABLE mikka_teams (LIKE public.mikka_teams INCLUDING ALL) ON COMMIT DROP')
+      await workspacePool.query('CREATE TEMP TABLE mikka_team_members (LIKE public.mikka_team_members INCLUDING ALL) ON COMMIT DROP')
+      const legacyTeam = await seedTeam(workspacePool, legacyWorkspace.id, legacyOwner, 'Legacy Personal Team')
+      await workspacePool.query(`CREATE TRIGGER check_team_workspace_kind BEFORE INSERT OR UPDATE OF "workspaceId" ON pg_temp.mikka_teams
+        FOR EACH ROW EXECUTE FUNCTION public.check_team_workspace_kind();
+        CREATE TRIGGER check_active_team_relation BEFORE INSERT OR UPDATE ON pg_temp.mikka_team_members
+        FOR EACH ROW EXECUTE FUNCTION public.check_active_team_relation()`)
+      assert.equal(await count(pool, 'public.mikka_teams where id=$1', [legacyTeam.id]), 0,
+        'the legacy Team exists only on the pinned Workspace connection')
+      assert.deepEqual(await accessibleTeams(legacyOwner, legacyWorkspace.id, { includeArchived: true }), [])
+      // Expected SQL errors need their own savepoint; otherwise PostgreSQL
+      // would abort the outer transaction before the lifecycle is exercised.
+      const guarded = (text: string, values: unknown[]) => workspaceDb.transaction(() => workspacePool.query(text, values))
+      await assert.rejects(workspaceDb.transaction(() => seedTeam(workspacePool, legacyWorkspace.id, legacyOwner)), /teamPersonalWorkspace/)
+      await assert.rejects(guarded('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [personalTask, legacyTeam.id, legacyWorkspace.id, legacyOwner]), /teamPersonalWorkspace/)
+      await assert.rejects(guarded('insert into mikka_team_projects("projectId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [randomUUID(), legacyTeam.id, legacyWorkspace.id, legacyOwner]), /teamPersonalWorkspace/)
+      await assert.rejects(guarded('insert into mikka_team_members("teamId","userId") values($1,$2)', [legacyTeam.id, member]), /teamPersonalWorkspace/)
+      // Each real lifecycle operation must find the connection-private Team;
+      // falling back to a second pool connection would raise teamNotFound.
+      assert.ok((await lifecycle.archiveTeamData(legacyOwner, legacyTeam.id)).archivedAt)
+      assert.equal((await lifecycle.restoreTeamData(legacyOwner, legacyTeam.id)).archivedAt, null)
+      await lifecycle.removeTeamGroupingData(legacyOwner, legacyTeam.id, legacyTeam.name)
+      assert.equal(await count(workspacePool, 'pg_temp.mikka_teams where id=$1', [legacyTeam.id]), 0)
+    })
     assert.equal(await count(pool, 'issues where id=$1 and "workspaceId"=$2', [personalTask, legacyWorkspace.id]), 1)
   })
 
