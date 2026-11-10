@@ -2293,6 +2293,7 @@
       "empty": "还没有连接应用",
       "level": {
         "workspaceDefault": "默认（按工作区设置）",
+        "runDefault": "默认（按运行策略）",
         "default": "默认（Decision API 判断）",
         "allow": "直接做",
         "ask": "先问你",

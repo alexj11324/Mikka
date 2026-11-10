@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { appCallAllowed, appPermissionKeys, appPermissionValue, withAppPermission } from './app-permission-keys'
+import { WRITE_ACTIONS } from './write-schema'
+import { WRITE_TOOL_APPS } from '@/lib/app-policy/apps'
+import { appCallAllowed, appPermissionKeys, appPermissionValue, withAppPermission, withAppPermissions } from './app-permission-keys'
 
 test('only an explicit deny withholds an app call; ask stays callable where no card exists', () => {
   assert.equal(appCallAllowed('allow'), true)
@@ -23,4 +25,20 @@ test('saving one app choice updates both keys and default removes both', () => {
   assert.deepEqual(saved, { slack: 'ask', send_slack_message: 'ask', hubspot: 'deny' })
   assert.deepEqual(withAppPermission(saved, 'slack', null), { hubspot: 'deny' })
   assert.deepEqual(withAppPermission({}, 'hubspot', 'deny'), { hubspot: 'deny' })
+})
+
+test('one save covers every selected app, and a page save carries both keys', () => {
+  assert.deepEqual(withAppPermissions({ gmail: 'ask' }, ['slack', 'notion'], 'deny'),
+    { gmail: 'ask', slack: 'deny', send_slack_message: 'deny', notion: 'deny', append_notion_paragraph: 'deny' })
+  assert.deepEqual(withAppPermissions({ slack: 'deny', send_slack_message: 'deny' }, ['slack'], null), {})
+})
+
+test('every first-class write action is governed by its app key', () => {
+  // A future action added to WRITE_ACTIONS must also be reachable from the workspace page.
+  for (const action of WRITE_ACTIONS) {
+    const app = WRITE_TOOL_APPS[action]
+    assert.equal(typeof app, 'string', action)
+    assert.deepEqual(appPermissionKeys(app), [app, action], action)
+    assert.deepEqual(withAppPermissions({}, [app], 'deny'), { [app]: 'deny', [action]: 'deny' }, action)
+  }
 })

@@ -19,30 +19,37 @@ export type AppToolCatalogue = {
 const MAX_TOOLS = 200
 const GITHUB_PAGES = 12
 
-/** Dependencies are injectable so the shape is testable without a live provider. */
+/** One hosted-MCP page, as the runtime lists it; the shape is untrusted provider output. */
+export type GitHubToolPage = { error?: unknown; tools?: unknown; nextCursor?: string | null }
+
+/** Dependencies are injectable so pagination and provider errors are testable without a live provider. */
 export type AppToolCatalogueDeps = {
-  github?: (userId: string) => Promise<{ tools: AppToolSummary[]; truncated: boolean; error?: string }>
+  /** The caller's own GitHub page loader; the default verifies the person's token on every page. */
+  githubPage?: (userId: string, cursor?: string) => Promise<GitHubToolPage>
   composio?: (app: string) => Promise<AppTool[]>
 }
 
-async function githubCatalogue(userId: string): Promise<{ tools: AppToolSummary[]; truncated: boolean; error?: string }> {
+function githubPages(): (userId: string, cursor?: string) => Promise<GitHubToolPage> {
   const runtime = createGitHubMcpRuntime(owner => githubTokenForUser(owner, { minValidityMs: GITHUB_MCP_MIN_VALIDITY_MS }))
+  return (userId, cursor) => runtime(userId, cursor ? { cursor } : {})
+}
+
+async function githubCatalogue(userId: string, listPage: (userId: string, cursor?: string) => Promise<GitHubToolPage>): Promise<{ tools: AppToolSummary[]; truncated: boolean; error?: string }> {
   const tools: AppToolSummary[] = []
   let cursor: string | undefined
   let truncated = false
   for (let page = 0; page < GITHUB_PAGES; page++) {
-    const result = await runtime(userId, cursor ? { cursor } : {})
-    if ('error' in result) return { tools, truncated: true, error: String(result.error) }
-    const listed = result as { tools?: unknown[]; nextCursor?: string | null }
-    if (!Array.isArray(listed.tools)) return { tools, truncated: true, error: 'githubToolCatalogueInvalid' }
-    for (const entry of listed.tools) {
+    const result = await listPage(userId, cursor)
+    if (result.error !== undefined) return { tools, truncated: true, error: String(result.error) }
+    if (!Array.isArray(result.tools)) return { tools, truncated: true, error: 'githubToolCatalogueInvalid' }
+    for (const entry of result.tools) {
       if (!entry || typeof entry !== 'object') continue
       const tool = entry as { name?: unknown; displayName?: unknown; readOnly?: unknown }
       if (typeof tool.name !== 'string' || tool.name.length === 0) continue
       if (tools.length >= MAX_TOOLS) { truncated = true; break }
       tools.push({ name: tool.name, displayName: typeof tool.displayName === 'string' ? tool.displayName : tool.name, readOnly: tool.readOnly === true })
     }
-    cursor = typeof listed.nextCursor === 'string' && listed.nextCursor.length > 0 ? listed.nextCursor : undefined
+    cursor = typeof result.nextCursor === 'string' && result.nextCursor.length > 0 ? result.nextCursor : undefined
     if (!cursor || tools.length >= MAX_TOOLS) break
     if (page === GITHUB_PAGES - 1) truncated = true
   }
@@ -66,7 +73,7 @@ export async function readAppToolCatalogue(
   deps: AppToolCatalogueDeps = {},
 ): Promise<AppToolCatalogue> {
   if (app === 'github') {
-    const catalogued = await (deps.github ?? githubCatalogue)(userId)
+    const catalogued = await githubCatalogue(userId, deps.githubPage ?? githubPages())
     return {
       app, tools: catalogued.tools, count: catalogued.tools.length,
       readOnlyCount: catalogued.tools.filter(tool => tool.readOnly).length,

@@ -2293,6 +2293,7 @@
       "empty": "No apps connected",
       "level": {
         "workspaceDefault": "Default (workspace setting)",
+        "runDefault": "Default (run policy)",
         "default": "Default (Decision API)",
         "allow": "On its own",
         "ask": "Asks you first",

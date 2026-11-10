@@ -1,11 +1,11 @@
+import { WRITE_TOOL_APPS } from '@/lib/app-policy/apps'
+
 // One app-level permission key, with the legacy first-class write tool that
 // acts in the same app. A settings page writes both so the app-level choice
-// governs generic app tools and the older write path together.
-export const LEGACY_WRITE_ACTIONS: Readonly<Record<string, string>> = {
-  append_notion_paragraph: 'notion',
-  send_slack_message: 'slack',
-  cancel_calendar_event: 'googlecalendar',
-}
+// governs generic app tools and the older write path together. The map is the
+// app policy's own (`WRITE_TOOL_APPS`), so a new first-class write action
+// cannot leave the workspace page silently unable to govern it.
+export const LEGACY_WRITE_ACTIONS: Readonly<Record<string, string>> = WRITE_TOOL_APPS
 
 export const LEGACY_APP_ACTIONS: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(LEGACY_WRITE_ACTIONS).map(([action, app]) => [app, action]),
@@ -51,4 +51,13 @@ export function withAppPermission(
     else next[key] = value
   }
   return next
+}
+
+/** One save applies the same choice to every selected app, each on both keys. */
+export function withAppPermissions(
+  permissions: Record<string, AppPermissionValue>,
+  apps: readonly string[],
+  value: AppPermissionValue | null,
+): Record<string, AppPermissionValue> {
+  return apps.reduce((next, app) => withAppPermission(next, app, value), permissions)
 }

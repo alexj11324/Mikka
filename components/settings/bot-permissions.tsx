@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { BotPermissionsPage } from '@ui-slot/settings-bot-permissions'
-import { listBots } from '@/app/actions/bots'
+import { listBots, listBotsForWorkspace } from '@/app/actions/bots'
 import { listAgents } from '@/app/actions/agents'
 import { AppTile, OWN_APPS, useAppInfo, useConnectedApps, appState } from '@/components/plugins/connected-apps'
 import { OWN_APP_STATES_KEY, fetchOwnAppStates } from '@/components/plugins/plugins-view'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { withBasePath } from '@/lib/base-path'
 import { CONFIGURABLE_ACTIONS, CONFIGURABLE_PERMISSIONS, type PermissionDecision } from '@mikka/protocol/agent-policy'
-import { LEGACY_APP_ACTIONS, appPermissionValue, withAppPermission } from '@/lib/operations/app-permission-keys'
+import { LEGACY_APP_ACTIONS, appPermissionValue, withAppPermissions } from '@/lib/operations/app-permission-keys'
 import { OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import type { BotPermissionAction, BotPermissionApp, BotPermissionAppTools, PermissionChoice, PermissionValue, SettingsBotPermissionsProps } from '@/components/slots/settings-bot-permissions-contract'
 
@@ -50,24 +51,25 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   const apps = useConnectedApps()
   // Mikka's own apps are connected apps too; only GitHub has a real per-app tool path.
   const own = useSWR(OWN_APP_STATES_KEY, () => fetchOwnAppStates())
-  const { data: bots } = useSWR('bots', listBots)
+  // The Bot list is scoped to the workspace the page shows (`?workspace=`), not the session's active one: the
+  // workspace routes resolve their workspace through this Bot.
+  const { data: bots, error: botsError } = useSWR(workspaceId ? ['bots', 'workspace', workspaceId] : 'bots', () => workspaceId ? listBotsForWorkspace(workspaceId) : listBots())
   const { data: agents } = useSWR('agents', () => listAgents())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Catalogue reads are lazy: GitHub plus the legacy write apps load with the page, every other app on request.
+  // Catalogue reads are lazy: GitHub plus the legacy write apps load with the page, every other app on open.
   const [catalogues, setCatalogues] = useState<Record<string, BotPermissionAppTools | 'loading'>>({})
   const started = useRef(new Set<string>())
   // The workspace-scoped routes resolve their workspace through a Bot the person owns in it. The page has no Bot
   // picker: any Bot in the workspace names the same workspace.
   const anchor = bots?.[0] ?? null
   const botId = anchor?.id ?? null
-  const botKey = botId ?? 'coordinator'
   // The worker the run policy is read through: the person's first agent (the workspace layer is the same for each).
   const agentId = agents?.[0]?.id ?? null
 
   // The workspace's own policy is the page's source of truth. The Bot layer is not read: it can only narrow.
-  const workspace = useSWR(botId && bots && workspaceId ? ['workspace-write-policy', workspaceId, botKey] : null, () => definition<WritePolicy>(botKey, { view: 'workspace_write_policy' }), { revalidateOnFocus: false })
-  const run = useSWR(agentId && botId && bots && workspaceId ? ['workspace-run-policy', workspaceId, botKey, agentId] : null, () => agentPolicy<AgentPolicy>({ operation: 'readAgent', agentId, botId }), { revalidateOnFocus: false })
+  const workspace = useSWR(botId && workspaceId ? ['workspace-write-policy', workspaceId, botId] : null, () => botId ? definition<WritePolicy>(botId, { view: 'workspace_write_policy' }) : null, { revalidateOnFocus: false })
+  const run = useSWR(agentId && botId && workspaceId ? ['workspace-run-policy', workspaceId, botId, agentId] : null, () => agentId && botId ? agentPolicy<AgentPolicy>({ operation: 'readAgent', agentId, botId }) : null, { revalidateOnFocus: false })
 
   const stored = workspace.data?.permissions ?? {}
   const writable = admin && workspace.data !== null && workspace.data !== undefined
@@ -119,30 +121,37 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   })
 
   function loadTools(id: string) {
-    if (started.current.has(id)) return
+    // `coordinator` is not an app-tools Bot id; without a real Bot in this workspace there is nothing to read through.
+    if (!botId || started.current.has(id)) return
     started.current.add(id)
     setCatalogues(previous => ({ ...previous, [id]: 'loading' }))
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 12_000)
-    fetch(withBasePath(`/api/bots/${botKey}/app-tools?app=${encodeURIComponent(id)}`), { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
+    // The route already bounds the catalogue (`private, max-age=60`), so the browser cache serves a reopen.
+    fetch(withBasePath(`/api/bots/${botId}/app-tools?app=${encodeURIComponent(id)}`), { credentials: 'same-origin', signal: controller.signal })
       .then(async response => {
         const body = await response.json().catch(() => null) as (BotPermissionAppTools & { error?: string }) | null
         if (!response.ok || !body || typeof body.count !== 'number') throw new Error('catalogueUnavailable')
         setCatalogues(previous => ({ ...previous, [id]: body }))
       })
-      .catch(() => setCatalogues(previous => ({ ...previous, [id]: { count: 0, readOnlyCount: 0, tools: [], truncated: false, error: 'readFailed' } })))
+      .catch(() => {
+        // A failed read can be retried by opening the app again.
+        started.current.delete(id)
+        setCatalogues(previous => ({ ...previous, [id]: { count: 0, readOnlyCount: 0, tools: [], truncated: false, error: 'readFailed' } }))
+      })
       .finally(() => clearTimeout(timer))
   }
 
   // A different workspace has different settings and its own catalogue reads.
   useEffect(() => { setCatalogues({}); started.current = new Set() }, [workspaceId])
-  const eagerKey = appList ? appList.map(app => app.id).sort().join(',') : ''
+  // Only GitHub and the legacy write apps load with the page; every other app is read when it is opened.
+  const eagerKey = appList ? appList.filter(app => app.id === 'github' || LEGACY_APP_ACTIONS[app.id] !== undefined).map(app => app.id).sort().join(',') : ''
   useEffect(() => {
     if (!eagerKey) return
     for (const id of eagerKey.split(',')) loadTools(id)
     // `loadTools` reads the current workspace and the started set; eagerKey is the set of apps to read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eagerKey, workspaceId])
+  }, [eagerKey, workspaceId, botId])
 
   async function save(work: () => Promise<unknown>) {
     setSaving(true); setError(null)
@@ -176,15 +185,14 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
         return
       }
       // `write` is the overlay's name for an app rule; both save the workspace's one policy.
-      if (!writable || !workspace.data) return
-      let permissions = { ...workspace.data.permissions }
-      for (const id of ids) permissions = withAppPermission(permissions, id, value === 'default' ? null : value)
-      await definition(botKey, { body: { action: 'set_workspace_write_policy', permissions, expectedVersion: workspace.data.version } })
+      if (!writable || !workspace.data || !botId) return
+      const permissions = withAppPermissions(workspace.data.permissions, ids, value === 'default' ? null : value)
+      await definition(botId, { body: { action: 'set_workspace_write_policy', permissions, expectedVersion: workspace.data.version } })
       await workspace.mutate()
     }) },
     onLoadTools: loadTools,
     saving,
-    error: error ?? (workspace.error || run.error ? tError('readFailed') : null),
+    error: error ?? (workspace.error || run.error || botsError ? tError('readFailed') : null),
   }
 }
 
@@ -196,7 +204,12 @@ export function BotPermissionsSettings({ admin = false, workspaceId }: { admin?:
 export function BotPermissionsView({ scope, apps, run, approvalMode, onLoadTools, error }: SettingsBotPermissionsProps) {
   const t = useTranslations('Settings.botPermissions')
   const level = (value: PermissionValue) => t(`level.${value}`)
-  if (!apps) return <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
+  // A run action with nothing stored runs under its scoped run policy, not the Decision API.
+  const runLevel = (value: PermissionValue) => value === 'default' ? t('level.runDefault') : level(value)
+  if (!apps) return <div className="flex flex-col gap-4">
+    <p role="status" className="text-sm text-muted-foreground">{t('loading')}</p>
+    {error && <p role="alert" className="text-sm text-destructive-foreground">{error}</p>}
+  </div>
   return <div className="flex flex-col gap-4">
     <p className="text-sm text-muted-foreground">{t('rule')}</p>
     {scope === 'workspace' && <p className="text-sm text-muted-foreground">{t('workspaceScope')}</p>}
@@ -214,7 +227,7 @@ export function BotPermissionsView({ scope, apps, run, approvalMode, onLoadTools
         </li>)}
       </ul>}
     {run && <ul className="flex flex-col divide-y rounded-xl border">
-      {run.map(action => <li key={action.id} className="flex justify-between gap-3 px-4 py-2 text-sm"><span>{action.name}</span><span className="text-muted-foreground">{action.effective ? `${level(action.value)} · ${level(action.effective)}` : level(action.value)}</span></li>)}
+      {run.map(action => <li key={action.id} className="flex justify-between gap-3 px-4 py-2 text-sm"><span>{action.name}</span><span className="text-muted-foreground">{action.effective ? `${runLevel(action.value)} · ${level(action.effective)}` : runLevel(action.value)}</span></li>)}
     </ul>}
   </div>
 }
@@ -222,15 +235,23 @@ export function BotPermissionsView({ scope, apps, run, approvalMode, onLoadTools
 /** The provider's real catalogue, read on first open. A count alone already replaces the old hand-written action list. */
 function AppTools({ app, onLoadTools }: { app: BotPermissionApp; onLoadTools?: (app: string) => void }) {
   const t = useTranslations('Settings.botPermissions')
-  if (app.tools === 'loading') return <p className="text-xs text-muted-foreground">{t('toolsLoading')}</p>
-  if (app.tools && 'error' in app.tools && app.tools.error) return <p className="text-xs text-muted-foreground">{t('toolsFailed')}</p>
-  if (app.tools && 'count' in app.tools) return <details className="text-xs text-muted-foreground" onToggle={event => { if (event.currentTarget.open) onLoadTools?.(app.id) }}>
-    <summary>{t('toolsCount', { count: app.tools.count, readOnly: app.tools.readOnlyCount })}</summary>
-    <ul className="mt-1 flex flex-col gap-0.5">
-      {app.tools.tools.slice(0, 100).map(tool => <li key={tool.name}><span>{tool.displayName}</span> <span className="text-muted-foreground/70">{tool.readOnly ? t('readOnly') : t('write')}</span></li>)}
-    </ul>
-  </details>
-  return <details className="text-xs text-muted-foreground" onToggle={event => { if (event.currentTarget.open) onLoadTools?.(app.id) }}>
-    <summary>{t('tools')}</summary>
-  </details>
+  const [open, setOpen] = useState(false)
+  const tools = app.tools
+  const catalogued = tools && tools !== 'loading' ? tools : null
+  const failed = catalogued && 'error' in catalogued && catalogued.error ? catalogued : null
+  // A failed read has a count of zero but no catalogue; keep the trigger at "View tools" so it can be retried.
+  const loaded = catalogued && !failed && 'count' in catalogued ? catalogued : null
+  return <Collapsible open={open} onOpenChange={next => { setOpen(next); if (next) onLoadTools?.(app.id) }}>
+    <CollapsibleTrigger className="cursor-pointer text-left text-xs text-muted-foreground underline-offset-4 hover:underline">
+      {loaded ? t('toolsCount', { count: loaded.count, readOnly: loaded.readOnlyCount }) : t('tools')}
+    </CollapsibleTrigger>
+    {/* Kept mounted while closed so an open panel can show its loading and failure states in place. */}
+    <CollapsibleContent keepMounted className="text-xs text-muted-foreground">
+      {tools === 'loading' && <p className="pt-1">{t('toolsLoading')}</p>}
+      {failed && <p className="pt-1">{t('toolsFailed')}</p>}
+      {loaded && <ul className="flex flex-col gap-0.5 pt-1">
+        {loaded.tools.slice(0, 100).map(tool => <li key={tool.name}><span>{tool.displayName}</span> <span className="text-muted-foreground/70">{tool.readOnly ? t('readOnly') : t('write')}</span></li>)}
+      </ul>}
+    </CollapsibleContent>
+  </Collapsible>
 }
