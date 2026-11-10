@@ -9,14 +9,14 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '0b598d264e45925bbec8ebc1284ab2ccf17e451d',
-  tree: '798ac44d8374d80647ab46f757645e492def6f3c',
-  workerSha: 'c8764e6ad1b8ee9f5fe44d9213e07980c28132d0',
+  source: '98403150bd6ac39683539bc278a9bf161e84dabf',
+  tree: '5bdc75978939051c8eab4ef50b053a59498f6b2d',
+  workerSha: '74a784f805ec89a72f80e8cc91ff514e761dae4c',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
-    'package.json': '42e0321a095d434bb22437cfd2a3685cbbfb0d0d66576e334aeab2d05e50eb47',
-    'pnpm-lock.yaml': 'e18697f2dd891b9159e43e40d1f8af4018d087cf2a0e668b9e358a766b020c28',
-    'pnpm-workspace.yaml': '5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f',
+    'package.json': 'a74f46267ef626882fc284ad802d0fe2e1066c8e6bf1ad420b271a27c9a83aa2',
+    'pnpm-lock.yaml': 'e1db8f01134e8e3377078e5e798b6a11ec117e0c4ffc69bae66c7c7b921d8dac',
+    'pnpm-workspace.yaml': '4ab8b2f25a1899aaa44bd216434063b80e0c29c79229e598a20725a55415d2ee',
     'scripts/e2b/workspace-candidates.py': '00757ff10c91206035a051e0625bd2b6adda4e07ef27806628ec6c916e2df0ef',
     'scripts/e2b/workspace-candidates.test.py': '34f3633b94b05b5c6db49cdcb3e61cdac436ccd52c2312087dbcbc7bacede4c4',
     'scripts/e2b/build-template.py': '33ff017fa85e6e05fbdf7d0e8a5c59db4da98825e2aff73ac3314956e479b42c',
