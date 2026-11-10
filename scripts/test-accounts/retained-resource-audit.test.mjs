@@ -1,7 +1,28 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { retainedAuditMatches } from './retained-resource-audit.mjs'
+import { retainedAuditFingerprints, retainedAuditMatches } from './retained-resource-audit.mjs'
+
+test('an unprepared pool never exempts immutable audit from a standalone footprint', async () => {
+  const queries = []
+  const receipts = await retainedAuditFingerprints({ query: async sql => {
+    queries.push(sql)
+    return { rows: [{ receipts: null }] }
+  } }, 'fixture-owner')
+  assert.deepEqual([...receipts], [])
+  assert.deepEqual(queries, ["SELECT to_regclass('mikka_test_accounts.retained_audit') AS receipts"])
+  assert.equal(retainedAuditMatches('resource_access_events', { value: { id: 'event' }, text: '{}' }, receipts), false)
+})
+
+test('catalog and receipt read failures remain failures, never permissive exemptions', async () => {
+  const failure = new Error('fixture-database-failure')
+  await assert.rejects(retainedAuditFingerprints({ query: async () => { throw failure } }, 'fixture-owner'), error => error === failure)
+  let calls = 0
+  await assert.rejects(retainedAuditFingerprints({ query: async () => {
+    if (++calls === 1) return { rows: [{ receipts: 'mikka_test_accounts.retained_audit' }] }
+    throw failure
+  } }, 'fixture-owner'), error => error === failure)
+})
 
 test('retaining immutable audit requires the exact record, table and unchanged bytes', () => {
   const value = { id: 'synthetic-audit', ownerId: 'owner', resourceKind: 'thread', action: 'delete' }

@@ -51,6 +51,10 @@ async function receipt(client,lease,resource,table,id,data,workspaceId) {
 /** Exact, content-addressed receipts only. Other events, a changed row or a
  * foreign lease still changes the account's baseline and prevents reuse. */
 export async function retainedAuditFingerprints(client,userId) {
+  // Standalone read-only footprint checks also run before a pool is prepared.
+  // Without its receipt table no audit row is excluded from the fingerprint.
+  const { rows: [catalog] } = await client.query("SELECT to_regclass('mikka_test_accounts.retained_audit') AS receipts")
+  if (!catalog.receipts) return new Map()
   const { rows } = await client.query(`SELECT a.table_name,a.record_id,a.fingerprint FROM mikka_test_accounts.retained_audit a
     JOIN mikka_test_accounts.resources r ON r.lease_id=a.lease_id AND r.type=a.source_type AND r.id=a.source_id
     JOIN mikka_test_accounts.leases l ON l.id=a.lease_id
