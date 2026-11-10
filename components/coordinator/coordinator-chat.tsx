@@ -373,8 +373,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     {/* The stored codes, and the turn failure behind a wake code, only under 详情 (decision 2026-11-05-0330). */}
     {liveRaw && <RunErrorDetails code={liveRaw} />}
   </>
-  // The newest reply keeps its actions in view, as Claude's does; older ones show them on hover.
-  const lastReplyAt = stream.replies.length ? -1 : items.findLast(item => item.from === 'coordinator' && item.text)?.position
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
   // A failed welcome is the Bot saying nothing yet: never an unread message.
@@ -541,7 +539,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       if (artifacts.length) parts.push({ kind: 'artifacts', items: artifacts, onOpen: openArtifact })
       if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
       entries.push({ id: key, role: 'bot', at, parts, streaming, ...(item.stopped ? { stopped: true } : {}),
-        actions: item.text && !streaming ? <MessageActions className={cn('items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>
+        actions: item.text && !streaming ? <MessageActions className={cn('items-start', REPLY_ACTIONS)}>
           <CopyAction text={replyCopyText(item.text)} />
           <AgentCitationsContext value={citations}><CitationSources text={item.text} /></AgentCitationsContext>
           {item.id && <MessageReactions reactions={reactions[item.id]} align="start" />}
@@ -657,8 +655,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} onOpenTask={openTask} /> : null
                     })}</>}
-                    // Copy and the pages it cites, on one line under the reply, only while it is hovered or tapped (R-83).
-                    actions={item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1 items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>
+                    // Copy and the pages it cites, on one line under the reply, always there and quiet (R-83 revised 2026-11-10).
+                    actions={item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1 items-start', REPLY_ACTIONS)}>
                       <CopyAction text={item.from === 'coordinator' ? replyCopyText(item.text) : splitReplyQuote(item.text).text} />
                       {item.from === 'coordinator' && <AgentCitationsContext value={citations}><CitationSources text={item.text} /></AgentCitationsContext>}
                     </MessageActions>}
