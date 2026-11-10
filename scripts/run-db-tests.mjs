@@ -125,6 +125,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/run-bot-name.ts', file: 'tests/run-agent-names.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/run-outcome-judge.ts', file: 'tests/run-outcomes.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/billing/service.ts', file: 'tests/billing.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/billing/management.ts', file: 'tests/billing-management.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/audit/query.ts', file: 'tests/audit-query.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/subscription-acquire-expiry.ts', file: 'lib/subscription-acquire-expiry.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },

@@ -35,7 +35,8 @@ export async function setOrganizationBillingAccount(actorId: string, organizatio
       const { workspace } = await requireWorkspace(tx, id, actorId, true)
       if (workspace.kind !== 'team') throw new GovernanceError('personal_workspace')
     }
-    await requireOrganizationAdmin(tx, organizationId, actorId)
+    const { membership } = await requireOrganizationAdmin(tx, organizationId, actorId)
+    if (membership.role !== 'owner') throw new GovernanceError('access_denied')
     const [current] = await tx.select().from(organizationBillingAccounts).where(eq(organizationBillingAccounts.organizationId, organizationId)).limit(1)
     if (current?.workspaceId !== observed?.workspaceId) throw new GovernanceError('plan_changed')
     if ((current?.workspaceId ?? null) === workspaceId) return { organizationId, accountWorkspaceId: workspaceId }

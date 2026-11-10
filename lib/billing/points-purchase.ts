@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { authTrustedOrigins, resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'
 import { MICRO_USD_PER_POINT } from '@/lib/abuse/policy'
-import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
-import { workspaceDb } from '@/lib/workspace-db'
+import { WorkspaceError } from '@/lib/workspace-access'
+import { withBillingAuthority } from './authority'
 import { POINTS_PURCHASE_AMOUNTS } from './points'
 import { stripeConfig, stripePost, StripeRequestError } from './stripe'
 import { ensureBillingCustomer } from './customer'
@@ -39,42 +39,43 @@ export interface PurchaseFromChat { chat: { botId: string | null } }
  * started (`url`).
  */
 export async function pointsPurchase(actorId: string, workspaceId: string, amount: number, locale: string, from: Partial<PurchaseFromChat> & { hosted?: boolean }, fetchImpl: typeof fetch = fetch, env: Env = process.env): Promise<{ url: string } | { clientSecret: string }> {
-  await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
-  z.number().refine(value => (POINTS_PURCHASE_AMOUNTS as readonly number[]).includes(value)).parse(amount)
-  const config = stripeConfig(env)
-  const origin = resolveAppOrigin(env)
-  if (!config?.webhookSecret || !origin) throw new WorkspaceError('billingNotConfigured')
-  const [trustedOrigin] = authTrustedOrigins({ BETTER_AUTH_URL: origin, NODE_ENV: env.NODE_ENV, CI: env.CI })
-  const chat = from.chat ? { botId: from.chat.botId === null ? null : z.uuid().parse(from.chat.botId) } : null
-  const { workspaceLink } = await import('@/components/workspace/workspace-navigation')
-  const back = new URL(withBasePath(`${locale === 'en' ? '/en' : ''}${chat ? workspaceLink(chat.botId ? { bot: chat.botId } : {}) : '/settings'}`), trustedOrigin)
-  if (!chat) back.searchParams.set('section', 'billing')
-  back.searchParams.set('workspace', workspaceId)
-  // The bundled renderer cannot load Stripe's remote script. Its authenticated
-  // RPC scope selects the existing hosted flow, retaining the same chat return.
-  const embedded = Boolean(chat && env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY && !from.hosted)
-  const metadata = { workspaceId, points: String(amount * 1_000_000 / MICRO_USD_PER_POINT), purpose: 'points_purchase' }
-  try {
-    const customer = await ensureBillingCustomer(workspaceId, config, fetchImpl)
-    back.searchParams.set('topup', 'success')
-    const successUrl = `${back.href}&session_id={CHECKOUT_SESSION_ID}`
-    back.searchParams.set('topup', 'cancelled')
-    const common = {
-      mode: 'payment', managed_payments: { enabled: true }, customer, client_reference_id: workspaceId,
-      line_items: [{ price_data: { currency: 'usd', unit_amount: amount * 100, product_data: { name: 'Mikka points', tax_code: POINTS_TAX_CODE } }, quantity: 1 }],
-      metadata, payment_intent_data: { metadata },
+  return withBillingAuthority(actorId, workspaceId, async () => {
+    z.number().refine(value => (POINTS_PURCHASE_AMOUNTS as readonly number[]).includes(value)).parse(amount)
+    const config = stripeConfig(env)
+    const origin = resolveAppOrigin(env)
+    if (!config?.webhookSecret || !origin) throw new WorkspaceError('billingNotConfigured')
+    const [trustedOrigin] = authTrustedOrigins({ BETTER_AUTH_URL: origin, NODE_ENV: env.NODE_ENV, CI: env.CI })
+    const chat = from.chat ? { botId: from.chat.botId === null ? null : z.uuid().parse(from.chat.botId) } : null
+    const { workspaceLink } = await import('@/components/workspace/workspace-navigation')
+    const back = new URL(withBasePath(`${locale === 'en' ? '/en' : ''}${chat ? workspaceLink(chat.botId ? { bot: chat.botId } : {}) : '/settings'}`), trustedOrigin)
+    if (!chat) back.searchParams.set('section', 'billing')
+    back.searchParams.set('workspace', workspaceId)
+    // The bundled renderer cannot load Stripe's remote script. Its authenticated
+    // RPC scope selects the existing hosted flow, retaining the same chat return.
+    const embedded = Boolean(chat && env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY && !from.hosted)
+    const metadata = { workspaceId, points: String(amount * 1_000_000 / MICRO_USD_PER_POINT), purpose: 'points_purchase' }
+    try {
+      const customer = await ensureBillingCustomer(workspaceId, config, fetchImpl)
+      back.searchParams.set('topup', 'success')
+      const successUrl = `${back.href}&session_id={CHECKOUT_SESSION_ID}`
+      back.searchParams.set('topup', 'cancelled')
+      const common = {
+        mode: 'payment', managed_payments: { enabled: true }, customer, client_reference_id: workspaceId,
+        line_items: [{ price_data: { currency: 'usd', unit_amount: amount * 100, product_data: { name: 'Mikka points', tax_code: POINTS_TAX_CODE } }, quantity: 1 }],
+        metadata, payment_intent_data: { metadata },
+      }
+      if (embedded) {
+        // In a dialog on the chat: Stripe returns there only for payment methods that must leave the page.
+        const session = await stripePost<{ client_secret: string }>(config, 'checkout/sessions', { ...common, ui_mode: 'embedded_page', return_url: successUrl }, fetchImpl)
+        return { clientSecret: z.string().min(1).parse(session.client_secret) }
+      }
+      const session = await stripePost<{ url: string }>(config, 'checkout/sessions', { ...common, success_url: successUrl, cancel_url: back.href }, fetchImpl)
+      const url = z.url().parse(session.url)
+      if (new URL(url).origin !== 'https://checkout.stripe.com') throw new WorkspaceError('billingProviderFailed')
+      return { url }
+    } catch (error) {
+      if (error instanceof StripeRequestError || (error as Error)?.name === 'TimeoutError' || error instanceof TypeError) throw new WorkspaceError('billingProviderFailed')
+      throw error
     }
-    if (embedded) {
-      // In a dialog on the chat: Stripe returns there only for payment methods that must leave the page.
-      const session = await stripePost<{ client_secret: string }>(config, 'checkout/sessions', { ...common, ui_mode: 'embedded_page', return_url: successUrl }, fetchImpl)
-      return { clientSecret: z.string().min(1).parse(session.client_secret) }
-    }
-    const session = await stripePost<{ url: string }>(config, 'checkout/sessions', { ...common, success_url: successUrl, cancel_url: back.href }, fetchImpl)
-    const url = z.url().parse(session.url)
-    if (new URL(url).origin !== 'https://checkout.stripe.com') throw new WorkspaceError('billingProviderFailed')
-    return { url }
-  } catch (error) {
-    if (error instanceof StripeRequestError || (error as Error)?.name === 'TimeoutError' || error instanceof TypeError) throw new WorkspaceError('billingProviderFailed')
-    throw error
-  }
+  }, { ownPlatformAccount: true })
 }

@@ -2,12 +2,9 @@ import type { Pool, PoolClient } from 'pg'
 import type { hostedBillingScope } from '@/lib/abuse/context'
 import { MICRO_USD_PER_POINT } from '@/lib/abuse/policy'
 
-export type BudgetScope = 'workspace' | 'member' | 'project' | 'thread' | 'run'
-export type BudgetPeriod = 'month' | 'day' | 'lifetime'
+export type { BudgetScope, BudgetPeriod, ResourceBudgetView } from './contract'
+import type { BudgetScope, ResourceBudgetView } from './contract'
 export type BillingAttribution = NonNullable<ReturnType<typeof hostedBillingScope.getStore>>
-export type ResourceBudgetView = { id: string; workspaceId: string; scope: BudgetScope; scopeId: string; period: BudgetPeriod;
-  limitPoints: number; warningPercent: number; spentPoints: number; reservedPoints: number; committedPoints: number;
-  remainingPoints: number; thresholdReached: boolean; exhausted: boolean }
 
 /** Same receipt ledger, including unknown-cost holds; no estimates are reported as settled charges. */
 export async function readResourceBudgets(query: Pick<Pool | PoolClient, 'query'>, workspaceIds: string[]): Promise<ResourceBudgetView[]> {

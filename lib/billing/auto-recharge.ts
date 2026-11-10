@@ -10,15 +10,8 @@ import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { requireOrganizationAdmin } from '@/lib/governance/organizations'
 import { recordAudit } from '@/lib/audit/write'
 
-export interface AutoRechargePolicyView {
-  state: 'provider_unsupported'
-  enabled: false
-  provider: 'stripe_managed_payments'
-  thresholdPoints: number | null
-  amountPoints: number | null
-  monthlyCapPoints: number | null
-  revision: number
-}
+export type { AutoRechargePolicyView } from './contract'
+import type { AutoRechargePolicyView } from './contract'
 
 /**
  * Stripe Managed Payments currently supports Checkout/Payment Links, not raw

@@ -24,7 +24,7 @@ export async function setWorkspaceBudget(actorId: string, workspaceId: string, i
   await workspaceDb.transaction(async ws => {
     const { membership } = await requireWorkspace(ws, workspaceId, actorId, true)
     if (value.scope === 'workspace' && value.scopeId !== workspaceId) throw new WorkspaceError('workspaceAccessDenied')
-    if (value.scope === 'member') {
+    if (value.scope === 'member' && value.limitPoints !== null) {
       const [member] = await ws.select({ id: workspaceMembers.userId }).from(workspaceMembers)
         .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, value.scopeId), eq(workspaceMembers.status, 'active'))).limit(1)
       if (!member) throw new WorkspaceError('workspaceAccessDenied')
@@ -33,9 +33,13 @@ export async function setWorkspaceBudget(actorId: string, workspaceId: string, i
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('hosted-free-budget',0))`)
       if (value.scope === 'project' || value.scope === 'thread' || value.scope === 'run') {
         const id = z.uuid().parse(value.scopeId), kind = value.scope === 'project' ? 'project' : 'thread'
+        const metadata = await tx.execute<{ available: boolean }>(sql`select to_regclass('resource_access_policies') is not null available`)
+        if (value.limitPoints !== null && !metadata.rows[0]?.available) throw new WorkspaceError('billingPolicyChanged')
         // Authoritative APP ACL metadata avoids crossing the Workspace DB tenant boundary.
-        const resource = await tx.execute(sql`select 1 from resource_access_policies where "workspaceId"=${workspaceId}::uuid and kind=${kind} and id=${id}::uuid limit 1`)
-        if (!resource.rows.length) throw new WorkspaceError('workspaceAccessDenied')
+        if (value.limitPoints !== null) {
+          const resource = await tx.execute(sql`select 1 from resource_access_policies where "workspaceId"=${workspaceId}::uuid and kind=${kind} and id=${id}::uuid limit 1`)
+          if (!resource.rows.length) throw new WorkspaceError('workspaceAccessDenied')
+        }
       }
       const prior = await tx.execute<{ limitPoints: number }>(sql`select "limitPoints" from billing_resource_budgets where "workspaceId"=${workspaceId}::uuid and scope=${value.scope} and "scopeId"=${value.scopeId} and period=${value.period} for update`)
       if (value.limitPoints === null) await tx.execute(sql`delete from billing_resource_budgets where "workspaceId"=${workspaceId}::uuid and scope=${value.scope} and "scopeId"=${value.scopeId} and period=${value.period}`)

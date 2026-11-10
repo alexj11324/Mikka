@@ -5,27 +5,18 @@ import { ensureLegacyVerification, hostedUsage } from '@/lib/abuse/runtime'
 import { requireWorkspace } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 
-export interface CreditTransaction {
-  id: string
-  date: string
-  type: 'topup' | 'verification' | 'refund' | 'subscription'
-  points: number
-  amountCents: number | null
-  currency: string | null
-  stripeFeeCents: number | null
-  status: 'succeeded'
-  receiptUrl: string | null
-}
-
-export interface CreditBillingView {
-  balancePoints: number
-  transactions: CreditTransaction[]
-}
+export type { CreditTransaction, CreditBillingView } from './contract'
+import type { CreditTransaction, CreditBillingView } from './contract'
 
 /** The same remaining allowance and purchased balance used to admit hosted calls. */
 export async function workspaceCreditBillingView(actorId: string, workspaceId: string): Promise<CreditBillingView> {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
   await ensureLegacyVerification(workspaceId)
+  return readCreditBillingAccount(workspaceId)
+}
+
+/** Internal metadata read; callers must hold fresh billing authority for this account. */
+export async function readCreditBillingAccount(workspaceId: string): Promise<CreditBillingView> {
   const balance = await hostedUsage.balance(workspaceId)
   const { rows } = await pool.query<Omit<CreditTransaction, 'date'> & { date: Date }>(
     `SELECT id::text AS id,"createdAt" AS date,CASE WHEN reason='refund' THEN 'refund' WHEN reason='subscription' THEN 'subscription' ELSE 'topup' END AS type,

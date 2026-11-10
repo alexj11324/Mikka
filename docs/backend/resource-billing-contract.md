@@ -4,7 +4,7 @@
 
 ## 账户归属
 
-Organization 可以通过 `setOrganizationBillingAccount(actorId, organizationId, workspaceId)` 指定一个已附属 Shared Workspace 的现有账户。调用者必须同时拥有 Organization 管理权限及原账户、新账户的 Workspace 管理权限。Personal Workspace 不能被指定。指定或解除操作只改变后续平台资源的付款路由，不移动余额、客户、订阅或账单。
+Organization 可以通过 `setOrganizationBillingAccount(actorId, organizationId, workspaceId)` 指定一个已附属 Shared Workspace 的现有账户。调用者必须是 Organization Owner，同时拥有原账户、新账户的 Workspace 管理权限。Personal Workspace 不能被指定。指定或解除操作只改变后续平台资源的付款路由，不移动余额、客户、订阅或账单。
 
 `resolvePlatformBillingAccount(workspaceId)` 返回 `{ organizationId, accountWorkspaceId }`。未指定 Organization 账户时，返回原 Workspace。组织角色本身不能成为读取 Workspace 私人内容的依据。Organization 管理员通过 `organizationBillingView` 读取管理元数据，不需要获得私人内容权限。
 
@@ -104,7 +104,7 @@ Checkout 显式保留 Stripe Managed Payments。购买点数以服务端定价�
 | `limitPoints` | 0–100,000,000；`null` 解除该限制 |
 | `warningPercent` | 1–100；默认 80 |
 
-Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies` 的权威绑定元数据。成员预算要求当前活跃成员。预算操作和 `billing.limits_changed` 审计在同一 APP 事务中提交。
+Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies` 的权威绑定元数据。新增或修改成员预算要求当前活跃成员。解除已存在的限制不需要恢复离队成员或已删除资源；仍须有当前 Workspace 管理权限。资源 ACL 尚未部署时，资源预算返回 `billingPolicyChanged`，Workspace 与 Member 预算继续可用。预算操作和 `billing.limits_changed` 审计在同一 APP 事务中提交。
 
 `workspaceBudgetView` 返回 `spentPoints`（已结算）、`reservedPoints`（执行中或未知成本的预留）、`committedPoints`、`remainingPoints`、`thresholdReached` 和 `exhausted`。这些值来自原用量账本，不另建用量计费账本。
 
@@ -113,6 +113,36 @@ Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies`
 `HostedUsageStore.reserve` 在原有平台和账户锁内检查已结算成本与所有在途预留，防止并发绕过 Workspace、Organization 账户或资源预算。旧的 `workspace_settings.monthlyCreditLimit` 继续生效。预算不足返回 `usage_budget_exhausted`，不能触发个人余额或付费模型回退。
 
 预算 admission 要求剩余额度覆盖调用预留。供应商的最终成本仍以真实收据为准，因此预留不是供应商账单的上限；发生超额后账本如实保留，后续调用停止。BYO 外部 Unknown 费用不能假装进入平台点数预算。
+
+## 账单管理 API 与客户端合同
+
+Web、Desktop 与 iOS 复用以下接口和 `lib/billing/management-contract.ts` 的纯 JSON 数据类型。官方 Web/Desktop 界面继续使用既有 Billing slot；iOS 使用既有 Settings 入口及原生表单组件，不另设一套计费域模型。
+
+| 接口 | GET | POST |
+| --- | --- | --- |
+| `/api/workspaces/:workspaceId/billing` | 当前 Workspace 的历史账户、平台付款账户、账本、用量及预算 | 当前权限允许的预算、Organization 账户指定、限额保存及付款入口 |
+| `/api/organizations/:organizationId/billing` | 已指定账户与附属 Workspace 的管理用量 | 当前 Organization 和 Workspace 权限同时允许的操作 |
+
+请求使用无 Cookie 缓存的当前 Session，Organization 路径另验证 Enterprise SSO/SCIM 状态。Workspace PAT 只能访问其绑定 Workspace，不得枚举或进入 Organization 管理。POST 要求 JSON、16 KiB 请求上限和既有浏览器/桌面同源校验。所有响应为 `private, no-store`，不将授权错误缓存成后续成员的视图。
+
+权限由服务端返回的能力描述驱动，提交时重新检查，界面禁用按钮不是授权依据：
+
+| 操作 | 权限 |
+| --- | --- |
+| Workspace 账单与预算元数据 | 当前 Workspace Admin |
+| Organization 账单与附属 Workspace 用量元数据 | 当前 Organization Owner 或 Admin |
+| 指定、变更或解除 Organization 付款账户 | Organization Owner，且具有原、新账户的 Workspace Admin 权限 |
+| 修改某 Workspace 的预算 | 该 Workspace 当前 Admin；Organization 角色本身不授予该权力 |
+| 创建 Checkout、购买点数或进入 Portal | 当前付款账户的 Workspace Admin；Organization 入口还须有当前组织管理权限 |
+| 保存自动充值限制 | 当前账户 Owner；组织账户须为 Organization Owner；实际扣款保持 `provider_unsupported` |
+
+Financial 操作必须携带读视图中的 `accountWorkspaceId`。创建付款入口前再次检查该 ID，按 Workspace → Organization 顺序持锁，固定权限和已指定账户直至提供商请求结束。内层 Billing service 复用同一异步权限租约，不重复申请 Workspace 数据库连接；APP 账本事务不等待反向 Workspace 锁。已经进入 Stripe 的请求保留原付款账户，不因后续组织设置变化而转移余额或付款归属。
+
+Workspace 视图保留该 Workspace 自己的历史余额与订阅。若 Organization 平台付款账户不同，返回 `canPurchasePlatform: false` 与实际 `platformAccountWorkspaceId`，阻止向不再使用的钱包误充值；仍允许有权限者进入旧订阅 Portal 管理历史合同。没有已指定 Organization 账户时，组织视图明确显示未配置，不伪造共享余额。
+
+用量将已结算平台费用、在途或未知费用预留、未知平台调用及外部 Unknown 执行数量分别返回。已结算的零平台支出不能解释为外部资源免费。成员归因只返回成员 ID、名称及用量；Project/Thread/Run 预算目标只返回资源 ID、种类、Owner 和可见性，不查询或返回私人标题、Prompt、工具输出、文件与凭证引用。历史离队成员的账本归因保留，不因成员列表缺失而丢弃金额。
+
+预算编辑支持零限额与明确解除；阈值和剩余额度包含预留。自动充值限制采用服务端 revision 比较更新，客户端不能将旧表单静默覆盖新限额。付款返回 URL 或 `points_status` 参数只触发重新读取账本，不作为付款成功或点数到账的证据。
 
 ## 迁移与回滚
 
@@ -127,6 +157,8 @@ Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies`
 ## 验证依据
 
 `tests/billing.db.test.ts` 覆盖付款期间、乱序 webhook、跨库投递失败后重试、旧订阅、显式 Organization 账户、套餐点数结算、部分/全额退款、多笔付款、退款先到和并发对账、Owner 自动充值限制与拒绝未支持扣款，以及 Checkout 并发、响应丢失、完成后 webhook 延迟和幂等键过期后的恢复。`tests/billing-points.db.test.ts` 覆盖含税购买与退款的点数/实际金额分离。`lib/abuse/store.db.test.ts` 覆盖真实 PostgreSQL 的并发预算、未知成本预留、期间边界和账本幂等性。`tests/governance-seats.db.test.ts` 保留 Personal 边界、配额容量以及单连接池锁顺序验收。
+
+`tests/billing-management.db.test.ts` 调用实际 HTTP handler 和真实 PostgreSQL，覆盖多组织/多 Workspace 管理权限、Owner 付款账户指定、单连接池读与权限租约、私有执行内容不进入财务元数据、零预算/撤销/未知预留、真实 PAT 的范围限制及过期撤销。外部 Cookie Session 适配器由合成身份提供；PAT 签名验证、权限查询、预算、审计和账本不使用 Mock。测试注册到既有 required DB inventory，不替代官方 UI 交互、真实提供商或生产验收。
 
 上述数据库测试使用隔离数据库和合成 Stripe HTTP 响应，只证明应用和数据库行为。它们不等同于真实 Stripe、Claude Code/Codex、E2B 或生产验收。生产价格修改、真实扣款及不可逆余额转移需要另外的明确财务授权。
 
