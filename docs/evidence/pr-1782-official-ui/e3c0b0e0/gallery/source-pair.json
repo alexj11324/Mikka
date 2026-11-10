@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "product": "e3c0b0e050515986a8e42cc15ce0a3de15b8e88c",
+  "productTree": "1e9b0ebbc340aa68096356bd75a9d00a61d88a82",
+  "overlay": "fe20f19bcf82e6541430b62c450920ba42c95fb0",
+  "productionEntry": "apps/frontend/src/index.tsx",
+  "inventorySemantics": "transformed_source_modules_not_render_coverage",
+  "build": {
+    "rendererBuild": "b73d67f1c627d4f93a996978843d40b5e949b2c0075c2b19250fd1b09dc9ea7b",
+    "transformedModuleCount": 952,
+    "inventorySha256": "3fbee4e19aa29c664cde3322af0e1aef87b60479a830a61403964b1ea47d75a5"
+  },
+  "targets": [
+    {
+      "path": "components/nav/all-threads-data.ts",
+      "sha256": "9be98108a308201d8d761138e420d8a15ba17fc6b8fa857d348ca0b179e80eb3",
+      "includedInProductionBuild": true
+    },
+    {
+      "path": "hooks/use-bot-tasks.ts",
+      "sha256": "49c0f541d6f668ffa6ea2a9b9b97bf3e3c0be5440ecbf6ba7144f0e44a67fea9",
+      "includedInProductionBuild": true
+    },
+    {
+      "path": "components/workspace/issue-detail-properties.tsx",
+      "sha256": "df341c8414b0c96dc481ef4355266db564ed012fb2edbceeaa4221fa72d3ec3c",
+      "includedInProductionBuild": true
+    },
+    {
+      "path": "components/workspace/issue-activity-feed.tsx",
+      "sha256": "19d32df4a4d5fa0f4f8d862d65bc7091176eaeb0870f318e3ba5a54820cf88a0",
+      "includedInProductionBuild": true
+    },
+    {
+      "path": "components/workspace/project-form.tsx",
+      "sha256": "a3abf3fbd959f8737e26cf6916262bb18015cbbc0daa87a42aff41e5271315f5",
+      "includedInProductionBuild": true
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "sha256": "68c900d070acb84d4c205efa976e39c254f9abc827f2e565e828306c6037949f",
+      "includedInProductionBuild": true
+    },
+    {
+      "path": "components/nav/context-panel.tsx",
+      "sha256": "23703b344a6a6f6a397d69eb7fcd552e04c5fe78e9efcd63fe298f945052a939",
+      "includedInProductionBuild": true
+    },
+    {
+      "path": "components/workspace/task-detail.tsx",
+      "sha256": "e348f11339de941b74f3a573d8075c1d49474230a1974c3c772a770dd57818c6",
+      "includedInProductionBuild": true
+    },
+    {
+      "path": "components/workspace/task-detail-frame.tsx",
+      "sha256": "14532d01d68308ab41fc1063b68f60147b94ff5ec02da3e0ef1f880d387c4b2e",
+      "includedInProductionBuild": true
+    }
+  ],
+  "slots": [
+    {
+      "name": "all-threads",
+      "privateOverlaySelected": true,
+      "includedInProductionBuild": true
+    },
+    {
+      "name": "bot-tasks",
+      "privateOverlaySelected": true,
+      "includedInProductionBuild": true
+    },
+    {
+      "name": "task-column",
+      "privateOverlaySelected": true,
+      "includedInProductionBuild": true
+    },
+    {
+      "name": "task-conversation",
+      "privateOverlaySelected": true,
+      "includedInProductionBuild": true
+    },
+    {
+      "name": "app-frame",
+      "privateOverlaySelected": true,
+      "includedInProductionBuild": true
+    },
+    {
+      "name": "thread",
+      "privateOverlaySelected": true,
+      "includedInProductionBuild": true
+    },
+    {
+      "name": "task-detail",
+      "privateOverlaySelected": true,
+      "includedInProductionBuild": true
+    }
+  ]
+}
