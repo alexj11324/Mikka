@@ -13,6 +13,7 @@ import type { WorkspaceSection } from './workspace-navigation'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import type { LegacyChatRequest } from './legacy-chat-archive'
 import { ConversationPill } from '@/components/nav/conversation-pill'
+import { FRAME_OWNS_HEADER } from '@/components/app-shell'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import type { BotView } from '@/app/actions/bots'
 import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
@@ -30,9 +31,10 @@ export function WorkspaceOverview({ section, teamName, counts, projectCount, onV
     return <section aria-label={i18nText("IssueDetail.menu.subscribe")} className="flex flex-col gap-6 px-5 py-8"><header className="flex flex-col gap-2"><h1 className="text-lg font-semibold">{i18nText("Overview.followingTitle")}</h1></header>{following.length ? <IssueList issues={following} searching onOpen={onOpen} onCreate={() => onView('all')} /> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Inbox /></EmptyMedia><EmptyTitle>{i18nText("Overview.noFollowingTitle")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => onView('all')}>{i18nText("Overview.viewAllTasks")}</Button></Empty>}</section>
   }
   // A bot's chat is the Coordinator's harness under the bot's name; an open thread sits beside it (R-82).
+  // A frame that owns the header (the hosted shell) draws no floating pill: the thread names itself in its own head.
   if (section === 'coordinator') return <div className="relative flex min-h-0 flex-1 flex-col">
-    <ConversationPill name={bot ? bot.name : i18nText('Nav.coordinator')} avatar={<BotAvatar {...(bot ? { id: bot.id, color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size="pill" />} />
-    <CoordinatorChat key={bot?.id ?? 'coordinator'} bot={bot} userId={userId} onOpenIssue={onOpen} prefill={bot ? undefined : coordinatorPrefill} />
+    {!FRAME_OWNS_HEADER && <ConversationPill name={bot ? bot.name : i18nText('Nav.coordinator')} avatar={<BotAvatar {...(bot ? { id: bot.id, color: bot.color, shape: bot.shape } : COORDINATOR_AVATAR)} size="pill" />} />}
+    <CoordinatorChat key={bot?.id ?? 'coordinator'} bot={bot} userId={userId} onOpenIssue={onOpen} prefill={bot ? undefined : coordinatorPrefill} pill={!FRAME_OWNS_HEADER} />
   </div>
   return <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-10"><header className="flex flex-col gap-2"><h1 className="text-xl font-semibold">{section === 'views' ? i18nText("Overview.viewsTitle") : teamName ?? WORKSPACE_NAME}</h1>{section !== 'views' && <p className="text-sm text-muted-foreground">{i18nText("Overview.teamOverview")}</p>}</header><div className="flex flex-wrap gap-3"><Button variant="outline" onClick={() => onView('favorites')}><Star data-icon="inline-start" />{i18nText("Overview.favorites")} · {counts.favorites}</Button><Button variant="outline" onClick={() => onView('following')}><Bell data-icon="inline-start" />{i18nText("Overview.following")} · {counts.following}</Button></div><div className="grid gap-3 sm:grid-cols-2">{ISSUE_STATUSES.map(status => <Button key={status.value} variant="outline" className="h-14 justify-start gap-3" onClick={() => onView(status.value)}><status.icon data-icon="inline-start" /><span>{statusLabel(status.value)}</span><span className="ml-auto text-muted-foreground">{counts[status.value]}</span></Button>)}</div>{section === 'team-home' && <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={onProjects}><Layers data-icon="inline-start" />{i18nText("Overview.viewProjects")} · {projectCount}</Button><Button variant="outline" onClick={() => onView('all')}>{i18nText("Overview.viewAllTasks")} · {counts.all}</Button></div>}</div>
 }

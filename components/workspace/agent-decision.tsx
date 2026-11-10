@@ -217,30 +217,30 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
     : option.action === 'modelSettings' ? agentCopy.needsModelSettings : option.action === 'githubInstall' ? agentCopy.githubInstallMore
     : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
   return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-sm min-w-0 flex-col gap-2">
-    <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
+    <p data-choice-title="" className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
       {task && <><CitationChip id={task.toLowerCase()} kind="issue" />{' '}</>}{title}
     </p>
     {/* What the person must do first (没有可用的电脑): one line under the question, not a bubble of its own. */}
-    {description && <p className="text-sm text-muted-foreground">{description}</p>}
-    <div className="flex flex-col gap-1.5">
+    {description && <p data-choice-description="" className="text-sm text-muted-foreground">{description}</p>}
+    <div data-choice-rows="" className="flex flex-col gap-1.5">
       {options.map((option, index) => {
         const selected = chosen === option.value
         const label = copy(option)
-        const row = { key: option.value, letter: String.fromCharCode(65 + index), label, selected, answered }
+        const row = { letter: String.fromCharCode(65 + index), label, selected, answered }
         const done = selected && (pending ? <Spinner aria-label={agentCopy.sendingChoice} /> : answered && <Check aria-hidden="true" />)
         const opens = <ChevronRight aria-hidden="true" />
         // Once answered every row is plain text: the picked one marked, the others still readable (Claude, ChatGPT).
-        if (answered) return <ChoiceRow {...row} render={<div />} end={done || null} />
+        if (answered) return <ChoiceRow key={option.value} {...row} render={<div />} end={done || null} />
         // No E2B key yet, 没有可用的电脑, a model to allow: the row opens the setup it names instead of answering.
         if (option.action === 'cloudKeySettings' || option.action === 'connectServer' || option.action === 'serverOnline' || option.action === 'modelSettings')
-          return <ChoiceRow {...row} end={opens} render={<Link href={option.action === 'cloudKeySettings' ? CLOUD_KEY_SETTINGS : option.action === 'modelSettings' ? MODEL_SETTINGS : CONNECT_SERVER_SETTINGS} />} />
+          return <ChoiceRow key={option.value} {...row} end={opens} render={<Link href={option.action === 'cloudKeySettings' ? CLOUD_KEY_SETTINGS : option.action === 'modelSettings' ? MODEL_SETTINGS : CONNECT_SERVER_SETTINGS} />} />
         // 已授权的仓库里没有: the GitHub App's page opens in a new tab, where the person adds repositories; nothing is answered.
-        if (option.action === 'githubInstall') return <ChoiceRow {...row} end={<ExternalLink aria-hidden="true" />} render={<a href={GITHUB_APP_INSTALL_URL} target="_blank" rel="noopener noreferrer" />} />
-        if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <ChoiceRow {...row} end={opens}
+        if (option.action === 'githubInstall') return <ChoiceRow key={option.value} {...row} end={<ExternalLink aria-hidden="true" />} render={<a href={GITHUB_APP_INSTALL_URL} target="_blank" rel="noopener noreferrer" />} />
+        if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <ChoiceRow key={option.value} {...row} end={opens}
           render={<Button variant="bare" onClick={() => setDialog(option.action === 'e2bKey' ? 'e2b' : 'mac')} />} />
         const busy = status !== 'pending'
         // 没有可用的电脑: 让这台电脑参与调度 switches that device on, then tells the bot to dispatch again.
-        return <ChoiceRow {...row} end={done || null} render={<Button variant="bare" aria-pressed={selected} disabled={busy}
+        return <ChoiceRow key={option.value} {...row} end={done || null} render={<Button variant="bare" aria-pressed={selected} disabled={busy}
           onClick={() => { if (option.action === 'allowAutoSchedule') void allowAutoSchedule(option.value, label); else { setPicked(option.value); void send(label) } }} />} />
       })}
     </div>

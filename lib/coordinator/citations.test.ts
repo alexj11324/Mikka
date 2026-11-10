@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { citedIds, namedCitations, remarkCitations, runThreadName, splitCitations, type CitationSource } from './citations'
+import { citedIds, namedCitations, remarkCitations, runThreadName, runTitle, splitCitations, type CitationSource } from './citations'
 
 const ISSUE = '3f6c1a52-8d0e-4b7a-9c3e-1f2a3b4c5d6e'
 const RUN = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
@@ -88,4 +88,9 @@ test('runThreadName names a thread for its task, as the thread list does, else f
   assert.equal(runThreadName({ name: 'Speed up the home page', issue: { id: ISSUE, number: 12, identifier: 'MIK-12', title: '首页提速' } }), 'MIK-12 首页提速')
   assert.equal(runThreadName({ name: 'Speed up the home page', issue: { id: ISSUE, number: null, identifier: null, title: '首页提速' } }), '首页提速')
   assert.equal(runThreadName({ name: 'Speed up the home page', issue: null }), 'Speed up the home page')
+})
+
+test('runTitle names a thread in a sentence by its task title without the code, else what it was asked (2026-11-10)', () => {
+  assert.equal(runTitle({ name: 'Speed up the home page', issue: { id: ISSUE, number: 12, identifier: 'MIK-12', title: '首页提速' } }), '首页提速')
+  assert.equal(runTitle({ name: 'Speed up the home page', issue: null }), 'Speed up the home page')
 })

@@ -2,9 +2,10 @@
 // whole page (bar, title, description, sub-tasks, activity, details) with its own controls; every save, read and
 // rule stays in public code (components/workspace/task-detail.tsx and task-detail-frame.tsx). The description editor,
 // 验收, an open thread and the dialogs stay Mikka's and come in rendered.
-import type { CompositionEvent, KeyboardEvent, ReactNode, RefObject } from 'react'
+import { createContext, type CompositionEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { IssueDetailNavigation } from '@/components/workspace/issue-detail-header'
 import type { IssueDiscussions } from '@/components/workspace/issue-editor'
+import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
 
 /** A glyph the layer draws from its own set. */
 export type TaskIcon =
@@ -69,6 +70,11 @@ export type TaskDetailRow = {
   /** A quiet word after the value (自动判断). */
   note?: string
   disabled?: boolean
+  /**
+   * The status row only: the task's own state (localTaskState on its newest thread, decision #1864 point 6), which the
+   * value shows instead of the board status, as every other surface names the task; `menu` still sets the board status.
+   */
+  state?: { state: TaskState; reason: TaskReason | null }
 }
 
 export type TaskSubtask = {
@@ -154,3 +160,12 @@ export type TaskDetailFrameProps = {
   /** Members, description history, the ⋯ menu's and the properties' dialogs. */
   dialogs: ReactNode
 }
+
+/**
+ * The task view in a chat's work area (decision 2026-11-10): a narrow tab, whose own × closes it, so the layer leaves
+ * out the way back, the pager and ✕, places the title before compact properties and the body, and offers expand:
+ * the task's full page (2026-11-10 Capy layout decision).
+ * Absent (null) on the task page itself.
+ */
+export type TaskDetailPlacement = { onExpand: () => void; expandLabel: string }
+export const TaskDetailPlacementContext = createContext<TaskDetailPlacement | null>(null)

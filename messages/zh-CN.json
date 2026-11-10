@@ -3014,7 +3014,27 @@
         "independent-review": "检查冻结的候选改动，并记录可复现的问题。",
         "systematic-debugging": "复现故障、定位根因，再验证修复。"
       },
-      "numberedSource": "{source} {number}"
+      "numberedSource": "{source} {number}",
+      "mark": {
+        "icon": "图标",
+        "color": "颜色",
+        "icons": {
+          "square": "方块",
+          "chevrons": "括号",
+          "lens": "放大镜",
+          "lines": "文本",
+          "check": "对勾",
+          "stairs": "台阶",
+          "diamond": "菱形",
+          "arrow": "箭头"
+        },
+        "colors": {
+          "ink": "墨黑",
+          "graphite": "石墨",
+          "teal": "青绿",
+          "pink": "粉"
+        }
+      }
     },
     "cloud": {
       "title": "Mikka 云服务",
@@ -4544,6 +4564,8 @@
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",
+      "titleLabel": "标题",
+      "titlePlaceholder": "标题（可选，不填由 Bot 起）",
       "placeholder": "要它做什么？",
       "promptWithContext": "帮我新建一个任务（{context}）：{text}",
       "contextDevice": "在 {device} 上做",
