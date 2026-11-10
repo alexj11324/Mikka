@@ -1,0 +1,19 @@
+{
+  "schema": "issue1512.rpc-projection-verifier-independent-review.v2",
+  "reviewer": "independent_final",
+  "candidate": "533f860a692015de1c6a8d305aada515e2c5e22b",
+  "producer": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+  "priorReview": "33a0a5dc778493377a0b64128f433d25b908f7d2",
+  "verdict": "PASS_STATIC_ARITHMETIC_AND_PHASE_CONTAINMENT_REVIEW",
+  "changesReviewed": [
+    "Unchanged correct count identities and half-open additive-field conservation.",
+    "Every phase action key must exist in its whole window; this closes the previously identified phase-only all-additive-zero row gap.",
+    "Both whole and phase logical rows exclude desktop.readBatch.",
+    "allEightProjectionsAvailable and allEightProjectionsComplete are separate; complete requires every window and segment status complete.",
+    "Return value explicitly limits the proof to exported projection arithmetic/boundaries and preserves non-additive observations."
+  ],
+  "limits": [
+    "No Native original logs were read and no product, V8 verifier or resources executed by this reviewer.",
+    "This is not original invocation-receipt replay or proof of completeness of unexported data; callers must inspect errors and the explicit complete/status results."
+  ]
+}

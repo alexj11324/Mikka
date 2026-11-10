@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 2,
+  "errors": [],
+  "coverage": [
+    {
+      "kind": "physical",
+      "name": "webLogin",
+      "available": true,
+      "status": "complete",
+      "segmentStatus": "complete"
+    },
+    {
+      "kind": "physical",
+      "name": "nativeLogin",
+      "available": true,
+      "status": "complete",
+      "segmentStatus": "complete"
+    },
+    {
+      "kind": "physical",
+      "name": "startup-bundled",
+      "available": true,
+      "status": "complete",
+      "segmentStatus": "complete"
+    },
+    {
+      "kind": "physical",
+      "name": "startup-hosted",
+      "available": true,
+      "status": "complete",
+      "segmentStatus": "complete"
+    },
+    {
+      "kind": "logical",
+      "name": "webLogin",
+      "available": true,
+      "status": "complete",
+      "segmentStatus": "complete"
+    },
+    {
+      "kind": "logical",
+      "name": "nativeLogin",
+      "available": true,
+      "status": "complete",
+      "segmentStatus": "complete"
+    },
+    {
+      "kind": "logical",
+      "name": "startup-bundled",
+      "available": true,
+      "status": "complete",
+      "segmentStatus": "complete"
+    },
+    {
+      "kind": "logical",
+      "name": "startup-hosted",
+      "available": true,
+      "status": "complete",
+      "segmentStatus": "complete"
+    }
+  ],
+  "windows": {
+    "physical.webLogin": {
+      "status": "complete",
+      "segmentStatus": "complete",
+      "totals": {
+        "startedInWindow": 25,
+        "completedInWindow": 25,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "totals": {
+            "startedInWindow": 0,
+            "completedInWindow": 0,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "totals": {
+            "startedInWindow": 0,
+            "completedInWindow": 0,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "totals": {
+            "startedInWindow": 25,
+            "completedInWindow": 25,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      ]
+    },
+    "physical.nativeLogin": {
+      "status": "complete",
+      "segmentStatus": "complete",
+      "totals": {
+        "startedInWindow": 15,
+        "completedInWindow": 15,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "totals": {
+            "startedInWindow": 0,
+            "completedInWindow": 0,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "totals": {
+            "startedInWindow": 1,
+            "completedInWindow": 1,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "totals": {
+            "startedInWindow": 14,
+            "completedInWindow": 14,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      ]
+    },
+    "physical.startup-bundled": {
+      "status": "complete",
+      "segmentStatus": "complete",
+      "totals": {
+        "startedInWindow": 7,
+        "completedInWindow": 7,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "totals": {
+            "startedInWindow": 7,
+            "completedInWindow": 7,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      ]
+    },
+    "physical.startup-hosted": {
+      "status": "complete",
+      "segmentStatus": "complete",
+      "totals": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      ]
+    },
+    "logical.webLogin": {
+      "status": "complete",
+      "segmentStatus": "complete",
+      "totals": {
+        "startedInWindow": 25,
+        "completedInWindow": 25,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "totals": {
+            "startedInWindow": 0,
+            "completedInWindow": 0,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "totals": {
+            "startedInWindow": 0,
+            "completedInWindow": 0,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "totals": {
+            "startedInWindow": 25,
+            "completedInWindow": 25,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      ]
+    },
+    "logical.nativeLogin": {
+      "status": "complete",
+      "segmentStatus": "complete",
+      "totals": {
+        "startedInWindow": 40,
+        "completedInWindow": 40,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "totals": {
+            "startedInWindow": 0,
+            "completedInWindow": 0,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "totals": {
+            "startedInWindow": 1,
+            "completedInWindow": 1,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "totals": {
+            "startedInWindow": 39,
+            "completedInWindow": 39,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      ]
+    },
+    "logical.startup-bundled": {
+      "status": "complete",
+      "segmentStatus": "complete",
+      "totals": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      ]
+    },
+    "logical.startup-hosted": {
+      "status": "complete",
+      "segmentStatus": "complete",
+      "totals": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "totals": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      ]
+    }
+  },
+  "rowsChecked": 80,
+  "segmentRowsChecked": 80,
+  "allEightProjectionsAvailable": true,
+  "allEightProjectionsComplete": true,
+  "limitations": [
+    "Checks exported projection arithmetic and phase boundaries only; does not replay unexported original RPC receipts.",
+    "Crossings, missing completions and status observations are preserved and are not additive request totals."
+  ]
+}

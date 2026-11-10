@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "passed": true,
+  "platform": "darwin",
+  "architecture": "arm64",
+  "revision": "c8ebffc19c788fa1db9cc441ac71a09f99dbb4a8",
+  "launches": [
+    {
+      "mode": "bundled",
+      "profile": "a",
+      "phase": "create",
+      "passed": true,
+      "crypto": {
+        "passed": true,
+        "phase": "create",
+        "available": true,
+        "verifiedCanaries": 0,
+        "encrypted": true,
+        "decrypted": true,
+        "identityMatches": true
+      },
+      "processExited": true,
+      "keychainLog": {
+        "observation": "after-launch-return",
+        "lookupFailureCount": 0,
+        "knownStatusCodes": [],
+        "truncated": false
+      }
+    },
+    {
+      "mode": "hosted",
+      "profile": "b",
+      "phase": "continue",
+      "passed": true,
+      "crypto": {
+        "passed": true,
+        "phase": "continue",
+        "available": true,
+        "verifiedCanaries": 1,
+        "encrypted": true,
+        "decrypted": true,
+        "identityMatches": true
+      },
+      "processExited": true,
+      "keychainLog": {
+        "observation": "after-launch-return",
+        "lookupFailureCount": 0,
+        "knownStatusCodes": [],
+        "truncated": false
+      }
+    },
+    {
+      "mode": "bundled",
+      "profile": "b",
+      "phase": "verify",
+      "passed": true,
+      "crypto": {
+        "passed": true,
+        "phase": "verify",
+        "available": true,
+        "verifiedCanaries": 2,
+        "encrypted": true,
+        "decrypted": true,
+        "identityMatches": true
+      },
+      "processExited": true,
+      "keychainLog": {
+        "observation": "after-launch-return",
+        "lookupFailureCount": 0,
+        "knownStatusCodes": [],
+        "truncated": false
+      }
+    }
+  ],
+  "package": {
+    "version": 1,
+    "variant": "acceptance",
+    "passed": true,
+    "signatureVerifiedStrictDeep": true,
+    "bundleIdentifier": "com.aspectlylabs.mikka.dev",
+    "urlScheme": "mikka-dev-auth",
+    "architecture": "arm64",
+    "identity": {
+      "adHoc": true,
+      "teamIdentifier": "none",
+      "hardenedRuntime": true,
+      "cdHash": "529eac5c674f469eb872b9b2c84d73349cf4f41d"
+    },
+    "signedBundleCount": 9,
+    "entitlements": {
+      "hardenedRuntime": true,
+      "devOnlyLibraryValidationException": true,
+      "unexpected": false,
+      "executables": 5,
+      "libraries": 4,
+      "librariesWithoutEntitlements": 4
+    },
+    "fuses": {
+      "RunAsNode": false,
+      "EnableCookieEncryption": false,
+      "EnableNodeOptionsEnvironmentVariable": false,
+      "EnableNodeCliInspectArguments": true,
+      "EnableEmbeddedAsarIntegrityValidation": false,
+      "OnlyLoadAppFromAsar": true,
+      "LoadBrowserProcessSpecificV8Snapshot": false,
+      "GrantFileProtocolExtraPrivileges": true
+    }
+  },
+  "sameImmutablePackage": true,
+  "distinctProcesses": 3,
+  "cleanup": "passed"
+}
