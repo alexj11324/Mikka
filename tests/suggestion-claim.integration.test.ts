@@ -52,6 +52,19 @@ before(async () => {
   // A Factory acceptance report is an Artifact with this index row (listArtifacts reads its task).
   await scope.run(() => pool.query(`CREATE TABLE factory_acceptance_artifacts ("taskId" uuid primary key, "artifactId" uuid not null unique)`))
   await scope.run(() => pool.query(`CREATE TABLE artifacts (id uuid primary key, "userId" text not null, kind text not null, title varchar(200) not null, "runId" uuid, "issueId" uuid, "latestVersion" int not null default 1, "createdAt" timestamptz not null default now(), "updatedAt" timestamptz not null default now()); CREATE TABLE artifact_versions (id uuid primary key, "artifactId" uuid not null, version int not null, "storageKey" text not null, "inlineContent" text, sha256 text not null, size int not null, "authorName" text not null, "createdAt" timestamptz not null default now(), unique("artifactId",version))`))
+  await scope.run(async () => {
+    await pool.query(`CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"ownershipState" text NOT NULL DEFAULT 'bound');
+      CREATE TABLE coordinator_sessions ("userId" text NOT NULL,"botId" uuid);
+      ALTER TABLE bots ADD COLUMN "workspaceId" uuid;
+      ALTER TABLE artifacts ADD COLUMN "workspaceId" uuid;
+      ALTER TABLE agent_runs ADD COLUMN "workspaceId" uuid,ADD COLUMN "issueId" uuid,
+        ADD COLUMN "continuesRunId" uuid,ADD COLUMN "retryOf" uuid,ADD COLUMN "questionContinuation" jsonb`)
+    // Keep the real resource/parent predicate inside this isolated schema.
+    // Missing parents and forged cross-tenant references must fail closed.
+    for (const name of ['20261110020010_resource_acl.sql', '20261110020016_new_collaborative_children.sql']) {
+      await pool.query(await readFile(new URL('../drizzle/' + name, import.meta.url), 'utf8'))
+    }
+  })
 })
 afterTests(async () => { await scope?.close(); await pool?.end(); await (await import('../lib/workspace-db')).workspacePool.end() })
 async function seed(key: string, title = 'synthetic') { await db.insert(suggestions).values({ id: key, userId: 'owner', source: 'gmail', externalId: key, action: 'reply', title, shown: true, decidedBy: 'rule', occurredAt: new Date() }) }
@@ -102,10 +115,17 @@ check('two concurrent sends commit one event and both receive a receipt', async 
   assert.equal(callbacks.length, 2)
 })
 
-check('Artifact actions return only owned rows, latest author, run filter and real timestamps', async () => {
-  const runId = randomUUID(), mine = randomUUID(), foreign = randomUUID(), outside = randomUUID()
-  await pool.query('ALTER TABLE artifacts ADD COLUMN "workspaceId" uuid')
-  await pool.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId","latestVersion","updatedAt","workspaceId") VALUES ($1,'owner','markdown','Real fixture document',$2,2,'2026-10-28T10:00:00Z',$5),($3,'foreign','html','Private fixture',$2,1,'2026-10-28T11:00:00Z',$6),($4,'owner','html','Other run',null,1,'2026-10-28T09:00:00Z',$5)`, [mine, runId, foreign, outside, workspaces.get('owner'), workspaces.get('foreign')])
+// Artifact actions now load the real Workspace and personal-credential policy.
+// Exercise those on the fully migrated APP database, leaving only the injected
+// suggestion insert failure in its deliberately narrow transaction fixture.
+test('Artifact actions enforce real parent ACL, latest author, run filter and timestamps', async () => {
+  const runId = randomUUID(), foreignRun = randomUUID(), mine = randomUUID(), foreign = randomUUID(), outside = randomUUID(), forged = randomUUID()
+  for (const [userId, id] of [['owner', runId], ['foreign', foreignRun]]) {
+    const agent = randomUUID()
+    await pool.query(`INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,'codex',$3)`, [agent, userId, `Fixture Agent ${agent}`])
+    await pool.query('INSERT INTO agent_runs (id,"userId","agentId","workspaceId") VALUES ($1,$2,$3,$4)', [id, userId, agent, workspaces.get(userId)])
+  }
+  await pool.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId","latestVersion","updatedAt","workspaceId") VALUES ($1,'owner','markdown','Real fixture document',$2,2,'2026-10-28T10:00:00Z',$5),($3,'foreign','html','Private fixture',$7,1,'2026-10-28T11:00:00Z',$6),($4,'owner','html','Other run',null,1,'2026-10-28T09:00:00Z',$5),($8,'foreign','html','Forged run reference',$2,1,'2026-10-28T12:00:00Z',$6)`, [mine, runId, foreign, outside, workspaces.get('owner'), workspaces.get('foreign'), foreignRun, forged])
   for (const [artifactId, version, author] of [[mine,1,'Earlier author'],[mine,2,'Latest author'],[foreign,1,'Foreign author'],[outside,1,'Other author']] as const) {
     await pool.query(`INSERT INTO artifact_versions (id,"artifactId",version,"storageKey",sha256,size,"authorName") VALUES ($1,$2,$3,'synthetic','synthetic',1,$4)`, [randomUUID(),artifactId,version,author])
   }
@@ -119,6 +139,8 @@ check('Artifact actions return only owned rows, latest author, run filter and re
   assert.deepEqual((await artifactActions.listRunArtifacts(runId)).map(row => row.id), [mine])
   assert.deepEqual(await artifactActions.listRunArtifacts('invalid'), [])
   owner = 'foreign'
-  assert.deepEqual((await artifactActions.listRunArtifacts(runId)).map(row => row.id), [foreign])
+  assert.deepEqual(await artifactActions.listRunArtifacts(runId), [], 'owning a row cannot authorize a foreign private parent')
+  assert.deepEqual((await artifactActions.listRunArtifacts(foreignRun)).map(row => row.id), [foreign])
+  assert.deepEqual((await artifactActions.listArtifacts()).map(row => row.id), [foreign])
   owner = 'owner'
 })

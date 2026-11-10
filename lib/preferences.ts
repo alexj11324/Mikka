@@ -24,13 +24,14 @@ export interface Preferences {
   memoryEnabled: boolean
   sendKey: (typeof SEND_KEYS)[number]
   personalInstructions: string
+  privateByDefault: boolean
   /** 每日建议. Always false while memoryEnabled is false. */
   dailySuggestions: boolean
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   proactive: true, pushDecide: true, pushReview: true, pushFinished: true, pushBriefing: true, pushWhen: 'always', memoryEnabled: true,
-  sendKey: 'enter', personalInstructions: '', dailySuggestions: true,
+  sendKey: 'enter', personalInstructions: '', dailySuggestions: true, privateByDefault: false,
 }
 
 /** Longest the personal instructions may be, in characters (code points). */
@@ -42,7 +43,7 @@ export const personalInstructionsSchema = z.string().transform(text => text.trim
 export const preferencesPatch = z.object({
   proactive: z.boolean(), pushDecide: z.boolean(), pushReview: z.boolean(), pushFinished: z.boolean(), pushBriefing: z.boolean(),
   pushWhen: z.enum(PUSH_WHEN), memoryEnabled: z.boolean(),
-  sendKey: z.enum(SEND_KEYS), personalInstructions: personalInstructionsSchema, dailySuggestions: z.boolean(),
+  privateByDefault: z.boolean(), sendKey: z.enum(SEND_KEYS), personalInstructions: personalInstructionsSchema, dailySuggestions: z.boolean(),
 }).partial().strict()
 
 export type PreferencesPatch = z.infer<typeof preferencesPatch>

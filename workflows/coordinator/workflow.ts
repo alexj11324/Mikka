@@ -21,6 +21,7 @@ import { promptOptions } from '@/lib/prompt-cache'
 import { isWelcomeOnlyTurn } from '@/lib/agent-welcome'
 import { finishCoordinatorTurn } from './finish-turn'
 import { completeAttentionQuestions } from '@/lib/coordinator/question-attention'
+import { SHARED_BOT_CHAT_TOOLS } from '@/lib/collaboration/bot-chat-contract'
 export { coordinatorTools } from './tools'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -128,7 +129,7 @@ export async function coordinatorTurn(userId: string, botId: string, startupRece
         let preparation = round === 0 && startup?.kind === 'ready' ? startup.preparation : null
         if (!preparation) {
           // Later rounds, schedules and disabled kit keep their boundaries.
-          preparing = timedPreparation(phaseMs, 'agentPreparation', () => prepareHostedAgentRound(userId,botId,holder,round,selected,mailboxEnabled,Boolean(inbox.scheduledRead),agentKitEnabled))
+          preparing = timedPreparation(phaseMs, 'agentPreparation', () => prepareHostedAgentRound(userId,botId,holder,round,selected,mailboxEnabled,Boolean(inbox.scheduledRead),agentKitEnabled,inbox.sourceEventId))
           starting = steps.writeStreamPart(writable,streamStart)
           ;[preparation] = await Promise.all([preparing,starting])
         }
@@ -138,27 +139,31 @@ export async function coordinatorTurn(userId: string, botId: string, startupRece
           prepared = preparation.prepared
           preparationBodyMs = preparation.bodyMs
         } else {
-          hosted = await kit.botRuntime(userId,botId)
+          hosted = await kit.botRuntime(userId,botId,inbox.sourceEventId)
           prepared = await timedPreparation(phaseMs, 'prepare', () => steps.prepareTurn(userId,botId,holder,{mailboxEnabled,runtime:inbox.scheduledRead ? null : hosted}))
         }
       } else {
         // Native harnesses and older recorded settings retain their original boundaries.
-        ;[execution] = await Promise.all([timedPreparation(phaseMs, 'begin', () => kit.beginAgentExecution(userId,botId,holder,round,selected)),steps.writeStreamPart(writable,streamStart)])
+        ;[execution] = await Promise.all([timedPreparation(phaseMs, 'begin', () => kit.beginAgentExecution(userId,botId,holder,round,selected,inbox.sourceEventId)),steps.writeStreamPart(writable,streamStart)])
         if (execution && execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')
-        hosted = selected.harness === 'ai_sdk' ? execution?.snapshot.runtime ?? await kit.botRuntime(userId,botId) : null
+        hosted = selected.harness === 'ai_sdk' ? execution?.snapshot.runtime ?? await kit.botRuntime(userId,botId,inbox.sourceEventId) : null
         prepared = selected.harness === 'ai_sdk'
           ? await timedPreparation(phaseMs, 'prepare', () => steps.prepareTurn(userId,botId,holder,{snapshot:execution?.snapshot,executionId:execution?.id,mailboxEnabled,runtime:inbox.scheduledRead ? null : hosted}))
           : {mailboxTools:mailboxEnabled ? await steps.mailboxCatalogue(userId,botId,execution?.id) : [],prompt:null,contextMs:null}
       }
       const mailboxTools = prepared.mailboxTools
+      const sharedChat = hosted?.modelSelection?.type === 'api_key' && hosted.modelSelection.collaborationEventId
+        ? { eventId: hosted.modelSelection.collaborationEventId, botId } : undefined
+      const sharedOptions = sharedChat ? { readOnly: true, readToolIds: SHARED_BOT_CHAT_TOOLS,
+        lazyGitHubContext: false, computerEnabled: false, writeEnabled: false, mailboxEnabled: false, mailboxTools: [] } : {}
       const welcomeOnly = selected.harness === 'ai_sdk' && isWelcomeOnlyTurn(prepared.prompt?.messages)
       // Every model call that finished with its tools, as it finishes: 停止 keeps these without waiting for the rest.
       let hostedTools: ReturnType<typeof coordinatorTools> | undefined
       const turn = signal.aborted && !inbox.scheduledRead
         ? Promise.resolve({ text:'',finishReason:'stop',responseMessages:[] as ModelMessage[] })
         : selected.harness === 'ai_sdk'
-        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),(hostedTools = welcomeOnly ? {} : coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ lazyGitHubContext: !inbox.scheduledRead && (!execution || execution.snapshot.effectiveTools.includes('find_repository')),...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,audits,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) })),{ ...promptOptions(prepared.prompt!),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,...(welcomeOnly ? {toolChoice:'none' as const,activeTools:[]} : {}),writable:modelWritable,preventClose:true,onStepEnd:step => { finished.push(...step.response.messages) },...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,actorId:userId,botId })
-        : nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),botId,execution?.snapshot,inbox.scheduledRead ? undefined : signal,finished)
+        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId,inbox.sourceEventId),(hostedTools = welcomeOnly ? {} : coordinatorTools(userId,botId,sharedChat ? { sharedChat } : scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ lazyGitHubContext: !inbox.scheduledRead && (!execution || execution.snapshot.effectiveTools.includes('find_repository')),...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,audits,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}),...sharedOptions })),{ ...promptOptions(prepared.prompt!),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,...(welcomeOnly ? {toolChoice:'none' as const,activeTools:[]} : {}),writable:modelWritable,preventClose:true,onStepEnd:step => { finished.push(...step.response.messages) },...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,actorId:hosted?.actorId ?? '',botId })
+        : nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scope?.sharedChat ? scope : scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),botId,execution?.snapshot,inbox.scheduledRead ? undefined : signal,finished)
       // A scheduled read is not stoppable from the chat: it posts only its fenced result. Otherwise 停止 ends a hosted
       // turn at once: the model call in flight is aborted, a tool call already running finishes on its own and nothing
       // follows it. A native turn answers 停止 itself between the device's calls, and closes the device's job as it ends.

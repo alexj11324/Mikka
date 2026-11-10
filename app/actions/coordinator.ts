@@ -13,7 +13,7 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
@@ -24,9 +24,9 @@ import { refreshChatMetadata, type UnchangedChat } from '@/lib/coordinator/chat-
 import type { CitationSource } from '@/lib/coordinator/citations'
 import { reasoningText } from '@/lib/coordinator/stream-response'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { chatBotId, type openChatBotId } from '@/lib/coordinator/coordinator-bot'
-import { bots, devices } from '@/lib/db/schema'
+import { devices } from '@/lib/db/schema'
 import { taskDestinationSchema, taskCreationSchema, type TaskDestination, type TaskCreation } from '@/lib/task-destination'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { NOTE_MAX, NOTES_MAX, withBrowserNotes, type BrowserNote } from '@/lib/browser/note'
@@ -44,9 +44,10 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { actAs } from '@/lib/acting-user'
 import { authorizedBotChat } from '@/lib/resource-access/chat'
+import { botChatContributionPolicy, botChatOwnerExclusive, submitBotChatMessage } from '@/lib/collaboration/bot-chat'
 
 async function getUser() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await auth.api.getSession({ headers: await headers(), query: { disableCookieCache: true } })
   if (!session?.user) throw new ActionFailureError('authRequired')
   return { ...session.user, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
 }
@@ -90,6 +91,14 @@ async function beginBotChatRead(ownerId: string, bot: { id: string; workspaceId:
 /** The person's chat with their Coordinator, or with one of their bots: every bot runs on the same harness. */
 export async function getCoordinatorChat(botId: string | null = null): Promise<CoordinatorChat> {
   return withDatabaseOperation('/actions/coordinator/chat', () => readFullChat(botId))
+}
+
+/** The existing composer uses this policy to distinguish a free comment from
+ * a bounded request funded by the Organization. Submission rechecks it. */
+export async function getBotChatContribution(botId: string | null = null) {
+  const user = await getUser()
+  const bot = await ownBot(user, botId)
+  return botChatContributionPolicy(bot.reader, bot.id)
 }
 
 async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
@@ -157,8 +166,8 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   return refreshChatMetadata(shared, previous, async ({ sourceIds, artifactIds }) => {
     const { artifactSummaries } = await import('@/lib/artifacts/store')
     const [sources, artifacts] = await Promise.all([
-      citationSources({ ...user, [tokenWorkspace]: bot.workspaceId }, sourceIds.map(id => `[[issue:${id}]] [[run:${id}]]`)),
-      artifactSummaries({ ...user, [tokenWorkspace]: bot.workspaceId }, artifactIds),
+      citationSources(bot.reader, sourceIds.map(id => `[[issue:${id}]] [[run:${id}]]`)),
+      artifactSummaries(bot.reader, artifactIds),
     ])
     return { sources, artifacts }
   })
@@ -240,10 +249,10 @@ async function readBotChatSummaries() {
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string, taskCreation?:TaskCreation): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string, taskCreation?:TaskCreation, collaborationMode: 'comment' | 'reply' = 'reply'): Promise<ActionResult<{ queued: boolean; accepted?: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
-    const session=await auth.api.getSession({headers:requestHeaders})
+    const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
     if(!session?.user)throw new ActionFailureError('authRequired')
     const userId=session.user.id
     let humanSessionId:string|undefined=desktopHumanSessionId()===session.session.id?session.session.id:undefined
@@ -253,7 +262,6 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
       }catch{/* Missing/malformed origin is no approval provenance. */}
     }
     const bot = await ownBot({ ...session.user, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }, botId, expectedWorkspaceId)
-    if (bot.ownerId !== userId) throw new ActionFailureError('threadExecutionAuthorizationRequired')
     const parsed = personalSubmissionInput.safeParse({ text, submissionId, ...(images?.length ? { images } : {}) })
     if (!parsed.success) throw new ActionFailureError('messageRequired')
     const quoted = quote ? quoteSchema.safeParse(quote) : null
@@ -270,11 +278,25 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if(!creation.success)throw new ActionFailureError('validationGeneric')
     if(creation.data?.projectId)await (await import('@/lib/resource-access/store')).requireResourceAccess(session.user,{kind:'project',id:creation.data.projectId,workspaceId:bot.workspaceId},'canSteer')
     const taskSubmission = Boolean(destination.data || profile.data || creation.data)
+    if (!['comment', 'reply'].includes(collaborationMode)) throw new ActionFailureError('validationGeneric')
+    const collaborative = !await botChatOwnerExclusive(pool, bot.ownerId, bot.id)
+    if (collaborative || collaborationMode === 'comment') {
+      if (taskSubmission || retryOf !== undefined || !parsed.data.submissionId) throw new ActionFailureError('threadExecutionAuthorizationRequired')
+      try {
+        const result = await submitBotChatMessage(bot.reader, bot.id, { text: withQuote(withNotes, quoted?.data),
+          images: parsed.data.images, submissionId: parsed.data.submissionId, mode: collaborationMode }, { humanSessionId })
+        return { queued: result.queued, accepted: true as const }
+      } catch (error) {
+        if (error instanceof SubmissionConflictError) throw Object.assign(new ActionFailureError('submissionConflict'), { cause: error })
+        throw error
+      }
+    }
+    if (bot.ownerId !== userId) throw new ActionFailureError('threadExecutionAuthorizationRequired')
     if (profile.data && profile.data !== BUILTIN_AGENT_PROFILE_ID) {
       try {
         const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
         if (row.archivedAt || !row.definition.enabled) throw new ActionFailureError('runInvalid')
-      } catch (error) { if (error instanceof AgentProfileError) throw new ActionFailureError('runInvalid'); throw error }
+      } catch (error) { if (error instanceof AgentProfileError) throw Object.assign(new ActionFailureError('runInvalid'), { cause: error }); throw error }
     }
     if (taskSubmission && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
     // A new task is handed to the Coordinator to create; with no Coordinator here, say so instead of queueing it silently.
@@ -290,7 +312,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     const retried = z.number().int().positive().optional().safeParse(retryOf)
     const message = withQuote(withNotes, quoted?.data)
     // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
-    if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
+    if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch (error) { throw Object.assign(new ActionFailureError('messageRequired'), { cause: error }) } }
     const reader = { id: userId, [tokenWorkspace]: bot.workspaceId, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
     const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, taskCreation:creation.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
     try {
@@ -299,7 +321,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
       else await record(db)
     }
     catch (error) {
-      if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
+      if (error instanceof SubmissionConflictError) throw Object.assign(new ActionFailureError('submissionConflict'), { cause: error })
       throw error
     }
     afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
@@ -314,10 +336,10 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
  */
 export async function welcomeCoordinator(botId: string | null = null): Promise<ActionResult<{ queued: boolean }>> {
   return runAction(async () => {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const session = await auth.api.getSession({ headers: await headers(), query: { disableCookieCache: true } })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
-    if (bot.ownerId !== session.user.id) return { queued: false as const, reason: 'unavailable' as const }
+    if (bot.ownerId !== session.user.id || !await botChatOwnerExclusive(pool, bot.ownerId, bot.id)) return { queued: false as const, reason: 'unavailable' as const }
     if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false }
     const chat = await chatView(session.user.id, 1, bot.id)
     if (chat.items.length || chat.working || chat.error) return { queued: false }
@@ -336,17 +358,17 @@ export async function stopCoordinatorTurn(botId: string | null = null): Promise<
     const { requireResourceAccess } = await import('@/lib/resource-access/store')
     await requireResourceAccess(bot.reader, bot.reference, 'canSteer')
     const { stopChatTurn } = await import('@/lib/coordinator/stop-turn')
-    return { stopped: await stopChatTurn(bot.ownerId, bot.id) }
+    return { stopped: await stopChatTurn(bot.ownerId, bot.id, undefined, { reader: bot.reader, reference: bot.reference }) }
   })
 }
 
 /** 重试 on a failed reply: the same turn again, once per click; the chat shows its normal working state. */
 export async function retryCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ queued: true } | { queued: false; reason: 'unavailable' | 'working' | 'nothingToRetry' }>> {
   return runAction(async () => {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const session = await auth.api.getSession({ headers: await headers(), query: { disableCookieCache: true } })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
-    if (bot.ownerId !== session.user.id) return { queued: false as const, reason: 'unavailable' as const }
+    if (bot.ownerId !== session.user.id || !await botChatOwnerExclusive(pool, bot.ownerId, bot.id)) return { queued: false as const, reason: 'unavailable' as const }
     if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false as const, reason: 'unavailable' as const }
     const queued = await retryFailedTurn(session.user.id, bot.id)
     if (queued) {
@@ -384,7 +406,7 @@ export async function sendSuggestion(suggestionId: string): Promise<ActionResult
         if (claimed) await suggestionInboxChanged(tx, userId, item.botId)
       })
     } catch (error) {
-      if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
+      if (error instanceof SubmissionConflictError) throw Object.assign(new ActionFailureError('submissionConflict'), { cause: error })
       throw error
     }
     afterJob('after:coordinator-wake', () => wakeCoordinator(userId))

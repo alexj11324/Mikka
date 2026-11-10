@@ -90,6 +90,10 @@ async function organizationAccess(userId: string, workspaceId: string, organizat
     // execution must additionally satisfy the organization's machine policy.
     state.credentialValid = !!proof && await organizationAccess(proof.actorId, workspaceId, organizationId,
       { kind: 'session', sessionId: proof.sessionId }, appExecutor)
+  } else if (principal?.kind === 'bot_chat' && principal.workspaceId === workspaceId) {
+    const { botChatExecutionProof } = await import('@/lib/collaboration/bot-chat')
+    const proof = await botChatExecutionProof(appExecutor, userId, workspaceId, principal.eventId)
+    state.credentialValid = !!proof && await organizationAccess(proof.actorId, workspaceId, organizationId, proof.principal, appExecutor)
   }
   return enterpriseAccessAllowed(state, principal)
 }

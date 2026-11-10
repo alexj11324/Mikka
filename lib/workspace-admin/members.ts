@@ -93,6 +93,12 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
     returning case when "subjectKind"='account' then "subjectId" end as "subjectId"`)
   await tx.execute(sql`update resource_access_policies set "ownerId"=${toUserId} where kind='bot' and id in ${ids} and "workspaceId"=${workspaceId}::uuid`)
   await tx.update(bots).set({ ownerId: toUserId, archivedAt: null, updatedAt: new Date() }).where(and(inArray(bots.id, ids), eq(bots.workspaceId, workspaceId), ownedBy))
+  // The recipient starts a separate private Chat before the first message or
+  // upload. Original Chat policies and attachment custody remain untouched.
+  await tx.execute(sql`insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
+    select 'chat',mikka_chat_resource_id(b."ownerId",b.id),b."workspaceId",b."ownerId",'private','created'
+    from bots b where b.id in ${ids} and b."workspaceId"=${workspaceId}::uuid and b."ownerId"=${toUserId}
+    on conflict(kind,id) do nothing`)
   for (const id of ids) await botListChanged(tx, id)
   if (fromUserId) await ownerListChanged(tx, fromUserId, ['thread_list', 'task_run_list', 'bot_chat_list'])
   await workspaceListChanged(tx, workspaceId, ['bot_list'])

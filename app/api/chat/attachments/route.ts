@@ -4,10 +4,9 @@ import {
   CHAT_FILE_MAX_BYTES,
   chatFileScopeSchema,
 } from '@mikka/protocol/chat-attachments'
-import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
+import { auth } from '@/lib/api-auth'
 import { writeAllowed } from '@/lib/mobile-api'
 import {
-  authorizeFileScope,
   beginChatFile,
   completeChatFile,
   uploadChatFilePart,
@@ -28,7 +27,7 @@ const init = z
 const complete = z.object({ operation: z.literal('complete'), id: z.uuid() }).strict()
 const headers = { 'Cache-Control': 'private, no-store' }
 export async function POST(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
+  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   if (!session) return Response.json({ error: 'authRequired' }, { status: 401, headers })
   if (!writeAllowed(request)) return Response.json({ error: 'originNotAllowed' }, { status: 403, headers })
   try {
@@ -56,8 +55,8 @@ export async function POST(request: Request) {
       }
       return Response.json(
         await (part === null
-          ? completeChatFile(session.user.id, id, Buffer.concat(chunks), session.tokenWorkspaceId)
-          : uploadChatFilePart(session.user.id, id, part, Buffer.concat(chunks), session.tokenWorkspaceId)),
+          ? completeChatFile(session.user, id, Buffer.concat(chunks), session.tokenWorkspaceId)
+          : uploadChatFilePart(session.user, id, part, Buffer.concat(chunks), session.tokenWorkspaceId)),
         { headers },
       )
     }
@@ -66,12 +65,10 @@ export async function POST(request: Request) {
     const data = z.discriminatedUnion('operation', [init, complete]).parse(JSON.parse(body))
     if (data.operation === 'complete')
       return Response.json(
-        await completeChatFile(session.user.id, data.id, undefined, session.tokenWorkspaceId),
+        await completeChatFile(session.user, data.id, undefined, session.tokenWorkspaceId),
         { headers },
       )
-    const workspace = await authorizeFileScope(session.user.id, data.scope)
-    if (!apiWorkspaceAllowed(session, workspace)) throw new ChatFileError('notFound')
-    return Response.json(await beginChatFile(session.user.id, data.scope, data), { headers })
+    return Response.json(await beginChatFile(session.user, data.scope, data), { headers })
   } catch (error) {
     const code =
       error instanceof ChatFileError

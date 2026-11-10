@@ -10,6 +10,7 @@ import type { BrowserNote } from '@/lib/browser/note'
 import type { TaskDestination, TaskCreation } from '@/lib/task-destination'
 
 export type CoordinatorMessageContext = {
+  collaborationMode?: 'comment' | 'reply'
   quote?: ArtifactQuote | null
   botId?: string | null
   taskDestination?: TaskDestination
@@ -39,7 +40,7 @@ export function useCoordinatorSubmit() {
   const submit = useCallback((text: string, context?: CoordinatorMessageContext) => {
     submitter.current ??= createCoordinatorSubmitter({ currentOwner, transport: async submission => {
       const details = submission.context as CoordinatorMessageContext | undefined
-      const expectation: [expectedWorkspaceId?: string,taskCreation?:TaskCreation] = details?.taskCreation ? [details.expectedWorkspaceId,details.taskCreation] : details?.expectedWorkspaceId === undefined ? [] : [details.expectedWorkspaceId]
+      const expectation: [expectedWorkspaceId?: string,taskCreation?:TaskCreation,collaborationMode?:'comment'|'reply'] = details?.collaborationMode ? [details.expectedWorkspaceId, details.taskCreation, details.collaborationMode] : details?.taskCreation ? [details.expectedWorkspaceId,details.taskCreation] : details?.expectedWorkspaceId === undefined ? [] : [details.expectedWorkspaceId]
       const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf, details?.profileId, ...expectation)
       return readActionOutcome(result)
     } })

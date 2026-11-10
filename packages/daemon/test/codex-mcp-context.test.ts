@@ -56,7 +56,7 @@ it('resolves the late entry beside the real stdio assets after bundling', async 
   await build({ entryPoints: [fileURLToPath(new URL('../src/codex-mcp-context.ts', import.meta.url))],
     outfile: join(root, 'context.mjs'), platform: 'node', format: 'esm', bundle: true,
     banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" } })
-  for (const name of ['mikka-mcp.mjs', 'mikka-mcp-backend.mjs', 'mikka-mcp-context.mjs', 'capture-copy.mjs'])
+  for (const name of ['mikka-mcp.mjs', 'mikka-mcp-backend.mjs', 'mikka-mcp-context.mjs', 'capture-copy.mjs', 'native-tool-isolation.mjs'])
     copyFileSync(fileURLToPath(new URL('../src/agents/' + name, import.meta.url)), join(root, name))
   const module = await import(pathToFileURL(join(root, 'context.mjs')).href)
   const value = module.writeCodexMcpContext(join(root, 'private'), runId,
@@ -64,7 +64,7 @@ it('resolves the late entry beside the real stdio assets after bundling', async 
   try {
     expect(value.server.args[0]).toBe(join(root, 'mikka-mcp-context.mjs'))
     const result = await request(value.server.command, value.server.args)
-    expect(result.code).toBe(0)
+    expect(result.code, result.err).toBe(0)
     expect(JSON.parse(result.out).result.tools.map((tool: { name: string }) => tool.name)).toContain('submit')
   } finally { value.close() }
 })

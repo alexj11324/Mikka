@@ -124,6 +124,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/workspace-admin/general.ts', file: 'tests/workspace-admin.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/app-policy/store.ts', file: 'tests/app-policy.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/organization-connections.ts', file: 'tests/organization-connections.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/collaboration/bot-chat.ts', file: 'tests/shared-bot-chat.db.test.ts', script: 'test:shared-bot-chat-db' },
   { marker: 'lib/hosted-execution-revocation.ts', file: 'tests/hosted-execution-revocation.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/model-api-keys.ts', file: 'tests/model-api-keys.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/usage/read.ts', file: 'tests/usage.db.test.ts', script: 'test:workspace-admin-db' },

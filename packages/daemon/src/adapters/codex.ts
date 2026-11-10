@@ -53,7 +53,7 @@ import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
 import { taskExecutionEnv } from '../task-env'
-import { NATIVE_TOOL_PROFILE, nativeToolConfigArgs, prepareNativeToolDirectories } from '../agents/native-tool-isolation.mjs'
+import { NATIVE_TOOL_PROFILE, nativeControllerCommand, nativeToolConfigArgs, prepareNativeToolDirectories } from '../agents/native-tool-isolation.mjs'
 import { mailboxToolResult } from '../run-mailbox'
 import { codexMailboxCatalogue, codexMailboxResumeVersion, recordCodexMailboxSession, verifyCodexMailboxResume } from './codex-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
@@ -482,7 +482,7 @@ export class CodexAdapter implements AgentAdapter {
       daemonTracer.registerGenerationDrain(drain)
       void drain.then(() => daemonTracer.flush()).catch(() => {})
     }
-    const argv = [
+    const nativeArgv = [
       binary,
       "app-server",
       "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
@@ -524,6 +524,7 @@ export class CodexAdapter implements AgentAdapter {
       ...(this.options.cliTiming?.args ?? []),
       ...(toolIsolation ? nativeToolConfigArgs(toolIsolation, options.env) : []),
     ]
+    const argv = toolIsolation ? nativeControllerCommand(toolIsolation, nativeArgv, { hideProjectConfig: true }) : nativeArgv
     const spawnOptions = {
       cwd: ctx.worktree,
       env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...ctx.decisionMcpEnv(), ...credential.env, CODEX_HOME: codexHome.home,

@@ -17,7 +17,7 @@ export async function prepareCoordinatorStartup(userId: string, botId: string, h
   // Schedules retain their separate fresh authority checkpoint. Without a
   // kit snapshot, model selection retains its original durable checkpoint.
   if (!inbox.added || inbox.scheduledRead || !settings.agentKitEnabled) return { ...take, preparation: null }
-  const preparing = prepareHostedAgentRound(userId, botId, holder, 0, settings.runtime, settings.mailboxEnabled, false, settings.agentKitEnabled)
+  const preparing = prepareHostedAgentRound(userId, botId, holder, 0, settings.runtime, settings.mailboxEnabled, false, settings.agentKitEnabled, inbox.sourceEventId)
   const starting = steps.writeStreamPart(writable, { type: 'coordinator-turn-start', id: `${holder}:0`, quietEligible: inbox.handoffOnly, modelStream: 'scoped-v1' })
   try {
     const [preparation] = await Promise.all([preparing, starting])

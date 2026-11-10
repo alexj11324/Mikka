@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AppState, Linking, View } from 'react-native'
+import { Linking, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Button, FieldGroup, Host, ListItem, Picker, Text as NativeText, TextInput, useNativeState } from '@expo/ui'
 import { NavBar } from '@/components/NavBar'
@@ -43,15 +43,9 @@ function BillingContext({ initial }: { initial: BillingScope }) {
   const read = useApi<BillingManagementView>(billingManagementPath(scope, workspace))
   const [pending, setPending] = useState<BillingManagementOperation['action'] | null>(null), [failure, setFailure] = useState<string | null>(null)
   const alive = useRef(true), writing = useRef(false)
-  const currentScope = useRef(scope), externalReturn = useRef(false)
+  const currentScope = useRef(scope)
   currentScope.current = scope
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
-  useEffect(() => {
-    const listener = AppState.addEventListener('change', next => {
-      if (next === 'active' && externalReturn.current) { externalReturn.current = false; void read.reload() }
-    })
-    return () => listener.remove()
-  }, [read.reload])
   async function save(operation: BillingManagementOperation): Promise<boolean> {
     if (writing.current) return false
     writing.current = true; setPending(operation.action); setFailure(null)
@@ -60,7 +54,7 @@ function BillingContext({ initial }: { initial: BillingScope }) {
       const pinned = ['checkout', 'portal', 'topup', 'recharge'].includes(operation.action) ? { ...operation, accountWorkspaceId: read.data?.account?.workspaceId } : operation
       const result = await api<{ url?: string }>(billingManagementPath(scope), { method: 'POST', body: pinned })
       if (!alive.current || context !== apiCache.context() || currentScope.current.kind !== scope.kind || currentScope.current.id !== scope.id) return false
-      if (result.url) { externalReturn.current = true; await Linking.openURL(result.url) }
+      if (result.url) await Linking.openURL(result.url)
       else await read.reload()
       return true
     } catch (error) { if (alive.current && context === apiCache.context()) setFailure(errorText(error)); return false }
@@ -78,7 +72,7 @@ function BillingContext({ initial }: { initial: BillingScope }) {
       <FieldGroup.Section title={copy.scope}>
         <ListItem trailing={<Picker selectedValue={`${scope.kind}:${scope.id}`} enabled={!busy} onValueChange={value => {
           if (writing.current) return
-          const [kind, id] = value.split(':'); if (kind === 'workspace' || kind === 'organization') { externalReturn.current = false; setScope({ kind, id }); setWorkspace(null); setFailure(null) }
+          const [kind, id] = value.split(':'); if (kind === 'workspace' || kind === 'organization') { setScope({ kind, id }); setWorkspace(null); setFailure(null) }
         }}>
           {data.organizations.map(org => <Picker.Item key={org.id} value={`organization:${org.id}`} label={`${copy.organizationScope} · ${org.name}`} />)}
           {workspaceChoices.map(row => <Picker.Item key={row.id} value={`workspace:${row.id}`} label={`${copy.workspaceScope} · ${row.name}`} />)}

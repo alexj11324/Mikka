@@ -28,17 +28,26 @@ test('disk hydration authority follows actual membership, role, selected workspa
     [ownerSessionId, owner, randomUUID(), strangerSessionId, stranger, randomUUID()])
   const ownerReader = { id: owner, [enterprisePrincipal]: { kind: 'session' as const, sessionId: ownerSessionId } }
   const strangerReader = { id: stranger, [enterprisePrincipal]: { kind: 'session' as const, sessionId: strangerSessionId } }
+  const expectAuthority = (value: Awaited<ReturnType<typeof authorizedCacheWorkspace>>, workspaceId: string, role: 'admin' | 'member') => {
+    assert.ok(value)
+    assert.deepEqual(Object.keys(value).sort(), ['accessExpiresAfterMs', 'accessExpiresAt', 'accessProof', 'role', 'workspaceId'])
+    assert.equal(value.workspaceId, workspaceId)
+    assert.equal(value.role, role)
+    assert.match(value.accessProof!, /^[a-f0-9]{64}$/)
+    assert.equal(value.accessExpiresAt, null)
+    assert.equal(value.accessExpiresAfterMs, null)
+  }
   try {
     const cold = await measured(() => authorizedCacheWorkspace(ownerReader, first.id))
-    assert.deepEqual(cold.value, { workspaceId: first.id, role: 'admin' })
-    assert.equal(cold.statements, 2, 'Enterprise adds one canonical Organization-link check to the bounded membership read; neither query loads task/member payloads')
-    assert.deepEqual(await withActivitySession(owner, () => authorizedCacheWorkspace(ownerReader), second.id), { workspaceId: second.id, role: 'member' })
+    expectAuthority(cold.value, first.id, 'admin')
+    assert.equal(cold.statements, 3, 'membership, canonical Enterprise link and one APP ACL digest; no content or resource identifiers are returned')
+    expectAuthority(await withActivitySession(owner, () => authorizedCacheWorkspace(ownerReader), second.id), second.id, 'member')
     assert.equal(await authorizedCacheWorkspace(strangerReader, first.id), null, 'another account never receives hydration authority')
     assert.equal(await authorizedCacheWorkspace(ownerReader, randomUUID()), null, 'an unauthorized explicit workspace never falls back to another cache')
     assert.equal(await authorizedCacheWorkspace(strangerReader), null, 'a read does not create a workspace for a new account')
 
     await pool.query('UPDATE mikka_workspace_members SET role=\'member\' WHERE "workspaceId"=$1 AND "userId"=$2', [first.id, owner])
-    assert.deepEqual(await authorizedCacheWorkspace(ownerReader, first.id), { workspaceId: first.id, role: 'member' }, 'downgrading the viewer changes the disk namespace')
+    expectAuthority(await authorizedCacheWorkspace(ownerReader, first.id), first.id, 'member')
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [first.id, owner])
     assert.equal(await authorizedCacheWorkspace(ownerReader, first.id), null, 'a suspended membership cannot hydrate its old read models')
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [second.id, owner])

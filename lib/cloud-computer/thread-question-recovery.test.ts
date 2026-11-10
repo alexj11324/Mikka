@@ -29,7 +29,9 @@ const ensureThreadMachine = async (...args: Parameters<typeof import('./thread-m
 const id = (n: number) => `41600000-0000-4000-8000-${String(n).padStart(12, '0')}`
 // Keep unexpected SQL rejected while the real registration locks its parent run.
 const sandboxRegistrationSql = `WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
-  UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp())
+  UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp()),
+    "resourceIsolation"=CASE WHEN $4 AND m."sandboxId" IS NULL AND m."deviceId" IS NULL AND m."resourceIsolation"='legacy_unknown'
+      THEN 'shared_clean' ELSE m."resourceIsolation" END
   FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`.replace(/\s+/g, ' ').trim()
 function fixture() {
   const actor = { userId: 'fixture-owner', workspaceId: id(2) }
@@ -77,6 +79,9 @@ function fixture() {
     }
     if (sql.startsWith('INSERT INTO device_tokens')) return result([{ now: new Date() }])
     if (sql.startsWith('UPDATE thread_machines') || sql.startsWith('WITH locked_run') || sql.replace(/\s+/g, ' ').trim() === sandboxRegistrationSql) {
+      if (sql.replace(/\s+/g, ' ').trim() === sandboxRegistrationSql) {
+        assert.deepEqual(values, [run.id, machine.sandboxId, machine.workerLeaseId, false], 'retained sessions never become clean fresh machines')
+      }
       if (sql.startsWith('UPDATE thread_machines SET "workerLeaseId"=$2')) {
         machine.workerLeaseId = values[1] as string; machine.workerLeaseUntil = new Date(Date.now() + 60_000)
       }

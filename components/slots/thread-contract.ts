@@ -108,4 +108,12 @@ export type ThreadScreenProps = {
   /** Opens a task and the Inbox. */
   onOpenTask: (taskId: string) => void
   onOpenInbox: () => void
+  /**
+   * Tabs the page adds to the conversation's right-hand work area when the frame owns that panel
+   * (FRAME_OWNS_PANEL): the chat's Overview and the browser. `reveal` counts up each time the page asks for one
+   * (`revealId`) to be shown; the work area stays folded until then.
+   */
+  panels?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null }
 }
+
+export type ThreadPanelTab = { id: 'overview' | 'browser'; title: string; content: ReactNode }

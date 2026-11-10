@@ -22,7 +22,7 @@ mock.module('next/headers', { namedExports: { cookies: async () => ({ get: (key:
 mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 const bot = randomUUID()
 const excessRuns = Array.from({ length: 21 }, () => randomUUID())
-test('real actions keep thread content with its owner; current members see only whose threads exist and their status', async () => {
+test('real actions hide explicit Private threads and expose new Shared thread content only within its current tenant', async () => {
   const { listIssueThreads, getIssueThread, sendIssueThreadMessage } = await import('../app/actions/agents')
   const { actAs } = await import('../lib/acting-user')
   const { requestRunStop } = await import('../lib/agent-runs')
@@ -84,12 +84,33 @@ test('real actions keep thread content with its owner; current members see only 
     requestHeaders = new Headers()
     await pool.query('INSERT INTO agents (id,"userId",harness,name) VALUES ($1,$2,\'codex\',\'Owned collaborator executor\')', [removedAgent,removed])
     await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt,report) VALUES ($1,$2,$3,$4,\'succeeded\',$5,$6)', [removedRun,removed,issue,removedAgent,'Private collaborator work',JSON.stringify({summary:'Private result'})])
-    // A workspace issue: teammates see whose threads exist and their status, never their content.
+    // These fixtures explicitly model Private sessions. New task-bound runs
+    // default Shared after #1849; the label in a prompt cannot make one private.
+    await pool.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='thread' AND id=ANY($1::uuid[])`, [[run, removedRun]])
+    // Neither the content nor the existence/count of Private sessions leaks.
     const listed = await actAs(viewer, () => listIssueThreads(issue))
-    assert.deepEqual(listed.map(row => [row.detail, row.ownerName, row.ownedByCurrentUser]).sort(), [[null, 'Isolated run test', false], [null, 'Isolated run test', false]])
+    assert.deepEqual(listed, [])
     assert.ok(!/Route|Mikka Backend|Owned Bot|Routed|PRIVATE/.test(JSON.stringify(listed)))
     await assert.rejects(actAs(viewer, () => getIssueThread(issue, run)))
     await assert.rejects(actAs(viewer, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'Check the fallback' })))
+    // A genuinely new Shared run is readable in full. This positive path is
+    // separate from the legacy/explicit Private negative cases above.
+    const sharedRun = randomUUID()
+    await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt,report)
+      VALUES($1,$2,$3,$4,'succeeded','Shared task work',$5)`, [sharedRun, owner, issue, agent, JSON.stringify({summary:'Shared result'})])
+    await pool.query('INSERT INTO run_chunks(id,"runId",seq,chunk) VALUES($1,$2,1,$3)', [randomUUID(), sharedRun, JSON.stringify({type:'text-delta',id:'shared',delta:'Shared execution trace'})])
+    assert.equal((await pool.query(`SELECT visibility FROM resource_access_policies WHERE kind='thread' AND id=$1`, [sharedRun])).rows[0].visibility, 'shared')
+    const sharedList = await actAs(viewer, () => listIssueThreads(issue))
+    assert.deepEqual(sharedList.map(row => row.id), [sharedRun])
+    assert.equal(sharedList[0].detail?.name, 'Shared task work')
+    assert.equal(sharedList[0].detail?.summary, 'Shared result')
+    const sharedDetail = await actAs(viewer, () => getIssueThread(issue, sharedRun))
+    assert.equal(sharedDetail.chunks.length, 1)
+    assert.match(JSON.stringify(sharedDetail.chunks), /Shared execution trace/)
+    await assert.rejects(actAs(outsider, () => getIssueThread(issue, sharedRun)))
+    selectedWorkspace = home
+    await assert.rejects(actAs(owner, () => getIssueThread(issue, sharedRun)))
+    selectedWorkspace = workspace
     // An acting-user override cannot attest a browser's human/session provenance.
     await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: issue, runId: run, text: 'No session' })), /authRequired/)
     requestHeaders = ownerHeaders
@@ -112,11 +133,12 @@ test('real actions keep thread content with its owner; current members see only 
     assert.equal(repeated.stopRequestedAt.getTime(),stopped.stopRequestedAt.getTime())
     // Suspension or removal from the workspace ends access, even with stale direct membership.
     await pool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,removed,'suspended'])
-    assert.deepEqual((await actAs(viewer,()=>listIssueThreads(issue))).map(row=>row.id),[run])
+    assert.deepEqual((await actAs(viewer,()=>listIssueThreads(issue))).map(row=>row.id),[sharedRun])
     await assert.rejects(actAs(removed,()=>listIssueThreads(issue)))
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2',[workspace,viewer])
     await assert.rejects(actAs(viewer,()=>listIssueThreads(issue)))
     await assert.rejects(actAs(viewer,()=>getIssueThread(issue, run)))
+    await assert.rejects(actAs(viewer,()=>getIssueThread(issue, sharedRun)))
     for (const id of excessRuns) await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId",status) VALUES ($1,$2,$3,$4,$5)', [id,owner,issue,agent,'succeeded'])
     const bounded = await actAs(owner, () => listIssueThreads(issue))
     assert.equal(bounded.length, 20)

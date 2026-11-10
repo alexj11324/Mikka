@@ -2,6 +2,7 @@ import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import type { IssueReader } from './issue-visibility'
 import { z } from 'zod'
 import { enqueueGroupTurn, GROUP_TURN_STOPPED, stopGroupTurns } from './coordinator/group-turns'
 import { groupParticipants, type GroupParticipant } from './group-participants'
@@ -15,7 +16,7 @@ const message = z.object({ body: z.string().trim().min(1).max(32000), mentions: 
 const read = z.object({ messageId: z.string().min(1).max(64) }).strict()
 export type Member = z.infer<typeof member>
 export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
-export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links' | 'stop'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; after?: string | null; limit?: string | null; workspaceId?: string | null }
+export type GroupRequest = { reader?: IssueReader; userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links' | 'stop'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; after?: string | null; limit?: string | null; workspaceId?: string | null }
 class Failure extends Error { constructor(readonly status: number) { super(String(status)) } }
 const fail = (status: number): never => { throw new Failure(status) }
 function parse<T>(schema: z.ZodType<T>, body?: string): T {
@@ -35,6 +36,20 @@ function decimal(value: string | null | undefined, fallback: string) {
  * bigint positions are JSON strings (never lossy JS numbers).
  */
 export async function handleGroup(pool: Pool, directory: Directory, req: GroupRequest, queueAgents = false): Promise<{ status: number; body: unknown }> {
+  if(req.userId && req.method==='POST' && req.resource==='messages' && z.uuid().safeParse(req.id).success && req.body?.includes('[mikka-file:')) {
+    const {withTaskWorkspace}=await import('./task-workspace')
+    const {ActionFailureError}=await import('./action-error')
+    const {WorkspaceError}=await import('./workspace-error')
+    const {tokenWorkspace}=await import('./tokens/principal')
+    const {rows:[group]}=await pool.query<{workspaceId:string}>('SELECT "workspaceId" FROM conversations WHERE id=$1 AND kind=\'group\'',[req.id])
+    if(!group || req.workspaceId&&req.workspaceId!==group.workspaceId)return {status:404,body:{error:'notFound'}}
+    const reader=req.reader??{id:req.userId,[tokenWorkspace]:group.workspaceId}
+    try {return await withTaskWorkspace(reader,group.workspaceId,()=>handleAuthorizedGroup(pool,directory,req,queueAgents))}
+    catch(error) {if(error instanceof ActionFailureError || error instanceof WorkspaceError)return {status:404,body:{error:'notFound'}};throw error}
+  }
+  return handleAuthorizedGroup(pool,directory,req,queueAgents)
+}
+async function handleAuthorizedGroup(pool: Pool, directory: Directory, req: GroupRequest, queueAgents = false): Promise<{ status: number; body: unknown }> {
   let client: PoolClient | undefined
   try {
     const userId = req.userId
@@ -201,7 +216,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const input = parse(message, req.body)
         if (splitChatFiles(input.body).files.length) {
           const { validateChatFiles } = await import('./chat-attachments/store')
-          await validateChatFiles(userId, { kind: 'group', id: req.id! }, input.body, client)
+          await validateChatFiles(req.reader??userId, { kind: 'group', id: req.id! }, input.body, client)
         }
         // Group-selected agents belong to the creator, not necessarily this sender.
         // Caller membership was verified above; directory ownership plus current

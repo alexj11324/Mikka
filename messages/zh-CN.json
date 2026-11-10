@@ -1112,6 +1112,9 @@
     "executionHarnessUnavailable": "所选设备上没有这个 Agent。",
     "executionAutoNotAllowed": "请选择具体的执行选项。",
     "executionModelUnknown": "此模型不可用。",
+    "botChatDailyBudgetExceeded": "组织今天的共享 Bot 回复额度已用完，你仍可添加评论。UTC 00:00 重置后，或管理员调整限额后可继续请求回复。",
+    "botChatModelCallBudgetExceeded": "本次回复已达到组织设置的模型调用上限。已完成的工作会保留，继续回复需要重新明确发起请求。",
+    "botChatInputCapacityExceeded": "本次共享回复超过了输入容量上限，请缩短对话或附件后再请求回复。",
     "executionRuleNotFound": "找不到这条执行规则。",
     "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
     "executionCommandNotFound": "找不到这次检测。",
@@ -1346,6 +1349,16 @@
     "viewProjects": "查看项目"
   },
   "IssueDetail": {
+    "frame": {
+      "delegate": "交给",
+      "open": "打开",
+      "openThread": "打开 {name} 的对话",
+      "subtaskPlaceholder": "输入子任务名称，按回车创建",
+      "subtaskMenu": "{title} 的操作",
+      "subscribe": "关注",
+      "unsubscribe": "取消关注",
+      "created": "创建于{when}"
+    },
     "breadcrumbBoard": "看板",
     "breadcrumbMore": "更多位置",
     "connecting": "正在连接…",
@@ -2418,7 +2431,55 @@
       "shadowConfirmMany": "{workspace} 已有 {names}，在你的运行里用你自己的值？",
       "useMine": "用我的"
     },
+    "permissionsPage": {
+      "accessHint": "点按权限即可更改",
+      "heading": "Bot 和成员可以做什么",
+      "detail": "锁定的项目对这个工作区的所有人禁止。",
+      "allowed": "允许",
+      "blocked": "禁止",
+      "allowedEmpty": "没有允许的项目",
+      "blockedEmpty": "没有禁止的项目",
+      "block": "禁止{name}",
+      "unblock": "允许{name}",
+      "readOnly": "只有管理员可以更改。",
+      "appColumn": "应用",
+      "accessColumn": "权限",
+      "summary": "{allowed} 项允许，{blocked} 项禁止"
+    },
     "audit": {
+      "unknownAction": "记录了「{action}」",
+      "filterMenu": {
+        "clearAll": "全部清除",
+        "remove": "移除{label}",
+        "more": "还有 {count} 项：{labels}"
+      },
+      "tableWords": {
+        "undo": "撤销",
+        "redo": "重做",
+        "values": "{count} 个值"
+      },
+      "adminOnly": "只有管理员可以查看审计日志。",
+      "categoryFilter": "类别",
+      "columns": {
+        "time": "时间",
+        "actor": "操作人",
+        "action": "操作",
+        "category": "类别",
+        "place": "地点"
+      },
+      "range": {
+        "label": "时间范围",
+        "today": "今天",
+        "yesterday": "昨天",
+        "last7": "最近 7 天",
+        "last30": "最近 30 天",
+        "last90": "最近 90 天",
+        "apply": "应用",
+        "pickEnd": "{start} – 选择结束日期",
+        "days": "{count} 天",
+        "choose": "选择时间范围",
+        "presets": "常用范围"
+      },
       "loading": "正在加载审计日志",
       "filter": "筛选",
       "filters": {
@@ -2484,7 +2545,8 @@
         },
         "agent": {
           "approval_decided": "{decision, select, approved {批准工具请求} denied {拒绝工具请求} other {处理工具请求}}",
-          "approval_consumed": "使用工具批准"
+          "approval_consumed": "使用工具批准",
+          "policy_changed": "更改了 Agent 审批规则"
         },
         "workspace": {
           "slug_changed": "把地址从 {from} 改为 {to}",
@@ -2496,7 +2558,9 @@
           "checkout_started": "打开了结账",
           "credits_purchased": "购买了点数",
           "auto_recharge_changed": "修改了自动充值",
-          "limits_changed": "修改了用量上限"
+          "limits_changed": "修改了用量上限",
+          "card_verified": "验证了付款卡",
+          "payment_method_changed": "更改了付款方式"
         },
         "audit": {
           "exported": "导出审计日志",
@@ -4507,7 +4571,12 @@
       "modelUnavailable": "没有可运行的默认模型",
       "loadingPlacement": "正在检查运行设置…",
       "quotaUnchecked": "模型额度待检查",
-      "workspaceDefault": "按工作区设置"
+      "workspaceDefault": "按工作区设置",
+      "machineRow": "机器",
+      "botRow": "交给",
+      "details": "详情",
+      "expand": "放大窗口",
+      "collapse": "缩小窗口"
     },
     "board": {
       "toolbar": "看板工具栏",
@@ -4621,7 +4690,9 @@
         "groups": "群聊",
         "tasks": "任务"
       },
-      "sourceSeparator": "、"
+      "sourceSeparator": "、",
+      "sectionsHint": "在分组间跳转",
+      "openHint": "打开"
     }
   },
   "SuggestionsPage": {
@@ -4647,7 +4718,9 @@
     "category": {
       "all": "全部",
       "documents": "文档",
-      "pages": "网页"
+      "pages": "网页",
+      "pullRequests": "PR",
+      "media": "截图与录屏"
     },
     "columns": {
       "name": "名称",
@@ -4660,7 +4733,7 @@
     "empty": "还没有 Artifact",
     "threadEntry": "Artifact · {count}",
     "folders": {
-      "sub": "Bot 和 Agent 在任务里交出的文档和网页，按任务分组。",
+      "sub": "Bot 和 Agent 在任务里交出的文档、网页、PR 和截图，按任务分组。",
       "folders": "按任务",
       "search": "搜索任务…",
       "noMatch": "没有和「{query}」匹配的任务。",
@@ -5202,7 +5275,11 @@
       "activePlan": "生效中的资源套餐",
       "inactiveCreditShare": "组织账户付款期间，此前的个人点数共享不生效。关闭此项可撤销原授权。",
       "capacity": "平台并发执行数",
-      "plans": { "free": "免费版", "pro": "专业版", "enterprise": "企业版" },
+      "plans": {
+        "free": "免费版",
+        "pro": "专业版",
+        "enterprise": "企业版"
+      },
       "removeLimitHelp": "移除此范围的消费上限，保留既有用量与审计记录。",
       "differentPayer": "平台执行使用另一个组织付款账户。此页显示当前工作区保留的余额与历史，请切换组织范围管理平台购买。"
     },
@@ -5466,7 +5543,9 @@
     "run_failed": {
       "default": "任务未能完成，请查看错误详情或重试。"
     },
-    "run_clean_isolation_required": {"default": "此共享线程需要具备原生凭证保护能力的干净云环境。请新建私人线程，或选择兼容的干净云电脑。"},
+    "run_clean_isolation_required": {
+      "default": "此共享线程需要具备原生凭证保护能力的干净云环境。请新建私人线程，或选择兼容的干净云电脑。"
+    },
     "governance_denied": {
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
@@ -5924,6 +6003,11 @@
       "pending": "读取中"
     }
   },
+  "HostedPlugins": {
+    "manageApp": "管理 {name}",
+    "moreTwo": "{first} 和 {second}",
+    "moreMany": "{first}、{second} 等 {count, number} 个"
+  },
   "HostedTasks": {
     "open": "打开任务",
     "status": "状态",
@@ -6155,6 +6239,48 @@
     "open": "打开",
     "runsCount": "{count, plural, other {{formatted} 次}}"
   },
+  "HostedShell": {
+    "newTab": "新标签页",
+    "searchOrUrl": "搜索或输入网址",
+    "tools": "工具",
+    "noTools": "还没有可用的工具",
+    "moreFor": "{name} 的更多操作",
+    "suggested": "推荐",
+    "noSuggestions": "暂时没有推荐"
+  },
+  "HostedMembers": {
+    "title": "成员与团队",
+    "overview": "概览",
+    "you": "（你）",
+    "changeRole": "更改角色",
+    "clear": "清除",
+    "selectAll": "全选",
+    "select": "选择 {name}",
+    "selected": "已选 {count} 人",
+    "roleOf": "{name} 的角色",
+    "noMatch": "没有与「{query}」匹配的成员。",
+    "membersSub": "{suspended, plural, =0 {全部启用中} other {# 位已停用}}",
+    "adminsSub": "可邀请、调整角色和停用成员",
+    "invitesSub": "{expired, plural, =0 {没有已过期的邀请} other {# 个已过期}}",
+    "yourRole": "你的角色",
+    "yourRoleSub": "仅管理员可邀请成员和更改权限",
+    "status": "状态",
+    "sortAscending": "姓名 A–Z",
+    "sortDescending": "姓名 Z–A",
+    "confirmSuspendMany": "将停用 {count} 位成员。他们将无法访问工作区成员目录；已有任务协作权限不变。",
+    "confirmRoleMany": "将 {count} 位成员设置为{role}并保持启用。",
+    "renewInvite": "重新生成邀请链接",
+    "copy": "复制",
+    "importCsv": "从 CSV 导入",
+    "teamCount": "{count} 个团队",
+    "deleteTeam": "删除团队",
+    "deleteConfirm": "输入 {name} 以确认",
+    "deleteTitle": "删除团队「{name}」？",
+    "deleteImpact": "将一并删除 {tasks} 个任务和 {projects} 个项目。与其他团队共享的项目只会取消关联。",
+    "deleteCounting": "正在统计将被删除的内容…",
+    "deleting": "正在删除…",
+    "teamDeleted": "已删除团队「{name}」。"
+  },
   "HostedSettings": {
     "back": "返回",
     "general": {
@@ -6377,6 +6503,14 @@
     "grantUnavailable": "此执行授权已不可用。请选择仅留言或其他有效授权。",
     "threadMessage": "给这个线程发消息",
     "readOnly": "你可以阅读此对话；如需参与，请联系 Owner 授权。",
-    "taskPrompt": "描述要创建的任务"
+    "taskPrompt": "描述要创建的任务",
+    "defaultsTitle": "默认可见范围",
+    "defaultsDescription": "用于新建项目、任务和线程。已有内容保留原权限，私人父级仍限制子资源的访问。",
+    "personalDefault": "默认创建为私人",
+    "personalDefaultDescription": "你新建的协作资源默认为私人，也可在创建时明确选择共享。",
+    "organizationDefault": "组织默认创建为私人",
+    "organizationDefaultDescription": "组织内新资源默认为私人，创建者可在创建时明确选择共享。",
+    "organizationDefaultReadOnly": "此默认值由组织管理，你也可以将自己的资源保留为私人。",
+    "defaultsLoading": "正在读取可见范围设置…"
   }
 }

@@ -12,6 +12,7 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { issueListChanged } from './live/lists'
 import { scheduleShortTitle } from './short-title-schedule'
 import { requireTaskWorkspace } from './task-workspace'
+import { newResourceVisibility, applyNewTaskVisibility } from './resource-access/creation-defaults'
 import { lockResourceAccess } from './resource-access/store'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -51,10 +52,7 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
   }).returning()
   // The initial policy is narrowed before this transaction becomes visible.
   // No other member can observe a transient shared private-task body.
-  if (visibility === 'private') {
-    await tx.execute(sql`select set_config('mikka.acl_actor',${userId},true),set_config('mikka.acl_source','private_task_created',true)`)
-    await tx.execute(sql`update resource_access_policies set visibility='private' where kind='task' and id=${id}::uuid and "ownerId"=${userId}`)
-  }
+  await applyNewTaskVisibility(tx, userId, id, await newResourceVisibility(userId, workspace.id, visibility))
   if(projectId){
     await tx.execute(sql`select set_config('mikka.acl_actor',${userId},true),set_config('mikka.acl_source','project_task_created',true)`)
     await tx.execute(sql`update resource_access_policies set "parentKind"='project',"parentId"=${projectId}::uuid

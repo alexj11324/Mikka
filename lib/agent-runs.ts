@@ -33,7 +33,7 @@ import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/fac
 import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { resolveStopTargets } from '@/lib/run-chain'
 import { afterRunEnded } from '@/lib/run-completion-effects'
-import { runBotName, threadNameHead } from '@/lib/run-bot-name'
+import { runBotName, threadNameHead, threadNamePrompt } from '@/lib/run-bot-name'
 import { requireTaskWorkspace } from '@/lib/task-workspace'
 
 // Run operations for one person, by user id. The agent actions call these
@@ -377,6 +377,26 @@ export async function visibleRunNames(reader: IssueReader, runIds: string[], tea
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(visible, inArray(agentRuns.id, runIds))).limit(Math.max(1, Math.min(runIds.length, 100)))
   return rows.map(({ ownerId, ...row }) => ({ ...row, own: ownerId === userId }))
+}
+
+/** Citation-only content under the same fresh tenant and resource gate. Read
+ * the name and tool count with the run, rather than authorizing and reading
+ * the same run again. No machine state, credential or private provenance is
+ * part of this projection, including for an authorized shared reader. */
+export async function visibleRunCitations(reader: IssueReader, runIds: string[]) {
+  const userId = typeof reader === 'string' ? reader : reader.id
+  if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
+  const visible = await runVisibilityPredicate(reader, { runIds })
+  const rows = await db.select({ ...runBriefViewColumns, ownerId: agentRuns.userId, prompt: threadNamePrompt,
+    steps: sql<number>`(select count(*) from ${runChunks} c where c."runId" = agent_runs.id
+      and c.chunk->>'type' = 'tool-input-available')`.mapWith(Number),
+  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
+    .where(and(visible, inArray(agentRuns.id, runIds))).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id))
+    .limit(Math.max(1, Math.min(runIds.length, 100)))
+  return rows.map(({ ownerId, prompt, steps, ...run }) => ({
+    run: ownerId === userId ? { ...run, failureDetails: readCompactRunFailure(run.failureDetails) } : sharedContentRunView(run),
+    prompt, steps,
+  }))
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,

@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 
 /** The app window (the app-frame slot; the open-source one is app-frame-view.tsx). */
-export { AppFrame, FRAME_LISTS_CHATS } from '@ui-slot/app-frame'
+export { AppFrame, FRAME_LISTS_CHATS, FRAME_OWNS_HEADER, FRAME_OWNS_PANEL } from '@ui-slot/app-frame'
 import { FRAME_LISTS_CHATS } from '@ui-slot/app-frame'
 
 type NavigationHistory = EventTarget & { canGoBack: boolean; canGoForward: boolean }

@@ -1,4 +1,5 @@
 'use client'
+import { useResourceCreation } from '@/hooks/use-resource-creation'
 
 import { useEffect, useRef, useState, useId } from 'react'
 import { useTranslations } from 'next-intl'
@@ -35,7 +36,9 @@ import { useChatFiles } from '@/components/chat/use-chat-files'
 import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 import { taskProfileSelectable, useAgentProfiles } from '@/components/settings/factory-profiles-data'
-import { TaskProfileNotice, TaskProfilePicker } from './task-profile-picker'
+import { TaskProfileNotice, TaskProfilePicker, useTaskProfileChoices } from './task-profile-picker'
+import * as newTaskSlot from '@ui-slot/new-task'
+import type { NewTaskMachine } from '@/components/slots/new-task-contract'
 
 const MAX_LENGTH = 8000
 
@@ -62,7 +65,8 @@ function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: s
 /**
  * 新建任务 the Comma way: say what needs doing in a sentence, on which machine and
  * for which bot, and that bot (the Coordinator by default) turns it into the task (title, status, assignee…). The
- * request goes into the Coordinator conversation, where its reply shows up.
+ * request goes into the Coordinator conversation, where its reply shows up. A UI layer's new-task slot draws the
+ * window instead (docs/ui-overlay.md); the data, state and sending stay here.
  */
 export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, workspaceId, initialText = '' }: {
   open: boolean
@@ -80,7 +84,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const tDevices = useTranslations('Devices')
   const tCommon = useTranslations('Common')
   const sharing=useTranslations('ResourceAccess')
-  const [visibility,setVisibility]=useState<'shared'|'private'>('shared')
+  const creation = useResourceCreation(workspaceId, open)
+  const { visibility, setVisibility } = creation
   const locationT = useTranslations('Settings.modelOrder')
   const { submit: submitMessage, failureMessage } = useCoordinatorSubmit()
   const { mutate } = useSWRConfig()
@@ -145,6 +150,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   }
 
   async function submit() {
+    if (!creation.ready) return
     const text = draft.trim()
     if (!text || sending || attachments.locked || !available || !profileAllowed) return
     setSending(true)
@@ -174,9 +180,36 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     }
   }
 
+  const profileChoices = useTaskProfileChoices({ workspaceId, value: profileId ?? null, data: profiles.data })
+  const keyDialogNode = keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />
+  const NewTask = newTaskSlot.NewTask ?? null
+  if (NewTask) {
+    const machineNote = (machine: Machine) => machine.cloud && !machine.usable ? t('addE2BKey') : !machine.cloud && !machine.usable ? machine.status : undefined
+    const slotMachine = (machine: Machine, group: NewTaskMachine['group']): NewTaskMachine => ({ value: machine.value, label: machine.label, icon: <MachineIcon machine={machine} cloudBotId={cloudBotId} />, usable: machine.usable, note: machineNote(machine), group })
+    const notices = <>
+      {creation.error && <Alert variant="destructive"><AlertTitle>{sharing('loadFailed')}</AlertTitle><Button type="button" variant="outline" size="sm" onClick={()=>{void creation.mutate()}}>{sharing('retry')}</Button></Alert>}
+      <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />
+      {!available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
+      {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
+    </>
+    return <>
+      {open && <NewTask onClose={() => onOpenChange(false)} project={project} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
+        files={attachments.files.length || attachments.pending.length ? <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} /> : null}
+        onAttach={files => { void attach(files) }} accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT}
+        machines={[slotMachine(defaults, 'default'), slotMachine(cloud, 'cloud'), ...own.map(item => slotMachine(item, 'own'))]} machine={picked ?? 'auto'} onMachine={pick}
+        bots={botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
+        bot={handler?.id ?? null} onBot={setBotPick}
+        profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
+        visibility={{value:visibility,label:sharing('visibility'),description:sharing(projectId?'parentBoundary':'creationHint'),options:[{value:'shared',label:sharing('shared'),disabled:creation.data?.kind==='personal'},{value:'private',label:sharing('private')}],disabled:sending||!creation.ready,onChange:setVisibility}}
+        notices={notices} sending={sending} canSubmit={creation.ready && available && profileAllowed && !!draft.trim() && !attachments.locked} onSubmit={() => { void submit() }} />}
+      {keyDialogNode}
+    </>
+  }
+
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')} finalFocus={openerFocus}>
-      <Field><FieldLabel htmlFor={`${fileId}-visibility`}>{sharing('visibility')}</FieldLabel><NativeSelect id={`${fileId}-visibility`} value={visibility} disabled={sending} onChange={event=>setVisibility(event.target.value as 'shared'|'private')}><NativeSelectOption value="shared">{sharing('shared')}</NativeSelectOption><NativeSelectOption value="private">{sharing('private')}</NativeSelectOption></NativeSelect><p className="text-xs text-muted-foreground">{sharing(projectId?'parentBoundary':'creationHint')}</p></Field>
+      {creation.error && <Alert variant="destructive"><AlertTitle>{sharing('loadFailed')}</AlertTitle><Button type="button" size="sm" variant="outline" onClick={()=>{void creation.mutate()}}>{sharing('retry')}</Button></Alert>}
+      <FieldGroup><Field><FieldLabel htmlFor={`${fileId}-visibility`}>{sharing('visibility')}</FieldLabel><NativeSelect id={`${fileId}-visibility`} value={visibility} disabled={sending || !creation.ready} onChange={event=>setVisibility(event.target.value as 'shared'|'private')}><NativeSelectOption value="shared" disabled={creation.data?.kind === 'personal'}>{sharing('shared')}</NativeSelectOption><NativeSelectOption value="private">{sharing('private')}</NativeSelectOption></NativeSelect><p className="text-xs text-muted-foreground">{sharing(projectId?'parentBoundary':'creationHint')}</p></Field></FieldGroup>
       <div className="flex flex-wrap items-center gap-2 pr-8 text-sm">
         {device
           ? <Select value={picked ?? 'auto'} onValueChange={value => { if (value) pick(value) }} items={[defaults, ...machines].map(({ value, label }) => ({ value, label }))}>
@@ -219,9 +252,9 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Paperclip data-icon="inline-start" /></Button>
-        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !profileAllowed || !draft.trim() || sending || attachments.locked} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
+        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!creation.ready || !available || !profileAllowed || !draft.trim() || sending || attachments.locked} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
       </div>
-      {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />}
+      {keyDialogNode}
     </DialogContent>
   </Dialog>
 }

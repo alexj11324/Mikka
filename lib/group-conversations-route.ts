@@ -54,11 +54,11 @@ export async function respondGroupDecisionReplay(request:Request,conversationId:
   return NextResponse.json(result.body,{status:result.status,headers:{'Cache-Control':'private, no-store'}})
 }
 export async function respondGroup(request: Request, resource: GroupRequest['resource'], id?: string) {
-  const session = await auth.api.getSession({ headers: request.headers })
+  const session = await auth.api.getSession({ headers: request.headers, query: {disableCookieCache:true} })
   const url = new URL(request.url)
   const scopedDirectory: typeof directory = async (workspaceId, userId, members) => (!session || apiWorkspaceAllowed(session, workspaceId)) && directory(workspaceId, userId, members)
   const result = await handleGroup(pool, scopedDirectory, {
-    userId: session?.user?.id ?? null, method: request.method as GroupRequest['method'], resource, id,
+    reader:session?.user,userId: session?.user?.id ?? null, method: request.method as GroupRequest['method'], resource, id,
     origin: request.headers.get('origin'),
     // Do not trust client-controlled x-forwarded-host to satisfy the Origin check.
     host: request.headers.get('host') ?? url.host,

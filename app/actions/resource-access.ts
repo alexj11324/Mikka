@@ -1,6 +1,7 @@
 'use server'
 
 import type { z } from 'zod'
+import { resourceCreationDefaults, setOrganizationCreationDefaults } from '@/lib/resource-access/creation-defaults'
 import { runAction } from '@/lib/action-error'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { resourceReferenceInput,resourceAccessChangeSchema } from '@/lib/resource-access/input'
@@ -42,5 +43,17 @@ export async function revokeThreadExecutionGrant(threadId:string,workspaceId:str
     const actor=await currentWorkspaceActor(workspaceId)
     await revokeThreadExecution(actor.reader,threadId,grantId)
     return {execution:await threadExecutionView(actor.reader,threadId)}
+  })
+}
+
+export async function getResourceCreationDefaults(workspaceId?: string) {
+  const actor = await currentWorkspaceActor(workspaceId)
+  return resourceCreationDefaults(actor.reader, actor.workspaceId)
+}
+
+export async function saveOrganizationCreationDefaults(workspaceId: string, input: unknown) {
+  return runAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return setOrganizationCreationDefaults(actor.reader, actor.workspaceId, input)
   })
 }

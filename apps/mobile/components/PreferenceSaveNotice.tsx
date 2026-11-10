@@ -4,7 +4,7 @@ import { Text } from '@/components/Text'
 import { useSettings } from '@/lib/settings'
 import { colors } from '@/lib/theme'
 
-const names: Record<string, string> = { proactive: '主动消息', pushDecide: '需要你决策', pushFinished: '线程完成', pushBriefing: '每日简报', memoryEnabled: '使用记忆' }
+const names: Record<string, string> = { privateByDefault: '默认创建为私人', proactive: '主动消息', pushDecide: '需要你决策', pushFinished: '线程完成', pushBriefing: '每日简报', memoryEnabled: '使用记忆' }
 
 /** Pending intention is separate from the switches' last confirmed values. */
 export function PreferenceSaveNotice() {

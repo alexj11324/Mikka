@@ -123,9 +123,54 @@ export function prepareNativeToolDirectories(config) {
   if (root !== config.worktree || !lstatSync(root).isDirectory()) throw Error('native_tool_worktree_unsafe')
 }
 
+/** The controller and all of its descendants share a private PID namespace.
+ * Killing its bwrap parent tears down that namespace, including double-forked
+ * children that created a new process group. The inner official sandbox still
+ * supplies the tool filesystem and clean environment boundary.
+ *
+ * A native controller must also be unable to load repository MCP/config code.
+ * Codex project trust alone is not a security boundary: 0.163 can start a repo
+ * MCP while reloading thread configuration. Mask those directories in this
+ * process's mount namespace without modifying repository files or host policy.
+ */
+export function nativeControllerCommand(config, argv, { hideProjectConfig = false } = {}) {
+  prepareNativeToolDirectories(config)
+  if (!Array.isArray(argv) || !argv.length || argv.some(arg => typeof arg !== 'string' || arg.includes('\0'))) throw Error('native_tool_command_invalid')
+  const bundled = join(dirname(dirname(realpathSync(config.binary))), 'codex-resources', 'bwrap')
+  const bwrap = [bundled, '/usr/bin/bwrap', '/bin/bwrap'].find(candidate => {
+    try { const stat = lstatSync(candidate); return stat.isFile() && (stat.mode & 0o022) === 0 && (stat.mode & 0o111) !== 0 }
+    catch { return false }
+  })
+  if (!bwrap) throw Error('native_tool_isolation_unavailable')
+  const args = ['--unshare-user', '--unshare-pid', '--new-session', '--die-with-parent', '--as-pid-1',
+    '--bind', '/', '/', '--proc', '/proc', '--dev', '/dev', '--cap-drop', 'ALL']
+  if (hideProjectConfig) {
+    const empty = join(config.control, 'repository-config-disabled')
+    mkdirSync(empty, { recursive: true, mode: 0o700 })
+    const masked = new Set()
+    for (const root of [config.worktree, config.temp, ...(config.readRoots ?? [])]) {
+      let directory = absolute(root)
+      while (true) {
+        const local = join(directory, '.codex')
+        if (!masked.has(local) && existsSync(local)) {
+          // Never traverse a repository-controlled config symlink while
+          // constructing a trusted controller's mount layout.
+          const stat = lstatSync(local)
+          if (!stat.isDirectory() || stat.isSymbolicLink()) throw Error('native_tool_project_config_unsafe')
+          args.push('--ro-bind', empty, local); masked.add(local)
+        }
+        const parent = dirname(directory)
+        if (parent === directory) break
+        directory = parent
+      }
+    }
+  }
+  return [bwrap, ...args, '--', ...argv]
+}
+
 /** Actual command execution. No model/API/authorization round trip. The child
  * has only stdio; the official sandbox owns its mount, PID and syscall boundary. */
-export async function runNativeToolCommand(config, command, { signal, timeoutMs = 120000, maxOutputBytes = 2 * 1024 * 1024, inherited = process.env } = {}) {
+export async function runNativeToolCommand(config, command, { signal, timeoutMs = 120000, maxOutputBytes = 2 * 1024 * 1024, inherited = process.env, onStdout } = {}) {
   signal?.throwIfAborted()
   if (typeof command !== 'string' || !command.trim() || command.includes('\0') || command.length > 65536 ||
     !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 1800000) throw Error('native_tool_command_invalid')
@@ -133,10 +178,10 @@ export async function runNativeToolCommand(config, command, { signal, timeoutMs 
   const args = ['sandbox', '--permission-profile', NATIVE_TOOL_PROFILE, ...nativeToolConfigArgs(config, inherited), '--',
     '/bin/sh', '-c', 'unset CODEX_HOME; cd -- "$1" && exec /bin/sh -c "$2"', 'mikka-isolated-tool', config.worktree, command]
   const env = { ...nativeToolEnvironment(config, inherited), CODEX_HOME: config.control }
-  // Keep the controller in the CLI's owned process group. A run stop also
-  // kills this helper; the official PID namespace/die-with-parent contract
-  // reaps its tools, including children that created another process group.
-  const child = spawn(config.binary, args, { cwd: config.temp, env, detached: false, stdio: ['ignore', 'pipe', 'pipe'] })
+  // Keep the outer bwrap in the CLI's owned process group. Its PID-1 child
+  // owns all nested namespaces, so Stop cannot leave a detached tool alive.
+  const [binary, ...isolatedArgs] = nativeControllerCommand(config, [config.binary, ...args], { hideProjectConfig: true })
+  const child = spawn(binary, isolatedArgs, { cwd: config.temp, env, detached: false, stdio: ['ignore', 'pipe', 'pipe'] })
   let stdout = '', stderr = '', bytes = 0, timedOut = false, overflow = false
   const stop = () => {
     try { child.kill('SIGKILL') } catch { /* Already exited. */ }
@@ -144,7 +189,8 @@ export async function runNativeToolCommand(config, command, { signal, timeoutMs 
   const collect = name => data => {
     bytes += data.length
     if (bytes > maxOutputBytes) { overflow = true; stop(); return }
-    if (name === 'stdout') stdout += data.toString('utf8'); else stderr += data.toString('utf8')
+    if (name === 'stdout') { const chunk = data.toString('utf8'); stdout += chunk; onStdout?.(chunk) }
+    else stderr += data.toString('utf8')
   }
   child.stdout.on('data', collect('stdout')); child.stderr.on('data', collect('stderr'))
   const timer = setTimeout(() => { timedOut = true; stop() }, timeoutMs)

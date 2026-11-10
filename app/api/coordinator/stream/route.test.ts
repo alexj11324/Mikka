@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { createHash } from 'node:crypto'
 import { drizzle } from 'drizzle-orm/pg-proxy'
+import { ActionFailureError } from '@/lib/action-error'
 import { fingerprint, type SecretFingerprint } from '@/lib/credentials/fingerprint'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
 
@@ -19,15 +20,19 @@ const queries: { sql: string; params: unknown[] }[] = []
 const botRows = [{ id: botId, ownerId: 'owner', workspaceId }, { id: peerBotId, ownerId: 'peer', workspaceId }]
 const db = drizzle(async (sql, params) => {
   queries.push({ sql, params })
-  if (sql.includes('from "bots"')) {
-    // Use Drizzle's real SQL builder so an omitted owner predicate fails this test.
-    assert.match(sql, /where \("bots"\."id" = \$1 and "bots"\."ownerId" = \$2\)/)
-    return { rows: botRows.filter(bot => bot.id === params[0] && bot.ownerId === params[1]).map(bot => [bot.workspaceId]) }
-  }
   assert.match(sql, /from "coordinator_sessions"/)
   assert.match(sql, /where \("coordinator_sessions"\."userId" = \$1 and "coordinator_sessions"\."botId" = \$2\)/)
   return { rows: chats.filter(chat => chat.userId === params[0] && chat.botId === params[1]).map(chat => [chat.leaseHolder, chat.leaseUntil?.toISOString() ?? null]) }
 })
+let sharedPermission = false
+let sourceVisible = true
+const resolveChat = mock.fn(async (user: { id: string }, chosen?: string | null) => {
+  const id = chosen ?? coordinatorOf[user.id]
+  const bot = botRows.find(row => row.id === id) ?? Object.entries(coordinatorOf).map(([ownerId, id]) => ({ id, ownerId, workspaceId })).find(row => row.id === id)
+  if (!bot || (bot.ownerId !== user.id && !sharedPermission) || session?.tokenWorkspaceId && session.tokenWorkspaceId !== bot.workspaceId) throw new ActionFailureError('botNotFound')
+  return { ...bot, viewerId: user.id, reader: user }
+})
+const executionVisible = mock.fn(async () => sourceVisible)
 const getSession = mock.fn(async (_options: unknown) => session)
 const loadFingerprints = mock.fn(async (_userId: string) => fingerprints)
 const start = (id = 'turn:0'): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-turn-start', id, quietEligible: false })
@@ -44,7 +49,7 @@ const logInfo = mock.method(console, 'info', () => {})
 let GET: typeof import('./route')['GET']
 before(async () => {
   mock.module(new URL('../../../../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession } } } })
-  mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { db } })
+  mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { db, pool: {} } })
   mock.module(new URL('../../../../lib/credentials/chat-guard.ts', import.meta.url).href, { namedExports: { credentialChatFingerprints: loadFingerprints } })
   mock.module(new URL('../../../../lib/request-log.ts', import.meta.url).href, { namedExports: {
     noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler,
@@ -54,6 +59,8 @@ before(async () => {
     chatBotId: async (owner: string, chosen: string | null | undefined) => chosen ?? coordinatorOf[owner],
     openChatBotId: async (user: { id: string }, chosen: string | null | undefined) => chosen ?? coordinatorOf[user.id],
   } })
+  mock.module(new URL('../../../../lib/resource-access/request-chat.ts', import.meta.url).href, { namedExports: { requestBotChat: resolveChat } })
+  mock.module(new URL('../../../../lib/collaboration/bot-chat-provenance.ts', import.meta.url).href, { namedExports: { botChatExecutionVisible: executionVisible } })
   GET = (await import('./route')).GET
 })
 beforeEach(() => {
@@ -65,7 +72,8 @@ beforeEach(() => {
     { userId: 'peer', botId: peerBotId, leaseHolder: 'wrun_peer_bot', leaseUntil },
     { userId: 'owner', botId: coordinatorOf.owner, leaseHolder: 'wrun_owner', leaseUntil },
   ]
-  fingerprints = []; queries.length = 0
+  fingerprints = []; queries.length = 0; sharedPermission = false; sourceVisible = true
+  resolveChat.mock.resetCalls(); executionVisible.mock.resetCalls()
   getSession.mock.resetCalls(); loadFingerprints.mock.resetCalls(); getRun.mock.resetCalls(); readStream.mock.resetCalls()
   logInfo.mock.resetCalls()
   source = () => partsStream([start(), delta('visible reply'), committed()])
@@ -167,9 +175,9 @@ test('a peer cannot use a known owner run ID and sees only their own Coordinator
   await response.text()
 })
 
-test('a bot stream requires ownership and selects that bot rather than the Coordinator', async () => {
+test('a private bot stream requires explicit access and selects that bot rather than the Coordinator', async () => {
   assert.equal((await call({ botId: peerBotId, runId: 'wrun_peer_bot' })).status, 404)
-  assert.equal(queries.length, 1); noStream()
+  assert.equal(queries.length, 0); noStream()
   const response = await call({ botId, runId: 'wrun_owner_bot' })
   assert.equal(response.status, 200)
   assert.deepEqual(getRun.mock.calls[0].arguments, ['wrun_owner_bot'])
@@ -180,7 +188,7 @@ test('a bot stream requires ownership and selects that bot rather than the Coord
 test('workspace-scoped API sessions cannot stream an owned bot outside their workspace', async () => {
   session!.tokenWorkspaceId = '10000000-0000-4000-8000-000000000099'
   assert.equal((await call({ botId })).status, 404)
-  assert.equal(queries.length, 1); noStream()
+  assert.equal(queries.length, 0); noStream()
   session!.tokenWorkspaceId = workspaceId
   const response = await call({ botId })
   assert.equal(response.status, 200)
@@ -264,4 +272,36 @@ test('a version 2 cursor replays after stopped-text projection boundaries change
   const response = await call({ after: '2' }, { 'x-mikka-stream-key': oldKey })
   assert.equal(response.headers.get('x-mikka-stream-reset'), '1')
   assert.deepEqual((await events(response)).map(event => event.type), ['start', 'text', 'committed'])
+})
+
+
+test('an authorized shared viewer reads only a proven clean execution, with the structural Owner masking policy', async () => {
+  session!.user.id = 'peer'
+  sharedPermission = true
+  const response = await call({ botId, runId: 'wrun_owner_bot' })
+  assert.equal(response.status, 200)
+  assert.deepEqual(loadFingerprints.mock.calls[0].arguments, ['owner'])
+  assert.equal((await events(response)).filter(event => event.type === 'text').map(event => event.delta).join(''), 'visible reply')
+  assert.ok(executionVisible.mock.callCount() > 1, 'provenance is checked before opening and before emitting')
+  sourceVisible = false
+  getRun.mock.resetCalls(); loadFingerprints.mock.resetCalls()
+  assert.equal((await call({ botId, runId: 'wrun_owner_bot' })).status, 404)
+  noStream()
+})
+
+for (const revoked of ['permission', 'session', 'source'] as const) test(`a live stream stops before the next bytes after ${revoked} revocation`, async () => {
+  session!.user.id = 'peer'; sharedPermission = true
+  let upstream!: ReadableStreamDefaultController<CoordinatorWorkflowStreamPart>
+  source = () => new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { upstream = controller; controller.enqueue(start()) } })
+  const response = await call({ botId })
+  const reader = response.body!.getReader()
+  assert.match(new TextDecoder().decode((await reader.read()).value), /"type":"start"/)
+  if (revoked === 'permission') sharedPermission = false
+  else if (revoked === 'session') session = null
+  else sourceVisible = false
+  upstream.enqueue(delta('revoked-private-bytes')); upstream.close()
+  let rest = ''
+  for (;;) { const next = await reader.read(); if (next.done) break; rest += new TextDecoder().decode(next.value) }
+  assert.doesNotMatch(rest, /revoked-private-bytes/)
+  assert.match(rest, /"type":"error"/)
 })

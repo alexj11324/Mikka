@@ -1208,6 +1208,8 @@ export const userPreferences = pgTable('user_preferences', {
   memoryEnabled: boolean('memoryEnabled').notNull().default(true),
   /** The chat composer's send key: Enter (Shift+Enter breaks the line) or ⌘/Ctrl+Enter (Enter breaks the line). */
   sendKey: text('sendKey').$type<SendKey>().notNull().default('enter'),
+  /** New collaboration resources start private when this personal preference is enabled. */
+  privateByDefault: boolean('privateByDefault').notNull().default(false),
   /** The person's own instructions for the Coordinator and their Bots, at most 2000 characters. */
   personalInstructions: text('personalInstructions').notNull().default(''),
   /** 每日建议: the 08:00 briefing. Needs memoryEnabled. */

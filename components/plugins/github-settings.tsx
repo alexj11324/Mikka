@@ -85,9 +85,13 @@ export function GitHubSettings() {
   return <ViewerGitHubSettings key={userId ?? 'unconfirmed'} userId={userId} email={session?.user.email ?? ''} isPending={isPending} />
 }
 
-function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | undefined; email: string; isPending: boolean }) {
+/**
+ * GitHub's page as data and actions: the connection and its link (in the browser, from the desktop's loopback, or
+ * through the browser signed in as another account), disconnecting, and repository access. Shared by the page below
+ * and UI layers (docs/ui-overlay.md); key it by the viewer, as GitHubSettings does.
+ */
+export function useGitHubPlugin({ userId, email, isPending }: { userId: string | undefined; email: string; isPending: boolean }) {
   const t = useTranslations('Settings.integrations')
-  const common = useTranslations('Common')
   // Cached across visits: a revisit shows the last state at once and re-checks it behind.
   // Every mount asks GitHub again, exactly once. Focus never does: what is shown
   // stays until the person's own action or a finished hand-off reads again.
@@ -226,6 +230,21 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
   const writes = ABILITIES.write.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
   const reads = ABILITIES.read.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
 
+  return {
+    userId, email, githubState, githubLoading, githubLinking, linking, browserAccount, browserIntent, browserView, connected, canLink, status, login, errors, writes, reads,
+    linkGitHub, disconnectGitHub, switchAccount, checkOnReturn,
+    confirming, setConfirming, browsing, setBrowsing, clearLinkError: () => setGithubLinkError(''),
+    /** Where 继续关联 goes in the browser, once it is signed in as the app's account. */
+    continueHref: browserIntent ? `${CONNECT_PATH}?intent=${encodeURIComponent(browserIntent.token)}` : null,
+  }
+}
+
+/** GitHub's page as the open-source UI draws it. */
+function ViewerGitHubSettings(viewer: { userId: string | undefined; email: string; isPending: boolean }) {
+  const t = useTranslations('Settings.integrations')
+  const common = useTranslations('Common')
+  const { userId, email, githubState, githubLoading, githubLinking, linking, browserAccount, browserIntent, browserView, connected, canLink, status, login, errors, writes, reads,
+    linkGitHub, disconnectGitHub, switchAccount, checkOnReturn, confirming, setConfirming, browsing, setBrowsing, clearLinkError } = useGitHubPlugin(viewer)
   return <div className="flex flex-col gap-8">
     <header className="flex flex-wrap items-center gap-4">
       <AppTile app="github" size="xl" />
@@ -268,7 +287,7 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{login}</span>
         {githubState.source === 'cloud'
           ? <Button variant="secondary" size="sm" nativeButton={false} render={<a href={withBasePath(settingsHref('account'))} />}>{t('githubManageCloud')}</Button>
-          : <Button type="button" variant="secondary" size="sm" disabled={githubLinking} onClick={() => { setGithubLinkError(''); setConfirming(true) }}>{t('githubDisconnect')}</Button>}
+          : <Button type="button" variant="secondary" size="sm" disabled={githubLinking} onClick={() => { clearLinkError(); setConfirming(true) }}>{t('githubDisconnect')}</Button>}
       </div>
     </SettingsSection></PageSection>}
 
@@ -308,7 +327,7 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
 }
 
 /** 已授权的仓库: search, open GitHub or configure the owner's verification command. */
-function RepositoriesDialog({ open, onOpenChange, repositories, userId }: { open: boolean; onOpenChange: (open: boolean) => void; repositories: GitHubRepository[]; userId: string }) {
+export function RepositoriesDialog({ open, onOpenChange, repositories, userId }: { open: boolean; onOpenChange: (open: boolean) => void; repositories: GitHubRepository[]; userId: string }) {
   const t = useTranslations('Settings.integrations')
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<GitHubRepository | null>(null)
@@ -346,9 +365,9 @@ async function fetchVerification([, userId, repository]: readonly [string, strin
   return verificationResult(userId, repository, await response.json())
 }
 
-function RepositoryVerificationForm({ repository, userId, onBack }: { repository: string; userId: string; onBack: () => void }) {
+/** One repository's verification command: read, edit and save (the owner's only). Shared with UI layers. */
+export function useRepositoryVerification({ repository, userId, onSaved }: { repository: string; userId: string; onSaved: () => void }) {
   const t = useTranslations('Settings.integrations')
-  const common = useTranslations('Common')
   const { data, error, mutate } = useSWR([VERIFICATION_PATH, userId, repository] as const, fetchVerification, { revalidateOnFocus: false, shouldRetryOnError: false })
   const [command, setCommand] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -368,15 +387,25 @@ function RepositoryVerificationForm({ repository, userId, onBack }: { repository
       await mutate(verificationResult(userId, repository, await response.json()), { revalidate: false })
       if (active.current) {
         toast.success(t('githubVerificationSaved'))
-        onBack()
+        onSaved()
       }
     } catch { setSaveError(true) } finally { setSaving(false) }
   }
+  return {
+    data, error, retry: () => { void mutate() }, saving, saveError, save,
+    value: command ?? data?.verifyCommand ?? '', setValue: (next: string) => { setCommand(next); setSaveError(false) },
+  }
+}
+
+function RepositoryVerificationForm({ repository, userId, onBack }: { repository: string; userId: string; onBack: () => void }) {
+  const t = useTranslations('Settings.integrations')
+  const common = useTranslations('Common')
+  const { data, error, retry, saving, saveError, save, value, setValue } = useRepositoryVerification({ repository, userId, onSaved: onBack })
 
   return <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); void save() }}>
-    {error ? <InlineLoadError message={t('githubVerificationLoadFailed')} retryLabel={common('retry')} onRetry={() => { void mutate() }} /> : <FieldGroup><Field>
+    {error ? <InlineLoadError message={t('githubVerificationLoadFailed')} retryLabel={common('retry')} onRetry={retry} /> : <FieldGroup><Field>
       <FieldLabel htmlFor="github-verification-command">{t('githubVerification')}</FieldLabel>
-      <Input id="github-verification-command" className="font-mono" value={command ?? data?.verifyCommand ?? ''} placeholder={t('githubNotConfigured')} maxLength={2000} disabled={!data || saving} autoComplete="off" spellCheck={false} aria-invalid={saveError} aria-describedby={saveError ? 'github-verification-error' : undefined} onChange={event => { setCommand(event.target.value); setSaveError(false) }} />
+      <Input id="github-verification-command" className="font-mono" value={value} placeholder={t('githubNotConfigured')} maxLength={2000} disabled={!data || saving} autoComplete="off" spellCheck={false} aria-invalid={saveError} aria-describedby={saveError ? 'github-verification-error' : undefined} onChange={event => setValue(event.target.value)} />
       {!data && <span role="status" className="sr-only">{common('loading')}</span>}
     </Field></FieldGroup>}
     {saveError && <FieldError id="github-verification-error">{t('githubVerificationSaveUnconfirmed')}</FieldError>}

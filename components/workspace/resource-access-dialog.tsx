@@ -11,7 +11,7 @@ import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Field, FieldError, FieldLabel } from '@/components/ui/field'
+import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Spinner } from '@/components/ui/spinner'
@@ -80,11 +80,12 @@ function ResourceAccessForm({reference,access,saved}:{reference:ResourceReferenc
     }catch{setError(t('saveFailed'))}finally{setPending(false)}
   }
   return <form className="flex flex-col gap-4" onSubmit={event=>{event.preventDefault();void save()}}>
+    <FieldGroup>
     <Field><FieldLabel htmlFor={`${formId}-visibility`}>{t('visibility')}</FieldLabel><NativeSelect id={`${formId}-visibility`} value={visibility} disabled={pending} onChange={event=>{setVisibility(event.target.value as 'shared'|'private');setConfirmed(false)}}>
       <NativeSelectOption value="shared">{t('shared')}</NativeSelectOption><NativeSelectOption value="private">{t('private')}</NativeSelectOption>
     </NativeSelect><p className="text-xs text-muted-foreground">{t(visibility==='shared'?'sharedDescription':'privateDescription')}</p></Field>
     <p className="text-xs text-muted-foreground">{t('parentBoundary')}</p>
-    <fieldset disabled={pending} className="flex min-w-0 flex-col gap-3"><legend className="mb-2 text-sm font-medium">{t('members')}</legend>
+    <FieldSet disabled={pending} className="min-w-0 gap-3"><FieldLegend variant="label">{t('members')}</FieldLegend>
       {grants.length===0&&<p className="text-xs text-muted-foreground">{t('noGrants')}</p>}
       {grants.map(grant=>{
         const person=access.members.find(candidate=>candidate.id===grant.subjectId)
@@ -96,8 +97,9 @@ function ResourceAccessForm({reference,access,saved}:{reference:ResourceReferenc
         </div>
       })}
       {remaining.length>0&&<div className="flex items-end gap-2"><Field className="min-w-0 flex-1"><FieldLabel htmlFor={`${formId}-member`}>{t('addMember')}</FieldLabel><NativeSelect id={`${formId}-member`} value={member} onChange={event=>setMember(event.target.value)}><NativeSelectOption value="">{t('chooseMember')}</NativeSelectOption>{remaining.map(person=><NativeSelectOption key={person.id} value={person.id}>{person.name||t('unavailableMember')}</NativeSelectOption>)}</NativeSelect></Field><Button type="button" variant="outline" disabled={!member} onClick={()=>{setGrants(current=>[...current,{subjectId:member,capabilities:levels.reader,expiresAt:null}]);setMember('');setConfirmed(false)}}>{t('add')}</Button></div>}
-    </fieldset>
+    </FieldSet>
     {expansion&&<Field orientation="horizontal"><Checkbox id={`${formId}-confirm`} checked={confirmed} disabled={pending} onCheckedChange={value=>setConfirmed(value===true)} /><FieldLabel htmlFor={`${formId}-confirm`}>{t('confirmExpansion')}</FieldLabel></Field>}
+    </FieldGroup>
     {error&&<FieldError>{error}</FieldError>}{success&&<p role="status" className="text-sm">{t('saved')}</p>}
     <Button type="submit" disabled={pending||!changed||expansion&&!confirmed}>{pending&&<Spinner />}{t('save')}</Button>
   </form>

@@ -127,17 +127,23 @@ export class AgentKitStore {
       return target
     })
   }
-  async beginExecution(scope: AgentScope, executionKey: string, hostInstructions: string, runtime: DefinitionSnapshot['runtime'] | ((definition: AgentDefinition) => Promise<DefinitionSnapshot['runtime']>), defaults: AgentDefinition, plugins?: (client: PoolClient) => Promise<import('@/lib/plugins/contracts').PersonalPluginSnapshot>): Promise<AgentExecution> {
+  async beginExecution(scope: AgentScope, executionKey: string, hostInstructions: string, runtime: DefinitionSnapshot['runtime'] | ((definition: AgentDefinition) => Promise<DefinitionSnapshot['runtime']>), defaults: AgentDefinition, plugins?: (client: PoolClient) => Promise<import('@/lib/plugins/contracts').PersonalPluginSnapshot>, projection?: { contextIsolation: 'shared_clean'; definition: AgentDefinition }): Promise<AgentExecution> {
     z.string().min(1).max(240).parse(executionKey)
     return this.transaction(async client => {
       const current = await this.head(client,scope,defaults)
       const existing = await client.query<AgentExecution>('select id,snapshot,status from agent_kit_executions where owner_id=$1 and bot_key=$2 and execution_key=$3',[...params(scope),executionKey])
-      if (existing.rows[0]) return existing.rows[0]
+      if (existing.rows[0]) {
+        if (projection && (existing.rows[0].snapshot.contextIsolation !== projection.contextIsolation
+          || typeof runtime !== 'function' && canonicalJSON(existing.rows[0].snapshot.runtime) !== canonicalJSON(runtime)))
+          throw new AgentKitError('agentRequestConflict')
+        return existing.rows[0]
+      }
       const resolvedRuntime = typeof runtime === 'function' ? await runtime(current.definition) : runtime
-      const id = randomUUID(); const snapshot = makeSnapshot(current.id,current.version,current.definition,hostInstructions,resolvedRuntime)
+      const id = randomUUID(); const snapshot = makeSnapshot(current.id,current.version,projection?.definition ?? current.definition,hostInstructions,resolvedRuntime)
       // Computed per new execution; the stored version and its digest stay as saved.
-      snapshot.effectiveTools = platformEffectiveTools(await this.toolSource(client,scope,current),defaults.tools)
-      if (plugins) {
+      snapshot.effectiveTools = projection ? [...projection.definition.tools] : platformEffectiveTools(await this.toolSource(client,scope,current),defaults.tools)
+      if (projection) snapshot.contextIsolation = projection.contextIsolation
+      if (plugins && !projection) {
         snapshot.personalPlugins = await plugins(client)
         // Personal installations are an independent, explicit owner grant; never
         // rewrite the saved Bot definition or an existing execution on replay.

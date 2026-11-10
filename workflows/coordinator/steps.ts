@@ -210,7 +210,8 @@ export async function hostedStartupSettings(userId: string): Promise<import('@/l
  */
 export async function prepareTurn(userId: string, botId: string, holder: string, input: { snapshot?: DefinitionSnapshot; executionId?: string; mailboxEnabled: boolean; runtime: { modelSelection?: unknown } | null }) {
   'use step'
-  const mailboxTools = input.mailboxEnabled ? await mailboxCatalogue(userId, botId, input.executionId) : []
+  const shared = input.snapshot?.contextIsolation === 'shared_clean'
+  const mailboxTools = input.mailboxEnabled && !shared ? await mailboxCatalogue(userId, botId, input.executionId) : []
   if (input.runtime) await noteQuotaSwitch(userId, holder, input.runtime, botId, true)
   return { mailboxTools, ...await preparePromptDetails(userId, botId, input.snapshot, mailboxTools, { hosted: true, readOnly: input.runtime === null, effectiveTools: input.snapshot?.effectiveTools }) }
 }
@@ -304,6 +305,23 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
 
 /** Context timings stay beside the prompt, never in its instructions or model options. */
 async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope) {
+  if (snapshot?.contextIsolation === 'shared_clean') {
+    const selection = snapshot.runtime.modelSelection
+    if (selection?.type !== 'api_key' || !selection.collaborationEventId) throw new FatalError('sharedBotAuthorityRequired')
+    const { liveBotChatAuthority, botChatActorReader } = await import('@/lib/collaboration/bot-chat')
+    const authority = await liveBotChatAuthority(pool, selection.collaborationEventId, { ownerId: userId, botId })
+    const conversation = await store.loadSharedConversationForPrompt(userId, botId, selection.collaborationEventId)
+    const { chatFileContent } = await import('@/lib/chat-attachments/store')
+    const messages = await Promise.all(conversation.messages.map(async row => row.message.role === 'user' && typeof row.message.content === 'string'
+      ? { ...row, message: { ...row.message, content: await chatFileContent(botChatActorReader(authority), { kind: 'bot', id: botId }, row.message.content) } }
+      : row))
+    const base = withCoordinatorPresentation(executionInstructions(snapshot))
+    const context = 'This is a collaborative Bot conversation. Every visible member can read the reply and tool results. Use only the explicitly provided shared read tools. The organization connection and hard reply budget are frozen for this turn. Personal instructions, memory, subscriptions, devices and private app data are unavailable. Do not claim to have executed or changed resources that the available tools cannot access.'
+    const prompt = promptWithCachedContext(base, context, '', '')
+    return { prompt: { ...prompt, messages: promptMessages(null, messages) }, contextMs: { execution: 0, personal: 0, github: 0 } }
+  }
+  if (!await (await import('@/lib/collaboration/bot-chat')).botChatOwnerExclusive(pool, userId, botId))
+    throw new FatalError('sharedBotAuthorityRequired')
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
@@ -493,7 +511,8 @@ accountWrite.maxRetries = 0
 
 export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
-  await assertNativeToolScope(userId,scope)
+  await assertNativeToolScope(userId,scope,'list_issues')
+  if (scope?.sharedChat) return (await import('@/lib/collaboration/bot-chat-read-tools')).listSharedBotIssues(userId, scope.sharedChat, input)
   if (!botId) throw new ActionFailureError('workspaceAccessDenied')
   const workspace = await coordinatorTaskWorkspace(userId, botId)
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
@@ -507,7 +526,8 @@ export async function listIssues(userId: string, input: { status?: string }, sco
 
 export async function getIssue(userId: string, input: { issueId: string }, scope: NativeToolScope | undefined, botId: string) {
   'use step'
-  await assertNativeToolScope(userId,scope)
+  await assertNativeToolScope(userId,scope,'get_issue')
+  if (scope?.sharedChat) return (await import('@/lib/collaboration/bot-chat-read-tools')).getSharedBotIssue(userId, scope.sharedChat, input.issueId)
   const workspace = await coordinatorTaskWorkspace(userId, botId)
   return actAs({ id: userId, [tokenWorkspace]: workspace.id }, async () => {
   const issue = await issueForUser(userId, input.issueId)
@@ -1019,7 +1039,8 @@ export async function bindComputerSubscription(userId: string, input: { botId: s
 
 export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope, botId?: string) {
   'use step'
-  await assertNativeToolScope(userId,scope)
+  await assertNativeToolScope(userId,scope,'list_runs')
+  if (scope?.sharedChat) return (await import('@/lib/collaboration/bot-chat-read-tools')).listSharedBotRuns(userId, scope.sharedChat, input)
   if (!botId) throw new ActionFailureError('workspaceAccessDenied')
   const workspace = await coordinatorTaskWorkspace(userId, botId)
   const rows = await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => visibleRuns(userId, input))
@@ -1028,7 +1049,8 @@ export async function listRuns(userId: string, input: { issueId?: string; active
 
 export async function getRun(userId: string, input: { runId: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
-  await assertNativeToolScope(userId,scope)
+  await assertNativeToolScope(userId,scope,'get_run')
+  if (scope?.sharedChat) return (await import('@/lib/collaboration/bot-chat-read-tools')).getSharedBotRun(userId, scope.sharedChat, input.runId)
   if (!botId) throw new ActionFailureError('workspaceAccessDenied')
   const workspace = await coordinatorTaskWorkspace(userId, botId)
   const detail = await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => readRun(userId, input.runId))
@@ -1074,8 +1096,10 @@ export async function stopRun(userId: string, input: { runId: string }, scope?: 
 export async function webSearchStep(userId: string, input: { query: string; limit?: number }, scope?: NativeToolScope, callId?: string) {
   'use step'
   return withCoordinatorWebSearchTiming(async () => {
-    await assertNativeToolScope(userId,scope)
-    return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+    await assertNativeToolScope(userId,scope,'web_search')
+    const shared = scope?.sharedChat ? await (await import('@/lib/collaboration/bot-chat')).sharedBotToolContext(userId, scope.sharedChat) : null
+    return webSearch(input.query, { userId: shared?.authority.actorId ?? userId, ...(shared ? { workspaceId: shared.workspaceId } : {}), caller: 'coordinator' },
+      { limit: input.limit, ...(shared ? { signal: AbortSignal.timeout(Math.max(1, new Date(shared.authority.expiresAt).getTime() - Date.now())) } : {}) })
   }, callId)
 }
 

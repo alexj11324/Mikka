@@ -35,7 +35,7 @@ export async function retainDeletedResourceAudit(client, lease, resource, fail) 
       d."ownerId"=$2 AND d."createdAt">=r.created_at AND (d."deviceId" IS NULL OR NOT EXISTS(
         SELECT 1 FROM devices v WHERE v.id=d."deviceId" AND v."removedAt" IS NULL)) AS eligible
       FROM run_resource_disclosures d CROSS JOIN mikka_test_accounts.resources r
-      WHERE d."runId"=$1::uuid AND r.lease_id=$3 AND r.type='agent_runs' AND r.id=$1`, [resource.id,resource.owner_id,lease.id])
+      WHERE d."runId"=$1::uuid AND r.lease_id=$3 AND r.type='agent_runs' AND r.id=$1::text`, [resource.id,resource.owner_id,lease.id])
     if (rows.some(row => !row.eligible)) fail('RESOURCE_AUDIT_UNPROVEN')
     for (const row of rows) await receipt(client,lease,resource,'run_resource_disclosures',row.id,row.data,row.workspaceId)
   }

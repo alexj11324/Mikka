@@ -12,6 +12,13 @@ export const organizationModelPolicySchema = z.object({
   models: z.record(z.string().min(1).max(128), modelRule).refine(rules => Object.keys(rules).length <= 200),
   /** An exhausted connection can use another connection of the SAME payer and model only after explicit opt-in. */
   paidFallback: z.enum(['deny', 'same_payer']),
+  /** Explicit organization-funded collaborative replies. Unknown external
+   * dollars stay unknown; these are hard capacity limits, not a price quote. */
+  sharedChat: z.object({
+    maxModelCallsPerTurn: z.number().int().min(1).max(64),
+    maxRepliesPerDay: z.number().int().min(1).max(10000),
+    maxOutputTokens: z.number().int().min(64).max(16384),
+  }).strict().optional(),
 }).strict()
 export type OrganizationModelPolicy = z.infer<typeof organizationModelPolicySchema>
 export const DEFAULT_ORGANIZATION_MODEL_POLICY: OrganizationModelPolicy = {

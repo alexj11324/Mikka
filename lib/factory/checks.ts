@@ -332,8 +332,8 @@ export async function configureFactoryCheck(
         JOIN artifact_versions av ON av."artifactId"=ar.id AND av.version=ar."latestVersion"
         WHERE fa."taskId"=c."taskId" AND fa."candidateId"=c.id) AS "acceptanceArtifact",
        r."agentId",r."questionContinuation",r."agentDefinition" AS "runDefinition",
-       (SELECT authorization."sourceRunId" FROM thread_execution_authorizations authorization
-         WHERE authorization.id::text=r."agentDefinition"->'executionIdentity'->>'collaborationAuthorizationId' AND authorization."runId"=r.id) AS "collaborationSourceRunId",
+       (SELECT receipt."sourceRunId" FROM thread_execution_authorizations receipt
+         WHERE receipt.id::text=r."agentDefinition"->'executionIdentity'->>'collaborationAuthorizationId' AND receipt."runId"=r.id) AS "collaborationSourceRunId",
        r."agentDefinition"->'policyCeiling' AS "policyCeiling",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId"
      FROM factory_candidates c JOIN agent_runs r ON r.id=$3
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4

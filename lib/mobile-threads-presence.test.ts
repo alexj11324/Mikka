@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test, { after, before, beforeEach, mock } from 'node:test'
 import { drizzle } from 'drizzle-orm/pg-proxy'
+import { resourceAccessPredicate } from './resource-access/predicate'
+import { agentRuns } from './db/schema'
 import { homeScopeProof } from './live/home-scope-proof'
 import { readDevicePresenceGrant } from './device-presence-grant'
 import { liveChannelId } from './live/scope'
@@ -34,6 +36,15 @@ before(async () => {
   })
   mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db, pool: { query: () => assert.fail('no extra app query') } } })
   mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: { query: () => assert.fail('the split workspace DB must not be read') } } })
+  // This fixture measures presentation/presence after admission. Actual tenant
+  // and ACL revocation are covered by the required PostgreSQL suites.
+  mock.module(new URL('./task-workspace.ts', import.meta.url).href, { namedExports: { taskReaderScope: (reader: string) => {
+    assert.equal(reader, 'owner'); return { userId: reader }
+  } } })
+  mock.module(new URL('./resource-access/thread.ts', import.meta.url).href, { namedExports: { threadReadAccess: async (reader: string) => {
+    assert.equal(reader, 'owner')
+    return resourceAccessPredicate(reader, agentRuns.workspaceId, 'thread', agentRuns.id)
+  } } })
   mock.module(new URL('./coordinator/store.ts', import.meta.url).href, { namedExports: { citationSources: () => assert.fail('no runs need citation reads') } })
   mock.module(new URL('./chat-preferences.ts', import.meta.url).href, { namedExports: { pinnedByDefault: () => assert.fail('threads do not read chat preferences') } })
   read = (await import('./mobile-threads')).mobileThreads

@@ -51,6 +51,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const { recordPushGrant } = await import('./support/github-app-stub')
   const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
   const { previewPersonalScope, changeIssueScopeLocally } = await import('../lib/issue-scope-store')
+  const { changeResourceAccess } = await import('../lib/resource-access/store')
   const fixtures: Fixture[] = []
 
   async function transaction<T>(work: (tx: PoolClient) => Promise<T>) {
@@ -73,7 +74,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   }
   // By default the fixture keeps the installation row an earlier build recorded
   // (lock-order evidence only; admission no longer reads it). `approved: false` leaves none.
-  async function fixture(options: { permission?: 'allow' | 'ask' | 'deny'; destination?: unknown | 'selected'; delivered?: boolean; approved?: boolean } = {}): Promise<Fixture> {
+  async function fixture(options: { permission?: 'allow' | 'ask' | 'deny'; destination?: unknown | 'selected'; delivered?: boolean; approved?: boolean; visibility?: 'private' | 'shared' } = {}): Promise<Fixture> {
     const id = randomUUID(), userId = `factory-admission-${id}`
     const remoteUrl = `https://github.com/mikka-ci/admission-${id}.git`
     const identity = { userId, issueId: randomUUID(), deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(), remoteUrl, remoteKey: remoteKey(remoteUrl) }
@@ -84,6 +85,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
     const { workspaceId } = await seedAllowedModel(pool, userId, { deviceIds: [identity.deviceId] })
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,null)', [identity.repoId, identity.deviceId, userId, identity.remoteKey, remoteUrl])
     await pool.query('INSERT INTO issues (id,"userId","workspaceId","ownershipState",title,content,status,priority,scope,"linearSyncPolicy","linearSyncBlocked") VALUES ($1,$2,$4,\'bound\',\'Synthetic admission task\',$3,\'todo\',\'normal\',\'workspace\',\'disabled\',true)', [identity.issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } }, content: [] }), workspaceId])
+    // These tests exercise the owner's personal local computer and native
+    // subscription. A Workspace task must explicitly remain Private to use
+    // that context; Shared local denial is covered separately below.
+    if (options.visibility !== 'shared') await changeResourceAccess(userId,
+      { kind: 'task', id: identity.issueId, workspaceId }, { visibility: 'private', expectedRevision: 1, grants: [] })
     const eventId = await addEvent(identity, { destination: options.destination === 'selected' ? { kind: 'device', deviceId: identity.deviceId } : options.destination, delivered: options.delivered })
     const routed = await factoryStore.route(userId, { issueId: identity.issueId, eventId: randomUUID(), sourceEventId: eventId, rationale: 'Synthetic requested implementation' })
     const f = { ...identity, workspaceId, eventId, task: routed.task }
@@ -132,6 +138,16 @@ test('real Factory admission preserves host scope, policy and transaction owners
 
   try {
     assert.equal(String((await pool.query('SHOW server_version_num')).rows[0].server_version_num).slice(0, 2), '17')
+
+    await t.test('a Shared task cannot borrow the Owner local computer or personal context', async () => {
+      const f = await fixture({ visibility: 'shared' })
+      await assert.rejects(dispatch(f), (error: unknown) => {
+        const failure = error as { code?: string; params?: { reason?: string } }
+        return failure.code === 'runInvalid' && failure.params?.reason === 'sharedRequiresIsolatedCloud'
+      })
+      assert.equal((await rowsFor(f)).runs, 0)
+      assert.equal((await rowsFor(f)).publications, 0)
+    })
 
     await t.test('a Factory dispatch queues a NULL-issue source through the real public admission store, with no grant or approval', async () => {
       const f = await fixture()

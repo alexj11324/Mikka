@@ -1,7 +1,7 @@
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { CHAT_FIRST_PAGE, chatUpdate, chatView } from '@/lib/coordinator/store'
@@ -20,6 +20,8 @@ import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { taskCreationSchema } from '@/lib/task-destination'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { authorizedBotChat } from '@/lib/resource-access/chat'
+import { requestBotChat } from '@/lib/resource-access/request-chat'
+import { botChatContributionPolicy, botChatOwnerExclusive, submitBotChatMessage } from '@/lib/collaboration/bot-chat'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,6 +71,7 @@ async function handleGET(request: Request) {
   const read = readKind(params)
   if (!read) return json({ error: 'invalidWindow' }, 400)
   try {
+    if (params.get('policy') === '1') { const access = await requestBotChat(user, bot.data); return json(await botChatContributionPolicy(access.reader, access.id)) }
     if (typeof user[tokenWorkspace] === 'string') {
       const botId = await openChatBotId(user, bot.data)
       const access = await authorizedBotChat(user, botId, 'canReadContent', user[tokenWorkspace])
@@ -104,11 +107,25 @@ async function handlePOST(request: Request) {
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   if (!writeAllowed(request)) return forbiddenOrigin()
-  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional(), submissionId: z.uuid().optional(),taskCreation:taskCreationSchema.optional() })
+  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional(), submissionId: z.uuid().optional(),taskCreation:taskCreationSchema.optional(), mode:z.enum(['comment','reply']).optional() }).strict()
     .refine(value => Boolean(value.text || value.images?.length)).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ error: 'messageRequired' }, 400)
   if(parsed.data.taskCreation&&!parsed.data.submissionId)return json({error:'validationGeneric'},400)
   const images = parsed.data.images?.length ? parsed.data.images : undefined
+  try {
+    const access = await requestBotChat(user, parsed.data.botId)
+    if (parsed.data.mode === 'comment' || !await botChatOwnerExclusive(pool, access.ownerId, access.id)) {
+      if (parsed.data.taskCreation || !parsed.data.submissionId) throw new ActionFailureError('threadExecutionAuthorizationRequired')
+      const result = await submitBotChatMessage(access.reader, access.id, { text: parsed.data.text, images,
+        submissionId: parsed.data.submissionId, mode: parsed.data.mode ?? 'reply' })
+      return json({ ...result, accepted: true }, 202)
+    }
+    if (access.ownerId !== user.id) throw new ActionFailureError('workspaceAccessDenied')
+  } catch (error) {
+    if (error instanceof ActionFailureError) return json({ error: error.code }, error.code === 'authRequired' ? 401 : 403)
+    if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
+    throw error
+  }
   if (typeof user[tokenWorkspace] === 'string') {
     if (!await tokenBotAllowed(user, parsed.data.botId ?? null)) return json({ error: 'botNotFound' }, 404)
     // No bot named: the Coordinator of the token's workspace, resolved here where the message enters.

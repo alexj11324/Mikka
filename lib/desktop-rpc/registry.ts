@@ -44,6 +44,8 @@ import * as resourceAccess from '@/app/actions/resource-access'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
+  'resource-access.getResourceCreationDefaults':resourceAccess.getResourceCreationDefaults,
+  'resource-access.saveOrganizationCreationDefaults':resourceAccess.saveOrganizationCreationDefaults,
   'resource-access.getResourceAccess':resourceAccess.getResourceAccess,
   'resource-access.saveResourceAccess':resourceAccess.saveResourceAccess,
   'resource-access.getThreadExecutionAccess':resourceAccess.getThreadExecutionAccess,
@@ -110,6 +112,7 @@ const functions = {
   'collaboration.listMembers': actions7.listMembers,
   'collaboration.inviteMember': actions7.inviteMember,
   'collaboration.removeMember': actions7.removeMember,
+  'coordinator.getBotChatContribution': actions8.getBotChatContribution,
   'coordinator.pollCoordinatorChat': actions8.pollCoordinatorChat,
   'coordinator.syncCoordinatorChat': actions8.syncCoordinatorChat,
   'coordinator.coordinatorHistory': actions8.coordinatorHistory,
@@ -214,6 +217,8 @@ const functions = {
   'teams.saveTeam': actions28.saveTeam,
   'teams.listTeamMembers': actions28.listTeamMembers,
   'teams.changeTeamMember': actions28.changeTeamMember,
+  'teams.getTeamDeletionImpact': actions28.getTeamDeletionImpact,
+  'teams.deleteTeam': actions28.deleteTeam,
   'telegram.getTelegramIntegrationStatus': actions29.getTelegramIntegrationStatus,
   'telegram.createTelegramConnectLink': actions29.createTelegramConnectLink,
   'telegram.disconnectTelegram': actions29.disconnectTelegram,

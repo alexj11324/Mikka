@@ -1112,6 +1112,9 @@
     "executionHarnessUnavailable": "This Agent is unavailable on the selected device.",
     "executionAutoNotAllowed": "Choose an explicit execution value.",
     "executionModelUnknown": "This model is unavailable.",
+    "botChatDailyBudgetExceeded": "The organization has reached its daily shared Bot reply limit. You can still add a comment. Replies become available after 00:00 UTC or when an administrator changes the limit.",
+    "botChatModelCallBudgetExceeded": "This reply reached the organization's model-call limit. Completed work is saved; another reply needs a new explicit request.",
+    "botChatInputCapacityExceeded": "This shared reply exceeds the input capacity limit. Shorten the conversation or attachments before requesting another reply.",
     "executionRuleNotFound": "This execution rule was not found.",
     "executionRuleOrderInvalid": "The execution rule order has changed. Reload and retry.",
     "executionCommandNotFound": "This detection command was not found.",
@@ -1346,6 +1349,16 @@
     "viewProjects": "View projects"
   },
   "IssueDetail": {
+    "frame": {
+      "delegate": "Handed to",
+      "open": "Open",
+      "openThread": "Open {name}'s conversation",
+      "subtaskPlaceholder": "Name the sub-task and press Enter",
+      "subtaskMenu": "Actions for {title}",
+      "subscribe": "Subscribe",
+      "unsubscribe": "Unsubscribe",
+      "created": "created {when}"
+    },
     "breadcrumbBoard": "Board",
     "breadcrumbMore": "More locations",
     "connecting": "Connecting…",
@@ -2418,7 +2431,55 @@
       "shadowConfirmMany": "{workspace} already has {names}. Use your own values in your runs?",
       "useMine": "Use mine"
     },
+    "permissionsPage": {
+      "accessHint": "Click an access to change it",
+      "heading": "What bots and members may do",
+      "detail": "Locked items are blocked for everyone in this workspace.",
+      "allowed": "Allowed",
+      "blocked": "Blocked",
+      "allowedEmpty": "Nothing is allowed",
+      "blockedEmpty": "Nothing is blocked",
+      "block": "Block {name}",
+      "unblock": "Allow {name}",
+      "readOnly": "Only admins can change these.",
+      "appColumn": "App",
+      "accessColumn": "Access",
+      "summary": "{allowed} allowed, {blocked} blocked"
+    },
     "audit": {
+      "unknownAction": "recorded “{action}”",
+      "filterMenu": {
+        "clearAll": "Clear all",
+        "remove": "Remove {label}",
+        "more": "{count} more: {labels}"
+      },
+      "tableWords": {
+        "undo": "Undo",
+        "redo": "Redo",
+        "values": "{count, plural, one {# value} other {# values}}"
+      },
+      "adminOnly": "Only admins can see the audit log.",
+      "categoryFilter": "Category",
+      "columns": {
+        "time": "Time",
+        "actor": "Who",
+        "action": "What",
+        "category": "Category",
+        "place": "Where"
+      },
+      "range": {
+        "label": "Period",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "last7": "Last 7 days",
+        "last30": "Last 30 days",
+        "last90": "Last 90 days",
+        "apply": "Apply",
+        "pickEnd": "{start} – pick an end",
+        "days": "{count, plural, one {# day} other {# days}}",
+        "choose": "Choose a period",
+        "presets": "Periods"
+      },
       "loading": "Loading audit log",
       "filter": "Filter",
       "filters": {
@@ -2484,7 +2545,8 @@
         },
         "agent": {
           "approval_decided": "{decision, select, approved {approved a tool request} denied {denied a tool request} other {decided a tool request}}",
-          "approval_consumed": "used a tool approval"
+          "approval_consumed": "used a tool approval",
+          "policy_changed": "changed the Agent approval rules"
         },
         "workspace": {
           "slug_changed": "changed the address from {from} to {to}",
@@ -2496,7 +2558,9 @@
           "checkout_started": "opened checkout",
           "credits_purchased": "bought points",
           "auto_recharge_changed": "changed auto recharge",
-          "limits_changed": "changed usage limits"
+          "limits_changed": "changed usage limits",
+          "card_verified": "verified a card",
+          "payment_method_changed": "changed the payment method"
         },
         "audit": {
           "exported": "exported audit log",
@@ -4507,7 +4571,12 @@
       "modelUnavailable": "No default model can run",
       "loadingPlacement": "Checking run settings…",
       "quotaUnchecked": "Model allowance needs checking",
-      "workspaceDefault": "Use workspace defaults"
+      "workspaceDefault": "Use workspace defaults",
+      "machineRow": "Machine",
+      "botRow": "Hand to",
+      "details": "Details",
+      "expand": "Bigger window",
+      "collapse": "Smaller window"
     },
     "board": {
       "toolbar": "Board toolbar",
@@ -4621,7 +4690,9 @@
         "groups": "group chats",
         "tasks": "tasks"
       },
-      "sourceSeparator": ", "
+      "sourceSeparator": ", ",
+      "sectionsHint": "to jump between sections",
+      "openHint": "to open"
     }
   },
   "SuggestionsPage": {
@@ -4647,7 +4718,9 @@
     "category": {
       "all": "All",
       "documents": "Documents",
-      "pages": "Web pages"
+      "pages": "Web pages",
+      "pullRequests": "Pull requests",
+      "media": "Screenshots and recordings"
     },
     "columns": {
       "name": "Name",
@@ -4660,7 +4733,7 @@
     "empty": "No artifacts yet",
     "threadEntry": "Artifact · {count}",
     "folders": {
-      "sub": "Documents and pages the Bots and Agents handed over in tasks, by task.",
+      "sub": "Documents, pages, pull requests and screenshots the Bots and Agents handed over in tasks, by task.",
       "folders": "By task",
       "search": "Search tasks…",
       "noMatch": "No task matches “{query}”.",
@@ -5202,7 +5275,11 @@
       "activePlan": "Active resource plan",
       "inactiveCreditShare": "Your earlier personal credit share is inactive while the Organization account pays. Turn it off to revoke that consent.",
       "capacity": "Concurrent platform runs",
-      "plans": { "free": "Free", "pro": "Pro", "enterprise": "Enterprise" },
+      "plans": {
+        "free": "Free",
+        "pro": "Pro",
+        "enterprise": "Enterprise"
+      },
       "removeLimitHelp": "Remove this scope’s spending cap. Existing usage and audit history remain.",
       "differentPayer": "Platform execution uses a different Organization payment account. This page shows this Workspace’s retained balance and history. Open the Organization scope to manage platform purchases."
     },
@@ -5466,7 +5543,9 @@
     "run_failed": {
       "default": "The task could not be completed. Check the error details or try again."
     },
-    "run_clean_isolation_required": {"default": "This shared thread requires a clean cloud environment with protected native credentials. Start a private thread or select a compatible clean cloud computer."},
+    "run_clean_isolation_required": {
+      "default": "This shared thread requires a clean cloud environment with protected native credentials. Start a private thread or select a compatible clean cloud computer."
+    },
     "governance_denied": {
       "plan_changed": "The plan changed. Review its current entitlements before applying this update.",
       "default": "The governance action could not be completed. Try again.",
@@ -5924,6 +6003,11 @@
       "pending": "Loading"
     }
   },
+  "HostedPlugins": {
+    "manageApp": "Manage {name}",
+    "moreTwo": "{first} and {second}",
+    "moreMany": "{first}, {second} and {count, number} more"
+  },
   "HostedTasks": {
     "open": "Open task",
     "status": "Status",
@@ -6155,6 +6239,48 @@
     "open": "Open",
     "runsCount": "{count, plural, one {# run} other {{formatted} runs}}"
   },
+  "HostedShell": {
+    "newTab": "New tab",
+    "searchOrUrl": "Search or enter URL",
+    "tools": "Tools",
+    "noTools": "No tools yet",
+    "moreFor": "More for {name}",
+    "suggested": "Suggested",
+    "noSuggestions": "Nothing suggested right now"
+  },
+  "HostedMembers": {
+    "title": "Members & teams",
+    "overview": "Overview",
+    "you": "(You)",
+    "changeRole": "Change role",
+    "clear": "Clear",
+    "selectAll": "Select all",
+    "select": "Select {name}",
+    "selected": "{count} selected",
+    "roleOf": "Role of {name}",
+    "noMatch": "No one matches “{query}”.",
+    "membersSub": "{suspended, plural, =0 {All active} one {# suspended} other {# suspended}}",
+    "adminsSub": "Can invite, change roles and suspend",
+    "invitesSub": "{expired, plural, =0 {None expired} one {# expired} other {# expired}}",
+    "yourRole": "Your role",
+    "yourRoleSub": "Only admins can invite and change access",
+    "status": "Status",
+    "sortAscending": "Name A–Z",
+    "sortDescending": "Name Z–A",
+    "confirmSuspendMany": "Suspend {count} members. They lose access to the workspace's member directory; access already granted on tasks stays.",
+    "confirmRoleMany": "Make {count} members {role} and keep them active.",
+    "renewInvite": "New invite link",
+    "copy": "Copy",
+    "importCsv": "Import from CSV",
+    "teamCount": "{count, plural, one {# team} other {# teams}}",
+    "deleteTeam": "Delete team",
+    "deleteConfirm": "Type {name} to confirm",
+    "deleteTitle": "Delete {name}?",
+    "deleteImpact": "{tasks, plural, one {# task} other {# tasks}} and {projects, plural, one {# project} other {# projects}} go with it. A project shared with another team only loses the link.",
+    "deleteCounting": "Counting what goes with it…",
+    "deleting": "Deleting…",
+    "teamDeleted": "{name} deleted."
+  },
   "HostedSettings": {
     "back": "Back",
     "general": {
@@ -6377,6 +6503,14 @@
     "grantUnavailable": "This execution authorization is no longer available. Choose comments only or another active authorization.",
     "threadMessage": "Message this thread",
     "readOnly": "You can read this conversation. Ask its owner for permission to contribute.",
-    "taskPrompt": "Describe the new task"
+    "taskPrompt": "Describe the new task",
+    "defaultsTitle": "Default visibility",
+    "defaultsDescription": "Applies to new projects, tasks and threads. Existing content keeps its current access. Private parent resources still restrict access.",
+    "personalDefault": "Create privately by default",
+    "personalDefaultDescription": "Start your new collaboration resources as Private. You can explicitly choose Shared when creating one.",
+    "organizationDefault": "Organization: private by default",
+    "organizationDefaultDescription": "Start new resources in this organization as Private unless the creator explicitly chooses Shared.",
+    "organizationDefaultReadOnly": "The organization controls this default. You can also keep your own resources Private.",
+    "defaultsLoading": "Loading the visibility settings…"
   }
 }

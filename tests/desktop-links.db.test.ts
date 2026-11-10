@@ -145,7 +145,7 @@ test('desktop links preserve real workspace membership and current resource ACL'
     await database.query('DELETE FROM mikka_workspace_slug_redirects WHERE "workspaceId"=ANY($1::uuid[])', [[workspaceId, foreignWorkspaceId]])
     await database.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [[workspaceId, foreignWorkspaceId]])
     await database.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[workspaceId, foreignWorkspaceId]])
-    await database.query('DELETE FROM session WHERE \"userId\"=ANY($1::text[])', [[owner,peer]])
+    await database.query('DELETE FROM session WHERE "userId"=ANY($1::text[])', [[owner,peer]])
     await database.query('DELETE FROM "user" WHERE id=ANY($1)', [[owner, peer]])
     client.release()
     await Promise.all([database.end(), applicationPool?.end()])
