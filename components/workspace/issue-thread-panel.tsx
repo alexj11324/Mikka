@@ -298,7 +298,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
             issueId={issueId} runId={runId} harness={detail?.harness ?? null}
             {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
           {/* In a task's one conversation the dispatch is the status line's, not a person's bubble (#1681). */}
-          {!attempt && data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
+          {!attempt && (data.thread.prompt.trim() || data.thread.hasInstructions) && <div className="group/message flex flex-col gap-1">{data.thread.prompt.trim() && <PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />}{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="group/message flex flex-col gap-1">
               {item.kind === 'agent' && <>
@@ -356,6 +356,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
       issueId={issueId} runId={runId} harness={detail?.harness ?? null} {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} /> }])
     if (!attempt && data.thread.prompt.trim()) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: data.thread.prompt.trim() }) }
+    if (!attempt && data.thread.hasInstructions) bot('instructions', [{ kind: 'text', text: '', node: <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} /> }])
     for (const item of items) {
       if (item.kind === 'person') { open = null; entries.push({ id: `${runId}:${item.id}`, role: 'person', at: at(item.at), text: item.text }); continue }
       const part: ThreadEntryPart = item.kind === 'agent' ? { kind: 'text', text: item.text, node: <div {...{ [QUOTE_SOURCE_ATTR]: '' }}><AgentMarkdown text={item.text} isStreaming={active} /></div> }

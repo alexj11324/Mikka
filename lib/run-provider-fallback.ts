@@ -112,7 +112,7 @@ export async function providerContinuationLaunchMatches(query: Query, prior: Run
   const definition = next.agentDefinition
   if (next.retryOf !== null || !definition || next.prompt !== prior.prompt || definition.promptDigest !== digest(prior.prompt) ||
     (next.status === 'queued' && next.sessionId !== null) || (next.sessionId && next.sessionId === prior.sessionId)) return false
-  const prompt = providerContinuationPrompt(prior.prompt)
+  const { prompt } = providerContinuationPrompt(prior)
   if (!providerContinuationMatches(prior, { ...next, retryOf: prior.id, prompt,
     agentDefinition: { ...definition, promptDigest: digest(prompt) } })) return false
   const { factoryEventId } = await import('./factory/event-id')
@@ -267,14 +267,15 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         }
         const queued = await readSource(client, source.userId, runId)
         if (!queued?.agentDefinition) throw new ActionFailureError('runInvalid')
-        const prompt = providerContinuationPrompt(source.prompt)
+        const copied = providerContinuationPrompt(source)
+        const { prompt } = copied
         const definition = providerContinuationDefinition(source.agentDefinition, queued.agentDefinition, prompt, policyCeiling)
         const identity = await freezeExecutionIdentity(client, { ...queued, agentDefinition: definition }, undefined, source.agentDefinition.executionIdentity?.workspaceId)
         const previous = executionIdentitySchema.parse(source.agentDefinition.executionIdentity)
         if (!isDeepStrictEqual(standingIdentity(previous), standingIdentity(identity))) throw new ActionFailureError('executionAccountUnavailable')
         definition.executionIdentity = identity
-        await client.query(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,prompt=$6,"agentDefinition"=$7,"source"=$8,"updatedAt"=now() WHERE id=$1`,
-          [runId, source.id, source.attempt, source.kind, source.baseBranch, prompt, JSON.stringify(definition), source.source])
+        await client.query(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,prompt=$6,"agentDefinition"=$7,"source"=$8,"promptTaskStart"=$9,"promptTaskLength"=$10,"updatedAt"=now() WHERE id=$1`,
+          [runId, source.id, source.attempt, source.kind, source.baseBranch, prompt, JSON.stringify(definition), source.source, copied.promptTaskStart, copied.promptTaskLength])
         receipt = { ...receipt, state: 'switched', to: choice(target.entry), retryRunId: runId, nextDefinitionDigest: definition.definitionDigest }
         continuation = { runId, previousRunId: source.id, deviceId: target.deviceId, cloud: target.cloud, workspaceId: target.workspaceId }
       }

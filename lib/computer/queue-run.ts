@@ -27,6 +27,8 @@ import { runChanged } from '@/lib/live/panels'
  * recovery admission independently of the parent computer's current state. */
 export async function queueCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, input: {
   botId: string; issueId: string; agentId: string; deviceRepoId: string; title: string; body: string; note?: string
+  /** Host recovery guidance belongs to execution instructions, never the person's run note. */
+  executionNote?: string
   /** The run keeps no bot of its own, like the run it continues (an MCP client's): it still runs on `botId`'s computer. */
   withoutBot?: boolean
   /** Required (lib/computer/run-model.ts): a new run's from 优先使用的模型, a thread's next run its own. Never 'auto' or empty. */
@@ -74,7 +76,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
     const target = await cloudTaskTarget(client, actor, input)
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
-    const instructions = [target.instructions, input.agentProfile?.instructions].filter(Boolean).join('\n\n')
+    const instructions = [target.instructions, input.agentProfile?.instructions, input.executionNote].filter(Boolean).join('\n\n')
     const { prompt, taskLength: promptTaskLength } = runPromptParts(input.title, input.body, instructions, input.note)
     if (digest) {
       const priorRun = (await client.query(`SELECT r."userId",r."issueId",r."agentId",r."deviceId",r."deviceRepoId",r.prompt,r."agentDefinition",r."dispatchFingerprint",r."botId" AS "runBotId",b."botId",b."workspaceId"

@@ -99,7 +99,7 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
         if (!configuredRun || configuredRun.prompt.length + handoffText.length > 100000) fail('factoryCheckBindingMismatch');
         await tx.query('UPDATE agent_runs SET prompt=prompt || $2 WHERE id=$1', [queued.runId, handoffText]);
       } else {
-        await tx.query('UPDATE agent_runs SET prompt=left(prompt,$2) || $3 WHERE id=$1', [queued.runId, 100000 - handoffText.length, handoffText]);
+        await tx.query('UPDATE agent_runs SET prompt=left(prompt,$2) || $3,"promptTaskStart"=CASE WHEN "promptTaskStart" IS NOT NULL AND "promptTaskLength" IS NOT NULL THEN LEAST("promptTaskStart",$2) END,"promptTaskLength"=CASE WHEN "promptTaskStart" IS NOT NULL AND "promptTaskLength" IS NOT NULL THEN LEAST("promptTaskLength",GREATEST(0,$2-"promptTaskStart")) END WHERE id=$1', [queued.runId, 100000 - handoffText.length, handoffText]);
       }
       await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ handoff: { eventId: handoff.eventId, digest: handoff.digest, requestEpoch: task.sourceEventId } })]);
       await adapters.freeze(tx,task,queued.runId);

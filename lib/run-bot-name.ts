@@ -38,8 +38,8 @@ export const runAgentName = sql<string>`case ${agents.harness} when 'claude_code
  * at 60 characters): leading blank space dropped, then 400 characters. A list
  * names a thread from this instead of reading whole prompts.
  */
-/** A run's prompt from its task on (`promptTaskStart`): Factory guidance prepended at dispatch never names the thread. */
-export const runTaskPrompt = sql<string>`substr(${agentRuns.prompt}, coalesce(${agentRuns.promptTaskStart}, 0) + 1)`
+/** Only the recorded task range may name a thread; missing/invalid provenance never falls back to execution instructions. */
+export const runTaskPrompt = sql<string>`case when ${agentRuns.promptTaskStart} >= 0 and ${agentRuns.promptTaskLength} >= 0 and ${agentRuns.promptTaskStart} <= char_length(${agentRuns.prompt}) and ${agentRuns.promptTaskLength} <= char_length(${agentRuns.prompt}) - ${agentRuns.promptTaskStart} then substr(${agentRuns.prompt}, ${agentRuns.promptTaskStart} + 1, ${agentRuns.promptTaskLength}) else '' end`
 export const threadNamePrompt = sql<string>`left(ltrim(${runTaskPrompt}, E' \\t\\r\\n'), 400)`
 /**
  * A run's prompt up to the end of its first line with a letter, in a query
@@ -48,6 +48,6 @@ export const threadNamePrompt = sql<string>`left(ltrim(${runTaskPrompt}, E' \\t\
  * emphasis, so a line with a letter is never empty and no later line is read.
  * The lines before it are kept, so the name equals the whole prompt's name.
  */
-export const threadNameLines = sql<string | null>`substring(ltrim(substr(agent_runs.prompt, coalesce(agent_runs."promptTaskStart", 0) + 1), E' \\t\\r\\n') from E'^(?:[^[:alpha:]\\n]*\\n)*[^\\n]*')`
+export const threadNameLines = sql<string | null>`substring(ltrim(${runTaskPrompt}, E' \\t\\r\\n') from E'^(?:[^[:alpha:]\\n]*\\n)*[^\\n]*')`
 /** `threadNameLines` within `threadNamePrompt`'s 400 characters: the same name as `threadNamePrompt` gives. */
 export const threadNameHead = sql<string | null>`left(${threadNameLines}, 400)`
