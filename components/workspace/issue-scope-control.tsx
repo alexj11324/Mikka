@@ -12,13 +12,25 @@ import type { TaskScope } from '@/lib/task-identifier'
 import { IssuePropertyMenu } from './issue-property-menu'
 import type { MetadataSavedIssue } from './issue-metadata-controls'
 
-/** Sharing requires the team's explicit save event; never infer a destination. */
-export function IssueScopeControl({ task, disabled, onSaved, teamChoice }: {
+type ScopeProps = {
   task: { id: string; revision: number; scope: TaskScope; scopeSetBy: 'agent' | 'user' }
   disabled?: boolean
   teamChoice?: ExplicitTeamChoice | null
   onSaved: (issue: MetadataSavedIssue) => void
-}) {
+}
+
+/** Sharing requires the team's explicit save event; never infer a destination. */
+export function IssueScopeControl(props: ScopeProps) {
+  const { task, disabled } = props
+  const { options, change, pending, current, judgedByAgent } = useIssueScope(props)
+  return <div className="flex min-w-0 items-center gap-2">
+    <IssuePropertyMenu variant="row" label={judgedByAgent.label} value={task.scope} options={options} icon={task.scope === 'workspace' ? Building2 : User} disabled={disabled || pending} displayValue={current} onChange={value => { void change(value) }} />
+    {judgedByAgent.shown && <span className="truncate text-xs text-muted-foreground">{judgedByAgent.text}</span>}
+  </div>
+}
+
+/** 归属's choices and the save behind them, for IssueScopeControl and a layer that draws the row itself. */
+export function useIssueScope({ task, onSaved, teamChoice }: ScopeProps) {
   const t = useTranslations('Issue.scope')
   const actionError = useActionError()
   const [pending, setPending] = useState(false)
@@ -58,8 +70,5 @@ export function IssueScopeControl({ task, disabled, onSaved, teamChoice }: {
     finally { setPending(false) }
   }
   const current = options.find(option => option.value === task.scope)?.label ?? task.scope
-  return <div className="flex min-w-0 items-center gap-2">
-    <IssuePropertyMenu variant="row" label={t('label')} value={task.scope} options={options} icon={task.scope === 'workspace' ? Building2 : User} disabled={disabled || pending} displayValue={current} onChange={value => { void change(value) }} />
-    {task.scope === 'workspace' && task.scopeSetBy === 'agent' && <span className="truncate text-xs text-muted-foreground">{t('judgedByAgent')}</span>}
-  </div>
+  return { options, change, pending, current, judgedByAgent: { label: t('label'), shown: task.scope === 'workspace' && task.scopeSetBy === 'agent', text: t('judgedByAgent') } }
 }

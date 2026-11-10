@@ -1,7 +1,7 @@
 'use client'
 
 import { issueKeys } from '@/lib/swr/keys'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, Bell, BellOff, Box, Calendar, Check, Circle, Copy, FileText, Flag, GitBranch, History, Link2, ListPlus, MoreHorizontal, Plus, Signal, Star, Tag, Trash2, Users, X } from 'lucide-react'
@@ -22,14 +22,63 @@ import { IssueRelationPicker, type RelationKind } from './issue-relations'
 import { workspaceSearch } from './workspace-navigation'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from './issue-properties'
 import type { MetadataRequest } from './issue-metadata-controls'
+import type { TaskMenuItem } from '@/components/slots/task-detail-contract'
 
 type Issue = IssueView
 export type IssueActionRequest = { kind: RelationKind | 'createChild' | 'dueDate' | 'estimate'; sequence: number }
 type OperationResult = { issue?: Issue; error?: string }
 
-export function IssueDetailActions({ task, userId, disabled, documentTools, request, getCurrent, onSaved, onOpen, onDeleted, onHistory, onMembers, onDocumentTools, onProperty, onStatus, onPriority }: {
+type ActionsProps = {
   task: Issue; userId: string; disabled: boolean; documentTools: boolean; request: IssueActionRequest | null; getCurrent: () => Promise<Issue | null>; onSaved: (issue: Issue) => void; onOpen: (id: string) => void; onDeleted: () => void; onHistory: () => void; onMembers: () => void; onDocumentTools: () => void; onProperty: (target: MetadataRequest['target']) => void; onStatus: (value: string) => void; onPriority: (value: string) => void
-}) {
+}
+
+export function IssueDetailActions(props: ActionsProps) {
+  const { task, userId, documentTools, onStatus, onPriority, onProperty, onHistory, onMembers, onDocumentTools } = props
+  const { tMenu, tWorkspaceDetail, relationTitle, statusOptions, priorityOptions, copyItems, queuedRelation, setRelation, setError, openDialog, run, copy, favorite, toggleFavorite, subscribed, unavailable, setDeleteOpen, dialogs } = useIssueDetailActions(props)
+  return <>
+    <Button variant="ghost" size="icon-sm" aria-label={favorite ? tMenu('unfavorite') : tMenu('favorite')} aria-pressed={favorite} disabled={unavailable} onClick={() => { void toggleFavorite() }}><Star data-icon="inline-start" fill={favorite ? 'currentColor' : 'none'} /></Button>
+    {/* Open the relation picker only after the menu's exit animation finishes, so the menu doesn't ghost over the dialog. */}
+    <DropdownMenu onOpenChange={open => { if (open) queuedRelation.current = null }} onOpenChangeComplete={open => { if (!open && queuedRelation.current) { setRelation(queuedRelation.current); queuedRelation.current = null } }}><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tWorkspaceDetail('moreActions')} disabled={unavailable} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuGroup>
+        <DropdownMenuSub><DropdownMenuSubTrigger><Circle />{tMenu('setStatus')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{statusOptions.map(status => <DropdownMenuItem key={status.value} onClick={() => onStatus(status.value)}><status.icon /><span className="flex-1">{status.label}</span>{task.status === status.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+        <DropdownMenuSub><DropdownMenuSubTrigger><Signal />{tMenu('setPriority')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{priorityOptions.map(priority => <DropdownMenuItem key={priority.value} onClick={() => onPriority(priority.value)}><priority.icon {...priority.iconProps} /><span className="flex-1">{priority.label}</span>{task.priority === priority.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+        <DropdownMenuItem onClick={() => onProperty('assignee')}><Users />{tMenu('assignAssignee')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onProperty('project')}><Box />{tMenu('moveToProject')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onProperty('labels')}><Tag />{tMenu('editLabels')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openDialog('dueDate')}><Calendar />{task.metadata.dueDate ? tMenu('editDueDate') : tMenu('setDueDate')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openDialog('estimate')}><Signal />{tMenu('setEstimate')}</DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem onClick={() => openDialog('createChild')}><Plus />{tMenu('createChild')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { setError(''); queuedRelation.current = 'child' }}><ListPlus />{tMenu('addExistingChild')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { setError(''); queuedRelation.current = 'parent' }}><GitBranch />{tMenu('setParent')}</DropdownMenuItem>
+        {task.metadata.parentId && <DropdownMenuItem onClick={() => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, targetId: null, kind: 'parent', remove: true })) }}><X />{tMenu('removeParent')}</DropdownMenuItem>}
+        <DropdownMenuSub><DropdownMenuSubTrigger><Link2 />{tMenu('addRelation')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{(['related', 'blockedBy', 'blocks', 'duplicate'] as RelationKind[]).map(kind => <DropdownMenuItem key={kind} onClick={() => { setError(''); queuedRelation.current = kind }}>{kind === 'blocks' || kind === 'blockedBy' ? <Flag /> : <Link2 />}{relationTitle(kind)}…</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuSub><DropdownMenuSubTrigger><Copy />{tMenu('copy')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{copyItems.map(item => <DropdownMenuItem key={item.kind} onClick={() => { void copy(item.kind) }}>{item.label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
+        <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id }); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />{tMenu('openNewTab')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openDialog('duplicate')}><Copy />{tMenu('createDuplicate')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { void toggleFavorite() }}><Star />{favorite ? tMenu('removeFavorite') : tMenu('addFavorite')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }}>{subscribed ? <BellOff /> : <Bell />}{subscribed ? tMenu('unsubscribe') : tMenu('subscribe')}</DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem onClick={onHistory}><History />{tMenu('showHistory')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onProperty('pullRequests')}><Link2 />{tMenu('managePullRequests')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onMembers}><Users />{tMenu('manageMembers')}</DropdownMenuItem>
+        <DropdownMenuItem onClick={onDocumentTools}><FileText />{documentTools ? tMenu('backToDescription') : tWorkspaceDetail('advancedTools')}</DropdownMenuItem>
+      </DropdownMenuGroup>
+      {task.userId === userId && <><DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuItem variant="destructive" onClick={() => { setError(''); setDeleteOpen(true) }}><Trash2 />{tMenu('deleteTask')}</DropdownMenuItem></DropdownMenuGroup></>}
+    </DropdownMenuContent></DropdownMenu>
+    {dialogs}
+  </>
+}
+
+/** The ⋯ menu's state, operations and dialogs, for IssueDetailActions and for a layer that draws the menu (useIssueDetailMenu). */
+export function useIssueDetailActions({ task, userId, disabled, request, getCurrent, onSaved, onOpen, onDeleted }: ActionsProps) {
   const t = useTranslations('IssueDetail')
   const tMenu = useTranslations('IssueDetail.menu')
   const tDialog = useTranslations('IssueDetail.dialog')
@@ -120,46 +169,46 @@ export function IssueDetailActions({ task, userId, disabled, documentTools, requ
   }
   const subscribed = task.metadata.subscriberUserIds.includes(userId)
   const unavailable = disabled || pending
-  return <>
-    <Button variant="ghost" size="icon-sm" aria-label={favorite ? tMenu('unfavorite') : tMenu('favorite')} aria-pressed={favorite} disabled={unavailable} onClick={() => { void toggleFavorite() }}><Star data-icon="inline-start" fill={favorite ? 'currentColor' : 'none'} /></Button>
-    {/* Open the relation picker only after the menu's exit animation finishes, so the menu doesn't ghost over the dialog. */}
-    <DropdownMenu onOpenChange={open => { if (open) queuedRelation.current = null }} onOpenChangeComplete={open => { if (!open && queuedRelation.current) { setRelation(queuedRelation.current); queuedRelation.current = null } }}><DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={tWorkspaceDetail('moreActions')} disabled={unavailable} />}><MoreHorizontal /></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-64">
-      <DropdownMenuGroup>
-        <DropdownMenuSub><DropdownMenuSubTrigger><Circle />{tMenu('setStatus')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{statusOptions.map(status => <DropdownMenuItem key={status.value} onClick={() => onStatus(status.value)}><status.icon /><span className="flex-1">{status.label}</span>{task.status === status.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-        <DropdownMenuSub><DropdownMenuSubTrigger><Signal />{tMenu('setPriority')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{priorityOptions.map(priority => <DropdownMenuItem key={priority.value} onClick={() => onPriority(priority.value)}><priority.icon {...priority.iconProps} /><span className="flex-1">{priority.label}</span>{task.priority === priority.value && <Check />}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-        <DropdownMenuItem onClick={() => onProperty('assignee')}><Users />{tMenu('assignAssignee')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onProperty('project')}><Box />{tMenu('moveToProject')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onProperty('labels')}><Tag />{tMenu('editLabels')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openDialog('dueDate')}><Calendar />{task.metadata.dueDate ? tMenu('editDueDate') : tMenu('setDueDate')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openDialog('estimate')}><Signal />{tMenu('setEstimate')}</DropdownMenuItem>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuItem onClick={() => openDialog('createChild')}><Plus />{tMenu('createChild')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { setError(''); queuedRelation.current = 'child' }}><ListPlus />{tMenu('addExistingChild')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { setError(''); queuedRelation.current = 'parent' }}><GitBranch />{tMenu('setParent')}</DropdownMenuItem>
-        {task.metadata.parentId && <DropdownMenuItem onClick={() => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, targetId: null, kind: 'parent', remove: true })) }}><X />{tMenu('removeParent')}</DropdownMenuItem>}
-        <DropdownMenuSub><DropdownMenuSubTrigger><Link2 />{tMenu('addRelation')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{(['related', 'blockedBy', 'blocks', 'duplicate'] as RelationKind[]).map(kind => <DropdownMenuItem key={kind} onClick={() => { setError(''); queuedRelation.current = kind }}>{kind === 'blocks' || kind === 'blockedBy' ? <Flag /> : <Link2 />}{relationTitle(kind)}…</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuSub><DropdownMenuSubTrigger><Copy />{tMenu('copy')}</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuGroup>{copyItems.map(item => <DropdownMenuItem key={item.kind} onClick={() => { void copy(item.kind) }}>{item.label}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuSubContent></DropdownMenuSub>
-        <DropdownMenuItem onClick={() => { const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id }); window.open(url.href, '_blank', 'noopener,noreferrer') }}><ArrowUpRight />{tMenu('openNewTab')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openDialog('duplicate')}><Copy />{tMenu('createDuplicate')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { void toggleFavorite() }}><Star />{favorite ? tMenu('removeFavorite') : tMenu('addFavorite')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }}>{subscribed ? <BellOff /> : <Bell />}{subscribed ? tMenu('unsubscribe') : tMenu('subscribe')}</DropdownMenuItem>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuItem onClick={onHistory}><History />{tMenu('showHistory')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onProperty('pullRequests')}><Link2 />{tMenu('managePullRequests')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={onMembers}><Users />{tMenu('manageMembers')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={onDocumentTools}><FileText />{documentTools ? tMenu('backToDescription') : tWorkspaceDetail('advancedTools')}</DropdownMenuItem>
-      </DropdownMenuGroup>
-      {task.userId === userId && <><DropdownMenuSeparator /><DropdownMenuGroup><DropdownMenuItem variant="destructive" onClick={() => { setError(''); setDeleteOpen(true) }}><Trash2 />{tMenu('deleteTask')}</DropdownMenuItem></DropdownMenuGroup></>}
-    </DropdownMenuContent></DropdownMenu>
+  const dialogs = <>
     {relation && <IssueRelationPicker task={task} kind={relation} validationError={error} open onOpenChange={open => { if (!open) setRelation(null) }} pending={pending} onSelect={targetId => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, kind: relation, targetId })).then(success => { if (success) setRelation(null) }) }} />}
     <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !pending) setDialog(null) }}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>{dialog === 'createChild' ? tDialog('createChildTitle') : dialog === 'duplicate' ? tDialog('duplicateTitle') : dialog === 'dueDate' ? tDialog('dueDateTitle') : tDialog('estimateTitle')}</DialogTitle></DialogHeader><form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); const kind = dialog; if (!kind) return; const entered = fieldRef.current?.value ?? ''; void run(issue => kind === 'createChild' || kind === 'duplicate' ? createLinkedIssue({ id: task.id, revision: issue.revision, kind: kind === 'createChild' ? 'child' : 'duplicate', title: entered, includeSubissues: kind === 'duplicate' && includeSubissues }) : updateIssueMetadata({ id: task.id, revision: issue.revision, patch: kind === 'dueDate' ? { dueDate: entered || null } : { estimate: entered === '' ? null : Number(entered) } }), kind === 'createChild' ? 'child' : kind === 'duplicate' ? 'duplicate' : 'current').then(success => { if (success) setDialog(null) }) }}><FieldGroup><Field><FieldLabel htmlFor="issue-action-value">{dialog === 'dueDate' ? tDialog('dueDateLabel') : dialog === 'estimate' ? tDialog('estimateLabel') : tDialog('taskTitleLabel')}</FieldLabel><Input ref={fieldRef} key={fieldKey} id="issue-action-value" autoFocus type={dialog === 'dueDate' ? 'date' : dialog === 'estimate' ? 'number' : 'text'} min={dialog === 'estimate' ? 0 : undefined} max={dialog === 'estimate' ? 100 : undefined} step={dialog === 'estimate' ? 1 : undefined} defaultValue={fieldDefault} disabled={pending} required={dialog === 'createChild' || dialog === 'duplicate'} maxLength={200} onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault() }} /></Field>{dialog === 'duplicate' && <Field orientation="horizontal"><Checkbox id="duplicate-subissues" checked={includeSubissues} onCheckedChange={checked => setIncludeSubissues(!!checked)} /><FieldLabel htmlFor="duplicate-subissues">{tDialog('duplicateSubissues')}</FieldLabel></Field>}</FieldGroup>{error && <FieldError>{error}</FieldError>}<DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setDialog(null)}>{tCommon('cancel')}</Button><Button type="submit" disabled={pending}>{pending ? tCommon('saving') : dialog === 'createChild' || dialog === 'duplicate' ? tIssue('create.submit') : tCommon('save')}</Button></DialogFooter></form></DialogContent></Dialog>
     <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{tDialog('deleteTitle', { id: issueIdentifier(task, `「${task.title}」`) })}</AlertDialogTitle><AlertDialogDescription>{tDialog('deleteDescription')}</AlertDialogDescription></AlertDialogHeader>{error && <FieldError>{error}</FieldError>}<AlertDialogFooter><AlertDialogCancel disabled={pending}>{tCommon('cancel')}</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={pending} onClick={event => { event.preventDefault(); void run(issue => setIssueDeleted({ id: task.id, revision: issue.revision }), 'delete').then(success => { if (success) setDeleteOpen(false) }) }}>{pending ? tDialog('deleting') : tDialog('deleteAction')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </>
+  return { t, tMenu, tWorkspaceDetail, relationTitle, statusOptions, priorityOptions, copyItems, queuedRelation, setRelation, setError, openDialog, run, copy, favorite, toggleFavorite, subscribed, unavailable, setDeleteOpen, dialogs }
+}
+
+/**
+ * The same ⋯ menu as data, for a layer that draws it with its own menu (components/slots/task-detail-contract.ts).
+ * Items `assignee`, `project` and `labels` call onProperty; a layer with its own choices puts them in a submenu.
+ */
+export function useIssueDetailMenu(props: ActionsProps): { items: TaskMenuItem[]; favorite: { on: boolean; label: string; toggle: () => void; disabled: boolean }; subscribed: boolean; toggleSubscribed: () => void; disabled: boolean; dialogs: ReactNode; copyLink: () => void } {
+  const { task, userId, documentTools, onStatus, onPriority, onProperty, onHistory, onMembers, onDocumentTools } = props
+  const { tMenu, tWorkspaceDetail, relationTitle, statusOptions, priorityOptions, copyItems, setRelation, setError, openDialog, run, copy, favorite, toggleFavorite, subscribed, unavailable, setDeleteOpen, dialogs } = useIssueDetailActions(props)
+  const relation = (kind: RelationKind) => () => { setError(''); setRelation(kind) }
+  const subscribe = () => { void run(() => toggleIssuePreference({ id: task.id, kind: 'subscribe' })) }
+  const items: TaskMenuItem[] = [
+    { id: 'status', label: tMenu('setStatus'), mark: { kind: 'icon', icon: 'status' }, submenu: statusOptions.map(status => ({ id: status.value, label: status.label, mark: { kind: 'status', value: status.value }, checked: task.status === status.value, onSelect: () => onStatus(status.value) })) },
+    { id: 'priority', label: tMenu('setPriority'), mark: { kind: 'icon', icon: 'priority' }, submenu: priorityOptions.map(priority => ({ id: priority.value, label: priority.label, mark: { kind: 'priority', value: priority.value }, checked: task.priority === priority.value, onSelect: () => onPriority(priority.value) })) },
+    { id: 'assignee', label: tMenu('assignAssignee'), mark: { kind: 'icon', icon: 'person' }, onSelect: () => onProperty('assignee') },
+    { id: 'project', label: tMenu('moveToProject'), mark: { kind: 'icon', icon: 'project' }, onSelect: () => onProperty('project') },
+    { id: 'labels', label: tMenu('editLabels'), mark: { kind: 'icon', icon: 'tag' }, onSelect: () => onProperty('labels') },
+    { id: 'dueDate', label: task.metadata.dueDate ? tMenu('editDueDate') : tMenu('setDueDate'), mark: { kind: 'icon', icon: 'calendar' }, onSelect: () => openDialog('dueDate') },
+    { id: 'estimate', label: tMenu('setEstimate'), mark: { kind: 'icon', icon: 'estimate' }, onSelect: () => openDialog('estimate') },
+    { id: 'createChild', label: tMenu('createChild'), mark: { kind: 'icon', icon: 'plus' }, divider: true, onSelect: () => openDialog('createChild') },
+    { id: 'addExistingChild', label: tMenu('addExistingChild'), mark: { kind: 'icon', icon: 'listPlus' }, onSelect: relation('child') },
+    { id: 'setParent', label: tMenu('setParent'), mark: { kind: 'icon', icon: 'parent' }, onSelect: relation('parent') },
+    ...task.metadata.parentId ? [{ id: 'removeParent', label: tMenu('removeParent'), mark: { kind: 'icon', icon: 'remove' }, onSelect: () => { void run(issue => updateIssueRelation({ id: task.id, revision: issue.revision, targetId: null, kind: 'parent', remove: true })) } } satisfies TaskMenuItem] : [],
+    { id: 'addRelation', label: tMenu('addRelation'), mark: { kind: 'icon', icon: 'link' }, submenu: (['related', 'blockedBy', 'blocks', 'duplicate'] as RelationKind[]).map(kind => ({ id: kind, label: `${relationTitle(kind)}…`, mark: { kind: 'icon', icon: kind === 'blocks' || kind === 'blockedBy' ? 'flag' : 'link' }, onSelect: relation(kind) })) },
+    { id: 'copy', label: tMenu('copy'), mark: { kind: 'icon', icon: 'copy' }, divider: true, submenu: copyItems.map(item => ({ id: item.kind, label: item.label, onSelect: () => { void copy(item.kind) } })) },
+    { id: 'openNewTab', label: tMenu('openNewTab'), mark: { kind: 'icon', icon: 'newTab' }, onSelect: () => { const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id }); window.open(url.href, '_blank', 'noopener,noreferrer') } },
+    { id: 'duplicate', label: tMenu('createDuplicate'), mark: { kind: 'icon', icon: 'copy' }, onSelect: () => openDialog('duplicate') },
+    { id: 'favorite', label: favorite ? tMenu('removeFavorite') : tMenu('addFavorite'), mark: { kind: 'icon', icon: 'star' }, onSelect: () => { void toggleFavorite() } },
+    { id: 'subscribe', label: subscribed ? tMenu('unsubscribe') : tMenu('subscribe'), mark: { kind: 'icon', icon: subscribed ? 'bellOff' : 'bell' }, onSelect: subscribe },
+    { id: 'history', label: tMenu('showHistory'), mark: { kind: 'icon', icon: 'history' }, divider: true, onSelect: onHistory },
+    { id: 'pullRequests', label: tMenu('managePullRequests'), mark: { kind: 'icon', icon: 'pullRequest' }, onSelect: () => onProperty('pullRequests') },
+    { id: 'members', label: tMenu('manageMembers'), mark: { kind: 'icon', icon: 'members' }, onSelect: onMembers },
+    { id: 'documentTools', label: documentTools ? tMenu('backToDescription') : tWorkspaceDetail('advancedTools'), mark: { kind: 'icon', icon: 'document' }, onSelect: onDocumentTools },
+    ...task.userId === userId ? [{ id: 'delete', label: tMenu('deleteTask'), mark: { kind: 'icon', icon: 'delete' }, danger: true, divider: true, onSelect: () => { setError(''); setDeleteOpen(true) } } satisfies TaskMenuItem] : [],
+  ]
+  return { items, favorite: { on: favorite, label: favorite ? tMenu('unfavorite') : tMenu('favorite'), toggle: () => { void toggleFavorite() }, disabled: unavailable }, subscribed, toggleSubscribed: subscribe, disabled: unavailable, dialogs, copyLink: () => { void copy('link') } }
 }

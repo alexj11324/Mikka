@@ -25,23 +25,12 @@ export function IssueActivity({ issueId, author, threads, anchors, events, onCom
 }) {
   const t = useTranslations('Workspace.activity')
   const format = useFormatter()
-  const [body, setBody] = useViewState(`task:${issueId}:comment`, '')
-  const [replyTo, setReplyTo] = useViewState<string | null>(`task:${issueId}:reply-to`, null)
-  const [reply, setReply] = useViewState(`task:${issueId}:reply`, '')
+  const { body, setBody, replyTo, setReplyTo, reply, setReply, submit, sendReply } = useActivityDrafts(issueId, onComment, onReply)
   const pressed = useRef<'reply' | 'resolve' | null>(null)
-  function submit() {
-    if (!body.trim()) return
-    onComment(body.trim())
-    setBody('')
-  }
   // R-63: comments are bordered cards; events stay plain rows.
   const card = 'overflow-hidden rounded-xl border border-rule bg-card'
   const bare = 'field-sizing-content min-h-0 resize-none rounded-none border-none bg-transparent px-0 py-0 shadow-none focus-visible:ring-0 dark:bg-transparent'
   const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-  function sendReply(id: string) {
-    if (!reply.trim() || replyTo !== id) return
-    onReply(id, reply.trim()); setReplyTo(null); setReply('')
-  }
   return <section aria-label={t('label')} className="flex flex-col gap-4">
     <h2 className="text-sm font-medium">{t('title')}</h2>
     {events && <div className="flex flex-col gap-3">{events}</div>}
@@ -68,4 +57,21 @@ export function IssueActivity({ issueId, author, threads, anchors, events, onCom
       <div className="flex justify-end"><Button type="submit" size="icon-xs" className="rounded-full" disabled={!body.trim()} aria-label={t('sendComment')}><ArrowUp data-icon="inline-start" /></Button></div>
     </form>
   </section>
+}
+
+/** The comment being written and the reply open on one discussion, kept per task as the page's view state. */
+export function useActivityDrafts(issueId: string, onComment: (body: string) => void, onReply: (id: string, body: string) => void) {
+  const [body, setBody] = useViewState(`task:${issueId}:comment`, '')
+  const [replyTo, setReplyTo] = useViewState<string | null>(`task:${issueId}:reply-to`, null)
+  const [reply, setReply] = useViewState(`task:${issueId}:reply`, '')
+  function submit() {
+    if (!body.trim()) return
+    onComment(body.trim())
+    setBody('')
+  }
+  function sendReply(id: string) {
+    if (!reply.trim() || replyTo !== id) return
+    onReply(id, reply.trim()); setReplyTo(null); setReply('')
+  }
+  return { body, setBody, replyTo, setReplyTo, reply, setReply, submit, sendReply }
 }
