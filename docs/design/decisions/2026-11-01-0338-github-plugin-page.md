@@ -1,4 +1,4 @@
-# GitHub's plugin page: connection, repository access and abilities with their own allow / ask / deny
+# GitHub's plugin page: one workspace connection, repository access and read/write abilities
 
 - Date: 2026-11-01
 - Source: Alex, MVP bug triage relayed by the coordinator: 「插件这一块仍然没有，一些信息、读写工具之类全部都没有」 and 「按照道理来说应该直接跳转到 GitHub 才对啊，怎么还在中间跳到我们的网页端来了呀？」; layout and permission wiring approved by Alex's coordinator the same day
@@ -11,6 +11,7 @@
   what GitHub grants; it never shows one value while another is saved.
 - Superseded in part by: [2026-11-02-1600-agents-use-own-github-credential](2026-11-02-1600-agents-use-own-github-credential.md) (能力: every
   ability is listed with no control; neither write is a setting).
+- Superseded in part by: [2026-11-10-1730-workspace-app-permissions](2026-11-10-1730-workspace-app-permissions.md) (workspace-only app access).
 
 Accepted Figma frames (file `zPe5LKycb2XuT1ivCLRw07`, page `773:2`): `773:3`
 connected, `775:4` not connected, `775:131` link failed, `775:240` repository

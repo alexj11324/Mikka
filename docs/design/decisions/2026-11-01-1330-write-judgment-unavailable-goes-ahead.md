@@ -4,6 +4,7 @@
 - Source: Alex, relayed by the coordinator session: when the Decision API cannot be reached, a write no longer asks the person for approval; it is bypassed, or left to the model running the task.
 - Rule: R-77
 - Replaces: "an unavailable, refused or malformed judgment asks" in the 2026-10-31 app-write row of `../decisions.md` (#657), and its "a `readOnlyHint` tool skips the call"
+- Superseded by: [2026-11-10-1730-workspace-app-permissions](2026-11-10-1730-workspace-app-permissions.md) (app access is a workspace level; there is no per-action write judge or per-person allow/ask/deny).
 
 The Decisions API judges every app write and read the person's settings leave
 open, the `readOnlyHint` tool included (the hint is input). When it gives no
