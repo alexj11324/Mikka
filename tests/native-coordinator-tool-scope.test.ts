@@ -314,7 +314,7 @@ test('evaluation Coordinator actions preserve host-owned identity and fixed trai
 })
 
 const stoppedRun: RunDetail['run'] = {
-  id:'run',issueId:'issue',agentId:'agent',agentName:'Agent',harness:'codex',mode:'ask',status:'stopped',kind:'implement',
+  id:'run',issueId:'issue',agentId:'agent',agentName:'Agent',harness:'codex',status:'stopped',kind:'implement',
   stopReason:'turn_ended',error:null,report:null,createdAt:new Date('2026-10-26T12:00:00Z'),startedAt:null,finishedAt:null,
 }
 const hostReport = {
@@ -333,7 +333,6 @@ test('getRun exposes exact persisted host evidence for a stopped owned run',asyn
   assert.deepEqual({sourceCommit:result.sourceCommit,skillMount:result.skillMount,runtime:result.runtime,verify:result.verify},
     {sourceCommit:hostReport.sourceCommit,skillMount:hostReport.skillMount,runtime:hostReport.runtime,verify:hostReport.verify})
   assert.equal(result.status,'stopped')
-  assert.equal(result.mode,'ask')
   assert.equal(result.summary,hostReport.summary)
   assert.equal('privateExtra' in result,false)
   assert.deepEqual(readRunResult.mock.calls.map(call=>call.arguments),[[user,'run']])

@@ -232,7 +232,6 @@ export class CursorAdapter implements AgentAdapter {
       childPath: options.env.PATH,
       harness: "cursor",
       kind: options.kind,
-      mode: options.mode,
       worktree: options.cwd,
       gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,

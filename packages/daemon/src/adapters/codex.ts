@@ -463,7 +463,6 @@ export class CodexAdapter implements AgentAdapter {
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
-      mode: options.mode,
       factoryCheck: options.factoryCheck,
       verifyCommand: options.verifyCommand,
       worktree: options.cwd,

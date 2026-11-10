@@ -1026,7 +1026,7 @@ export async function getRun(userId: string, input: { runId: string }, scope?: N
   if (!detail) return { error: 'runNotFound' }
   const { run } = detail
   return {
-    id: run.id, issueId: run.issueId, agent: run.agentName, harness: run.harness, mode: run.mode, status: run.status,
+    id: run.id, issueId: run.issueId, agent: run.agentName, harness: run.harness, status: run.status,
     stopReason: run.stopReason, error: run.error, summary: (run.report as { summary?: string } | null)?.summary ?? null,
     sourceCommit: run.report?.sourceCommit ?? null,
     skillMount: run.report?.skillMount ?? null,

@@ -163,7 +163,7 @@ async function queueDeviceContinuation(tx: Tx, run: Run, key: RunApiKey | null):
   await tx.insert(agentRuns).values({
     id, userId: run.userId, workspaceId: run.workspaceId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
     agentDefinition: await continuationDefinition(run, prompt, key), deviceId: run.deviceId, deviceRepoId: run.deviceRepoId,
-    status: 'queued', mode: run.mode, kind: run.kind, baseBranch: run.baseBranch, ...copied, attempt: run.attempt, retryOf: run.id,
+    status: 'queued', kind: run.kind, baseBranch: run.baseBranch, ...copied, attempt: run.attempt, retryOf: run.id,
   })
   await runListChanged(tx, id)
   await runChanged(tx, id)
@@ -207,7 +207,7 @@ export async function queueCloudQuotaContinuation(hint: Run, cloud: CloudBinding
           WHERE runtime."botId"=$1 AND runtime."ownerId"=$2 AND runtime.harness=$3`, [cloud.botId, run.userId, run.agentDefinition!.harness, run.deviceRepoId])
         if (!target) throw new ActionFailureError('runInvalid')
         const repoId = target.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(run.userId, target.deviceId, target.remoteUrl, client)).id : target.repoId
-        const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: target.agentId, deviceRepoId: repoId, readOnly: run.agentDefinition?.readOnly, carriedMode: run.mode, title: issue.title, body: tiptapToText(issue.content),
+        const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: target.agentId, deviceRepoId: repoId, readOnly: run.agentDefinition?.readOnly, title: issue.title, body: tiptapToText(issue.content),
           allowLocalRecovery: run.agentDefinition?.allowLocalRecovery, sourceEventId: run.agentDefinition?.allowLocalRecovery ? request?.sourceEventId : undefined,
           executionNote: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
           // Preserve the selected model and credential; tenant admission grants neither.

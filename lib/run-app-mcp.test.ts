@@ -15,10 +15,10 @@ test('the token names owner, Bot and run; the request names only the toolkit', a
 })
 
 test('a read-only run is named as such, and a run outside the caller is unavailable', async () => {
-  const readOnly = await authorizeRunApp(live, 'gmail', async () => true, now, async () => true)
+  const readOnly = await authorizeRunApp(live, 'gmail', allowed, now, async () => true)
   assert.equal(readOnly?.readOnly, true)
   // A run that no longer belongs to the caller is refused, not treated as writable.
-  assert.equal(await authorizeRunApp(live, 'gmail', async () => true, now, async () => null), null)
+  assert.equal(await authorizeRunApp(live, 'gmail', allowed, now, async () => null), null)
 })
 
 test('another person\'s app is refused: the owner always comes from the token', async () => {

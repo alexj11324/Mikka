@@ -1574,7 +1574,6 @@ export class RunSupervisor {
       runId,
       requireSessionResume: assignment.requireSessionResume,
       kind: assignment.kind,
-      mode: assignment.mode,
       factoryCheck: assignment.factoryCheck,
       verifyCommand: assignment.verifyCommand,
       env: taskExecutionEnv(buildChildEnv({

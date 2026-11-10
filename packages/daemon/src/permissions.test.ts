@@ -213,10 +213,12 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     // action left at `ask` names the tool that reaches the gate.
     const installAsk = claudePermissionRules(policy({}))
     expect(installAsk.ask).toEqual([])
-    // install_dependency: ask names the install commands, never the shell.
+    // install_dependency: ask names the install commands. The native shell is
+    // withheld too (rawCliShellAvailable is false unless installs are allowed),
+    // so the install rule never reaches a shell the policy already denies.
     const asking = claudePermissionRules(policy({ install_dependency: "ask" }))
     expect(asking.ask).toEqual(expect.arrayContaining(["Bash(npm install:*)"]))
-    expect(asking.deny).not.toContain("Bash")
+    expect(asking.deny).toEqual(expect.arrayContaining(["Bash", "PowerShell", "Monitor"]))
     // A non-gate action left at `ask` adds no CLI rule: the sandbox and the
     // broker already enforce it, so nothing is routed to the callback.
     // write_outside_repo and computer_use both default to `ask`, so a default
@@ -233,8 +235,9 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(rules.ask).toEqual([])
     expect(claudeSettings(planPolicy).permissions).toEqual(rules)
     expect(policyInstructions(planPolicy)[0]).toContain("read-only check")
-    // A writable run's brief says nothing about reading.
-    expect(policyInstructions(policy({}))).not.toContainEqual(expect.stringContaining("read-only"))
+    // A writable run's brief never calls the run itself read-only; the only
+    // other use of the word is the worktree boundary rule, which every run gets.
+    expect(policyInstructions(policy({}))).not.toContainEqual(expect.stringContaining("This is a read-only"))
   })
 
   it("lets every Cursor tool call go ahead, git push included", async () => {
