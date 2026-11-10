@@ -9,7 +9,12 @@
  *
  * Mention names: `@mikka` always, plus the configured App slug the caller
  * passes from `githubAppSlug()` (cloud: `mikka-github`; self-hosted:
- * `GITHUB_APP_SLUG`). No import keeps this usable in the webhook's early path.
+ * `GITHUB_APP_SLUG`). `appSlug` is a **required caller input**, not an optional
+ * extra: this module cannot import `githubAppSlug()` without giving up the
+ * import-free early path, so a caller that omits it silently drops cloud
+ * `@mikka-github` mentions. Pass `{ appSlug: githubAppSlug() }`, which may be
+ * `null` when unconfigured. No import keeps this usable in the webhook's early
+ * path.
  */
 
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/
@@ -70,11 +75,13 @@ function commentUrl(kind: CommentMentionKind, repo: string, pullNumber: number, 
     : `https://github.com/${repo}/pull/${pullNumber}#discussion_r${commentId}`
 }
 
-/** The mention's identities, or null when this delivery must be ignored. */
+/** The mention's identities, or null when this delivery must be ignored.
+ * `appSlug` is required so webhook wiring cannot forget it; pass
+ * `githubAppSlug()`, which returns null when no App slug is configured. */
 export function commentMentionEvent(
   event: string | null,
   payload: unknown,
-  options: { appSlug?: string | null } = {},
+  options: { appSlug: string | null },
 ): CommentMention | null {
   if (event !== 'issue_comment' && event !== 'pull_request_review_comment') return null
   const root = object(payload)
