@@ -5729,6 +5729,9 @@
       "pending": "读取中"
     }
   },
+  "HostedPlugins": {
+    "manageApp": "管理 {name}"
+  },
   "HostedTasks": {
     "open": "打开任务",
     "status": "状态",
