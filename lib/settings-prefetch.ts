@@ -21,6 +21,7 @@ import { connectedAppsKey, readConnectedApps } from '@/components/plugins/connec
 import { currentMonth } from '@/lib/usage/month'
 import { settingsRead } from '@/lib/settings-read'
 import type { SettingsSectionId } from '@/lib/settings-sections'
+import type { listEnvironments } from '@/app/actions/environments'
 import { settingsKeys } from '@/lib/swr/keys'
 import { prefetchScopedRead } from '@/lib/swr/prefetch'
 
@@ -51,6 +52,7 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: Ke
   models: id => [[subscriptionsKey(id), () => readSubscriptions(id)], [subscriptionUsageKey(id), () => readSubscriptionUsage(id)], [apiKeysKey(id), () => readApiKeys(id)], [modelOrderKey(id), () => readModelOrder(id)], [settingsKeys.e2bKey(id), () => settingsRead<Result<typeof getE2BKeyCapability>>('e2b-key', { workspace: id })]],
   // useSWRInfinite takes a preloaded page by the page's own key: page one of 全部.
   audit: id => [[settingsKeys.audit(id, 'all', null), () => settingsRead<Result<typeof listAuditLog>>('audit', { workspace: id, filter: 'all' })]],
+  environments: id => [[settingsKeys.environments(id), () => settingsRead<Result<typeof listEnvironments>>('environments', { workspace: id })]],
 }
 
 export function prefetchSettingsSection(section: SettingsSectionId, workspaceId: string | undefined, cache: Cache, mutate: ReturnType<typeof useSWRConfig>['mutate']) {

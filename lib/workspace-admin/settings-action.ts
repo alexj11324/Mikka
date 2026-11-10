@@ -9,6 +9,9 @@ export const SETTINGS_ACTION_ERROR_CODES = [
   'secretLimitReached', 'secretsUnavailable', 'secretImportEmpty', 'secretImportTooLarge', 'secretNameShadowsWorkspace', 'e2bKeyInvalid', 'e2bKeyUnverifiable',
   'e2bKeyRateLimited', 'botNotFound', 'tokenNotFound', 'tokenLimitReached',
   'apiKeyInvalid', 'apiKeyUnverifiable', 'apiKeyBaseUrlInvalid', 'apiKeyNotFound',
+  'environmentNotFound', 'environmentConflict', 'environmentInvalid', 'environmentNameTaken',
+  'environmentLimitReached', 'environmentPermissionDenied', 'environmentProjectUnavailable',
+  'environmentSaveFailed',
 ] as const
 export type SettingsActionErrorCode = ActionErrorCode | typeof SETTINGS_ACTION_ERROR_CODES[number]
 export type SettingsActionResult<T> = ActionResult<T, SettingsActionErrorCode>

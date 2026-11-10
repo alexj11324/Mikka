@@ -8,6 +8,8 @@ import { runListChanged } from '@/lib/live/lists'
 import { NextResponse } from 'next/server'
 import { afterJob } from '@/lib/background'
 import { and, eq, isNull } from 'drizzle-orm'
+import { workspacePool } from '@/lib/workspace-db'
+import { freezeRunEnvironment } from '@/lib/environments/runs'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { applyApprovalMode } from '@mikka/protocol/agent-policy'
 import { readRepositorySettings } from '@/lib/device-repositories'
@@ -424,6 +426,17 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId && earlierHarness === harness && profileNativeSessionMatches(earlier.agentDefinition, run.agentDefinition) ? { resumeSessionId: earlier.sessionId } : {}) }
     : {}
   const settings = repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
+  // A default environment freezes here, before the daemon creates the worktree.
+  // Its setup/install scripts reuse the existing approved-recipe path; a live
+  // configuration change cannot alter a claimed run.
+  const frozenEnvironment = run.workspaceId && repo.remoteUrl
+    ? await freezeRunEnvironment(pool, workspacePool, { runId, ownerId: caller.userId, workspaceId: run.workspaceId,
+      issueId: run.issueId, repositoryKey: repo.repoPath })
+    : null
+  const environmentSetup = frozenEnvironment?.setupCommand ?? null
+  const setup = environmentSetup
+    ? { copyFiles: settings?.setup?.approved ? settings.setup.copyFiles : [], command: environmentSetup, approved: true }
+    : settings?.setup
   const verifyCommand = settings ? settings.verifyCommand : device.kind === 'cloud' ? repo.verifyCommand : null
   // Whether the daemon itself pushes the verified task branch: a run with a
   // task branch does. The agent's own push is never withheld; it works with the
@@ -480,12 +493,12 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       repository: remoteRepositoryRef(repo.remoteUrl), harness, subscriptionBindingId: subscription?.id })
     // Reuse the same owner/remote settings already read for this assignment.
     // No discovery, authorization or provider work is added inside the fence.
-    const initialRepository = device.kind === 'cloud' && repo.remoteUrl &&
+    const initialRepository = repo.remoteUrl && (environmentSetup || (device.kind === 'cloud' &&
       !current.retryOf && !current.continuesRunId && !current.sessionId &&
-      request.headers.get(INITIAL_REPOSITORY_HEADER) === '1'
+      request.headers.get(INITIAL_REPOSITORY_HEADER) === '1'))
       ? deviceRepoSchema.safeParse({ repoId: repo.id, path: repo.repoPath,
         name: repo.repoPath.split('/').filter(Boolean).pop() ?? repo.repoPath, remoteUrl: repo.remoteUrl,
-        ...(settings?.setup ? { setup: settings.setup } : {}),
+        ...(setup ? { setup } : {}),
         ...(settings?.networkAllow ? { networkAllow: settings.networkAllow } : {}) }).data : undefined
     return NextResponse.json({
     ...publication,

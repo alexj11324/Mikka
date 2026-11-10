@@ -22,6 +22,7 @@ import { CloudSettings } from '@/components/settings/cloud-settings'
 
 import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { SecretsPage } from '@/components/settings/secrets-page'
+import { EnvironmentsSettings } from '@/components/settings/environments-settings'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
@@ -134,6 +135,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
+    case 'environments': return workspaceId && !preview ? <EnvironmentsSettings key={workspaceId} workspaceId={workspaceId} canManage={admin} /> : waiting
     case 'preferences': return <PreferencesSettings />
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
