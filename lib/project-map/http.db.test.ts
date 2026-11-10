@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { mock, test } from 'node:test'
 import { RUN_DECISION_CATALOGUE } from './mcp-tool'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedUser, seedPersonalWorkspace, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { createApiHandler } from '../../apps/api/src/application'
 import * as apiServer from '../../apps/api/compat/server'
 
@@ -26,9 +26,8 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
   const mcpApi = createApiHandler([{ path: '/mikka/api/mcp', template: '/api/mcp', source: 'app/api/mcp/route.ts',
     methods: ['POST'], load: async () => mcp }])
   const owner = await seedUser(connection, 'decision-http-owner'), other = await seedUser(connection, 'decision-http-other')
-  const workspace = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }])
+  const workspace = { id: await seedPersonalWorkspace(connection, owner) }
   const foreign = await seedWorkspace(connection, other, [{ userId: other, role: 'admin' }])
-  await connection.query('update mikka_workspaces set kind=\'personal\' where id=$1', [workspace.id])
   const projectId = await seedProject(connection, owner, [])
   const issueId = await seedIssue(connection, owner)
   await connection.query('update workspace_projects set "issueIds"=$2 where id=$1', [projectId, JSON.stringify([issueId])])

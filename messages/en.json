@@ -1285,6 +1285,7 @@
     "dataExportRateLimited": "You can export your data once an hour. Try again in {minutes} min.",
     "accountEmailMismatch": "The email doesn’t match this account.",
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
+    "accountLastOrganizationOwner": "Keep at least one active organization owner.",
     "runChainEnded": "This task has already stopped; there is nothing left to stop.",
     "threadStopping": "The thread is stopping",
     "secretNotFound": "That secret or variable no longer exists.",
@@ -2477,7 +2478,8 @@
         "workspace": {
           "slug_changed": "changed the address from {from} to {to}",
           "deleted": "deleted the workspace",
-          "ownership_transferred": "transferred the workspace to {target}"
+          "ownership_transferred": "transferred the workspace to {target}",
+          "entitlements_changed": "changed workspace entitlements from {fromPlan} to {toPlan}"
         },
         "billing": {
           "checkout_started": "opened checkout",
@@ -5341,6 +5343,19 @@
     "run_network_error": { "default": "The provider connection failed. Check the connection and try again." },
     "run_provider_error": { "default": "The model provider could not complete this request. Try again." },
     "run_failed": { "default": "The task could not be completed. Check the error details or try again." },
+    "governance_denied": {
+      "plan_changed": "The plan changed. Review its current entitlements before applying this update.",
+      "default": "The governance action could not be completed. Try again.",
+      "access_denied": "You do not have permission to manage this organization or workspace.",
+      "seat_limit": "This plan has reached its active member limit. Remove or suspend a member, or upgrade the plan.",
+      "feature_unavailable": "This feature needs Team Pro or Enterprise.",
+      "last_owner": "Keep at least one active organization owner.",
+      "workspace_attached": "This workspace already belongs to another organization.",
+      "personal_workspace": "Personal workspaces cannot use shared-workspace entitlements or join an organization.",
+      "invalid_request": "Check the information and try again.",
+      "template_limit": "This plan has reached its approval template limit.",
+      "not_found": "This organization, workspace, or template is unavailable."
+    },
     "web_auth_invalid_request": { "default": "The sign-in request is invalid. Connect again." },
     "web_auth_forbidden": { "default": "The server refused this sign-in origin." },
     "web_auth_state_unavailable": { "default": "This sign-in request was already used. Connect again." },

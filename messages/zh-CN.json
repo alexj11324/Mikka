@@ -1285,6 +1285,7 @@
     "dataExportRateLimited": "每小时只能导出一次，{minutes} 分钟后可再次导出。",
     "accountEmailMismatch": "输入的邮箱与当前账户不一致。",
     "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。",
+    "accountLastOrganizationOwner": "组织至少需要保留一位活跃所有者。",
     "runChainEnded": "这个任务已经停了，没有可停止的运行。",
     "threadStopping": "线程正在停止",
     "secretNotFound": "该密钥或环境变量已不存在。",
@@ -2477,7 +2478,8 @@
         "workspace": {
           "slug_changed": "把地址从 {from} 改为 {to}",
           "deleted": "删除了工作区",
-          "ownership_transferred": "把工作区转让给 {target}"
+          "ownership_transferred": "把工作区转让给 {target}",
+          "entitlements_changed": "将工作区权益从 {fromPlan} 调整为 {toPlan}"
         },
         "billing": {
           "checkout_started": "打开了结账",
@@ -5341,6 +5343,19 @@
     "run_network_error": { "default": "无法连接模型服务商，请检查连接后重试。" },
     "run_provider_error": { "default": "模型服务商未能完成这次请求，请重试。" },
     "run_failed": { "default": "任务未能完成，请查看错误详情或重试。" },
+    "governance_denied": {
+      "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
+      "default": "治理操作未完成，请重试。",
+      "access_denied": "你没有管理此组织或工作区的权限。",
+      "seat_limit": "活跃成员已达到当前套餐上限。请移除或停用成员，或升级套餐。",
+      "feature_unavailable": "此功能需要 Team Pro 或 Enterprise。",
+      "last_owner": "组织至少需要保留一位活跃所有者。",
+      "workspace_attached": "此工作区已属于另一个组织。",
+      "personal_workspace": "个人工作区不能使用共享工作区权益或加入组织。",
+      "invalid_request": "请检查填写的信息后重试。",
+      "template_limit": "审批模板数量已达到当前套餐上限。",
+      "not_found": "此组织、工作区或模板不可用。"
+    },
     "web_auth_invalid_request": { "default": "登录请求无效，请重新连接。" },
     "web_auth_forbidden": { "default": "服务器拒绝了这个登录来源。" },
     "web_auth_state_unavailable": { "default": "这个登录请求已被使用，请重新连接。" },
