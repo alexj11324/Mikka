@@ -59,6 +59,13 @@ test('a run judged done, idle or blocked is not waiting', () => {
   assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'blocked' }) }), new Set()), [])
 })
 
+test('the judge can hand a succeeded run back as needs_input; the inbox waits on that too', () => {
+  assert.deepEqual(
+    waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'succeeded', outcome: 'needs_input' }) }), new Set()),
+    [{ runId: 'r1', title: 'what r1 was asked' }],
+  )
+})
+
 test('a stale event is not waiting', () => {
   assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1') }), new Set([1])), [])
 })

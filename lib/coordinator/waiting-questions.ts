@@ -43,11 +43,13 @@ export function waitingQuestionRuns(
     const key = run?.issue?.id ?? line.runId ?? `position-${item.position}`
     if (seen.has(key)) continue
     seen.add(key)
-    // `issue.run` is the task's newest run (lib/issue-summary-columns): the same
-    // row the inbox reads, so the sentence and needsReply cannot disagree.
+    // `issue.run` is the task's newest run (lib/issue-summary-columns). Waiting is
+    // the inbox's needsReply: a live `waiting_input`, or the judged `needs_input`
+    // (a run that asked ends `stopped`, and the judge may also call it after
+    // `succeeded` when it hands work back), so the sentence and the inbox agree.
     const newest = run ? run.issue?.run ?? { status: run.status, outcome: run.outcome ?? null } : null
     if (!run || !newest) continue
-    if (newest.status !== 'waiting_input' && !(newest.status === 'stopped' && newest.outcome === 'needs_input')) continue
+    if (newest.status !== 'waiting_input' && newest.outcome !== 'needs_input') continue
     rows.push({ runId: line.runId, title: runTitle(run) })
   }
   return rows.reverse()

@@ -25,7 +25,10 @@ test('runtime events read as lines in the person\'s language, with the thread as
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
     const agentId = randomUUID()
     await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
-    await pool.query('INSERT INTO agent_runs (id, "userId", "agentId", status, prompt) VALUES ($1, $2, $3, $4, $5)', [runId, user.id, agentId, 'waiting_input', '改用 msw 还是只改这两个测试'])
+    // The recorded task range is the only thing allowed to name a thread (lib/run-bot-name.ts); without it the
+    // citation falls back to the agent name and the waiting sentence could not name the task it links.
+    await pool.query('INSERT INTO agent_runs (id, "userId", "agentId", status, prompt, "promptTaskStart", "promptTaskLength") VALUES ($1, $2, $3, $4, $5, 0, char_length($5))',
+      [runId, user.id, agentId, 'waiting_input', '改用 msw 还是只改这两个测试'])
     // What the server stores for each event (eventPrompt + sourcedEventMessage): the model's text and its kind.
     const events = [
       { kind: 'run_question', text: `[Event] The agent in run ${runId} asks the person: msw or just these two tests?\nCheck the current run state and existing task facts first. Never invent their permission. send_to_run does not itself prove the run resumed.` },
