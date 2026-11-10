@@ -91,9 +91,9 @@ test('task identity: split DB migration, immutable issuance, historical aliases 
       VALUES($1,$2,'peer','PEER-71','mikka/peer-71','2020-01-01'),($3,$2,'owner','OWNER-71','mikka/owner-71','2020-02-01')`, [peerRun, upgraded, ownerRun])
     const upgradePublicationsBefore = (await app.query('SELECT * FROM run_publications WHERE "issueId"=$1 ORDER BY "runId"', [upgraded])).rows
     const upgradeRunsBefore = (await app.query('SELECT id,"issueId","userId","agentDefinition","baseBranch" FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [upgraded])).rows
-    const appMigration = await readFile(new URL('../drizzle/20261110151001_task_identity.sql', import.meta.url), 'utf8')
-    const wsMigration = await readFile(new URL('../drizzle/20261110151002_task_identity_aliases.sql', import.meta.url), 'utf8')
-    const aliasMigration = await readFile(new URL('../drizzle/20261110151007_task_alias_tenant.sql', import.meta.url), 'utf8')
+    const appMigration = await readFile(new URL('../drizzle/20261111010001_task_identity.sql', import.meta.url), 'utf8')
+    const wsMigration = await readFile(new URL('../drizzle/20261111010002_task_identity_aliases.sql', import.meta.url), 'utf8')
+    const aliasMigration = await readFile(new URL('../drizzle/20261111010007_task_alias_tenant.sql', import.meta.url), 'utf8')
     await app.query(appMigration); await app.query(aliasMigration); await ws.query(wsMigration)
     await app.query('SELECT * FROM reconcile_bound_task_identifier_aliases($1::uuid[])', [[publication]])
     moduleApp = (await import('../lib/db')).pool

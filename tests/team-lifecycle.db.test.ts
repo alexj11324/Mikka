@@ -54,8 +54,11 @@ test('Team lifecycle preserves canonical workspace objects and their history', {
     const legacyOwner = await seedUser(pool, 'legacy-personal-team')
     const legacyWorkspace = await seedWorkspace(pool, legacyOwner, [{ userId: legacyOwner, role: 'admin' }])
     const legacyTeam = await seedTeam(pool, legacyWorkspace.id, legacyOwner, 'Legacy Personal Team')
-    // A pre-migration record: never synthesize a new Team in a personal tenant.
-    await pool.query('update mikka_workspaces set kind=\'personal\' where id=$1', [legacyWorkspace.id])
+    // A pre-migration record: the kind changed before the immutability guard
+    // existed, so disable that one guard for the setup write and restore it.
+    await pool.query('ALTER TABLE mikka_workspaces DISABLE TRIGGER mikka_workspace_kind_guard')
+    try { await pool.query('update mikka_workspaces set kind=\'personal\' where id=$1', [legacyWorkspace.id]) }
+    finally { await pool.query('ALTER TABLE mikka_workspaces ENABLE TRIGGER mikka_workspace_kind_guard') }
     assert.deepEqual(await accessibleTeams(legacyOwner, legacyWorkspace.id, { includeArchived: true }), [])
     const personalTask = await seedIssue(pool, legacyOwner, legacyWorkspace.id)
     await assert.rejects(pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [personalTask, legacyTeam.id, legacyWorkspace.id, legacyOwner]), /teamPersonalWorkspace/)

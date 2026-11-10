@@ -22,7 +22,7 @@ test('directives count only in the header (leading comment / blank lines)', () =
 
 test('Project rolling-upgrade fence is an atomic Workspace migration', async () => {
   const { readFile } = await import('node:fs/promises')
-  const name = '20261110151008_project_writer_fence.sql'
+  const name = '20261111010008_project_writer_fence.sql'
   const source = await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8')
   const migration = planMigration(name, source)
   assert.equal(migration.target, 'DATABASE_URL')
