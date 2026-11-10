@@ -593,7 +593,7 @@ export async function loadConversation(userId: string, botId: string): Promise<L
 }
 
 /** One fresh owner-scoped preference row supplies this prompt's memory switch and personal instructions. */
-export async function loadConversationForPrompt(userId: string, botId: string): Promise<LoadedConversation & { personalInstructions: string }> {
+export async function loadConversationForPrompt(userId: string, botId: string): Promise<LoadedConversation & { personalInstructions: string; memoryEnabled: boolean }> {
   const [conversation, preferences] = await Promise.allSettled([
     readConversationRows(userId, botId),
     readCoordinatorPromptPreferences(userId),
@@ -605,6 +605,7 @@ export async function loadConversationForPrompt(userId: string, botId: string): 
   return {
     ...conversationWithMemory(conversation.value, preferences.value.memoryEnabled),
     personalInstructions: preferences.value.personalInstructions,
+    memoryEnabled: preferences.value.memoryEnabled,
   }
 }
 

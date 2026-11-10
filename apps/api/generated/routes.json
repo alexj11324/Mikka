@@ -730,7 +730,7 @@
         "GET"
       ],
       "maxDuration": 60,
-      "sourceHash": "0d1bf999aba2847b3c562b6520b20557a399fb0a44722595ec88dc9754a3389e"
+      "sourceHash": "9c2a81ff6ca542a6b228d86b0675dc1c0daffbbcd2f470cda661d4dced44c4e2"
     },
     {
       "path": "/mikka/api/desktop/begin",

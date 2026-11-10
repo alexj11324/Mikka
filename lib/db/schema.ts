@@ -9,7 +9,7 @@ import type { RunFailure } from '@mikka/protocol/run-failure'
 import type { DaemonUpdateFailure, SetupRecipe } from '@mikka/protocol/device'
 import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
-import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
+import type { UserFactKind, UserFactState, MemorySourceKind, MemoryReviewStatus, MemoryScopeKind } from '@/lib/profile/kinds'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -744,9 +744,53 @@ export const userFacts = pgTable('user_facts', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
   state: text('state').$type<UserFactState>().notNull().default('active'),
   userEdited: boolean('userEdited').notNull().default(false),
+  reviewStatus: text('reviewStatus').$type<MemoryReviewStatus>().notNull().default('approved'),
+  sourceKind: text('sourceKind').$type<MemorySourceKind>(),
+  sourceId: text('sourceId'),
+  sourceUrl: text('sourceUrl'),
+  scopeKind: text('scopeKind').$type<MemoryScopeKind>().notNull().default('global'),
+  scopeIds: uuid('scopeIds').array().notNull().default(sql`'{}'::uuid[]`),
+  clientRequestId: uuid('clientRequestId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
+
+/** A persisted consolidation answer and the actual facts it derived from. No provider/model attribution is inferred. */
+export const userFactDecisions = pgTable('user_fact_decisions', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull(),
+  factId: uuid('factId').notNull().references(() => userFacts.id, { onDelete: 'cascade' }),
+  sourceFactIds: uuid('sourceFactIds').array().notNull(),
+  method: text('method').$type<'consolidation_answer'>().notNull(),
+  decisionKey: text('decisionKey').notNull(),
+  decidedAt: timestamp('decidedAt', { withTimezone: true }).notNull(),
+}, table => [unique('user_fact_decisions_request_unique').on(table.userId, table.decisionKey), index('user_fact_decisions_fact_idx').on(table.userId, table.factId)])
+
+/** Short-lived, owner-private snapshot. The main fact is scrubbed immediately on delete. */
+export const userFactUndo = pgTable('user_fact_undo', {
+  factId: uuid('factId').primaryKey().references(() => userFacts.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  snapshot: jsonb('snapshot').$type<{
+    value: Record<string, unknown>; evidence: UserFactEvidence[];
+    reviewStatus: MemoryReviewStatus; sourceKind: MemorySourceKind | null;
+    sourceId: string | null; sourceUrl: string | null;
+  }>().notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+}, table => [index('user_fact_undo_expires_idx').on(table.expiresAt)])
+
+/** Only trusted server-side prompt/consumer events can write actual usage. */
+export const userFactUses = pgTable('user_fact_uses', {
+  factId: uuid('factId').notNull().references(() => userFacts.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  eventId: uuid('eventId').notNull(),
+  targetKind: text('targetKind').$type<'thread' | 'task'>().notNull(),
+  targetId: uuid('targetId').notNull(),
+  targetUrl: text('targetUrl'),
+  usedAt: timestamp('usedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.factId, table.eventId] }),
+  index('user_fact_uses_recent_idx').on(table.userId, table.factId, table.usedAt.desc()),
+])
 
 /** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person (lib/profile/store.ts). The 记忆 switch is userPreferences.memoryEnabled. */
 export const userFactConsolidations = pgTable('user_fact_consolidations', {

@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
-import { attestCoreProduction, coreTargetFailure } from './self-hosted-production-target.mjs'
+import { attestCoreProduction, assertCoreProductionTarget, coreBusinessSelected, coreTargetFailure } from './self-hosted-production-target.mjs'
 import { runMobileDaemonProof } from '../ops/production-mobile-daemon.mjs'
 
 export async function runCoreProduction({ env = process.env, event, attestation, ...options } = {}) {
-  return runMobileDaemonProof({ env, event, attestation, ...options })
+  const fresh = await assertCoreProductionTarget({ env, event, attestation, fetchImpl: options.fetchImpl, now: options.now })
+  if (!coreBusinessSelected(fresh)) return { status: 'skipped', code: 'core_business_issues_closed',
+    applicationSha: fresh.applicationSha, driverRunId: fresh.driverRunId }
+  return runMobileDaemonProof({ env, event, attestation: fresh, ...options })
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -26,8 +29,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     '## Mikka cloud core compatibility ' + (attesting ? 'target' : 'API acceptance') + '\n\n'
     + 'Result: ' + report.status + '. No model calls, cloud computers, browser, OAuth or billing settlement are exercised.\n\n'
     + '```json\n' + json + '```\n')
-  if (attesting && process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, 'readable=' + (report.readable === true) + '\n')
+  if (attesting && process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT,
+    'readable=' + (report.readable === true) + '\ncore_selected=' + coreBusinessSelected(report) + '\n')
   process.exitCode = attesting
     ? (report.status === 'ready' || report.status === 'skipped' && report.code === 'core_issues_closed' ? 0 : 1)
-    : report.status === 'pass' ? 0 : 1
+    : report.status === 'pass' || report.status === 'skipped' && report.code === 'core_business_issues_closed' ? 0 : 1
 }

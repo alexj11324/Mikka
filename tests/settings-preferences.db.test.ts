@@ -31,7 +31,11 @@ async function load() {
 before(async () => {
   if (!databaseUrl) return
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } } } })
+  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  mock.module('@/lib/auth', { namedExports: {
+    auth: { api: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } },
+    authBaseURL: 'https://memory-rpc.example.invalid', googleEnabled: false, githubSignInEnabled: async () => false,
+  } })
   mock.module('@/lib/session', { namedExports: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } })
   mock.module('@/lib/suggestions/sources', { namedExports: { connectedComposioApps: async () => connected } })
   m = await load()
@@ -245,6 +249,61 @@ dbTest('删除全部记忆 removes only the person\'s facts and getMemory counts
   assert.deepEqual(await memory.clearMemory(), { removed: 0 })
   as(people.dana)
   assert.equal((await memory.getMemory()).total, 1, 'another person\'s memory is untouched')
+})
+
+dbTest('memory browser RPC reaches actual actions for manual facts, scope, review and undo without taking a client owner', async () => {
+  const [{ createBrowserRpc }, { desktopActions }, { decode }] = await Promise.all([
+    import('@/lib/browser-rpc/handler'), import('@/lib/desktop-rpc/registry'), import('@/lib/desktop-rpc/wire'),
+  ])
+  const origin = 'https://memory-rpc.example.invalid'
+  const handle = createBrowserRpc({
+    trustedBaseURL: origin,
+    authenticate: async headers => headers.get('cookie') === 'fixture=memory' && sessionUser ? sessionUser : null,
+    scope: async (_identity, work) => work(),
+    actions: desktopActions,
+  })
+  const send = (action: string, args: unknown[] = []) => handle(new Request(origin + '/mikka/api/rpc', {
+    method: 'POST', headers: { origin, cookie: 'fixture=memory', 'x-mikka-rpc': '1', 'content-type': 'application/json' },
+    body: JSON.stringify({ version: 1, action, args }),
+  }))
+  const call = async (action: string, args: unknown[] = []) => {
+    const response = await send(action, args)
+    assert.equal(response.status, 200, action)
+    const payload = await response.json()
+    assert.equal(payload.ok, true, action)
+    return decode(payload.result)
+  }
+  as(null)
+  assert.equal((await send('memory.getMemory')).status, 401)
+  as(people.alex)
+  const input = { requestId: randomUUID(), kind: 'preference', subject: 'RPC fixture ' + randomUUID() }
+  assert.equal((await send('memory.addFact', [{ ...input, userId: people.dana }])).status, 400)
+  const id = await call('memory.addFact', [input]) as string
+  assert.match(id, /^[a-f0-9-]{36}$/)
+  try {
+    assert.equal(await call('memory.addFact', [input]), id, 'wire replay keeps the same idempotent insert')
+    let view = await call('memory.getMemory') as Awaited<ReturnType<Modules['memory']['getMemory']>>
+    const own = view.facts.find(fact => fact.id === id)!
+    assert.equal(own.source?.kind, 'told')
+    assert.equal(own.usedCount, 0)
+    assert.deepEqual(own.recentUses, [])
+    const personal = view.scopeOptions.workspaces[0].id
+    assert.equal(await call('memory.setFactScope', [id, { kind: 'workspaces', ids: [personal] }]), true)
+    assert.equal(await call('memory.reviewFact', [id, 'approve']), true)
+    assert.equal(await call('memory.removeFact', [id]), true)
+    view = await call('memory.getMemory') as typeof view
+    assert.equal(view.facts.some(fact => fact.id === id), false)
+    assert.deepEqual(view.undoable.find(fact => fact.id === id)?.actions, ['undo'])
+    assert.equal(await call('memory.undoRemoveFact', [id]), true)
+    assert.equal(await call('memory.undoRemoveFact', [id]), true)
+    assert.equal((await call('memory.getMemory') as typeof view).facts.find(fact => fact.id === id)?.source?.kind, 'told')
+    as(people.dana)
+    assert.equal((await call('memory.getMemory') as typeof view).facts.some(fact => fact.id === id), false)
+    assert.equal(await call('memory.removeFact', [id]), false)
+    assert.equal(await call('memory.undoRemoveFact', [id]), false)
+  } finally {
+    await m.db.delete(m.schema.userFacts).where(m.drizzle.eq(m.schema.userFacts.id, id))
+  }
 })
 
 dbTest('数据来源: connected apps are listed with their switch, and a turned-off app is not read', async () => {
