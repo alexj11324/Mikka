@@ -1,3 +1,4 @@
+import { DE, diagRecord, diagObject, diagKey, diagKindCode } from '../diagnostics/issue1512-native-reads.mjs'
 import { liveInvalidation, liveReadiness, LIVE_ID, LIVE_REVISION_PARAM, type LiveKind } from './events'
 import { liveRevisionKey, type LiveRevisions } from './revisions'
 import { LIVE_PRESENCE_PARAM, PRESENCE_MAX_TOKEN_BYTES, PRESENCE_MAX_WATCHES_PER_SOCKET, presenceReply, type PresenceCommand, type PresenceProof } from './presence'
@@ -70,7 +71,7 @@ export class LiveChannel {
   private flushAt: number | null = null
   private nextDeadline = 0
 
-  constructor(private runtime: LiveRuntime) {}
+  constructor(private runtime: LiveRuntime) { diagRecord(DE.channel, diagObject(this), 1, this.generation) }
 
   private observe(observation: LiveObservation) {
     try { this.runtime.observe?.(observation) } catch { /* analytics never changes a read */ }
@@ -90,17 +91,19 @@ export class LiveChannel {
       deadlineObservation: Number.isFinite(options.deadline?.observation) ? options.deadline!.observation! : null,
       timer: `deadline:${++this.nextDeadline}`, revisions: heldRevisions(options.revisions), presence: options.presence }
     this.subscriptions.add(subscription)
+    for (const key of keys) diagRecord(DE.subscription, diagObject(this), this.generation, diagObject(subscription), diagKey(key), diagKindCode(kind), 1)
     if (this.subscriptions.size === 1) {
       this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
       if (this.runtime.visible()) { this.fallback(); void this.connect() }
     }
     if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true, false, undefined,
       this.supported(subscription) && this.coverageAfter !== null
-        ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined)
+        ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined, 2)
     this.syncPresence()
     this.fallback()
     this.scheduleDeadline(subscription)
     const stop = () => {
+      for (const key of keys) diagRecord(DE.subscription, diagObject(this), this.generation, diagObject(subscription), diagKey(key), diagKindCode(kind), 2)
       this.subscriptions.delete(subscription)
       this.clear(subscription.timer)
       this.syncPresence()
@@ -159,6 +162,7 @@ export class LiveChannel {
   }
 
   private closeSocket() {
+    diagRecord(DE.channel, diagObject(this), 5, this.generation, Number(this.connected))
     this.connected = false
     this.coverageAfter = null
     this.invalidationAfter.clear()
@@ -209,7 +213,7 @@ export class LiveChannel {
     })
   }
 
-  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number, after = readBoundary()) {
+  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number, after = readBoundary(), diagnosticCause = 0) {
     if (!this.runtime.visible()) { this.observe({ event: 'skipped', reason: 'hidden', kind, id, rev }); return }
     for (const subscription of this.subscriptions) {
       if (kind && (subscription.kind !== kind || subscription.id !== id)) continue
@@ -220,6 +224,7 @@ export class LiveChannel {
         const at = kind && !immediate ? Math.max(this.localNow(), (this.lastRead.get(key) ?? -Infinity) + subscription.minIntervalMs) : this.localNow()
         const previous = this.pending.get(key)
         const waits = [...previous?.waits ?? [], ...rev === undefined ? [] : [{ subscription, key, rev }]]
+        diagRecord(DE.invalidate, diagObject(this), this.generation, diagKey(key), after, Math.max(after, previous?.after ?? after), Number(immediate), Number(unsupportedOnly), rev ?? 0, diagnosticCause)
         this.pending.set(key, { at: Math.min(at, previous?.at ?? Infinity), after: Math.max(after, previous?.after ?? after),
           unconditional: rev === undefined || previous?.unconditional === true, waits })
       }
@@ -253,6 +258,7 @@ export class LiveChannel {
       if (this.covered(read)) { this.pending.delete(key); this.skippedReads++; this.observe({ event: 'skipped', reason: 'covered', key }); continue }
       if (this.inFlight.has(key) || at > this.localNow()) continue
       this.pending.delete(key)
+      diagRecord(DE.flush, diagObject(this), this.generation, diagKey(key), read.after, Number(read.unconditional), read.waits.length)
       this.lastRead.set(key, this.localNow())
       const request = Symbol()
       this.inFlight.set(key, request)
@@ -348,6 +354,7 @@ export class LiveChannel {
       } else if (!watch.unavailable && reply.expiresAt > this.runtime.now() && reply.expiresAt <= watch.proof.expiresAt) {
         watch.coveredUntil = this.localNow() + reply.expiresAt - this.runtime.now()
         this.coverageAfter = readBoundary()
+        diagRecord(DE.channel, diagObject(this), 6, this.generation, this.coverageAfter)
         this.expirePresence(watch, reply.expiresAt)
       }
     }
@@ -386,6 +393,7 @@ export class LiveChannel {
     const generation = ++this.generation
     const controller = this.controller = new AbortController()
     this.observe({ event: 'socket', state: 'connecting' })
+    diagRecord(DE.channel, diagObject(this), 2, generation)
     try {
       const ticket = await this.runtime.ticket(controller.signal)
       if (generation !== this.generation || !this.runtime.visible()) return
@@ -399,9 +407,10 @@ export class LiveChannel {
         if (generation !== this.generation) return
         this.connected = true; this.retryMs = 1_000; this.pong = true
         this.observe({ event: 'socket', state: 'open' })
+        diagRecord(DE.channel, diagObject(this), 3, generation)
         // An open socket/pong is not evidence that this Worker supports a new kind.
         this.fallback()
-        this.invalidate() // Covers changes committed while the connection was opening.
+        this.invalidate(undefined, undefined, false, false, undefined, undefined, 1) // Covers changes committed while the connection was opening.
         this.heartbeat(generation)
         this.later('renew', Math.max(1, ticket.expiresAt - this.runtime.now()), () => this.disconnected(generation, 0))
       }
@@ -416,6 +425,7 @@ export class LiveChannel {
           if (readiness) {
             this.observe({ event: 'socket', state: 'ready' })
             this.coverageAfter = readBoundary()
+            diagRecord(DE.channel, diagObject(this), 4, generation, this.coverageAfter)
             this.capabilities = new Set(readiness.kinds)
             this.revisionKinds = new Set(readiness.revisions)
             if (this.allSupported()) this.clear('fallback'); else this.fallback()
@@ -427,6 +437,7 @@ export class LiveChannel {
             this.observe({ event: 'received', kind: value.kind, id: value.id, rev: value.rev })
             const after = readBoundary()
             this.invalidationAfter.set(value.kind, after)
+            diagRecord(DE.incoming, diagObject(this), generation, diagKindCode(value.kind), after, value.rev ?? 0)
             this.invalidate(value.kind, value.id, false, false, value.rev !== undefined && this.revisionKinds.has(value.kind) ? value.rev : undefined, after)
           } else this.observe({ event: 'skipped', reason: 'invalid' })
         } catch { /* malformed keys/capabilities cannot trigger reads or disable fallback */ }

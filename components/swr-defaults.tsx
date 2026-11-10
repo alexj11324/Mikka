@@ -6,6 +6,7 @@ import { pageNeedsRefresh } from '@/lib/app-build'
 import { PersistentReadCache, waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { isAutoRetryable, MAX_READ_RETRIES, retryRead } from '@/lib/swr/retry'
 import { liveKeyConnection } from '@/lib/swr/live-focus'
+import { diagCurrentRead, diagWithRead } from '@/lib/diagnostics/issue1512-native-reads.mjs'
 import { acceptSWRRead, failSWRRead, isSnapshotReadFetcher, observeSWRRead } from '@/lib/swr/read-observer'
 
 /** Data younger than this is fresh: focus leaves it alone. A hook may set a longer `focusThrottleInterval`. */
@@ -35,8 +36,9 @@ export const staleOnFocus: Middleware = useSWRNext => (key, fetcher, config) => 
   const resumeAfterHydration = Boolean(fetcher) && config.revalidateOnMount !== false
   const stamped = fetcher && id && cache
     ? (...args: unknown[]) => observeSWRRead(cache, id, async withDispatch => {
+      const diagnosticRead = diagCurrentRead()
       await waitForCacheHydration(cache)
-      const run = () => (fetcher as (...input: unknown[]) => unknown)(...args)
+      const run = () => diagWithRead(diagnosticRead, () => (fetcher as (...input: unknown[]) => unknown)(...args))
       const result = await (isSnapshotReadFetcher(fetcher) ? withDispatch(run) : run())
       stamps(cache).set(id, Date.now())
       return result

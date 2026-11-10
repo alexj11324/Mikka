@@ -19,6 +19,7 @@ import { captureNativeResources } from './native-resources.mjs'
 import { observeAccountRelease } from './account-release-observer.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { recordNativeCleanup } from './native-auth-diagnostics.mjs'
+import { nativeReadDiagnosticEnabled, attachWebReadDiagnostic, collectWebReadDiagnostic, collectNativeReadDiagnostic } from './native-read-diagnostic.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
 import { readNativeStartup } from './native-startup.mjs'
@@ -53,6 +54,7 @@ const evidence = {
     hosted: { revision, mode: 'hosted', url: `${environment.origin}/mikka`, backend: environment.origin },
   },
   startedAt: new Date().toISOString(), viewport, checks: [], samples: [], nativeStates: [], nativeViewports: [], nativeSetup: [], navigation: [], phases: [],
+  ...(nativeReadDiagnosticEnabled ? { readDiagnostics: { version: 1, purpose: 'causal-diagnosis-only', records: [] } } : {}),
   measurement: {
     clock: 'Node performance.now, immediately before Electron launch to visible seeded message and enabled composer accepting a draft',
     process: 'same compiled shell/backend, bundled vs preserved hosted loading path; fresh Electron process for every sample, existing authenticated profile, same account/workspace',
@@ -99,7 +101,8 @@ async function launch(mode, extraArgs = []) {
   const app = await launchElectron({
     ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
     args: [...(process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')]), ...extraArgs],
-    cwd: root, env: { ...process.env, MIKKA_DESKTOP_RENDERER: mode, MIKKA_USER_DATA_DIR: profiles[mode] }, timeout: 90_000,
+    cwd: root, env: { ...process.env, MIKKA_DESKTOP_RENDERER: mode, MIKKA_USER_DATA_DIR: profiles[mode],
+      MIKKA_1512_READ_DIAGNOSTIC: nativeReadDiagnosticEnabled ? '1' : '0' }, timeout: 90_000,
   })
   const connectedMs = performance.now() - started
   active.add(app)
@@ -127,13 +130,16 @@ async function close(app) {
 async function recordNativeState(page, phase, mode) {
   // This observes the actual local IPC state. It neither starts a service nor
   // performs a backend read, and always runs after readiness timing stops.
-  const state = await page.evaluate(async () => {
+  const { readDiagnostic, ...state } = await page.evaluate(async enabled => {
     const [device, installer] = await Promise.all([window.mikka.device.status(), window.mikka.ssh?.state()])
     return {
       device: { status: device.status, signedIn: device.signedIn, server: device.server, deviceIdPresent: Boolean(device.deviceId) },
       installer: installer ? { status: installer.status, step: installer.step, retryable: installer.retryable ?? false } : null,
+      ...(enabled ? { readDiagnostic: globalThis.__mikka1512ReadDiagnostic?.dump(2) ?? null } : {}),
     }
-  })
+  }, nativeReadDiagnosticEnabled)
+  if (nativeReadDiagnosticEnabled) evidence.readDiagnostics.records.push({ phase, mode,
+    launch: evidence.nativeViewports.length, ...await collectNativeReadDiagnostic(application, readDiagnostic) })
   evidence.nativeStates.push({ phase, mode, ...state, daemon: await readNativeDaemonMetadata(profiles[mode]) })
   return state
 }
@@ -312,10 +318,13 @@ try {
   try {
     const webPage = await webContext.newPage()
     webPage.setDefaultTimeout(60_000)
+    const webReadDiagnostic = nativeReadDiagnosticEnabled ? await attachWebReadDiagnostic(webPage) : null
     await webPage.goto(`${environment.origin}/mikka`, { waitUntil: 'domcontentloaded' })
     await checkpointQueryWindow(webLogin, 'web-navigation-to-dom-content-loaded')
     assert.equal(await selectFixture(webPage), 'zh-CN')
     await checkpointQueryWindow(webLogin, 'workspace-selection-to-usable', true)
+    if (webReadDiagnostic) evidence.readDiagnostics.records.push({ phase: 'ordinary-web-login', mode: 'web', launch: 0,
+      ...await collectWebReadDiagnostic(webPage, webReadDiagnostic) })
   } finally { await webContext.close() }
 
   let run = await launch('bundled')

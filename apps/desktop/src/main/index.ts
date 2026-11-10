@@ -1,3 +1,4 @@
+import { installMainReadDiagnostic } from '../../../../lib/diagnostics/issue1512-read-collector.mjs'
 // Electron main: one window on the shared web UI, plus the native abilities
 // the UI reads through `window.mikka`. The renderer is treated as untrusted;
 // every privileged call goes through the validated IPC surface in `./bridge`.
@@ -323,9 +324,13 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
+      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : []),
+        ...(process.env.MIKKA_1512_READ_DIAGNOSTIC === '1' ? ['--mikka-1512-read-diagnostic'] : [])],
     },
   })
+  if (process.env.MIKKA_1512_READ_DIAGNOSTIC === '1') {
+    try { installMainReadDiagnostic(mainWindow.webContents) } catch { /* absent diagnostics remain incomplete */ }
+  }
   markStartup('main.window.created')
   mainWindow.setMenuBarVisibility(false)
   mainWindow.once('ready-to-show', () => mainWindow?.show())
