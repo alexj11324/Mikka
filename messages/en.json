@@ -5602,6 +5602,14 @@
     }
   },
   "FactoryFlow": {
+    "trail": {
+      "done": "Done",
+      "running": "Working",
+      "waiting": "Needs you",
+      "failed": "Failed",
+      "pending": "Up next",
+      "approval": "Approval"
+    },
     "acceptance": "Acceptance",
     "stages": {
       "triage": "Triage",
@@ -6232,5 +6240,46 @@
     "content": "Content",
     "readFailed": "Unable to load {label}.",
     "refreshFailed": "Unable to refresh {label}. Previous content is shown."
+  },
+  "HostedAcceptance": {
+    "agent": "Factory",
+    "candidate": "Candidate",
+    "open": "Open",
+    "approved": "Approved",
+    "edited": "Approved with changes",
+    "rejected": "Sent back",
+    "state": {
+      "stopped": "Stopped",
+      "waiting": "Waiting on you",
+      "running": "Running",
+      "done": "Done"
+    },
+    "waiting": "Waiting on you",
+    "decided": "Decided",
+    "run": "State",
+    "more": "Full context",
+    "less": "Less context",
+    "stopped": "Stopped here",
+    "emptyTitle": "Nothing waits for you",
+    "previous": "Previous",
+    "next": "Next",
+    "of": "{index} of {total}",
+    "loading": "Loading",
+    "cases": {
+      "item": "Item",
+      "evidence": "Evidence",
+      "thread": "Thread",
+      "result": "Result",
+      "commit": "Commit",
+      "all": "All",
+      "passed": "Passed",
+      "unverified": "Unverified",
+      "failed": "Not passed",
+      "empty": "No items with this result"
+    },
+    "earlier": "earlier",
+    "moreSteps": "more",
+    "fewer": "Show fewer",
+    "untitled": "Untitled"
   }
 }

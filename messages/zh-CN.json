@@ -5602,6 +5602,14 @@
     }
   },
   "FactoryFlow": {
+    "trail": {
+      "done": "完成",
+      "running": "进行中",
+      "waiting": "等你处理",
+      "failed": "失败",
+      "pending": "待开始",
+      "approval": "待你批准"
+    },
     "acceptance": "验收",
     "stages": {
       "triage": "分诊",
@@ -6232,5 +6240,46 @@
     "content": "内容",
     "readFailed": "{label}加载失败。",
     "refreshFailed": "{label}更新失败，仍显示上次内容。"
+  },
+  "HostedAcceptance": {
+    "agent": "Factory",
+    "candidate": "候选版本",
+    "open": "打开",
+    "approved": "已批准",
+    "edited": "已修改后批准",
+    "rejected": "已退回",
+    "state": {
+      "stopped": "已停止",
+      "waiting": "等你处理",
+      "running": "进行中",
+      "done": "已完成"
+    },
+    "waiting": "等你处理",
+    "decided": "已决定",
+    "run": "状态",
+    "more": "完整信息",
+    "less": "收起",
+    "stopped": "在此停止",
+    "emptyTitle": "没有等你处理的事",
+    "previous": "上一个",
+    "next": "下一个",
+    "of": "{index} / {total}",
+    "loading": "加载中",
+    "cases": {
+      "item": "项目",
+      "evidence": "证据",
+      "thread": "线程",
+      "result": "结果",
+      "commit": "提交",
+      "all": "全部",
+      "passed": "通过",
+      "unverified": "未验证",
+      "failed": "未通过",
+      "empty": "没有这种结果的项目"
+    },
+    "earlier": "更早",
+    "moreSteps": "更多",
+    "fewer": "收起",
+    "untitled": "未命名"
   }
 }

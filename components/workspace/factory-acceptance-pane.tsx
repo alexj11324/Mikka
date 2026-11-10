@@ -12,23 +12,30 @@ import { Spinner } from '@/components/ui/spinner'
 import { useViewState } from '@/lib/hooks/view-state'
 import { cn } from '@/lib/utils'
 import type { PublicationEnvironment } from '@/lib/factory/vercel-target'
-import { acceptanceState, flowMergeAcceptance, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
-import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
+import { acceptanceState, acceptanceStateKey, flowMergeAcceptance, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
+import { flowTone } from '@/lib/factory/flow-client'
+import type { StatusTone } from '@/lib/status-appearance'
+import * as acceptanceSlot from '@ui-slot/acceptance'
+import type { AcceptanceAction, AcceptanceNotice, AcceptancePaneProps } from '@/components/slots/acceptance-contract'
+import { canReject, canSubmitReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
 import { evidenceEntries, orderEvidence, type EvidenceEntry } from '@/lib/factory/evidence-view'
 import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, candidateRecheck, candidateRecheckConfirmed, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
-import { CriterionEvidence, EvidenceViewer } from './factory-evidence'
+import { CriterionEvidence, EvidenceViewer, itemLabel } from './factory-evidence'
 import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
 import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
-import { RunErrorDetails } from './run-error-text'
+import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { RequestError, request } from '@/lib/factory/browser-request'
 import { isFlowV2, useFactoryFlow } from './factory-flow'
 import { artifactReviewKind, pullNumberOf } from '@/lib/factory/artifact-review'
 import type { ArtifactDecisionSlots } from '@/components/artifacts/artifact-viewer'
 
 export { RequestError, request } from '@/lib/factory/browser-request'
+
+/** The colour of an acceptance state's badge (R-87). */
+export const acceptanceTone = (state: AcceptanceState): StatusTone => state === 'live' || state === 'merged' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
 
 type Candidate = { sha: string | null; kind?: 'repository' | 'report' | 'deliverable'; repository: string; environment: string; scope: string }
 export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean; revision?: number; attemptId?: string; completionRecovery?: AcceptanceDetail['completionRecovery'] }
@@ -186,8 +193,10 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
  * the decision bar pinned to the bottom. Approve, publish, reconcile, revoke
  * and send-back are the A1/A2 operations on the approval route.
  */
-export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, artifact }: { task: FactoryTask; onOpenThread?: (runId: string) => void; artifactBinding?: { candidateId: string; revision: number }; /** Inside the Artifact window (P1–P7b): the report, the header actions and 要求修改 in the thread's composer. */ artifact?: ArtifactReviewSlots }) {
+export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, artifact, onClose }: { task: FactoryTask; onOpenThread?: (runId: string) => void; artifactBinding?: { candidateId: string; revision: number }; /** Inside the Artifact window (P1–P7b): the report, the header actions and 要求修改 in the thread's composer. */ artifact?: ArtifactReviewSlots; /** The panel's ✕, for a layer that draws the pane with its own header (acceptance slot). */ onClose?: () => void }) {
   const t = useTranslations('FactoryAcceptance')
+  const tFlow = useTranslations('FactoryFlow')
+  const runErrorText = useRunErrorText()
   const tReview = useTranslations('ArtifactReview')
   const format = useFormatter()
   const [confirming, setConfirming] = useState(false)
@@ -384,6 +393,117 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   const results = resultRows(checks, task.candidateId)
   const envChip = task.isSkillCandidate ? t('internalSkill') : environment ? t(`envChip.${environment}`) : null
   const open = viewing ? groups[viewing.group] : undefined
+  const viewer = viewing && open && open.items[viewing.index] ? <EvidenceViewer taskId={task.id} items={open.items} index={viewing.index} title={open.title} passed={open.passed}
+    onIndex={index => setViewing({ group: viewing.group, index })} onClose={() => setViewing(null)}
+    readText={readText} sha={candidate?.sha ?? undefined} environment={envChip} /> : null
+
+  // A layer's 验收 (acceptance slot): the same values and actions, laid out by the layer. The Artifact window keeps this view.
+  const PaneSlot = acceptanceSlot.AcceptancePane ?? null
+  if (PaneSlot && !artifactBinding) {
+    const phase = ledgerError || evidenceError || detailError || (v2 && flowError) ? 'error'
+      : !detailLoaded || !ledger || (v2 && !flow) || ((v2 ? needsEvidence : task.stage === 'approval' || superseded) && !evidence && !evidenceMissing) ? 'loading' : 'ready'
+    const refused = state === 'pending' && Boolean(refusal)
+    const isDeliverable = candidate?.kind === 'report' || candidate?.kind === 'deliverable'
+    const canApprove = task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || isDeliverable))
+    const canPublish = Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)
+    const showBar = Boolean(v2 && flow) || (!detail?.completionRecovery && !check && state !== 'unavailable')
+    const actions: AcceptanceAction[] = []
+    const publish = () => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }
+    const revokeAction: AcceptanceAction = { id: 'revoke', label: t('revoke'), quiet: true, disabled: busy, onSelect: () => { void revoke() } }
+    const publishAction: AcceptanceAction = { id: 'publish', label: t('publish'), primary: true, busy, disabled: busy, onSelect: publish }
+    if (detail?.completionRecovery) actions.push({ id: 'retry-completion', label: t('retry'), primary: true, busy, disabled: busy, onSelect: () => { void retryCompletion() } })
+    if (retryCheck) actions.push({ id: 'retry-check', label: t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify'), primary: true, busy, disabled: busy, onSelect: () => { void retryCandidateCheck() } })
+    if (recheck) actions.push({ id: 'recheck', label: t('retryReview'), busy, disabled: busy, onSelect: () => { void retryCandidateCheck(true) } })
+    if (showBar) {
+      if (state === 'pending' && !refused && canReject(state, ledger?.capabilities?.reject === true)) actions.push({ id: 'reject', label: t('reject'), quiet: true, disabled: busy, onSelect: () => dispatchReject({ type: 'open' }) })
+      if ((state === 'merged' || refused) && pullRequestUrl) actions.push({ id: 'open-pr', label: t('openOnGitHub'), href: pullRequestUrl, primary: refused })
+      if (state === 'pending' && canApprove) actions.push(task.isSkillCandidate
+        ? { id: 'enable', label: t('enable'), primary: true, busy, disabled: busy, onSelect: () => { void approve() } }
+        : { id: 'accept', label: t(isDeliverable ? 'acceptDeliverable' : 'accept'), primary: !(refused && pullRequestUrl), busy, disabled: busy, onSelect: () => { void accept() } })
+      if (state === 'approved' || state === 'failed') actions.push(revokeAction, ...canPublish ? [publishAction] : [])
+      if (state === 'publishing' || state === 'checking') actions.push(revokeAction, { id: 'reconcile', label: t('reconcile'), primary: true, busy, disabled: busy, onSelect: () => { void reconcile() } })
+      if (state === 'live' && reference) actions.push({ id: 'reference', label: publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview'), href: reference })
+    }
+    const notices: AcceptanceNotice[] = []
+    if (refused && refusal) notices.push({ id: 'refusal', tone: 'warning', text: `${t('cannotMerge')} · ${t(`mergeRefusal.${refusal}` as 'mergeRefusal.githubUnavailable')}` })
+    if (check?.status === 'blocked' && currentTask.reason) { const copy = runErrorText(currentTask.reason); notices.push({ id: 'blocked', tone: 'error', text: copy.message ?? t('blocked'), detail: copy.code ?? currentTask.reason }) }
+    if (!check && state === 'failed') notices.push({ id: 'publish-failed', tone: 'error', text: t('publishFailed') })
+    if (error) notices.push({ id: 'error', tone: 'error', text: t(ERROR_KEYS[error] ?? 'error') })
+    if (checkError && [retryCheck?.key, recheck?.key].includes(checkError.key)) notices.push({ id: 'check-error', tone: 'error', text: t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed') })
+    if (recheck) notices.push({ id: 'recheck', tone: 'neutral', text: t('recheckDescription') })
+    const shown = (group: CriterionGroup) => group.title === null ? 'none' : group.passed === null ? 'unverified' : group.passed ? 'passed' : 'failed'
+    const pr = detail?.delivery?.pullRequest
+    const prNumber = pr ? pullNumber(pr.url) : null
+    const sha = candidate?.sha ?? detail?.delivery?.candidateSha ?? undefined
+    const repository = candidate?.repository ?? detail?.delivery?.repository
+    const sourceEnvironment = candidate?.environment ?? detail?.delivery?.environment
+    const delivery = detail?.delivery
+    const runtime = task.isSkillCandidate ? t('internalSkill') : envChip ?? (sourceEnvironment?.startsWith('device:')
+      ? delivery?.machine?.name ?? delivery?.machineName ?? t(delivery?.machine?.kind === 'cloud' ? 'envChip.cloud' : 'envChip.device')
+      : sourceEnvironment)
+    const time = (iso: string) => format.dateTime(new Date(iso), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const badge = v2 && flow ? { label: flow.needsYou ? tFlow(`card.needsYou.${flow.needsYou.kind}`) : flow.stage === 'completed' && flow.completion === 'accepted' ? t('state.accepted') : tFlow(`stages.${flow.stage}`), tone: flowTone(flow) }
+      : check ? { label: t(`checkState.${check.stage}.${check.status}`), tone: (check.status === 'failed' || check.status === 'blocked' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info') as StatusTone }
+        : { label: derived.refusal ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate)), tone: acceptanceTone(state) }
+    const props: AcceptancePaneProps = {
+      taskId: task.id,
+      title: task.isSkillCandidate ? t('skillTitle') : t('title'),
+      phase, loadError: t('loadError'),
+      state: badge,
+      waiting: state === 'pending' && !check && !detail?.completionRecovery,
+      decision: { label: refused ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate)), tone: refused ? 'warning' : acceptanceTone(state) },
+      machine: delivery?.machine?.name ?? null,
+      candidate: [
+        ...pr ? [{ id: 'pr', label: t('pullRequest'), value: prNumber ? `#${prNumber}${pr.title ? ` ${pr.title}` : ''}` : pr.title ?? t('pullRequest'), href: pr.url }] : [],
+        ...sha ? [{ id: 'commit', label: t('commitLabel'), value: `${shortSha(sha)}${!pr && repository ? ` · ${repository}` : ''}`, mono: true, full: sha }] : [],
+        ...superseded?.candidate?.sha ? [{ id: 'superseded', label: t('commitLabel'), value: t('superseded', { sha: shortSha(superseded.candidate.sha) }), mono: true, full: superseded.candidate.sha }] : [],
+        ...delivery?.previewUrl ? [{ id: 'preview', label: t('previewLabel'), value: bareUrl(delivery.previewUrl), href: delivery.previewUrl }] : [],
+        ...runtime ? [{ id: 'environment', label: t('environmentLabel'), value: `${runtime}${!task.isSkillCandidate && delivery?.previewDatabaseBranch ? ` · Neon ${delivery.previewDatabaseBranch}` : ''}` }] : [],
+        ...task.isSkillCandidate ? [{ id: 'target', label: t('target'), value: 'mikka-builtin:run-report', mono: true }] : [],
+      ],
+      headline: pr?.title ?? repository ?? null,
+      criteriaTitle: criteria.length ? t('criteria') : t('evidence'),
+      criteriaCount: criteria.length ? `${criteria.filter(group => group.passed).length}/${criteria.length}` : null,
+      criteria: evidence ? groups.map((group, position) => ({
+        key: group.key,
+        title: group.title ?? t('otherEvidence'),
+        verdict: shown(group),
+        verdictLabel: group.title === null ? t('evidence') : group.passed === null ? t('inProgress') : t(group.passed ? 'passed' : 'notPassed'),
+        evidence: group.items.map(item => itemLabel(t, item)).join(' · '),
+        onOpen: group.items.length ? () => setViewing({ group: position, index: 0 }) : undefined,
+      })) : [],
+      criteriaEmpty: evidence ? (groups.length ? null : t('evidenceEmpty')) : null,
+      resultsTitle: t('results'),
+      results: results.map(row => {
+        const done = row.status === 'passed' || row.status === 'failed'
+        const runId = row.runId
+        return {
+          key: row.stage,
+          title: t(row.stage === 'review' ? 'review' : 'verify'),
+          status: done ? row.status as 'passed' | 'failed' : row.status === 'blocked' ? 'blocked' : 'running',
+          word: done ? t(RESULT_WORD[row.stage][row.status as 'passed' | 'failed']) : t(row.status === 'blocked' ? 'blocked' : 'inProgress'),
+          meta: row.stage === 'verify' ? (row.total ? `${row.passed}/${row.total}` : null) : row.total - row.passed > 0 ? t('opinions', { count: String(row.total - row.passed) }) : null,
+          sha: row.sha ? shortSha(row.sha) : null,
+          thread: t(row.stage === 'review' ? 'reviewThread' : 'verifyThread'),
+          onOpenThread: runId && onOpenThread ? () => onOpenThread(runId) : undefined,
+          sources: (row.commandSources ?? []).map(source => ({ key: `${source.runId}:${source.recoveryEventId}`, label: t('questionCommandSource'), at: time(source.observedAt),
+            onOpen: onOpenThread ? () => onOpenThread(source.runId) : undefined })),
+        }
+      }),
+      notices,
+      actions,
+      reject: {
+        open: reject.phase !== 'closed', title: t('reject'), label: t('rejectNote'), note: reject.note,
+        error: reject.phase === 'failed' ? t('rejectFailed') : null, submitting: reject.phase === 'submitting', canSubmit: canSubmitReject(reject),
+        cancel: t('cancel'), submit: reject.phase === 'submitting' ? t('rejecting') : reject.phase === 'failed' ? t('resubmit') : t('rejectSubmit'),
+        onEdit: note => dispatchReject({ type: 'edit', note }), onSubmit: () => { void sendBack() }, onCancel: () => dispatchReject({ type: 'cancel' }),
+      },
+      viewer,
+      onClose,
+      closeLabel: t('close'),
+    }
+    return <PaneSlot {...props} />
+  }
 
   if (ledgerError || evidenceError || detailError || (v2 && flowError)) return <FieldError className="px-6 py-6 text-xs">{t('loadError')}</FieldError>
   if (!detailLoaded || !ledger || (v2 && !flow) || ((v2 ? needsEvidence : task.stage === 'approval' || superseded) && !evidence && !evidenceMissing)) return <div className="flex flex-1 items-center justify-center py-10"><Spinner /></div>
@@ -471,9 +591,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
         onReconcile={() => { void reconcile() }} />
     </footer>}
     <RejectNote flow={reject} onEdit={note => dispatchReject({ type: 'edit', note })} onSubmit={() => { void sendBack() }} onCancel={() => dispatchReject({ type: 'cancel' })} />
-    {viewing && open && open.items[viewing.index] && <EvidenceViewer taskId={task.id} items={open.items} index={viewing.index} title={open.title} passed={open.passed}
-      onIndex={index => setViewing({ group: viewing.group, index })} onClose={() => setViewing(null)}
-      readText={readText} sha={candidate?.sha ?? undefined} environment={envChip} />}
+    {viewer}
   </div>
 }
 

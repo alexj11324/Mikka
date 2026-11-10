@@ -12,17 +12,16 @@ import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
-import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
+import { acceptanceStateKey } from '@/lib/factory/acceptance-state'
 import { visibleAcceptance } from '@/lib/factory/acceptance-view'
-import { FactoryAcceptancePane, request, useAcceptance, type ArtifactReviewSlots, type FactoryTask } from './factory-acceptance-pane'
+import { acceptanceTone as tone, FactoryAcceptancePane, request, useAcceptance, type ArtifactReviewSlots, type FactoryTask } from './factory-acceptance-pane'
+import * as acceptanceSlot from '@ui-slot/acceptance'
 import { FactoryFlowBadge, FactoryFlowCard, isFlowV2, useFactoryTaskDetail } from './factory-flow'
 import { flowKey, readFlow } from '@/lib/factory/flow-client'
 import { InlineLoadError } from '@/components/load-error'
 import { ArtifactReportLead } from './acceptance-report'
 
 export type { FactoryTask } from './factory-acceptance-pane'
-
-const tone = (state: AcceptanceState) => state === 'live' || state === 'merged' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
 
 const tasksKey = (issueId: string) => `/api/factory/tasks?issueId=${encodeURIComponent(issueId)}`
 
@@ -98,6 +97,11 @@ function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () 
   const t = useTranslations('FactoryAcceptance')
   const { derived, check } = useAcceptance(task)
   const state = derived?.state
+  const Slot = acceptanceSlot.AcceptanceRow ?? null
+  // data-slot="item" keeps the 验收 heading over a layer's row, as over the open-source Item.
+  if (Slot) return <div data-slot="item" className="w-full min-w-0"><Slot taskId={task.id} title={task.isSkillCandidate ? t('skillTitle') : t('title')} reason={check?.status !== 'blocked' ? task.reason || null : null} onOpen={onOpen}
+    state={check ? { label: t(`checkState.${check.stage}.${check.status}`), tone: check.status === 'failed' || check.status === 'blocked' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info' }
+      : state ? { label: derived?.refusal ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate)), tone: tone(state) } : null} /></div>
   return <div className="w-full max-w-[26.25rem]">
     <Item variant="muted">
       <ItemMedia variant="icon"><ClipboardCheck aria-hidden="true" /></ItemMedia>
@@ -180,6 +184,10 @@ export function FactoryAcceptancePanel({ task, onClose, onOpenThread }: { task: 
   // the same owned task through checks and approval without retaining old props.
   const current = useAcceptanceTasks(task.issueId).allTasks.find(row => row.id === task.id) ?? task
   const title = current.isSkillCandidate ? t('skillTitle') : t('title')
+  // A layer's pane draws its own header with ✕ (acceptance slot).
+  if (acceptanceSlot.AcceptancePane) return <section aria-label={title} className="flex h-full min-h-0 flex-col">
+    <FactoryAcceptancePane task={current} onOpenThread={onOpenThread} onClose={onClose} />
+  </section>
   return <section aria-label={title} className="flex h-full min-h-0 flex-col">
     <header className="flex h-12 shrink-0 items-center gap-2 px-4">
       <ClipboardCheck aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
