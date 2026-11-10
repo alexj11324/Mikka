@@ -1,6 +1,6 @@
 {
   "schema": "issue1512.macos-inprocess-diagnostic-request.v1",
-  "enabled": true,
+  "enabled": false,
   "requestId": "20261110-5852-inprocess-a1",
   "sourceCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
   "sourceTree": "42d33eb7faf77d7049607523599de9374e065660",

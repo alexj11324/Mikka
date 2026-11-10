@@ -12,8 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: >-
-      ${{ github.run_attempt == 1 && startsWith(github.event.head_commit.message, 'ci: run issue1512 mac restart diagnostic 20261110-5852-inprocess-a1') }}
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -62,8 +61,7 @@ jobs:
             source/artifacts/daemon/build-source-binding.json
           retention-days: 7
   macos-diagnostic:
-    if: >-
-      ${{ github.run_attempt == 1 && startsWith(github.event.head_commit.message, 'ci: run issue1512 mac restart diagnostic 20261110-5852-inprocess-a1') }}
+    if: ${{ false }}
     needs: package
     runs-on: macos-26
     timeout-minutes: 20
