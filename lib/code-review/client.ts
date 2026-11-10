@@ -227,7 +227,16 @@ async function* terminalEvents(body: ReadableStream<Uint8Array>): AsyncGenerator
         if (event) yield event
       }
     }
-  } finally { reader.releaseLock() }
+    // A stream that ends without the final blank line still carries its last event (often `ended`).
+    buffer += decoder.decode()
+    if (buffer.trim()) {
+      const event = terminalEvent(buffer)
+      if (event) yield event
+    }
+  } finally {
+    await reader.cancel().catch(() => {})
+    reader.releaseLock()
+  }
 }
 
 /**
@@ -250,7 +259,7 @@ export async function sendReviewTerminalInput(taskId: string, data: string): Pro
 }
 
 const previewSchema = z.union([
-  z.object({ running: z.literal(true), url: z.string().min(1) }),
+  z.object({ running: z.literal(true), url: z.string().url() }),
   z.object({ running: z.literal(false) }),
 ]) satisfies z.ZodType<ReviewPreview>
 
