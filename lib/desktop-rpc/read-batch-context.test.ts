@@ -459,6 +459,7 @@ test('a workspace SELECT is removed before callback construction and Drizzle the
       reads++
       if (point === 'construction') following = readPendingWorkspaceChoices(choiceInput(), fresh)
       return {
+        // oxlint-disable-next-line unicorn/no-thenable -- Match Drizzle query builders to test dispatch cleanup before assimilation.
         then(resolve: (rows: ReturnType<typeof choiceRow>[]) => void) {
           if (point === 'then') following = readPendingWorkspaceChoices(choiceInput(), fresh)
           resolve([choiceRow()])
