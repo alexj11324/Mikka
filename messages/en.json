@@ -3537,6 +3537,17 @@
     "events": {
       "aThread": "A thread",
       "aTask": "A task",
+      "anAgent": "An Agent",
+      "aSchedule": "A schedule",
+      "schedule": "Schedule “{title}”",
+      "scheduleEnded": {
+        "succeeded": "ran",
+        "failed": "failed",
+        "skipped": "was skipped",
+        "cancelled": "was cancelled",
+        "other": "ran"
+      },
+      "scheduleDue": "is due",
       "quoted": "“{title}”",
       "runEnded": {
         "succeeded": "finished",
@@ -5823,6 +5834,7 @@
   "HostedTasks": {
     "open": "Open task",
     "status": "Status",
+    "factoryStage": "Factory stage",
     "tasks": "Tasks",
     "steps": "Steps",
     "happened": "Latest",

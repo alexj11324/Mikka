@@ -118,6 +118,11 @@ function movedToText(payload: Record<string, unknown>) {
   return deviceId ? `handed to device ${deviceId}` : 'queued again'
 }
 
+/** A schedule's title, quoted, when its event carries one (events written before it did have none). */
+function scheduleTitle(payload: Record<string, unknown>) {
+  return typeof payload.title === 'string' && payload.title.trim() ? ` "${payload.title.trim().replace(/\s+/g, ' ')}"` : ''
+}
+
 /** The text the Coordinator receives for one inbox event. */
 export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string | null; runId: string | null; payload: Record<string, unknown>; tier?: CoordinatorEventTier | null }, observation?: RunCompletionObservation): string {
   const payload = event.payload
@@ -182,6 +187,13 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         `Structured host handoff: ${payload.handoffEventId}, digest ${payload.handoffDigest}.`,
         'The host already attempted bounded recovery through authorized executors. Inspect the current task and blockers. Do not replay uncertain external actions; use the Decision API to decide whether an actionable owner notification is needed.',
         event.issueId ? `Issue: ${event.issueId}.` : null, note,
+      ].filter(Boolean).join('\n')
+      // A schedule's own events name it (the chat's line shows its title, lib/coordinator/event-line.ts); a result has no text of its own.
+      if (payload.source === 'schedule_result') return [
+        `[Event] Schedule ${payload.scheduleId}${scheduleTitle(payload)} ran with status ${payload.status}${payload.error ? ` (${payload.error})` : ''}. Its result is already in the chat above.`, note,
+      ].filter(Boolean).join('\n')
+      if (payload.source === 'schedule_due') return [
+        `[Event] Schedule ${payload.scheduleId}${scheduleTitle(payload)} is due.`, `An Agent reports coordination data: ${payload.text}`, note,
       ].filter(Boolean).join('\n')
       return [event.runId ? `[Event] The agent in run ${event.runId} reports progress: ${payload.text}` : `[Event] An Agent reports coordination data: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
     case 'run_question':
