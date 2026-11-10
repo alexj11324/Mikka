@@ -8,6 +8,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { MODEL_CREDENTIAL_HEADER, RECOVERY_WORKTREE_HEADER, REPO_ORIGIN_HEADER, MIN_DAEMON_VERSION } from '@mikka/protocol/device'
+import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import type { ProviderFailure } from '@mikka/protocol/provider-failure'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { emptyRunReport } from '@mikka/protocol/run'
@@ -20,9 +21,11 @@ import { isolateCoordinatorWakes } from './support/coordinator-wake'
 import { threadPromptView } from '../lib/thread-prompt'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
-  const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
+  const names = ['WORKSPACE_SECRETS_KEY', 'BETTER_AUTH_SECRET', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
   const saved = new Map(names.map(name => [name, process.env[name]]))
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+  // Policy snapshots sign with this secret; CI provides one, local runs get a test-only value.
+  process.env.BETTER_AUTH_SECRET ??= randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
@@ -174,10 +177,11 @@ test('provider failure continues the same task through its authorized preferred 
   const end = (p: Person, runId: string, failure: ProviderFailure) => persistRunCompletion(p.id, runId, {
     stopReason: 'provider_failure', report: { ...emptyRunReport('The model provider could not serve the request.'), providerFailure: failure },
   })
-  const claim = async (p: Person, runId: string) => {
+  const claim = async (p: Person, runId: string, options: { snapshot?: boolean } = {}) => {
     const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
       method: 'POST', headers: { 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${p.token}`,
-        [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
+        [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1',
+        ...(options.snapshot ? { [POLICY_SNAPSHOT_HEADER]: POLICY_SNAPSHOT_VERSION } : {}) },
     }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
     const body = await response.text()
     assert.equal(response.status, 200, body)
@@ -605,7 +609,8 @@ test('provider failure continues the same task through its authorized preferred 
     await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy) VALUES ($1,'allow',$2)
       ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [p.workspaceId,
       { approvalMode: 'ask', permissions: { git_push: 'allow', network: 'allow' } }])
-    const assignment = await claim(p, continuation.id)
+    // A non-empty workspace layer requires a signed-policy consumer at claim.
+    const assignment = await claim(p, continuation.id, { snapshot: true })
     assert.equal(assignment.policy.readOnly, true)
     assert.equal(assignment.policy.permissions.git_push, 'deny')
     assert.equal(assignment.policy.permissions.computer_use, 'deny')

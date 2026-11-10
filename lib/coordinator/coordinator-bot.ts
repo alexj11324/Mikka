@@ -308,7 +308,7 @@ async function copyAgentHead(client: PoolClient, ownerId: string, botId: string,
     WHERE h.owner_id=$1 AND h.bot_key='coordinator'`, [ownerId])).rows[0]
   if (!old) return
   const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id)
-      VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [ownerId, botId, workspaceId])
+      VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [ownerId, botId, botId, workspaceId])
   // Fold only when this head is first created. A later backfill must not
   // re-apply the legacy ceiling over an admin's newer workspace choice.
   if (!created.rowCount) return
