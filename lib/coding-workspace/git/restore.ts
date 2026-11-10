@@ -16,7 +16,8 @@ import { readCheckpointEntries } from './service'
 export type GitDependencies = { database: Pool; membership: Pool }
 const retryable = (error: unknown) => error instanceof CodingWorkspaceError
   && ['workspace_machine_unavailable', 'workspace_checkout_unavailable', 'workspace_request_expired'].includes(error.code)
-const unavailable = () => new WorkspaceGitError('workspace_git_restore_unavailable')
+const unavailable = (cause?: unknown) => new WorkspaceGitError('workspace_git_restore_unavailable',
+  cause === undefined ? undefined : { cause })
 
 /** Only the newest capture has a stored payload. The server inflates and
  * bounds it; the device proves the resulting files before writing. */
@@ -29,7 +30,7 @@ async function checkpointPayload(database: Pool, scope: ReviewScope, checkpointI
   if (!legacy?.patch || legacy.unavailableReason || legacy.baseCommit !== entry.revision.baseSha) throw unavailable()
   let patch: Buffer
   try { patch = gunzipSync(legacy.patch, { maxOutputLength: WORKSPACE_GIT_MAX_PATCH_BYTES }) }
-  catch { throw unavailable() }
+  catch (error) { throw unavailable(error) }
   if (!patch.length || patch.length > WORKSPACE_GIT_MAX_PATCH_BYTES) throw unavailable()
   return { entry, patch, patchSha256: gitDigest(patch) }
 }

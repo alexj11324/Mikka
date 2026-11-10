@@ -35,7 +35,9 @@ type Mode = '100644' | '100755'
 type ObservedFile = { exists: boolean; bytes: Buffer | null; mode: Mode | null; size: number | null
   contentSha256: string | null; workingVersion: string; fence?: string; unsafe?: boolean }
 
-const conflict = () => new CodingWorkspaceError('workspace_version_conflict')
+const conflict = (cause?: unknown) => cause === undefined
+  ? new CodingWorkspaceError('workspace_version_conflict')
+  : new CodingWorkspaceError('workspace_version_conflict', { cause })
 const unavailable = () => new CodingWorkspaceError('workspace_checkout_unavailable')
 
 function failure(command: WorkspaceReadCommand, cause: unknown): WorkspaceReadReceipt {
@@ -149,7 +151,7 @@ async function writePinnedFile(root: WorkspaceRoot, path: string, bytes: Buffer,
     if (Number((await target.stat({ bigint: true })).size) !== bytes.length) throw conflict()
   } catch (error) {
     if (error instanceof CodingWorkspaceError) throw error
-    if (missing(error)) throw conflict()
+    if (missing(error)) throw conflict(error)
     throw new CodingWorkspaceError('workspace_path_unavailable', { cause: error })
   } finally {
     await target?.close()
@@ -172,7 +174,7 @@ async function deletePinnedFile(root: WorkspaceRoot, path: string, expectedFence
     await unlink(targetPath)
   } catch (error) {
     if (error instanceof CodingWorkspaceError) throw error
-    if (missing(error)) throw conflict()
+    if (missing(error)) throw conflict(error)
     throw new CodingWorkspaceError('workspace_path_unavailable', { cause: error })
   } finally { await Promise.all(parents.map(handle => handle.close())) }
 }
@@ -411,7 +413,7 @@ async function dryRunCheckpoint(git: Git, root: WorkspaceRoot, identity: Workspa
   statusBase: string | null, patchBase: string, patch: Buffer, signal: AbortSignal): Promise<RestorePlan> {
   const head = await headSha(git)
   try { await git(['merge-base', '--is-ancestor', patchBase, head]) }
-  catch { throw new CodingWorkspaceError('workspace_unsupported') }
+  catch (error) { throw new CodingWorkspaceError('workspace_unsupported', { cause: error }) }
   const parent = await mkdtemp(join(tmpdir(), 'mikka-git-restore-'))
   const worktree = join(parent, 'wt'), patchFile = join(parent, 'checkpoint.patch')
   try {
