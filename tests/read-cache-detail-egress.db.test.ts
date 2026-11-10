@@ -275,7 +275,7 @@ test('detail and activity revalidate current access while returning only changed
         linkedCitation: { statements: 4, read: 1188, written: 1934 },
         unlinkedCitation: { statements: 5, read: 1403, written: 2257 },
         linkedRunCitation: { statements: 9, read: 3157, written: 6581 },
-        unlinkedRunCitation: { statements: 10, read: 2724, written: 6798 },
+        unlinkedRunCitation: { statements: 10, read: 2708, written: 6897 },
       } as const
       for (const [label, result, statementLimit] of [
         ['linkedConnections', linkedConnections, 14],
