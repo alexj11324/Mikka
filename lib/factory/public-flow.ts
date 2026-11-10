@@ -31,7 +31,12 @@ export interface FactoryFlowView {
   acceptance: { artifactId: string; version: number; runId: string; candidateId: string; counts: Record<string, number>; media: FactoryAcceptanceMedia[] } | null;
   pullRequest: { url: string; state: string } | null;
 }
-export interface FactoryAcceptanceMedia { captureId: string; kind: 'image' | 'video'; url: string; title: string; criterion: string | null; runId: string }
+/** Authenticated media references; public PR share URLs live only in the publication receipt. */
+export interface FactoryAcceptanceMedia {
+  captureId: string; kind: 'image' | 'video'; url: string; title: string; criterion: string | null; runId: string;
+  contentType?: string; size?: number; durationMs?: number | null;
+  candidateId?: string; appliesToCurrentCandidate?: boolean;
+}
 export function publicFactoryStage(stage: FactoryTask['stage'], status: FactoryTask['status'], merged: boolean): FactoryPublicStage {
   if (status === 'cancelled' || status === 'revoked') return 'cancelled';
   if (merged) return 'completed';

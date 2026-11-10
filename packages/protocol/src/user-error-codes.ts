@@ -92,6 +92,8 @@ export const USER_ERROR_CODES = {
   web_auth_exchange_rejected: [],
   web_auth_session_expired: [],
   factory_spec_approval_required: [],
+  factory_visual_evidence_required: [],
+  factory_public_evidence_required: [],
   map_invalid_request: ["invalid_query", "invalid_token"],
   map_not_found: [],
   map_snapshot_changed: ["source_changed"],

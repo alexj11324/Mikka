@@ -40,6 +40,8 @@ if [[ -e "$mikka_release" || -L "$mikka_release" ]]; then
   [[ "$(cat "$mikka_release/worker-ready.sha")" = "$mikka_sha" ]] || exit 3
   [[ "$(git -C "$mikka_release/source" rev-parse HEAD)" = "$mikka_commit" ]] || exit 3
   python3 "$mikka_release/source/scripts/e2b/official-files.py" cli-check "$mikka_release/source/.mikka-original-cli.json" --kind "$mikka_kind"
+  install -d -m 0755 /opt/mikka/runtime/capture-tools
+  /opt/mikka/runtime/node/bin/node "$mikka_release/source/packages/daemon/scripts/install-capture-tools.mjs"
   printf 'mikka-official-instance-staged %s %s\n' "$mikka_commit" "$mikka_sha"
   exit 0
 fi
@@ -87,6 +89,12 @@ mikka_phase_done gh
 fi
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 cd "$mikka_release/source"
+# Both a fresh installation and a stage refresh need the pinned pair. The
+# versioned private directory is additive; staging never changes active links
+# or an official template's FFmpeg/system packages.
+install -d -m 0755 /opt/mikka/runtime/capture-tools
+node packages/daemon/scripts/install-capture-tools.mjs
+mikka_phase_done capture_tools
 # pnpm 10 also installs the root importer of a filtered shared-lock workspace.
 # Keep the fetched source intact and install only the worker's locked importers.
 mikka_install="$mikka_release/worker-install"

@@ -8,7 +8,7 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryActor, type FactoryBinding } from "./approval-contract";
 import type { FactoryApprovalStore, FactoryAuthorize, FactoryTask } from "./approval-dependencies";
-import { approvalEvidence, digest } from "./evidence";
+import { approvalEvidence, blockFactoryApprovalWithoutEvidence, digest } from "./evidence";
 import { requestBudgetSignal, type RequestBudget } from '../request-budget';
 
 // #528: acceptance is the person's own merge of the candidate PR (Warp
@@ -327,6 +327,8 @@ export function createFactoryMerges(
           if (prior) return { accepted: prior.id as string, task };
           if (digest(bindingOf(task)) !== digest(req.binding)) fail('factoryStale');
           if (task.stage !== 'approval' || !['pending','waiting'].includes(task.status)) fail('factoryTransition');
+          const refusal = await blockFactoryApprovalWithoutEvidence(tx, task, store, req.eventId);
+          if (refusal) return refusal;
           const evidence = await approvalEvidence(tx, task);
           const id = randomUUID();
           await tx.query('INSERT INTO factory_deliverable_acceptances (id,"taskId","candidateId","userId","sessionId","eventId") VALUES ($1,$2,$3,$4,$5,$6)', [id, task.id, task.candidateId, actor.userId, actor.sessionId, req.eventId]);
@@ -354,6 +356,8 @@ export function createFactoryMerges(
         if (active) { await boundary?.existing(tx, active); return { existing: active, task }; }
         if (digest(bindingOf(task)) !== digest(req.binding)) fail("factoryStale");
         if (task.stage !== "approval" || !["pending", "waiting"].includes(task.status)) fail("factoryTransition");
+        const refusal = await blockFactoryApprovalWithoutEvidence(tx, task, store, req.eventId);
+        if (refusal) return refusal;
         const pull = await candidatePull(tx, task);
         if (!credential && typeof token === 'function') credential = await token();
         if (!credential) throw new FactoryMergeRefused("githubMergeAuthorizationRequired", pull.url);
@@ -367,6 +371,7 @@ export function createFactoryMerges(
         return { id, pull };
       });
 
+      if (claim instanceof FactoryError) throw claim;
       if (typeof claim.accepted === 'string' && claim.task) return { status: 'accepted', acceptanceId: claim.accepted, binding: bindingOf(claim.task) };
       if ("existing" in claim) {
         const row = claim.existing;

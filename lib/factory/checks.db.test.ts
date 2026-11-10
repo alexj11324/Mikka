@@ -3,6 +3,7 @@ import { readFactoryFlow } from './public-flow';
 import { createFactorySpecApproval } from './spec-approval';
 import { createFactoryHumanStore } from './human-store';
 import { handleFactoryFlow } from './flow-http';
+import { handleFactory } from './http';
 import { readIssueThreads, loadIssueDocument, encodedIssueDocument } from '../linear-sync/document';
 import { runArtifactSubmissions } from '../artifacts/run-submissions';
 // Real #192 migrations/store/dispatch/questions/claim and #193 consumers.
@@ -25,15 +26,18 @@ import {
 import { Pool } from "pg";
 import { assertE2eTarget } from "../../tests/helpers/e2e-target.mjs";
 import { createRequestDatabaseScope } from "../db";
+import { observePoolCommits } from '../db/commit-effects';
+import { coordinatorWakeTransport } from '../coordinator/wake-after-commit';
 import { hostedBillingScope } from "../abuse/context";
 import { HostedUsageStore } from "../abuse/store";
 import { exerciseFactoryRecoveryEntry } from "../../tests/support/factory-recovery-entry-fixture";
 import { bindFixtureWorkspaceDatabase } from "../../tests/helpers/workspace-database";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import { claimLocalRun } from "../computer/claim";
 import { FactoryError } from "./contract";
-import { approvalEvidence } from "./evidence";
+import { approvalEvidence, hasFactoryVisualEvidence } from "./evidence";
 import { createFactoryApprovalGates } from './approval';
 import { createFactoryMerges } from './merge';
 import { createFactoryStore, type FactoryTask } from "./store";
@@ -76,6 +80,12 @@ test(
   // individual SQL, lock and model deadlines and all assertions stay unchanged.
   { timeout: 300_000 },
   async (t) => {
+    // Acceptance Artifacts register real after-COMMIT wakes. The consumer is
+    // outside this fixture; do not start a Coordinator or pre-load the native
+    // and queue modules before their explicit recovery fixtures below.
+    const previousWake=coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake=async()=>{};
+    t.after(()=>{coordinatorWakeTransport.wake=previousWake;});
     assert.equal(process.env.REQUIRE_DB, "1");
     const url = process.env.E2E_DATABASE_URL;
     assert.ok(url);
@@ -116,6 +126,7 @@ test(
         max: 12,
         options: "-c statement_timeout=15000 -c lock_timeout=5000",
       });
+      observePoolCommits(pool);
       const db = pool;
       modelDatabase = createRequestDatabaseScope(isolated.toString());
       closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(db);
@@ -368,7 +379,7 @@ test(
         review: reconcileFactoryCheck,
         verify: reconcileFactoryCheck,
       }, coordinatorBot);
-      async function pendingReview(kind: 'repository' | 'report' | 'deliverable' = 'repository', legacy = true, producer?: (runId: string, issueId: string) => Promise<void>) {
+      async function pendingReview(kind: 'repository' | 'report' | 'deliverable' = 'repository', legacy = true, producer?: (runId: string, issueId: string) => Promise<void>, options: { visual?: boolean; publication?: boolean } = {}) {
         const issueId = randomUUID(),
           sourceEventId = randomUUID();
         await db.query(
@@ -413,6 +424,8 @@ test(
           ],
         );
         await producer?.(execute.runId,issueId);
+        if (options.visual !== false && !(await db.query(`SELECT 1 FROM run_captures WHERE "runId"=$1 AND status='ready'`, [execute.runId])).rowCount)
+          await addFactoryVisualEvidence(db,execute.runId);
         state = await store.apply("owner", execute.binding, randomUUID(), {
           action: "candidate",
           runId: execute.runId,
@@ -445,13 +458,15 @@ test(
             output: {},
           },
         );
+        if (state.task.status !== 'passed') return state;
+        if (options.publication !== false) await addFactoryPublicationEvidence(db,state.task.id);
         return store.apply("owner", factoryBinding(state.task), randomUUID(), {
           action: "advance",
           stage: "review",
           reason: "Independent review",
         });
       }
-      const start = async (task: FactoryTask) => {
+      const start = async (task: FactoryTask, deviceRepoId = repoId) => {
         // A positive local-device fixture represents a daemon which is still
         // online. Refresh its real heartbeat for each dispatch, rather than
         // relying on the suite finishing inside the 60-second presence window.
@@ -459,7 +474,7 @@ test(
         return dispatch("owner", {
           binding: factoryBinding(task),
           agentId,
-          deviceRepoId: repoId,
+          deviceRepoId,
         });
       };
       async function terminal(
@@ -867,6 +882,172 @@ test(
           return result;
         } finally { tx.release(); }
       }
+      for (const kind of ['repository','report','deliverable'] as const) await t.test(`${kind} report-only completion is durably blocked before handoff`, async () => {
+        const blocked = await pendingReview(kind,false,undefined,{visual:false});
+        assert.equal(blocked.task.stage,'execute');
+        assert.equal(blocked.task.status,'blocked');
+        assert.equal(blocked.refusal?.code,'factory_visual_evidence_required');
+        assert.match(blocked.task.reason,/no ready screenshot or recording/);
+        assert.equal(blocked.attempts.some(attempt=>attempt.stage==='approval'||attempt.stage==='review'),false);
+        const persisted = await state(blocked.task.id);
+        assert.equal(persisted.task.status,'blocked');
+        assert.equal((await readFactoryFlow(db,persisted.task)).needsYou?.kind,'blocked');
+        await assert.rejects(store.apply('owner',factoryBinding(persisted.task),randomUUID(),{action:'advance',stage:'approval',reason:'Unverified is not handoff evidence'}),
+          (error:unknown)=>error instanceof FactoryError && error.code==='factoryTransition');
+      });
+      await t.test('retrying a visual-evidence refusal creates a fresh producer candidate and preserves the blocked history',async()=>{
+        const blocked=await pendingReview('repository',false,undefined,{visual:false});
+        const previous=blocked.attempts.find(attempt=>attempt.id===blocked.task.attemptId)!;
+        const retried=await store.apply('owner',factoryBinding(blocked.task),randomUUID(),{action:'retry',reason:'Record the implementation verification'});
+        assert.equal(retried.task.candidateId,null);
+        const run=await start(retried.task);
+        await terminal(run.runId,`visual-retry-${blocked.task.id}`,false,report=>{
+          report.sourceCommit='b'.repeat(40);report.publish={commit:'b'.repeat(40),pushed:true};
+        });
+        await addFactoryVisualEvidence(db,run.runId,{kind:'video'});
+        await reconcile.run('owner',run.runId);
+        const current=await state(blocked.task.id);
+        assert.equal(current.task.stage,'review');assert.equal(current.task.status,'pending');
+        assert.notEqual(current.task.candidateId,blocked.task.candidateId);
+        assert.equal(current.candidates.find(candidate=>candidate.id===current.task.candidateId)?.runId,run.runId);
+        assert.deepEqual(current.attempts.find(attempt=>attempt.id===previous.id),previous);
+        assert.ok(current.candidates.some(candidate=>candidate.id===blocked.task.candidateId));
+      });
+      await t.test('retrying a repaired implementation awaiting public evidence replaces only its current candidate and keeps one review',async()=>{
+        // Reconciliation derives the candidate kind from the queued repository.
+        // The default fixture has no remote and correctly becomes report-only;
+        // these repairs retain the original repository identity and PR gate.
+        const repairRepoId=randomUUID();
+        await db.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","verifyCommand") VALUES($1,$2,'owner','/fixture/public-evidence-repair','/fixture/repo',$3)`,[repairRepoId,deviceId,command]);
+        const pending=await pendingReview('repository',false);
+        const review=await start(pending.task);
+        await terminal(review.runId,`public-retry-review-${pending.task.id}`);
+        await reconcile.run('owner',review.runId);
+        const approved=await state(pending.task.id);
+        const repair=await store.apply('owner',factoryBinding(approved.task),randomUUID(),{action:'repair',reason:'Update the reviewed implementation'});
+        const first=await start(repair.task,repairRepoId);
+        await terminal(first.runId,`public-retry-first-${pending.task.id}`,false,report=>{report.sourceCommit='b'.repeat(40);report.publish={commit:'b'.repeat(40),pushed:true};});
+        await addFactoryVisualEvidence(db,first.runId,{kind:'video'});
+        await reconcile.run('owner',first.runId);
+        const blocked=await state(pending.task.id),previous=blocked.attempts.find(attempt=>attempt.id===blocked.task.attemptId)!;
+        assert.equal(blocked.candidates.find(candidate=>candidate.id===blocked.task.candidateId)?.kind,'repository');
+        assert.equal(blocked.task.stage,'execute');assert.equal(blocked.task.status,'blocked');
+        assert.equal(blocked.refusal?.code,'factory_public_evidence_required');
+        const retried=await store.apply('owner',factoryBinding(blocked.task),randomUUID(),{action:'retry',reason:'Check and declare the visual evidence safe to publish'});
+        assert.equal(retried.task.stage,'execute');assert.equal(retried.task.status,'pending');
+        assert.equal(retried.task.candidateId,null);
+        const run=await start(retried.task,repairRepoId);
+        await terminal(run.runId,`public-retry-final-${pending.task.id}`,false,report=>{report.sourceCommit='c'.repeat(40);report.publish={commit:'c'.repeat(40),pushed:true};});
+        await addFactoryVisualEvidence(db,run.runId,{kind:'video'});
+        await reconcile.run('owner',run.runId);
+        await addFactoryPublicationEvidence(db,pending.task.id);
+        const current=await store.resumeEvidenceHandoff('owner',run.runId);
+        assert.equal(current?.task.stage,'approval');assert.equal(current?.task.status,'pending');
+        assert.notEqual(current?.task.candidateId,blocked.task.candidateId);
+        assert.equal(current?.attempts.filter(attempt=>attempt.stage==='review').length,1);
+        assert.deepEqual(current?.attempts.find(attempt=>attempt.id===previous.id),previous);
+        assert.ok(current?.candidates.some(candidate=>candidate.id===blocked.task.candidateId));
+      });
+      await t.test('only a ready media object from the exact producer session and candidate SHA passes the visual gate',async()=>{
+        const pending = await pendingReview('repository',false);
+        const producer = pending.candidates.find(candidate=>candidate.id===pending.task.candidateId)!;
+        const {rows:[capture]} = await db.query('SELECT id FROM run_captures WHERE "runId"=$1',[producer.runId]);
+        const tx=await db.connect();
+        try {
+          await tx.query('BEGIN');
+          assert.equal(await hasFactoryVisualEvidence(tx,pending.task),true);
+          const invalid: [string,unknown[]][] = [
+            [`UPDATE run_captures SET status='uploading' WHERE id=$1`,[capture.id]],
+            [`UPDATE run_captures SET "userId"='other' WHERE id=$1`,[capture.id]],
+            [`UPDATE run_captures SET "contentType"='video/mp4' WHERE id=$1`,[capture.id]],
+            [`UPDATE run_captures SET size=0 WHERE id=$1`,[capture.id]],
+            [`UPDATE run_captures SET size=100000001 WHERE id=$1`,[capture.id]],
+            [`UPDATE run_captures SET sha256='' WHERE id=$1`,[capture.id]],
+            [`UPDATE run_captures SET "storageKey"='',"inlineContent"=NULL WHERE id=$1`,[capture.id]],
+            [`UPDATE agent_runs SET "sessionId"='another-session' WHERE id=$1`,[producer.runId]],
+            [`UPDATE factory_candidates SET sha=repeat('f',40) WHERE id=$1`,[producer.id]],
+          ];
+          for (const [sql,params] of invalid) {
+            await tx.query('SAVEPOINT invalid_media');
+            await tx.query(sql,params);
+            assert.equal(await hasFactoryVisualEvidence(tx,pending.task),false,sql);
+            await tx.query('ROLLBACK TO SAVEPOINT invalid_media');
+          }
+          await tx.query('ROLLBACK');
+        } finally {await tx.query('ROLLBACK');tx.release();}
+      });
+      await t.test('reviewer media cannot replace missing producer evidence at the handoff transition',async()=>{
+        const pending=await pendingReview('repository',false);
+        const producer=pending.candidates.find(candidate=>candidate.id===pending.task.candidateId)!;
+        await db.query('DELETE FROM run_captures WHERE "runId"=$1',[producer.runId]);
+        const review=await start(pending.task);
+        await addFactoryVisualEvidence(db,review.runId,{kind:'video'});
+        await terminal(review.runId,`reviewer-only-${pending.task.id}`,false,report=>{
+          report.verify={status:'not_run'};
+          report.criteria=[{text:'Application behavior',passed:false,status:'unverified',reason:'Reviewer could not verify the requested behavior.'}];
+        });
+        await reconcile.run('owner',review.runId);
+        const blocked=await state(pending.task.id);
+        assert.equal(blocked.task.stage,'review');
+        assert.equal(blocked.task.status,'blocked');
+        assert.equal(blocked.refusal?.code,'factory_visual_evidence_required');
+        assert.equal(blocked.attempts.filter(attempt=>attempt.stage==='approval').length,0);
+        assert.equal(blocked.attempts.find(attempt=>attempt.runId===review.runId)?.status,'passed','the review advice remains immutable');
+      });
+      await t.test('a repaired candidate cannot inherit the previous implementation video',async()=>{
+        const pending=await pendingReview('repository',false,async runId=>{await addFactoryVisualEvidence(db,runId,{kind:'video'});});
+        const original=pending.candidates.find(candidate=>candidate.id===pending.task.candidateId)!;
+        const repair=await store.apply('owner',factoryBinding(pending.task),randomUUID(),{action:'repair',reason:'Produce the corrected implementation'});
+        const execution=await start(repair.task);
+        await terminal(execution.runId,`uncaptured-repair-${repair.task.id}`,false,report=>{
+          report.sourceCommit='b'.repeat(40);report.publish={commit:'b'.repeat(40),pushed:true};
+        });
+        await reconcile.run('owner',execution.runId);
+        const blocked=await state(pending.task.id);
+        assert.notEqual(blocked.task.candidateId,original.id);
+        assert.equal(blocked.task.stage,'execute');assert.equal(blocked.task.status,'blocked');
+        assert.equal(blocked.refusal?.code,'factory_visual_evidence_required');
+        assert.equal((await db.query(`SELECT id FROM run_captures WHERE "runId"=$1 AND kind='video' AND status='ready'`,[original.runId])).rowCount,1);
+        assert.equal((await db.query('SELECT id FROM run_captures WHERE "runId"=$1',[execution.runId])).rowCount,0);
+      });
+      await t.test('retrying an old approval without media returns HTTP 409 and keeps it blocked',async()=>{
+        const pending=await pendingReview('report',false);
+        const review=await start(pending.task);
+        await terminal(review.runId,`retry-approval-${pending.task.id}`);
+        await reconcile.run('owner',review.runId);
+        const ready=await state(pending.task.id);
+        const stopped=await store.apply('owner',factoryBinding(ready.task),randomUUID(),{action:'finish',status:'blocked',reason:'Evidence needs recovery',evidence:[],output:{}});
+        await db.query('DELETE FROM run_captures WHERE "runId"=(SELECT "runId" FROM factory_candidates WHERE id=$1)',[ready.task.candidateId]);
+        const response=await handleFactory(store,{userId:'owner',method:'POST',taskId:ready.task.id,origin:'https://mikka.example',
+          url:`https://mikka.example/api/factory/tasks/${ready.task.id}`,body:{binding:factoryBinding(stopped.task),eventId:randomUUID(),action:'retry',reason:'Retry handoff'}});
+        assert.equal(response.status,409);
+        assert.equal((response.body as {error:string}).error,'factory_visual_evidence_required');
+        assert.equal((await state(ready.task.id)).task.status,'blocked');
+        assert.equal((await state(ready.task.id)).attempts.filter(attempt=>attempt.stage==='approval').length,1);
+      });
+      await t.test('a playable producer video hands off only after its exact PR receipt is published, then resumes once without repeating review',async()=>{
+        let producerRun='';
+        const pending=await pendingReview('repository',false,async runId=>{
+          producerRun=runId;
+          await addFactoryVisualEvidence(db,runId,{kind:'video'});
+        },{publication:false});
+        const review=await start(pending.task);
+        await terminal(review.runId,`publication-race-${pending.task.id}`);
+        await reconcile.run('owner',review.runId);
+        const blocked=await state(pending.task.id);
+        assert.equal(blocked.task.stage,'review');
+        assert.equal(blocked.task.status,'blocked');
+        assert.equal(blocked.refusal?.code,'factory_public_evidence_required');
+        assert.equal((await store.resumeEvidenceHandoff('owner',producerRun))?.task.status,'blocked');
+        await addFactoryPublicationEvidence(db,pending.task.id);
+        const ready=await store.resumeEvidenceHandoff('owner',producerRun);
+        assert.equal(ready?.task.stage,'approval');
+        assert.equal(ready?.task.status,'pending');
+        assert.equal(ready?.task.candidateId,blocked.task.candidateId);
+        assert.equal(ready?.attempts.filter(attempt=>attempt.stage==='review').length,1);
+        assert.equal(ready?.attempts.filter(attempt=>attempt.stage==='approval').length,1);
+        assert.equal(await store.resumeEvidenceHandoff('owner',producerRun),null,'duplicate publication events cannot create a second handoff');
+      });
       await t.test('new host-frozen flow hands a single review to the person without a Verify run', async () => {
         const pending = await pendingReview('repository', false);
         assert.equal(pending.task.route.flowVersion, 2);
@@ -1027,7 +1208,8 @@ test(
           await db.query('UPDATE artifacts SET "latestVersion"="latestVersion"+1 WHERE id=$1',[flow.acceptance.artifactId]);
           assert.equal((await readFactoryFlow(db,state.task)).acceptance,null,'the decision projection must match the host report hash at the latest version');
           await db.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey","pullRequest")
-            VALUES($1,'owner',$2,'https://github.com/example/fixture.git','github.com/example/fixture',$3)`,[producerRun,state.task.issueId,JSON.stringify({url:'https://github.com/example/fixture/pull/1',state:'closed'})]);
+            VALUES($1,'owner',$2,'https://github.com/example/fixture.git','github.com/example/fixture',$3)
+            ON CONFLICT ("runId") DO UPDATE SET "pullRequest"=EXCLUDED."pullRequest"`,[producerRun,state.task.issueId,JSON.stringify({url:'https://github.com/example/fixture/pull/1',state:'closed'})]);
           assert.equal((await readFactoryFlow(db,state.task)).stage,'handoff','closed without merge is never completed');
           await db.query(`INSERT INTO factory_merges(id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source,"finishedAt")
             VALUES($1,$2,$3,'owner',$4,'https://github.com/example/fixture/pull/1',$5,'merged','github',now())`,[randomUUID(),state.task.id,state.task.candidateId,randomUUID(),sha]);
@@ -1097,12 +1279,14 @@ test(
             report.verify={status:'passed'};report.publish={commit:sha,pushed:true};report.sourceCommit=sha;
             report.criteria=[{criterionId,text:'Behavior',passed:true,status:'passed',evidence:'New implementation fixture observed the requested behavior.',resolution:'Added the observation.'}];
           });
+          await addFactoryVisualEvidence(db,execution.runId);
           let completed=await store.apply('owner',execution.binding,randomUUID(),{action:'candidate',runId:execution.runId,
             candidate:{sha,repository:'/fixture/repo',environment:`device:${deviceId}`,scope:`issue:${repair.task.issueId}`}});
           assert.notEqual(completed.task.candidateId,handed.task.candidateId);
           assert.equal((await readFactoryFlow(db,completed.task)).acceptance,null,'a newly selected but unfinished candidate cannot inherit old acceptance');
           completed=await store.apply('owner',factoryBinding(completed.task),randomUUID(),{action:'finish',status:'passed',reason:'Repair observed',
             evidence:[{artifact:`run-report:${execution.runId}`,kind:'report',runId:execution.runId,sessionId:session,candidateId:completed.task.candidateId,sha,environment:`device:${deviceId}`,recordedAt:new Date().toISOString()}],output:{}});
+          await addFactoryPublicationEvidence(db,completed.task.id);
           completed=await store.apply('owner',factoryBinding(completed.task),randomUUID(),{action:'advance',stage:'approval',reason:'Single review already completed'});
           const current=await readFactoryFlow(db,completed.task);
           assert.equal(current.acceptance!.artifactId,artifactId);assert.equal(current.acceptance!.candidateId,completed.task.candidateId);
@@ -1199,7 +1383,10 @@ test(
           "startedAt"=now()-interval '1 second',"finishedAt"=now(),report=$3 WHERE id=$1`,
           [run.runId, `repair-${pending.task.id}`, JSON.stringify({ sourceCommit: repairedSha, publish: { commit: repairedSha, pushed: true },
             summary: 'The finding was repaired and validated during implementation', verify: { status: 'passed' }, filesChanged: [] })]);
+        await addFactoryVisualEvidence(db,run.runId);
         await reconcile('owner');
+        await addFactoryPublicationEvidence(db,pending.task.id);
+        await store.resumeEvidenceHandoff('owner',run.runId);
         const ready = await state(pending.task.id);
         assert.equal(ready.task.stage, 'approval');
         assert.equal(ready.task.status, 'pending');
@@ -2381,6 +2568,7 @@ test(
           const repairedRun = (await db.query('SELECT "continuesRunId" FROM agent_runs WHERE id=$1', [repair.runId])).rows[0];
           assert.equal(repairedRun.continuesRunId, failed.candidates.find(c => c.id === failed.task.candidateId)!.runId);
           await terminal(repair.runId, `model-repair-${r.task.id}`, false, report => { report.publish = { commit: sha }; report.sourceCommit = sha; });
+          await addFactoryVisualEvidence(db,repair.runId);
           await reconcile.run('owner', repair.runId);
           const next = (await state(r.task.id)).task;
           assert.equal(next.stage, 'review');
@@ -2511,8 +2699,10 @@ test(
           assert.equal(repairRun.questionContinuation, null, 'a new repair session does not impersonate the original native answer consumer');
           assert.equal(repairRun.agentDefinition.promptDigest, (await import('../agent-kit/definition')).digest(repairRun.prompt));
           await terminal(repairRun.id, `new-repair-session-${pending.task.id}`, false, report => { report.publish = { commit: sha }; report.sourceCommit = sha; });
+          await addFactoryVisualEvidence(db,repairRun.id);
           await reconcile.run('owner', repairRun.id);
           const repaired = await state(pending.task.id);
+          await addFactoryPublicationEvidence(db,repaired.task.id);
           assert.equal(repaired.task.stage, 'review');
           assert.equal(repaired.task.status, 'pending');
           assert.notEqual(repaired.task.candidateId, candidate.id);
@@ -3161,11 +3351,13 @@ test(
               report.publish = { commit: sha };
               report.safePoint = { session: 'exited', checkpoint: 'unavailable', observedAt: new Date().toISOString() };
             });
+            await addFactoryVisualEvidence(db,execute.runId);
             current = await cloudStore.apply(userId, execute.binding, randomUUID(), { action: 'candidate', runId: execute.runId,
               candidate: { sha, repository: remote, environment: `device:${producerWorker.deviceId}`, scope: `issue:${issueId}` } });
             current = await cloudStore.apply(userId, factoryBinding(current.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'Offline worker report fixture',
               evidence: [{ artifact: `run-report:${execute.runId}`, kind: 'report', runId: execute.runId, sessionId: `producer-${issueId}`,
                 candidateId: current.task.candidateId, sha, environment: `device:${producerWorker.deviceId}`, recordedAt: new Date().toISOString() }], output: {} });
+            await addFactoryPublicationEvidence(db,current.task.id);
             current = await cloudStore.apply(userId, factoryBinding(current.task), randomUUID(), { action: 'advance', stage: 'review', reason: 'Independent check' });
             const candidateBefore = (await db.query('SELECT to_jsonb(c) AS value FROM factory_candidates c WHERE id=$1', [current.task.candidateId])).rows[0].value;
             const automatic = automaticFactoryDispatch(db);

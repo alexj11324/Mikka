@@ -1,3 +1,5 @@
+import { addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
+import { observePoolCommits } from '../db/commit-effects';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { factoryTestLifecycle } from "../../tests/helpers/factory-test-authority";
@@ -62,6 +64,7 @@ test(
       max: 12,
       options: `-c search_path=${schema}`,
     });
+    observePoolCommits(pool);
     const authorize = async (
       userId: string,
       issueId: string,
@@ -241,7 +244,7 @@ test(
       assert.equal(planRun.agentDefinition.instructions, instructions);
       assert.equal(planRun.dispatchKey, `factory:${spec.task.attemptId}`);
       await pool.query(
-        'UPDATE agent_runs SET status=\'succeeded\',"stopReason"=\'submitted\',"sessionId"=$2,report=$3,"finishedAt"=now() WHERE id=$1',
+        'UPDATE agent_runs SET status=\'succeeded\',"stopReason"=\'submitted\',"sessionId"=$2,report=$3,"startedAt"=coalesce("startedAt",now()-interval \'1 minute\'),"finishedAt"=now() WHERE id=$1',
         [
           planned.runId,
           `plan-${randomUUID()}`,
@@ -453,8 +456,9 @@ test(
       });
       const completionSha = "c".repeat(40),
         completionSession = `complete-${randomUUID()}`;
+      await addFactoryVisualEvidence(pool, dispatchedRetry.runId);
       await pool.query(
-        'UPDATE agent_runs SET status=\'succeeded\',"stopReason"=\'submitted\',"sessionId"=$2,report=$3,"finishedAt"=now() WHERE id=$1',
+        'UPDATE agent_runs SET status=\'succeeded\',"stopReason"=\'submitted\',"sessionId"=$2,report=$3,"startedAt"=coalesce("startedAt",now()-interval \'1 minute\'),"finishedAt"=now() WHERE id=$1',
         [
           dispatchedRetry.runId,
           completionSession,
@@ -509,6 +513,8 @@ test(
           lostRun.runId,
         ],
       );
+      await pool.query(`UPDATE agent_runs SET "startedAt"=now()-interval '1 minute' WHERE id=$1`, [childId]);
+      await addFactoryVisualEvidence(pool, childId);
       const runCountBeforeRecovery = (
         await pool.query("SELECT count(*) FROM agent_runs")
       ).rows[0].count;
@@ -640,6 +646,7 @@ test(
         max: 2,
         options: `-c search_path=${schema}`,
       });
+      observePoolCommits(reopened);
       try {
         const recovered = createFactoryStore(reopened, authorize, null, factoryTestLifecycle);
         const replayed = await recovered.apply(
@@ -714,6 +721,7 @@ test(
           }),
         ],
       );
+      await pool.query(`UPDATE agent_runs SET "startedAt"=coalesce("startedAt",now()-interval '1 minute'),"finishedAt"=clock_timestamp() WHERE id=$1`, [runId]);
       const evidence = {
         artifact: `run-report:${runId}`,
         kind: "report" as const,
@@ -743,8 +751,7 @@ test(
         "factoryArtifactMissing",
       );
       const captureId = randomUUID();
-      await pool.query(`INSERT INTO run_captures (id,"userId","runId",kind,"contentType",source,status,title,size,sha256,"storageKey","createdAt","updatedAt") VALUES ($1,'owner',$2,'image','image/png','local','ready','Captured result',3,$3,$4,$5,$5)`,
-        [captureId, runId, "c".repeat(64), `owner/captures/${captureId}`, evidence.recordedAt]);
+      await addFactoryVisualEvidence(pool, runId, { captureId });
       const capture = { ...evidence, artifact: `run-capture:${captureId}`, kind: "screenshot" as const };
       const rejectCapture = () => rejects(() => store.apply("owner", binding(state.task), randomUUID(), { ...finish, evidence: [capture] }), "factoryArtifactMissing");
       await rejects(() => store.apply("owner", binding(state.task), randomUUID(), { ...finish, evidence: [{ ...capture, artifact: `run-capture:${randomUUID()}` }] }), "factoryArtifactMissing");
@@ -913,6 +920,7 @@ test(
           max: 1,
           options: `-c search_path=${schema}`,
         });
+        observePoolCommits(reconnect);
         try {
           const recovered = createFactoryStore(reconnect, authorize, null, factoryTestLifecycle);
           const again = await recovered.apply(

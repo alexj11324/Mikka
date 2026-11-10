@@ -1,3 +1,5 @@
+import { observePoolCommits } from '../db/commit-effects';
+import { addFactoryVisualEvidence, addFactoryPublicationEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
@@ -92,6 +94,7 @@ test(
       max: 14,
       options: `-c search_path=${schema}`,
     });
+    observePoolCommits(pool);
     const directory = await mkdtemp(join(tmpdir(), "mikka-194-"));
     const targetDirectory = join(directory, "target");
     const authorize = async (
@@ -226,6 +229,10 @@ test(
               }),
             ],
           );
+          if (stage === "execute") {
+            await addFactoryVisualEvidence(pool, runId);
+            await addFactoryPublicationEvidence(pool, s.task.id);
+          }
           const evidence: FactoryEvidence = {
             artifact: `run-report:${runId}`,
             kind: "report",
@@ -1038,6 +1045,7 @@ test(
             max: 1,
             options: `-c search_path=${schema}`,
           });
+          observePoolCommits(reconnected);
           try {
             const recovered = createFactoryApprovals(
               reconnected,

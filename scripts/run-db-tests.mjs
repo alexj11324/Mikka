@@ -100,6 +100,8 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/computer/event-page.ts', file: 'lib/computer/event-session.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/credentials/broker.ts', file: 'lib/computer/event-broker.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/captures/store.ts', file: 'lib/captures/store.db.test.ts', script: 'test:captures-db' },
+  { marker: 'lib/captures/publication.ts', file: 'lib/captures/publication.db.test.ts', script: 'test:captures-db' },
+  { marker: 'packages/daemon/src/agents/capture-video.mjs', file: 'lib/captures/video-evidence.db.test.ts', script: 'test:captures-db' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-conversations.test.ts', script: 'test:groups' },
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-reads.db.test.ts', script: 'test:conversation-reads' },
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },

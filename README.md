@@ -47,7 +47,8 @@ This registers Mikka in Claude Code and uses browser-based OAuth sign-in. You ne
 - **Runs where your work lives.** Connect your own computers and SSH servers through the Mikka daemon, or use a configured cloud execution environment. Eligible parallel coding runs use isolated Git worktrees or task sandboxes.
 - **Keeps work reviewable.** Follow task progress, answer agents' questions, inspect run results and review eligible pull requests through Factory's checks and acceptance flow.
 - **Provides cloud desktops.** On configured Mikka Cloud accounts, bots can use a desktop you can watch, take over and hand back. Direct E2B access uses the owner's own key.
-- **Works with existing tools.** Reach Mikka from Claude Code or Codex through MCP, or from Telegram and Slack. Connected-app actions respect the relevant permissions and approval policy.
+- **Works with existing tools.** Reach Mikka from Claude Code or Codex through MCP, or from Telegram and Slack. Connected-app actions follow the workspace's access level for each app.
+- **Authorizes at the workspace.** The workspace is the only authorization surface: admins allow, disable or make each MCP server read-only, and allow each device. A bot has no permission settings, no allow/ask/deny layer and no per-action approval.
 - **Bring your own subscriptions.** Use your existing Claude or ChatGPT/Codex subscription with supported coding agents. Model API keys are also supported where applicable.
 - **Supports personal and team work.** Tasks, bots and activity can be organized across personal and team workspaces, with access controls for connected resources.
 

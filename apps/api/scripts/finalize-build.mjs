@@ -28,7 +28,8 @@ export async function compileTracing(root) {
 
 async function runtimeFiles(root) {
   const files = ['lib/abuse/data/disposable-email-domains.txt', 'packages/subscription-worker/CPA_COMMIT',
-    'packages/daemon/scripts/official-e2b-instance-bootstrap.sh', 'packages/daemon/scripts/refresh-cloud-worker.py']
+    'packages/daemon/scripts/official-e2b-instance-bootstrap.sh', 'packages/daemon/scripts/refresh-cloud-worker.py',
+    'packages/daemon/src/agents/capture-video.mjs']
   for (const item of await readdir(join(root, 'scripts/e2b'), { withFileTypes: true })) {
     if (item.isFile() && /\.(?:py|mjs|sh)$/.test(item.name)) files.push(`scripts/e2b/${item.name}`)
   }

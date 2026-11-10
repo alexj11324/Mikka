@@ -26,6 +26,7 @@ import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
 import { scheduleTools } from '@/lib/schedules/tools'
 import { recordDecisionSchema } from '@/lib/project-map/contracts'
 import { withToolDisplayNames } from '@/lib/coordinator/tool-metadata'
+import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
 
 /** `coordinator`: this chat's bot is the person's Coordinator, which may act on any of their bots and hold the factory tools. */
 /** Deployment switches the tools depend on (lib/deployment-switches.ts), read in a step: a workflow body never reads one itself. */
@@ -36,7 +37,7 @@ export function readCoordinatorSwitches(): CoordinatorSwitches {
   return { issueTools: issueMutationsEnabled(), factoryRouting: deploymentSwitch('factoryRouting'), factoryLifecycle: deploymentSwitch('factoryLifecycle') }
 }
 
-export interface CoordinatorToolOptions { /** The hosted prompt omitted repository facts; discover its workspace context on demand. */ lazyGitHubContext?: boolean; /** Started tool finish records; the round awaits them before storing its reply. Without it each record is awaited in place. */ audits?: Promise<unknown>[]; switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
+export interface CoordinatorToolOptions { /** The hosted prompt omitted repository facts; discover its workspace context on demand. */ lazyGitHubContext?: boolean; /** Started tool finish records; the round awaits them before storing its reply. Without it each record is awaited in place. */ audits?: Promise<unknown>[]; switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; /** Evidence-only entry provenance for dispatched runs; the app's chats are 'web', Slack names itself. */ origin?: RunOrigin; originRef?: RunOriginRef | null; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 /** One task, one thread (decision 2026-11-01-1330-one-thread-per-task): how both dispatch tools say it. */
 const ONE_THREAD = 'A task has one thread at a time. When the task already has one, this goes to that thread: a thread still working gets `note` as a message; a thread that ended (done, failed or stopped) runs again in the same thread with `note`. Use it to retry or to add information; never to start over. Set newThread only when the person, in their own words, explicitly asked for a new session or thread, or a different agent; the host checks their message and otherwise keeps the existing thread.'
 const newThreadInput = z.boolean().optional().describe('Only when the person explicitly asked for a new session or thread, or a different agent, in their own words. Retries and added information never set it.')
@@ -46,7 +47,7 @@ const factoryCapabilities = new Set<string>([...FACTORY_TOOL_IDS, 'dispatch_fact
 
 export function createCoordinatorRegistry(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
-  const { execution,computerEnabled = false,mailboxEnabled = false,coordinator = false,sourceEventId } = options
+  const { execution,computerEnabled = false,mailboxEnabled = false,coordinator = false,sourceEventId,origin,originRef } = options
   const switches = options.switches ?? readCoordinatorSwitches()
   const factoryOn = switches.issueTools && switches.factoryRouting && switches.factoryLifecycle
   const id = z.uuid()
@@ -185,7 +186,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       dispatch_bot_computer: tool({
         description: `Give an existing issue's work that needs a screen (computer use, watching a front-end test run) to a Bot computer, or any work the person asked to run there; it runs on its own machine with a desktop. A standalone file or report with no repository also goes here, even without screen interaction. Repository work that needs no screen and was not explicitly requested on a Bot computer goes to dispatch_run. ${ONE_THREAD} The host wakes and prepares this Bot's existing computer after checking access and the selected subscription or API key. A separate wake call is not required. Follow the authoritative effective execution policy: allow executes, ask uses the existing wait, deny or revocation stops. Do not add another blanket confirmation.`,
         inputSchema: z.object({ botId: botInput, issueId: id, profileId: agentProfileReferenceSchema.optional().describe('Exact authorized Factory Agent Profile ID only when explicitly chosen; default requires the structured task-form selection. Omit for host selection.'), harness: z.enum(['codex', 'claude_code']).optional().describe('Only when the person explicitly named Claude Code or Codex. Otherwise the host selects the authorized Profile and harness.'), note: z.string().max(10_000).optional(), suggestionId: id.optional(), readOnly: z.boolean().optional().describe('true when the task only reads and reports: no file changes, commit, push or PR.'), needsSpec: needsSpecInput, newThread: newThreadInput, model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional().describe('The model id for this harness, only when the person named one. Choose from the Allowed models (优先使用的模型) list in your instructions; omit to use the first entry that can run now. A model outside that list returns error modelNotAllowed with result.allowed, and nothing is queued.') }),
-        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerThread(userId, { ...input, botId: target, ...(sourceEventId ? { sourceEventId } : {}) }, options.toolCallId, scope, execution ?? undefined, botId) : { error: 'botMismatch' } },
+        execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerThread(userId, { ...input, botId: target, ...(sourceEventId ? { sourceEventId } : {}), ...(origin ? { origin } : {}), ...(originRef ? { originRef } : {}) }, options.toolCallId, scope, execution ?? undefined, botId) : { error: 'botMismatch' } },
       }),
     } : {}),
     list_factory_agent_profiles: tool({
@@ -208,7 +209,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         model: z.object({ harness: z.enum(['claude_code', 'codex']), model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional() }).optional().describe('Only when the person named the Agent or model for this thread. Choose from the Allowed models (优先使用的模型) list in your instructions; omit to use the first entry that can run now. A model outside that list returns error modelNotAllowed with result.allowed, and nothing is queued. The Agent alone ("give it to Codex"): pass harness only; the host takes that Agent\'s first entry in the list. A model too: its id exactly as the list shows it.'),
       }),
       execute: (input,call) => {
-        const request={...input,requestKey:`dispatch:${call.toolCallId}`,...(sourceEventId ? { sourceEventId } : {})}
+        const request={...input,requestKey:`dispatch:${call.toolCallId}`,...(sourceEventId ? { sourceEventId } : {}),...(origin ? { origin } : {}),...(originRef ? { originRef } : {})}
         return options.taskEventId
           ? steps.dispatchRun(userId, request, scope, botId, execution ?? undefined, options.taskEventId)
           : steps.dispatchRun(userId, request, scope, botId, execution ?? undefined)

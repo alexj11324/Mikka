@@ -1,4 +1,8 @@
 import { runChanged } from './live/panels'
+import { resolveAppOrigin } from './auth-config'
+import { lockFactoryPublicationEvidence, prepareFactoryPublicationEvidence } from './captures/publication'
+import { factoryPullRequestText } from './captures/publication-contract'
+import type { PoolClient } from 'pg'
 import { completionFailureDetails } from './run-failure-details'
 import 'server-only'
 import { isCurrentFactoryDeliverable } from './factory/execution-kind'
@@ -139,6 +143,7 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
  * uses that frozen report even if a daemon sends different data afterward.
  */
 export async function persistRunCompletion(userId: string, runId: string, completion: RunCompleteRequest, scopeDeviceId?: string | null) {
+  await (await import('./captures/run-end')).finishOwnedRunRecordings(userId, runId, scopeDeviceId)
   for (let attempt = 0; ; attempt++) {
     try {
       const result = await completionTransaction(userId, runId, completion, scopeDeviceId)
@@ -300,12 +305,14 @@ async function settlePublication(claim: Publication, result: { pullRequest?: Pub
 /** Freeze authorized inputs and revalidate them immediately around each
  * external mutation. Workspace locks precede app locks, as team promotion
  * does; application locks always follow issue -> run -> publication. The
- * provider callback encloses only its existing eight-second HTTP write. */
-async function withPublicationAuthority<T>(claim: Publication, work: (value: { publication: Publication; run: Run; report: RunReport; allowCreate: boolean }) => Promise<T>): Promise<T> {
+ * provider callback encloses only bounded GitHub head/body reads and writes. */
+async function withPublicationAuthority<T>(claim: Publication, work: (value: { publication: Publication; run: Run; report: RunReport; allowCreate: boolean }, client: PoolClient) => Promise<T>): Promise<T> {
   const [hint] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
     .where(and(eq(agentRuns.id, claim.runId), eq(agentRuns.userId, claim.userId), eq(agentRuns.issueId, claim.issueId))).limit(1)
   if (!hint?.workspaceId) throw new PublicationError('issue_unavailable')
-  return withPublicationWorkspace(claim.userId, hint.workspaceId, () => db.transaction(async tx => {
+  return withPublicationWorkspace(claim.userId, hint.workspaceId, async () => {
+    const client = await pool.connect()
+    try { return await withDatabaseClient(client, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
     await tx.execute(sql`set local lock_timeout = '8s'`)
     const [task] = await tx.select().from(issues).where(eq(issues.id, claim.issueId)).for('update')
     const [run] = await tx.select().from(agentRuns).where(and(eq(agentRuns.id, claim.runId), eq(agentRuns.userId, claim.userId))).for('update')
@@ -327,8 +334,9 @@ async function withPublicationAuthority<T>(claim: Publication, work: (value: { p
     if (admission && !accepted) throw new PublicationError('publication_mismatch')
     // The pull request opens with the run owner's own GitHub credential
     // (decision 2026-11-02-1600); no Mikka setting or approval gates it.
-    return work({ publication, run, report, allowCreate: readIssueMetadata(task.content).pullRequests.length < 10 })
-  }))
+    return work({ publication, run, report, allowCreate: readIssueMetadata(task.content).pullRequests.length < 10 }, client)
+    }))) } finally { client.release() }
+  })
 }
 
 /** What publication hands GitHub: the pull request, for the run owner `userId`. */
@@ -368,7 +376,8 @@ async function ownerGitHubCredential(userId: string, remoteKey: string): Promise
 export async function publishRunResult(runId: string, openPullRequest: OwnerPullRequestOpener = openOwnerPullRequest): Promise<{ done: boolean }> {
   const claim = await claimPublication(runId)
   if (!claim) {
-    const [row] = await db.select({ status: runPublications.status }).from(runPublications).where(eq(runPublications.runId, runId))
+    const [row] = await db.select({ status: runPublications.status, userId: runPublications.userId }).from(runPublications).where(eq(runPublications.runId, runId))
+    if (row?.status === 'published') await resumePublicationEvidenceHandoff(row.userId, runId)
     return { done: !row || WORKFLOW_DONE.includes(row.status) }
   }
   try {
@@ -377,11 +386,25 @@ export async function publishRunResult(runId: string, openPullRequest: OwnerPull
     // preconfigured command; the person's merge still requires both checks.
     const factoryBound = (await pool.query(`SELECT 1 FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND a.stage='execute' AND t."userId"=$2 AND t."issueId"=$3`,[runId,claim.userId,claim.issueId])).rowCount === 1
     const snapshot = await withPublicationAuthority(claim, async ({ publication, report, allowCreate }) => ({
-      remoteKey: publication.remoteKey, issueId: publication.issueId, identifier: publication.identifier!, title: publication.issueTitle!, summary: report.summary,
+      remoteKey: publication.remoteKey, issueId: publication.issueId, identifier: publication.identifier!,
+      title: factoryBound ? factoryPullRequestText(publication.issueId).title : publication.issueTitle!,
+      summary: factoryBound ? factoryPullRequestText(publication.issueId).summary : report.summary,
       branch: publication.branch!, commit: report.publish!.commit!, baseBranch: publication.baseBranch, draft: report.verify.status === 'not_run' && !factoryBound, allowCreate,
     }))
-    const pullRequest = await openPullRequest({ ...snapshot, userId: claim.userId, withWrite: write => withPublicationAuthority(claim, () => write()) })
-    return { done: await settlePublication(claim, { pullRequest }) }
+    const visualEvidence = factoryBound ? await prepareFactoryPublicationEvidence(pool, {
+      userId: claim.userId, issueId: claim.issueId, runId, sha: snapshot.commit,
+    }, resolveAppOrigin(process.env)) : undefined
+    const pullRequest = await openPullRequest({ ...snapshot, userId: claim.userId, ...(visualEvidence ? { visualEvidence } : {}),
+      withWrite: write => withPublicationAuthority(claim, async (_authority, client) => {
+        // Same SQL transaction/connection as issue/run authority: concurrent
+        // publications cannot exhaust the pool while waiting for a second one.
+        if (visualEvidence) await lockFactoryPublicationEvidence(client, visualEvidence)
+        return write()
+      }) })
+    if (visualEvidence && pullRequest.evidenceDigest !== visualEvidence.digest) throw new PublicationError('factory_public_evidence_required')
+    const done = await settlePublication(claim, { pullRequest })
+    if (done) await resumePublicationEvidenceHandoff(claim.userId, runId)
+    return { done }
   } catch (error) {
     if (!(error instanceof PublicationError)) throw error
     if (error.retryable && claim.attempts < MAX_ATTEMPTS) {
@@ -390,6 +413,15 @@ export async function publishRunResult(runId: string, openPullRequest: OwnerPull
     }
     return { done: await settlePublication(claim, { errorCode: error.code }) }
   }
+}
+
+/** A committed publication wakes the existing same-candidate handoff; no new review or polling. */
+async function resumePublicationEvidenceHandoff(userId: string, runId: string) {
+  const { rows } = await pool.query<{ botId: string | null }>(`SELECT DISTINCT t."botId" FROM factory_tasks t
+    JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`, [runId, userId])
+  if (!rows.length) return
+  const { factoryRuntimeForBot } = await import('./factory/runtime')
+  for (const row of rows) await factoryRuntimeForBot(row.botId).store.resumeEvidenceHandoff(userId, runId)
 }
 
 /** The durable workflow's exhausted-error path still produces a chat result. */

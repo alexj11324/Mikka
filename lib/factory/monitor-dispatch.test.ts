@@ -1,4 +1,5 @@
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -9,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { Pool, type PoolClient } from "pg";
+import { observePoolCommits } from '../db/commit-effects';
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { FactoryError } from "./contract";
 import { type FactoryTask } from "./store";
@@ -61,6 +63,7 @@ test(
       max: 12,
       options: `-c search_path=${schema}`,
     });
+    observePoolCommits(pool);
     const root = await mkdtemp(join(tmpdir(), "factory-monitor-dispatch-"));
     const actor = { userId: "owner", sessionId: randomUUID() };
     const deviceId = randomUUID(),
@@ -276,6 +279,8 @@ test(
           `UPDATE factory_tasks SET stage='approval',status='pending',revision=5,"candidateId"=$2,"attemptId"=$3 WHERE id=$1`,
           [state.task.id, candidateId, approvalAttempt],
         );
+        await addFactoryVisualEvidence(pool,runIds[0]);
+        await addFactoryPublicationEvidence(pool,state.task.id);
         const evidence = await service.evidence(actor, state.task.id);
         const approval = await service.approve(actor, policyFixture.request(actor.userId, {
           binding: evidence.binding,

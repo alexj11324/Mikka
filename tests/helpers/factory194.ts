@@ -24,6 +24,8 @@ import {
 } from "../../lib/factory/vercel-publication";
 import { vercelProtocolFixture } from "./factory-vercel";
 import { factory194Target } from "./factory194-target";
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from './factory-visual-evidence';
+import { observePoolCommits } from '../../lib/db/commit-effects';
 
 export const binding = (t: FactoryTask): FactoryBinding => ({
   taskId: t.id,
@@ -47,14 +49,15 @@ export async function factory194Fixture(connectionString: string) {
     max: 12,
     options: `-c search_path=${schema}`,
   });
+  observePoolCommits(pool);
   await pool.query(`
     CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"ownershipState" text NOT NULL DEFAULT 'pending',title text,content jsonb,revision integer,status text NOT NULL DEFAULT 'todo',scope text NOT NULL DEFAULT 'personal',"scopeVersion" integer NOT NULL DEFAULT 1);
     CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,kind text,payload jsonb);
     CREATE TABLE "session" (id text PRIMARY KEY,"userId" text,"expiresAt" timestamptz);
     CREATE TABLE account (id text,"userId" text,"providerId" text);
     CREATE TABLE "user" (id text PRIMARY KEY,name text);
-    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid,"scopeVersion" integer);
-    CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,sha text,repository text,environment text,scope text,UNIQUE("taskId",id));
+    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid,"scopeVersion" integer,reason text NOT NULL DEFAULT '');
+    CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,sha text,repository text,environment text,scope text,"runId" uuid,kind text NOT NULL DEFAULT 'repository',UNIQUE("taskId",id));
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"candidateId" uuid,stage text,position integer,"runId" uuid,"sessionId" text,status text,evidence jsonb,output jsonb,"finishedAt" timestamptz,UNIQUE("taskId",id));
     CREATE TABLE factory_events ("taskId" uuid,"eventId" uuid,request jsonb NOT NULL DEFAULT '{}',result jsonb NOT NULL DEFAULT '{}',PRIMARY KEY("taskId","eventId"));
     CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"issueId" uuid,"sessionId" text,status text,"stopRequestedAt" timestamptz,report jsonb,"startedAt" timestamptz,"finishedAt" timestamptz,"stopReason" text);
@@ -62,7 +65,9 @@ export async function factory194Fixture(connectionString: string) {
     CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean);
     CREATE TABLE run_tokens (id uuid PRIMARY KEY,"runId" uuid,"userId" text,"tokenHash" text,"revokedAt" timestamptz,"expiresAt" timestamptz);
     CREATE TABLE run_chunks (id uuid PRIMARY KEY,"runId" uuid,chunk jsonb,"createdAt" timestamptz,seq integer NOT NULL DEFAULT 1);
-    CREATE TABLE run_captures (id uuid PRIMARY KEY,"userId" text NOT NULL,"runId" uuid NOT NULL,kind text NOT NULL,"contentType" text NOT NULL,status text NOT NULL,title text NOT NULL,size integer,sha256 text,"durationMs" integer,"createdAt" timestamptz NOT NULL DEFAULT now(),"updatedAt" timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE run_captures (id uuid PRIMARY KEY,"userId" text NOT NULL,"runId" uuid NOT NULL,"issueId" uuid,kind text NOT NULL,"contentType" text NOT NULL,source text NOT NULL DEFAULT 'local',status text NOT NULL,title text NOT NULL,size integer,sha256 text,"storageKey" text,"inlineContent" bytea,"durationMs" integer,"createdAt" timestamptz NOT NULL DEFAULT now(),"updatedAt" timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE run_capture_shares (id uuid PRIMARY KEY,"captureId" uuid,"tokenHash" text,"createdBy" text,"revokedAt" timestamptz);
+    CREATE TABLE run_publications ("runId" uuid PRIMARY KEY,"userId" text,"issueId" uuid,"remoteUrl" text,"remoteKey" text,status text,"pullRequest" jsonb);
     CREATE TABLE run_capture_steps (id uuid PRIMARY KEY,"captureId" uuid NOT NULL,"userId" text NOT NULL,"atMs" integer NOT NULL,label text NOT NULL,source text NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now());
   `);
   await pool.query(
@@ -135,17 +140,17 @@ export async function factory194Fixture(connectionString: string) {
           await tx.query(`INSERT INTO factory_attempts(id,"taskId","candidateId",stage,position,status,evidence,output) VALUES($1,$2,$3,'approval',99,'pending','[]','{}')`, [attemptId,task.id,task.candidateId]);
           return { task: (await tx.query<FactoryTask>(`UPDATE factory_tasks SET stage='approval',status='pending',"attemptId"=$2,revision=revision+1 WHERE id=$1 RETURNING *`, [task.id,attemptId])).rows[0] };
         }
-        if (change.action === "finish" && change.status === "failed") {
+        if (change.action === "finish" && (change.status === "failed" || change.status === "blocked")) {
           // Contract substitute for #192: failing never needs a consumer gate.
           await tx.query(
-            "UPDATE factory_attempts SET status='failed',\"finishedAt\"=clock_timestamp() WHERE id=$1",
-            [task.attemptId],
+            "UPDATE factory_attempts SET status=$2,output=COALESCE(output,'{}'::jsonb)||$3::jsonb,\"finishedAt\"=clock_timestamp() WHERE id=$1",
+            [task.attemptId,change.status,JSON.stringify(change.output)],
           );
           return {
             task: (
               await tx.query<FactoryTask>(
-                "UPDATE factory_tasks SET status='failed',revision=revision+1 WHERE id=$1 RETURNING *",
-                [task.id],
+                "UPDATE factory_tasks SET status=$2,reason=$3,revision=revision+1 WHERE id=$1 RETURNING *",
+                [task.id,change.status,change.reason],
               )
             ).rows[0],
           };
@@ -219,7 +224,7 @@ export async function factory194Fixture(connectionString: string) {
       adapters,
     );
   /** `capture`: the verify run also took a screenshot, referenced as run capture evidence (A3). */
-  async function prepare(executionActor: FactoryActor = actor, options: { capture?: boolean } = {}) {
+  async function prepare(executionActor: FactoryActor = actor, options: { capture?: boolean; visual?: boolean; publication?: boolean } = {}) {
     let captureId: string | null = null;
     const task: FactoryTask & { workspaceId: string } = {
       id: randomUUID(),
@@ -279,7 +284,7 @@ export async function factory194Fixture(connectionString: string) {
       ],
     );
     await pool.query(
-      "INSERT INTO factory_candidates VALUES ($1,$2,$3,$4,$5,$6)",
+      'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope) VALUES ($1,$2,$3,$4,$5,$6)',
       [
         task.candidateId,
         task.id,
@@ -321,6 +326,13 @@ export async function factory194Fixture(connectionString: string) {
         ],
       );
       const evidenceList: Record<string, unknown>[] = [evidence];
+      if (stage === 'execute') {
+        await pool.query('UPDATE factory_candidates SET "runId"=$2 WHERE id=$1', [task.candidateId,runId]);
+        if (options.visual !== false) {
+          const producerCaptureId = await addFactoryVisualEvidence(pool,runId);
+          evidenceList.push({ ...evidence,artifact:`run-capture:${producerCaptureId}`,kind:'screenshot' });
+        }
+      }
       if (options.capture && stage === "verify") {
         captureId = randomUUID();
         await pool.query(
@@ -348,6 +360,7 @@ export async function factory194Fixture(connectionString: string) {
       `INSERT INTO factory_attempts (id,"taskId","candidateId",stage,position,status,evidence,output) VALUES ($1,$2,$3,'approval',3,'pending','[]','{}')`,
       [task.attemptId, task.id, task.candidateId],
     );
+    if (options.visual !== false && options.publication !== false) await addFactoryPublicationEvidence(pool,task.id);
     const e = await service().evidence(executionActor, task.id);
     const approval = {
       binding: binding(task),

@@ -3,6 +3,16 @@
 Agents such as Claude Code and Codex can drive Mikka through its MCP server at
 `https://app.aspectlylabs.com/mikka/api/mcp` (Streamable HTTP).
 
+Every call names one Mikka workspace and is authorized against it:
+`lib/mcp/workspace.ts` resolves the caller's workspace, checks membership and
+refuses a call with no resolvable workspace (`workspaceAccessDenied`).
+
+Target contract: each connection is scoped to one Mikka workspace, and the
+workspace's MCP-server policy (allow / disable / read-only) is checked before
+every call. Today an OAuth connection may name any workspace its user belongs
+to, and `workspace_app_policies` covers connected apps (allow / deny), not MCP
+servers.
+
 How to connect and the tool list for users are in the public docs:
 [aspectlylabs.com/mikka/docs/mcp](https://aspectlylabs.com/mikka/docs/mcp)
 (maintained in the separate `mikka-web` repository). This page covers the
@@ -44,6 +54,11 @@ plugin, configured in `lib/auth.ts`, tables in `drizzle/0009_oauth_provider.sql`
   consent page at `/oauth/consent`.
 - Access tokens (`mka_…`, one hour) and refresh tokens (`mkr_…`) are opaque and
   stored hashed. `lib/mcp/auth.ts` checks them against the database.
+- Target contract: each OAuth grant is pinned to one workspace
+  (`authInfo.extra.workspaceId`); a request naming another workspace returns
+  `workspaceAccessDenied`. Consent grants the current workspace only, and the
+  token cannot read or write another workspace. Run tokens already carry the
+  run's `workspaceId` and are pinned to it; OAuth grants are not pinned yet.
 
 ## Worker tools (inside a run)
 
@@ -61,7 +76,9 @@ serve these tools instead of the ones above (`lib/mcp/worker.ts`):
 | `submit_artifact` | `artifact_submitted` | `{ title, kind: 'markdown' \| 'html', content, artifactId? }`; one event per version |
 
 Each call writes one event with the run's `userId`, `runId` and `issueId` and
-wakes the Coordinator. Tokens are stored hashed (`run_tokens`,
+wakes the Coordinator. The event belongs to the run's bot, whose workspace
+places it in the right workspace; `coordinator_events` has no separate
+workspace column. Tokens are stored hashed (`run_tokens`,
 `drizzle/0012_run_tokens.sql`), live at most 24 hours, work only while the run
 is live, and are revoked when the run completes.
 
@@ -124,7 +141,7 @@ selected credentials, as [orchestration](design/orchestration.md) defines.
 
 | Where the thread runs | Tools | Path |
 | --- | --- | --- |
-| Local daemon (Playwright on the person's machine) | `submit_capture { path, title }` on the daemon's `mikka` MCP | The MCP copies a file from the worktree or the run's temp dir into the run dir; the daemon checks it again (no links, bytes, limit), then `POST /v1/runs/:runId/captures` → PUT to a presigned R2 URL (or the server without a bucket) → `POST …/:captureId/complete`, where the server re-reads the object and checks size, sha256 and type before it counts |
+| Local daemon (Playwright on the person's machine) | `submit_capture { path, title, steps? }` on the daemon's `mikka` MCP | The MCP copies a file from the worktree or the run's temp dir into the run dir; the daemon checks it again (no links, bytes, limit), then `POST /v1/runs/:runId/captures` → PUT to a presigned R2 URL (or the server without a bucket) → `POST …/:captureId/complete`, where the server re-reads the object and checks size, sha256 and type before it counts |
 | Cloud computer | `capture_screenshot { title }`, `start_screen_recording { title, maxSeconds? }`, `stop_screen_recording {}`, `mark_recording_step { label }` on `mikka_computer` | The cloud worker relays the call to `POST /v1/runs/:runId/screen`; the server picks the desktop from the run's binding and runs `scripts/e2b/screen-capture.sh` (ffmpeg x11grab) in the sandbox through E2B |
 
 Cloud captures need no per-call review: the image never goes back to the
@@ -145,7 +162,8 @@ A recording has a step timeline (Figma 13 「操作」). Each computer action
 does in plain words for the person (「点击登录按钮」), never coordinates or a
 tool name. The driver never sees it. While the broker's own recording window
 is open (from `start_screen_recording`'s `stopsAt` until stop), it relays a
-done action's step as `POST /v1/runs/:runId/screen {action:"step",label,source:"action"}`;
+done action's step as `POST /v1/runs/:runId/screen {action:"step",label,source:"action",durationMs}`;
+`durationMs` measures the action execution and excludes human approval waiting time.
 `mark_recording_step` marks a moment that is not an action (`source:"mark"`).
 The server masks the label like a title and keeps it in `run_capture_steps`
 as an offset from `run_captures.startedAt` (set once ffmpeg is up), at most
@@ -157,3 +175,59 @@ after that run ends, while its 15-minute reservation is valid. A stop request
 or revoked device credential still denies access. It cannot create a new
 reservation after the run ends; an unregistered or expired file remains in
 the local queue for inspection instead of being silently discarded.
+
+
+### Factory visual handoff
+
+Every implementation candidate needs a ready screenshot or video from its own
+producer run. Video is the default for UI, backend, CLI and documentation work:
+record the running app, actual test/API result, or rendered document respectively.
+A report, logs, an old candidate's capture, or an `unverified` criterion cannot
+replace visual evidence. Missing media commits a blocked state and returns
+`factory_visual_evidence_required` at handoff, approval and merge entry points.
+See [the visual-evidence decision](design/decisions/2026-11-08-2328-factory-visual-evidence-required.md).
+
+The daemon and cloud recorder share `capture-video.mjs`. FFmpeg removes only
+idle gaps established by complete action timing, preserves every action and
+first/final state, and remaps step offsets. Older clips without durations keep
+the full timeline. Inputs can be up to 1 GB; final MP4s remain at most 100 MB and
+one hour for local captures (cloud recordings keep their existing 300-second
+limit). Oversized output is recompressed with a bitrate budget and smaller
+frame size, never truncated to fit. Processing failure publishes no ready file.
+Local daemons need `ffmpeg` and `ffprobe` on PATH. Official cloud runtimes install
+the paired tools under a versioned `/opt/mikka/runtime/capture-tools` directory
+on both initial installation and worker staging. The source pins the upstream
+asset IDs, compressed bytes and executable SHA-256 digests; installation verifies
+them and leaves official files and system PATH unchanged. Both the daemon and
+the standalone computer helper use that private pair. Cloud processing runs in
+the existing computer, not the web server. No second media store is introduced.
+
+`submit_capture` returns a stable `{captureId,status:"queued"}` before upload;
+queued is not ready. The daemon drains captures before submitting completion,
+and cloud completion awaits recording finalization. Independent application
+instances serialize finalization through PostgreSQL so a second stop cannot
+discard another instance's input or mark its valid output failed.
+The terminal deadline cancels and drains hashing, processing and upload through
+one abort signal. A failed publication retains its queue for recovery and cannot
+be reported as a completed capture checkpoint.
+
+Before PR publication, inspect the captured pixels for credentials and personal
+data. Existing title, step and report masking does not redact pixels. Use safe
+fixture data and submit only checked capture IDs in
+`submit_result.visualEvidence: [{captureId,publicSafe:true}]`. The server accepts
+no agent-supplied public URL and never shares undeclared historic media. It uses
+the existing `run_capture_shares` links and records their candidate/digest receipt
+in `factory_events`. Revocation blocks handoff and never silently creates a new
+link. `factory_public_evidence_required` also blocks a repository candidate when
+its current PR body has not acknowledged those exact links.
+
+The host adds a managed `## Visual verification` block to the PR, preserving
+human text and the final Mikka issue marker. The acceptance Artifact and task
+conversation keep authenticated capture URLs. `FactoryFlowView.acceptance.media`
+carries `captureId`, `kind`, `contentType`, `size`, `durationMs`, `url` and candidate
+metadata for the existing clients' inline image/video rendering. The task's
+[activity snapshot](factory/task-activity-v1.md) supplies its state and historical
+submissions together. Clients identify a submission by task and activity item ID,
+read media through its task media URL, and download reports at their submitted
+Artifact version. Display titles and the Artifact's latest version are not
+submission identities. These evidence reads grant no automatic merge authority.

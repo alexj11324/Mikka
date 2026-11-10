@@ -1,6 +1,7 @@
 import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type NativeCoordinatorCommand } from "@mikka/protocol/coordinator"
 import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
 import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
+import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-git'
 // HTTP transport for `ServerLink`: the routes apps/server serves for the
 // daemon (ADR 0016). Paths and payloads come from packages/protocol
 // (`devicePaths`, `runCompletePath` and their zod schemas); responses are
@@ -309,6 +310,7 @@ export class HttpServerLink implements ServerLink {
           [MAILBOX_NOTICE_HEADER]: '1',
           [WORKSPACE_REQUEST_HEADER]: '1',
           [WORKSPACE_DIFF_REQUEST_HEADER]: '1',
+          [WORKSPACE_GIT_REQUEST_HEADER]: '1',
           ...daemonTracer.headers(),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
@@ -466,16 +468,16 @@ export class HttpServerLink implements ServerLink {
     return {contentType,body:response.body}
   }
 
-  async beginCapture(runId: string, request: CaptureUploadRequest) {
-    return this.call("POST", capturePaths.begin(checkId(runId)), { body: request, schema: captureUploadResponse })
+  async beginCapture(runId: string, request: CaptureUploadRequest, signal?: AbortSignal) {
+    return this.call("POST", capturePaths.begin(checkId(runId)), { body: request, schema: captureUploadResponse, signal })
   }
 
-  async resumeCapture(runId: string, captureId: string) {
-    return this.call("POST", capturePaths.upload(checkId(runId), checkId(captureId)), { schema: captureUploadResponse })
+  async resumeCapture(runId: string, captureId: string, signal?: AbortSignal) {
+    return this.call("POST", capturePaths.upload(checkId(runId), checkId(captureId)), { schema: captureUploadResponse, signal })
   }
 
   /** Straight to object storage with the signed headers, or to the server when it has no bucket. */
-  async sendCapture(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string) {
+  async sendCapture(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string, signal?: AbortSignal) {
     const server = upload.target === "server"
     let response: Response
     try {
@@ -486,7 +488,7 @@ export class HttpServerLink implements ServerLink {
           : upload.headers,
         body: bytes,
         redirect: "error",
-        signal: AbortSignal.timeout(300_000),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(300_000)]) : AbortSignal.timeout(300_000),
       })
     } catch (error) {
       throw new ServerUnreachableError(error)
@@ -496,8 +498,8 @@ export class HttpServerLink implements ServerLink {
     if (!response.ok) throw new DaemonError(response.status, `PUT capture failed: ${response.status}`, { status: response.status })
   }
 
-  async completeCapture(runId: string, captureId: string) {
-    const { capture } = await this.call("POST", capturePaths.complete(checkId(runId), checkId(captureId)), { schema: captureCompleteResponse, timeoutMs: 120_000 })
+  async completeCapture(runId: string, captureId: string, signal?: AbortSignal) {
+    const { capture } = await this.call("POST", capturePaths.complete(checkId(runId), checkId(captureId)), { schema: captureCompleteResponse, timeoutMs: 120_000, signal })
     return capture
   }
 

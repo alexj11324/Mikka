@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { after, beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
-import { CLOSED_TASK_RETENTION_MS, THREAD_MACHINE_BUDGET_MS, THREAD_MACHINE_IDLE_MS, THREAD_MACHINE_RETENTION_MS,
+import { CLOSED_TASK_RETENTION_MS, THREAD_MACHINE_BUDGET_MS, THREAD_MACHINE_IDLE_MS, THREAD_MACHINE_RESTORE_MS, THREAD_MACHINE_RETENTION_MS,
   reconcileThreadMachine, threadMachineExecutionDeadline, threadMachineLifecycleDecision, type ThreadLifecycleRow } from './thread-lifecycle'
 import { threadLifecycleErrorKind, threadLifecycleLogFields } from './thread-lifecycle-log'
 
@@ -102,6 +102,20 @@ test('an ended row with an unacknowledged kill remains recoverable; a pending cr
   assert.equal(threadMachineLifecycleDecision(row({ state: 'ended' }), running, now).action, 'retire')
   assert.deepEqual(threadMachineLifecycleDecision(row({ state: 'ended', sandboxId: null, workerLeaseUntil: now + 5_000 }), null, now),
     { action: 'wait', at: now + 5_000 + 1, reason: 'creation_cleanup_unconfirmed' })
+})
+
+test('a restore waits on its lease, then on the restore cadence, and closes with the task', () => {
+  const restoring = row({ state: 'restore', sandboxId: null, workerLeaseUntil: now + 60_000, restoreStartedAt: now })
+  assert.deepEqual(threadMachineLifecycleDecision(restoring, null, now),
+    { action: 'wait', at: now + 60_001, reason: 'provisioning' })
+  assert.deepEqual(threadMachineLifecycleDecision({ ...restoring, workerLeaseUntil: null }, null, now),
+    { action: 'wait', at: now + THREAD_MACHINE_RESTORE_MS, reason: 'provisioning' })
+  assert.deepEqual(threadMachineLifecycleDecision({ ...restoring, taskClosed: true }, null, now),
+    { action: 'stop', at: now + 30_000, reason: 'task_closed' })
+  assert.equal(threadMachineLifecycleDecision({ ...restoring, taskClosed: true, stopRequestedAt: now }, null, now).action, 'wait',
+    'an already requested stop is never re-requested in a tight loop')
+  // A snapshot left on a paused row changes nothing until a wake needs it.
+  assert.equal(threadMachineLifecycleDecision(row({ state: 'paused', snapshotState: 'ready', filesystemSnapshotId: 'snap' }), paused, now).action, 'wait')
 })
 
 /** Provider faults and lost responses on a small store boundary. SQL locking,

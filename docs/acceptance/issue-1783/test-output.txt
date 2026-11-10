@@ -1,0 +1,188 @@
+▶ Factory public capture receipts bind the current producer and the acknowledged PR body
+  ✔ a ready private capture requires an explicit safe-to-share declaration (23.925619ms)
+  ✔ simultaneous preparation and ambiguous retries reuse one existing share receipt (20.746776ms)
+  ✔ wrong owner, run, candidate, commit, missing capture and arbitrary declarations fail closed (25.225121ms)
+  ✔ revocation is serialized with GitHub writes and is never silently reissued (65.119482ms)
+  ✔ watchdog recovery requires the exact existing owner completion receipt (26.298181ms)
+  ✔ a video appears in the acknowledged PR, the versioned Artifact and the same task conversation (116.054273ms)
+✔ Factory public capture receipts bind the current producer and the acknowledged PR body (1370.726423ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:02.430Z","sampleRate":0.01,"route":null,"command":"COMMIT","tables":[],"statement":"9505cacb7c71","rows":0,"bytes":0}
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:02.491Z","sampleRate":0.01,"route":null,"command":"SET","tables":[],"statement":"97772e041993","rows":0,"bytes":0}
+▶ PG17 + real FFmpeg: oversized video is trimmed, compressed and stored once with its remapped timeline
+  ✔ an aborted object upload cannot become ready and its cleanup does not reuse the expired signal (52.575122ms)
+{"level":"info","msg":"db_transport_sample","timestamp":"2026-11-08T23:58:02.570Z","runtime":"29ce518f-d439-4db9-a6f8-5d2da83af1ce","windowStart":"2026-11-08T23:58:02.393Z","windowEnd":"2026-11-08T23:58:02.570Z","elapsedMs":177,"measurement":"postgres_protocol_plaintext_received","pgProtocolReceiveBytes":108559,"knownPgProtocolReceiveBytes":108559,"connections":5,"scopes":["request"],"unknownReadings":0,"coverage":"observed_connections","startupExcluded":true,"excludes":["TLS","TCP","startup_before_registration","other_runtimes","Go_workers","supplier_metering"]}
+✔ PG17 + real FFmpeg: oversized video is trimmed, compressed and stored once with its remapped timeline (1355.853162ms)
+(node:20612) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:20612) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:04.780Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["factory_tasks","issues","bots"],"statement":"f89d56f0423f","rows":0,"bytes":0}
+▶ actual migrated PG/HTTP: review/verify receipt consumers and bounded repair
+  ✔ prior review handoff carries real paired artifact observations into verify, which still inspects independently (899.056043ms)
+  ✔ prior review observations retain owner, candidate, epoch, independent SID and latest-review fences (405.875066ms)
+  ✔ prior review native IO is all-or-incomplete for missing, ambiguous, failed, over-budget or redacted records (398.695181ms)
+  ✔ verify continuation retains frozen prior-review identity and rejects native content or digest drift (945.072401ms)
+  ✔ a stale local heartbeat rejects direct dispatch until the same pending check receives a real fresh heartbeat (1108.676822ms)
+  ✔ repository report-only completion is durably blocked before handoff (44.466296ms)
+  ✔ report report-only completion is durably blocked before handoff (42.646895ms)
+  ✔ deliverable report-only completion is durably blocked before handoff (41.223543ms)
+  ✔ retrying a visual-evidence refusal creates a fresh producer candidate and preserves the blocked history (80.006114ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:08.351Z","sampleRate":0.01,"route":"after:device-wake","command":"SELECT","tables":["unnest"],"statement":"8f13016f0409","rows":1,"bytes":18}
+  ✔ retrying a repaired implementation awaiting public evidence replaces only its current candidate and keeps one review (208.341707ms)
+  ✔ only a ready media object from the exact producer session and candidate SHA passes the visual gate (60.761709ms)
+  ✔ reviewer media cannot replace missing producer evidence at the handoff transition (93.391996ms)
+  ✔ a repaired candidate cannot inherit the previous implementation video (118.132675ms)
+  ✔ retrying an old approval without media returns HTTP 409 and keeps it blocked (122.718489ms)
+  ✔ a playable producer video hands off only after its exact PR receipt is published, then resumes once without repeating review (100.09484ms)
+  ✔ new host-frozen flow hands a single review to the person without a Verify run (105.797814ms)
+  ✔ single review hands unverified observations to the person with their reason instead of asking for a command (102.320632ms)
+  ✔ report human acceptance completes the public flow through its real receipt without changing the review verdict (138.281912ms)
+  ✔ deliverable human acceptance completes the public flow through its real receipt without changing the review verdict (229.549334ms)
+  ✔ public flow, same Artifact versions and one Bot comment per visited stage use real persisted provenance (205.873126ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:09.768Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["bots"],"statement":"e9b7627fc4c8","rows":0,"bytes":0}
+  ✔ acceptance history survives live run cleanup and keeps task and Artifact deletion semantics (74.68841ms)
+  ✔ current review-only missing observations update handoff counts; repairs never expose an earlier candidate as current acceptance (209.657019ms)
+  ✔ two tasks on one issue keep both comments without upgrading issue SHARE locks (document exists: false) (41.028023ms)
+  ✔ two tasks on one issue keep both comments without upgrading issue SHARE locks (document exists: true) (28.074603ms)
+  ✔ completed specifications wait for a real browser approval receipt; stale and replayed requests cannot bypass it (52.614593ms)
+  ✔ single review can hand an ambiguous finding to the person without starting a repair or a second review (96.377328ms)
+  ✔ single-review repair hands off its new candidate and keeps earlier findings tied to the old SHA (225.519802ms)
+  ✔ review missing harness persists blocked after rollback, without an orphan run (81.783636ms)
+  ✔ verify missing harness persists blocked after rollback, without an orphan run (172.770109ms)
+  ✔ review missing command queues an independent inference check instead of blocking dispatch (72.425808ms)
+  ✔ verify missing command queues an independent inference check instead of blocking dispatch (114.937013ms)
+  ✔ a real report-only review finding retains trusted provenance without fabricated process fields (101.275692ms)
+  ✔ review quota fallback restarts independently and preserves the exact candidate assignment (107.757686ms)
+  ✔ verify quota fallback restarts independently and preserves the exact candidate assignment (162.677801ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:11.322Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["factory_tasks","issues","bots"],"statement":"f89d56f0423f","rows":0,"bytes":0}
+  ✔ dispatch blocked observation cannot overwrite cancel (77.162203ms)
+  ✔ dispatch blocked observation cannot overwrite access-loss (64.706782ms)
+  ✔ question/caller transaction failure is left to its caller, with no committed blocked state or orphan (58.426597ms)
+  ✔ claim retains host network allow and its frozen domain list (72.599599ms)
+  ✔ claim retains host network ask and its frozen domain list (93.293905ms)
+  ✔ claim retains host network deny and its frozen domain list (61.175869ms)
+  ✔ dispatch freezes exact assignment and real snapshot; actual local claim joins token transaction (127.884363ms)
+  ✔ separate review/verify pass reaches approval only with paired original verifier chunks (175.554111ms)
+  ✔ reject model-only without advance or automatic repair (118.439115ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:12.207Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["workspace_projects","mikka_workspaces","mikka_team_projects","mikka_workspace_members"],"statement":"aefdfff0d155","rows":0,"bytes":0}
+  ✔ reject wrong-sha without advance or automatic repair (100.677651ms)
+  ✔ reject missing-chunks without advance or automatic repair (154.157674ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:12.385Z","sampleRate":0.01,"route":"after:device-wake","command":"SELECT","tables":["unnest"],"statement":"8f13016f0409","rows":1,"bytes":18}
+  ✔ reject tool-error without advance or automatic repair (176.084812ms)
+  ✔ reject post-finish-chunks without advance or automatic repair (160.99389ms)
+  ✔ reject forged-failure without advance or automatic repair (96.016267ms)
+  ✔ repository review question continuation keeps its owned running VM, issue, candidate and original session without a parent runtime (1840.473561ms)
+  ✔ deliverable review question continuation keeps its owned running VM, issue, candidate and original session without a parent runtime (2458.323758ms)
+  ✔ repository review question continuation keeps its owned paused VM, issue, candidate and original session without a parent runtime (826.051225ms)
+  ✔ deliverable review question continuation keeps its owned paused VM, issue, candidate and original session without a parent runtime (1601.247929ms)
+  ✔ repository verify question continuation keeps its owned running VM, issue, candidate and original session without a parent runtime (1358.575293ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:20.926Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["workspace_projects","mikka_workspaces","mikka_team_projects","mikka_workspace_members"],"statement":"aefdfff0d155","rows":0,"bytes":0}
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:21.081Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["workspace_projects","mikka_workspaces","mikka_team_projects","mikka_workspace_members"],"statement":"aefdfff0d155","rows":0,"bytes":0}
+  ✔ deliverable verify question continuation keeps its owned running VM, issue, candidate and original session without a parent runtime (2056.328495ms)
+  ✔ repository verify question continuation keeps its owned paused VM, issue, candidate and original session without a parent runtime (379.432405ms)
+  ✔ deliverable verify question continuation keeps its owned paused VM, issue, candidate and original session without a parent runtime (1270.879212ms)
+  ✔ a deliverable review question cannot turn an Owner explanation into a verification command (461.843442ms)
+  ✔ a deliverable verify question cannot turn an Owner explanation into a verification command (706.490088ms)
+  ✔ a report review question cannot turn an Owner explanation into a verification command (250.189201ms)
+  ✔ a report verify question cannot turn an Owner explanation into a verification command (241.359854ms)
+  ✔ review trusted same-session human question resumes and advances (159.753379ms)
+  ✔ review trusted same-session human question resumes and retains failure for the model recovery choice (202.945004ms)
+  ✔ verify trusted same-session human question resumes and advances (244.828826ms)
+  ✔ verify trusted same-session human question resumes and retains failure for the model recovery choice (255.784996ms)
+  ✔ unadopted retry, cancel and access loss reject before claim and token callback (190.149664ms)
+  ✔ repair bound retains original failed attempt without dispatching another executor (134.459938ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:27.464Z","sampleRate":0.01,"route":"after:device-wake","command":"SELECT","tables":["unnest"],"statement":"8f13016f0409","rows":1,"bytes":18}
+  ✔ model-selected transient retry keeps SHA, immutable failure, fresh run/session and idempotent receipt (242.298205ms)
+  ✔ model recovery preserves cancellation, ownership and shared retry budget fences (400.721033ms)
+  ✔ a recorded timeout stays blocked until the model chooses retry_check (147.790719ms)
+  ✔ a recorded timeout stays blocked until the model chooses repair_code (158.155717ms)
+  ✔ model-selected repair forwards a redacted excerpt and keeps the immutable original receipt (253.154134ms)
+  ✔ approved spec starts a fresh executor role without planner read-only or continuation grants (157.530226ms)
+  ✔ saved Owner answer survives automatic repair and the new candidate checks through canonical same-epoch ancestry (397.53732ms)
+  ✔ automatic review repair keeps original criteria separate from false findings and preserves immutable history (171.423089ms)
+  ✔ automatic verify repair keeps original criteria separate from false findings and preserves immutable history (241.950764ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:29.821Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["factory_tasks","issues","bots"],"statement":"f89d56f0423f","rows":0,"bytes":0}
+  ✔ automatic repair rolls back when the complete request and persisted handoff exceed the prompt budget (145.389456ms)
+  ✔ a new authenticated request epoch does not inherit the adjacent old failed check or repository binding (157.678936ms)
+  ✔ shared invocation null retains the original observation pending (133.307748ms)
+  ✔ shared invocation refusal retains the original observation pending (154.760255ms)
+  ✔ shared invocation defer retains the original observation pending (143.823246ms)
+  ✔ shared invocation request-digest retains the original observation pending (148.2312ms)
+  ✔ shared invocation image-digest retains the original observation pending (146.108977ms)
+  ✔ shared invocation generation retains the original observation pending (136.765099ms)
+  ✔ shared invocation model retains the original observation pending (142.245674ms)
+  ✔ shared invocation time retains the original observation pending (160.188189ms)
+  ✔ shared invocation vision retains the original observation pending (145.105307ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:31.513Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["factory_tasks","issues","bots"],"statement":"f89d56f0423f","rows":0,"bytes":0}
+  ✔ zero confidence is retained without a programmed human fallback; replay never reinfers (146.508638ms)
+  ✔ concurrent request observes a bounded reservation without holding SQL during inference (158.445387ms)
+  ✔ actual model return cannot apply after cancel (151.148041ms)
+  ✔ actual model return cannot apply after revoke-access (134.766569ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:32.107Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["factory_tasks","issues","bots"],"statement":"f89d56f0423f","rows":0,"bytes":0}
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:32.121Z","sampleRate":0.01,"route":null,"command":"SELECT","tables":["cloud_service_registration","LATERAL","cloud_service_bindings"],"statement":"71590a376f1c","rows":0,"bytes":0}
+  ✔ actual model return cannot apply after new-binding (142.525105ms)
+  ✔ actual shared image request valid binds pixels and original provenance (155.315755ms)
+  ✔ actual shared image request missing binds pixels and original provenance (141.063433ms)
+  ✔ actual shared image request foreign-session binds pixels and original provenance (129.168764ms)
+  ✔ actual shared image request wrong-sha binds pixels and original provenance (129.507795ms)
+  ✔ actual shared image request future-time binds pixels and original provenance (126.596962ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:32.838Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["workspace_projects","mikka_workspaces","mikka_team_projects","mikka_workspace_members"],"statement":"aefdfff0d155","rows":0,"bytes":0}
+  ✔ actual shared image request changed-during-call binds pixels and original provenance (142.299854ms)
+  ✔ recovery requires a positive real balance and records actual cost without reserving funds (182.022947ms)
+  ✔ registered recovery entry -> actual step/runtime/decision: text (163.093031ms)
+  ✔ registered recovery entry -> actual step/runtime/decision: image (151.519502ms)
+  ✔ registered recovery entry -> actual step/runtime/decision: missing-image (124.13481ms)
+  ✔ real recovery step rechecks native scope before resolving runtime or model (129.707625ms)
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:34.541Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["factory_tasks","issues","bots"],"statement":"f89d56f0423f","rows":0,"bytes":0}
+  ✔ unavailable model calls exhaust only their invocation budget, with no fixed recovery (143.894796ms)
+thread_machine_lifecycle {
+  run: 'a67699db9582',
+  task: 'fad07d9d3baa',
+  vm: '2c77f2e04082',
+  epoch: 2,
+  phase: 'created',
+  reason: 'created',
+  owner: 'run-recovery',
+  deadline: 1794182314890,
+  computeSeconds: 0,
+  computeSource: 'database_estimate',
+  provider: 'running',
+  observedAt: 1794182314890
+}
+{"msg":"cloud_startup_timing","runIdHash":"fcd903ae02aee991","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794182314863,"endedAt":1794182314866,"ms":3},{"phase":"execution_identity","startedAt":1794182314866,"endedAt":1794182314873,"ms":7},{"phase":"admission","startedAt":1794182314873,"endedAt":1794182314873,"ms":0},{"phase":"admission","startedAt":1794182314873,"endedAt":1794182314878,"ms":5},{"phase":"connect","startedAt":1794182314878,"endedAt":1794182314878,"ms":0},{"phase":"record_sandbox","startedAt":1794182314878,"endedAt":1794182314881,"ms":3},{"phase":"post_connect_admission","startedAt":1794182314881,"endedAt":1794182314881,"ms":0},{"phase":"runtime_configuration","startedAt":1794182314881,"endedAt":1794182314881,"ms":0},{"phase":"read_worker","startedAt":1794182314881,"endedAt":1794182314881,"ms":0},{"phase":"verify_worker","startedAt":1794182314881,"endedAt":1794182314881,"ms":0},{"phase":"read_refreshed_worker","startedAt":1794182314881,"endedAt":1794182314881,"ms":0},{"phase":"verify_refreshed_worker","startedAt":1794182314881,"endedAt":1794182314881,"ms":0},{"phase":"start_desktop","startedAt":1794182314881,"endedAt":1794182314881,"ms":0},{"phase":"credential_bootstrap","startedAt":1794182314881,"endedAt":1794182314886,"ms":5},{"phase":"publish_bootstrap","startedAt":1794182314886,"endedAt":1794182314887,"ms":1},{"phase":"start_worker","startedAt":1794182314887,"endedAt":1794182314888,"ms":1},{"phase":"worker_register","startedAt":1794182314888,"endedAt":1794182314888,"ms":0},{"phase":"verify_runtime","startedAt":1794182314888,"endedAt":1794182314888,"ms":0},{"phase":"finish","startedAt":1794182314888,"endedAt":1794182314891,"ms":3}]}
+{"msg":"cloud_startup_timing","runIdHash":"fcd903ae02aee991","stage":"cloud.thread.ensure","startedAt":1794182314862,"endedAt":1794182314891,"ms":29}
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:34.916Z","sampleRate":0.01,"route":"after:live-notify","command":"SELECT","tables":["factory_tasks","issues","bots"],"statement":"f89d56f0423f","rows":1,"bytes":231}
+{"event":"model_routing_decision","required":"unknown","selectedTier":"light","reason":"decision_unavailable"}
+{"event":"model_routing_decision","required":"unknown","selectedTier":"light","reason":"decision_unavailable"}
+{"level":"info","msg":"db_sample","timestamp":"2026-11-08T23:58:35.036Z","sampleRate":0.01,"route":null,"command":"SELECT","tables":["issues"],"statement":"e197e403f1e8","rows":1,"bytes":264}
+{"event":"model_routing_decision","required":"unknown","selectedTier":"light","reason":"decision_unavailable"}
+{"event":"model_routing_decision","required":"unknown","selectedTier":"light","reason":"decision_unavailable"}
+thread_machine_lifecycle {
+  run: 'e78f25a5d75a',
+  task: 'fad07d9d3baa',
+  vm: '2c77f2e04082',
+  epoch: 5,
+  phase: 'resumed',
+  reason: 'resumed',
+  owner: 'run-recovery',
+  deadline: 1794182315231,
+  computeSeconds: 0,
+  computeSource: 'database_estimate',
+  provider: 'running',
+  observedAt: 1794182315231
+}
+{"msg":"cloud_startup_timing","runIdHash":"6d1b21aa6107c86d","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794182315211,"endedAt":1794182315213,"ms":2},{"phase":"execution_identity","startedAt":1794182315213,"endedAt":1794182315215,"ms":2},{"phase":"admission","startedAt":1794182315215,"endedAt":1794182315215,"ms":0},{"phase":"admission","startedAt":1794182315215,"endedAt":1794182315220,"ms":5},{"phase":"connect","startedAt":1794182315220,"endedAt":1794182315220,"ms":0},{"phase":"record_sandbox","startedAt":1794182315220,"endedAt":1794182315222,"ms":2},{"phase":"post_connect_admission","startedAt":1794182315222,"endedAt":1794182315223,"ms":1},{"phase":"runtime_configuration","startedAt":1794182315223,"endedAt":1794182315223,"ms":0},{"phase":"read_worker","startedAt":1794182315223,"endedAt":1794182315223,"ms":0},{"phase":"verify_worker","startedAt":1794182315223,"endedAt":1794182315223,"ms":0},{"phase":"read_refreshed_worker","startedAt":1794182315223,"endedAt":1794182315223,"ms":0},{"phase":"verify_refreshed_worker","startedAt":1794182315223,"endedAt":1794182315223,"ms":0},{"phase":"start_desktop","startedAt":1794182315223,"endedAt":1794182315223,"ms":0},{"phase":"credential_bootstrap","startedAt":1794182315223,"endedAt":1794182315228,"ms":5},{"phase":"publish_bootstrap","startedAt":1794182315228,"endedAt":1794182315228,"ms":0},{"phase":"start_worker","startedAt":1794182315228,"endedAt":1794182315229,"ms":1},{"phase":"worker_register","startedAt":1794182315229,"endedAt":1794182315229,"ms":0},{"phase":"verify_runtime","startedAt":1794182315229,"endedAt":1794182315229,"ms":0},{"phase":"finish","startedAt":1794182315229,"endedAt":1794182315231,"ms":2}]}
+{"msg":"cloud_startup_timing","runIdHash":"6d1b21aa6107c86d","stage":"cloud.thread.ensure","startedAt":1794182315211,"endedAt":1794182315231,"ms":20}
+  ✔ first-use cloud single-review flow keeps its task VM without waking or installing a parent (600.116563ms)
+  ✔ the owner Artifact reader retains its report task hint and media without exposing them to another reader (288.912082ms)
+✔ actual migrated PG/HTTP: review/verify receipt consumers and bounded repair (33060.903063ms)
+ℹ Factory flow fixture: full snapshot 6462 bytes; public flow 1129 bytes; projected DB rows 915 + 100 bytes; acceptance Markdown 875 bytes.
+{"level":"info","msg":"db_transport_sample","timestamp":"2026-11-08T23:58:35.580Z","runtime":"6559d951-58f6-40b8-b649-05ff6381d1ca","windowStart":"2026-11-08T23:58:03.285Z","windowEnd":"2026-11-08T23:58:35.580Z","elapsedMs":32295,"measurement":"postgres_protocol_plaintext_received","pgProtocolReceiveBytes":303540,"knownPgProtocolReceiveBytes":303540,"connections":15,"scopes":["default","request","workspace"],"unknownReadings":0,"coverage":"observed_connections","startupExcluded":true,"excludes":["TLS","TCP","startup_before_registration","other_runtimes","Go_workers","supplier_metering"]}
+✔ isolated PG: producer command records bind owner/session/candidate and retain actual results, never self-reported success (65.922673ms)
+ℹ tests 116
+ℹ suites 0
+ℹ pass 116
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 34817.013976

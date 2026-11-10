@@ -15,6 +15,7 @@ import {
 } from "./approval-contract";
 import {
   approvalEvidence,
+  blockFactoryApprovalWithoutEvidence,
   digest,
   readFactoryArtifact,
   redactArtifact,
@@ -532,7 +533,7 @@ export function createFactoryApprovals(
       const parsed = approvalRequest.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const req = parsed.data;
-      return transaction(async (tx) => {
+      const result = await transaction(async (tx) => {
         const task = await owned(tx, actor, req.binding.taskId);
         const {
           rows: [prior],
@@ -563,10 +564,12 @@ export function createFactoryApprovals(
         // approving one is refused rather than leaving it approved but unpublished.
         if (options.codeCandidatesMerge && req.action !== "activate_skill")
           fail("factoryAcceptanceIsMerge");
+        await humanApproval(tx, actor);
+        const refusal = await blockFactoryApprovalWithoutEvidence(tx, task, store, req.eventId);
+        if (refusal) return refusal;
         const current = await approvalEvidence(tx, task);
         if (digest(req.candidate) !== digest(current.manifest.candidate))
           fail("factoryEvidenceMismatch");
-        await humanApproval(tx, actor);
         const approvalId = randomUUID();
         // Retain the existing column and receipt shape during rollout. This
         // timestamp is immutable metadata, not an expiring permission grant.
@@ -625,6 +628,10 @@ export function createFactoryApprovals(
         await reservePublication(tx, { approvalId, taskId: task.id, candidateId: task.candidateId!, action: req.action, target: req.target, eventId: publication.eventId, request: publication });
         return { approvalId, binding: bindingOf(result.task) };
       });
+      // The blocked task survives the HTTP conflict; throwing inside the
+      // transaction would silently roll it back to waiting for acceptance.
+      if (result instanceof FactoryError) throw result;
+      return result;
     },
     /** The browser approves and starts the exact durable reservation in one
      * operation. The legacy publish call below can only consume/read it. */

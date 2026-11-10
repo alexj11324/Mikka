@@ -5,7 +5,7 @@ import { recordCoordinatorEvent } from '../coordinator-event-store';
 import { artifactSubmittedEvent } from '../coordinator-events';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
-import { criterionVerificationStatus, runCriterion, type RunCriterion } from '@mikka/protocol/run';
+import { criterionVerificationStatus, runCriterion, runVisualEvidence, type RunCriterion } from '@mikka/protocol/run';
 import { artifactStorage, putArtifactObject } from '../artifacts/storage';
 import { artifactChanged } from '../live/artifacts';
 import { executionIdentityForRun } from '../execution-identity';
@@ -15,7 +15,7 @@ import { redactFactoryCheckText } from './checks';
 import type { FactoryTask } from './store';
 import type { FactoryAcceptanceMedia } from './public-flow';
 
-type Report = { summary: string; criteria: RunCriterion[]; filesChanged: string[]; verify: { status?: string; command?: string; output?: string }; reviewVerdict?: string };
+type Report = { summary: string; criteria: RunCriterion[]; filesChanged: string[]; verify: { status?: string; command?: string; output?: string }; reviewVerdict?: string; visualEvidence?: unknown };
 type Source = { id: string; candidateId: string; sha: string | null; report: Report; author: string; title: string; locale: string; pullRequest: { url: string; additions?: number; deletions?: number } | null };
 /** Narrow JSON paths, bounded arrays and excerpts: never read a whole run/snapshot. */
 const excerpt = (expression: string, length: number) => `CASE WHEN length(${expression})>${length} THEN left(${expression},${length}) || ' […]' ELSE ${expression} END`;
@@ -27,6 +27,7 @@ const projection = (alias: string) => `jsonb_build_object(
     'reason',${excerpt("entry->>'reason'",1000)},'resolution',${excerpt("entry->>'resolution'",1000)},'evidence',${excerpt("entry->>'evidence'",2000)},
     'command',${excerpt("entry->>'command'",500)},'exitCode',entry->'exitCode'))) FROM (SELECT value AS entry FROM jsonb_array_elements(COALESCE(${alias}.report->'criteria','[]')) LIMIT 200) criteria),'[]'),
   'verify',jsonb_build_object('status',${alias}.report->'verify'->>'status','command',${excerpt(`${alias}.report->'verify'->>'command'`,500)},'output',${excerpt(`${alias}.report->'verify'->>'output'`,2000)}),
+  'visualEvidence',COALESCE((SELECT jsonb_agg(jsonb_build_object('captureId',entry->>'captureId','publicSafe',entry->'publicSafe')) FROM (SELECT value AS entry FROM jsonb_array_elements(COALESCE(${alias}.report->'visualEvidence','[]')) LIMIT 40) captures),'[]'),
   'reviewVerdict',${alias}.report->>'reviewVerdict')`;
 const plain = (value: string) => redactFactoryCheckText(value).replace(/[\\`*_{}[\]<>#]/g, '\\$&');
 function bounded(value: unknown, bytes = 2000) {
@@ -148,7 +149,7 @@ export function acceptanceMarkdown(source: Source, review: Review | null, media:
 
 /** Runs only for a completed implementation/review; one Artifact is versioned across repairs. */
 export async function syncFactoryAcceptanceArtifact(tx: PoolClient, task: FactoryTask) {
-  if (!task.candidateId || !((task.stage === 'execute' && task.status === 'passed') || (task.stage === 'review' && ['passed','failed'].includes(task.status)))) return;
+  if (!task.candidateId || !((task.stage === 'execute' && task.status === 'passed') || (task.stage === 'review' && ['passed','failed'].includes(task.status)) || task.stage === 'approval')) return;
   const { rows: [source] } = await tx.query<Source>(`SELECT r.id,c.id AS "candidateId",c.sha,${projection('r')} AS report,
     left(a.name,200) AS author,left(i.title,200) AS title,COALESCE(settings.locale,'zh-CN') AS locale,
     CASE WHEN p."pullRequest" IS NULL THEN NULL ELSE jsonb_build_object('url',left(p."pullRequest"->>'url',2000),'additions',p."pullRequest"->'additions','deletions',p."pullRequest"->'deletions') END AS "pullRequest"
@@ -160,12 +161,19 @@ export async function syncFactoryAcceptanceArtifact(tx: PoolClient, task: Factor
   const { rows: [review] } = await tx.query<{ id: string; candidateId: string | null; report: Report }>(`SELECT r.id,a."candidateId",${projection('r')} AS report FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2 AND r."issueId"=$3
     WHERE a."taskId"=$1 AND a.stage='review' AND a.status IN ('passed','failed') ORDER BY a.position DESC LIMIT 1`,[task.id,task.userId,task.issueId]);
   const runIds = [source.id,...(review ? [review.id] : [])];
-  const { rows: captures } = await tx.query<{ id: string; kind: 'image' | 'video'; title: string; runId: string }>(`SELECT id,kind,left(title,200) AS title,"runId" FROM run_captures WHERE "userId"=$1 AND "runId"=ANY($2::uuid[]) AND status='ready' ORDER BY "createdAt",id LIMIT 40`,[task.userId,runIds]);
+  const declared = runVisualEvidence.safeParse(source.report.visualEvidence);
+  const publicCaptureIds = declared.success ? declared.data.map(ref => ref.captureId) : [];
+  // Every capture explicitly selected for the PR must also appear here, even
+  // when exploratory screenshots would otherwise exhaust the report limit.
+  const { rows: captures } = await tx.query<{ id: string; kind: 'image' | 'video'; title: string; runId: string; contentType: string; size: number; durationMs: number | null }>(`SELECT id,kind,left(title,200) AS title,"runId","contentType",size,"durationMs" FROM run_captures WHERE "userId"=$1 AND "runId"=ANY($2::uuid[]) AND ("issueId" IS NULL OR "issueId"=$5) AND status='ready' ORDER BY CASE WHEN "runId"=$3 AND id=ANY($4::uuid[]) THEN 0 ELSE 1 END,"createdAt",id LIMIT 40`,[task.userId,runIds,source.id,publicCaptureIds,task.issueId]);
   const origin = resolveAppOrigin(process.env);
   const currentCriteria = reportCriteria(source,review ?? null);
   const media: FactoryAcceptanceMedia[] = captures.map(capture => {
     const index = currentCriteria.findIndex(entry => entry.criterion.evidence?.includes(capture.id) || entry.reviewObservation?.evidence?.includes(capture.id));
-    return { captureId: capture.id, kind: capture.kind, title: capture.title, runId: capture.runId,
+    return { captureId: capture.id, kind: capture.kind, title: redactFactoryCheckText(capture.title), runId: capture.runId,
+      contentType: capture.contentType, size: capture.size, durationMs: capture.durationMs,
+      candidateId: capture.runId === source.id ? source.candidateId : review?.candidateId ?? undefined,
+      appliesToCurrentCandidate: capture.runId === source.id || review?.candidateId === source.candidateId,
       criterion: index < 0 ? null : currentCriteria[index].criterion.criterionId ?? `criterion-${index + 1}`,
       url: origin ? new URL(withBasePath(`/api/captures/${capture.id}`),origin).href : withBasePath(`/api/captures/${capture.id}`) };
   });

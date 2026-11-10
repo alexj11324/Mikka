@@ -58,6 +58,8 @@ const mail: ExternalNotification = { userId: 'u1', source: 'gmail', externalId: 
 test('with every switch on, one call writes facts and leaves generation capture to the model boundary', async () => {
   assert.equal(await extractFacts(mail, 's1'), 1)
   assert.equal(generateText.mock.callCount(), 1)
+  const written = store.recordFacts.mock.calls.at(-1)?.arguments[1] as { source: { kind: string; id: string; url: string | null } }[]
+  assert.deepEqual(written[0].source, { kind: 'thread', id: 'suggestion:s1', url: null }, 'the actual extraction call passes server-derived provenance to storage')
   assert.deepEqual(store.recordExtractionTokens.mock.calls.at(-1)?.arguments, ['u1', '2026-10-28', 100, 20])
   assert.equal(captured.length, 0, 'the extraction no longer emits a duplicate generation event')
   assert.ok(!JSON.stringify(captured).includes('cloudflared'), 'no prompt or answer goes to PostHog')

@@ -137,14 +137,30 @@ class StageTest(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name);self.runtime=self.root/'runtime'
         self.bin=self.root/'bin';self.bin.mkdir();self.repo=self.root/'repository';self.repo.mkdir()
         (self.repo/'scripts/e2b').mkdir(parents=True);(self.repo/'scripts/e2b/build-template.py').write_text("print('c'*40)\n")
+        # Stage the real protection and lock projection helpers. The fixture
+        # still substitutes network/package/build work, but must satisfy the
+        # same CLI inventory and fresh importer-link contract as production.
+        scripts=pathlib.Path(__file__).parent
+        official=scripts.parents[2]/'scripts/e2b/official-files.py'
+        (self.repo/'scripts/e2b/official-files.py').write_text(official.read_text().replace('/opt/mikka',str(self.runtime)))
+        for name in ['config','protocol','daemon']:
+            package=self.repo/'packages'/name;package.mkdir(parents=True)
+            (package/'package.json').write_text(json.dumps({'name':'@mikka/'+name,'version':'0.0.0','private':True}))
+        (self.repo/'packages/daemon/scripts').mkdir()
+        (self.repo/'packages/daemon/scripts/prepare-worker-install.py').write_bytes((scripts/'prepare-worker-install.py').read_bytes())
+        (self.repo/'package.json').write_text('{"private":true,"packageManager":"pnpm@10.34.3"}')
+        (self.repo/'pnpm-workspace.yaml').write_text('packages:\n  - packages/*\n')
+        (self.repo/'pnpm-lock.yaml').write_text("lockfileVersion: '9.0'\n\nimporters:\n  .: {}\n  packages/config: {}\n  packages/protocol: {}\n  packages/daemon: {}\n")
+        for name in ['claude','codex']:
+            self.executable(self.bin/name,'#!/bin/sh\nprintf "official-fixture\\n"\n')
         subprocess.run(['git','init','-q',str(self.repo)],check=True)
         subprocess.run(['git','-C',str(self.repo),'add','.'],check=True)
         subprocess.run(['git','-C',str(self.repo),'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture'],check=True)
         self.source=subprocess.check_output(['git','-C',str(self.repo),'rev-parse','HEAD'],text=True).strip()
         self.destination=self.runtime/'releases'/self.source
         self.node=self.runtime/'runtime/node/bin';self.node.mkdir(parents=True)
-        self.executable(self.node/'node','#!/bin/sh\nexit 0\n')
-        self.executable(self.bin/'corepack','#!/bin/sh\ntest ! -e "$STAGE_FAIL_INSTALL"\n')
+        self.executable(self.node/'node','#!/bin/sh\nif test "$1" = --input-type=module; then printf "{}\\n"; fi\nexit 0\n')
+        self.executable(self.bin/'corepack','#!/bin/sh\nset -e\ntest ! -e "$STAGE_FAIL_INSTALL"\nfor package in config protocol daemon; do mkdir -p "packages/$package/node_modules"; done\n')
         self.executable(self.bin/'git',"""#!/usr/bin/env python3
 import os,sys
 args=sys.argv[1:]
@@ -179,6 +195,14 @@ else exec /usr/bin/stat "$@"; fi
         self.assertEqual(self.destination.stat().st_mode & 0o777,0o755)
         self.assertEqual((self.destination/'source').stat().st_mode & 0o777,0o755)
         self.assertEqual((self.destination/'worker-ready.sha').read_text().strip(),'c'*40)
+        manifest=json.loads((self.destination/'source/.mikka-original-cli.json').read_text())
+        self.assertEqual(manifest['original']['codex']['path'],str(self.bin/'codex'))
+        self.assertEqual(manifest['original']['claude_code']['path'],str(self.bin/'claude'))
+        self.assertEqual(manifest['added'],{})
+        for name in ['config','protocol','daemon']:
+            modules=self.destination/'source/packages'/name/'node_modules'
+            self.assertTrue(modules.is_symlink())
+            self.assertEqual(modules.resolve(strict=True),self.destination/'worker-install/packages'/name/'node_modules')
         self.assertEqual((self.runtime/'worker-source-sha').read_text(),'b'*40)
         self.assertEqual((self.runtime/'worker').readlink(),self.root/'original-source')
         pathlib.Path(self.env['STAGE_FAIL_FETCH']).touch();pathlib.Path(self.env['STAGE_FAIL_INSTALL']).touch()

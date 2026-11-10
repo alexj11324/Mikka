@@ -11,6 +11,8 @@ export class ComputerBroker {
   grants = new Map();
   // runId → when its screen recording stops by itself; only set while one runs.
   recordingUntil = new Map();
+  recordingSteps = new Map();
+  recordingTimingFailed = new Set();
   pending = new Map();
   sockets = new Set();
   suspended = false;
@@ -105,19 +107,31 @@ export class ComputerBroker {
       return Promise.reject(new Error("Not permitted"));
     const call = normalizeCall(value);
     const step = actionStep(value);
-    return this.requestCall(token, grant, call, signal).then((result) => {
-      this.markStep(grant.runId, step);
-      return result;
-    });
+    return this.requestCall(token, grant, call, signal, step);
   }
-  /** While this run records, a done action's description becomes a step on the recording (best effort; never fails the action). */
-  markStep(runId, label) {
+  /** Timings cover execution itself, excluding decision and human-approval waits. */
+  async executeRecorded(driver, call, display, runId, context, step) {
+    const started = this.now();
+    try { return await this.execute(driver, call, display, runId, context); }
+    finally {
+      const label = step ?? ({ get_desktop_state: "Read the screen", click: "Click", type_text: "Type text", press_key: "Press a key", scroll: "Scroll" })[call.name];
+      this.markStep(runId, label, Math.max(0, Math.round(this.now() - started)));
+    }
+  }
+  /** Pending timing writes drain before stop, so the last action cannot disappear. */
+  markStep(runId, label, durationMs) {
     const until = this.recordingUntil.get(runId);
     if (!label || !this.capture || until === undefined) return;
-    if (this.now() > until) { this.recordingUntil.delete(runId); return; }
-    void Promise.resolve().then(() => this.capture(runId, { action: "step", label, source: "action" })).catch(() => {});
+    if (this.now() > until + 30_000) { this.recordingUntil.delete(runId); return; }
+    const pending = this.recordingSteps.get(runId) ?? new Set();
+    const write = Promise.resolve().then(() => this.capture(runId, { action: "step", label, source: "action", durationMs: Math.min(durationMs, 300_000) }, AbortSignal.timeout(5_000)))
+      .then(result => { if (result?.recorded === false) this.recordingTimingFailed.add(runId); })
+      .catch(() => { this.recordingTimingFailed.add(runId); })
+      .finally(() => { pending.delete(write); if (!pending.size) this.recordingSteps.delete(runId); });
+    pending.add(write);
+    this.recordingSteps.set(runId, pending);
   }
-  requestCall(token, grant, call, signal) {
+  requestCall(token, grant, call, signal, step) {
     const actionId = randomUUID();
     const assertLive = () => {
       if (this.suspended || signal?.aborted || this.grants.get(token) !== grant ||
@@ -129,7 +143,7 @@ export class ComputerBroker {
       // enforces the live run, owner, display and policy-version fence.
       return Promise.resolve().then(() => {
         assertLive();
-        return this.execute(this.driver, call, grant.display, grant.runId, { actionId, assertLive });
+        return this.executeRecorded(this.driver, call, grant.display, grant.runId, { actionId, assertLive }, step);
       });
     }
     // Under `ask`, the Decisions API says whether this action needs the
@@ -150,15 +164,15 @@ export class ComputerBroker {
           if (needsPerson !== false) {
             // Yes, or no answer: reviewed by the person, as every ask action was before the Decisions API.
             if (needsPerson !== true) console.warn(`Decision fallback: computer action ${call.name} reviewed as before without a judgment`);
-            return this.review(token, grant, call, actionId, assertLive, signal);
+            return this.review(token, grant, call, actionId, assertLive, signal, step);
           }
           assertLive();
-          return this.execute(this.driver, call, grant.display, grant.runId, { actionId, assertLive });
+          return this.executeRecorded(this.driver, call, grant.display, grant.runId, { actionId, assertLive }, step);
         });
     }
-    return this.review(token, grant, call, actionId, assertLive, signal);
+    return this.review(token, grant, call, actionId, assertLive, signal, step);
   }
-  review(token, grant, call, actionId, assertLive, signal) {
+  review(token, grant, call, actionId, assertLive, signal, step) {
     if (this.pending.size >= 20) return Promise.reject(new Error("Not permitted"));
     const request = {
       id: actionId,
@@ -185,6 +199,7 @@ export class ComputerBroker {
       signal?.addEventListener("abort", cancel, { once: true });
       this.pending.set(request.id, {
         token,
+        step,
         assertLive,
         cleanup: () => signal?.removeEventListener("abort", cancel),
         request: { ...request, digest },
@@ -202,10 +217,18 @@ export class ComputerBroker {
       return { error: "Not permitted" };
     const call = normalizeCaptureCall(value);
     try {
+      if (call.action === "stop_recording") {
+        await Promise.all(this.recordingSteps.get(grant.runId) ?? []);
+        if (this.recordingTimingFailed.has(grant.runId))
+          await this.capture(grant.runId, { action: "step", label: "Recording timing incomplete", source: "action" }, signal);
+      }
       const result = await this.capture(grant.runId, call, signal);
       // The broker keeps the recording window so it reports action steps only while one runs.
-      if (call.action === "start_recording" && typeof result?.stopsAt === "string") this.recordingUntil.set(grant.runId, Date.parse(result.stopsAt));
-      if (call.action === "stop_recording") this.recordingUntil.delete(grant.runId);
+      if (call.action === "start_recording" && typeof result?.stopsAt === "string") {
+        this.recordingUntil.set(grant.runId, Date.parse(result.stopsAt));
+        this.recordingTimingFailed.delete(grant.runId);
+      }
+      if (call.action === "stop_recording") { this.recordingUntil.delete(grant.runId); this.recordingTimingFailed.delete(grant.runId); }
       return { result };
     } catch (error) {
       // Only the server's own fixed wording, never transport or provider detail.
@@ -258,7 +281,7 @@ export class ComputerBroker {
           throw new Error("Not permitted");
       };
       assertLive();
-      row.resolve(await this.execute(this.driver, call, display, runId, { actionId: id, assertLive }));
+      row.resolve(await this.executeRecorded(this.driver, call, display, runId, { actionId: id, assertLive }, row.step));
     } catch (error) {
       row.reject(error);
     }

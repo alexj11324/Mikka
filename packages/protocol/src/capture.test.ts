@@ -34,4 +34,15 @@ describe('capture contract', () => {
     expect(screenCaptureRequest.safeParse({ action: 'start_recording', title: 'Flow', maxSeconds: 3600 }).success).toBe(false)
     expect(screenCaptureRequest.safeParse({ action: 'screenshot', title: 'Home', display: ':2' }).success).toBe(false)
   })
+
+  it('keeps action windows inside the final video and refuses fabricated mark durations', () => {
+    const capture = { title: 'CLI verification', contentType: 'video/mp4', size: 10, sha256: 'a'.repeat(64), durationMs: 2000,
+      steps: [{ atMs: 1500, durationMs: 1000, label: 'Run tests', source: 'action' }] }
+    expect(captureUploadRequest.safeParse(capture).success).toBe(true)
+    expect(captureUploadRequest.safeParse({ ...capture, durationMs: 1000 }).success).toBe(false)
+    expect(captureUploadRequest.safeParse({ ...capture, contentType: 'image/png' }).success).toBe(false)
+    expect(captureUploadRequest.safeParse({ ...capture, steps: [{ ...capture.steps[0], durationMs: 2000 }] }).success).toBe(false)
+    expect(screenCaptureRequest.safeParse({ action: 'step', label: 'Completed request', source: 'action', durationMs: 500 }).success).toBe(true)
+    expect(screenCaptureRequest.safeParse({ action: 'step', label: 'Result', source: 'mark', durationMs: 500 }).success).toBe(false)
+  })
 })

@@ -20,6 +20,8 @@ import { maskDeep } from '@/lib/secrets/mask'
 import { judgeRunOutcome } from '@/lib/run-outcome-judge'
 
 export const dynamic = 'force-dynamic'
+// The run's bounded recording finalizer finishes before its terminal receipt.
+export const maxDuration = 120
 
 /** The first completion is immutable; retries also recover a failed enqueue. */
 async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string }> }) {

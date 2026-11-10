@@ -131,3 +131,26 @@ test('media that fails to load shows the error; retry asks for the file again', 
   assert.equal(again.getAttribute('src'), '/api/factory/tasks/t1/evidence/c1?attempt=1')
   assert.equal(container.querySelector('[role="alert"]'), null)
 })
+
+test('activity captures use their authorized media route in the viewer, filmstrip, retry and download', async () => {
+  function ActivityViewer() {
+    const [index, setIndex] = useState(2)
+    return <mod.EvidenceViewer taskId="t1" items={items} index={index} onIndex={setIndex} onClose={() => {}}
+      readText={async () => { throw new Error('A capture must not use the approval text reader') }}
+      mediaSource={entry => entry.captureId ? `/api/factory/tasks/t1/media/${entry.captureId}` : null} />
+  }
+  await act(async () => root.render(<ActivityViewer />))
+  const video = container.querySelector('video')!
+  assert.equal(video.getAttribute('src'), '/api/factory/tasks/t1/media/c2')
+  assert.equal(byLabel('下载')?.getAttribute('href'), '/api/factory/tasks/t1/media/c2')
+  const thumbnail = document.querySelector('[role="group"] img')!
+  assert.equal(thumbnail.getAttribute('src'), '/api/factory/tasks/t1/media/c1')
+  await act(async () => { video.dispatchEvent(new browser.Event('error') as unknown as Event) })
+  await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === '重试')!.click() })
+  assert.equal(container.querySelector('video')?.getAttribute('src'), '/api/factory/tasks/t1/media/c2?attempt=1')
+  await key('ArrowLeft')
+  const image = [...container.querySelectorAll('img')].find(value => value.getAttribute('alt') === '首页')!
+  assert.match(image.getAttribute('src')!, /^\/api\/factory\/tasks\/t1\/media\/c1(?:\?attempt=1)?$/)
+  assert.equal(byLabel('下载')?.getAttribute('href'), '/api/factory/tasks/t1/media/c1')
+  assert.equal(container.querySelector('[src*="/evidence/"]'), null, 'historical activity media must not fall back to current-candidate approval routes')
+})

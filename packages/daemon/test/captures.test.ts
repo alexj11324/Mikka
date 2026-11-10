@@ -1,8 +1,9 @@
-import { spawn } from "node:child_process"
+import { execFile, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
+import { promisify } from "node:util"
 
 import pino from "pino"
 import { afterEach, describe, expect, it } from "vitest"
@@ -21,8 +22,13 @@ afterEach(async () => {
 })
 
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("IHDR-test-image")])
-const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypisom-test-video")])
 const log = pino({ level: "silent" })
+const execute = promisify(execFile)
+async function video(path: string) {
+  await execute('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=160x120:rate=10:duration=1',
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', path])
+  return readFileSync(path)
+}
 
 /** Calls the run's MCP server the way a harness does, over stdio. */
 async function mcp(args: string[], messages: object[]) {
@@ -67,6 +73,7 @@ describe("submit_capture", () => {
     const files = readdirSync(captures).sort()
     expect(files).toHaveLength(2)
     const meta = files.find((name) => name.endsWith(".json"))!
+    expect(JSON.parse(result!.content![0].text!)).toEqual({ captureId: meta.slice(0, -5), status: 'queued' })
     expect(JSON.parse(readFileSync(join(captures, meta), "utf8")).title).toBe("Login page")
     expect(readFileSync(join(captures, meta.replace(".json", ".png")))).toEqual(PNG)
   })
@@ -90,7 +97,7 @@ function fakeLink(fail?: (step: string) => Error | undefined) {
     beginCapture: async (_runId, request) => {
       const error = fail?.("begin"); if (error) throw error
       sent.push({ request, bytes: new Uint8Array() })
-      return { captureId: "6f1d8c0e-1b2a-4c3d-8e9f-0a1b2c3d4e5f", upload: { target: "server" } }
+      return { captureId: request.captureId!, upload: { target: "server" } }
     },
     sendCapture: async (_runId, _id, _upload, bytes) => { const error = fail?.("send"); if (error) throw error; sent.at(-1)!.bytes = bytes },
     completeCapture: async () => { const error = fail?.("complete"); if (error) throw error; return {} as never },
@@ -108,14 +115,50 @@ describe("capture upload", () => {
   it("sends what the bytes are, with their hash, then removes the queued files", async () => {
     const dir = tempDir("orvu-")
     queue(dir, ids[0], "png", PNG, "Home")
-    queue(dir, ids[1], "mp4", MP4, "Checkout flow")
+    const recording = await video(join(dir, 'source.mp4'))
+    queue(dir, ids[1], "mp4", recording, "Checkout flow")
+    // The source isn't part of the queue.
+    rmSync(join(dir, 'source.mp4'))
     const { link, sent } = fakeLink()
     expect(await uploadCaptures(dir, "run-1", link, log)).toBe(2)
-    expect(sent.map((item) => item.request)).toEqual([
-      { title: "Home", contentType: "image/png", size: PNG.length, sha256: createHash("sha256").update(PNG).digest("hex") },
-      { title: "Checkout flow", contentType: "video/mp4", size: MP4.length, sha256: createHash("sha256").update(MP4).digest("hex") },
-    ])
+    expect(sent[0].request).toEqual({ captureId: ids[0], title: "Home", contentType: "image/png", size: PNG.length, sha256: createHash("sha256").update(PNG).digest("hex") })
+    expect(sent[1].request).toEqual({ captureId: ids[1], title: "Checkout flow", contentType: "video/mp4", size: sent[1].bytes.length,
+      sha256: createHash("sha256").update(sent[1].bytes).digest("hex"), durationMs: 1000, steps: [] })
     expect(readdirSync(dir)).toEqual([])
+  })
+
+  it('retains the processed video and identical reservation digest across an upload retry', async () => {
+    const dir = tempDir('capture-video-'), pending = tempDir('capture-video-pending-')
+    await video(join(dir, `${ids[0]}.mp4`))
+    writeFileSync(join(dir, `${ids[0]}.json`), JSON.stringify({ title: 'Observed test execution',
+      steps: [{ atMs: 500, label: 'Run test', source: 'action', durationMs: 300 }] }))
+    let connected = false, sentSuccessfully = false, reserved: Parameters<NonNullable<Link['beginCapture']>>[1] | undefined
+    const link: Link = {
+      beginCapture: async (_runId, request) => { reserved = request; return { captureId: request.captureId!, upload: { target: 'server' } } },
+      resumeCapture: async (_runId, captureId) => ({ captureId, upload: { target: 'server' } }),
+      sendCapture: async (_runId, _captureId, _target, bytes) => {
+        if (!connected) throw new ServerUnreachableError('offline')
+        expect(createHash('sha256').update(bytes).digest('hex')).toBe(reserved!.sha256)
+        sentSuccessfully = true
+      },
+      completeCapture: async () => { if (!sentSuccessfully) throw new DaemonError(404, 'not sent'); return {} as never },
+    }
+    expect(await uploadCaptures(dir, 'run-1', link, log, pending)).toBe(0)
+    expect(readdirSync(pending).sort()).toEqual([`${ids[0]}.json`, `${ids[0]}.processed.mp4`, `${ids[0]}.video.json`])
+    expect(reserved).toMatchObject({ captureId: ids[0], durationMs: 1000, steps: [{ atMs: 500, source: 'action', durationMs: 300 }] })
+    connected = true
+    expect(await uploadCaptures(dir, 'run-1', link, log, pending, true)).toBe(1)
+    expect(sentSuccessfully).toBe(true)
+    expect(readdirSync(dir)).toEqual([]); expect(readdirSync(pending)).toEqual([])
+  })
+
+  it('never reserves a malformed video whose MP4 header alone looks valid', async () => {
+    const dir = tempDir('capture-invalid-video-')
+    queue(dir, ids[0], 'mp4', Buffer.from('\x00\x00\x00\x18ftypisom-not-a-video'))
+    const { link, sent } = fakeLink()
+    expect(await uploadCaptures(dir, 'run-1', link, log)).toBe(0)
+    expect(sent).toEqual([])
+    expect(readdirSync(dir)).toHaveLength(2)
   })
 
   it("drops what the agent planted: wrong bytes, a link, no title", async () => {
@@ -229,6 +272,83 @@ describe("capture upload", () => {
     await Promise.all([first, afterEnd])
     expect({ begins, sends, completes }).toEqual({ begins: 1, sends: 1, completes: 1 })
     expect(readdirSync(dir)).toEqual([])
+  })
+
+  it('cancels an existing background upload and drains it before the final flush fails', async () => {
+    const dir = tempDir('capture-deadline-'), pending = tempDir('capture-deadline-pending-')
+    queue(dir, ids[0], 'png', PNG)
+    let release!: () => void, entered!: () => void, uploadSignal: AbortSignal | undefined
+    const uploading = new Promise<void>(resolve => { entered = resolve })
+    const cleanup = new Promise<void>(resolve => { release = resolve })
+    let completes = 0
+    const link: Link = {
+      beginCapture: async () => ({ captureId: ids[0], upload: { target: 'server' } }),
+      sendCapture: async (_runId, _captureId, _upload, _bytes, _contentType, signal) => {
+        uploadSignal = signal
+        entered()
+        // Even a transport that takes time to unwind cannot publish afterward.
+        await cleanup
+      },
+      completeCapture: async () => { completes++; return {} as never },
+    }
+    const uploader = new CaptureUploader(() => dir, link, log, pending)
+    const background = uploader.flush('run-1')
+    await uploading
+    const deadline = new AbortController(), reason = new Error('Capture finalization deadline exceeded')
+    let finalSettled = false
+    const final = uploader.flush('run-1', false, deadline.signal)
+      .then(() => ({ error: undefined }), error => ({ error }))
+      .finally(() => { finalSettled = true })
+    try {
+      deadline.abort(reason)
+      expect(uploadSignal?.aborted).toBe(true)
+      await Promise.resolve()
+      expect(finalSettled).toBe(false)
+      release()
+      expect(await final).toEqual({ error: reason })
+      await background
+      expect(completes).toBe(0)
+      expect(readdirSync(dir)).toHaveLength(2)
+      expect(existsSync(join(pending, 'run-1', 'blocked.json'))).toBe(false)
+    } finally { release(); await Promise.all([background, final]) }
+  })
+
+  it('reports an incomplete final flush when the server cannot accept the evidence', async () => {
+    const dir = tempDir('capture-final-failure-'), pending = tempDir('capture-final-failure-pending-')
+    queue(dir, ids[0], 'png', PNG)
+    const { link } = fakeLink(() => new ServerUnreachableError('offline'))
+    const uploader = new CaptureUploader(() => dir, link, log, pending)
+    await expect(uploader.flush('run-1', false, new AbortController().signal)).rejects.toThrow('Capture upload incomplete')
+    expect(readdirSync(dir)).toHaveLength(2)
+    expect(existsSync(join(pending, 'run-1', 'blocked.json'))).toBe(false)
+  })
+
+  it('cancels real oversized-video preparation before it can reserve an upload after the final deadline', async () => {
+    const dir = tempDir('capture-prepare-deadline-'), pending = tempDir('capture-prepare-deadline-pending-')
+    const source = join(dir, `${ids[0]}.mp4`)
+    const original = await video(source)
+    // A valid sparse free atom makes preparation long enough to observe without
+    // replacing FFmpeg or the file pipeline with a mock.
+    const atomSize = 200_000_001, header = Buffer.alloc(8)
+    header.writeUInt32BE(atomSize); header.write('free', 4)
+    appendFileSync(source, header)
+    truncateSync(source, original.length + atomSize)
+    writeFileSync(join(dir, `${ids[0]}.json`), JSON.stringify({ title: 'Recorded execution' }))
+    const { link, sent } = fakeLink()
+    const uploader = new CaptureUploader(() => dir, link, log, pending)
+    const background = uploader.flush('run-1'), pendingDir = join(pending, 'run-1')
+    const deadline = new AbortController(), reason = new Error('Capture finalization deadline exceeded')
+    try {
+      await waitFor(() => existsSync(pendingDir) && readdirSync(pendingDir).some(name => name.startsWith('.capture-process-')), 15_000, 1)
+      const final = uploader.flush('run-1', false, deadline.signal)
+      const rejected = expect(final).rejects.toBe(reason)
+      deadline.abort(reason)
+      await rejected
+      await background
+      expect(sent).toEqual([])
+      expect(existsSync(source)).toBe(true)
+      expect(readdirSync(pendingDir)).toEqual([])
+    } finally { deadline.abort(reason); await background }
   })
 
   it("retains the file and stops retries when authorization is denied", async () => {

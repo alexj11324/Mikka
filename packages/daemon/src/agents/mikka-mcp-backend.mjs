@@ -220,6 +220,13 @@ const TOOLS = [
         previewDatabaseBranch: { type: "string", description: "Name of the preview database branch you actually created or used; omit when none." },
         verificationCommand: { type: "object", description: "For a Factory verification with no frozen command: the command inferred from repository scripts, Makefile or CI and its concrete source. Run it and report its actual observations too. If no command can be inferred, mark that criterion unverified with its reason; do not invent a command or ask the person for one.", properties: { command: { type: "string" }, basis: { type: "string" } }, required: ["command", "basis"] },
         reviewVerdict: { type: "string", enum: ["passed", "changes_requested", "needs_judgment"], description: "The task’s single review: clear defects require changes; ambiguous findings go to the person. An unverified observation is not an observed defect." },
+        visualEvidence: {
+          type: "array", maxItems: 40,
+          description: "Capture IDs from this task's real visual verification. Inspect every image/video before declaring publicSafe: no credentials, private account details or personal data may appear. This explicit declaration permits only these captures to be linked in the public PR. Never invent a capture ID or authorize an uninspected recording.",
+          items: { type: "object", additionalProperties: false, properties: {
+            captureId: { type: "string", format: "uuid" }, publicSafe: { type: "boolean", const: true },
+          }, required: ["captureId", "publicSafe"] },
+        },
         criteria: {
           type: "array",
           description:
@@ -299,17 +306,22 @@ const TOOLS = [
 ]
 
 // The same limits as @mikka/protocol/capture; this file has no dependencies.
-const CAPTURE_LIMITS = { png: 10_000_000, jpg: 10_000_000, webp: 10_000_000, mp4: 100_000_000, webm: 100_000_000 }
+const CAPTURE_LIMITS = { png: 10_000_000, jpg: 10_000_000, webp: 10_000_000, mp4: 1_000_000_000, webm: 1_000_000_000 }
 const MAX_QUEUED_CAPTURES = 20
 const CAPTURE_TOOL = {
   name: "submit_capture",
   description:
-    "Attach a screenshot or screen recording you made (for example with Playwright) to this thread as evidence for the person. PNG, JPEG or WebP up to 10 MB; MP4 or WebM up to 100 MB. Pass a file inside the worktree or your temp directory.",
+    "Queue a screenshot or real screen recording you made (for example with Playwright) as evidence. Returns its captureId for submit.visualEvidence. Images: PNG/JPEG/WebP up to 10 MB. Raw MP4/WebM up to 1 GB is processed before upload into the existing 100 MB limit; processing failure leaves the task blocked. Prefer video. Pass a file inside the worktree or your temp directory. Include measured action steps to remove only the idle gaps between actions; omit guessed timings.",
   inputSchema: {
     type: "object",
     properties: {
       path: { type: "string", description: "The file's path." },
       title: { type: "string", description: "What it shows, for the person." },
+      steps: { type: "array", maxItems: 200, description: "Optional real recording timeline. atMs is the action's end offset and durationMs its actual execution duration. Omit unknown duration; never guess a timing to remove footage.",
+        items: { type: "object", additionalProperties: false, properties: {
+          atMs: { type: "integer", minimum: 0, maximum: 300000 }, label: { type: "string", minLength: 1, maxLength: 200 },
+          source: { type: "string", enum: ["action", "mark"] }, durationMs: { type: "integer", minimum: 0, maximum: 300000 },
+        }, required: ["atMs", "label", "source"] } },
     },
     required: ["path", "title"],
   },
@@ -610,6 +622,17 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
     if (!capturesDir) throw new Error("Captures are not available in this run.")
     const title = typeof args.title === "string" ? args.title.replace(/\s+/g, " ").trim().slice(0, 200) : ""
     if (!title) throw new Error("A title is required.")
+    if (args.steps !== undefined && (!Array.isArray(args.steps) || args.steps.length > 200)) throw new Error('Invalid recording timeline.')
+    const steps = args.steps?.map(step => {
+      if (!step || typeof step !== 'object' || Array.isArray(step) ||
+          Object.keys(step).some(key => !['atMs', 'label', 'source', 'durationMs'].includes(key)) ||
+          !Number.isSafeInteger(step.atMs) || step.atMs < 0 || step.atMs > 300000 ||
+          typeof step.label !== 'string' || !step.label.trim() || step.label.length > 200 || !['action', 'mark'].includes(step.source) ||
+          (step.durationMs !== undefined && (step.source !== 'action' || !Number.isSafeInteger(step.durationMs) || step.durationMs < 0 || step.durationMs > step.atMs)))
+        throw new Error('Invalid recording timeline.')
+      return { atMs: step.atMs, label: step.label.replace(/\s+/g, ' ').trim(), source: step.source,
+        ...(step.durationMs === undefined ? {} : { durationMs: step.durationMs }) }
+    })
     if (typeof args.path !== "string" || !args.path) throw new Error("A path is required.")
     const real = realpathSync(args.path)
     if (!captureRoots.some((root) => real === root || real.startsWith(root + sep)))
@@ -622,6 +645,7 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
       const head = Buffer.alloc(64)
       ext = sniff(head.subarray(0, readSync(fd, head, 0, 64, 0)))
       if (!ext) throw new Error("Not a PNG, JPEG or WebP image, or an MP4 or WebM video.")
+      if (steps?.length && !['mp4', 'webm'].includes(ext)) throw new Error('Only recordings have a timeline.')
       if (stat.size === 0 || stat.size > CAPTURE_LIMITS[ext]) throw new Error(`At most ${CAPTURE_LIMITS[ext]} bytes for a .${ext} file.`)
       if (readdirSync(capturesDir).filter((name) => name.endsWith(".json")).length >= MAX_QUEUED_CAPTURES)
         throw new Error("Too many captures waiting to upload; try again shortly.")
@@ -632,13 +656,19 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
     }
     // The metadata lands last: the daemon only takes files that have one.
     const meta = join(capturesDir, `${id}.json`)
-    writeFileSync(`${meta}.tmp`, JSON.stringify({ title, at: new Date().toISOString() }))
+    writeFileSync(`${meta}.tmp`, JSON.stringify({ title, ...(steps ? { steps } : {}), at: new Date().toISOString() }))
     renameSync(`${meta}.tmp`, meta)
+    return id
   }
 
 
 
   function record(kind, args, toolName) {
+    const visualEvidence = kind === 'submit' ? args.visualEvidence : undefined
+    if (visualEvidence !== undefined && (!Array.isArray(visualEvidence) || visualEvidence.length > 40 || visualEvidence.some(item =>
+      !item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).some(key => !['captureId', 'publicSafe'].includes(key)) ||
+      typeof item.captureId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.captureId) || item.publicSafe !== true)))
+      throw new Error('Visual evidence must name inspected captures explicitly safe for public sharing.')
     // A planning hand-in carries the spec and the split it proposes. The id is
     // generated here, once, so the cards the daemon puts in the conversation
     // and the row the server stores name the same spec.
@@ -707,6 +737,7 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
       // Kept as sent; the daemon validates and trims each entry.
       ...(typeof args.previewDatabaseBranch === "string" ? { previewDatabaseBranch: args.previewDatabaseBranch } : {}),
       ...(Array.isArray(args.criteria) ? { criteria: args.criteria } : {}),
+      ...(visualEvidence === undefined ? {} : { visualEvidence: visualEvidence.map(item => ({ captureId: item.captureId, publicSafe: true })) }),
       ...(typeof args.reviewVerdict === "string" ? { reviewVerdict: args.reviewVerdict } : {}),
       ...(args.verificationCommand ? { verificationCommand: args.verificationCommand } : {}),
       ...(args.repositorySelection ? { repositorySelection: args.repositorySelection } : {}),
@@ -760,11 +791,11 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
         }
         if (capturesDir && params?.name === CAPTURE_TOOL.name) {
           try {
-            queueCapture(params.arguments ?? {})
+            const captureId = queueCapture(params.arguments ?? {})
+            return reply(id, { content: [{ type: "text", text: JSON.stringify({ captureId, status: 'queued' }) }] })
           } catch (error) {
             return reply(id, { isError: true, content: [{ type: "text", text: `Not attached: ${error instanceof Error ? error.message : error}` }] })
           }
-          return reply(id, { content: [{ type: "text", text: "Attached to this thread. Keep working; it uploads in the background." }] })
         }
         const kind = KINDS[params?.name]
         if (!kind) return fail(id, -32602, `Unknown tool: ${params?.name}`)

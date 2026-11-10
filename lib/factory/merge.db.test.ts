@@ -56,8 +56,6 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
   try {
     // The candidate's run opened the PR (run_publications); skill candidates have their own table.
     await pool.query(`
-      ALTER TABLE factory_candidates ADD COLUMN "runId" uuid;
-      CREATE TABLE run_publications ("runId" uuid PRIMARY KEY,"userId" text NOT NULL,"pullRequest" jsonb);
       CREATE TABLE improvement_skill_candidates ("factoryTaskId" uuid,"candidateId" uuid,"userId" text);
     `);
     await pool.query(await readFile(new URL("../../drizzle/20261101121000_factory_merges.sql", import.meta.url), "utf8"));
@@ -74,9 +72,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
     let nextPull = 418;
     async function prepared(pr = `https://github.com/alexj11324/Mikka/pull/${nextPull++}`) {
       const x = await f.prepare();
-      const runId = randomUUID();
-      await pool.query('UPDATE factory_candidates SET "runId"=$1 WHERE id=$2', [runId, x.task.candidateId]);
-      await pool.query('INSERT INTO run_publications VALUES ($1,$2,$3)', [runId, actor.userId, JSON.stringify({ url: pr, state: "open" })]);
+      await pool.query(`UPDATE run_publications SET "pullRequest"="pullRequest"||$2::jsonb
+        WHERE "runId"=(SELECT "runId" FROM factory_candidates WHERE id=$1)`, [x.task.candidateId,JSON.stringify({url:pr,state:'open'})]);
       const github = fakeGitHub();
       github.setHead(x.candidate.sha);
       const merges = createFactoryMerges(pool, f.authorize, f.store, github.port);
@@ -86,6 +83,21 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       return { ...x, pr, github, merges, accept, taskState: task, rows };
     }
     const refused = (code: string) => (e: unknown) => e instanceof FactoryMergeRefused && e.code === code;
+
+    await t.test('a direct repository acceptance cannot merge before visual evidence and public PR acknowledgement are ready',async()=>{
+      for (const missing of ['visual','publication'] as const) {
+        const x=await prepared();
+        if (missing==='visual') await pool.query(`DELETE FROM run_captures WHERE "runId"=(SELECT "runId" FROM factory_candidates WHERE id=$1)`,[x.task.candidateId]);
+        else await pool.query(`UPDATE run_publications SET status='failed' WHERE "runId"=(SELECT "runId" FROM factory_candidates WHERE id=$1)`,[x.task.candidateId]);
+        let credentialReads=0;
+        await assert.rejects(x.merges.accept(actor,{binding:x.approval.binding,eventId:randomUUID()},async()=>{credentialReads++;return TOKEN;}),
+          (error:unknown)=>error instanceof FactoryError && error.code===(missing==='visual'?'factory_visual_evidence_required':'factory_public_evidence_required'));
+        assert.deepEqual(await x.taskState(),{stage:'approval',status:'blocked'});
+        assert.equal(credentialReads,0);
+        assert.equal(x.github.calls.length,0);
+        assert.equal((await x.rows()).length,0);
+      }
+    });
 
     async function preparedDeliverable(kind: 'report' | 'deliverable' = 'report') {
       const x = await prepared();
@@ -640,15 +652,18 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       // Real PG, lifecycle/park and merge writers; only provider I/O and live
       // transport are fixtures. Signature admission has its own route tests.
       await pool.query(`
-        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid;
-        ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
+        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid, ADD COLUMN "retryOf" uuid, ADD COLUMN "continuesRunId" uuid, ADD COLUMN "agentId" uuid;
+        ALTER TABLE run_publications ADD COLUMN "updatedAt" timestamptz DEFAULT now();
         CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
+        CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"ownerId" text,"botId" uuid);
+        CREATE TABLE bot_cloud_runtimes ("ownerId" text,"agentId" uuid,"botId" uuid);
         CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"revokedAt" timestamptz);
         CREATE TABLE suggestion_executions ("runId" uuid,status text,"endedAt" timestamptz);
         CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"issueId" uuid,
           "sandboxId" text,state text,"deviceId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
           "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,"lastActiveAt" timestamptz NOT NULL DEFAULT now(),
           "runningSince" timestamptz,"computeSeconds" bigint NOT NULL DEFAULT 0,
+          "snapshotState" text NOT NULL DEFAULT 'none',"snapshotOperationId" uuid,"filesystemSnapshotId" text,"restoreStartedAt" timestamptz,
           "lifecycleAt" timestamptz DEFAULT now(),lifecycle jsonb NOT NULL DEFAULT '{}');
         CREATE TABLE IF NOT EXISTS mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
         CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);

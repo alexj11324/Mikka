@@ -180,6 +180,29 @@ test('explicit schemas and function map have exactly matching action names', () 
   }
 })
 
+test('memory RPC exposes manual, review, scope and undo actions with closed owner-free inputs', () => {
+  const schemas = desktopActionSchemas as Record<string, z.ZodType | undefined>
+  const manual = { requestId: owner, kind: 'preference', subject: 'Synthetic fact', scope: { kind: 'global', ids: [] } }
+  const valid: [string, unknown[]][] = [
+    ['memory.addFact', [manual]], ['memory.clearMemory', []],
+    ['memory.reviewFact', [owner, 'approve']], ['memory.reviewFact', [owner, 'reject']],
+    ['memory.setFactScope', [owner, { kind: 'workspaces', ids: [peer] }]],
+    ['memory.setFactScope', [owner, { kind: 'projects', ids: [peer] }]], ['memory.undoRemoveFact', [owner]],
+  ]
+  for (const [name, args] of valid) assert.equal(schemas[name]?.safeParse(args).success, true, name)
+  const invalid: [string, unknown[]][] = [
+    ['memory.addFact', [{ ...manual, userId: peer }]],
+    ['memory.addFact', [{ ...manual, subject: '' }]],
+    ['memory.addFact', [{ ...manual, kind: 'administrator' }]],
+    ['memory.addFact', [{ ...manual, scope: { kind: 'global', ids: [peer] } }]],
+    ['memory.reviewFact', [owner, 'approve', peer]], ['memory.reviewFact', [owner, 'force']],
+    ['memory.setFactScope', [owner, { kind: 'projects', ids: [] }]],
+    ['memory.setFactScope', [owner, { kind: 'workspaces', ids: [peer], admin: true }]],
+    ['memory.undoRemoveFact', [owner, peer]], ['memory.clearMemory', [peer]],
+  ]
+  for (const [name, args] of invalid) assert.equal(schemas[name]?.safeParse(args).success, false, name)
+})
+
 test('Coordinator submission accepts an optional captured workspace without widening its authority tuple', () => {
   const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
   const legacy = ['hello', null, null, owner, undefined, undefined, undefined, undefined, undefined]

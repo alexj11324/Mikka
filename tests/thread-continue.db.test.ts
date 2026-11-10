@@ -11,6 +11,7 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
+import { addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists (decision 2026-11-02-1400).
 const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
@@ -80,6 +81,21 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const a = await person()
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
+
+  await t.test('a dispatch records its entry and a person continuation is an app entry', async () => {
+    const c = await person()
+    const originRef = { kind: 'telegram' as const, chatId: '42', messageId: 7 }
+    const initial = await steps.dispatchRun(c.id, {
+      issueId: c.issueId, repo: 'octo/repo', requestKey: `origin:${randomUUID()}`, origin: 'telegram', originRef,
+    }, undefined, c.botId) as unknown as { runId: string }
+    const [stored] = (await pool.query('SELECT origin,"originRef" FROM agent_runs WHERE id=$1', [initial.runId])).rows
+    assert.deepEqual(stored, { origin: 'telegram', originRef })
+    await end(initial.runId, 'succeeded')
+    const next = await sendThreadMessage(c.id, initial.runId, 'Continue the same task from the app.')
+    assert.equal(next.continued, true)
+    const [continued] = (await pool.query('SELECT origin,"originRef" FROM agent_runs WHERE id=$1', [next.runId])).rows
+    assert.deepEqual(continued, { origin: 'web', originRef: null }, 'a person’s continuation is the app entry, not the old one')
+  })
 
   await t.test('a lost reply and concurrent retries reuse one owner submission, epoch, run and message', async () => {
     const b = await person()
@@ -361,10 +377,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), { action: 'candidate', runId: next.id,
         candidate: { kind: 'deliverable', sha: null, repository: worktree, environment: `device:${childDevice}`, scope: 'Question artifact' } })).task
       const candidate = { id: current.candidateId!, executionSha: head, producerExecution: { runId: next.id, sessionId: nativeSessionId } }
+      await addFactoryVisualEvidence(pool, next.id)
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), { action: 'finish', status: 'passed',
         reason: 'Synthetic producer submitted its artifact', output: { runId: next.id },
         evidence: [{ artifact: `run-report:${next.id}`, kind: 'report', runId: next.id, sessionId: nativeSessionId,
           candidateId: candidate.id, sha: null, environment: `device:${childDevice}`, recordedAt: new Date().toISOString() }] })).task
+      assert.equal(current.status, 'passed', 'the submitted producer already has ready same-run visual evidence')
       const producerAttemptId = current.attemptId
       current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), {
         action: 'advance', stage: 'review', reason: 'Independent review remains required' })).task
@@ -776,7 +794,13 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(repairQueues, 1, 'same automatic repair/source replay does not queue another execute')
     const repaired = (await pool.query('SELECT t."sourceEventId",r.prompt FROM factory_tasks t JOIN agent_runs r ON r.id=$2 WHERE t.id=$1', [task.id, repairId])).rows[0]
     assert.equal(repaired.sourceEventId, event.id)
-    assert.ok(repaired.prompt.startsWith('Current owner request for this Factory task:'))
+    const validationEnd = repaired.prompt.indexOf('\n\n')
+    const validationBrief = repaired.prompt.slice(0, validationEnd)
+    assert.match(validationBrief, /^Factory implementation owns validation\./)
+    assert.match(validationBrief, /Every implementation must produce at least one ready visual capture, video by default\./)
+    assert.match(validationBrief, /Text logs, a report, and an unverified label never replace visual evidence\./)
+    assert.ok(repaired.prompt.slice(validationEnd + 2).startsWith('Current owner request for this Factory task:'),
+      'the current owner request immediately follows required visual validation guidance')
     assert.ok(repaired.prompt.indexOf(request) < repaired.prompt.indexOf('Historical issue:'))
     await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [repairId, sent.runId])
     await end(repairId, 'failed')

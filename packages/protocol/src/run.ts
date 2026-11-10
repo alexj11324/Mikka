@@ -163,6 +163,8 @@ export const runSafePoint = z.object({
  * the files changed in the worktree and its own verify result, so an agent
  * cannot report its own verify as passed.
  */
+export const runVisualEvidence = z.array(z.object({ captureId: z.uuid(), publicSafe: z.literal(true) }).strict()).max(40)
+
 export const runReport = z.object({
   repositorySelection: runRepositorySelection.optional(),
   /** Worktree base journaled before the adapter started; never agent-supplied. */
@@ -216,6 +218,10 @@ export const runReport = z.object({
   previewDatabaseBranch: z.string().trim().min(1).max(500).optional(),
   /** Acceptance criteria the agent checked, with evidence. */
   criteria: z.array(runCriterion).max(200).optional(),
+  /** Captures from this run whose full visible content was checked for public sharing.
+   * This is an explicit content review, not an automatic pixel-redaction claim.
+   * The server resolves capture ownership and creates the existing share URL. */
+  visualEvidence: runVisualEvidence.optional(),
   /** A review completes once; this verdict never changes daemon-owned verification. */
   reviewVerdict: reviewVerdict.optional(),
   /**

@@ -1,5 +1,6 @@
 import { isDeviceOnline } from '@mikka/protocol/device';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import { createFactoryDispatch } from "./dispatch";
@@ -38,6 +39,7 @@ import { readFactoryArtifact } from "./evidence";
 import { registerHooks } from "node:module";
 import test from "node:test";
 import { Pool, type PoolClient } from "pg";
+import { observePoolCommits } from '../db/commit-effects';
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { evidenceSchema, FactoryError, type FactoryBinding } from "./contract";
 import { handleFactory } from "./http";
@@ -179,6 +181,7 @@ test(
       max: 16,
       options: `-c search_path=${schema}`,
     });
+    observePoolCommits(pool);
     const scopes = new Map<string, string>();
     const workspaceFixtures = new Map<string, string>();
     const authorityWorkspaces: string[] = [];
@@ -508,6 +511,7 @@ test(
         runId: execute,
       });
       await complete(execute);
+      await addFactoryVisualEvidence(pool,execute);
       state = await store.apply(owner, binding(state.task), randomUUID(), {
         action: "candidate",
         runId: execute,
@@ -599,6 +603,7 @@ test(
           output,
         });
       }
+      await addFactoryPublicationEvidence(pool,state.task.id);
       state = await store.apply(owner, binding(state.task), randomUUID(), {
         action: "advance",
         stage: "approval",
@@ -1011,6 +1016,7 @@ test(
             max: 16,
             options: `-c search_path=${schema}`,
           });
+          observePoolCommits(pool);
           store = createFactoryStore(pool, authorize, integrationGates);
           monitor = makeMonitor();
           assert.deepEqual(await monitor.consume("owner", sample.input), {

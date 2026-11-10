@@ -1,0 +1,61 @@
+{
+  "reviewedAt": "2026-11-09T21:24:58.609125+00:00",
+  "repository": "alexj11324/mikka-hosted-ui",
+  "pr": 59,
+  "headSha": "fd011bd6f73446237033189d04f2ade9cb9c51e8",
+  "requiredBase": "feat/affectui-shell-palette",
+  "upstreamPr": 58,
+  "upstreamHeadSha": "1ea64db0330993abe9daff5199ec8d90b13d5b55",
+  "mergeBaseSha": "c2776011c26f981154f210c7369deb58b96fc98b",
+  "upstreamMerged": false,
+  "overlap": [
+    "patches/README.md"
+  ],
+  "resolvedReadmeSha256": "8271583929643d51790acad52f70e43e0b211d5c54781a00dd116c7933f929e2",
+  "changedStyles": false,
+  "styleReview": [
+    {
+      "file": "components/app-shell.tsx",
+      "classAttributes": 299,
+      "styleAttributes": 16,
+      "cssDefinitions": 3,
+      "unchanged": true
+    },
+    {
+      "file": "components/inbox.tsx",
+      "classAttributes": 116,
+      "styleAttributes": 1,
+      "cssDefinitions": 1,
+      "unchanged": true
+    },
+    {
+      "file": "components/agent-tasks.tsx",
+      "classAttributes": 71,
+      "styleAttributes": 1,
+      "cssDefinitions": 1,
+      "unchanged": true
+    }
+  ],
+  "tests": {
+    "command": "node --test scripts/factory-activity.test.mjs",
+    "total": 15,
+    "passed": 15,
+    "failed": 0,
+    "skipped": 0
+  },
+  "coverage": [
+    "same activity snapshot state/revision/evidence",
+    "current acceptance artifact/version/run/candidate",
+    "fixed same-origin task media routes",
+    "duplicate-title stable task/file identity",
+    "failed activity forbids latest-version fallback",
+    "actual paid ArtifactChips and Inbox/Tasks callbacks preserve defaults",
+    "older question cannot read latest task evidence"
+  ],
+  "remoteMutation": false,
+  "remaining": [
+    "Normal merge upstream into PR59 with both actual parent commits; no rebase or force push.",
+    "Keep PR59 base on feat/affectui-shell-palette until PR58 has actually merged, then change base to main.",
+    "Latest merged-head hosted CI and deployed browser review remain required."
+  ]
+}

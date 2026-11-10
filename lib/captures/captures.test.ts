@@ -56,7 +56,11 @@ test('capture provider propagates cancellation to file and command requests', as
   const signals: (AbortSignal | undefined)[] = []
   const sandbox = {
     files: {
-      write: async (_path: string, _data: string, options: { signal?: AbortSignal }) => { signals.push(options.signal) },
+      write: async (files: { path: string; data: string }[], options: { signal?: AbortSignal }) => {
+        assert.deepEqual(files.map(file => file.path), ['/opt/mikka/computer/screen-capture.sh', '/opt/mikka/computer/capture-video.mjs'])
+        assert.ok(files.every(file => file.data.length > 0))
+        signals.push(options.signal)
+      },
       read: async (_path: string, options: { signal?: AbortSignal }) => { signals.push(options.signal); return new Uint8Array([1]) },
     },
     commands: { run: async (_command: string, options: { signal?: AbortSignal }) => { signals.push(options.signal); return { stdout: '' } } },

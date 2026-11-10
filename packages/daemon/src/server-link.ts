@@ -122,10 +122,10 @@ export interface ServerLink {
    * Screenshots and recordings a run keeps as evidence (`@mikka/protocol/capture`).
    * Optional: links without them keep the files on this machine.
    */
-  beginCapture?(runId: string, request: CaptureUploadRequest): Promise<CaptureUploadResponse>
-  resumeCapture?(runId: string, captureId: string): Promise<CaptureUploadResponse>
-  sendCapture?(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string): Promise<void>
-  completeCapture?(runId: string, captureId: string): Promise<CaptureView>
+  beginCapture?(runId: string, request: CaptureUploadRequest, signal?: AbortSignal): Promise<CaptureUploadResponse>
+  resumeCapture?(runId: string, captureId: string, signal?: AbortSignal): Promise<CaptureUploadResponse>
+  sendCapture?(runId: string, captureId: string, upload: CaptureUploadResponse["upload"], bytes: Uint8Array, contentType: string, signal?: AbortSignal): Promise<void>
+  completeCapture?(runId: string, captureId: string, signal?: AbortSignal): Promise<CaptureView>
   /** The cloud computer's capture tools for a run on this cloud worker. */
   screenCapture?(runId: string, request: ScreenCaptureRequest, signal?: AbortSignal): Promise<ScreenCaptureResponse>
   /** Appends to the run's event stream; returns the new tail offset. */

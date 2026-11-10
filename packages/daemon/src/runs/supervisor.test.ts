@@ -103,6 +103,21 @@ describe("supervisor structured terminal failures", () => {
     expect(completion?.failureDetails?.code).toBe("run_failed")
     expect(completion?.report).not.toHaveProperty("failureDetails")
   })
+  it("retains only explicit inspected capture declarations in the completed report", async () => {
+    const visualEvidence = [{ captureId: "10000000-0000-4000-8000-000000000001", publicSafe: true as const }]
+    const f = await fixture({ outcome: "succeeded", stopReason: "submitted", report: { summary: "Recorded the running terminal", visualEvidence } })
+    f.supervisor.start(f.assignment)
+    await f.supervisor.idle(); await f.outbox.flushAll()
+    expect(f.server.runs.get(f.runId)?.completion?.report?.visualEvidence).toEqual(visualEvidence)
+  })
+  it("drops malformed sharing declarations without automatically marking them safe", async () => {
+    const f = await fixture({ outcome: "succeeded", stopReason: "submitted", report: {
+      summary: "A private recording", visualEvidence: [{ captureId: "10000000-0000-4000-8000-000000000001", publicSafe: false }],
+    } as unknown as ExitEvent["report"] })
+    f.supervisor.start(f.assignment)
+    await f.supervisor.idle(); await f.outbox.flushAll()
+    expect(f.server.runs.get(f.runId)?.completion?.report).not.toHaveProperty("visualEvidence")
+  })
   it("gives a pre-launch refusal the registered error details", async () => {
     const f = await fixture({ outcome: "succeeded" })
     expect(() => f.supervisor.start({ ...f.assignment, harness: "codex" })).toThrow()

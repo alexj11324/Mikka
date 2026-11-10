@@ -28,8 +28,10 @@ export function bootstrapScope(location: URL): BootstrapScope {
 
 export function AuthForm(props: ComponentProps<typeof ExistingAuthForm>) {
   const location = useLocation()
-  const { oauthResume: _oauth, composioResume: _composio, desktopRefused: _refused, ...auth } = webAuthentication(location)
-  return <ExistingAuthForm {...props} {...auth} />
+  // A refusal is a step decision, not a notice: pass it through as its own
+  // prop so this route keeps the same refusal as the served sign-in page.
+  const { oauthResume: _oauth, composioResume: _composio, desktopRefused, ...auth } = webAuthentication(location)
+  return <ExistingAuthForm {...props} {...auth} handoffRefused={desktopRefused} />
 }
 
 // Better Auth owns the web's cookie session store. Bootstrap's safe projection

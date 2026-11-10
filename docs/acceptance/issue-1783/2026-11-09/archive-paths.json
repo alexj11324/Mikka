@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "archiveDirectory": "cloud-linux-40376665-final03",
+  "manifestSha256": "1db726eab5a4be6ddd2fc6bf27fc61269c0df32a4fbcee76c0f992936b5ca992",
+  "originalToTextPaths": {
+    "ffmpeg-readback/copied-helper/capture-video.mjs": "ffmpeg-readback/copied-helper/capture-video.mjs.txt",
+    "harness/curate-evidence.mjs": "harness/curate-evidence.mjs.txt",
+    "harness/oversize-readback.mjs": "harness/oversize-readback.mjs.txt",
+    "harness/plan.mjs": "harness/plan.mjs.txt",
+    "harness/register-readback.mjs": "harness/register-readback.mjs.txt",
+    "harness/review.mjs": "harness/review.mjs.txt",
+    "harness/run.mjs": "harness/run.mjs.txt",
+    "harness/stage.mjs": "harness/stage.mjs.txt"
+  }
+}

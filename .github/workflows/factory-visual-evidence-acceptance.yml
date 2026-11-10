@@ -1,0 +1,166 @@
+name: Factory visual evidence production acceptance
+# One finite #1783 acceptance, not a paid task on every main deployment.
+# Web may finish first. E2B's completion then re-enters the selector after the
+# exact runtime is published; no credentials are read while a release is busy.
+on:
+  workflow_run:
+    workflows: [Web deploy, E2B additive runtime release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      application_sha:
+        description: Exact PR 1789 merge SHA served by production and current main
+        type: string
+        required: true
+      window_comment_id:
+        description: Active issue 1783 release-window comment on issue 1752
+        type: string
+        required: true
+      model_case:
+        description: Retry only a failed official subscription; successful exact-source cases are reused
+        type: choice
+        options: [all, claude, codex]
+        default: all
+permissions:
+  contents: read
+jobs:
+  authorize:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.repository.full_name == 'alexj11324/Mikka' &&
+        github.event.workflow_run.head_repository.full_name == 'alexj11324/Mikka'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      APPLICATION_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || inputs.application_sha }}
+      WINDOW_COMMENT_ID: ${{ inputs.window_comment_id }}
+      FACTORY_VISUAL_MODEL_CASE: ${{ github.event_name == 'workflow_run' && 'all' || inputs.model_case }}
+    outputs:
+      selected: ${{ steps.select.outputs.selected }}
+      source-sha: ${{ steps.select.outputs.source-sha }}
+      window-id: ${{ steps.select.outputs.window-id }}
+      window-digest: ${{ steps.select.outputs.window-digest }}
+    steps:
+      # For workflow_run, github.sha is the trusted default branch commit, not
+      # an arbitrary upstream checkout. The selector then requires equality to
+      # the PR merge, current main, public build and authenticated release.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Select only PR 1789 merge, active issue 1783 window and completed exact runtime
+        id: select
+        run: node scripts/acceptance/factory-visual-evidence.mjs select
+      - name: Retain read-only selection receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: factory-visual-selection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/factory-visual-evidence-1783/
+          retention-days: 14
+          if-no-files-found: ignore
+  acceptance:
+    needs: authorize
+    if: needs.authorize.outputs.selected == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      pull-requests: read
+      id-token: write
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      APPLICATION_SHA: ${{ needs.authorize.outputs.source-sha }}
+      WINDOW_COMMENT_ID: ${{ needs.authorize.outputs.window-id }}
+      WINDOW_MARKER_SHA256: ${{ needs.authorize.outputs.window-digest }}
+      FACTORY_VISUAL_MODEL_CASE: ${{ github.event_name == 'workflow_run' && 'all' || inputs.model_case }}
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.authorize.outputs.source-sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install real media readers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y ffmpeg
+          ffmpeg -version
+          ffprobe -version
+      - name: Test acceptance guards and hostile evidence before credentials
+        run: node --test scripts/acceptance/factory-visual-evidence.test.mjs
+      - name: Recheck exact release, active window and previously successful native cases inside shared queue
+        id: attest
+        run: node scripts/acceptance/factory-visual-evidence.mjs attest
+      - name: Read only existing shared acceptance account
+        if: steps.attest.outputs.claude == 'true' || steps.attest.outputs.codex == 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Recheck release and window immediately before account password
+        if: steps.attest.outputs.claude == 'true' || steps.attest.outputs.codex == 'true'
+        run: node scripts/acceptance/factory-visual-evidence.mjs attest
+      - name: Read only that account password
+        id: password
+        if: steps.attest.outputs.claude == 'true' || steps.attest.outputs.codex == 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      # Both paths get their own real result even if the other fails. The
+      # final step is mandatory and fails unless BOTH are verified and clean.
+      - name: Run real Claude Factory task and verify stored evidence
+        id: claude
+        if: steps.attest.outputs.claude == 'true' && steps.password.outcome == 'success'
+        run: node scripts/acceptance/factory-visual-evidence.mjs run claude
+      - name: Run real Codex Factory task and verify stored evidence
+        id: codex
+        if: always() && steps.attest.outcome == 'success' && steps.password.outcome == 'success' && steps.attest.outputs.codex == 'true'
+        run: node scripts/acceptance/factory-visual-evidence.mjs run codex
+      - name: Require both official subscription cases, unchanged production and completed cleanup
+        if: always() && steps.attest.outcome == 'success'
+        run: node scripts/acceptance/factory-visual-evidence.mjs complete
+      - name: Retain actual videos, screenshots, immutable reports and safe receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: factory-visual-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/factory-visual-evidence-1783/
+          retention-days: 30
+          if-no-files-found: warn

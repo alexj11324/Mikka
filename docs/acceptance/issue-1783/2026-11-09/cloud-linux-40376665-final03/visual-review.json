@@ -1,0 +1,110 @@
+{
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "reviewedAt": "2026-11-09T15:43:53.909889+00:00",
+  "reviewer": "capture_validation agent",
+  "method": "Direct visual inspection of all 12 exported PNG keyframes; exact download hashes verified against curated manifest. All complete videos were separately decoded during the actual harness and registered media GET verification.",
+  "scope": "Selected start/running/result frames, not a claim that every video frame was visually inspected. Isolated Xvfb displayed only scrubbed terminal output, and all 32 text artifacts passed the private-value/token/credential-URL check before export.",
+  "result": "passed",
+  "limitations": [
+    "Long command and test-name lines can extend beyond the terminal viewport; complete commands and output are preserved in the stage JSON and text logs. Core SHA and PASS/count information is fully visible.",
+    "Temporary application URLs in immutable documents prove the observed same-origin relationship; their owned app and DB were cleaned up. The offline index displays the archived actual GET bytes."
+  ],
+  "frames": [
+    {
+      "file": "01-postgresql-gates-start.png",
+      "sha256": "09c18fd971113918faaf14f5483bffbbd5d1c1679c735914594edd58d4bee84d",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "Fixed SHA, synthetic-fixture boundary and actual node command are visible."
+    },
+    {
+      "file": "01-postgresql-gates-running.png",
+      "sha256": "f4118b470db617486db19a485e652f8b9c55b32454bf29a86b49aac66cbfe72b",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "Live nested PostgreSQL gate and bypass test output is visible."
+    },
+    {
+      "file": "01-postgresql-gates-result.png",
+      "sha256": "f288566d9489a6f6f12db49931b17d5460e6d56a14f02fa7555d8de6d248e92a",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "202 tests / 202 pass / 0 fail / 0 skipped, fixed SHA and stage PASS are visible."
+    },
+    {
+      "file": "02-real-http-start.png",
+      "sha256": "7e3ea6fae1d2b6b158212c20ac5bd41b3de27aca3939c834bb6e5b0a160573d0",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "Actual HTTP test command and fixed SHA are visible before application startup."
+    },
+    {
+      "file": "02-real-http-running.png",
+      "sha256": "277e331e2f301e23a0ddc3cace6c199384994b7cf604a03e1367f9c903ee343a",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "Application startup is silent; the same live terminal command remains visible. No output replay is implied."
+    },
+    {
+      "file": "02-real-http-result.png",
+      "sha256": "dc9fcd573e9188e2e224e5597335c4a1fd2aee5087d1b6ce702177267d2a15de",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "8 tests / 8 pass / 0 skipped, exact SHA and safe HTTP diagnostic summary are visible."
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg-start.png",
+      "sha256": "451e4cb395461538f087b5b502b802b57fb027f751754e67c4ea0b7a40feb9d3",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "Actual daemon test command and fixed SHA are visible."
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg-running.png",
+      "sha256": "8efc935e80b59b077710b532e3da4264dfb95ff7bed16da0faec9383b0e5579a",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "91 daemon tests pass; actual pinned tool installer and real FFmpeg tests are running."
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg-result.png",
+      "sha256": "7b3092db7b2547186df3828f2bc6946a1e6e696eafa7712297dcd69a16bdee6a",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "10 tool tests pass and READBACK PASS shows 100004592-byte input, 3780-byte output, retained first/final pixels and matching helper output."
+    },
+    {
+      "file": "04-activity-registration-start.png",
+      "sha256": "0b3f73ed1b235c36f33532c7c564feb5dc63f266bb64834afd4c9d21838c924c",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "Actual registration script command, fixed SHA and synthetic transport boundary are visible."
+    },
+    {
+      "file": "04-activity-registration-running.png",
+      "sha256": "aecfa8841819599163bc98b012ffde2d0bb6b28c0e0da5b7504822d1044af283",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "Own disposable PostgreSQL identity check has passed while the real application starts."
+    },
+    {
+      "file": "04-activity-registration-result.png",
+      "sha256": "66257bb5fb6a7e54cfdb9eddbf77693b4550955eb1e0bf40c74b0ced34cb8b64",
+      "inspected": true,
+      "readability": "passed for revision, command context, result summaries and relevant output",
+      "privateMaterialObserved": false,
+      "observation": "All six media GET/decode checks, four document versions, 15 checks and cleanup complete are visible; this is an independent static witness."
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import { defaultAgentCopy } from './agent-copy'
 import { ActionFailureError } from './action-error'
 import { ComputerError } from './computer/store'
 import { runChanged } from './live/panels'
+import { resolveRunOrigin } from './run-origin'
 
 type Run = typeof agentRuns.$inferSelect
 type Query = Pick<Pool | PoolClient, 'query'>
@@ -259,6 +260,9 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
             withoutBot: source.botId === null, idempotencyKey: `provider:${source.id}`,
             allowLocalRecovery: source.agentDefinition.allowLocalRecovery,
             sourceEventId: source.agentDefinition.repositoryAdmission?.requestEventId,
+            // The fallback continues the failed source's entry; a legacy run
+            // is recorded as the host's automatic recovery, never guessed as web.
+            ...resolveRunOrigin({ sourceRun: source, defaultOrigin: source.source === 'mcp' ? 'api' : 'automation' }),
           }, client)
           runId = queued.runId
         } else {

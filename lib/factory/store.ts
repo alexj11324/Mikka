@@ -24,7 +24,7 @@ import { factoryTaskDetail, type FactoryTaskDetail } from "./task-detail";
 import { readFactoryFlowStates } from './public-flow';
 import { publicFactoryTaskSummary, type FactoryPublicTaskSummary } from './public-task';
 import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
-import { captureIdOf } from "./evidence";
+import { captureIdOf, hasFactoryVisualEvidence, factoryHandoffEvidenceError, factoryEvidenceBlockReason, FACTORY_VISUAL_EVIDENCE_REQUIRED, FACTORY_PUBLIC_EVIDENCE_REQUIRED } from "./evidence";
 import { escapeLiteral, type Pool, type PoolClient, type QueryResult } from "pg";
 import { z } from "zod";
 import { daemonTestMode, normalizeRepository, repositoryBindingMatches } from '@mikka/protocol/repository'
@@ -51,6 +51,11 @@ function isSelectResult(value: unknown): value is Pick<QueryResult, 'command' | 
 }
 
 type ProviderRun = Parameters<typeof import('../run-provider-fallback').providerContinuationMatches>[0]
+const evidenceRefusalCodeSchema = z.object({ code: z.enum([FACTORY_VISUAL_EVIDENCE_REQUIRED, FACTORY_PUBLIC_EVIDENCE_REQUIRED]) });
+const evidenceBlockBindingSchema = evidenceRefusalCodeSchema.extend({ eventId: z.uuid(), candidateId: z.uuid(), sourceEventId: z.uuid() });
+const handoffEvidenceSchema = evidenceBlockBindingSchema.extend({
+  action: z.enum(['advance','retry','retry_publication','snapshot_recovery']), stage: z.string(), status: z.string(), reason: z.string(),
+});
 
 /** Model changes are authorized by the host receipt. Repository authority
  * remains independently checked, including read-only and no-repository runs
@@ -178,6 +183,8 @@ export interface FactorySnapshot {
   task: FactoryTask;
   attempts: FactoryAttempt[];
   candidates: FactoryCandidate[];
+  /** The transition was refused after its blocked state was committed. */
+  refusal?: { code: string };
 }
 /** A store-owned issue snapshot from the same APP transaction. GETs use MVCC;
  * write callers lock their own rows. This replaces a second issue read, never
@@ -190,7 +197,7 @@ export type FactoryAuthorize = (
   lockedIssue?: Readonly<FactoryLockedIssue>,
 ) => Promise<boolean>;
 const completionRecoveryAuthority = Symbol('owner-completion-recovery');
-type CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; sourceEventId: string; runId: string };
+type CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; sourceEventId: string; runId: string; sessionId: string };
 const questionRetryAuthority = Symbol('question-execution-retry');
 type QuestionRetryAuthority = { [questionRetryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; sourceEventId: string; runId: string };
 const checkStartRetryAuthority = Symbol('owner-check-start-retry');
@@ -308,9 +315,11 @@ export function createFactoryStore(
     if (!Array.isArray(result) || result.length !== 2 || !result.every(isSelectResult)) throw new TypeError('Invalid Factory snapshot');
     const attempts = result[0].rows as FactoryAttempt[];
     const candidates = result[1].rows as FactoryCandidate[];
+    const current = attempts.find(attempt => attempt.id === task.attemptId);
+    const refusal = task.status === 'blocked' ? evidenceRefusalCodeSchema.safeParse(current?.output?.handoffEvidence ?? current?.output?.evidenceGate) : null;
     // Return the same JSON representation on the first call and durable replay.
     return JSON.parse(
-      JSON.stringify({ contractVersion: 1, task, attempts, candidates }),
+      JSON.stringify({ contractVersion: 1, task, attempts, candidates, ...(refusal?.success ? { refusal: refusal.data } : {}) }),
     ) as FactorySnapshot;
   }
   /** Read-only hint for ordinary Owner retry, never a new execution grant.
@@ -402,6 +411,33 @@ export function createFactoryStore(
     task.status = "pending";
   }
 
+  async function blockHandoff(tx: PoolClient, task: FactoryTask, eventId: string, action: 'advance' | 'retry' | 'retry_publication' | 'snapshot_recovery', reason: string,
+    completedProducer?: {runId:string;sessionId:string}) {
+    const error = await factoryHandoffEvidenceError(tx, task, completedProducer);
+    if (!error) return false;
+    const receipt = { code: error.code, eventId, action, candidateId: task.candidateId,
+      sourceEventId: task.sourceEventId, stage: task.stage, status: task.status, reason };
+    // Preserve the completed review. This is a handoff refusal, not another
+    // review result; the publication completion event can resume this receipt.
+    await tx.query(`UPDATE factory_attempts SET output=COALESCE(output,'{}'::jsonb)||jsonb_build_object('handoffEvidence',$2::jsonb) WHERE id=$1`,
+      [task.attemptId, JSON.stringify(receipt)]);
+    task.status = 'blocked';
+    task.reason = factoryEvidenceBlockReason(error.code);
+    return true;
+  }
+
+  async function retryingEvidenceBlockedExecution(tx: PoolClient, task: FactoryTask, attempt: FactoryAttempt) {
+    if (task.stage !== 'execute' || task.status !== 'blocked' || !task.candidateId) return false;
+    const parsed = evidenceBlockBindingSchema.safeParse(attempt.output.handoffEvidence ?? attempt.output.evidenceGate);
+    if (!parsed.success || parsed.data.candidateId !== task.candidateId || parsed.data.sourceEventId !== task.sourceEventId) return false;
+    const { rows: [receipt] } = await tx.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id,parsed.data.eventId]);
+    const recorded = receipt?.result?.task, requested = receipt?.request?.change;
+    if (!recorded || recorded.revision !== task.revision || recorded.attemptId !== task.attemptId || recorded.candidateId !== task.candidateId ||
+      recorded.sourceEventId !== task.sourceEventId || recorded.stage !== 'execute' || recorded.status !== 'blocked' || receipt.result.refusal?.code !== parsed.data.code) return false;
+    return requested?.action === 'advance' && requested.stage === 'approval' ||
+      requested?.action === 'finish' && requested.status === 'passed' && parsed.data.code === FACTORY_VISUAL_EVIDENCE_REQUIRED;
+  }
+
   type IssueList<T> = { contractVersion: 1; issueId: string; tasks: T[] };
   async function listIssueTasks(userId: string, issueId: string, anyBot: boolean, publicFlow: false): Promise<IssueList<FactoryTaskSummary>>;
   async function listIssueTasks(userId: string, issueId: string, anyBot: boolean, publicFlow: true): Promise<IssueList<FactoryTaskSummary | FactoryPublicTaskSummary>>;
@@ -447,6 +483,38 @@ export function createFactoryStore(
     });
   }
   const store = {
+    /** Event-driven recovery after PR evidence was published. It can only
+     * consume a host-recorded refusal for this exact candidate and request. */
+    async resumeEvidenceHandoff(userId: string, runId: string): Promise<FactorySnapshot | null> {
+      uuid(runId);
+      return transaction(async tx => {
+        const { rows: [bound] } = await tx.query(`SELECT t.id FROM factory_tasks t JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
+          WHERE t."userId"=$1 AND c."runId"=$2 AND t.status='blocked' ORDER BY t.id LIMIT 1`, [userId, runId]);
+        if (!bound) return null;
+        const task = await owned(tx, userId, bound.id);
+        if (task.status !== 'blocked') return null;
+        const { rows: [attempt] } = await tx.query<FactoryAttempt>('SELECT * FROM factory_attempts WHERE id=$1 AND "taskId"=$2 FOR UPDATE', [task.attemptId, task.id]);
+        const parsed = handoffEvidenceSchema.safeParse(attempt?.output?.handoffEvidence);
+        if (!parsed.success) return null;
+        const gate = parsed.data;
+        if (gate.candidateId !== task.candidateId || gate.sourceEventId !== task.sourceEventId || gate.stage !== task.stage) return null;
+        const { rows: [receipt] } = await tx.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, gate.eventId]);
+        if (!receipt || receipt.result?.task?.revision !== task.revision || receipt.result?.task?.candidateId !== task.candidateId ||
+          receipt.result?.task?.attemptId !== task.attemptId || receipt.result?.task?.status !== 'blocked' ||
+          (gate.action === 'snapshot_recovery' ? receipt.request?.kind !== 'owner_deliverable_snapshot_recovery' : receipt.request?.change?.action !== gate.action)) return null;
+        if (await factoryHandoffEvidenceError(tx, task)) return snapshot(tx, task);
+        if (gate.action === 'retry_publication') await tx.query(`UPDATE factory_attempts SET status='failed',reason=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [attempt.id, gate.reason]);
+        await tx.query(`UPDATE factory_attempts SET output=output-'handoffEvidence' WHERE id=$1`, [attempt.id]);
+        task.reason = gate.reason;
+        await freshAttempt(tx, task, 'approval', task.reason);
+        task.revision++;
+        await tx.query(`UPDATE factory_tasks SET stage='approval',status='pending',revision=$2,"attemptId"=$3,reason=$4,"updatedAt"=now() WHERE id=$1`,
+          [task.id, task.revision, task.attemptId, task.reason]);
+        return save(tx, task, factoryEventId('evidence-handoff-resume', `${runId}:${gate.eventId}`), {
+          kind: 'evidence_handoff_resumed', refusedEventId: gate.eventId, runId, candidateId: task.candidateId,
+        });
+      });
+    },
     lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
     /** Read-only GET paths: ownership/scope checked, nothing locked. */
     readTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false),
@@ -730,14 +798,17 @@ export function createFactoryStore(
         if (!run) {
           // A denied completion recovery must not fall through to a fresh producer.
           if (task.stage === 'execute' && task.status === 'blocked') {
-            const { rowCount } = await tx.query(`SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+            const { rows: [attempt] } = await tx.query<FactoryAttempt>(`SELECT a.* FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
               WHERE a.id=$1 AND a."taskId"=$2 AND a.output->'watchdog'->>'reasonCode'='recovery_exhausted' AND r.status='succeeded'`, [task.attemptId,task.id]);
-            if (rowCount) fail('factoryCompletionRecoveryUnavailable');
+            // A consumed completion can itself be refused for missing media.
+            // Its exact host receipt permits the ordinary evidence retry to
+            // create a fresh producer; an unqualified recovery still fails closed.
+            if (attempt && !await retryingEvidenceBlockedExecution(tx, task, attempt)) fail('factoryCompletionRecoveryUnavailable');
           }
           return null;
         }
         await runFor(tx, task, run.id); // The canonical run/owner/Bot fence, with the run lock.
-        const authority: CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true, tx, userId, taskId: task.id, attemptId: task.attemptId, sourceEventId: task.sourceEventId, runId: run.id };
+        const authority: CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true, tx, userId, taskId: task.id, attemptId: task.attemptId, sourceEventId: task.sourceEventId, runId: run.id, sessionId: run.sessionId };
         const current = await completeFactoryExecution(tx, { apply: (owner, currentBinding, id, action, client) => store.apply(owner, currentBinding, id, action, client, authority) }, task, run);
         const start = await dispatch?.(tx, store, current, run);
         const final = await owned(tx, userId, task.id);
@@ -795,6 +866,17 @@ export function createFactoryStore(
           await tx.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 FOR UPDATE', [prepared.scope.machineRunId, userId]);
           const checked = await retainedDeliverableForRecovery(tx, task, observation.leaseId);
           if (!checked || !isDeepStrictEqual(checked.scope, prepared.scope)) fail('factoryDeliverableSnapshotUnavailable');
+          // Reject before deriving a new candidate/snapshot receipt. The
+          // retained delivery still needs its producer's visual verification.
+          if (!await hasFactoryVisualEvidence(tx, task)) {
+            task.status = 'blocked';
+            task.reason = factoryEvidenceBlockReason(FACTORY_VISUAL_EVIDENCE_REQUIRED);
+            await tx.query(`UPDATE factory_attempts SET output=COALESCE(output,'{}'::jsonb)||jsonb_build_object('evidenceGate',$2::jsonb) WHERE id=$1`,
+              [task.attemptId,JSON.stringify({code:FACTORY_VISUAL_EVIDENCE_REQUIRED,candidateId:task.candidateId})]);
+            task.revision++;
+            await tx.query(`UPDATE factory_tasks SET status='blocked',revision=$2,reason=$3,"updatedAt"=now() WHERE id=$1`,[task.id,task.revision,task.reason]);
+            return {result:await save(tx,task,eventId,{kind:'owner_deliverable_snapshot_recovery',input,scope:checked.scope})};
+          }
           const candidateId = randomUUID();
           const inserted = await tx.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName",kind)
             SELECT $1,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName",kind
@@ -804,10 +886,11 @@ export function createFactoryStore(
           task.candidateId = candidateId;
           task.reason = reason;
           const next = factoryFlowVersion(task) === 2 && await factoryReviewPerformed(tx, task) ? 'approval' : 'review';
-          await freshAttempt(tx, task, next, reason);
+          const handoffBlocked = next === 'approval' && await blockHandoff(tx, task, eventId, 'snapshot_recovery', reason);
+          if (!handoffBlocked) await freshAttempt(tx, task, next, reason);
           task.revision++;
-          await tx.query(`UPDATE factory_tasks SET stage=$6,status='pending',revision=$2,"attemptId"=$3,"candidateId"=$4,reason=$5,"updatedAt"=now() WHERE id=$1`,
-          [task.id, task.revision, task.attemptId, candidateId, reason, next]);
+          await tx.query(`UPDATE factory_tasks SET stage=$6,status=$7,revision=$2,"attemptId"=$3,"candidateId"=$4,reason=$5,"updatedAt"=now() WHERE id=$1`,
+          [task.id, task.revision, task.attemptId, candidateId, task.reason, task.stage, task.status]);
           // A changed candidate derives the old check question as superseded.
           // Its row, its failed run, the producer and old receipts stay untouched.
           const request = { kind: 'owner_deliverable_snapshot_recovery', input, scope: checked.scope };
@@ -827,6 +910,7 @@ export function createFactoryStore(
           // Both versions are inside this uncommitted transaction. The one
           // immutable receipt exposed to replays includes the queued review or human handoff.
           await tx.query('UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId, JSON.stringify(result)]);
+          await lifecycle?.onTransition?.(tx, final);
           await factoryChanged(tx, final);
           return { result, start };
         });
@@ -927,6 +1011,7 @@ export function createFactoryStore(
           [task.attemptId, task.id],
         );
         if (!attempt) fail("factoryAttemptMissing");
+        let handoffBlocked = false;
         const recovering = completion?.[completionRecoveryAuthority] === true && completion.tx === tx && completion.userId === userId &&
           completion.taskId === task.id && completion.attemptId === attempt.id && completion.sourceEventId === task.sourceEventId &&
           completion.runId === attempt.runId && task.stage === 'execute' && attempt.status === 'blocked';
@@ -1158,7 +1243,7 @@ export function createFactoryStore(
             }
             if (
               (!task.candidateId && task.stage !== "spec") ||
-              !change.evidence.length
+              (!change.evidence.length && task.stage !== 'execute')
             )
               fail("factoryEvidenceRequired");
             const {
@@ -1209,8 +1294,9 @@ export function createFactoryStore(
                 if (captureId && (evidence.kind === "screenshot" || evidence.kind === "video")) {
                   // The run's own ready capture of the stated kind; no other run's file.
                   const { rows } = await tx.query(
-                    `SELECT id FROM run_captures WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' AND kind=$4`,
-                    [captureId, run.id, task.userId, evidence.kind === "video" ? "video" : "image"],
+                    `SELECT id FROM run_captures WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' AND kind=$4
+                      AND ("issueId" IS NULL OR "issueId"=$5)`,
+                    [captureId, run.id, task.userId, evidence.kind === "video" ? "video" : "image", task.issueId],
                   );
                   if (!rows.length) fail("factoryArtifactMissing");
                   continue;
@@ -1236,11 +1322,25 @@ export function createFactoryStore(
           }
           task.status = change.status;
           task.reason = change.reason;
+          const finishedOutput = { ...attempt.output, ...change.output };
+          // Even a successful test report cannot substitute for the current
+          // implementation's actual screenshot or recording.
+          if (task.stage === 'execute' && change.status === 'passed' && !await hasFactoryVisualEvidence(tx, task, recovering ? completion : undefined)) {
+            task.status = 'blocked';
+            task.reason = factoryEvidenceBlockReason(FACTORY_VISUAL_EVIDENCE_REQUIRED);
+            finishedOutput.evidenceGate = { code: FACTORY_VISUAL_EVIDENCE_REQUIRED, candidateId: task.candidateId, sourceEventId: task.sourceEventId, eventId };
+            // Recovery retains the historical attempt's status, session and
+            // submitted evidence. Append only the host refusal so the committed
+            // snapshot returns 409 and a later ordinary retry has its exact fence.
+            if (recovering) await tx.query(`UPDATE factory_attempts SET output=COALESCE(output,'{}'::jsonb)||jsonb_build_object('evidenceGate',$2::jsonb) WHERE id=$1`,
+              [attempt.id, JSON.stringify(finishedOutput.evidenceGate)]);
+          }
+          if (task.status === 'passed' && !change.evidence.length) fail('factoryEvidenceRequired');
           if (!recovering) await tx.query(
             "UPDATE factory_attempts SET output=$2,evidence=$3 WHERE id=$1",
             [
               attempt.id,
-              JSON.stringify({ ...attempt.output, ...change.output }),
+              JSON.stringify(finishedOutput),
               JSON.stringify(change.evidence),
             ],
           );
@@ -1255,16 +1355,22 @@ export function createFactoryStore(
               [task.id, task.attemptId, task.sourceEventId, task.userId]);
             if (!approved.rowCount) fail('factory_spec_approval_required');
           }
-          task.reason = change.reason;
-          await freshAttempt(tx, task, change.stage, change.reason);
+          handoffBlocked = change.stage === 'approval' && await blockHandoff(tx, task, eventId, 'advance', change.reason, recovering ? completion : undefined);
+          if (!handoffBlocked) {
+            task.reason = change.reason;
+            await freshAttempt(tx, task, change.stage, change.reason);
+          }
         } else if (change.action === "retry_publication") {
           if (task.stage !== 'publish' || task.status !== 'pending' || !task.candidateId)
             fail('factoryTransition');
           const { rowCount } = await tx.query(`SELECT id FROM factory_publications WHERE id=$1 AND "taskId"=$2 AND "candidateId"=$3 AND status='failed' AND request->'binding'->>'revision'=$4 FOR UPDATE`, [change.publicationId, task.id, task.candidateId, String(task.revision)]);
           if (rowCount !== 1) fail('factoryPublicationReceiptRequired');
-          await tx.query(`UPDATE factory_attempts SET status='failed',reason=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [attempt.id, change.reason]);
-          task.reason = change.reason;
-          await freshAttempt(tx, task, 'approval', change.reason);
+          handoffBlocked = await blockHandoff(tx, task, eventId, 'retry_publication', change.reason);
+          if (!handoffBlocked) {
+            await tx.query(`UPDATE factory_attempts SET status='failed',reason=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [attempt.id, change.reason]);
+            task.reason = change.reason;
+            await freshAttempt(tx, task, 'approval', change.reason);
+          }
         } else if (change.action === "retry" || change.action === "repair") {
           if (task.stage === "clarify") fail("factoryTransition");
           // A completed review can lead to repair or human judgment, never a
@@ -1332,20 +1438,27 @@ export function createFactoryStore(
           // execution and cannot be requested by the public change schema.
           if ((change.action === 'repair' || task.stage === 'execute') && !continuingQuestion)
             await checkFactoryRepairBudget(tx, task);
-          task.reason = change.reason;
-          if (change.action === "repair") task.candidateId = null;
-          await freshAttempt(
-            tx,
-            task,
-            change.action === "repair" ? "execute" : task.stage,
-            change.reason,
-          );
+          handoffBlocked = change.action === 'retry' && task.stage === 'approval' && await blockHandoff(tx, task, eventId, 'retry', change.reason);
+          if (!handoffBlocked) {
+            // A retry must produce its own candidate. Only these host-bound
+            // evidence refusals add this path; historical candidates/attempts
+            // remain intact and other retry meanings stay unchanged.
+            const retryEvidence = change.action === 'retry' && await retryingEvidenceBlockedExecution(tx,task,attempt);
+            task.reason = change.reason;
+            if (change.action === "repair" || retryEvidence) task.candidateId = null;
+            await freshAttempt(
+              tx,
+              task,
+              change.action === "repair" ? "execute" : task.stage,
+              change.reason,
+            );
+          }
         }
         else fail("factoryTransitionUnavailable");
         const stoppedFinishedAttempt =
           (change.action === "cancel" || change.action === "revoke") &&
           ["passed", "failed", "blocked"].includes(attempt.status);
-        if (task.attemptId === attempt.id && !stoppedFinishedAttempt && !recovering) {
+        if (task.attemptId === attempt.id && !stoppedFinishedAttempt && !recovering && !handoffBlocked) {
           await tx.query(
             "UPDATE factory_attempts SET status=$2,reason=$3,\"finishedAt\"=CASE WHEN $2 IN ('passed','failed','blocked','cancelled','revoked') THEN clock_timestamp() ELSE NULL END WHERE id=$1",
             [attempt.id, task.status, task.reason],

@@ -47,7 +47,7 @@ const nextConfig = {
     '/.well-known/workflow/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py', './scripts/e2b/lease-driver.py'],
     '/api/workspaces/**': ['./scripts/e2b/lease-driver.py'],
-    '/v1/runs/*/screen': ['./scripts/e2b/screen-capture.sh'],
+    '/v1/runs/*/screen': ['./scripts/e2b/screen-capture.sh', './packages/daemon/src/agents/capture-video.mjs'],
     '/api/subscriptions/**': ['./packages/subscription-worker/bin/mikka-subscription-worker', './packages/subscription-worker/bin/mikka-subscription-enrollment'],
     '/api/cron/subscriptions': ['./packages/subscription-worker/bin/mikka-subscription-worker'],
     '/v1/devices/**/subscription': ['./packages/subscription-worker/bin/mikka-subscription-worker'],

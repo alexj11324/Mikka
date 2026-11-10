@@ -19,7 +19,7 @@ import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
 import type { Harness, RunKind } from "@mikka/protocol"
-import { runQuestion, runRepositorySelection, type RunQuestion } from "@mikka/protocol/run"
+import { runQuestion, runRepositorySelection, runVisualEvidence, type RunQuestion } from "@mikka/protocol/run"
 import { planHandoff, planSplitProblem } from "@mikka/protocol/plan"
 import {
   SKILL_BODY_FILE,
@@ -165,6 +165,7 @@ interface HandoffFile {
   plan?: unknown
   /** Per acceptance criterion, with the evidence the agent saw. */
   criteria?: unknown
+  visualEvidence?: AgentReport["visualEvidence"]
   reviewVerdict?: AgentReport["reviewVerdict"]
   previewDatabaseBranch?: unknown
 }
@@ -498,6 +499,7 @@ export class RunContext {
     // dropped rather than passed up as if the daemon had asked for it.
     const plan =
       this.options.kind === "plan" ? planFromHandoff(file.plan, log) : null
+    const visualEvidence = runVisualEvidence.safeParse(file.visualEvidence)
     const question = runQuestion.safeParse(file.question)
     const repositorySelection = !this.options.factoryCheck && ['implement', 'fix'].includes(this.options.kind ?? '')
       ? runRepositorySelection.safeParse(file.repositorySelection) : null
@@ -511,6 +513,7 @@ export class RunContext {
       ...(plan ? { plan } : {}),
       ...(typeof file.previewDatabaseBranch === "string" ? { previewDatabaseBranch: file.previewDatabaseBranch } : {}),
       ...(Array.isArray(file.criteria) ? { criteria: file.criteria } : {}),
+      ...(visualEvidence.success ? { visualEvidence: visualEvidence.data } : {}),
       ...(file.reviewVerdict ? { reviewVerdict: file.reviewVerdict } : {}),
       ...(file.verificationCommand ? { verificationCommand: file.verificationCommand } : {}),
       ...(runQuestion.safeParse(file.question).success

@@ -19,6 +19,8 @@ export async function runtime(userId: string): Promise<CoordinatorRuntime> {
 export async function enqueue(userId: string, holder: string, round: number, selected: Exclude<CoordinatorRuntime, { harness: 'ai_sdk' }>, tools: NativeCoordinatorJob['tools'], botId: string, snapshot?: DefinitionSnapshot) {
   'use step'
   const { summary, memory, messages } = await loadConversation(userId, botId)
+  const { memoryForBotPrompt } = await import('@/lib/profile/memory')
+  const profile = await memoryForBotPrompt(userId, botId)
   const base = snapshot ? withCoordinatorPresentation(executionInstructions(snapshot)) : await botInstructions(userId, botId, personalCoordinatorInstructions())
   const permitted = snapshotMailboxTools(snapshot).filter(name => tools.some(tool => tool.name === name))
   const { githubContext } = await import('@/lib/coordinator/github-context')
@@ -26,7 +28,7 @@ export async function enqueue(userId: string, holder: string, round: number, sel
   const execution = await executionContextParts(userId, botId)
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
     // The GitHub lines (the authorized repository list) and the allowed models list come before the memory, so the provider's prefix cache covers them.
-    instructions: promptWithCachedContext(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), memory, '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : '')).instructions,
+    instructions: promptWithCachedContext(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), [memory, profile].filter(Boolean).join('\n'), '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : '')).instructions,
     context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }

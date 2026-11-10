@@ -62,8 +62,8 @@ test('independent delivery prompt carries host execution observations and usable
 
 const originalRepairRequest = 'Only acceptance.txt: exact UTF-8 "mikka-production-20261101-847\\n\\n", 31 bytes. Keep all standing constraints.'
 const failedRepairClaim = 'Expected "mikka-production-acceptance-20261101-847\\n\\n", 42 bytes; actual file is 31 bytes.'
-function repairBriefFixture(options: { stage?: 'review' | 'verify'; previous?: boolean; context?: boolean; prompt?: string } = {}) {
-  const task = { id: 'task', attemptId: 'repair-attempt', userId: 'owner', issueId: 'issue', botId: 'bot', sourceEventId: 'current-request', stage: 'execute', status: 'pending' } as FactoryTask
+function repairBriefFixture(options: { stage?: 'review' | 'verify'; previous?: boolean; context?: boolean; prompt?: string; flowVersion?: 1 | 2 } = {}) {
+  const task = { id: 'task', attemptId: 'repair-attempt', userId: 'owner', issueId: 'issue', botId: 'bot', sourceEventId: 'current-request', stage: 'execute', status: 'pending', route: { flowVersion: options.flowVersion ?? 1 } } as FactoryTask
   const pending = { position: 3, output: {} }
   const failed = { id: 'failed-attempt', taskId: task.id, position: 2, stage: options.stage ?? 'review', status: 'failed',
     runId: 'failed-run', sessionId: 'failed-session', candidateId: 'fixed-candidate', reason: failedRepairClaim,
@@ -94,13 +94,16 @@ function repairBriefFixture(options: { stage?: 'review' | 'verify'; previous?: b
   return { tx, task, failed, pending, read: () => ({ prompt, writes }) }
 }
 
-for (const stage of ['review', 'verify'] as const) test(`automatic ${stage} repair carries the fixed host context and keeps a false finding distinct from the original criterion`, async () => {
-  const f = repairBriefFixture({ stage })
+for (const flowVersion of [1, 2] as const) for (const stage of ['review', 'verify'] as const) test(`v${flowVersion} automatic ${stage} repair carries the fixed host context and keeps a false finding distinct from the original criterion`, async () => {
+  const f = repairBriefFixture({ stage, flowVersion })
   const before = structuredClone({ pending: f.pending, failed: f.failed })
   const configured = await factoryRepairBrief(f.tx, f.task, 'repair-run')
   assert.deepEqual(configured, { preservePrompt: true }, 'later handoff composition must preserve the complete automatic repair request')
   const { prompt, writes } = f.read()
-  assert.equal(writes, 1)
+  assert.equal(writes, 1, 'required visual guidance and trusted repair context commit together')
+  assert.match(prompt, /Every implementation must produce at least one ready visual capture, video by default/)
+  assert.match(prompt, /submit_result\.visualEvidence/)
+  assert.equal(prompt.includes('Factory implementation owns validation'), flowVersion === 2)
   assert.match(prompt, /Factory stage: execute \(automatic repair\)/)
   assert.match(prompt, new RegExp(`Failed ${stage} attempt failed-attempt, run failed-run, session failed-session`))
   assert.match(prompt, /Current host repository: https:\/\/github.com\/owner\/current.git/)
@@ -115,32 +118,41 @@ for (const stage of ['review', 'verify'] as const) test(`automatic ${stage} repa
   assert.deepEqual({ pending: f.pending, failed: f.failed }, before, 'brief must not invent a model decision or alter the old report')
 })
 
-test('ordinary execute without an adjacent trusted failed check receives no invented repair context', async () => {
-  const f = repairBriefFixture({ previous: false })
+for (const flowVersion of [1, 2] as const) test(`v${flowVersion} ordinary execute receives required visual guidance without invented repair context`, async () => {
+  const f = repairBriefFixture({ previous: false, flowVersion })
   await factoryRepairBrief(f.tx, f.task, 'repair-run')
-  assert.deepEqual(f.read(), { prompt: originalRepairRequest, writes: 0 })
+  const { prompt, writes } = f.read()
+  assert.equal(writes, 1)
+  assert.match(prompt, /Every implementation must produce at least one ready visual capture, video by default/)
+  assert.match(prompt, /report_blocked with the specific reason/)
+  assert.match(prompt, /submit_result\.visualEvidence/)
+  assert.doesNotMatch(prompt, /automatic repair|Failed review attempt|Coordinator model decision/)
+  assert.ok(prompt.endsWith(originalRepairRequest))
+  assert.equal(prompt.includes('Factory implementation owns validation'), flowVersion === 2)
 })
 
-test('automatic repair refuses missing host/candidate context before writing its prompt', async () => {
-  const f = repairBriefFixture({ context: false })
+for (const flowVersion of [1, 2] as const) test(`v${flowVersion} automatic repair refuses missing host/candidate context before writing its prompt`, async () => {
+  const f = repairBriefFixture({ context: false, flowVersion })
   await assert.rejects(factoryRepairBrief(f.tx, f.task, 'repair-run'), (error: unknown) => error instanceof FactoryError && error.code === 'factoryCheckBindingMismatch')
   assert.equal(f.read().writes, 0)
 })
 
-test('automatic repair bounds only failure excerpts and preserves a long original request and standing constraints', async () => {
-  const original = originalRepairRequest + 'x'.repeat(98000) + '\nFinal standing constraint: never change the exact target.'
-  const f = repairBriefFixture({ prompt: original })
+for (const flowVersion of [1, 2] as const) test(`v${flowVersion} automatic repair reserves mandatory guidance and bounds only failure excerpts, preserving the original request`, async () => {
+  const original = originalRepairRequest + 'x'.repeat(96000) + '\nFinal standing constraint: never change the exact target.'
+  const f = repairBriefFixture({ prompt: original, flowVersion })
   f.failed.output.completion.findings[0].evidence = 'observation '.repeat(5000)
   await factoryRepairBrief(f.tx, f.task, 'repair-run')
-  const { prompt } = f.read()
+  const { prompt, writes } = f.read()
+  assert.equal(writes, 1)
+  assert.match(prompt, /Every implementation must produce at least one ready visual capture, video by default/)
   assert.ok(prompt.endsWith(original))
   assert.ok(prompt.length <= 100000)
   assert.ok(prompt.includes('Failure excerpt truncated'))
 })
 
-test('automatic repair fails closed when required context cannot fit beside the untouched original request', async () => {
+for (const flowVersion of [1, 2] as const) test(`v${flowVersion} automatic repair fails without a prompt write when guidance and context cannot fit beside the untouched original request`, async () => {
   const original = 'x'.repeat(100000)
-  const f = repairBriefFixture({ prompt: original })
+  const f = repairBriefFixture({ prompt: original, flowVersion })
   await assert.rejects(factoryRepairBrief(f.tx, f.task, 'repair-run'), (error: unknown) => error instanceof FactoryError && error.code === 'factoryCheckBindingMismatch')
   assert.deepEqual(f.read(), { prompt: original, writes: 0 })
 })

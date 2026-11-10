@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
+import { addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
@@ -89,6 +90,7 @@ test('isolated PG: direct question recovery exposes historical native observatio
       const producerRunId = producer.runId, producerAttemptId = producer.task.attemptId
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='original-native-session',"startedAt"=now()-interval '2 hours',"finishedAt"=now()-interval '118 minutes',"worktreePath"=$2,report=$3 WHERE id=$1`,
         [producerRunId, worktreePath, JSON.stringify({ sourceCommit: base, summary: 'Original completed report remains unchanged.', verify: { status: 'not_run' } })])
+      await addFactoryVisualEvidence(pool,producerRunId)
       const clock = Date.now()
       for (const minutes of [0, 3, 8, 17]) await sweepFactoryWatchdog(pool, {
         runtime: () => ({ store, reconcile: { run: async () => { throw new Error('Synthetic historical dispatch failure') } } }),
