@@ -3,7 +3,6 @@
 // provider lifecycle is observed at its boundary, never called or claimed live.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-process.env.MIKKA_REVIEW_DEBUG = '1'
 import { createHash, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { readFile, readdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
