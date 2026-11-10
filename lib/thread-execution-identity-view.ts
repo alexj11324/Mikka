@@ -18,7 +18,8 @@ export const modelRoutingEvidenceSchema = z.discriminatedUnion('version', [
   z.object({ version: z.literal(2), required: z.enum([...MODEL_ROUTING_TIERS, 'unknown']), ...frozenRouting }).strip(),
 ])
 
-const reference = z.string().min(1).max(200)const resource = z.object({
+const reference = z.string().min(1).max(200)
+const resource = z.object({
   kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'mcp']),
   id: reference, ownerId: reference, access: z.enum(['owner', 'workspace_share']),
   revision: z.string().max(200).optional(),
