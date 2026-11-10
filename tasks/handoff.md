@@ -75,10 +75,13 @@
 1. **provider fallback 会静默回滚用户选的线程模式。**
    `lib/thread-mode/store.ts:45-65` 的 `freezeThreadMode` 把任何显式 `requested` 都当成 thread transition，更新 `task_thread_modes`、bump version、写 `thread.mode_changed` 审计。而 `lib/run-provider-fallback.ts:256-267` 与 `lib/agent-runs.ts:223-227` 在 fallback 时传 `mode: source.mode`；源 run 是 `failed`（terminal，`run-provider-fallback.ts:217`），`unfinishedRun` 不拦。用户在这段窗口把 ask 改成 execute 后，fallback 又把它改回 ask。
    改法：拆分「冻结 run 的 mode」与「切换 thread 的 mode」——continuation 只把源 mode 写进新 run 行，不碰 `task_thread_modes`/version/audit。先例：`lib/run-quota.ts:163-167`、`lib/factory/questions/queue-continuation.ts:87-88`。
+   已澄清：**不是**继承路径 `INSERT ... 'execute' ON CONFLICT DO NOTHING`（幂等、读路径不写），**也不是** `resolveThreadMode` 回落 execute（DB 有 CHECK，回落是 fail-safe）；就是显式 `requested` 被当成了 thread transition。local fallback 走 `lib/agent-runs.ts:223-227`，cloud fallback 走 `lib/run-provider-fallback.ts:256-267`，两条都会触发。
 
 2. **mode API 用 task 创建者做授权，与 workspace-only / per-person 设计矛盾。**
    `lib/thread-mode/store.ts:81` 的 `SELECT "workspaceId" FROM issues WHERE id=$1 AND "userId"=$2 FOR SHARE` 额外要求 caller 是 issue 的 `userId`。但 `threadModeTarget` 只校验 run owner、`requireTaskWorkspace` 只校验 workspace 成员；team workspace 里成员在队友 task 上拥有 run 时，GET 正常、POST 却 409。测试 `lib/thread-mode/store.db.test.ts:89-95` 把这个错误行为固化了。
    改法：保留 `FOR SHARE`，去掉 `AND "userId"=$2`（或在事务内校验 run 的 owner/issue 可见性），测试改成「run owner 可切自己的行；非 workspace 成员由 route 拒绝」。
+
+   > **这是一条需要产品拍板的开放决策，接手者不要自行选边**：如果规则是「run owner 可以给自己那行 `(userId, issueId)` 选 mode」，就去掉 `"userId"=$2`；如果规则是「只有 task 创建者能选」，那当前实现也不自洽——`freezeThreadMode` 用的是调用者自己的 per-user 行，队友的 run 会读写队友自己的行，只是显式 POST 被拦。二选一之后必须让 GET 与 POST 语义一致（要么都允许，要么 GET 也 404 并明确队友的 run 永远 execute），否则 UI 会先显示再报错。
 
 LOW（可后续 PR）：`approvals.ts:129-132` 过期状态在事务内 throw 导致 ROLLBACK、`approvals.ts:176-182` 的 list 缺 membership fence、`mode/route.ts:50-56` 成员校验在事务外、Codex 把所有 MCP 都送进 gate 与 server 侧判定重复、`lib/run-app-mcp.ts:18,26` 的 `runMode` 缺省 execute 应改 fail closed、Claude Ask 放行 `mcp__mikka_computer__`（UNVERIFIED，需确认 broker 在 `allow` 下是否逐步 ask）。
 
