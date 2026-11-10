@@ -6,7 +6,7 @@ import { assertSafeId } from '../ids'
 import type { RunMailbox } from '../run-mailbox'
 
 type Catalogue = { type: 'function'; name: string; description: string; inputSchema: Record<string, unknown> }[]
-type NativeVersion = '0.163.0' | '0.166.0'
+type NativeVersion = '0.163.0' | '0.166.0' | '0.167.0'
 type Receipt = { version: 1; nativeVersion: NativeVersion; runId: string; threadId: string; historyPath: string; catalogue: Catalogue }
 const unavailable = () => new Error('Run mailbox requires a verified original Codex thread')
 
@@ -14,9 +14,9 @@ const unavailable = () => new Error('Run mailbox requires a verified original Co
 export function codexMailboxResumeVersion(userAgent: unknown): NativeVersion | null {
   // initialize prefixes this with clientInfo.name, not a fixed Codex name.
   const version = typeof userAgent === 'string'
-    ? /^[A-Za-z0-9._-]+\/(0\.163\.0|0\.166\.0)(?:\s|$)/.exec(userAgent)?.[1]
+    ? /^[A-Za-z0-9._-]+\/(0\.163\.0|0\.166\.0|0\.167\.0)(?:\s|$)/.exec(userAgent)?.[1]
     : undefined
-  return version === '0.163.0' || version === '0.166.0' ? version : null
+  return version === '0.163.0' || version === '0.166.0' || version === '0.167.0' ? version : null
 }
 
 export function codexMailboxCatalogue(mailbox: RunMailbox): Catalogue {
@@ -76,7 +76,7 @@ export function verifyCodexMailboxResume(stateDir: string, sourceRunId: string, 
     const dir = lstatSync(join(stateDir, 'codex-mailbox'))
     if (!dir.isDirectory() || dir.isSymbolicLink()) throw unavailable()
     const receipt = readJson(receiptFile(stateDir, sourceRunId), 256 * 1024) as Partial<Receipt> | null
-    if (receipt?.version !== 1 || (receipt.nativeVersion !== '0.163.0' && receipt.nativeVersion !== '0.166.0') || receipt.runId !== sourceRunId || receipt.threadId !== threadId ||
+    if (receipt?.version !== 1 || (receipt.nativeVersion !== '0.163.0' && receipt.nativeVersion !== '0.166.0' && receipt.nativeVersion !== '0.167.0') || receipt.runId !== sourceRunId || receipt.threadId !== threadId ||
         !isDeepStrictEqual(receipt.catalogue, catalogue) || typeof receipt.historyPath !== 'string') throw unavailable()
     verifyHistory(home, receipt.historyPath, threadId, catalogue)
     return receipt.nativeVersion

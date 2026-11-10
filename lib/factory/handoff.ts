@@ -5,6 +5,7 @@ import { escapeLiteral, type Pool, type PoolClient, type QueryResult } from 'pg'
 import type { FactoryTask } from './store'
 import { factoryEventId } from './event-id'
 import { maskFactoryNote } from './note-mask'
+import { copyRunPrompt, type RunPromptSource, type CopiedRunPrompt } from '../run-prompt-copy'
 
 function sanitize(value: unknown): unknown {
   if (typeof value === 'string') return maskFactoryNote(value).slice(0, 10000)
@@ -121,15 +122,17 @@ export function factoryHandoffPrompt(handoff: Awaited<ReturnType<typeof persistF
 
 /** The existing lease-retry path bypasses ordinary dispatch. Refresh its handoff
  * before it creates the child; claim still rechecks the current task/attempt. */
-export async function factoryRecoveryHandoff(pool: Pool, run: { id: string; userId: string }, prompt: string, existing?: PoolClient): Promise<{ prompt: string; briefing: string; blocked?: string }> {
-  if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return { prompt, briefing: '' }
+export async function factoryRecoveryHandoff(pool: Pool, run: { id: string; userId: string }, input: string | RunPromptSource, existing?: PoolClient): Promise<CopiedRunPrompt & { briefing: string; blocked?: string }> {
+  const source = typeof input === 'string' ? { prompt: input } : input
+  const { prompt } = source
+  if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return { ...copyRunPrompt(source), briefing: '' }
   return withFactoryBackgroundWorkspace(pool, run.userId, { kind: 'run', id: run.id }, async () => {
   const tx = existing ?? await pool.connect()
   try {
     if (!existing) await tx.query('BEGIN')
     const { factoryClaimTask } = await import('./claim')
     const identity = await factoryClaimTask(tx, run.id)
-    if (!identity) { if (!existing) await tx.query('COMMIT'); return { prompt, briefing: '' } }
+    if (!identity) { if (!existing) await tx.query('COMMIT'); return { ...copyRunPrompt(source), briefing: '' } }
     const { factoryRuntimeForBot } = await import('./runtime')
     const task = await factoryRuntimeForBot(identity.botId).store.lockTask(tx, run.userId, identity.id)
     const handoff = await persistFactoryHandoff(tx, task)
@@ -140,7 +143,7 @@ export async function factoryRecoveryHandoff(pool: Pool, run: { id: string; user
     const currentRequest = await (await import('./checks')).currentFactoryRequest(tx, task)
     const suffix = factoryHandoffPrompt(handoff)
     if (!existing) await tx.query('COMMIT')
-    return { prompt: currentRequest + prompt.slice(0, 100000 - currentRequest.length - suffix.length) + suffix, briefing: currentRequest + suffix,
+    return { ...copyRunPrompt(source, currentRequest + prompt.slice(0, 100000 - currentRequest.length - suffix.length) + suffix, currentRequest), briefing: currentRequest + suffix,
       ...(uncertain ? { blocked: 'An external action may already have happened. Reconcile its existing receipt before resuming on another machine.' } : {}) }
   } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error } finally { if (!existing) tx.release() }
   }, existing)

@@ -21,6 +21,24 @@ const pullRequestEvent = z.object({
   }),
 })
 
+const reviewEvent = z.object({ repository: z.object({ full_name: z.string().regex(/^[\w.-]+\/[\w.-]+$/) }),
+  pull_request: z.object({ number: z.number().int().positive(), html_url: z.url() }) })
+
+/** The already verified review webhook names an existing delivery. It never
+ * copies a review body or changes approval/merge state from event contents. */
+export async function invalidatePublishedPullReview(payload: unknown, database: Pick<Pool, 'query'> = pool) {
+  const parsed = reviewEvent.safeParse(payload)
+  if (!parsed.success) return
+  const { repository, pull_request: pull } = parsed.data
+  const url = `https://github.com/${repository.full_name}/pull/${pull.number}`
+  if (pull.html_url !== url) return
+  const { rows } = await database.query<{ issueId: string }>(`SELECT DISTINCT p."issueId" FROM run_publications p
+    JOIN agent_runs r ON r.id=p."runId" AND r."userId"=p."userId" AND r."issueId"=p."issueId"
+    WHERE p.status='published' AND p."remoteKey"=$1 AND p."pullRequest"->>'url'=$2 AND p."issueId" IS NOT NULL LIMIT 50`,
+  [`v2/github.com/${repository.full_name.toLowerCase()}`, url])
+  await pullRequestStatusChanged(database, rows.map(row => row.issueId))
+}
+
 /**
  * The PR's line counts on the tasks its delivery belongs to, as the thread
  * card's PR list shows them. Only the counts of that one PR change, only when

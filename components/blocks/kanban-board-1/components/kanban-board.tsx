@@ -28,6 +28,7 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components
 import { PriorityIcon } from '@/components/workspace/priority-icon'
 import { BOARD_COLUMNS, type AgentState, type BoardColumn, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
 import type { TaskBlock } from '@/lib/task-blocked'
+import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
 import { blockLabel } from '@/components/workspace/block-label'
 import { BoardCard, BoardColumnFrame, BoardHiddenLane } from '@ui-slot/board'
 
@@ -83,6 +84,8 @@ export type CardHandlers = {
 export type CardContext = {
   properties: ReadonlySet<CardProperty>
   agentStates: ReadonlyMap<string, AgentState>
+  /** Each task's own state (localTaskState on its newest run), for a card's status line (decision #1864 point 6). */
+  taskStates?: ReadonlyMap<string, { state: TaskState; reason: TaskReason | null }>
   subtasks: ReadonlyMap<string, { done: number; total: number }>
   /** The Bot and coding agents working each task, from its threads. */
   owners?: ReadonlyMap<string, RunOwner>

@@ -16,7 +16,11 @@ import { FieldError } from '@/components/ui/field'
 type IntegrationState = Awaited<ReturnType<typeof getLinearIntegrationState>>
 type TeamOption = Awaited<ReturnType<typeof listLinearTeamOptions>>[number]
 
-export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | null }) {
+/**
+ * Linear's page as data and actions: the connection, the synced team, and failed issues and deliveries to retry.
+ * Shared by the page below and UI layers (docs/ui-overlay.md).
+ */
+export function useLinearPlugin() {
   const t = useTranslations('Settings.linear')
   const [state, setState] = useState<IntegrationState | null>(null)
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -135,6 +139,12 @@ export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | nu
     finally { setBusy(false) }
   }
 
+  return { state, enabled, teams, selectedTeam, setSelectedTeam, activeTeam, busy, error, connect, enableTeam, disableTeam, disconnect, retry, retryDelivery }
+}
+
+export function LinearSettings({ notice }: { notice?: 'connected' | 'error' | null }) {
+  const t = useTranslations('Settings.linear')
+  const { state, enabled, teams, selectedTeam, setSelectedTeam, activeTeam, busy, error, connect, enableTeam, disableTeam, disconnect, retry, retryDelivery } = useLinearPlugin()
   return <div className="flex flex-col gap-8">
     <SettingsSection
       id="linear-heading"

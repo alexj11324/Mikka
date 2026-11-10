@@ -24,3 +24,11 @@ export type IconRailProps = RailProps
  * RailProps.chats, so the page draws no bot column and no button to open one.
  */
 export type FrameListsChats = boolean
+
+/**
+ * `FRAME_OWNS_PANEL`: true when the conversation's own right-hand work area holds the chat's Overview and the
+ * browser as tabs (ThreadScreenProps.panels), so the page draws no right column of its own beside a chat.
+ * `FRAME_OWNS_HEADER`: true when the frame has its own search, Inbox count and work area, so the window bar
+ * carries only ← → (in the desktop app) and the page header no search or 全部任务 buttons.
+ */
+export type FrameOwnsPanel = boolean

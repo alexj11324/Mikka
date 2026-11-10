@@ -432,17 +432,12 @@ export function PluginBreadcrumb({ rootLabel, rootHref, onBack, name }: { rootLa
   </Breadcrumb>
 }
 
-/** One app: header, its connected accounts with their actions, and 关于. */
-export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: { apps: ConnectedApps; app: string; rootLabel: string; rootHref: string; onBack: () => void }) {
+/**
+ * One store app's page, as data and actions: its accounts and what each can do, Composio's page data, 关于,
+ * and how it connects. Shared by the page below and UI layers (docs/ui-overlay.md); toasts say what an action did.
+ */
+export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   const t = useTranslations('Settings.integrations')
-  const tPlugins = useTranslations('Plugins')
-  const common = useTranslations('Common')
-  const format = useFormatter()
-  const [renaming, setRenaming] = useState<ConnectedAccountView | null>(null)
-  const [alias, setAlias] = useState('')
-  const [confirming, setConfirming] = useState<ConnectedAccountView | null>(null)
-  // Errors from a dialog stay in that dialog and go when it closes.
-  const [dialogError, setDialogError] = useState('')
   const accounts = apps.accountsFor(app)
   const several = accounts.length > 1
   const { name, iconUrl } = useAppInfo()(app)
@@ -456,8 +451,6 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
   const takeoverText = useTakeoverText()
   const statusLabel = (account: ConnectedAccountView) => account.status === 'EXPIRED' ? t('statusExpired')
     : account.status === 'FAILED' ? t('statusFailed') : account.status !== 'ACTIVE' ? t('statusInactive') : null
-  const closeRename = () => { setRenaming(null); setDialogError('') }
-  const closeConfirm = () => { setConfirming(null); setDialogError('') }
   // How it connects: Composio's OAuth, the person's own key in a form, or nothing to connect.
   const kind = detail.data?.auth.kind ?? null
   const withKey = kind === 'credentials'
@@ -465,6 +458,51 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
   const [keyTarget, setKeyTarget] = useState<CredentialTarget | null>(null)
   const add = () => { if (withKey) setKeyTarget({ app }); else void apps.connect(app) }
   const reconnect = (accountId: string) => { if (withKey) setKeyTarget({ app, replaceAccountId: accountId }); else void apps.reconnect(accountId) }
+  const makeDefault = (account: ConnectedAccountView) => {
+    const title = accountName(account)
+    void apps.makeDefault(account.id).then(ok => { if (ok) toast.success(t('madeDefault', { account: title })) })
+  }
+  /** Turns one account off or on; turning off says who the bots use now. */
+  const toggle = (account: ConnectedAccountView) => {
+    const title = accountName(account)
+    const turningOff = account.enabled
+    // Worked out before the switch moves: who the bots use once this one is off.
+    const takeover = turningOff ? takeoverText(accounts, account.id) : null
+    void apps.setEnabled([account.id], !turningOff).then(ok => {
+      if (ok && turningOff) toast.success(t('turnedOff', { name: title }), takeover ? { description: takeover } : undefined)
+    })
+  }
+  /** Disconnects after the person confirmed; false when it failed, for the confirmation to say so. */
+  const disconnect = async (account: ConnectedAccountView) => {
+    const label = accountName(account)
+    const takeover = takeoverText(accounts, account.id)
+    const done = await apps.disconnect(account.id)
+    if (done) toast.success(t('disconnected', { name: label }), takeover ? { description: takeover } : undefined)
+    return done
+  }
+  /** What the confirmation says will happen. */
+  const disconnectText = (account: ConnectedAccountView) => takeoverText(accounts, account.id) ?? t('disconnectConsequence', { name })
+  return {
+    name, iconUrl, accounts, several, detail, about, website, busy, kind, withKey, canAdd, keyTarget, setKeyTarget,
+    accountName, statusLabel, needsReconnect, add, reconnect, makeDefault, toggle, disconnect, disconnectText,
+  }
+}
+
+/** One app: header, its connected accounts with their actions, and 关于. */
+export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: { apps: ConnectedApps; app: string; rootLabel: string; rootHref: string; onBack: () => void }) {
+  const t = useTranslations('Settings.integrations')
+  const tPlugins = useTranslations('Plugins')
+  const common = useTranslations('Common')
+  const format = useFormatter()
+  const [renaming, setRenaming] = useState<ConnectedAccountView | null>(null)
+  const [alias, setAlias] = useState('')
+  const [confirming, setConfirming] = useState<ConnectedAccountView | null>(null)
+  // Errors from a dialog stay in that dialog and go when it closes.
+  const [dialogError, setDialogError] = useState('')
+  const page = useConnectedAppPage(apps, app)
+  const { name, iconUrl, accounts, several, detail, about, website, busy, kind, withKey, canAdd, keyTarget, setKeyTarget, accountName, statusLabel, add, reconnect } = page
+  const closeRename = () => { setRenaming(null); setDialogError('') }
+  const closeConfirm = () => { setConfirming(null); setDialogError('') }
 
   return <div className="flex flex-col gap-8">
     <PluginBreadcrumb rootLabel={rootLabel} rootHref={rootHref} onBack={onBack} name={name} />
@@ -510,19 +548,10 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('accountActions', { name: title })} disabled={busy} />}><Ellipsis data-icon="inline-start" /></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuGroup>
-                {several && !account.isDefault && !broken && account.enabled && <DropdownMenuItem onClick={() => {
-                  void apps.makeDefault(account.id).then(ok => { if (ok) toast.success(t('madeDefault', { account: title })) })
-                }}>{t('makeDefault')}</DropdownMenuItem>}
+                {several && !account.isDefault && !broken && account.enabled && <DropdownMenuItem onClick={() => page.makeDefault(account)}>{t('makeDefault')}</DropdownMenuItem>}
                 <DropdownMenuItem onClick={() => { setAlias(account.alias ?? account.email ?? ''); setDialogError(''); setRenaming(account) }}>{t('rename')}</DropdownMenuItem>
                 <DropdownMenuItem disabled={!canAdd} onClick={() => reconnect(account.id)}>{withKey ? tPlugins('key.replace') : t('reconnect')}</DropdownMenuItem>
-                {!broken && <DropdownMenuItem onClick={() => {
-                  const turningOff = account.enabled
-                  // Worked out before the switch moves: who the bots use once this one is off.
-                  const takeover = turningOff ? takeoverText(accounts, account.id) : null
-                  void apps.setEnabled([account.id], !turningOff).then(ok => {
-                    if (ok && turningOff) toast.success(t('turnedOff', { name: title }), takeover ? { description: takeover } : undefined)
-                  })
-                }}>{account.enabled ? t('turnOff') : t('turnOn')}</DropdownMenuItem>}
+                {!broken && <DropdownMenuItem onClick={() => page.toggle(account)}>{account.enabled ? t('turnOff') : t('turnOn')}</DropdownMenuItem>}
                 <DropdownMenuItem variant="destructive" onClick={() => { setDialogError(''); setConfirming(account) }}>{t('disconnect')}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
@@ -579,19 +608,16 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
           <AlertDialogTitle>{t('disconnectTitle', { name: confirming ? accountName(confirming) : name })}</AlertDialogTitle>
-          <AlertDialogDescription>{(confirming && takeoverText(accounts, confirming.id)) ?? t('disconnectConsequence', { name })}</AlertDialogDescription>
+          <AlertDialogDescription>{confirming ? page.disconnectText(confirming) : t('disconnectConsequence', { name })}</AlertDialogDescription>
         </AlertDialogHeader>
         {dialogError && <FieldError className="text-xs">{dialogError}</FieldError>}
         <AlertDialogFooter>
           <AlertDialogCancel variant="secondary" disabled={busy}>{common('cancel')}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" disabled={busy} onClick={() => {
             if (!confirming) return
-            const label = accountName(confirming)
-            const takeover = takeoverText(accounts, confirming.id)
-            void apps.disconnect(confirming.id).then(done => {
+            void page.disconnect(confirming).then(done => {
               if (!done) { setDialogError(t('disconnectFailed')); return }
               closeConfirm()
-              toast.success(t('disconnected', { name: label }), takeover ? { description: takeover } : undefined)
             })
           }}>{busy ? t('working') : t('disconnect')}</AlertDialogAction>
         </AlertDialogFooter>

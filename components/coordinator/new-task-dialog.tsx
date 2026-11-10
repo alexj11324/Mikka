@@ -34,9 +34,13 @@ import { useChatFiles } from '@/components/chat/use-chat-files'
 import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 import { taskProfileSelectable, useAgentProfiles } from '@/components/settings/factory-profiles-data'
-import { TaskProfileNotice, TaskProfilePicker } from './task-profile-picker'
+import { TaskProfileNotice, TaskProfilePicker, useTaskProfileChoices } from './task-profile-picker'
+import * as newTaskSlot from '@ui-slot/new-task'
+import type { NewTaskMachine } from '@/components/slots/new-task-contract'
 
 const MAX_LENGTH = 8000
+/** The task's short title column. */
+const TITLE_MAX = 60
 
 type Machine = PickerMachine & { label: string; status?: string }
 
@@ -61,7 +65,8 @@ function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: s
 /**
  * 新建任务 the Comma way: say what needs doing in a sentence, on which machine and
  * for which bot, and that bot (the Coordinator by default) turns it into the task (title, status, assignee…). The
- * request goes into the Coordinator conversation, where its reply shows up.
+ * request goes into the Coordinator conversation, where its reply shows up. A UI layer's new-task slot draws the
+ * window instead (docs/ui-overlay.md); the data, state and sending stay here.
  */
 export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId, initialText = '' }: {
   open: boolean
@@ -81,6 +86,9 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const { submit: submitMessage, failureMessage } = useCoordinatorSubmit()
   const { mutate } = useSWRConfig()
   const [draft, setDraft] = useState('')
+  // 标题 (optional): written by the person, the task gets exactly it; empty, the Bot writes one.
+  const [title, setTitle] = useState('')
+  const descriptionRef = useRef<HTMLTextAreaElement>(null)
   const [sending, setSending] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
   const profiles = useAgentProfiles(workspaceId, open, picked ? picked === 'cloud' ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
@@ -92,7 +100,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const tCoordinator = useTranslations('Coordinator')
   const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable())
   const fileRef = useRef<HTMLInputElement>(null)
-  const composed = useRef<{ key: string; message: string; taskDestination?: TaskDestination } | null>(null)
+  const composed = useRef<{ key: string; message: string; taskTitle?: string; taskDestination?: TaskDestination } | null>(null)
   const fileId = useId()
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
@@ -141,22 +149,25 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   }
 
   async function submit() {
-    const text = draft.trim()
+    const name = title.trim()
+    const text = draft.trim() || name
     if (!text || sending || attachments.locked || !available || !profileAllowed) return
     setSending(true)
     setCoordinatorUnavailable(false)
     try {
-      const key = JSON.stringify([text, picked, project ?? null, handler?.id ?? null, profileId ?? null])
+      const key = JSON.stringify([text, name, picked, project ?? null, handler?.id ?? null, profileId ?? null])
       if (composed.current?.key !== key) {
         const destination = pickedTaskDestination(picked)
         const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
         composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }),
+          ...(name ? { taskTitle: name } : {}),
           ...(destination ? { taskDestination: destination } : {}) }
       }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId })
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, taskTitle: composed.current.taskTitle })
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
+      setTitle('')
       setPicked(null)
       setProfilePick(null)
       composed.current = null
@@ -168,6 +179,30 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
     } finally {
       setSending(false)
     }
+  }
+
+  const profileChoices = useTaskProfileChoices({ workspaceId, value: profileId ?? null, data: profiles.data })
+  const keyDialogNode = keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />
+  const NewTask = newTaskSlot.NewTask ?? null
+  if (NewTask) {
+    const machineNote = (machine: Machine) => machine.cloud && !machine.usable ? t('addE2BKey') : !machine.cloud && !machine.usable ? machine.status : undefined
+    const slotMachine = (machine: Machine, group: NewTaskMachine['group']): NewTaskMachine => ({ value: machine.value, label: machine.label, icon: <MachineIcon machine={machine} cloudBotId={cloudBotId} />, usable: machine.usable, note: machineNote(machine), group })
+    const notices = <>
+      <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />
+      {!available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
+      {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
+    </>
+    return <>
+      {open && <NewTask onClose={() => onOpenChange(false)} project={project} title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
+        files={attachments.files.length || attachments.pending.length ? <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} /> : null}
+        onAttach={files => { void attach(files) }} accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT}
+        machines={[slotMachine(defaults, 'default'), slotMachine(cloud, 'cloud'), ...own.map(item => slotMachine(item, 'own'))]} machine={picked ?? 'auto'} onMachine={pick}
+        bots={botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
+        bot={handler?.id ?? null} onBot={setBotPick}
+        profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
+        notices={notices} sending={sending} canSubmit={available && profileAllowed && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
+      {keyDialogNode}
+    </>
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -203,8 +238,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
       <FieldGroup onDragOver={event => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = sending ? 'none' : 'copy' } }} onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); void attach(Array.from(event.dataTransfer.files)) } }} onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void attach(Array.from(event.clipboardData.files)) } }}>
         <Field>
           <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} />
+          <FieldLabel htmlFor="new-task-name" className="sr-only">{t('titleLabel')}</FieldLabel>
+          <Input id="new-task-name" autoFocus value={title} maxLength={TITLE_MAX} disabled={sending} placeholder={t('titlePlaceholder')} className="h-auto border-0 bg-transparent px-0 text-lg font-medium shadow-none focus-visible:ring-0" onChange={event => setTitle(event.target.value)} onKeyDown={event => {
+            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+            event.preventDefault()
+            if (event.metaKey || event.ctrlKey) void submit(); else descriptionRef.current?.focus()
+          }} />
           <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('label')}</FieldLabel>
-          <Textarea id="new-issue-title" autoFocus value={attachments.text} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 bg-transparent" onChange={event => attachments.edit(event.target.value)} onKeyDown={event => {
+          <Textarea ref={descriptionRef} id="new-issue-title" value={attachments.text} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-28 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 bg-transparent" onChange={event => attachments.edit(event.target.value)} onKeyDown={event => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() }
           }} />
         </Field>
@@ -214,9 +255,9 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
       {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Paperclip data-icon="inline-start" /></Button>
-        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !profileAllowed || !draft.trim() || sending || attachments.locked} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
+        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !profileAllowed || !(draft.trim() || title.trim()) || sending || attachments.locked} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
       </div>
-      {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />}
+      {keyDialogNode}
     </DialogContent>
   </Dialog>
 }

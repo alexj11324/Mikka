@@ -77,11 +77,11 @@ test('hosted calls check positive balance, debit only after receipts, and resume
   await Promise.race([arrived, firstCall.then(() => { throw Error('Provider responded before the held receipt') })])
   try {
     assert.equal(providerCalls, 1, 'a positive balance is sufficient even below the old estimated maximum')
-    assert.deepEqual(await store.balance(workspace), { verified: true, free: 1, purchased: 0 })
+    assert.deepEqual(await store.balance(workspace), { verified: true, free: 1, plan: 0, purchased: 0 })
     const row = (await pool.query('SELECT "reservedFree","reservedPurchased","reservedUnpaid","costMicroUsd" FROM hosted_usage WHERE "workspaceId"=$1', [workspace])).rows[0]
     assert.deepEqual(Object.values(row).map(value => value === null ? null : Number(value)), [0, 0, 0, null])
   } finally { releaseFirst(); await firstCall }
-  assert.deepEqual(await store.balance(workspace), { verified: true, free: 0, purchased: 0 })
+  assert.deepEqual(await store.balance(workspace), { verified: true, free: 0, plan: 0, purchased: 0 })
   const receipt = (await store.recent(workspace))[0]
   assert.equal(Number(receipt.costMicroUsd), 2)
   assert.equal(Number(receipt.freeMicroUsd), 1)

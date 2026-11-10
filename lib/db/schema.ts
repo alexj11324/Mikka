@@ -54,7 +54,8 @@ export const issues = pgTable('issues', {
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc())])
+}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc()),
+  check('issues_short_title_compact', sql`mikka_issue_short_title_valid(${table.shortTitle})`)])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
@@ -1266,12 +1267,38 @@ export const workspaceBilling = pgTable('workspace_billing', {
   plan: text('plan'),
   status: text('status'),
   seats: integer('seats').notNull().default(0),
+  // Historical seat quantities are retained; new checkouts use resource_v1.
+  billingModel: text('billingModel').$type<'legacy_seat' | 'resource_v1'>().notNull().default('legacy_seat'),
+  stripePriceId: text('stripePriceId'),
+  billingPlan: text('billingPlan').$type<'free' | 'pro' | 'enterprise'>().notNull().default('free'),
+  billingExpiresAt: timestamp('billingExpiresAt', { withTimezone: true }),
+  billingRevision: bigint('billingRevision', { mode: 'number' }).notNull().default(0),
+  billingInvoiceId: text('billingInvoiceId'),
   currentPeriodEnd: timestamp('currentPeriodEnd', { withTimezone: true }),
   autoRechargeEnabled: boolean('autoRechargeEnabled').notNull().default(false),
   autoRechargeThreshold: integer('autoRechargeThreshold'),
   autoRechargePacks: integer('autoRechargePacks'),
+  autoRechargeMonthlyCap: integer('autoRechargeMonthlyCap'),
+  autoRechargeAmountPoints: integer('autoRechargeAmountPoints'),
+  autoRechargeConsentBy: text('autoRechargeConsentBy'),
+  autoRechargeConsentAt: timestamp('autoRechargeConsentAt', { withTimezone: true }),
+  autoRechargeRevision: integer('autoRechargeRevision').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** One recoverable subscription Checkout per account, with immutable provider parameters. */
+export const billingCheckoutRequests = pgTable('billing_checkout_requests', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspaceId').notNull().references(() => workspaceBilling.workspaceId),
+  actorId: text('actorId').notNull(),
+  customerId: text('customerId').notNull(),
+  priceId: text('priceId').notNull(),
+  params: jsonb('params').$type<Record<string, unknown>>().notNull(),
+  sessionId: text('sessionId').unique(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  closedAt: timestamp('closedAt', { withTimezone: true }),
+}, table => [uniqueIndex('billing_checkout_requests_active_idx').on(table.workspaceId).where(sql`${table.closedAt} IS NULL`)])
 
 /** Credit grants: 'plan' per paid invoice (replaces the previous period's), 'purchased' never expires. */
 export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
@@ -1282,10 +1309,15 @@ export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
   reason: text('reason').notNull(),
   externalId: text('externalId').notNull().unique(),
   stripePaymentIntentId: text('stripePaymentIntentId'),
+  parentGrantId: uuid('parentGrantId'),
+  stripeInvoiceId: text('stripeInvoiceId'),
+  paymentAllocations: jsonb('paymentAllocations').$type<Record<string, { paidCents: number; totalCents: number }>>().notNull().default({}),
   amountCents: integer('amountCents'),
   currency: text('currency'),
   receiptUrl: text('receiptUrl'),
   stripeFeeCents: integer('stripeFeeCents'),
+  periodStart: timestamp('periodStart', { withTimezone: true }),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('workspace_credit_grants_workspace_idx').on(table.workspaceId, table.createdAt), index('workspace_credit_grants_payment_intent_idx').on(table.stripePaymentIntentId)])
 
@@ -1294,6 +1326,19 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   type: text('type').notNull(),
   processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** APP -> Workspace entitlement delivery. No credentials or payment payloads. */
+export const billingEntitlementOutbox = pgTable('billing_entitlement_outbox', {
+  eventId: text('eventId').primaryKey().references(() => stripeWebhookEvents.id),
+  workspaceId: uuid('workspaceId').notNull(),
+  subscriptionId: text('subscriptionId').notNull(),
+  plan: text('plan').$type<'free' | 'pro' | 'enterprise'>().notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  revision: bigint('revision', { mode: 'number' }).notNull(),
+  billingModel: text('billingModel').$type<'legacy_seat' | 'resource_v1'>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
+}, table => [index('billing_entitlement_pending_idx').on(table.workspaceId, table.deliveredAt, table.revision)])
 
 /** A live key's post-commit revision (lib/live/revisions.ts). No content: kind, ID and a counter. */
 export const liveRevisions = pgTable('live_revisions', {

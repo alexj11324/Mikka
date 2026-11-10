@@ -5,6 +5,7 @@ import { cloudEndpoint, cloudServiceUrl, selfHostedAddress } from './config'
 import { CloudServiceError } from './errors'
 import { cloudJson, parseCloudToken, readCloudJson } from './transport'
 import { AVAILABLE_CLOUD_SCOPES, type CloudConnectionView, type CloudRegistration, type CloudScope, type CloudToken } from './types'
+import { remainingRequestBudget, requestBudgetSignal, type RequestBudget } from '../request-budget'
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 const opaque = () => randomBytes(32).toString('base64url')
@@ -110,8 +111,13 @@ export class CloudClientStore {
     await this.saveBinding('server', null, registration.serverId, { serverKey: key, token }, this.pool)
   }
 
-  async access(userId: string, scope: CloudScope): Promise<{ token: CloudToken; registration: CloudRegistration; actor: string; binding: Pick<BindingRow, 'owner' | 'secret'> }> {
-    return this.transaction(async client => {
+  async access(userId: string, scope: CloudScope, budget?: RequestBudget): Promise<{ token: CloudToken; registration: CloudRegistration; actor: string; binding: Pick<BindingRow, 'owner' | 'secret'> }> {
+    if (budget) remainingRequestBudget(budget)
+    const access = await this.transaction(async client => {
+      if (budget) {
+        const timeout = String(Math.min(2000, remainingRequestBudget(budget)))
+        await client.query("SELECT set_config('lock_timeout',$1,true),set_config('statement_timeout',$1,true)", [timeout])
+      }
       const registration = await this.registration(client); if (!registration) throw new CloudServiceError('cloud_not_connected')
       const { rows: [row] } = await client.query<BindingRow>(`SELECT owner,server_id,secret,scopes,revoked FROM cloud_service_bindings WHERE owner=ANY($1::text[]) ORDER BY CASE WHEN owner='server' THEN 1 ELSE 0 END LIMIT 1 FOR UPDATE`, [[`user:${userId}`, 'server']])
       if (!row) throw new CloudServiceError('cloud_not_connected')
@@ -120,6 +126,10 @@ export class CloudClientStore {
       const secret = this.open<BindingSecret>(row.secret, 'binding', `${row.server_id}:${row.owner}`)
       let token = secret.token, bindingSecret = row.secret
       if (!token || token.expiresAt <= Date.now() + 60_000) {
+        // Cancellation before a refresh must not enter the uncertain-refresh
+        // catch below or revoke a still-valid binding. Once sent, drain its
+        // independent 20s response and persist before observing UI abort.
+        if (budget) remainingRequestBudget(budget, 22_000)
         const form = row.owner === 'server'
           ? new URLSearchParams({ grant_type: 'client_credentials', client_id: registration.serverId, client_secret: secret.serverKey ?? '' })
           : new URLSearchParams({ grant_type: 'refresh_token', client_id: registration.serverId, client_secret: registration.serverSecret, refresh_token: token?.refreshToken ?? '' })
@@ -139,14 +149,21 @@ export class CloudClientStore {
       if (!token.scopes.includes(scope)) throw new CloudServiceError('cloud_scope_missing')
       return { token, registration, actor: createHmac('sha256', registration.serverSecret).update(userId).digest('hex'), binding: { owner: row.owner, secret: bindingSecret } }
     })
+    if (budget) remainingRequestBudget(budget)
+    return access
   }
 
-  async request(userId: string, scope: CloudScope, path: string, init: RequestInit = {}): Promise<Response> {
-    const { token, registration, actor, binding } = await this.access(userId, scope)
+  async request(userId: string, scope: CloudScope, path: string, init: RequestInit = {}, budget?: RequestBudget): Promise<Response> {
+    if (budget) remainingRequestBudget(budget)
+    const { token, registration, actor, binding } = await this.access(userId, scope, budget)
     const headers = new Headers(init.headers)
     headers.set('authorization', `Bearer ${token.accessToken}`); headers.set('X-Mikka-Actor', actor)
     let response: Response
-    try { response = await this.send(cloudEndpoint(registration.serviceUrl, path), { ...init, headers, credentials: 'omit', redirect: 'error', cache: 'no-store', signal: init.signal ?? AbortSignal.timeout(60_000) }) }
+    try {
+      const signal = budget ? requestBudgetSignal(budget, 60_000) : init.signal ?? AbortSignal.timeout(60_000)
+      response = await this.send(cloudEndpoint(registration.serviceUrl, path), { ...init, headers, credentials: 'omit', redirect: 'error', cache: 'no-store',
+        signal: budget && init.signal ? AbortSignal.any([signal, init.signal]) : signal })
+    }
     catch (error) { throw new CloudServiceError('cloud_unavailable', 'network', error) }
     if (!response.ok) {
       try { await readCloudJson(response) }

@@ -10,6 +10,7 @@ import { Box, Check, CircleUserRound, UserRoundPen, Columns3, Flag, List, ListFi
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { useLiveTaskRunList } from '@/hooks/use-live-lists'
+import { localTaskState } from '@/hooks/use-bot-tasks'
 import { useListExpiry } from '@/hooks/use-list-expiry'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
@@ -168,6 +169,11 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run, issues.find(issue => issue.id === run.issueId)); return state ? [[run.issueId, state] as const] : [] })), [runs, issues])
+  // Each task's own state, from the one derivation (localTaskState, decision #1864 point 6): the card's status line.
+  const taskStates = useMemo(() => {
+    const newest = new Map((runs ?? []).map(run => [run.issueId, run] as const))
+    return new Map(issues.map(issue => [issue.id, localTaskState(issue, newest.get(issue.id))] as const))
+  }, [runs, issues])
   // 受阻 is worked out here from the task and its newest thread; the task keeps its own status (lib/task-blocked.ts).
   const blocks = useMemo(() => boardBlocks(issues, runs), [issues, runs])
   const newestRuns = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, run.runId] as const)), [runs])
@@ -250,7 +256,7 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
   return <div className="flex min-h-0 flex-1">
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <h1 id={titleId} className="sr-only">{t('title')}</h1>
-      {BoardScreen ? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks, personalWorkspace }}
+      {BoardScreen ? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks, personalWorkspace }}
         view={view} onView={next => update({ view: next })} scopes={scopes} scope={scope} onScope={next => update({ scope: next as Scope })}
         filterItems={filterItems} filterCount={activeFilters.length} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}
         onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />
