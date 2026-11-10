@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { localTaskState, pendingTaskCount, tasksOf, TASK_GROUPS } from './use-bot-tasks'
+import { inboxCount, inboxSelection, localTaskState, pendingTaskCount, tasksOf, TASK_GROUPS } from './use-bot-tasks'
 
 const issue = (id: string, status = 'doing', pullRequests: { url: string; state: 'open' | 'draft' | 'merged' | 'closed' }[] = []) =>
   ({ id, status, title: id, metadata: { pullRequests } }) as never
@@ -58,4 +58,27 @@ test('with no attempt a task shows its board status: backlog is 暂不处理, ot
   assert.deepEqual(localTaskState(issue('a', 'todo')), { state: 'todo', reason: null })
   assert.deepEqual(localTaskState(issue('a'), { status: 'succeeded', outcome: 'blocked' }), { state: 'blocked', reason: null })
   assert.deepEqual(localTaskState(issue('a', 'done', [{ url: 'u', state: 'merged' }]), null), { state: 'done', reason: null })
+})
+
+test("收件箱's count is what it lists: one row per waiting task (not per thread), a task waiting on a question once, then questions and suggestions", () => {
+  const issues = [issue('a'), issue('b'), issue('c'), issue('d')]
+  const threads = [
+    // Task a has had three threads, all waiting: it is one item, not three.
+    thread('a3', 'a', 'waiting_input', '2026-11-07T10:00:00Z'),
+    thread('a2', 'a', 'waiting_input', '2026-11-07T09:00:00Z'),
+    thread('a1', 'a', 'succeeded', '2026-11-07T08:00:00Z'),
+    thread('rb', 'b', 'succeeded', '2026-11-07T07:00:00Z'),
+    // Blocked and failed tasks are in 等待你 but not in 收件箱.
+    thread('rc', 'c', 'paused', '2026-11-07T06:00:00Z'),
+    thread('rd', 'd', 'failed', '2026-11-07T05:00:00Z'),
+    // A thread whose task is not in this workspace's list, or that has none, is not an item.
+    thread('rx', 'elsewhere', 'waiting_input', '2026-11-07T04:00:00Z'),
+    thread('ry', null, 'waiting_input', '2026-11-07T03:00:00Z'),
+  ]
+  const questions = [{ questionId: 'q1', issueId: 'b' }, { questionId: 'q2', issueId: null }]
+  const listed = inboxSelection(threads, issues, questions)
+  assert.deepEqual(listed.tasks.map(row => row.issue.id), ['a'])
+  assert.deepEqual(listed.questions.map(question => question.questionId), ['q1', 'q2'])
+  assert.equal(inboxCount(threads, issues, questions, 4), 1 + 2 + 4)
+  assert.equal(inboxCount(threads, issues, [], 0), 2, 'without its question, task b waits on the person itself')
 })

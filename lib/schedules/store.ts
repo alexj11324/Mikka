@@ -119,7 +119,7 @@ export class ScheduleStore {
     if (inserted.rowCount) await coordinatorSessionChanged(tx, row.owner_id, row.bot_id)
     // A result is already in the chat. Whether it also needs the person (a failure, a skipped or cancelled run, a result they would want flagged)
     // is triage's call on the Decisions API, not a fixed background tier: the event is left untriaged and undelivered.
-    await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,'run_report',$4,$5) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,occurrenceId:o.id,operationId:o.operation_id,status,error}])
+    await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,'run_report',$4,$5) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,title:o.definition.title,occurrenceId:o.id,operationId:o.operation_id,status,error}])
     wakeCoordinatorAfterCommit(tx,row.owner_id)
     await tx.query('UPDATE schedule_occurrences SET reported_at=$2,report_attempts=report_attempts+1 WHERE id=$1',[o.id,this.clock()])
   }
@@ -141,7 +141,7 @@ export class ScheduleStore {
       const task=o.definition.task
       if(!skipped&&task.kind==='agent_read'){
         const eventId=randomUUID()
-        await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'run_report',$4,$5,'attention')`,[eventId,row.owner_id,row.bot_id,`schedule_due:${o.id}:${o.attempts}`,{source:'schedule_due',scheduleId:row.id,occurrenceId:o.id,text:task.prompt}])
+        await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'run_report',$4,$5,'attention')`,[eventId,row.owner_id,row.bot_id,`schedule_due:${o.id}:${o.attempts}`,{source:'schedule_due',scheduleId:row.id,title:o.definition.title,occurrenceId:o.id,text:task.prompt}])
         await botChatChanged(tx, row.owner_id, row.bot_id)
         await tx.query('UPDATE schedule_occurrences SET event_id=$2 WHERE id=$1',[o.id,eventId])
         return row.owner_id

@@ -88,3 +88,23 @@ export function useTasksOf(threads: readonly Thread[], issues: readonly Issue[])
 export function pendingTaskCount(threads: readonly Thread[], issues: readonly Issue[]) {
   return tasksOf(threads, issues).pending.filter(row => row.state === 'waiting').length
 }
+
+/** A pending Factory question as 收件箱 needs it: the task it waits on, when it has one (hooks/use-factory-questions.ts). */
+export type InboxQuestion = { issueId: string | null }
+
+/**
+ * What 收件箱 lists, from the workspace's own lists: every pending Factory question, then every task waiting on the
+ * person (等你处理, not 受阻 or 失败) that no question already stands for (a task waiting on a question is listed once,
+ * as the question). The suggestions follow them. The rail's count on 收件箱 is `inboxCount`, read from this same
+ * selection, so the count and the list never disagree.
+ */
+export function inboxSelection<Q extends InboxQuestion>(threads: readonly Thread[], issues: readonly Issue[], questions: readonly Q[]): { questions: readonly Q[]; tasks: TaskRow[] } {
+  const asked = new Set(questions.flatMap(question => question.issueId ? [question.issueId] : []))
+  return { questions, tasks: tasksOf(threads, issues).pending.filter(row => row.state === 'waiting' && !asked.has(row.issue.id)) }
+}
+
+/** How many items 收件箱 lists: its questions, its waiting tasks and its suggestions (`inboxSelection`). */
+export function inboxCount(threads: readonly Thread[], issues: readonly Issue[], questions: readonly InboxQuestion[], suggestions: number) {
+  const { questions: asked, tasks } = inboxSelection(threads, issues, questions)
+  return asked.length + tasks.length + suggestions
+}

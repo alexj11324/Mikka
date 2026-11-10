@@ -3537,6 +3537,17 @@
     "events": {
       "aThread": "一个线程",
       "aTask": "一个任务",
+      "anAgent": "一个 Agent",
+      "aSchedule": "一个定时任务",
+      "schedule": "定时任务「{title}」",
+      "scheduleEnded": {
+        "succeeded": "已执行",
+        "failed": "执行失败",
+        "skipped": "已跳过",
+        "cancelled": "已取消",
+        "other": "已执行"
+      },
+      "scheduleDue": "到点了",
       "quoted": "「{title}」",
       "runEnded": {
         "succeeded": "已完成",

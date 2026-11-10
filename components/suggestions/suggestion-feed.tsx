@@ -49,12 +49,13 @@ function useSuggestionsKey() {
 
 /**
  * The 建议 list and 交给 Coordinator (R-21), shared with a UI layer's inbox (docs/ui-overlay.md).
- * `send` resolves to the error to show, or null once the Coordinator has it.
+ * `send` resolves to the error to show, or null once the Coordinator has it. `enabled` false reads nothing.
  */
-export function useSuggestions() {
+export function useSuggestions(enabled = true) {
   const actionError = useActionError()
   const { mutate: mutateAll } = useSWRConfig()
-  const { data, error, mutate } = useSWR(useSuggestionsKey(), fetchJson<SuggestionsView>)
+  const key = useSuggestionsKey()
+  const { data, error, mutate } = useSWR(enabled ? key : null, fetchJson<SuggestionsView>)
   // One list, newest first (R-21); the API still groups by app.
   const items = data?.groups.flatMap(group => group.items) ?? []
   async function send(id: string): Promise<string | null> {
