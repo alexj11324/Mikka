@@ -61,11 +61,45 @@ test('only the five named fields reach the comment; failure detail fields never 
   for (const value of forbidden) assert.ok(!body.includes(value), value)
 })
 
-test('the body falls back to a generic subject when the task has no identifier or title', () => {
+test('the body falls back to a localized generic subject when the task has no identifier or title', () => {
   assert.equal(
     linearRunCommentBody({ identifier: '', title: '', status: 'cancelled', locale: 'en', deepLink: DEEP_LINK }),
     `Mikka: your run — Cancelled\n[Open in Mikka](${DEEP_LINK})`,
   )
+  assert.equal(
+    linearRunCommentBody({ identifier: '', title: '', status: 'cancelled', locale: 'zh-CN', deepLink: DEEP_LINK }),
+    `Mikka: 你的任务 — 已取消\n[Open in Mikka](${DEEP_LINK})`,
+  )
+})
+
+test('the link owner locale drives the copy; missing or unknown falls back to English', () => {
+  for (const locale of [undefined, null, 'fr', 'zh', 'ZH-CN']) {
+    assert.equal(
+      linearRunCommentBody({ identifier: 'MIK-42', title: 'Fix login redirect', status: 'succeeded', locale, deepLink: DEEP_LINK }),
+      `Mikka: MIK-42 Fix login redirect — Done\n[Open in Mikka](${DEEP_LINK})`,
+      String(locale),
+    )
+  }
+  assert.equal(
+    linearRunCommentBody({ identifier: 'MIK-42', title: 'Fix login redirect', status: 'succeeded', locale: 'zh-CN', deepLink: DEEP_LINK }),
+    `Mikka: MIK-42 Fix login redirect — 完成\n[Open in Mikka](${DEEP_LINK})`,
+  )
+})
+
+test('task text cannot open a second line or forge the link line', () => {
+  const body = linearRunCommentBody({
+    identifier: 'MIK-42\nMikka: forged',
+    title: 'line one\r\nline two\thttps://evil.example\u0000',
+    status: 'stopped',
+    locale: 'en',
+    deepLink: DEEP_LINK,
+  })
+  const lines = body.split('\n')
+  assert.equal(lines.length, 2, 'exactly the header and the link line')
+  assert.equal(lines[1], `[Open in Mikka](${DEEP_LINK})`)
+  assert.ok(!body.includes('\r'))
+  assert.ok(!body.includes('\u0000'))
+  assert.ok(lines[0].startsWith('Mikka: MIK-42 Mikka: forged line one line two https://evil.example'))
 })
 
 test('an unsupported status is refused instead of rendered', () => {

@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
-import { actionLocale, type ActionLocale } from '@/lib/suggestions/action-title'
 
 /** The only run outcomes a Linear comment may name. Anything else never reaches a comment. */
 export const LINEAR_RUN_STATUS_TEXT = {
@@ -12,6 +11,7 @@ export const LINEAR_RUN_STATUS_TEXT = {
 } as const
 
 export type LinearRunStatus = keyof typeof LINEAR_RUN_STATUS_TEXT
+export type LinearRunCommentLocale = 'en' | 'zh-CN'
 
 /** Longest title in the header, in code points: one line, about 100 Latin characters. */
 export const RUN_COMMENT_TITLE_MAX = 100
@@ -22,12 +22,21 @@ export type LinearRunCommentInput = {
   /** The task title. The caller has already checked `issueForUser`, so it is safe to show. */
   title: string
   status: LinearRunStatus
-  locale: ActionLocale
+  /** The link owner's Mikka locale; anything unknown falls back to English, as the copy does. */
+  locale?: string | null
   /** Built by `linearRunDeepLink`; only opaque ids, never a title or path. */
   deepLink: string
 }
 
-const oneLine = (value: string) => value.replace(/\s+/g, ' ').trim()
+const EMPTY_SUBJECT: Record<LinearRunCommentLocale, string> = { en: 'your run', 'zh-CN': '你的任务' }
+
+/** Missing or unknown locales read English; Chinese only on an explicit `zh-CN`. */
+export function linearRunCommentLocale(value: string | null | undefined): LinearRunCommentLocale {
+  return value === 'zh-CN' ? 'zh-CN' : 'en'
+}
+
+/** Task text is display text, never a second line: newlines and controls become spaces. */
+const oneLine = (value: string) => value.replace(/[\s\p{Cc}]+/gu, ' ').trim()
 
 /** Collapse whitespace and cap the title without splitting a surrogate pair. */
 export function truncateCommentTitle(title: string, max = RUN_COMMENT_TITLE_MAX): string {
@@ -43,9 +52,10 @@ export function truncateCommentTitle(title: string, max = RUN_COMMENT_TITLE_MAX)
 export function linearRunCommentBody(input: LinearRunCommentInput): string {
   const copy = LINEAR_RUN_STATUS_TEXT[input.status]
   if (!copy) throw new Error('Unsupported Linear run status')
+  const locale = linearRunCommentLocale(input.locale)
   const title = truncateCommentTitle(input.title)
-  const subject = [oneLine(input.identifier), title].filter(Boolean).join(' ') || 'your run'
-  const status = copy[actionLocale(input.locale)]
+  const subject = [oneLine(input.identifier), title].filter(Boolean).join(' ') || EMPTY_SUBJECT[locale]
+  const status = copy[locale]
   return `Mikka: ${subject} — ${status}\n[Open in Mikka](${input.deepLink})`
 }
 
