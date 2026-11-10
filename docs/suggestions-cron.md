@@ -158,3 +158,11 @@ Cloudflare scheduled-run history and the Worker log line of each endpoint.
 
 Run the source-only Worker checks with:
 `node --test cloudflare/suggestions-cron/src/index.test.mjs`.
+
+## Inbox handling
+
+Rejection, undo and snooze use the [Inbox API](inbox-api.md). Rejected or snoozed
+suggestions are excluded from list/briefing reads and Coordinator attention
+handoff. Inbox deadlines share the existing schedules due timer; the cron
+routes above do not poll for them. Completed handling is recorded from the
+source transaction starting at the inbox migration, without historical backfill.
