@@ -100,7 +100,7 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
       create trigger ${trigger} before insert or update on mikka_workspace_entitlements for each row execute function ${trigger}()`)
     const pending = event()
     try {
-      await assert.rejects(billing.applyStripeEvent(pending, options), /synthetic_workspace_outage/)
+      await assert.rejects(billing.applyStripeEvent(pending, options), (error: Error & { cause?: Error }) => /synthetic_workspace_outage/.test(`${error.message} ${error.cause?.message ?? ''}`))
       assert.equal((await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId"=$1 and "deliveredAt" is null', [pending.id])).rows[0].n, 1)
     } finally { await pool.query(`drop trigger ${trigger} on mikka_workspace_entitlements; drop function ${trigger}()`) }
     assert.equal(await billing.applyStripeEvent(pending, options), false)

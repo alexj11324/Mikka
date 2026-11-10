@@ -84,6 +84,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
       const workspaceId = await verified(), actorId = `member-${randomUUID()}`, projectId = randomUUID(), threadId = randomUUID(), runId = randomUUID()
       const scopeId = { workspace: workspaceId, member: actorId, project: projectId, thread: threadId, run: runId }[scope]
       await pool.query(`insert into billing_resource_budgets (id,"workspaceId",scope,"scopeId",period,"limitPoints","warningPercent","updatedBy") values($1,$2,$3,$4,'month',20,50,$5)`, [randomUUID(), workspaceId, scope, scopeId, actorId])
+      assert.equal((await store.status(workspaceId)).state, 'ready', 'an unscoped billing summary does not pretend every private resource budget is exhausted')
       const attribution = { workspaceId, billingAccountWorkspaceId: workspaceId, actorId, projectId, threadId, runId, attributionComplete: true }
       const calls = [randomUUID(), randomUUID(), randomUUID()]
       const outcomes = await hostedBillingScope.run(attribution, () => Promise.allSettled(calls.map(call => store.reserve(workspaceId, 'synthetic/budget', call))))
@@ -97,6 +98,34 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
       if (scope !== 'workspace') await assert.rejects(store.reserve(workspaceId, 'synthetic/missing-attribution', randomUUID()), /usage_budget_exhausted/)
       await store.settle(accepted[1], 0)
       await hostedBillingScope.run(attribution, () => store.reserve(workspaceId, 'synthetic/resumed', randomUUID()))
+    }
+  })
+  await t.test('trial identity reads the Workspace database while receipts remain in APP, including single-connection pools', async () => {
+    const workspaceSchema = `${schema}_ws`, isolatedApp = new Pool({ connectionString: url, max: 1, options: `-c search_path=${schema}` })
+    await admin.query(`create schema ${workspaceSchema}`)
+    const workspaceDatabase = new Pool({ connectionString: url, max: 1, options: `-c search_path=${workspaceSchema}` })
+    const hiddenTable = `mikka_workspaces_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`alter table mikka_workspaces rename to ${hiddenTable}`)
+    try {
+      await workspaceDatabase.query('create table mikka_workspaces(id uuid primary key,"userId" text)')
+      const first = randomUUID(), second = randomUUID(), another = randomUUID(), bot = randomUUID()
+      await workspaceDatabase.query(`insert into mikka_workspaces values($1,'trial-owner'),($2,'trial-owner'),($3,'another-owner')`, [first, second, another])
+      await isolatedApp.query('insert into bots values($1,$2)', [bot, first])
+      for (let i = 0; i < 20; i++) await isolatedApp.query(`insert into coordinator_events values($1,$2,'user_message','{"text":"synthetic trial message"}')`, [randomUUID(), bot])
+      const separated = new HostedUsageStore(isolatedApp, { workspaceDatabase, quota: async () => {
+        const lease = await workspaceDatabase.connect(); await lease.query('begin')
+        return { limit: 8, close: async () => { await lease.query('rollback'); lease.release() } }
+      } })
+      assert.equal((await separated.status(second)).trialLeft, 0)
+      await separated.reserve(second, 'synthetic/split-db', randomUUID())
+      await isolatedApp.query(`insert into coordinator_events values($1,$2,'user_message','{"text":"over limit"}')`, [randomUUID(), bot])
+      await assert.rejects(separated.reserve(second, 'synthetic/split-db', randomUUID()), /verification_required/)
+      await assert.rejects(separated.canUseMikkaPaid(second), /verification_required/)
+      assert.equal((await separated.status(another)).trialLeft, 20)
+    } finally {
+      await pool.query(`alter table ${hiddenTable} rename to mikka_workspaces`)
+      await Promise.all([isolatedApp.end(), workspaceDatabase.end()])
+      await admin.query(`drop schema ${workspaceSchema} cascade`)
     }
   })
   await t.test('a paid-only store requires verification and positive balance without consuming a chat trial', async () => {

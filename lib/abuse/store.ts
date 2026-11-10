@@ -19,14 +19,18 @@ export class HostedUsageStore {
   readonly metered: boolean
   readonly allowTrial: boolean
   private readonly quota?: (workspaceId: string) => Promise<HostedQuotaLease>
+  private readonly workspaceDatabase: Pick<Pool, 'query'>
   constructor(readonly pool: Pool, options: {
     metered?: boolean
     allowTrial?: boolean
     quota?: (workspaceId: string) => Promise<HostedQuotaLease>
+    /** Workspace identity lives in WS DB; APP-only deployments must supply it. */
+    workspaceDatabase?: Pick<Pool, 'query'>
   } = {}) {
     this.metered = options.metered ?? true
     this.allowTrial = options.allowTrial ?? true
     this.quota = options.quota
+    this.workspaceDatabase = options.workspaceDatabase ?? pool
   }
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>) {
     const tx = await this.pool.connect()
@@ -148,7 +152,7 @@ export class HostedUsageStore {
     return scope?.billingAccountWorkspaceId === workspaceId ? scope : { workspaceId }
   }
   /** Actual receipts plus in-flight holds, serialized by the existing hosted admission lock. */
-  private async budget(workspaceId: string, sourceWorkspaceId: string, estimate: number, tx: Query = this.pool) {
+  private async budget(workspaceId: string, sourceWorkspaceId: string, estimate: number, tx: Query = this.pool, requireCompleteAttribution = true) {
     const { rows } = await tx.query<{ workspaceId: string; limit: number; spent: number }>(`SELECT s."workspaceId",s."monthlyCreditLimit"*$3::float8 AS "limit",
       COALESCE((SELECT sum(CASE WHEN u.state IN ('pending','unknown') THEN COALESCE(u."costMicroUsd",u."holdMicroUsd") ELSE COALESCE(u."costMicroUsd",0) END)
         FROM hosted_usage u WHERE (CASE WHEN s."workspaceId"=$1 THEN u."workspaceId"=s."workspaceId" ELSE COALESCE(u."usageWorkspaceId",u."workspaceId")=s."workspaceId" END)
@@ -156,7 +160,7 @@ export class HostedUsageStore {
       FROM workspace_settings s WHERE s."workspaceId"=ANY($2::uuid[]) AND s."monthlyCreditLimit" IS NOT NULL`,
     [workspaceId, [...new Set([workspaceId, sourceWorkspaceId])], MICRO_USD_PER_POINT])
     return rows.every(row => row.limit - row.spent > 0 && row.limit - row.spent >= estimate)
-      && resourceBudgetAdmission(tx, workspaceId, this.attribution(workspaceId), estimate)
+      && resourceBudgetAdmission(tx, workspaceId, this.attribution(workspaceId), estimate, requireCompleteAttribution)
   }
   /**
    * The free messages left before a card is needed (TRIAL_MESSAGES), for a
@@ -167,14 +171,19 @@ export class HostedUsageStore {
    * request; the one being answered is included, so its turn is admitted
    * while this is 0 or more.
    */
-  async trialLeft(workspaceId: string, balance: { verified: boolean; purchased: number }, tx: Query = this.pool) {
+  private async trialWorkspaces(workspaceId: string) {
+    const { rows } = await this.workspaceDatabase.query<{ id: string }>(
+      'select id from mikka_workspaces where "userId"=(select "userId" from mikka_workspaces where id=$1)', [workspaceId])
+    return rows.map(row => row.id)
+  }
+  async trialLeft(workspaceId: string, balance: { verified: boolean; purchased: number }, tx: Query = this.pool, workspaceIds?: string[]) {
     if (!this.metered) return null
     if (balance.verified || balance.purchased > 0) return null
+    const scope = workspaceIds ?? await this.trialWorkspaces(workspaceId)
     const { rows: [row] } = await tx.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM coordinator_events e JOIN bots b ON b.id=e."botId"
-       JOIN mikka_workspaces w ON w.id=b."workspaceId"
-       WHERE w."userId"=(SELECT "userId" FROM mikka_workspaces WHERE id=$1) AND e.kind='user_message' AND e.payload->>'retry' IS NULL AND coalesce(e.payload->>'text','') NOT LIKE '[Welcome]%'`,
-      [workspaceId],
+       WHERE b."workspaceId"=ANY($1::uuid[]) AND e.kind='user_message' AND e.payload->>'retry' IS NULL AND coalesce(e.payload->>'text','') NOT LIKE '[Welcome]%'`,
+      [scope],
     )
     return TRIAL_MESSAGES - Number(row?.n ?? 0)
   }
@@ -215,6 +224,9 @@ export class HostedUsageStore {
     if (!this.metered) return { id, workspaceId }
     if (!Number.isSafeInteger(estimate) || estimate <= 0) throw new Error('invalid_usage_hold')
     const attribution = this.attribution(workspaceId)
+    // Resolve WS identity before pinning either pool's transaction. WS and APP
+    // can both have max=1; no cross-database JOIN or nested pool checkout occurs.
+    const trialWorkspaces = this.allowTrial ? await this.trialWorkspaces(workspaceId) : undefined
     // Pin plan authority before reserving an APP connection, matching the
     // workspace -> APP order used by task and governance writers.
     const quota = await this.quota?.(attribution.workspaceId)
@@ -247,7 +259,7 @@ export class HostedUsageStore {
       const balance = await this.balance(workspaceId, tx)
       // No card and nothing bought: only the first TRIAL_MESSAGES messages' turns, paid by the platform.
       if (!this.allowTrial && !balance.verified && balance.purchased <= 0) throw new PaidResourceError('verification_required')
-      const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance, tx) : null
+      const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance, tx, trialWorkspaces) : null
       if (trial !== null && trial < 0)
         throw new PaidResourceError('verification_required')
       const available = balance.free + balance.plan + balance.purchased
@@ -406,7 +418,9 @@ export class HostedUsageStore {
     )
     // Whether the next call would be admitted, by the same rules as reserve().
     const available = balance.free + balance.plan + balance.purchased
-    const withinBudget = await this.budget(workspaceId, this.attribution(workspaceId).workspaceId, HOSTED_CALL_HOLD_MICRO_USD)
+    // A billing page has no particular Project/Thread/Run. It summarizes the
+    // known scopes; reserve() still requires complete execution attribution.
+    const withinBudget = await this.budget(workspaceId, this.attribution(workspaceId).workspaceId, HOSTED_CALL_HOLD_MICRO_USD, this.pool, false)
     const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance) : null
     // These pool reads retain no APP connection. Once the plan is pinned,
     // status computes the response without acquiring another APP connection.

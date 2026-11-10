@@ -28,7 +28,7 @@ export async function readResourceBudgets(query: Pick<Pool | PoolClient, 'query'
   })
 }
 
-export async function resourceBudgetAdmission(query: Pick<Pool | PoolClient, 'query'>, accountWorkspaceId: string, attribution: BillingAttribution, estimate: number): Promise<boolean> {
+export async function resourceBudgetAdmission(query: Pick<Pool | PoolClient, 'query'>, accountWorkspaceId: string, attribution: BillingAttribution, estimate: number, requireCompleteAttribution = true): Promise<boolean> {
   const budgets = await readResourceBudgets(query, [...new Set([accountWorkspaceId, attribution.workspaceId])])
   const scopeIds: Record<BudgetScope, string | null | undefined> = { workspace: attribution.workspaceId, member: attribution.actorId,
     project: attribution.projectId, thread: attribution.threadId, run: attribution.runId }
@@ -36,7 +36,7 @@ export async function resourceBudgetAdmission(query: Pick<Pool | PoolClient, 'qu
     if (budget.scope !== 'workspace') {
       if (budget.workspaceId !== attribution.workspaceId) continue
       // Dropping actor/resource IDs must never bypass a configured narrower cap.
-      if (!attribution.attributionComplete) return false
+      if (requireCompleteAttribution && !attribution.attributionComplete) return false
       if (budget.scopeId !== scopeIds[budget.scope]) continue
     }
     if (budget.exhausted || budget.remainingPoints * MICRO_USD_PER_POINT < estimate) return false

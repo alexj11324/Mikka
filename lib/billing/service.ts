@@ -127,7 +127,7 @@ export async function planCheckoutUrl(actorId: string, workspaceId: string, back
   let price: ReturnType<typeof resourcePrice>
   const configuredPrice = await provider(() => stripeGet<unknown>(config, `prices/${config.resourcePriceId}`, fetchImpl))
   try { price = resourcePrice(configuredPrice, config.resourcePriceId) }
-  catch { throw new WorkspaceError('billingResourcePlanUnavailable') }
+  catch (error) { throw new WorkspaceError('billingResourcePlanUnavailable', { cause: error }) }
   const session = await provider(() => stripePost<{ url: string }>(config, 'checkout/sessions', {
     mode: 'subscription',
     line_items: [{ price: price.id, quantity: 1 }],
