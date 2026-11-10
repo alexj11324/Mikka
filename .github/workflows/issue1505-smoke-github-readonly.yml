@@ -1,4 +1,4 @@
-# Bounded issue1506 reuse of the reviewed issue1505 read-only connection contract.
+# Disabled issue1506 reuse of the reviewed issue1505 read-only connection contract.
 # Bind actual APP/tree and one finite deadline only after shared-account handoff.
 # Does not revoke or renew any historical child. Cleanup must use this run's new receipt.
 name: Issue 1506 read-only Smoke GitHub cleanup
@@ -17,7 +17,7 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/issues-1504-1506' && github.run_attempt == 1
+    if: false && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/issues-1504-1506' && github.run_attempt == 1
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
