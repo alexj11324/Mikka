@@ -14,7 +14,7 @@ const sha = (value: string) => createHash('sha256').update(value).digest('hex')
 test('Profile Skills: personal and workspace sources stay owner/workspace scoped and profiles pin the saved body', { skip: !dbUrl, timeout: 120_000 }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('@/lib/db'), import('@/lib/workspace-db')])
-  const migrations = ['20261104231000_agent_profiles.sql', '20261031040000_personal_plugins.sql', '20261110200000_agent_profile_skill_shares.sql']
+  const migrations = ['20261104231000_agent_profiles.sql', '20261031040000_personal_plugins.sql', '20261110235900_agent_profile_skill_shares.sql']
   for (const migration of migrations) await pool.query(await readFile(new URL(`../../drizzle/${migration}`, import.meta.url), 'utf8'))
   const owners: string[] = [], workspaces: string[] = []
   t.after(async () => {
