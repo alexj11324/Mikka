@@ -35,6 +35,27 @@ A selected built-in Default keeps its structured intent so the normal dispatcher
 
 The existing thread execution identity dialog shows the frozen Profile name, version, selection source and reason (stored as a code — `capability_fit`, `stage_fit`, `only_suitable` — and worded in the reader's language; a run frozen before the codes reads as the neutral 按任务能力选择). The configuration digest stays in the snapshot but is not shown beside the run's actual Agent, model and credential kind. Opening a thread from a task uses the same dialog. It never reconstructs historical Profile data from the current settings.
 
+## Role templates
+
+Add opens a menu of a blank Profile and four starting points: Investigator, Planner, Implementer and Reviewer. A template is a copy, never a shared record: choosing one fills the normal editor (roles, private instructions, an initial Skill selection, automatic Agent and inherited model), and nothing exists until the person saves. Saving creates one ordinary custom Profile; it creates no Bot, machine or extra Profile. Template revisions are versioned in `lib/factory/agent-profile-templates.ts`; a revision never rewrites a Profile created from an earlier one, and the read-only Default stays empty and unchanged. Templates are editor data only: they enter the automatic Decision catalogue after a person instantiates and enables them.
+
+## Skills, sources and progressive disclosure
+
+A Profile selects capabilities from one resolver over four closed sources:
+
+| Source | Reference | Authority | Notes |
+| --- | --- | --- | --- |
+| Official | bare legacy id or `official:<id>` | Reviewed Mikka text shipped in the repository | IDs are immutable: a revised text is a new id |
+| Personal | `personal:<skill id>` | The Profile owner's own enabled installation (`personal_skills`, #582) | Never auto-shared to a workspace |
+| Workspace | `workspace:<skill id>` | An owner's explicit share to the current team workspace plus active membership and the organization sharing policy | Revocation stops future runs |
+| Repository | `repository:<name>` | `.claude/skills/<name>/SKILL.md` or `.agents/skills/<name>/SKILL.md` in the task's own checkout | Discovered and pinned by the daemon when the run starts |
+
+The Profile row freezes the selected Skill envelope (name, description, version, digest, body). A later source edit does not rewrite a saved Profile: the pinned body stays, while a disabled, uninstalled, unshared or unauthorized source makes the Profile unavailable for new dispatch with a specific reason. Changing the Skill reference set re-resolves against current entitlements. The editor shows source, version, availability and a share action for team workspaces; a free-text field declares repository Skills because only the run's checkout can discover them. Skill selection grants no tool, credential, account or service permission.
+
+The brief carries only each Skill's id, name and purpose plus the `load_skill` instruction. The server sends the frozen bodies to the owner's daemon at claim; the daemon writes them (and any declared repository Skill it pinned from the checkout) under `profile-skills/manifest.json` in the run directory, never the worktree. The `mikka` MCP server exposes `load_skill`: it serves exactly one pinned body, verifies its SHA-256 and writes a write-once receipt. Both official Claude Code and Codex runs use this server, locally and in a cloud task machine. The brief never contains a body, so a harness that reads nothing still cannot claim to have applied it.
+
+The run identity dialog lists the configured Skills separately from the daemon-receipted loads. A configured Skill without a receipt is shown as not loaded; the UI never reconstructs either list from current settings. The frozen Profile row and JSONB snapshots remain the historical source of truth.
+
 ## Fields and precedents
 
 | Field or action | Mikka behavior | Precedent |
@@ -44,7 +65,7 @@ The existing thread execution identity dialog shows the frozen Profile name, ver
 | Agent and model | Auto / Claude Code / Codex; inherit preferred models or pin an authorized model/source | [Warp agent configuration](https://docs.warp.dev/factories/factory-agents/configuration/), existing Mikka Preferred models |
 | Reasoning effort | Default or the supported profile effort values | #1284 and existing per-run effort configuration |
 | Private instructions | Explicitly saved with the other Profile fields | Warp configuration's prompt editing |
-| Skills | Checkboxes over the host's controlled, versioned catalogue | [Warp factory agents](https://docs.warp.dev/factories/factory-agents/) and Mikka [Agent-as-Code](agent-as-code.md) |
+| Skills | Checkboxes over the unified official/personal/workspace catalogue, declared repository names, and on-demand loading | [Warp factory agents](https://docs.warp.dev/factories/factory-agents/) and Mikka [Agent-as-Code](agent-as-code.md) |
 | Enable | One row switch; confirmed server value stays visible until saved | Existing Mikka subscription/device switches |
 | Edit, duplicate, archive | Row action menu; archive confirms by name and retains historical runs | Existing Mikka settings menus and archive flows |
 
@@ -91,6 +112,8 @@ Rules: R-01, R-22/23, R-30/31/32/33/34, R-40/41/42/43, R-70, R-74, R-90. Setting
 | Choose a role for one task | Missing | New task selector sends the exact Profile ID |
 | Use preferred models for one task while custom Profiles exist | Default available only as a read-only settings row | New task can explicitly select Default with its current availability |
 | Explain a previous run's selection | Physical run identity only | Frozen Profile version/source/reason in the same run identity dialog |
+| Start a role from a known responsibility | Blank Profile only | Investigator, Planner, Implementer and Reviewer templates fill the editor; saving creates one ordinary Profile |
+| Use an installed or shared Skill | The three built-in texts only | Personal, explicitly shared workspace and declared repository Skills, pinned with a load receipt per run |
 | Recover from a removed source, Skill or concurrent edit | Missing | Explicit errors, replacement/removal controls and reload |
 
 ## Review and verification record
