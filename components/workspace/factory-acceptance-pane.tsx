@@ -436,7 +436,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
     if (check?.status === 'blocked' && currentTask.reason) { const copy = runErrorText(currentTask.reason); problem = { text: copy.message ?? t('blocked'), detail: copy.code ?? currentTask.reason } }
     // 退回修改 and the rest of the decision: with a report in its window (要求修改 is said in the conversation there), without one in the full pane.
     const noReport = !reportId && (state === 'pending' || refused)
-    if (!reportId && onOpenPane) links.push({ id: 'open-pane', label: t('block.openPane'), onSelect: onOpenPane })
+    if (!reportId && onOpenPane && !block.status) links.push({ id: 'open-pane', label: t('block.openPane'), onSelect: onOpenPane })
     const notices: AcceptanceNotice[] = [...block.notices]
     if (!check && state === 'failed') notices.push({ id: 'publish-failed', text: t('publishFailed') })
     if (error) notices.push({ id: 'error', text: t(ERROR_KEYS[error] ?? 'error') })
