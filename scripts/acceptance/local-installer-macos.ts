@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, open, readFile, realpath, rm, symlink, writeFile } from
 import { dirname, join, resolve } from 'node:path'
 import { SshInstaller, runProcess, quote, type SshInstallState } from '../../apps/desktop/src/main/ssh-install'
 import { InstallProcessError, nodeDiscoveryScript, redactInstallLog } from '../../apps/desktop/src/main/local-install'
-import { prepareLaunchctlDiagnostic } from './local-installer-launchctl-diagnostic.mjs'
+import { createLaunchctlInprocessDiagnostic, readDaemonLifecycle } from './local-installer-inprocess-diagnostic.mjs'
 
 assert.equal(process.platform, 'darwin')
 assert.equal(process.arch, 'arm64')
@@ -66,7 +66,7 @@ let done = new Promise<void>(resolve => { finish = resolve })
 const tarball = process.env.MIKKA_DAEMON_TARBALL ? resolve(process.env.MIKKA_DAEMON_TARBALL) : ''
 let npmStarted = false
 let lastStatus = ''
-let launchctlDiagnostic: Awaited<ReturnType<typeof prepareLaunchctlDiagnostic>> | undefined
+const launchctlDiagnostic = createLaunchctlInprocessDiagnostic()
 const sanitized = (value: string) => redactInstallLog(value).replaceAll(home, '[fixture-home]').replaceAll(deviceId, '[fixture-device]').replaceAll(workspaceId, '[fixture-workspace]')
 const evidence = () => ({ platform: process.platform, arch: process.arch, node: process.versions.node,
   npmStarted, registrations, heartbeats, enrollments, socketPathBytes,
@@ -99,8 +99,6 @@ try {
     await mkdir(nvm, { recursive: true })
     await symlink(process.execPath, join(nvm, 'node'))
     await symlink(join(selectedBin, 'npm'), join(nvm, 'npm'))
-    // Wrap launchctl in the already-selected nvm bin; the original Finder PATH remains unchanged.
-    launchctlDiagnostic = await prepareLaunchctlDiagnostic(home, process.execPath)
     process.env.PATH = '/usr/bin:/bin:/usr/sbin:/sbin'
     assert.ok(tarball)
   } else {
@@ -116,10 +114,11 @@ try {
     if (script.includes('npm install')) { npmStarted = true; script = script.replace('@aspectlylabs/mikka', quote(tarball)) }
     try {
       const result = await runProcess(command, [...args.slice(0, -1), script], input, timeout, signal)
+      if (script.includes('mikka daemon service install')) launchctlDiagnostic.capture(result)
       if (script.includes('mikka daemon status')) lastStatus = sanitized(result)
       return result
     } catch (error) {
-      if (script.includes('mikka daemon service install')) launchctlDiagnostic?.probeAfterFailure()
+      if (script.includes('mikka daemon service install')) launchctlDiagnostic.capture(error instanceof InstallProcessError ? error.stdout : undefined)
       if (script.includes('mikka daemon status')) lastStatus = sanitized(error instanceof InstallProcessError ? error.stderr : error instanceof Error ? error.message : String(error))
       throw error
     }
@@ -148,13 +147,13 @@ try {
     const manifest = JSON.parse(await readFile(join(home, '.mikka/npm/lib/node_modules/@aspectlylabs/mikka/package.json'), 'utf8'))
     assert.equal(manifest.engines.node, '>=22')
     done = new Promise<void>(resolve => { finish = resolve })
-    await launchctlDiagnostic?.reconnect()
+    launchctlDiagnostic.reconnect()
     await installer.restartLocal('fixture-owner')
     await done
     assert.equal(installer.state()?.status, 'online')
     assert.equal(enrollments, 1, 'reconnect must not re-enroll')
   }
-  const result = { ...evidence(), result: major === 18 ? 'check/node_required' : 'installed/launchagent/online/reconnect', launchctl: launchctlDiagnostic?.snapshot() }
+  const result = { ...evidence(), result: major === 18 ? 'check/node_required' : 'installed/launchagent/online/reconnect', launchctl: launchctlDiagnostic.snapshot(), daemonLifecycle: await readDaemonLifecycle(join(dataDir, 'logs/daemon.log')) }
   await mkdir('artifacts/local-installer', { recursive: true })
   await writeFile(`artifacts/local-installer/node-${major}.json`, JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result))
@@ -165,7 +164,7 @@ try {
     ['service', join(home, 'Library/Logs/mikka-daemon.log')],
     ['daemon', join(dataDir, 'logs/daemon.log')],
   ].map(async ([name, path]) => [name, sanitized(await readFile(path, 'utf8').catch(() => 'unavailable'))])))
-  const result = { ...evidence(), result: 'failed', lastStatus, logs, installer: await installerDiagnostic(), launchctl: launchctlDiagnostic?.snapshot() }
+  const result = { ...evidence(), result: 'failed', lastStatus, logs, installer: await installerDiagnostic(), launchctl: launchctlDiagnostic.snapshot(), daemonLifecycle: await readDaemonLifecycle(join(dataDir, 'logs/daemon.log')) }
   await mkdir('artifacts/local-installer', { recursive: true })
   await writeFile(`artifacts/local-installer/node-${major}.json`, JSON.stringify(result, null, 2) + '\n')
   process.stderr.write(JSON.stringify(result, null, 2) + '\n')

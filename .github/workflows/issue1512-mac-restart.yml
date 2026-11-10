@@ -1,4 +1,4 @@
-name: Issue 1512 macOS restart diagnostic
+name: Issue 1512 macOS in-process restart diagnostic
 on:
   push:
     branches: ['ops/1512-macos-restart-20261110']
@@ -12,13 +12,19 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: ${{ false }}
+    if: >-
+      ${{ github.run_attempt == 1 && startsWith(github.event.head_commit.message, 'ci: run issue1512 mac restart diagnostic 20261110-5852-inprocess-a1') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: source
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: 5852aa8832c07fdeef43665dd5e156ce5516e3ea
@@ -33,7 +39,11 @@ jobs:
           cache: pnpm
           cache-dependency-path: source/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - name: Build the fixed tested daemon package once
+      - name: Verify the sole temporary product overlay
+        run: |
+          node --check ../control/scripts/ops/issue1512-macos-restart-controller.mjs
+          node ../control/scripts/ops/issue1512-macos-restart-controller.mjs prepare-build
+      - name: Build the temporary diagnostic daemon package once
         shell: bash
         run: |
           set -euo pipefail
@@ -41,37 +51,19 @@ jobs:
           node packages/daemon/scripts/build.mjs > /tmp/mikka-build.log
           package_dir=$(sed -n 's/^Retained build directory: //p' /tmp/mikka-build.log)
           npm pack "$package_dir" --pack-destination artifacts/daemon
-      - name: Bind the original package bytes to the fixed source
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict'
-          import { execFileSync } from 'node:child_process'
-          import { createHash } from 'node:crypto'
-          import { readFile, readdir, writeFile } from 'node:fs/promises'
-          const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
-          const sourceTree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim()
-          assert.equal(sourceCommit, '5852aa8832c07fdeef43665dd5e156ce5516e3ea')
-          assert.equal(sourceTree, '42d33eb7faf77d7049607523599de9374e065660')
-          const files = (await readdir('artifacts/daemon')).filter(name => name.endsWith('.tgz'))
-          assert.equal(files.length, 1)
-          const bytes = await readFile('artifacts/daemon/' + files[0])
-          await writeFile('artifacts/daemon/package-binding.json', JSON.stringify({
-            schema: 'issue1512.macos-diagnostic-package.v1', sourceCommit, sourceTree,
-            runId: process.env.GITHUB_RUN_ID, attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
-            platform: process.platform, arch: process.arch, node: process.versions.node,
-            filename: files[0], bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'),
-          }, null, 2) + '\n')
-          NODE
+      - name: Bind the actual tarball and compiled diagnostic marker
+        run: node ../control/scripts/ops/issue1512-macos-restart-controller.mjs bind-package
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1512-mac-restart-daemon
+          name: issue1512-mac-inprocess-daemon
           path: |
             source/artifacts/daemon/*.tgz
             source/artifacts/daemon/package-binding.json
+            source/artifacts/daemon/build-source-binding.json
           retention-days: 7
   macos-diagnostic:
-    if: ${{ false }}
+    if: >-
+      ${{ github.run_attempt == 1 && startsWith(github.event.head_commit.message, 'ci: run issue1512 mac restart diagnostic 20261110-5852-inprocess-a1') }}
     needs: package
     runs-on: macos-26
     timeout-minutes: 20
@@ -100,7 +92,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: issue1512-mac-restart-daemon
+          name: issue1512-mac-inprocess-daemon
           path: source/artifacts/daemon
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -108,7 +100,7 @@ jobs:
       - name: Verify fixed source and temporary diagnostic overlays
         run: |
           node --check ../control/scripts/ops/issue1512-macos-restart-controller.mjs
-          node --check ../control/scripts/acceptance/local-installer-launchctl-diagnostic.mjs
+          node --check ../control/scripts/acceptance/local-installer-inprocess-diagnostic.mjs
           node ../control/scripts/ops/issue1512-macos-restart-controller.mjs prepare
       - name: One actual install and reconnect
         id: fixture
@@ -125,7 +117,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: issue1512-mac-restart-diagnostic
+          name: issue1512-mac-inprocess-diagnostic
           path: |
             source/artifacts/local-installer/node-22.json
             source/artifacts/local-installer/fixture-cleanup.json

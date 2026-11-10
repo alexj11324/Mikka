@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { writeSync } from 'node:fs'
 import { promisify } from 'node:util'
 import { runServiceNpm } from './auto-update'
 import { mkdir, writeFile, rm } from 'node:fs/promises'
@@ -38,8 +39,45 @@ export async function installService(server: string, deviceType = 'server', opti
     await mkdir(join(home, 'Library/Logs'), { recursive: true })
     await writeFile(file, content, { mode: 0o600 })
     const domain = `gui/${process.getuid!()}`
-    await exec('launchctl', ['bootout', `${domain}/${label}`]).catch(() => undefined)
-    await exec('launchctl', ['bootstrap', domain, file])
+    // Temporary #1512 diagnostic: only synchronous timestamps/error references
+    // are recorded between the original commands; output happens after the sequence.
+    const bootoutStartWall = Date.now(), bootoutStartMono = performance.now()
+    let bootoutEndWall: number | null = null, bootoutEndMono: number | null = null
+    let bootstrapStartWall: number | null = null, bootstrapStartMono: number | null = null
+    let bootoutFailed = false, bootstrapFailed = false
+    let bootoutError: unknown, bootstrapError: unknown
+    try {
+      await exec('launchctl', ['bootout', `${domain}/${label}`]).catch(error => { bootoutFailed = true; bootoutError = error })
+      bootoutEndWall = Date.now(); bootoutEndMono = performance.now()
+      bootstrapStartWall = Date.now(); bootstrapStartMono = performance.now()
+      try { await exec('launchctl', ['bootstrap', domain, file]) }
+      catch (error) { bootstrapFailed = true; bootstrapError = error; throw error }
+    } finally {
+      const endWall = Date.now(), endMono = performance.now()
+      // Never emit paths, command arguments, output, messages or credentials.
+      // A killed command process cannot emit a completed record.
+      if (/^\/tmp\/mikka-i-[A-Za-z0-9]+$/.test(home)) try {
+        const errors = new Set(['ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT', 'ENOBUFS'])
+        const signals = new Set(['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGILL', 'SIGABRT', 'SIGFPE', 'SIGKILL', 'SIGSEGV', 'SIGPIPE', 'SIGALRM', 'SIGTERM', 'SIGUSR1', 'SIGUSR2'])
+        const stage = (startWall: number | null, startMono: number | null, finishWall: number | null, finishMono: number | null, failed: boolean, error: unknown) => {
+          const complete = startWall !== null && startMono !== null && finishWall !== null && finishMono !== null
+          const value = error && typeof error === 'object' ? error as { code?: unknown; signal?: unknown } : undefined
+          const exitCode = !complete ? null : !failed ? 0 : Number.isInteger(value?.code) && Number(value?.code) >= 0 && Number(value?.code) <= 255 ? Number(value?.code) : null
+          return { startedAt: startWall === null ? null : new Date(startWall).toISOString(),
+            finishedAt: finishWall === null ? null : new Date(finishWall).toISOString(),
+            elapsedMs: complete ? Math.max(0, Math.round((finishMono! - startMono!) * 1000) / 1000) : null,
+            complete, failed: complete ? failed : null, exitCode,
+            errorCode: !complete || !failed ? null : typeof value?.code === 'number' ? null : typeof value?.code === 'string' && errors.has(value.code) ? value.code : 'OTHER',
+            signal: typeof value?.signal === 'string' ? signals.has(value.signal) ? value.signal : 'OTHER' : null }
+        }
+        writeSync(1, 'MIKKA_LAUNCHCTL_DIAGNOSTIC ' + JSON.stringify({
+          schema: 'issue1512.launchctl-inprocess.v1',
+          bootout: stage(bootoutStartWall, bootoutStartMono, bootoutEndWall, bootoutEndMono, bootoutFailed, bootoutError),
+          bootstrap: stage(bootstrapStartWall, bootstrapStartMono, bootstrapStartWall === null ? null : endWall, bootstrapStartMono === null ? null : endMono, bootstrapFailed, bootstrapError),
+          betweenCommandsMs: bootoutEndMono !== null && bootstrapStartMono !== null ? Math.max(0, Math.round((bootstrapStartMono - bootoutEndMono) * 1000) / 1000) : null,
+        }) + '\n')
+      } catch { /* Diagnostic output must never replace the original command result. */ }
+    }
   }
 }
 

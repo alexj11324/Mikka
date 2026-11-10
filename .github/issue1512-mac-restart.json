@@ -1,63 +1,74 @@
 {
-  "schema": "issue1512.macos-restart-diagnostic-request.v1",
-  "enabled": false,
-  "requestId": "20261110-5852-a1",
+  "schema": "issue1512.macos-inprocess-diagnostic-request.v1",
+  "enabled": true,
+  "requestId": "20261110-5852-inprocess-a1",
   "sourceCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
   "sourceTree": "42d33eb7faf77d7049607523599de9374e065660",
-  "priorFailure": {
+  "priorFormalFailure": {
     "runId": 42731843507,
     "attempt": 1,
     "jobId": 129551876738,
     "rawGitBlob": "989174f5612eaffa364b517728571cefb88d9763",
-    "sourceReviewGitBlob": "6732c9769bafbdda81d0e081bdc7f5c9f5366711"
+    "observed": "restartLocal bootstrap EIO5; bootout result not recorded"
+  },
+  "priorInstrumentedRun": {
+    "runId": 42739939984,
+    "attempt": 1,
+    "source": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "resultGitBlob": "9236028bad545490051d680deafe1ef631896f8f",
+    "archive": "6c71125de288846e0a86948de4af671ed3fcce72",
+    "observed": "Succeeded with Node launchctl wrapper; measured reconnect command gap 70ms. Does not resolve original failure."
+  },
+  "productOverlay": {
+    "path": "packages/daemon/src/service.ts",
+    "gitBlob": "a650a67ab4fc24d4014d0513b11b2e5f8bc6c639",
+    "bytes": 9415,
+    "sha256": "dcf6d9b0ea4e4fc06086b76a45f318606d4447ec2010a980d048a58dc91c4ccb",
+    "beforeGitBlob": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+    "beforeSha256": "5834bcddac2a5437157279930ecaf1aa5d30641c2f49535944fdbaa6c9ea563d"
   },
   "overlays": [
     {
-      "path": "scripts/acceptance/local-installer-launchctl-diagnostic.mjs",
+      "path": "scripts/acceptance/local-installer-inprocess-diagnostic.mjs",
+      "gitBlob": "df7774974e60776ec196b3c76aa558f1a5aff493",
+      "bytes": 5293,
+      "sha256": "f5af6ff0684d4f0b8a4a23ed59947d0694c463494a5d73dde4277347a9d85c0e",
       "beforeGitBlob": null,
-      "beforeSha256": null,
-      "gitBlob": "486227c042e6f40778bee40f06540f3e5b9c76ed",
-      "bytes": 8802,
-      "sha256": "ce20d2774596d0f5837936ecbef05ba5021fd3e2ee561780b9918aacc34901f1"
+      "beforeSha256": null
     },
     {
       "path": "scripts/acceptance/local-installer-macos.ts",
+      "gitBlob": "af24a8b53480a9a394658d87e6da6a47480dc5ec",
+      "bytes": 11604,
+      "sha256": "0798cce4a2f464b53d03e5b3cc90dc5816db38d28b042951035fc475e5b4d297",
       "beforeGitBlob": "858b521f583e605340adc7be0685de17de2c60a8",
-      "beforeSha256": "eb6b97e018e194d5fadbbe2ef14810952f7421bbf77fa87982ef1d3e6ec4a680",
-      "gitBlob": "e270807d4b726cb25d34d6e8e027ebfbf28eb98e",
-      "bytes": 11490,
-      "sha256": "73df05e2beb4688853b161b5683df256c777ef1c5a58b342a4a5c68431e43377"
+      "beforeSha256": "eb6b97e018e194d5fadbbe2ef14810952f7421bbf77fa87982ef1d3e6ec4a680"
     }
   ],
   "controller": {
     "path": "scripts/ops/issue1512-macos-restart-controller.mjs",
-    "gitBlob": "8028b287e990f40d316a22d1fc5394be24be5cac",
-    "bytes": 9203,
-    "sha256": "cfb6288cd7d50b3f55ef812e593f62c3272d960a039a2439bf2875e35dfeb91a"
+    "gitBlob": "adb484a5e5606149570afccca5c3bba55eaea600",
+    "bytes": 13032,
+    "sha256": "039e7d33af1424b5675abee35ba584b4f7b93fffb03884f48ae03e9bf0ab84d6"
   },
   "limits": {
-    "originalFixtureRuns": 1,
+    "actualFixtureRuns": 1,
     "runAttempts": 1,
     "productionCredentials": false,
     "readOnlyGithubToken": true,
     "primaryCommandRetries": 0,
-    "probeTimeoutMs": 1000,
-    "wrapperJournalMaxBytes": 8192,
-    "wrapperJournalMaxRecords": 16,
-    "failureProbeCommands": 2,
+    "betweenCommandSubprocesses": 0,
+    "betweenCommandFileIO": false,
+    "launchctlWrapper": false,
+    "extraLaunchctlProbes": false,
+    "diagnosticCommandOutputMaxBytes": 16384,
+    "diagnosticSequenceMaxRecords": 2,
+    "daemonLogReadMaxBytes": 65536,
+    "daemonLifecycleMaxEvents": 16,
     "controllerCleanupCommands": 2,
     "controllerCleanupCommandTimeoutMs": 10000
   },
-  "interpretation": "This temporary overlay adds time between bootout and bootstrap. Non-reproduction does not establish a product fix; no diagnostic outcome replaces the formal Node22 acceptance.",
-  "closure": "After this single workflow reaches a terminal state, publish a normal closing commit that disables the job guards and sets enabled false; preserve receipts before closing the entry.",
-  "closedExecution": {
-    "runId": 42739939984,
-    "attempt": 1,
-    "head": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
-    "completedAt": "2026-11-10T02:07:00Z",
-    "conclusion": "success",
-    "diagnosticOnly": true,
-    "formalProductFixProven": false,
-    "reason": "The one allowed actual fixture execution has completed. No further runs are authorized for this request."
-  }
+  "sourceBoundary": "The Linux package is fixed formal source plus exactly the listed service.ts diagnostic overlay. The Mac source is fixed formal source plus only the two fixture overlays. The installed package binding checks the same run/attempt, all hashes and its compiled diagnostic marker.",
+  "interpretation": "Only synchronous timestamp calls and error-reference bookkeeping occur between the original commands. The entire sequence emits one bounded closed-schema stdout line after completion/failure. This still changes timing; non-reproduction cannot establish a product fix or replace formal Node22 acceptance.",
+  "closure": "After the sole actual run reaches a terminal state, publish a normal closing commit disabling both job guards and setting enabled false; preserve result and cleanup receipts. Never rerun the old failed or instrumented source."
 }

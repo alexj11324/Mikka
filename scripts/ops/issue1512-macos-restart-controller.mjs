@@ -31,29 +31,84 @@ function launchctl(args) {
     signal: result.signal ?? null, errorCode: code(result.error),
     timedOut: result.error?.code === 'ETIMEDOUT' }
 }
-function fixedRun() {
-  assert.equal(manifest.schema, 'issue1512.macos-restart-diagnostic-request.v1')
+function fixedRun(mode = 'mac') {
+  assert.equal(manifest.schema, 'issue1512.macos-inprocess-diagnostic-request.v1')
   assert.equal(manifest.enabled, true)
-  assert.equal(manifest.requestId, '20261110-5852-a1')
+  assert.equal(manifest.requestId, '20261110-5852-inprocess-a1')
   assert.equal(manifest.sourceCommit, '5852aa8832c07fdeef43665dd5e156ce5516e3ea')
   assert.equal(manifest.sourceTree, '42d33eb7faf77d7049607523599de9374e065660')
   assert.equal(process.env.GITHUB_RUN_ATTEMPT, '1')
-  assert.equal(process.platform, 'darwin')
-  assert.equal(process.arch, 'arm64')
-  assert.equal(process.versions.node, '22.22.1')
+  assert.equal(process.platform, mode === 'build' ? 'linux' : 'darwin')
+  assert.equal(process.arch, mode === 'build' ? 'x64' : 'arm64')
+  assert.equal(process.versions.node, mode === 'build' ? '24.22.1' : '22.22.1')
 }
-async function prepare() {
-  fixedRun()
+async function verifyBase() {
   const actualSource = git('rev-parse', 'HEAD')
   const actualTree = git('rev-parse', 'HEAD^{tree}')
   const actualControl = execFileSync('git', ['-C', controlRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8', timeout: 10_000 }).trim()
   assert.equal(actualSource, manifest.sourceCommit)
   assert.equal(actualTree, manifest.sourceTree)
   assert.equal(actualControl, process.env.GITHUB_SHA)
+  return { actualSource, actualTree, actualControl }
+}
+async function verifyProductOverlay() {
+  const file = manifest.productOverlay
+  assert.equal(file.path, 'packages/daemon/src/service.ts')
+  const bytes = await readFile(join(controlRoot, file.path))
+  assert.equal(bytes.length, file.bytes)
+  assert.equal(hash(bytes), file.sha256)
+  return { file, bytes }
+}
+async function prepareBuild() {
+  fixedRun('build')
+  const binding = await verifyBase()
+  assert.equal(git('status', '--porcelain', '--untracked-files=no'), '')
+  const { file, bytes } = await verifyProductOverlay()
+  assert.equal(hash(await readFile(join(sourceRoot, file.path))), file.beforeSha256)
+  await writeFile(join(sourceRoot, file.path), bytes)
+  assert.deepEqual(git('diff', '--name-only').split('\n'), [file.path])
+  const receipt = { schema: 'issue1512.macos-inprocess-build-source.v1',
+    requestId: manifest.requestId, runId: process.env.GITHUB_RUN_ID, attempt: 1,
+    ...binding, productOverlay: file, platform: process.platform, arch: process.arch, node: process.versions.node,
+    boundary: 'The temporary daemon package includes exactly this diagnostic service.ts overlay; it is not the unmodified formal package.' }
+  await mkdir(join(sourceRoot, 'artifacts/daemon'), { recursive: true })
+  await writeFile(join(sourceRoot, 'artifacts/daemon/build-source-binding.json'), JSON.stringify(receipt, null, 2) + '\n')
+  console.log(JSON.stringify(receipt))
+}
+async function bindPackage() {
+  fixedRun('build')
+  const binding = await verifyBase(), { file } = await verifyProductOverlay()
+  assert.equal(hash(await readFile(join(sourceRoot, file.path))), file.sha256)
+  assert.deepEqual(git('diff', '--name-only').split('\n'), [file.path])
+  const directory = join(sourceRoot, 'artifacts/daemon')
+  const files = (await readdir(directory)).filter(name => name.endsWith('.tgz'))
+  assert.equal(files.length, 1)
+  const tarball = join(directory, files[0]), bytes = await readFile(tarball)
+  const entry = execFileSync('tar', ['-xOf', tarball, 'package/mikka.js'], { timeout: 10_000, maxBuffer: 32 * 1024 * 1024 })
+  const marker = 'MIKKA_LAUNCHCTL_DIAGNOSTIC '
+  const occurrences = entry.toString('utf8').split(marker).length - 1
+  assert.ok(occurrences >= 1)
+  const receipt = { schema: 'issue1512.macos-inprocess-diagnostic-package.v1',
+    requestId: manifest.requestId, sourceCommit: binding.actualSource, sourceTree: binding.actualTree,
+    actualControl: binding.actualControl, runId: process.env.GITHUB_RUN_ID, attempt: 1,
+    productOverlay: file, platform: process.platform, arch: process.arch, node: process.versions.node,
+    filename: files[0], bytes: bytes.length, sha256: hash(bytes),
+    entry: { path: 'package/mikka.js', bytes: entry.length, sha256: hash(entry), diagnosticMarkerOccurrences: occurrences } }
+  await writeFile(join(directory, 'package-binding.json'), JSON.stringify(receipt, null, 2) + '\n')
+  console.log(JSON.stringify(receipt))
+}
+async function prepare() {
+  fixedRun()
+  const { actualSource, actualTree, actualControl } = await verifyBase()
   assert.equal(git('status', '--porcelain', '--untracked-files=no'), '')
   assert.equal(await absent(privateRoot), true)
   const packageRoot = join(sourceRoot, 'artifacts/daemon')
   const packageBinding = JSON.parse(await readFile(join(packageRoot, 'package-binding.json'), 'utf8'))
+  assert.equal(packageBinding.schema, 'issue1512.macos-inprocess-diagnostic-package.v1')
+  assert.equal(packageBinding.requestId, manifest.requestId)
+  assert.equal(packageBinding.actualControl, actualControl)
+  assert.deepEqual(packageBinding.productOverlay, manifest.productOverlay)
+  assert.ok(packageBinding.entry?.diagnosticMarkerOccurrences >= 1)
   assert.equal(packageBinding.sourceCommit, actualSource)
   assert.equal(packageBinding.sourceTree, actualTree)
   assert.equal(packageBinding.runId, process.env.GITHUB_RUN_ID)
@@ -64,7 +119,7 @@ async function prepare() {
   const tarball = await readFile(join(packageRoot, tarballs[0]))
   assert.equal(packageBinding.bytes, tarball.length)
   assert.equal(packageBinding.sha256, hash(tarball))
-  const paths = ['scripts/acceptance/local-installer-launchctl-diagnostic.mjs', 'scripts/acceptance/local-installer-macos.ts']
+  const paths = ['scripts/acceptance/local-installer-inprocess-diagnostic.mjs', 'scripts/acceptance/local-installer-macos.ts']
   assert.deepEqual(manifest.overlays.map(file => file.path), paths)
   const verified = []
   for (const file of manifest.overlays) {
@@ -80,12 +135,12 @@ async function prepare() {
     await writeFile(join(sourceRoot, file.path), await readFile(join(controlRoot, file.path)), { mode: 0o644 })
   }
   await mkdir(privateRoot, { recursive: true, mode: 0o700 })
-  await save('source-binding.json', { schema: 'issue1512.macos-restart-diagnostic-source.v1',
+  await save('source-binding.json', { schema: 'issue1512.macos-inprocess-diagnostic-source.v1',
     requestId: manifest.requestId, runId: process.env.GITHUB_RUN_ID, attempt: 1,
     actualSource, actualTree, actualControl, overlays: verified,
-    package: packageBinding, platform: process.platform, arch: process.arch, node: process.versions.node,
+    package: packageBinding, temporaryProductOverlay: manifest.productOverlay, platform: process.platform, arch: process.arch, node: process.versions.node,
     assertions: 'All existing install/reconnect/owner/enrollment/Node assertions are retained.',
-    limitation: 'Temporary wrapper adds time between commands. Diagnostic success is not a product fix or formal acceptance.' })
+    limitation: 'Only in-process timestamps/bookkeeping occur between the original launchctl commands. Output is emitted after the sequence. Synchronous recording still changes timing; diagnostic success is not a product fix or formal acceptance.' })
 }
 async function cleanup() {
   fixedRun()
@@ -150,12 +205,14 @@ async function cleanup() {
 }
 const mode = process.argv[2]
 try {
-  if (mode === 'prepare') await prepare()
+  if (mode === 'prepare-build') await prepareBuild()
+  else if (mode === 'bind-package') await bindPackage()
+  else if (mode === 'prepare') await prepare()
   else if (mode === 'cleanup') await cleanup()
   else throw new Error('Unknown diagnostic controller mode')
 } catch (error) {
   console.error(JSON.stringify({ schema: 'issue1512.macos-diagnostic-controller-error.v1',
-    mode: mode === 'prepare' || mode === 'cleanup' ? mode : 'unknown',
+    mode: ['prepare-build', 'bind-package', 'prepare', 'cleanup'].includes(mode) ? mode : 'unknown',
     errorCode: code(error), errorName: error?.name === 'AssertionError' ? 'AssertionError' : 'Error',
     failed: true }))
   process.exitCode = 1
