@@ -27,8 +27,10 @@ What follows:
   runs directly, without the Decision API. Precedence is restrictive first: a
   deny in the Bot's or the workspace's layer wins, then an ask; only when
   neither restricts does an allow run the call. A Bot's ask/deny narrows a
-  workspace Allow, and a workspace ask/deny narrows a Bot Allow. Decision API
-  judgment applies only when no layer names the app (Default).
+  workspace Allow, and a workspace ask/deny narrows a Bot Allow. In particular,
+  a Bot ask never turns a workspace deny into an approval card: a workspace
+  deny is absolute. Decision API judgment applies only when no layer names the
+  app (Default).
 - The page shows the provider's real catalogue, read lazily from
   `/api/bots/:botId/app-tools`: GitHub's hosted MCP tools (with their
   read-only hints) and Composio's tools for every other store app. The old

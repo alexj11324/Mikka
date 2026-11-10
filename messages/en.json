@@ -6158,7 +6158,7 @@
   "HostedPermissions": {
     "apps": "Apps",
     "redLines": "Red lines",
-    "redLinesText": "Apps set to Not allowed: direct app and GitHub calls won't use them, even if a Bot's own layer would allow them",
+    "redLinesText": "Apps set to Not allowed: direct app and GitHub calls won't use them. A Bot's own allow or ask cannot override this.",
     "redLinesEmpty": "No app is set to Not allowed",
     "allowText": "Does it without asking – recorded in the activity",
     "askText": "Waits for your OK in the Inbox",

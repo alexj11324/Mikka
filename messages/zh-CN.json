@@ -6158,7 +6158,7 @@
   "HostedPermissions": {
     "apps": "应用",
     "redLines": "红线",
-    "redLinesText": "设为「不允许」的应用：直接的应用调用和 GitHub 调用不会使用，即使 Bot 自己的设置允许",
+    "redLinesText": "设为「不允许」的应用：直接的应用调用和 GitHub 调用不会使用；Bot 自己的允许或先问也不能覆盖。",
     "redLinesEmpty": "还没有设为「不允许」的应用",
     "allowText": "不问你直接做，记录在动态里",
     "askText": "在收件箱等你确认",
