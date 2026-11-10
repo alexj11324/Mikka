@@ -1,0 +1,113 @@
+{
+  "schema": "issue1512.macos-restart-diagnostic-candidate.v1",
+  "createdAt": "2026-11-10T01:58:41Z",
+  "repository": "alexj11324/Mikka",
+  "preparedBy": "/root/mac_restart_diagnostic",
+  "candidate": {
+    "commit": "7dbbda2133c0832582f1641fbb8a86152dc3191a",
+    "parent": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "tree": "e0c3ab3960db2e1f55fa6e75af736817105b227d",
+    "suggestedBranch": "ops/1512-macos-restart-20261110",
+    "commitMessage": "ci: run issue1512 mac restart diagnostic 20261110-5852-a1",
+    "referenced": false
+  },
+  "files": [
+    {
+      "path": ".github/workflows/issue1512-mac-restart.yml",
+      "gitBlob": "bd26bfa9c178047ad47e6adb8d292fbc44aa10e1",
+      "bytes": 6042,
+      "sha256": "e53d02a7cea3f04dd910da7d9be36ca944500fdfa8f7b827705cf2c78e24e72f",
+      "readbackHashMatches": true
+    },
+    {
+      "path": ".github/issue1512-mac-restart.json",
+      "gitBlob": "4533323df5ec6cc175592b4902cf8dffdc0c33f1",
+      "bytes": 2228,
+      "sha256": "3d319079d298696fc5d3509fdd8a6d810acb69a0e6124ccb643a5601753190ff",
+      "readbackHashMatches": true
+    },
+    {
+      "path": "scripts/ops/issue1512-macos-restart-controller.mjs",
+      "gitBlob": "8028b287e990f40d316a22d1fc5394be24be5cac",
+      "bytes": 9203,
+      "sha256": "cfb6288cd7d50b3f55ef812e593f62c3272d960a039a2439bf2875e35dfeb91a",
+      "readbackHashMatches": true
+    },
+    {
+      "path": "scripts/acceptance/local-installer-macos.ts",
+      "gitBlob": "e270807d4b726cb25d34d6e8e027ebfbf28eb98e",
+      "bytes": 11490,
+      "sha256": "73df05e2beb4688853b161b5683df256c777ef1c5a58b342a4a5c68431e43377",
+      "readbackHashMatches": true
+    },
+    {
+      "path": "scripts/acceptance/local-installer-launchctl-diagnostic.mjs",
+      "gitBlob": "486227c042e6f40778bee40f06540f3e5b9c76ed",
+      "bytes": 8802,
+      "sha256": "ce20d2774596d0f5837936ecbef05ba5021fd3e2ee561780b9918aacc34901f1",
+      "readbackHashMatches": true
+    }
+  ],
+  "priorEvidence": {
+    "sourceReviewGitBlob": "6732c9769bafbdda81d0e081bdc7f5c9f5366711",
+    "formalFailureRun": 42731843507,
+    "formalFailureJob": 129551876738,
+    "formalLogGitBlob": "989174f5612eaffa364b517728571cefb88d9763",
+    "previousOverlayManifest": "5096f40ade89b5c12e85a62c2ca4bc5ab629bc0c"
+  },
+  "staticChecks": {
+    "originalAssertionsByteEqual": true,
+    "originalPathAssignmentsByteEqual": true,
+    "originalNodeAndNpmSymlinksByteEqual": true,
+    "originalProductionInstallerCallsByteEqual": true,
+    "originalServerResponsesByteEqual": true,
+    "privateControlFileAbsentFromUpload": true,
+    "noNewProductionSecrets": true,
+    "noWorkflowDispatch": true,
+    "runAttemptOneGuardTwice": true,
+    "fixedBaseSourceCheckoutTwice": true,
+    "formalBuildCommandPresent": true,
+    "formalFixtureCommandPresent": true,
+    "node18NotExecuted": true
+  },
+  "executionDesign": {
+    "package": "Fixed5852/42d33 checkout; original Ubuntu Node24.22.1/pnpm10.34.3 frozen install and daemon build/npm pack once; package bytes and source bound to same workflow run/attempt.",
+    "macos": "Fixed5852/42d33 independent checkout; original frozen install then Node22.22.1 on macos-26; exact helper/test overlays verified; original real install/reconnect sequence once.",
+    "authorization": "contents:read; no production credentials, API tokens, subscriptions, databases or external test accounts.",
+    "entry": "Exact ops branch push and fixed commit prefix, attempt1 only, no workflow_dispatch; owner must disable guard and manifest after terminal outcome.",
+    "limits": "15min package/20min Mac jobs; no bootstrap retries, polling, Node18 run, threshold relaxation, fake-green fallback or formal source edit.",
+    "artifactPaths": [
+      "node-22.json",
+      "fixture-cleanup.json",
+      "source-binding.json",
+      "controller-cleanup.json"
+    ],
+    "cleanup": "Private exact owned-home file0600 under .cache/launchctl-fixture-control. The finally receipt records the original bootout result/server close/environment restore/home removal. The always controller bootouts only fixed label in current GUI domain, probes it once, removes only exact fixture HOME, removes private handoff directory; bounded command statuses retained.",
+    "cleanupInterpretation": "Nonzero print/bootout alone never means absent. Null/spawn/timeout cannot qualify as a closed command result. Cleanup status requires actual successful bootout plus exact directory removals and a numeric nonzero post-probe; independent daemon-process absence remains unproven. Missing handoff is partial unless fixture step was skipped.",
+    "privacy": "No owned-home path, environment, launchctl stdout/stderr, credentials or ambient config uploaded. Existing fixture test output retains its existing redaction."
+  },
+  "changesFromPriorOverlay": [
+    "Adds private owned-home handoff before fixture service/server setup; failed handoff removes the newly created HOME and aborts.",
+    "Records the previously best-effort finally bootout outcome and already executed server/environment/home cleanup without changing original install/reconnect assertions.",
+    "Adds temporary source/package binding and always-cleanup controller plus one-shot workflow outside the formal branch."
+  ],
+  "reviewCorrections": [
+    "Root identified missing recursive:true in privateRoot setup; corrected while retaining absent precondition.",
+    "Require package-binding runId and attempt1 to match current workflow.",
+    "Require a numeric service-probe exit before qualifying cleanup status; unknown results stay partial.",
+    "Tracked source cleanliness uses --untracked-files=no because legitimate downloaded artifacts are not globally gitignored."
+  ],
+  "limits": {
+    "productFixImplemented": false,
+    "formalAcceptancePassed": false,
+    "diagnosticTimingPerturbed": true,
+    "nodeOrMacTestsExecuted": 0,
+    "v8SyntaxOnly": "Parsed helper/controller after removing module syntax and replacing import.meta. Did not execute Node built-ins or TypeScript.",
+    "actionsLogDownloads": 0,
+    "actionsArtifactDownloads": 0,
+    "workflowsTriggered": 0,
+    "refsModified": 0,
+    "temporaryResourcesCreated": 0,
+    "formalBranchModified": false
+  }
+}

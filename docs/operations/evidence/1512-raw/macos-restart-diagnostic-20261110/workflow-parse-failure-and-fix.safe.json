@@ -1,0 +1,53 @@
+{
+  "schema": "issue1512.mac-diagnostic-workflow-parse-failure.v1",
+  "invalidRun": {
+    "id": 42739643440,
+    "attempt": 1,
+    "head": "7dbbda2133c0832582f1641fbb8a86152dc3191a",
+    "createdAt": "2026-11-10T01:59:54Z",
+    "completedAt": "2026-11-10T01:59:54Z",
+    "result": "failure",
+    "jobs": 0,
+    "checkRuns": 0,
+    "githubActionsSuite": 115754204580,
+    "suiteCheckRuns": 0
+  },
+  "originalGitBlob": "bd26bfa9c178047ad47e6adb8d292fbc44aa10e1",
+  "parser": {
+    "source": "https://github.com/nodeca/js-yaml/blob/4.1.0/dist/js-yaml.js",
+    "sha256": "c738b0020702aa631abd8de23a902a3079d99d3060e44166955cb51f570881c4",
+    "evaluation": "Actual unmodified distribution evaluated in V8; module.exports.load parsed full workflow.",
+    "before": {
+      "name": "YAMLException",
+      "reason": "bad indentation of a mapping entry",
+      "message": "bad indentation of a mapping entry (15:88)\n\n 12 |  ... \n 13 |  ... \n 14 |  ... \n 15 |  ... event.head_commit.message, 'ci: run issue1512 mac restart dia ...\n-----------------------------------------^\n 16 |  ... \n 17 |  ... ",
+      "line": 14,
+      "column": 87
+    },
+    "after": "Parsed two jobs; both condition strings unchanged.",
+    "limitations": "No GitHub annotation object was exposed because no check-runs were created. The precise15:88 diagnostic is from js-yaml, not an invented GitHub annotation."
+  },
+  "fix": {
+    "commit": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "parent": "7dbbda2133c0832582f1641fbb8a86152dc3191a",
+    "tree": "e31707ffe113dc0371636479fff6aab3a2b36468",
+    "workflowGitBlob": "bebaf5c6dd758b59730329f7d013db9b773920a8",
+    "changedFiles": 1,
+    "change": "Only both job-level if plain scalars become >- block scalars; colon-space inside the single-quoted expression argument no longer breaks YAML.",
+    "changesVerifiedByGithubCompare": true
+  },
+  "fixedRun": {
+    "id": 42739939984,
+    "attempt": 1,
+    "head": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "createdAt": "2026-11-10T02:02:20Z",
+    "hasJobs": true
+  },
+  "activity": {
+    "invalidRunLogsRequested": 0,
+    "invalidRunArtifactsRequested": 0,
+    "invalidRunReruns": 0,
+    "formalBranchModified": false,
+    "additionalProductChanges": 0
+  }
+}

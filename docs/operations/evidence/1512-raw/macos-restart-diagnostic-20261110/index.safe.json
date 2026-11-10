@@ -1,0 +1,152 @@
+{
+  "schema": "issue1512.macos-restart-diagnostic-index.v1",
+  "createdAt": "2026-11-10T02:11:39Z",
+  "repository": "alexj11324/Mikka",
+  "prefix": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110",
+  "result": "Diagnostic run succeeded with timing instrumentation; original formal bootstrap EIO5 remains unresolved.",
+  "runIds": {
+    "invalidYaml": 42739643440,
+    "actualDiagnostic": 42739939984,
+    "entryClosure": 42740630331
+  },
+  "source": {
+    "formal": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+    "candidate": "7dbbda2133c0832582f1641fbb8a86152dc3191a",
+    "yamlRepair": "fd3862c99d2c23d25edecabdeb76e85b097571b8",
+    "disabledEntry": "a7ba52b13336654471a486571f8655cc42c7734e"
+  },
+  "reader": "/root/mac_restart_diagnostic",
+  "verification": "Original Mac job log downloaded once and frozen before parsing. Extracted JSON preserves the original log payload bytes; these files are not represented as downloaded artifact members. Metadata-only artifact information is explicitly separated.",
+  "files": [
+    {
+      "name": "invalid-workflow-run.raw.json",
+      "gitBlob": "418c8b4def2c631295b792d28a19356fd940dde2",
+      "bytes": 11896,
+      "sha256": "a7f2c9712c689fecb7878697840aaf4785f5896e951d2395c2e2addd637eaa6d",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/invalid-workflow-run.raw.json"
+    },
+    {
+      "name": "invalid-workflow-jobs.raw.json",
+      "gitBlob": "4f9bdd7bcd783d2155d1f2e7dff68294c20eaffa",
+      "bytes": 27,
+      "sha256": "b3dab5870ff3a8209160335de7c1077b89e461d875d9041ac9d8b8ed7c1666f6",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/invalid-workflow-jobs.raw.json"
+    },
+    {
+      "name": "invalid-commit-check-suites.raw.json",
+      "gitBlob": "cb24bc73086dbd82fdcd304926cbe1bc656d2a7f",
+      "bytes": 59609,
+      "sha256": "4eea0e89bcd767ba7c6b51371ff562b9ccaf83215793775ff156b8122f0968e4",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/invalid-commit-check-suites.raw.json"
+    },
+    {
+      "name": "invalid-commit-check-runs.raw.json",
+      "gitBlob": "e7a8ee1ca5e784344fd4725cc86fa85e7a7976af",
+      "bytes": 33,
+      "sha256": "e83cfac35507982a40cfeb776ce85aa0367e7646f81fe857df4a6c841ea8a170",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/invalid-commit-check-runs.raw.json"
+    },
+    {
+      "name": "workflow-parse-failure-and-fix.safe.json",
+      "gitBlob": "c8d108ee7e5512f01ad58efa812ca1d03c622266",
+      "bytes": 2242,
+      "sha256": "8647f895ab2056c6d6eac679152817b87b4d599dcde22dabeb8cec2feb5e5ed2",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/workflow-parse-failure-and-fix.safe.json"
+    },
+    {
+      "name": "actual-run.terminal.raw.json",
+      "gitBlob": "3c8f3542a864fe7c7ce5525eb19791dabb519041",
+      "bytes": 11926,
+      "sha256": "ee41aa4ffe1b69de1114b255a7a8f1e7bd88fee32288cab80c7065f4c34201bf",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/actual-run.terminal.raw.json"
+    },
+    {
+      "name": "actual-jobs.terminal.raw.json",
+      "gitBlob": "75f7f1cc67251e49c4ba665bc88668588d29ca4d",
+      "bytes": 7692,
+      "sha256": "2ef5202937de4344b311c4a03e8133465c0d18c5a86e0fbd826f7a3ea396701f",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/actual-jobs.terminal.raw.json"
+    },
+    {
+      "name": "macos-node22-from-log.json",
+      "gitBlob": "15a77af65095b7921d8f4c38cbe6d63482e50bbd",
+      "bytes": 1703,
+      "sha256": "f7478b058b17fb89c7c51834b6d3c412f542eb79825442f96e6061ac98988228",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/macos-node22-from-log.json"
+    },
+    {
+      "name": "macos-controller-cleanup-from-log.json",
+      "gitBlob": "f62c7b3fb6cccfe13e3b7d85676763baea0451e7",
+      "bytes": 964,
+      "sha256": "002a02b5829b9616f378c714fa5dbaf25c8cb40296381f596069b5995493bdcd",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/macos-controller-cleanup-from-log.json"
+    },
+    {
+      "name": "macos-job-log.mcp-response.json",
+      "gitBlob": "feec7a2d9a2cdda73355ac42ee7be2aaf9d38d9d",
+      "bytes": 63758,
+      "sha256": "5bc6f3553602e36d3c1b84d685df6fdfd82f87b16a09306e2db88d5df3d44df2",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/macos-job-log.mcp-response.json"
+    },
+    {
+      "name": "macos-job-log.txt",
+      "bytes": 62290,
+      "sha256": "11c0497d418bc3e3a2080046ae87882ccbb6ba45e0e868309c97cf42da2dc4d9",
+      "gitBlob": "5fa27277f48e51ad3cfa2931fce83a3666c1d3d2",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/macos-job-log.txt"
+    },
+    {
+      "name": "closure-runs.raw.json",
+      "gitBlob": "5518f0105ac9a26c969f91d713c943b8001ca7af",
+      "bytes": 11898,
+      "sha256": "b7ddb40d199dc53e0954d42f1f5fd6554772d7d3d4ee1eab10d977575c7b85e0",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/closure-runs.raw.json"
+    },
+    {
+      "name": "closure-ref.raw.json",
+      "gitBlob": "0329f065119c6699003266b71a44f8adce75fee2",
+      "bytes": 423,
+      "sha256": "9ff52a2cf3d0dc92aa4fd4546efc1e3e807f67cfccd46ca6b21bf15a4590f750",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/closure-ref.raw.json"
+    },
+    {
+      "name": "actual-artifact-metadata.raw.json",
+      "gitBlob": "a102b1088a7598ad6b0fded2c78dd22a4393a310",
+      "bytes": 1465,
+      "sha256": "08f765c1f22d8dcbc29d40e7c93078c764d9fe468c892df0af24d7793186e69f",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/actual-artifact-metadata.raw.json"
+    },
+    {
+      "name": "closure-jobs.raw.json",
+      "gitBlob": "b24353d69a769fa6b2a20fdac999e7c7eb100c82",
+      "bytes": 1802,
+      "sha256": "6d0396c97cd10ca0dd5f5f241d916006dd6d977f54a4d41be9da999712d057c3",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/closure-jobs.raw.json"
+    },
+    {
+      "name": "candidate-source-review.safe.json",
+      "gitBlob": "10bf2cef4be5f4527ebee55ba75e363c84d91cc0",
+      "bytes": 6190,
+      "sha256": "79b1f7cfd0f69e9ba11652865a6432b41b3329a8a76e056fcd2f6d8f739562f4",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/candidate-source-review.safe.json"
+    },
+    {
+      "name": "diagnostic-result.safe.json",
+      "gitBlob": "9236028bad545490051d680deafe1ef631896f8f",
+      "bytes": 8261,
+      "sha256": "813a977b24375c1430f6f193f105a7785f57d88207862ea71fdaca9dfe1da033",
+      "path": "docs/operations/evidence/1512-raw/macos-restart-diagnostic-20261110/diagnostic-result.safe.json"
+    }
+  ],
+  "payloadFiles": 17,
+  "payloadBytes": 252179,
+  "limits": {
+    "formalProductFix": false,
+    "productionAcceptance": false,
+    "formalNode22Replacement": false,
+    "actualMacFixtureRuns": 1,
+    "zipDownloads": 0,
+    "temporaryMachinesCreated": 0,
+    "entryDisabled": true
+  }
+}
