@@ -516,3 +516,258 @@ test('task-run visibility skips unused team metadata without weakening fresh wor
     await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
   }
 })
+
+
+test('Native workspace choices share only undispatched real SELECTs and retain fresh authority', { skip: !enabled, timeout: 60_000 }, async t => {
+  const { pool } = await import('../lib/db')
+  const { workspacePool, workspaceDb } = await import('../lib/workspace-db')
+  const { COMMIT_EXECUTOR } = await import('../lib/db/commit-effects')
+  const { loadWorkspaceContext } = await import('../lib/workspace-access')
+  const { withReadBatchContext } = await import('../lib/desktop-rpc/read-batch-context')
+  const { withDesktopSession } = await import('../lib/desktop-rpc/session')
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
+  const { activityFixtureSession } = await import('./fixtures/activity-runtime.mjs')
+  const { tokenWorkspace } = await import('../lib/tokens/principal')
+  const { enterprisePrincipal } = await import('../lib/enterprise/principal')
+  const { AsyncLocalStorage } = await import('node:async_hooks')
+  const { routeScope } = await import('../lib/tracing/labels')
+  const owner = 'pending-choices-' + randomUUID(), peer = 'pending-choices-peer-' + randomUUID()
+  const personal = randomUUID(), selected = randomUUID(), foreign = randomUUID(), organization = randomUUID()
+  type Reader = NonNullable<Parameters<typeof loadWorkspaceContext>[1]>
+  const reader = (id = owner) => ({ id, email: id + '@example.invalid', name: 'Synthetic', image: null }) as Reader
+  const rawPool = (workspacePool as typeof workspacePool & { [COMMIT_EXECUTOR]: typeof workspacePool })[COMMIT_EXECUTOR]
+  assert.ok(rawPool && rawPool !== workspacePool, 'the exact real Workspace Pool is available before any transaction')
+  const native = <T>(work: (user: Reader) => Promise<T>) => withActivitySession(owner, () => {
+    const session = activityFixtureSession()
+    assert.ok(session?.user)
+    return runRequestScope(createRequestScope(new Request('http://localhost/api/desktop/rpc')), () =>
+      withDesktopSession(session, () => withReadBatchContext(() => work(reader()))))
+  }, selected)
+  const choices = (values: Read[]) => values.filter(read =>
+    read.fields.join(',') === 'id,name,kind,role,organizationId'
+    && read.text.includes('from "mikka_workspaces"')
+    && read.text.includes('join "mikka_workspace_members"'))
+  const policyReads = (values: Read[]) => values.filter(read => read.text.includes('from enterprise_org_policy'))
+  const bounded = async <T>(pending: Promise<T>): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      return await Promise.race([pending, new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('Workspace SELECT barrier did not settle')), 10_000)
+      })])
+    } finally { if (timer) clearTimeout(timer) }
+  }
+  // The Pool instance is intercepted, not Client.prototype: commit observation
+  // can already have bound a client's query method by the time this test runs.
+  const heldFirstRead = async (
+    change: (client: import('pg').PoolClient) => Promise<unknown>,
+    restore: (client: import('pg').PoolClient) => Promise<unknown>,
+  ) => {
+    // Keep this checkout leased before the observed Pool.query begins. It
+    // cannot be the Pool's concurrent query checkout; no backend PID is inferred.
+    const revoker = await rawPool.connect()
+    const descriptor = Object.getOwnPropertyDescriptor(rawPool, 'query')
+    const query = rawPool.query as (...args: unknown[]) => unknown
+    let release!: () => void, entered!: () => void, failed!: (error: unknown) => void, held = false
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const started = new Promise<void>((resolve, reject) => { entered = resolve; failed = reject })
+    const pending: Promise<unknown>[] = []
+    let restoreNeeded = false
+    rawPool.query = function (this: typeof rawPool, ...args: unknown[]) {
+      const text = typeof args[0] === 'string' ? args[0] : (args[0] as { text?: string })?.text ?? ''
+      const parameters = Array.isArray(args[1]) ? args[1] : (args[0] as { values?: unknown[] })?.values
+      const target = text.startsWith('select "mikka_workspaces"."id", "mikka_workspaces"."name", "mikka_workspaces"."kind", "mikka_workspace_members"."role", "mikka_organization_workspaces"."organizationId" from "mikka_workspaces" inner join "mikka_workspace_members"')
+        && parameters?.includes(owner)
+      if (held || !target) return Reflect.apply(query, this, args)
+      held = true
+      try {
+        const result = Reflect.apply(query, this, args)
+        assert.ok(result instanceof Promise, 'the real Drizzle Pool read uses its Promise API')
+        return result.then(async value => { entered(); await gate; return value }, error => { failed(error); throw error })
+      } catch (error) { failed(error); throw error }
+    } as typeof rawPool.query
+    try {
+      return await measured(() => native(async user => {
+        const first = loadWorkspaceContext(selected, user)
+        pending.push(first); void first.catch(() => undefined)
+        await bounded(started)
+        restoreNeeded = true
+        await change(revoker)
+        const second = loadWorkspaceContext(selected, user)
+        pending.push(second)
+        await assert.rejects(bounded(second), { code: 'workspaceAccessDenied' })
+        release()
+        assert.equal((await bounded(first)).workspace.id, selected, 'the original pre-change SELECT retains its own observation')
+        await restore(revoker)
+        restoreNeeded = false
+        const restored = loadWorkspaceContext(selected, user)
+        pending.push(restored)
+        assert.equal((await bounded(restored)).workspace.id, selected)
+      }))
+    } finally {
+      release()
+      // Even when an assertion or the mutation fails, settle every outstanding
+      // caller before restoring the query method or deleting fixture rows.
+      await Promise.allSettled(pending)
+      try { if (restoreNeeded) await restore(revoker) }
+      finally {
+        try {
+          if (descriptor) Object.defineProperty(rawPool, 'query', descriptor)
+          else Reflect.deleteProperty(rawPool, 'query')
+        } finally { revoker.release() }
+      }
+    }
+  }
+  try {
+    const [appDatabase, workspaceDatabase] = await Promise.all([
+      pool.query<{ name: string }>('select current_database() as name'),
+      rawPool.query<{ name: string }>('select current_database() as name'),
+    ])
+    assert.equal(workspaceDatabase.rows[0].name, appDatabase.rows[0].name, 'both stores are bound to the same guarded disposable database')
+    for (const id of [owner, peer]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [id, id + '@example.invalid'])
+    await seedFixtureWorkspace(pool, owner, 'personal', personal)
+    await seedFixtureWorkspace(pool, owner, 'team', selected)
+    await seedFixtureWorkspace(pool, peer, 'personal', foreign)
+    await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'member\',\'active\')', [selected, peer, peer + '@example.invalid'])
+    await pool.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,$2,$3)', [organization, 'Pending choices fixture', owner])
+    // Warm only the existing idempotent Personal-share setup, identically in
+    // RED and GREEN. The measured path still executes the real workspace reader.
+    await withActivitySession(owner, () => loadWorkspaceContext(selected, reader()), selected)
+    await withActivitySession(peer, () => loadWorkspaceContext(foreign, reader(peer)), foreign)
+
+    await t.test('five concurrent authenticated readers issue one unchanged membership-and-link SELECT', async sub => {
+      const sample = await measured(() => native(user => Promise.all(Array.from({ length: 5 }, () => loadWorkspaceContext(selected, user)))))
+      assert.equal(sample.value.length, 5)
+      assert.ok(sample.value.every(value => value.workspace.id === selected && value.currentUserId === owner && value.role === 'admin'))
+      for (const value of sample.value) assert.deepEqual(value.choices.map(choice => choice.id).sort(), [personal, selected].sort())
+      assert.equal(choices(sample.reads).length, 1, 'the old product issues five equivalent fresh SELECTs')
+      sub.diagnostic(JSON.stringify({ read: 'pending-native-workspace-choices', readers: 5, workspaceSelects: choices(sample.reads).length,
+        selectedWorkspaceRows: sample.value.length, projection: choices(sample.reads)[0].fields }))
+      sample.value[0].choices[0].name = 'One consumer changed its local copy'
+      assert.notEqual(sample.value[1].choices[0].name, sample.value[0].choices[0].name)
+      const later = await measured(() => native(user => loadWorkspaceContext(selected, user)))
+      assert.equal(choices(later.reads).length, 1, 'a later HTTP batch always performs a new SELECT')
+    })
+
+    await t.test('completed reads never hide same-batch suspension, removal or restoration', async () => {
+      const sample = await measured(() => native(async user => {
+        assert.equal((await loadWorkspaceContext(selected, user)).workspace.id, selected)
+        try {
+          for (const status of ['suspended', 'removed']) {
+            await rawPool.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [selected, owner, status])
+            await assert.rejects(loadWorkspaceContext(selected, user), { code: 'workspaceAccessDenied' })
+          }
+        } finally {
+          await rawPool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [selected, owner])
+        }
+        assert.equal((await loadWorkspaceContext(selected, user)).workspace.id, selected)
+      }))
+      assert.equal(choices(sample.reads).length, 4)
+    })
+
+    await t.test('a membership change is visible while the earlier real SELECT is still unresolved', async () => {
+      const sample = await heldFirstRead(
+        client => client.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [selected, owner]),
+        client => client.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [selected, owner]),
+      )
+      assert.equal(choices(sample.reads).length, 3, 'initial, revoked and restored callers each use their own SELECT')
+    })
+
+    await t.test('a newly attached archived Organization is visible before the old SELECT resolves', async () => {
+      await pool.query('INSERT INTO enterprise_org_policy("organizationId","archivedAt") VALUES($1,now())', [organization])
+      try {
+        const sample = await heldFirstRead(
+          client => client.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES($1,$2)', [selected, organization]),
+          client => client.query('DELETE FROM mikka_organization_workspaces WHERE "workspaceId"=$1 AND "organizationId"=$2', [selected, organization]),
+        )
+        assert.equal(choices(sample.reads).length, 3)
+        assert.equal(policyReads(sample.reads).length, 1, 'only the newly linked SELECT enters the real archived-Organization gate')
+      } finally {
+        await rawPool.query('DELETE FROM mikka_organization_workspaces WHERE "workspaceId"=$1 AND "organizationId"=$2', [selected, organization])
+        await pool.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organization])
+      }
+    })
+
+    await t.test('joined readers still execute independent current Organization policy checks', async () => {
+      await rawPool.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES($1,$2)', [selected, organization])
+      await pool.query('INSERT INTO enterprise_org_policy("organizationId") VALUES($1)', [organization])
+      try {
+        const sample = await measured(() => native(async user => {
+          const allowed = await Promise.all([loadWorkspaceContext(selected, user), loadWorkspaceContext(selected, user)])
+          assert.ok(allowed.every(value => value.workspace.id === selected))
+          await pool.query('UPDATE enterprise_org_policy SET "archivedAt"=now() WHERE "organizationId"=$1', [organization])
+          const denied = await Promise.allSettled([loadWorkspaceContext(selected, user), loadWorkspaceContext(selected, user)])
+          assert.ok(denied.every(value => value.status === 'rejected' && value.reason.code === 'workspaceAccessDenied'))
+        }))
+        assert.equal(choices(sample.reads).length, 2, 'each parallel pair has one fresh membership/link observation')
+        assert.equal(policyReads(sample.reads).length, 4, 'each of the four callers checks Organization policy independently')
+      } finally {
+        await rawPool.query('DELETE FROM mikka_organization_workspaces WHERE "workspaceId"=$1 AND "organizationId"=$2', [selected, organization])
+        await pool.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organization])
+      }
+    })
+
+    await t.test('different authenticated readers, pins, principals, requests and Native sessions cannot join', async () => {
+      const pairs = [
+        () => [loadWorkspaceContext(selected, reader()), loadWorkspaceContext(selected, reader(peer))],
+        () => [loadWorkspaceContext(selected, reader()), loadWorkspaceContext(selected, Object.assign(reader(), { [tokenWorkspace]: selected }))],
+        () => [loadWorkspaceContext(selected, reader()), loadWorkspaceContext(personal, reader())],
+        () => [loadWorkspaceContext(selected, Object.assign(reader(), { [enterprisePrincipal]: { kind: 'session' as const, sessionId: 'principal-a' } })),
+          loadWorkspaceContext(selected, Object.assign(reader(), { [enterprisePrincipal]: { kind: 'session' as const, sessionId: 'principal-b' } }))],
+        () => [loadWorkspaceContext(selected, reader()), runRequestScope(createRequestScope(new Request('http://localhost/api/desktop/rpc')), () => loadWorkspaceContext(selected, reader()))],
+        () => [loadWorkspaceContext(selected, reader()), withDesktopSession({ session: { id: 'another-native-session' } }, () => loadWorkspaceContext(selected, reader()))],
+      ]
+      for (const [index, pair] of pairs.entries()) {
+        const sample = await measured(() => native(() => Promise.all(pair())))
+        assert.equal(sample.value.length, 2)
+        assert.equal(choices(sample.reads).length, 2)
+        if (index === 0) {
+          assert.deepEqual(sample.value.map(value => [value.currentUserId, value.workspace.id, value.role]), [[owner, selected, 'admin'], [peer, selected, 'member']])
+          assert.deepEqual(sample.value[0].choices.map(value => value.id).sort(), [personal, selected].sort())
+          assert.deepEqual(sample.value[1].choices.map(value => value.id).sort(), [foreign, selected].sort())
+        }
+        if (index === 1) assert.deepEqual(sample.value[1].choices.map(value => value.id), [selected], 'the pinned reader keeps its original filtered choices')
+      }
+      await native(async user => {
+        await assert.rejects(loadWorkspaceContext(foreign, user), { code: 'workspaceAccessDenied' })
+        await assert.rejects(loadWorkspaceContext(personal, Object.assign(reader(), { [tokenWorkspace]: selected })), { code: 'workspaceAccessDenied' })
+      })
+    })
+
+    await t.test('top-level Workspace transactions and nested savepoints bypass the pending queue', async () => {
+      const sample = await measured(() => native(user => workspaceDb.transaction(async () => {
+        const outer = await Promise.all([loadWorkspaceContext(selected, user), loadWorkspaceContext(selected, user)])
+        assert.ok(outer.every(value => value.workspace.id === selected))
+        await workspaceDb.transaction(async () => {
+          const inner = await Promise.all([loadWorkspaceContext(selected, user), loadWorkspaceContext(selected, user)])
+          assert.ok(inner.every(value => value.workspace.id === selected))
+        })
+      })))
+      assert.equal(choices(sample.reads).length, 4, 'no transaction or savepoint query is coalesced')
+    })
+
+    await t.test('foreground-only scope cannot survive as deferred, expired or non-Native work', async () => {
+      for (const route of ['after:pending-choices', 'cron:pending-choices', 'workflow:pending-choices']) {
+        const sample = await measured(() => native(user => routeScope.run(route, () => Promise.all([
+          loadWorkspaceContext(selected, user), loadWorkspaceContext(selected, user),
+        ]))))
+        assert.equal(choices(sample.reads).length, 2)
+      }
+      let later!: () => Promise<Awaited<ReturnType<typeof loadWorkspaceContext>>[]>
+      await native(async user => {
+        later = AsyncLocalStorage.bind(() => Promise.all([loadWorkspaceContext(selected, user), loadWorkspaceContext(selected, user)]))
+      })
+      assert.equal(choices((await measured(later)).reads).length, 2, 'retained ALS cannot reactivate a closed queue')
+      const ordinary = await measured(() => withActivitySession(owner, () => withReadBatchContext(() => Promise.all([
+        loadWorkspaceContext(selected, reader()), loadWorkspaceContext(selected, reader()),
+      ])), selected))
+      assert.equal(choices(ordinary.reads).length, 2, 'a non-Native scope does not opt into the queue')
+    })
+  } finally {
+    await rawPool.query('DELETE FROM mikka_organization_workspaces WHERE "workspaceId"=$1 AND "organizationId"=$2', [selected, organization])
+    await pool.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organization])
+    await rawPool.query('DELETE FROM mikka_organizations WHERE id=$1', [organization])
+    await rawPool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [[personal, selected, foreign]])
+    await rawPool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[personal, selected, foreign]])
+    await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
+  }
+})
