@@ -19,7 +19,9 @@ export function notificationSourceUrl(notice: NoticeSource): string | null {
   if (!notice.url) return null
   let url: URL
   try { url = new URL(notice.url) } catch { return null }
-  if (url.protocol !== 'https:' || url.username || url.password || url.port || url.href !== notice.url) return null
+  if (url.protocol !== 'https:') return null
+  if (url.username.length !== 0 || url.password.length !== 0) return null
+  if (url.port || url.href !== notice.url) return null
   if (notice.source === 'gmail') {
     const thread = notice.matterKey?.match(/^gmail:([A-Za-z0-9_-]{1,200})$/)?.[1]
     return thread && notice.url === `https://mail.google.com/mail/u/0/#all/${thread}` ? notice.url : null
