@@ -65,7 +65,7 @@ export function useWorkspaceMembers(workspaceId: string | undefined, inviteIniti
   }
 
   /** The given people as members.csv, the columns MembersSettings exports. */
-  function exportCsv(members: WorkspaceMember[], invitations: WorkspaceInvitation[]) {
+  function exportCsv(members: WorkspaceMember[], invitations: WorkspaceInvitation[], link: HTMLAnchorElement | null) {
     const role = (value: string) => value === 'admin' ? t('role.admin') : t('role.member')
     const csv = memberCsv([
       [t('csv.name'), t('csv.email'), t('csv.role'), t('csv.status'), t('csv.joined')],
@@ -73,7 +73,8 @@ export function useWorkspaceMembers(workspaceId: string | undefined, inviteIniti
       ...(canManage ? invitations : []).map(item => ['', item.email, role(item.role), t('status.invited'), item.expiresAt]),
     ])
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
+    // The page renders the link (lint-ui: no hand-built elements); without one there is nothing to click.
+    if (!link) { URL.revokeObjectURL(url); return }
     link.href = url
     link.download = 'members.csv'
     link.click()

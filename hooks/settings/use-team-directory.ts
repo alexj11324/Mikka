@@ -93,11 +93,12 @@ export function useTeamDirectory(workspaceId?: string) {
   }
 
   /** The given teams as teams.csv, the columns TeamDirectory exports. */
-  function exportCsv(teams: DirectoryTeam[]) {
+  function exportCsv(teams: DirectoryTeam[], link: HTMLAnchorElement | null) {
     const csv = memberCsv([[t('Settings.workspaceForm.name'), t('FeatureCopy.c_f60daeb5'), t('FeatureCopy.c_5ea2e0cd'), t('FeatureCopy.c_747b74ce'), t('Invite.roles.member'), t('FeatureCopy.c_243d2318')],
       ...teams.map(team => [team.name, team.identifier, team.description, t('Settings.groups.workspace'), String(team.memberCount), team.role === 'owner' ? t('Projects.fields.lead') : team.role === 'member' ? t('Invite.roles.member') : t('FeatureCopy.c_8dabc5fb')])])
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
+    // The page renders the link (lint-ui: no hand-built elements); without one there is nothing to click.
+    if (!link) { URL.revokeObjectURL(url); return }
     link.href = url
     link.download = 'teams.csv'
     link.click()
