@@ -78,17 +78,16 @@ export function LocalComputerUse() {
       ? t('status.binaryVersionUnknown')
       : t(`status.${doctor.probe.status}`, { version: doctor.version ?? '' })
     : t('statusLabel')
-  // Nothing to request when the pinned driver is absent: install it first.
+  // Nothing to request when the pinned driver is absent: install it first,
+  // then 重新检查 (which also re-detects it in the running daemon).
   const canGrant = doctor?.installed === true && status !== 'ok'
   const action = !doctor || loading
     ? null
-    : status === 'ok'
-      ? <Button size="sm" variant="secondary" disabled={granting} onClick={() => { void run(false) }}>{t('recheck')}</Button>
-      : canGrant
-        ? <Button size="sm" variant="secondary" disabled={granting} onClick={() => { void run(true) }}>
-          {granting ? <><Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />{t('enabling')}</> : t('enable')}
-        </Button>
-        : null
+    : canGrant
+      ? <Button size="sm" variant="secondary" disabled={granting} onClick={() => { void run(true) }}>
+        {granting ? <><Loader2 data-icon="inline-start" aria-hidden="true" className="animate-spin motion-reduce:animate-none" />{t('enabling')}</> : t('enable')}
+      </Button>
+      : <Button size="sm" variant="secondary" disabled={granting} onClick={() => { void run(false) }}>{t('recheck')}</Button>
 
   return <SettingsSection id="local-computer-use-heading" title={t('title')} description={t('description')} action={action}>
     <SettingRow title={t('driver')} description={doctor?.binaryPath ?? undefined}>

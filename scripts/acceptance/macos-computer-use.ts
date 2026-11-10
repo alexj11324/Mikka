@@ -83,7 +83,8 @@ function startProxy(grant: { socketPath: string; token: string }): ProxyClient {
     const waiter = pending.get(message.id);
     if (!waiter) return;
     pending.delete(message.id);
-    message.error ? waiter.reject(new Error("proxy error")) : waiter.resolve(message.result);
+    if (message.error) waiter.reject(new Error("proxy error"));
+    else waiter.resolve(message.result);
   });
   child.on("exit", () => {
     for (const waiter of pending.values()) waiter.reject(new Error("proxy exited"));
@@ -116,7 +117,8 @@ function directTool(driver: ComputerDriver, name: string, args: Record<string, u
       clearTimeout(timer);
       try { child.stdin.end(); } catch { /* exited */ }
       child.kill();
-      error ? rejectCall(error) : resolveCall(value);
+      if (error) rejectCall(error);
+      else resolveCall(value);
     };
     createInterface({ input: child.stdout }).on("line", (line) => {
       let message: any;
@@ -124,7 +126,8 @@ function directTool(driver: ComputerDriver, name: string, args: Record<string, u
       const waiter = pending.get(message.id);
       if (!waiter) return;
       pending.delete(message.id);
-      message.error ? finish(new Error("driver rejected the check")) : waiter(message.result);
+      if (message.error) finish(new Error("driver rejected the check"));
+      else waiter(message.result);
     });
     child.on("error", () => finish(new Error("driver did not start")));
     child.on("exit", () => finish(new Error("driver exited before answering")));
