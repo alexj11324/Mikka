@@ -195,8 +195,8 @@ export function RunCitation({ run }: { run: RunSource }) {
       variant="object"
       className={runLinkClassName}
       data-thread-link=""
-      aria-label={issue ? t('openThread', { name: title }) : t('runOf', { bot: run.agentName })}
-      onClick={issue ? () => openThread(run.id) : undefined}
+      aria-label={t('openThread', { name: title })}
+      onClick={() => openThread(run.id)}
     >
       <InlineCitationLabel>{title}</InlineCitationLabel>
     </InlineCitationTrigger>

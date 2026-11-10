@@ -66,6 +66,34 @@ test('a task chip is its own state icon and code (localTaskState); the title, st
   }
 })
 
+test('a thread without a task opens its conversation from its title, with click and keyboard', async () => {
+  const { setWorkAreaOpener } = await import('../components/workspace/workspace-navigation')
+  const opened: string[] = []
+  const release = setWorkAreaOpener({ task: () => assert.fail('a standalone thread must not open a task'), thread: id => { opened.push(id) } })
+  const standalone = { ...run(RUNS.running, 'running', 'Check the logs'), issue: null } as CitationSource
+  const container = browser.document.createElement('div') as unknown as HTMLElement
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => {
+      root.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}>
+        <citations.AgentCitationsContext value={{ sources: { [RUNS.running]: standalone }, previews: {}, onOpenIssue: () => assert.fail('no task') }}>
+          <citations.CitationChip id={RUNS.running} kind="run" />
+        </citations.AgentCitationsContext>
+      </NextIntlClientProvider>)
+    })
+    const link = container.querySelector('[data-thread-link]') as HTMLElement
+    assert.equal(link.textContent, 'Check the logs')
+    await act(async () => { link.click() })
+    await act(async () => { link.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }) as unknown as Event) })
+    assert.deepEqual(opened, [RUNS.running, RUNS.running])
+  } finally {
+    release()
+    await act(async () => { root.unmount() })
+    container.remove()
+  }
+})
+
 test('a thread is its title as a link, no icon or badge, and opens the thread beside the chat (?thread=); only a task chip opens the task', async () => {
   const opened: { issues: string[]; moves: number } = { issues: [], moves: 0 }
   const counted = () => { opened.moves++ }

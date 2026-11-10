@@ -32,12 +32,12 @@ const NO_PAGER = { index: -1, total: 0, onOpen: () => {} }
 const nothing = () => {}
 
 /** A task in the chat's work area: the task page's own view, narrow; expand opens the full page (decision 2026-11-10). */
-function TaskTab({ issueId, origin, onOpenTask }: { issueId: string; origin: string; onOpenTask: (id: string) => void }) {
+function TaskTab({ issueId, origin, onOpenTask, onFlush }: { issueId: string; origin: string; onOpenTask: (id: string) => void; onFlush: (issueId: string, flush: (() => Promise<boolean>) | null) => void }) {
   const t = useTranslations('Shell.panel.task')
   const { data: session } = authClient.useSession()
   // Expand saves what is still being written first, as leaving the task page does; a save that fails keeps the tab.
   const flush = useRef<(() => Promise<boolean>) | null>(null)
-  const registerFlush = useCallback((next: (() => Promise<boolean>) | null) => { flush.current = next }, [])
+  const registerFlush = useCallback((next: (() => Promise<boolean>) | null) => { flush.current = next; onFlush(issueId, next) }, [issueId, onFlush])
   const placement = useMemo(() => ({
     onExpand: () => { void (flush.current?.() ?? Promise.resolve(true)).then(saved => { if (saved) navigate({ issue: issueId }) }, () => {}) },
     expandLabel: t('openPage'),
@@ -95,6 +95,15 @@ export type WorkTabNames = { task: (issueId: string) => string; thread: (runId: 
  * `?thread=`) opens its tab instead of a column beside the chat.
  */
 export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
+  const flushes = useRef(new Map<string, () => Promise<boolean>>())
+  const registerFlush = useCallback((issueId: string, flush: (() => Promise<boolean>) | null) => {
+    if (flush) flushes.current.set(issueId, flush)
+    else flushes.current.delete(issueId)
+  }, [])
+  const beforeClose = useCallback(async (tabId: string) => {
+    const flush = tabId.startsWith('task:') ? flushes.current.get(tabId.slice(5)) : undefined
+    return flush ? await flush() : true
+  }, [])
   const [opened, setOpened] = useState<Opened[]>([])
   const [reveal, setReveal] = useState<{ reveal: number; revealId: string | null }>({ reveal: 0, revealId: null })
   const open = useCallback((kind: Opened['kind'], id: string) => {
@@ -121,13 +130,13 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
     return () => { release(); window.removeEventListener('popstate', take); window.removeEventListener(NAVIGATE_EVENT, take) }
   }, [on, openTask, openRun])
   const tabs = opened.map((item): ThreadPanelTab => {
-    if (item.kind === 'task') return { id: `task:${item.id}`, title: names.task(item.id), content: <TaskTab key={item.id} issueId={item.id} origin={origin} onOpenTask={openTask} /> }
+    if (item.kind === 'task') return { id: `task:${item.id}`, title: names.task(item.id), content: <TaskTab key={item.id} issueId={item.id} origin={origin} onOpenTask={openTask} onFlush={registerFlush} /> }
     const thread = names.thread(item.id)
     // A run the chat has no source for (opened from the Overview, search or another thread) learns its title once read.
     const unknown = thread.issueId === undefined
     return { id: `thread:${item.id}`, title: (unknown && learned[item.id]) || thread.title,
       content: <ThreadTab key={item.id} runId={item.id} issueId={thread.issueId} name={thread.name} onOpenTask={openTask} onTitle={unknown ? learn : undefined} /> }
   })
-  const work: ThreadScreenProps['work'] = on ? { tabs, ...reveal } : undefined
+  const work: ThreadScreenProps['work'] = on ? { tabs, ...reveal, beforeClose } : undefined
   return { work, openTask }
 }

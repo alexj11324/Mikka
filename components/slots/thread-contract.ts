@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { createContext, type ReactNode } from 'react'
 import type { RunSource } from '@/lib/coordinator/citations'
 import type { ChatComposerProps } from './chat-composer-contract'
 
@@ -122,7 +122,10 @@ export type ThreadScreenProps = {
    * Agent's stretch or a subagent. `reveal` counts up each time one is asked for (`revealId`). With `work`, a task card
    * opens through its part's `onOpen` only, never the template's own task tab.
    */
-  work?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null }
+  work?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null; beforeClose?: (tabId: string) => Promise<boolean> }
 }
+
+/** The hosted shell waits for a task tab's existing save before removing it. */
+export const WorkTabCloseContext = createContext<((tabId: string) => Promise<boolean>) | null>(null)
 
 export type ThreadPanelTab = { id: 'overview' | 'browser' | `task:${string}` | `thread:${string}`; title: string; content: ReactNode }
