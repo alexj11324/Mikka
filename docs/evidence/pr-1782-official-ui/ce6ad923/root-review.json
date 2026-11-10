@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "scope": "official_ui_isolated_production_build",
+  "result": "passed",
+  "reviewedAtUtc": "2026-11-10 06:01:53 UTC",
+  "product": "ce6ad923bbb449023783052d0848db22e4360f1d",
+  "productTree": "dffda64a4975b22cfc649908a8c5e19749ea8a96",
+  "overlay": "fe20f19bcf82e6541430b62c450920ba42c95fb0",
+  "producer": {
+    "run": 42762093106,
+    "attempt": 1,
+    "job": 129649935513,
+    "rawLogSha256": "cde460ee1b0d2da438fcec1fe9b2d07560ffeab0eada28dc72409d379e4be9b1",
+    "unitTests": 58,
+    "realChromiumTests": 9
+  },
+  "independentReader": {
+    "run": 42765207187,
+    "attempt": 1,
+    "job": 129659964748,
+    "commit": "787455ed555c7bdf26a38d22a39f63fdc29a610a",
+    "rawLogSha256": "5ef485a793fa3d494b0ab30aa3d50f19d97f440139fda93ad36cb0a2feea2065",
+    "rawLogBytes": 1789313,
+    "canonicalReceiptSha256": "936b7f0922870cacdc9ce61d7a43450ba522e8b066139fe557ece143dcf223d8",
+    "archiveSha256": "bb69f6e2a1b71da3363d62e97b1284ec69d3452fbdafb9c9ed6b3c7b5d1824eb",
+    "archiveBytes": 1202395,
+    "zipMembers": 23,
+    "crcVerified": true,
+    "rootReconstructedPngs": 20,
+    "rootReconstructedJson": 2,
+    "rootTransportDigestsVerified": true
+  },
+  "visual": {
+    "freshlyViewed": [
+      {
+        "index": 0,
+        "filename": "wide-light-task-groups-expanded.png",
+        "sha256": "5fa1f81378df4afe97e86fe112a631fe2c2d28199444f1f4af58477409d6b71c"
+      },
+      {
+        "index": 2,
+        "filename": "wide-light-human-and-delegate.png",
+        "sha256": "049bcff566dbb16cdab83a215de43b819828b7c595af33d101a2ba7b5087fa19"
+      },
+      {
+        "index": 3,
+        "filename": "wide-light-delegation-and-history.png",
+        "sha256": "f5a8867a182ea98756c7c8e172008ddeba4de532bcfefc89ffb3a2dd5071bc5e"
+      },
+      {
+        "index": 5,
+        "filename": "wide-dark-task-groups-expanded.png",
+        "sha256": "02cd5bd031852ab99d136233bb25ae02664d9667e5cf89f62851ec482618de61"
+      },
+      {
+        "index": 7,
+        "filename": "wide-dark-human-and-delegate.png",
+        "sha256": "4088f2c876d3e51443b2029be1ed09dcee481af8dca2365a2027d28027d92b7a"
+      },
+      {
+        "index": 8,
+        "filename": "wide-dark-delegation-and-history.png",
+        "sha256": "4bffaa2259c15be337355f6a7ff1995b1a4a5af4966be98de04ddbeda2f2af02"
+      },
+      {
+        "index": 10,
+        "filename": "narrow-light-task-groups-expanded.png",
+        "sha256": "cf8342235931826c86a1ca4b860ade8a60bab077208bd49bbe9379795129f03b"
+      },
+      {
+        "index": 12,
+        "filename": "narrow-light-human-and-delegate.png",
+        "sha256": "95120c0913885e1764df2be433e16c043e60b47213f0072947eb2944e83b48be"
+      },
+      {
+        "index": 13,
+        "filename": "narrow-light-delegation-and-history.png",
+        "sha256": "d4d83fc3d504deffc71767db5e3ff6a11831490cfaee7bd3893d76a4b0ee30c0"
+      },
+      {
+        "index": 14,
+        "filename": "narrow-light-project-error-editable.png",
+        "sha256": "5fd4f0ab2be330fcd45dcaa4887e664ad314b57e7a5e94f934da8ffb4b0b6cbc"
+      },
+      {
+        "index": 15,
+        "filename": "narrow-dark-task-groups-expanded.png",
+        "sha256": "521d505836eac3e1bba8efd03b66f7248b2132d1ae5a96677ca4529c9dc97eab"
+      },
+      {
+        "index": 17,
+        "filename": "narrow-dark-human-and-delegate.png",
+        "sha256": "d2cad115273ecd084c293f51a50ac4972fc942ec7c34036c31ecb7f37daa7c36"
+      },
+      {
+        "index": 18,
+        "filename": "narrow-dark-delegation-and-history.png",
+        "sha256": "b2f6d526d89e5a5cc2fc5ab602383218faacb2ab79719af906fb8f34daf33012"
+      },
+      {
+        "index": 19,
+        "filename": "narrow-dark-project-error-editable.png",
+        "sha256": "23c343c9af746355e7396093e59f53182c013ad829df4d867e6b2b9633dbfeab"
+      }
+    ],
+    "reusedByExactBytes": [
+      {
+        "index": 1,
+        "filename": "wide-light-empty-dispatcher.png",
+        "gitBlob": "d6f10803ec7a21d658c12af92bab038cae82cc29",
+        "previousEvidenceCommit": "b9061119c3c4b7784960069f541b994dc5cd5c65"
+      },
+      {
+        "index": 4,
+        "filename": "wide-light-project-error-editable.png",
+        "gitBlob": "1ddd6aa5c44535bdd5ea771f7672d212eeb07c34",
+        "previousEvidenceCommit": "b9061119c3c4b7784960069f541b994dc5cd5c65"
+      },
+      {
+        "index": 6,
+        "filename": "wide-dark-empty-dispatcher.png",
+        "gitBlob": "5c67cd99e74153d4ee50e69bf9ccf178ddfad4ee",
+        "previousEvidenceCommit": "b9061119c3c4b7784960069f541b994dc5cd5c65"
+      },
+      {
+        "index": 9,
+        "filename": "wide-dark-project-error-editable.png",
+        "gitBlob": "7a54617e398260f4d92b551f414a2f50a8f964e4",
+        "previousEvidenceCommit": "b9061119c3c4b7784960069f541b994dc5cd5c65"
+      },
+      {
+        "index": 11,
+        "filename": "narrow-light-empty-dispatcher.png",
+        "gitBlob": "33ddbd0e14d8e017ef5ca3faf79c6fbabbea4407",
+        "previousEvidenceCommit": "b9061119c3c4b7784960069f541b994dc5cd5c65"
+      },
+      {
+        "index": 16,
+        "filename": "narrow-dark-empty-dispatcher.png",
+        "gitBlob": "ac5d2f65d3426ac35fa370ea6f869442968216b0",
+        "previousEvidenceCommit": "b9061119c3c4b7784960069f541b994dc5cd5c65"
+      }
+    ],
+    "notes": [
+      {
+        "indices": [
+          0,
+          2,
+          3
+        ],
+        "result": "pass",
+        "observations": [
+          "Wide light: global Inbox count 1; task groups pending 3, todo 1, done 1; waiting/failed/blocked have distinct icons and colors.",
+          "Wide light: human Assignee Test owner remains separate from Handed to Ada.",
+          "Wide light: historical Codex Done and delegation activity coexist with current In Progress task status; no text or panel overlap."
+        ],
+        "masking": "Producer-defined avatar/time/identity rectangles are present."
+      },
+      {
+        "indices": [
+          5,
+          7,
+          8
+        ],
+        "result": "pass",
+        "observations": [
+          "Wide dark: the same 3/1/1 task grouping and global Inbox 1 render correctly; distinct blue waiting, red failure and amber blocked icons remain visible.",
+          "Wide dark: Assignee and Handed to remain separate; current In Progress and historical Codex Done/delegation are consistent; no panel or control overlap."
+        ]
+      },
+      {
+        "indices": [
+          10,
+          12,
+          13,
+          14
+        ],
+        "result": "pass",
+        "observations": [
+          "Narrow light: responsive task panel keeps 3 pending, 1 todo and 1 done visible; long titles truncate within the panel.",
+          "Narrow light: properties stack with distinct human assignee and Agent delegate; historical activity remains readable after scroll.",
+          "Narrow light: real stale-project error is visible; edited title and description remain, Save changes is visible and enabled."
+        ],
+        "limitation": "The narrow sidebar Inbox count is established by the retained DOM assertion, not by these screenshots."
+      },
+      {
+        "indices": [
+          15,
+          17,
+          18,
+          19
+        ],
+        "result": "pass",
+        "observations": [
+          "Narrow dark: task groups and distinct waiting/failure/blocked indicators remain legible inside the responsive panel.",
+          "Narrow dark: human Assignee and Agent delegate remain distinct; scroll reveals the historical successful attempt and delegation event without changing current task status.",
+          "Narrow dark: the actual stale-project error, preserved edited title/description and enabled Save changes control are visible within the viewport."
+        ]
+      }
+    ]
+  },
+  "limitations": [
+    "Synthetic fixtures in an isolated local production build; no external production account or model execution.",
+    "The narrow sidebar Inbox count is supported by the real DOM assertion, not visible pixels in this gallery.",
+    "This gallery does not establish preview iframe, peer PTY, production subscriptions, the complete Secret negative matrix or full issue closure."
+  ],
+  "sourceConservation": {
+    "publicTargets": 9,
+    "officialSlots": 7,
+    "inventorySemantics": "transformed_source_modules_not_render_coverage"
+  },
+  "documentationCheck": {
+    "scope": "new immutable evidence folder only",
+    "priorEvidencePreserved": true,
+    "linksChecked": true,
+    "imagesHaveDescriptiveAltText": true,
+    "factsBoundToActualRuns": true,
+    "score": 10
+  }
+}

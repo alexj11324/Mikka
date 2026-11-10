@@ -1,0 +1,940 @@
+{
+  "version": 1,
+  "product": "ce6ad923bbb449023783052d0848db22e4360f1d",
+  "productTree": "dffda64a4975b22cfc649908a8c5e19749ea8a96",
+  "overlay": "fe20f19bcf82e6541430b62c450920ba42c95fb0",
+  "scope": "official_ui_isolated_production_build",
+  "synthetic": true,
+  "productionAcceptance": false,
+  "responseMocks": 0,
+  "edition": "cloud",
+  "externalCloudServiceConfigured": false,
+  "startedAt": "2026-11-10T05:31:53.162Z",
+  "fixtureCases": [
+    {
+      "key": "waiting",
+      "taskStatus": "doing",
+      "runStatus": "succeeded",
+      "outcome": "needs_input",
+      "group": "pending",
+      "state": "waiting"
+    },
+    {
+      "key": "blocked",
+      "taskStatus": "doing",
+      "runStatus": "succeeded",
+      "outcome": "blocked",
+      "group": "pending",
+      "state": "blocked"
+    },
+    {
+      "key": "failed",
+      "taskStatus": "doing",
+      "runStatus": "failed",
+      "outcome": "failed",
+      "group": "pending",
+      "state": "failed"
+    },
+    {
+      "key": "open",
+      "taskStatus": "doing",
+      "runStatus": "succeeded",
+      "outcome": "done",
+      "group": "todo",
+      "state": "todo"
+    },
+    {
+      "key": "done",
+      "taskStatus": "done",
+      "runStatus": "succeeded",
+      "outcome": "done",
+      "group": "done",
+      "state": "done"
+    }
+  ],
+  "screens": [
+    {
+      "name": "task-groups-expanded",
+      "title": "Dispatcher Overview: waiting, blocked, failed, still-open and completed tasks",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-light-task-groups-expanded.png",
+      "sha256": "5fa1f81378df4afe97e86fe112a631fe2c2d28199444f1f4af58477409d6b71c",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 607.921875,
+          "y": 28,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 1182,
+          "y": 157,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 301,
+          "y": 214.390625,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 361.890625,
+          "y": 214.796875,
+          "width": 56.96875,
+          "height": 19.1875
+        }
+      ]
+    },
+    {
+      "name": "empty-dispatcher",
+      "title": "Coordinator Overview has no tasks; the global Inbox still counts one",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-light-empty-dispatcher.png",
+      "sha256": "8421ad056b63d181386c704936a3243100046a158d54d459e5a0cb71f9648b23",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 578.40625,
+          "y": 28,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 1182,
+          "y": 157,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 301,
+          "y": 214.390625,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 413.578125,
+          "y": 214.796875,
+          "width": 56.96875,
+          "height": 19.1875
+        }
+      ]
+    },
+    {
+      "name": "human-and-delegate",
+      "title": "Human assignee and separate Agent Delegate",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-light-human-and-delegate.png",
+      "sha256": "049bcff566dbb16cdab83a215de43b819828b7c595af33d101a2ba7b5087fa19",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1325.109375,
+          "y": 278,
+          "width": 16,
+          "height": 16
+        }
+      ]
+    },
+    {
+      "name": "delegation-and-history",
+      "title": "Delegation event and successful historical attempt; task remains open",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-light-delegation-and-history.png",
+      "sha256": "f5a8867a182ea98756c7c8e172008ddeba4de532bcfefc89ffb3a2dd5071bc5e",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1325.109375,
+          "y": 278,
+          "width": 16,
+          "height": 16
+        }
+      ]
+    },
+    {
+      "name": "project-error-editable",
+      "title": "Real stale-revision error; unsaved draft remains editable",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-light-project-error-editable.png",
+      "sha256": "1d178ee1b046bae2356a7acdf46fde3dc35c9555a1ae12ea484eec1dd9914808",
+      "masks": []
+    },
+    {
+      "name": "task-groups-expanded",
+      "title": "Dispatcher Overview: waiting, blocked, failed, still-open and completed tasks",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-dark-task-groups-expanded.png",
+      "sha256": "02cd5bd031852ab99d136233bb25ae02664d9667e5cf89f62851ec482618de61",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 607.921875,
+          "y": 28,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 1182,
+          "y": 157,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 301,
+          "y": 214.390625,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 361.890625,
+          "y": 214.796875,
+          "width": 56.96875,
+          "height": 19.1875
+        }
+      ]
+    },
+    {
+      "name": "empty-dispatcher",
+      "title": "Coordinator Overview has no tasks; the global Inbox still counts one",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-dark-empty-dispatcher.png",
+      "sha256": "b375ed865496c41ac4d41cb68209167c4b1b133c8bcd6e7cf80d432b546c6f07",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 578.40625,
+          "y": 28,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 1182,
+          "y": 157,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 301,
+          "y": 214.390625,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 413.578125,
+          "y": 214.796875,
+          "width": 56.96875,
+          "height": 19.1875
+        }
+      ]
+    },
+    {
+      "name": "human-and-delegate",
+      "title": "Human assignee and separate Agent Delegate",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-dark-human-and-delegate.png",
+      "sha256": "4088f2c876d3e51443b2029be1ed09dcee481af8dca2365a2027d28027d92b7a",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1325.109375,
+          "y": 278,
+          "width": 16,
+          "height": 16
+        }
+      ]
+    },
+    {
+      "name": "delegation-and-history",
+      "title": "Delegation event and successful historical attempt; task remains open",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-dark-delegation-and-history.png",
+      "sha256": "4bffaa2259c15be337355f6a7ff1995b1a4a5af4966be98de04ddbeda2f2af02",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1325.109375,
+          "y": 278,
+          "width": 16,
+          "height": 16
+        }
+      ]
+    },
+    {
+      "name": "project-error-editable",
+      "title": "Real stale-revision error; unsaved draft remains editable",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "filename": "wide-dark-project-error-editable.png",
+      "sha256": "2a314178323c141ff1fd236b646d7d864e01b061cb28ad139ca57f21dd2ff3d4",
+      "masks": []
+    },
+    {
+      "name": "task-groups-expanded",
+      "title": "Dispatcher Overview: waiting, blocked, failed, still-open and completed tasks",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-light-task-groups-expanded.png",
+      "sha256": "cf8342235931826c86a1ca4b860ade8a60bab077208bd49bbe9379795129f03b",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 59,
+          "y": 20,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 182,
+          "y": 148,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 31,
+          "y": 204.390625,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 91.890625,
+          "y": 204.796875,
+          "width": 56.96875,
+          "height": 19.1875
+        }
+      ]
+    },
+    {
+      "name": "empty-dispatcher",
+      "title": "Coordinator Overview has no tasks; the global Inbox still counts one",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-light-empty-dispatcher.png",
+      "sha256": "48ba05a37643b9150cc8ddc852852847aea7d80b84cc40b049d541ff8e33310a",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 59,
+          "y": 20,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 182,
+          "y": 148,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 31,
+          "y": 204.390625,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 143.578125,
+          "y": 204.796875,
+          "width": 56.96875,
+          "height": 19.1875
+        }
+      ]
+    },
+    {
+      "name": "human-and-delegate",
+      "title": "Human assignee and separate Agent Delegate",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-light-human-and-delegate.png",
+      "sha256": "95120c0913885e1764df2be433e16c043e60b47213f0072947eb2944e83b48be",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 289.109375,
+          "y": 289,
+          "width": 16,
+          "height": 16
+        }
+      ]
+    },
+    {
+      "name": "delegation-and-history",
+      "title": "Delegation event and successful historical attempt; task remains open",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-light-delegation-and-history.png",
+      "sha256": "d4d83fc3d504deffc71767db5e3ff6a11831490cfaee7bd3893d76a4b0ee30c0",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 289.109375,
+          "y": -13,
+          "width": 16,
+          "height": 16
+        }
+      ]
+    },
+    {
+      "name": "project-error-editable",
+      "title": "Real stale-revision error; unsaved draft remains editable",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-light-project-error-editable.png",
+      "sha256": "5fd4f0ab2be330fcd45dcaa4887e664ad314b57e7a5e94f934da8ffb4b0b6cbc",
+      "masks": []
+    },
+    {
+      "name": "task-groups-expanded",
+      "title": "Dispatcher Overview: waiting, blocked, failed, still-open and completed tasks",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-dark-task-groups-expanded.png",
+      "sha256": "521d505836eac3e1bba8efd03b66f7248b2132d1ae5a96677ca4529c9dc97eab",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 59,
+          "y": 20,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 182,
+          "y": 148,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 31,
+          "y": 204.390625,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 91.890625,
+          "y": 204.796875,
+          "width": 56.96875,
+          "height": 19.1875
+        }
+      ]
+    },
+    {
+      "name": "empty-dispatcher",
+      "title": "Coordinator Overview has no tasks; the global Inbox still counts one",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-dark-empty-dispatcher.png",
+      "sha256": "f9ef36b0133324579e541b72f080fcbad08962fc28fad666aab513b7f0a621c7",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 59,
+          "y": 20,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 182,
+          "y": 148,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 31,
+          "y": 204.390625,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 143.578125,
+          "y": 204.796875,
+          "width": 56.96875,
+          "height": 19.1875
+        }
+      ]
+    },
+    {
+      "name": "human-and-delegate",
+      "title": "Human assignee and separate Agent Delegate",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-dark-human-and-delegate.png",
+      "sha256": "d2cad115273ecd084c293f51a50ac4972fc942ec7c34036c31ecb7f37daa7c36",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 289.109375,
+          "y": 289,
+          "width": 16,
+          "height": 16
+        }
+      ]
+    },
+    {
+      "name": "delegation-and-history",
+      "title": "Delegation event and successful historical attempt; task remains open",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-dark-delegation-and-history.png",
+      "sha256": "b2f6d526d89e5a5cc2fc5ab602383218faacb2ab79719af906fb8f34daf33012",
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 289.109375,
+          "y": -13,
+          "width": 16,
+          "height": 16
+        }
+      ]
+    },
+    {
+      "name": "project-error-editable",
+      "title": "Real stale-revision error; unsaved draft remains editable",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "filename": "narrow-dark-project-error-editable.png",
+      "sha256": "23c343c9af746355e7396093e59f53182c013ad829df4d867e6b2b9633dbfeab",
+      "masks": []
+    }
+  ],
+  "checks": [
+    {
+      "case": "task_groups",
+      "theme": "light",
+      "width": 1440,
+      "taskCount": 5,
+      "surface": "dispatcher_overview",
+      "pendingIndicator": "inbox",
+      "globalWaitingCount": 1,
+      "renderedSlots": [
+        "app-frame",
+        "thread",
+        "bot-tasks"
+      ],
+      "groups": {
+        "pending": 3,
+        "running": 0,
+        "todo": 1,
+        "done": 1
+      },
+      "completedInitiallyFolded": true,
+      "openTaskWithSuccessfulAttempt": "todo",
+      "emptyDispatcher": true,
+      "icons": [
+        {
+          "key": "waiting",
+          "shapeSha256": "5368b6852ebed98b7d4017363994182f2ff1364a789570944ea14888ca21b2f0",
+          "color": "lab(44.0605 29.0279 -86.0352)"
+        },
+        {
+          "key": "blocked",
+          "shapeSha256": "a5a89c2a0aebf3703c5bb0b375f80629ba41111a07d8eda10dcb12be48e0a87b",
+          "color": "lab(47.2709 42.9082 69.2966)"
+        },
+        {
+          "key": "failed",
+          "shapeSha256": "ed64731de7a9cfafaf02e0519e2a9e6408c9a6bcc2fa8fab6797f0650413e7c6",
+          "color": "lab(48.4493 77.4328 61.5452)"
+        },
+        {
+          "key": "open",
+          "shapeSha256": "23684114c8d5b6498f53981d982c8ef8adeae719c37b04e1321cc3c57c672370",
+          "color": "lab(66.128 -0.0000298023 0.0000119209)"
+        },
+        {
+          "key": "done",
+          "shapeSha256": "b71b8d6836eb513a6fce4231ba7af42fea556453d7fa2870eae575df87ec6da6",
+          "color": "lab(61.1055 -41.0235 73.1483)"
+        }
+      ]
+    },
+    {
+      "case": "human_delegate_history",
+      "theme": "light",
+      "width": 1440,
+      "humanAssignee": true,
+      "separateDelegate": true,
+      "delegationActivity": true,
+      "surface": "hosted_task_detail_frame",
+      "renderedSlots": [
+        "task-detail"
+      ],
+      "historicalAttemptResult": "done",
+      "taskStatus": "doing"
+    },
+    {
+      "case": "project_stale_form",
+      "theme": "light",
+      "width": 1440,
+      "normalRpcBusinessError": true,
+      "serverProjectUnchanged": true,
+      "draftPreserved": true,
+      "editableAfterError": true,
+      "saveEnabledAfterError": true
+    },
+    {
+      "case": "task_groups",
+      "theme": "dark",
+      "width": 1440,
+      "taskCount": 5,
+      "surface": "dispatcher_overview",
+      "pendingIndicator": "inbox",
+      "globalWaitingCount": 1,
+      "renderedSlots": [
+        "app-frame",
+        "thread",
+        "bot-tasks"
+      ],
+      "groups": {
+        "pending": 3,
+        "running": 0,
+        "todo": 1,
+        "done": 1
+      },
+      "completedInitiallyFolded": true,
+      "openTaskWithSuccessfulAttempt": "todo",
+      "emptyDispatcher": true,
+      "icons": [
+        {
+          "key": "waiting",
+          "shapeSha256": "5368b6852ebed98b7d4017363994182f2ff1364a789570944ea14888ca21b2f0",
+          "color": "lab(77.5052 -6.4629 -36.42)"
+        },
+        {
+          "key": "blocked",
+          "shapeSha256": "a5a89c2a0aebf3703c5bb0b375f80629ba41111a07d8eda10dcb12be48e0a87b",
+          "color": "lab(80.1641 16.6016 99.2089)"
+        },
+        {
+          "key": "failed",
+          "shapeSha256": "ed64731de7a9cfafaf02e0519e2a9e6408c9a6bcc2fa8fab6797f0650413e7c6",
+          "color": "lab(63.7053 60.745 31.3109)"
+        },
+        {
+          "key": "open",
+          "shapeSha256": "23684114c8d5b6498f53981d982c8ef8adeae719c37b04e1321cc3c57c672370",
+          "color": "lab(34.924 0 0)"
+        },
+        {
+          "key": "done",
+          "shapeSha256": "b71b8d6836eb513a6fce4231ba7af42fea556453d7fa2870eae575df87ec6da6",
+          "color": "lab(89.9218 -35.6546 68.5254)"
+        }
+      ]
+    },
+    {
+      "case": "human_delegate_history",
+      "theme": "dark",
+      "width": 1440,
+      "humanAssignee": true,
+      "separateDelegate": true,
+      "delegationActivity": true,
+      "surface": "hosted_task_detail_frame",
+      "renderedSlots": [
+        "task-detail"
+      ],
+      "historicalAttemptResult": "done",
+      "taskStatus": "doing"
+    },
+    {
+      "case": "project_stale_form",
+      "theme": "dark",
+      "width": 1440,
+      "normalRpcBusinessError": true,
+      "serverProjectUnchanged": true,
+      "draftPreserved": true,
+      "editableAfterError": true,
+      "saveEnabledAfterError": true
+    },
+    {
+      "case": "task_groups",
+      "theme": "light",
+      "width": 390,
+      "taskCount": 5,
+      "surface": "dispatcher_overview",
+      "pendingIndicator": "inbox",
+      "globalWaitingCount": 1,
+      "renderedSlots": [
+        "app-frame",
+        "thread",
+        "bot-tasks"
+      ],
+      "groups": {
+        "pending": 3,
+        "running": 0,
+        "todo": 1,
+        "done": 1
+      },
+      "completedInitiallyFolded": true,
+      "openTaskWithSuccessfulAttempt": "todo",
+      "emptyDispatcher": true,
+      "icons": [
+        {
+          "key": "waiting",
+          "shapeSha256": "5368b6852ebed98b7d4017363994182f2ff1364a789570944ea14888ca21b2f0",
+          "color": "lab(44.0605 29.0279 -86.0352)"
+        },
+        {
+          "key": "blocked",
+          "shapeSha256": "a5a89c2a0aebf3703c5bb0b375f80629ba41111a07d8eda10dcb12be48e0a87b",
+          "color": "lab(47.2709 42.9082 69.2966)"
+        },
+        {
+          "key": "failed",
+          "shapeSha256": "ed64731de7a9cfafaf02e0519e2a9e6408c9a6bcc2fa8fab6797f0650413e7c6",
+          "color": "lab(48.4493 77.4328 61.5452)"
+        },
+        {
+          "key": "open",
+          "shapeSha256": "23684114c8d5b6498f53981d982c8ef8adeae719c37b04e1321cc3c57c672370",
+          "color": "lab(66.128 -0.0000298023 0.0000119209)"
+        },
+        {
+          "key": "done",
+          "shapeSha256": "b71b8d6836eb513a6fce4231ba7af42fea556453d7fa2870eae575df87ec6da6",
+          "color": "lab(61.1055 -41.0235 73.1483)"
+        }
+      ]
+    },
+    {
+      "case": "human_delegate_history",
+      "theme": "light",
+      "width": 390,
+      "humanAssignee": true,
+      "separateDelegate": true,
+      "delegationActivity": true,
+      "surface": "hosted_task_detail_frame",
+      "renderedSlots": [
+        "task-detail"
+      ],
+      "historicalAttemptResult": "done",
+      "taskStatus": "doing"
+    },
+    {
+      "case": "project_stale_form",
+      "theme": "light",
+      "width": 390,
+      "normalRpcBusinessError": true,
+      "serverProjectUnchanged": true,
+      "draftPreserved": true,
+      "editableAfterError": true,
+      "saveEnabledAfterError": true
+    },
+    {
+      "case": "task_groups",
+      "theme": "dark",
+      "width": 390,
+      "taskCount": 5,
+      "surface": "dispatcher_overview",
+      "pendingIndicator": "inbox",
+      "globalWaitingCount": 1,
+      "renderedSlots": [
+        "app-frame",
+        "thread",
+        "bot-tasks"
+      ],
+      "groups": {
+        "pending": 3,
+        "running": 0,
+        "todo": 1,
+        "done": 1
+      },
+      "completedInitiallyFolded": true,
+      "openTaskWithSuccessfulAttempt": "todo",
+      "emptyDispatcher": true,
+      "icons": [
+        {
+          "key": "waiting",
+          "shapeSha256": "5368b6852ebed98b7d4017363994182f2ff1364a789570944ea14888ca21b2f0",
+          "color": "lab(77.5052 -6.4629 -36.42)"
+        },
+        {
+          "key": "blocked",
+          "shapeSha256": "a5a89c2a0aebf3703c5bb0b375f80629ba41111a07d8eda10dcb12be48e0a87b",
+          "color": "lab(80.1641 16.6016 99.2089)"
+        },
+        {
+          "key": "failed",
+          "shapeSha256": "ed64731de7a9cfafaf02e0519e2a9e6408c9a6bcc2fa8fab6797f0650413e7c6",
+          "color": "lab(63.7053 60.745 31.3109)"
+        },
+        {
+          "key": "open",
+          "shapeSha256": "23684114c8d5b6498f53981d982c8ef8adeae719c37b04e1321cc3c57c672370",
+          "color": "lab(34.924 0 0)"
+        },
+        {
+          "key": "done",
+          "shapeSha256": "b71b8d6836eb513a6fce4231ba7af42fea556453d7fa2870eae575df87ec6da6",
+          "color": "lab(89.9218 -35.6546 68.5254)"
+        }
+      ]
+    },
+    {
+      "case": "human_delegate_history",
+      "theme": "dark",
+      "width": 390,
+      "humanAssignee": true,
+      "separateDelegate": true,
+      "delegationActivity": true,
+      "surface": "hosted_task_detail_frame",
+      "renderedSlots": [
+        "task-detail"
+      ],
+      "historicalAttemptResult": "done",
+      "taskStatus": "doing"
+    },
+    {
+      "case": "project_stale_form",
+      "theme": "dark",
+      "width": 390,
+      "normalRpcBusinessError": true,
+      "serverProjectUnchanged": true,
+      "draftPreserved": true,
+      "editableAfterError": true,
+      "saveEnabledAfterError": true
+    }
+  ],
+  "cleanup": {
+    "browser": true,
+    "extension": true,
+    "base": true,
+    "workspaceName": true,
+    "lease": true
+  },
+  "result": "passed",
+  "compiled": {
+    "revision": "ce6ad923bbb449023783052d0848db22e4360f1d",
+    "appBuild": "ce6ad923bbb449023783052d0848db22e4360f1d",
+    "rendererBuild": "e670ba976212fafb3f646f0716f30c6ddd32b69fa6d1fa9a634a0f90e60b5a7f",
+    "lockSha256": "e1db8f01134e8e3377078e5e798b6a11ec117e0c4ffc69bae66c7c7b921d8dac",
+    "routesSha256": "5783d52ab7d79e1588890df67ee810e0fdfc557eadd8e1429859746ed4765feb",
+    "tracingSha256": "3e5f41561281d0a5e189dd242df307056d93610aa8a53a3c4e7b98c10647163e",
+    "servedBuildMatches": true,
+    "servedOverlayMatches": true
+  },
+  "workspaceNameCleanup": {
+    "captured": true,
+    "phase": "restored",
+    "restored": true,
+    "initialName": {
+      "en": false,
+      "zhCN": true
+    },
+    "initialOwnerMatchesSealedBaseline": true,
+    "beforeName": {
+      "en": true,
+      "zhCN": false
+    },
+    "peerMatchesSealedBaseline": true,
+    "onlyGeneratedNameDifference": true,
+    "afterName": {
+      "en": false,
+      "zhCN": true
+    },
+    "ownerMatchesSealedBaseline": true
+  },
+  "fixtureIdentity": {
+    "taskCount": 5,
+    "uniqueOwnerNumbers": 5,
+    "uniqueIssuedIdentifiers": 5,
+    "originalTaskNumberPreserved": true,
+    "normalRpcConfirmed": true
+  },
+  "pageErrors": [],
+  "finishedAt": "2026-11-10T05:32:56.195Z",
+  "runtimeShutdown": "passed"
+}
