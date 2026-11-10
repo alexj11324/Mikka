@@ -766,7 +766,9 @@ dbTest('malformed stored receipts never fall back to consuming a later input', {
     { label: 'missing settings flag', corrupt: row => { delete row.settings!.f } },
     { label: 'unknown receipt field', corrupt: row => { row.inbox!.newAuthority = true } },
     { label: 'unknown settings bit', corrupt: row => { row.settings!.f = Number(row.settings!.f) | 256 } },
-    { label: 'unknown inbox bit', corrupt: row => { row.inbox!.f = Number(row.inbox!.f) | 512 } },
+    // Bits 512/1024 now declare origin/originRef; 2048 stays outside the
+    // closed presence bitmap.
+    { label: 'unknown inbox bit', corrupt: row => { row.inbox!.f = Number(row.inbox!.f) | 2048 } },
     { label: 'missing added', corrupt: row => { delete row.inbox!.a } },
     { label: 'null added', corrupt: row => { row.inbox!.a = null } },
     { label: 'null declared optional questions', corrupt: row => { row.inbox!.f = Number(row.inbox!.f) | 128; row.inbox!.q = null } },

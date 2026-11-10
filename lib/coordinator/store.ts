@@ -241,12 +241,17 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       const receipt = codec.readStartupReceipt(1, settings, inbox)
       const stored = codec.encodeStoredStartupReceipt(receipt)
       const storedSettings = JSON.stringify(stored.settings), storedInbox = JSON.stringify(stored.inbox)
+      // Entry provenance is mandatory handoff data, not ordinary inbox work.
+      // Measure the ordinary payload so gaining a Telegram ref cannot flip an
+      // otherwise small take to the inbox-only boundary.
+      const { o: _origin, r: _originRef, ...ordinaryInbox } = stored.inbox
+      const storedOrdinaryInbox = JSON.stringify(ordinaryInbox)
       // Only a small ordinary inbox needs a receipt for preparation inside
       // this step. Larger/new non-combined takes return their complete inbox
       // directly at the original durable boundary, with no fallible work
       // after COMMIT. Existing receipts were replayed above before this choice.
       if (inbox.added > 0 && (inbox.scheduledRead || !settings.agentKitEnabled ||
-        Buffer.byteLength(storedSettings, 'utf8') + Buffer.byteLength(storedInbox, 'utf8') > 256)) {
+        Buffer.byteLength(storedSettings, 'utf8') + Buffer.byteLength(storedOrdinaryInbox, 'utf8') > 256)) {
         return { inbox: receipt.inbox, startup: { kind: 'inbox-only', ...receipt } }
       }
       const inserted = await tx.execute(sql`INSERT INTO coordinator_startup_receipts("userId","botId",holder,round,version,settings,inbox) VALUES(${userId},${botId}::uuid,${holder},0,1,${storedSettings}::jsonb,${storedInbox}::jsonb) ON CONFLICT("userId","botId",holder,round) DO NOTHING`)
