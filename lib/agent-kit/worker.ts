@@ -26,6 +26,9 @@ export interface WorkerDefinitionSnapshot {
   traceContext?: RunTraceContext
   /** Trusted dispatch identity; absent on historical runs, never inferred retroactively. */
   executionIdentity?: ExecutionIdentity
+  /** Host-created without private Agent/parent/MCP/mailbox context. Historical
+   * snapshots never acquire this provenance by changing their visibility. */
+  contextIsolation?: 'shared_clean'
   /** Copied only from the host's authorized parent execution; legacy workers gain nothing. */
   customMcp?: McpAuthority
   schemaVersion: 1

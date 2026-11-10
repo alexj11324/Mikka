@@ -17,6 +17,9 @@ import { ActionFailureError } from '@/lib/action-error'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { MESSAGE_MAX } from '@/lib/message-limits'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
+import { taskCreationSchema } from '@/lib/task-destination'
+import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
+import { authorizedBotChat } from '@/lib/resource-access/chat'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,11 +70,11 @@ async function handleGET(request: Request) {
   if (!read) return json({ error: 'invalidWindow' }, 400)
   try {
     if (typeof user[tokenWorkspace] === 'string') {
-      if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const botId = await openChatBotId(user, bot.data)
-      if (read.kind === 'history') return history(user.id, await chatView(user.id, CHAT_FIRST_PAGE, botId, { through: read.through }))
-      const enabled = await coordinatorEnabled(user.id, botId)
-      const view = await chatUpdate(user.id, botId, read.kind === 'update' ? read.continuation : undefined)
+      const access = await authorizedBotChat(user, botId, 'canReadContent', user[tokenWorkspace])
+      if (read.kind === 'history') return history(user.id, await chatView(access.ownerId, CHAT_FIRST_PAGE, botId, { through: read.through }, access.reader))
+      const enabled = await coordinatorEnabled(access.ownerId, botId)
+      const view = await chatUpdate(access.ownerId, botId, read.kind === 'update' ? read.continuation : undefined, access.reader)
       // The app shows a failed welcome through `failure`; the empty Bot item is no message (nor unread, nor reactable).
       const chat = { ...view, items: view.items.filter(item => !item.welcome) }
       const working = enabled && chat.working
@@ -92,7 +95,7 @@ async function handleGET(request: Request) {
 /** An older page: its messages and what they cite, and whether there are older ones still. */
 async function history(userId: string, page: Awaited<ReturnType<typeof chatView>>) {
   const items = page.items.filter(item => !item.welcome)
-  return json({ items, sources: page.sources, artifacts: page.artifacts, historyBefore: page.historyBefore ?? null, reactions: await reactionsOf(userId, items) })
+  return json({ items, access: page.access, sources: page.sources, artifacts: page.artifacts, historyBefore: page.historyBefore ?? null, reactions: await reactionsOf(userId, items) })
 }
 
 /** `submissionId` identifies one immutable send across mobile retries; older clients may omit it. */
@@ -101,24 +104,34 @@ async function handlePOST(request: Request) {
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   if (!writeAllowed(request)) return forbiddenOrigin()
-  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional(), submissionId: z.uuid().optional() })
+  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional(), submissionId: z.uuid().optional(),taskCreation:taskCreationSchema.optional() })
     .refine(value => Boolean(value.text || value.images?.length)).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ error: 'messageRequired' }, 400)
+  if(parsed.data.taskCreation&&!parsed.data.submissionId)return json({error:'validationGeneric'},400)
   const images = parsed.data.images?.length ? parsed.data.images : undefined
   if (typeof user[tokenWorkspace] === 'string') {
     if (!await tokenBotAllowed(user, parsed.data.botId ?? null)) return json({ error: 'botNotFound' }, 404)
     // No bot named: the Coordinator of the token's workspace, resolved here where the message enters.
     const botId = await openChatBotId(user, parsed.data.botId)
-    try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images, submissionId: parsed.data.submissionId }) }
+    try {
+      if(parsed.data.taskCreation){
+        if(!issueMutationsEnabled())throw new ActionFailureError('issueToolsDisabled')
+        if(!await coordinatorEnabled(user.id,botId))throw new ActionFailureError('coordinatorUnavailable')
+        if(parsed.data.taskCreation.projectId)await (await import('@/lib/resource-access/store')).requireResourceAccess(user,{kind:'project',id:parsed.data.taskCreation.projectId,workspaceId:user[tokenWorkspace]!},'canSteer')
+      }
+      await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images, submissionId: parsed.data.submissionId,taskCreation:parsed.data.taskCreation }) }
     catch (error) {
       if (error instanceof ChatFileError) return Response.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 400 })
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
+      if(error instanceof ActionFailureError)return json({error:error.code},400)
       throw error
     }
     afterJob('after:coordinator-wake', () => wakeCoordinator(user.id))
     return json({ queued: true }, 202)
   }
-  const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, parsed.data.submissionId, undefined, null, images)
+  const result = parsed.data.taskCreation
+    ?await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, parsed.data.submissionId, undefined, null, images,undefined,undefined,undefined,parsed.data.taskCreation)
+    :await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, parsed.data.submissionId, undefined, null, images)
   return result.error ? json(result, 400) : json(result, 202)
 }
 

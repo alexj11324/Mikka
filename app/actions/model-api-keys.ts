@@ -3,10 +3,13 @@
 import { withFreshSession } from '@/lib/fresh-session'
 import { and, eq, inArray } from 'drizzle-orm'
 import { pool } from '@/lib/db'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import type { PoolClient } from 'pg'
+import { recordAudit, type AuditEvent } from '@/lib/audit/record'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { requireUser } from '@/lib/issue-access'
 import type { ApiKeyView } from '@/lib/model-api-key-providers'
-import { addApiKey, listApiKeys, refreshApiKeyModels, removeApiKey, setApiKeyAfterQuota, setApiKeyShare, usableApiKeys, type ApiKeysPage, type UsableApiKey } from '@/lib/model-api-keys'
+import { addApiKey, addApiKeyInput, apiKeyAfterQuota, listApiKeys, refreshApiKeyModels, removeApiKey, setApiKeyAfterQuota, setApiKeyShare, usableApiKeys, type ApiKeysPage, type UsableApiKey } from '@/lib/model-api-keys'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
@@ -18,7 +21,21 @@ import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/worksp
 async function actor(workspaceId?: string) {
   const user = await requireUser()
   const context = await loadWorkspaceContext(workspaceId || undefined, user)
-  return { userId: user.id, workspace: context.workspace }
+  return { userId: user.id, userName: user.name, workspace: context.workspace }
+}
+
+/** Credential mutation and its non-secret audit are one APP commit. */
+async function audited<T>(identity: Awaited<ReturnType<typeof actor>>, work: (client: PoolClient) => Promise<{ value: T; audit?: Pick<AuditEvent, 'action' | 'target' | 'metadata'> }>): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { value, audit } = await work(client)
+    if (audit) await recordAudit(drizzle(client), { workspaceId: identity.workspace.id,
+      actor: { type: 'user', id: identity.userId, name: identity.userName }, ...audit })
+    await client.query('COMMIT')
+    return value
+  } catch (error) { await client.query('ROLLBACK'); throw error }
+  finally { client.release() }
 }
 
 export async function getApiKeys(workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
@@ -30,15 +47,22 @@ export async function getApiKeys(workspaceId?: string): Promise<SettingsActionRe
 
 async function createApiKeyBody(input: unknown, workspaceId?: string): Promise<SettingsActionResult<ApiKeyView>> {
   return settingsWorkspaceAction(async () => {
-    const { userId } = await actor(workspaceId)
-    return addApiKey(pool, userId, input)
+    const identity = await actor(workspaceId), parsed = addApiKeyInput.parse(input)
+    return audited(identity, async client => {
+      const previous = await client.query('SELECT id FROM model_api_keys WHERE "ownerId"=$1 AND provider=$2 AND provider<>\'custom\'', [identity.userId, parsed.provider])
+      const value = await addApiKey(client, identity.userId, parsed)
+      return { value, audit: { action: previous.rowCount ? 'credential.replaced' : 'credential.created', target: { type: 'model_api_key', id: value.id } } }
+    })
   })
 }
 
 async function deleteApiKeyBody(id: string, workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
   return settingsWorkspaceAction(async () => {
-    const { userId } = await actor(workspaceId)
-    return removeApiKey(pool, userId, id)
+    const identity = await actor(workspaceId)
+    return audited(identity, async client => {
+      const value = await removeApiKey(client, identity.userId, id)
+      return { value, ...(value.removed ? { audit: { action: 'credential.revoked' as const, target: { type: 'model_api_key', id } } } : {}) }
+    })
   })
 }
 
@@ -53,17 +77,29 @@ export async function refetchApiKeyModels(id: string, workspaceId?: string): Pro
 
 async function updateApiKeyShareBody(input: { id: string; shared: boolean }, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
   return settingsWorkspaceAction(async () => {
-    const { userId, workspace } = await actor(workspaceId)
-    await setApiKeyShare(pool, userId, workspace, input.id, input.shared)
-    return listApiKeys(pool, userId, workspace)
+    const identity = await actor(workspaceId)
+    return audited(identity, async client => {
+      const previous = await client.query('SELECT 1 FROM model_api_key_shares WHERE "keyId"=$1 AND "workspaceId"=$2', [input.id, identity.workspace.id])
+      await setApiKeyShare(client, identity.userId, identity.workspace, input.id, input.shared)
+      return { value: await listApiKeys(client, identity.userId, identity.workspace), audit: {
+        action: 'integration.permission_changed', target: { type: 'model_api_key', id: input.id },
+        metadata: { integration: 'model_connections', capability: 'team_key_use', from: previous.rowCount ? 'allow' : 'none', to: input.shared ? 'allow' : 'none' },
+      } }
+    })
   })
 }
 
-export async function updateApiKeyAfterQuota(on: boolean, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
+async function updateApiKeyAfterQuotaBody(on: boolean, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
   return settingsWorkspaceAction(async () => {
-    const { userId, workspace } = await actor(workspaceId)
-    await setApiKeyAfterQuota(pool, userId, on)
-    return listApiKeys(pool, userId, workspace)
+    const identity = await actor(workspaceId)
+    return audited(identity, async client => {
+      const previous = await apiKeyAfterQuota(client, identity.userId)
+      await setApiKeyAfterQuota(client, identity.userId, on)
+      return { value: await listApiKeys(client, identity.userId, identity.workspace), audit: {
+        action: 'integration.permission_changed', target: { type: 'model_fallback', id: identity.userId },
+        metadata: { integration: 'model_connections', capability: 'paid_model_fallback', from: previous ? 'allow' : 'deny', to: on ? 'allow' : 'deny' },
+      } }
+    })
   })
 }
 
@@ -76,12 +112,12 @@ export async function listUsableApiKeys(workspaceId?: string): Promise<SettingsA
   return settingsWorkspaceAction(async () => {
     const { userId, workspace } = await actor(workspaceId)
     const keys = await usableApiKeys(pool, userId, workspace.id)
-    const owners = [...new Set(keys.filter(key => !key.mine).map(key => key.ownerId))]
+    const owners = [...new Set(keys.filter(key => !key.mine && key.ownership !== 'organization').map(key => key.ownerId))]
     const members = owners.length ? await workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspace.id), inArray(workspaceMembers.userId, owners), eq(workspaceMembers.status, 'active'))) : []
     const names = new Map(members.map(member => [member.userId, member.name]))
     // A teammate who is no longer an active member here does not lend a key.
-    return { keys: keys.filter(key => key.mine || names.has(key.ownerId)).map(key => ({ ...key, ownerName: key.mine ? null : names.get(key.ownerId)! })) }
+    return { keys: keys.filter(key => key.mine || key.ownership === 'organization' || names.has(key.ownerId)).map(key => ({ ...key, ownerName: key.ownership === 'organization' ? key.organizationName ?? null : key.mine ? null : names.get(key.ownerId)! })) }
   })
 }
 
@@ -89,3 +125,4 @@ export async function listUsableApiKeys(workspaceId?: string): Promise<SettingsA
 export async function createApiKey(...args: Parameters<typeof createApiKeyBody>) { return withFreshSession(() => createApiKeyBody(...args)) }
 export async function deleteApiKey(...args: Parameters<typeof deleteApiKeyBody>) { return withFreshSession(() => deleteApiKeyBody(...args)) }
 export async function updateApiKeyShare(...args: Parameters<typeof updateApiKeyShareBody>) { return withFreshSession(() => updateApiKeyShareBody(...args)) }
+export async function updateApiKeyAfterQuota(...args: Parameters<typeof updateApiKeyAfterQuotaBody>) { return withFreshSession(() => updateApiKeyAfterQuotaBody(...args)) }

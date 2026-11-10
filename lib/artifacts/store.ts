@@ -20,6 +20,7 @@ import { taskActivityChanged } from '@/lib/factory/activity-live'
 import { artifactAccess, artifactReadAccess, artifactWorkspace, submissionWorkspace, type ArtifactReader } from './access'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
+import { withResourceAccess } from '@/lib/resource-access/store'
 
 // Artifacts in Neon (who, which version, share links) with their files in R2.
 // Every read is scoped to the owner, or to a live share token.
@@ -256,14 +257,17 @@ export async function readArtifactContent(reader: ArtifactReader, artifactId: st
 
 const SHARE_PREFIX = 'mks_'
 
-/** A new link anyone can open; returns the token once. */
+/** An authenticated permalink; the link never enlarges the resource ACL. */
 export async function createShare(reader: ArtifactReader, artifactId: string): Promise<{ token: string } | null> {
   const workspaceId = await artifactWorkspace(reader, artifactId)
   if (!workspaceId) return null
   const { userId } = taskReaderScope(reader)
-  return withTaskWorkspace(reader, workspaceId, async () => {
+  return withResourceAccess(reader, { kind: 'artifact', id: artifactId, workspaceId }, 'canManageAccess', async policy => {
     const token = `${SHARE_PREFIX}${randomBytes(24).toString('base64url')}`
-    await db.insert(artifactShares).values({ id: crypto.randomUUID(), artifactId, tokenHash: sha256(token), createdBy: userId })
+    const linkId = crypto.randomUUID()
+    await db.insert(artifactShares).values({ id: linkId, artifactId, tokenHash: sha256(token), createdBy: userId })
+    await db.execute(sql`insert into resource_access_events("resourceKind","resourceId","workspaceId","actorId","ownerId",revision,source,action,detail)
+      values('artifact',${artifactId}::uuid,${workspaceId}::uuid,${userId},${policy.ownerId},${policy.revision},'artifact_link','link_created',jsonb_build_object('linkId',${linkId}::text))`)
     await artifactChanged(db, userId, artifactId)
     return { token }
   })
@@ -274,23 +278,27 @@ export async function revokeShares(reader: ArtifactReader, artifactId: string): 
   const workspaceId = await artifactWorkspace(reader, artifactId)
   if (!workspaceId) return 0
   const { userId } = taskReaderScope(reader)
-  return withTaskWorkspace(reader, workspaceId, async () => {
+  return withResourceAccess(reader, { kind: 'artifact', id: artifactId, workspaceId }, 'canManageAccess', async policy => {
   const revoked = await db.update(artifactShares).set({ revokedAt: new Date() })
-    .where(and(eq(artifactShares.artifactId, artifactId), isNull(artifactShares.revokedAt), sql`exists (select 1 from ${artifacts} where ${artifacts.id} = ${artifactShares.artifactId} and ${artifacts.userId} = ${userId})`))
+    .where(and(eq(artifactShares.artifactId, artifactId), isNull(artifactShares.revokedAt)))
     .returning({ id: artifactShares.id })
-  if (revoked.length) await artifactChanged(db, userId, artifactId)
+  if (revoked.length) {
+    await db.execute(sql`insert into resource_access_events("resourceKind","resourceId","workspaceId","actorId","ownerId",revision,source,action,detail)
+      values('artifact',${artifactId}::uuid,${workspaceId}::uuid,${userId},${policy.ownerId},${policy.revision},'artifact_link','links_revoked',jsonb_build_object('count',${revoked.length}::integer))`)
+    await artifactChanged(db, userId, artifactId)
+  }
   return revoked.length
   })
 }
 
 /** The artifact a live share token opens, at its latest version. */
-export async function sharedArtifact(token: string): Promise<(ArtifactDetail & { content: string }) | null> {
-  if (!token.startsWith(SHARE_PREFIX)) return null
+export async function sharedArtifact(token: string, reader?: ArtifactReader | null): Promise<(ArtifactDetail & { content: string }) | null> {
+  if (!reader || !token.startsWith(SHARE_PREFIX)) return null
   const [share] = await db.select({ artifactId: artifactShares.artifactId, createdBy: artifactShares.createdBy }).from(artifactShares)
     .where(and(eq(artifactShares.tokenHash, sha256(token)), isNull(artifactShares.revokedAt))).limit(1)
   if (!share) return null
   // A removed/suspended issuer cannot leave an anonymous back door into a tenant.
-  const found = await detail(and(eq(artifacts.id, share.artifactId), await artifactAccess(share.createdBy)))
+  const found = await detail(and(eq(artifacts.id, share.artifactId), await artifactAccess(share.createdBy), await artifactAccess(reader)))
   if (!found) return null
   const content = await versionContent(found.id, found.latestVersion)
   return content === null ? null : { ...found, content }

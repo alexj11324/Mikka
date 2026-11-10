@@ -7,10 +7,11 @@ import { activeTaskWorkspaces, taskReaderScope } from '@/lib/task-workspace'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 
 export type ArtifactReader = string | { id: string; [tokenWorkspace]?: string; [enterprisePrincipal]?: EnterprisePrincipal }
 
-/** Workspace membership is necessary in addition to the existing owner ACL.
+/** Workspace membership is necessary in addition to the resource ACL.
  * Null legacy bindings are never assigned to a reader's current/personal tenant. */
 export async function artifactReadAccess(reader: ArtifactReader) {
   const { userId } = taskReaderScope(reader)
@@ -18,8 +19,8 @@ export async function artifactReadAccess(reader: ArtifactReader) {
   // Both reads belong to one list operation. Keep the complete reader at the
   // fresh membership/Enterprise gate; never retain these predicates as a cache.
   return {
-    artifactPredicate: and(eq(artifacts.userId, userId), workspaceIds.length
-      ? inArray(artifacts.workspaceId, workspaceIds) : sql`false`),
+    artifactPredicate: and(workspaceIds.length ? inArray(artifacts.workspaceId, workspaceIds) : sql`false`,
+      resourceAccessPredicate(userId, artifacts.workspaceId, 'artifact', artifacts.id)),
     taskPredicate: issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds }),
   }
 }

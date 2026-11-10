@@ -81,6 +81,8 @@ export interface SessionOptions {
   githubEnvironment?: Record<string, string>
   /** Trusted cloud runner: use the task machine's ordinary HOME and environment. */
   machineEnvironment?: true
+  /** Server-required, host-verified tool isolation; native CLI model calls remain direct. */
+  nativeCredentialIsolation?: import('@mikka/protocol/native-isolation').NativeCredentialIsolation
   /** Add a refreshed credential to the existing in-memory output masker before use. */
   onCredential?(name: string, value: string): void
   /** Trusted server-issued app entries (one MCP server each), never model-selected. */

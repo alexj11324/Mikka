@@ -1,6 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { listOwnerBots } from '@/lib/coordinator/coordinator-bot'
 import { ActionFailureError } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -29,7 +30,7 @@ async function getOwner() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const context = await loadWorkspaceContext(undefined, session.user)
-  return { ownerId: session.user.id, workspaceId: context.workspace.id }
+  return { ownerId: session.user.id, workspaceId: context.workspace.id, reader: { id: session.user.id, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } } }
 }
 
 /** The bot list: the person's bots here, their Coordinator first (lib/coordinator/coordinator-bot.ts listOwnerBots). */
@@ -39,8 +40,8 @@ export async function listBots(): Promise<BotView[]> {
 
 /** The list cache is bound to this actual authorized Owner/workspace read. */
 export async function pollBots() {
-  const { ownerId, workspaceId } = await getOwner()
-  return { items: await listOwnerBots(ownerId, workspaceId), live: { ownerId, workspaceId } }
+  const { ownerId, workspaceId, reader } = await getOwner()
+  return { items: await listOwnerBots(ownerId, workspaceId, reader), live: { ownerId, workspaceId } }
 }
 
 /**
@@ -61,7 +62,7 @@ export async function updateBot(input: { botId: string; name?: string; color?: s
 
 /** 设置 › 工作区 › Bot: the defaults a new bot starts with, and the choices. Any member may read. */
 export async function getWorkspaceBotDefaults(): Promise<ActionResult<BotDefaultOptions>> {
-  return workspaceAction(async () => botDefaultOptions((await currentWorkspaceActor()).workspaceId))
+  return workspaceAction(async () => { const actor = await currentWorkspaceActor(); return botDefaultOptions(actor.workspaceId, actor.reader) })
 }
 
 /** Set or clear (null) the default model and repository for new bots. Admins only. */
@@ -74,7 +75,7 @@ export async function updateWorkspaceBotDefaults(input: { defaultModel?: string 
 
 /** Every bot in the current workspace: owner, 空闲 or 运行中 · N 个线程. Any member may read. */
 export async function listWorkspaceBots(): Promise<ActionResult<{ bots: WorkspaceBotView[] }>> {
-  return workspaceAction(async () => ({ bots: await workspaceBots((await currentWorkspaceActor()).workspaceId) }))
+  return workspaceAction(async () => { const actor = await currentWorkspaceActor(); return { bots: await workspaceBots(actor.workspaceId, actor.reader) } })
 }
 
 /**
@@ -84,6 +85,6 @@ export async function listWorkspaceBots(): Promise<ActionResult<{ bots: Workspac
 export async function listBotThreads(input: { botId: string; limit?: number; cursor?: string | null }): Promise<SettingsActionResult<BotThreadPage>> {
   return settingsWorkspaceAction(async () => {
     const actor = await currentWorkspaceActor()
-    return listBotThreadsFor(actor.userId, actor.workspaceId, input)
+    return listBotThreadsFor(actor.reader, actor.workspaceId, input)
   })
 }

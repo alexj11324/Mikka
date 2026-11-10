@@ -21,6 +21,8 @@ export interface LiveRuntime {
   cancel(timer: Timer): void
   /** Optional metadata-only observer. It must never change transport behavior. */
   observe?(observation: LiveObservation): void
+  /** Security handling is distinct from the optional analytics observer. */
+  invalidateAccess?(workspaceId: string): void
 }
 export type LiveSubscriptionOptions = {
   /** Minimum spacing for changes, never for reconnect/visibility catch-up. */ minIntervalMs?: number
@@ -424,6 +426,7 @@ export class LiveChannel {
           if (message.data.length > 256) return
           const value = liveInvalidation(parsed, this.revisionKinds.size > 0)
           if (value) {
+            if (value.kind === 'resource_access') this.runtime.invalidateAccess?.(value.id)
             this.observe({ event: 'received', kind: value.kind, id: value.id, rev: value.rev })
             const after = readBoundary()
             this.invalidationAfter.set(value.kind, after)

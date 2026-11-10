@@ -49,7 +49,6 @@ export async function botModelMenu(
   inspectPreference = false,
 ): Promise<BotModelMenu & { preferenceState?: "absent" | "present" }> {
   const rows = await settings.chatModels(scope);
-  const pooled = botId && settings.pooledBindings ? await settings.pooledBindings(scope) : [];
   // Claude first, then ChatGPT/Codex, as the resolver orders them (orchestration §2).
   const ordered = [
     ...rows.filter((row) => row.provider === "claude"),
@@ -68,25 +67,15 @@ export async function botModelMenu(
     subscriptions.set(key, group);
     group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
   }
-  // API keys and custom providers that reach bot chats (C22): the person's own, then teammates' shared ones.
+  // Reuse the existing key picker for personal, Organization and explicitly shared API connections.
   const { usableApiKeys } = await import("./model-api-keys");
   const keys = (await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).filter((key) => apiKeyChatBaseUrl(key) && key.models.length);
   const keyOptions = (key: (typeof keys)[number]) =>
     key.models.map((model) => ({ id: apiKeyOptionId(key.id, model), modelId: model, provider: key.provider }));
   const keyLabel = (key: (typeof keys)[number]) => [key.name, key.last4 ? `····${key.last4}` : null].filter(Boolean).join(" ") || key.provider;
   const ownKeys = keys.filter((key) => key.mine);
-  const sharedOwners = [...new Set([...pooled.map(row => row.ownerId), ...keys.filter((key) => !key.mine).map((key) => key.ownerId)])];
+  const sharedOwners = [...new Set(keys.filter((key) => !key.mine && key.ownership !== "organization").map((key) => key.ownerId))];
   const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
-  const sharedSubscriptions = new Map<string, BotModelMenuGroup>();
-  for (const row of pooled) {
-    if (!ownerNames.has(row.ownerId)) continue;
-    const group: BotModelMenuGroup = sharedSubscriptions.get(row.connectionId) ?? {
-      kind: "subscription" as const, provider: row.provider, owner: ownerNames.get(row.ownerId)!,
-      credentialLabel: ownerNames.get(row.ownerId)!, options: [],
-    };
-    group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
-    sharedSubscriptions.set(row.connectionId, group);
-  }
   // Mikka 默认 is listed only where this chat's workspace has points for it, with how many (decision 2026-11-02-1450).
   const { hostedPointsHere } = await import("./points-fallback");
   const local = !isCloudEdition();
@@ -98,15 +87,14 @@ export async function botModelMenu(
   const groups: BotModelMenuGroup[] = [
     ...(usable ? [{ kind: "hosted" as const, ...(hostedSource ? { hostedSource } : { points, ...(points > 0 ? {} : { trialLeft }) }), options: [hostedOption] }] : []),
     ...subscriptions.values(),
-    ...sharedSubscriptions.values(),
     ...ownKeys.map((key) => ({ kind: "apiKey" as const, credentialLabel: keyLabel(key), options: keyOptions(key) })),
-    ...keys.filter((key) => !key.mine && ownerNames.has(key.ownerId)).map((key) => ({
-      kind: "shared" as const, owner: ownerNames.get(key.ownerId)!, credentialLabel: keyLabel(key), options: keyOptions(key),
+    ...keys.filter((key) => !key.mine && (key.ownership === "organization" || ownerNames.has(key.ownerId))).map((key) => ({
+      kind: "shared" as const, owner: key.organizationName ?? ownerNames.get(key.ownerId)!, credentialLabel: keyLabel(key), options: keyOptions(key),
     })),
   ];
   const preference = await botModelPreference(pool, scope, botId);
   const choice = await resolveBotModelChoice(pool, settings, scope, botId,
-    preference, { rows, pooled, keys, now });
+    preference, { rows, keys, now });
   const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
   if (choice.kind === "hosted") {
@@ -115,12 +103,12 @@ export async function botModelMenu(
     current = {
       id: apiKeyOptionId(choice.key.id, choice.model), modelId: choice.model, provider: choice.key.provider,
       kind: choice.key.mine ? "apiKey" : "shared", ...state, available: true, availability: "available",
-      credentialLabel: choice.key.mine ? keyLabel(choice.key) : [ownerNames.get(choice.key.ownerId), keyLabel(choice.key)].filter(Boolean).join(" · "),
+      credentialLabel: choice.key.mine ? keyLabel(choice.key) : [choice.key.organizationName ?? ownerNames.get(choice.key.ownerId), keyLabel(choice.key)].filter(Boolean).join(" · "),
       ...(choice.quota ? { quota: choice.quota } : {}),
     };
   } else {
     const binding = choice.binding;
-    const option = (choice.sharedOwnerId ? pooled : rows).find(item => item.connectionId === binding.connectionId && item.modelId === binding.modelId);
+    const option = rows.find(item => item.connectionId === binding.connectionId && item.modelId === binding.modelId);
     const availability = subscriptionAvailability(binding.quota, binding.modelId, binding.provider === "codex" ? "codex" : "claude", now);
     const sharedOwner = choice.sharedOwnerId ? ownerNames.get(choice.sharedOwnerId)
       ?? (await memberNames(scope.workspaceId, [choice.sharedOwnerId])).get(choice.sharedOwnerId) : undefined;
@@ -135,7 +123,7 @@ export async function botModelMenu(
   return { groups, current, ...(inspectPreference ? { preferenceState: !preference.key && preference.selected === undefined ? "absent" as const : "present" as const } : {}) };
 }
 
-/** Active members' public names for shared subscriptions and keys. Never the credential. */
+/** Active members' public names for explicitly shared API keys. Never the credential. */
 async function memberNames(workspaceId: string, userIds: string[]) {
   const [{ workspaceDb }, { workspaceMembers }, { and, eq, inArray }] = await Promise.all([
     import("./workspace-db"), import("./db/workspace-schema"), import("drizzle-orm"),

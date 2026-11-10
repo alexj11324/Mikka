@@ -27,6 +27,7 @@ const values = flag => process.argv.flatMap((arg, i) => arg === flag && process.
 const backend = createMikkaMcpBackend({
   handoffFile, capturesDir: values('--captures')[0] ?? null, captureRoots: values('--capture-root'),
   factoryVerify: value('--factory-verify') === undefined ? null : JSON.parse(value('--factory-verify')),
+  toolIsolation: value('--tool-isolation') === undefined ? null : JSON.parse(value('--tool-isolation')),
   artifactRoot: value('--factory-artifacts'), repositoryRoot: value('--repository-selection'),
   decisionUrl: process.env.MIKKA_DECISION_MCP_URL, decisionToken: process.env.MIKKA_DECISION_MCP_TOKEN,
   decisionCatalogue: process.env.MIKKA_DECISION_MCP_CATALOGUE,

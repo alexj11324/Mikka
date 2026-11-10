@@ -38,6 +38,16 @@ async function fixture(exit: Omit<ExitEvent, "type">) {
 }
 const failure = captureRunFailure({ provider: "openai", status: 429, error: { code: "insufficient_quota", message: "Account exhausted. opaque-task-secret" } }, { runId: "original", appVersion: "1.2.3", occurredAt: "2026-11-01T00:00:00.000Z" })
 
+it('refuses an isolation-required assignment before an unsupported adapter or bootstrap can execute', async () => {
+  const f = await fixture({ outcome: 'succeeded' })
+  const bootstrap = vi.spyOn(f.worktrees, 'bootstrap')
+  f.supervisor.start({ ...f.assignment, nativeCredentialIsolation: 'tools_v1' })
+  await f.supervisor.idle()
+  expect(f.adapter.start).not.toHaveBeenCalled()
+  expect(bootstrap).not.toHaveBeenCalled()
+  expect(f.journal.get(f.runId)?.state).toBe('failed')
+})
+
 it('persists measured tool durations before outbox batching and keeps task secrets masked', async () => {
   const f = await fixture({ outcome: 'succeeded' })
   vi.mocked(f.adapter.start).mockResolvedValueOnce({

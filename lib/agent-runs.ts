@@ -15,14 +15,15 @@ import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import type { RunModel } from '@/lib/computer/run-model'
-import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
+import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, users, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
-import { workspaceRunView } from '@/lib/run-visibility'
+import { sharedContentRunView } from '@/lib/run-visibility'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
@@ -73,7 +74,7 @@ export interface RunDetail {
   decisionWarnings?: ProjectDecisionWarning[]
   run: RunView
   chunks: Record<string, unknown>[]
-  messages: { id: string; text: string; createdAt: Date }[]
+  messages: { id: string; text: string; createdAt: Date; userId: string; author: string | null }[]
 }
 
 export const runViewColumns = {
@@ -213,10 +214,17 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
     } catch { throw invalid() }
     const { executionIdentitySchema } = await import('./execution-identity')
     const originalIdentity = executionIdentitySchema.safeParse(current.agentDefinition.executionIdentity)
-    if (!originalIdentity.success || originalIdentity.data.requester !== userId || originalIdentity.data.executionPrincipal !== userId ||
-      originalIdentity.data.outputOwner !== userId || originalIdentity.data.botId !== current.botId) throw new ActionFailureError('executionAccountUnavailable')
+    if (!originalIdentity.success || originalIdentity.data.executionPrincipal !== userId ||
+      originalIdentity.data.outputOwner !== userId || originalIdentity.data.botId !== current.botId ||
+      originalIdentity.data.requester !== (originalIdentity.data.actor ?? userId)) throw new ActionFailureError('executionAccountUnavailable')
+    // This admission targets an Owner's personal local computer. A delegated
+    // cloud run cannot recover here by silently replacing its Actor with Owner.
+    if ((originalIdentity.data.actor ?? userId) !== userId) throw new ActionFailureError('executionAccountUnavailable')
+    const originalModel = current.agentDefinition.apiKey?.model ?? current.agentDefinition.subscription?.modelId ?? current.agentDefinition.model
+    if (input.model !== originalModel || input.modelDispatch?.entry?.harness !== current.agentDefinition.harness) throw new ActionFailureError('executionAccountUnavailable')
     const result = await queueAdmittedRun(userId, {
       ...input, issueId: current.issueId!, repo: repo.remoteUrl,
+      threadRunId: current.id,
       requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
       readOnly: current.agentDefinition.readOnly,
     }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId, current.source,
@@ -231,8 +239,11 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
     // admission authenticates its replacement; the requester's standing scope
     // must still equal the original host-frozen identity.
     const nextIdentity = executionIdentitySchema.safeParse(definition.executionIdentity)
-    const standing = ['requester', 'executionPrincipal', 'outputOwner', 'botId', 'botOwner', 'workspaceId', 'personalResourcePolicy'] as const
-    if (!nextIdentity.success || standing.some(field => originalIdentity.data[field] !== nextIdentity.data[field])) throw new ActionFailureError('executionAccountUnavailable')
+    const standing = ['requester', 'executionPrincipal', 'outputOwner', 'botId', 'botOwner', 'workspaceId', 'personalResourcePolicy', 'collaborationAuthorizationId'] as const
+    if (!nextIdentity.success || standing.some(field => originalIdentity.data[field] !== nextIdentity.data[field]) ||
+      (originalIdentity.data.actor ?? originalIdentity.data.requester) !== (nextIdentity.data.actor ?? nextIdentity.data.requester) ||
+      (originalIdentity.data.threadOwner ?? originalIdentity.data.outputOwner) !== (nextIdentity.data.threadOwner ?? nextIdentity.data.outputOwner) ||
+      originalIdentity.data.billingAccount.model.ownerId !== nextIdentity.data.billingAccount.model.ownerId) throw new ActionFailureError('executionAccountUnavailable')
     return result
   })
 }
@@ -297,7 +308,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
       .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
   }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, threadRunId: input.threadRunId, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */
@@ -337,7 +348,7 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
     botWorkspaceId: botId ? workspaceId : null, choiceWorkspaceId: workspaceId, subscription, localLogin: true })
 }
 
-/** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */
+/** A fresh tenant gate and the resource ACL precede all content projections. */
 async function runVisibilityPredicate(reader: IssueReader, input: { issueId?: string; runIds?: string[]; teams?: readonly TeamScope[] }) {
   const userId = typeof reader === 'string' ? reader : reader.id
   // The persisted run/task tenant and fresh reader authority decide access.
@@ -345,9 +356,10 @@ async function runVisibilityPredicate(reader: IssueReader, input: { issueId?: st
   const visibility = await issueVisibility(reader, false, undefined, db, { teams: input.teams, withTeamLinks: false })
   const tenant = visibility.workspaceIds.length ? inArray(agentRuns.workspaceId, visibility.workspaceIds) : sql`false`
   const task = and(visibility.predicate, eq(agentRuns.workspaceId, issues.workspaceId))
-  // Task-bound runs use the exact same Task gate for every reader. Factoring
-  // it once avoids sending and evaluating the full recursive ACL twice.
-  return and(tenant, or(and(eq(agentRuns.userId, userId), isNull(agentRuns.issueId)), task))
+  // Factor the Task gate once; the Thread ACL also covers task-free shared
+  // conversations and never relies on a reader's administrative role.
+  return and(tenant, or(isNull(agentRuns.issueId), task),
+    resourceAccessPredicate(userId, agentRuns.workspaceId, 'thread', agentRuns.id))
 }
 
 /**
@@ -361,7 +373,7 @@ export async function visibleRunNames(reader: IssueReader, runIds: string[], tea
   if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
   const visible = await runVisibilityPredicate(reader, { runIds, teams })
   const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, agentName: runBotName, harness: runViewColumns.harness,
-    promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end` }).from(agentRuns)
+    promptHead: threadNameHead }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(visible, inArray(agentRuns.id, runIds))).limit(Math.max(1, Math.min(runIds.length, 100)))
   return rows.map(({ ownerId, ...row }) => ({ ...row, own: ownerId === userId }))
@@ -388,19 +400,19 @@ export async function visibleRuns(reader: IssueReader, input: { issueId?: string
     ? [{ id: row.waitDeviceId, lastSeenAt: row.lastSeenAt }] : []))
   return rows.map(({ ownerId, waitDeviceId, lastSeenAt, deviceEnabled, ...run }) => {
     const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, lastSeenAt, deviceEnabled, deviceOnline: waitDeviceId ? presence.get(waitDeviceId) : undefined })
-    return ownerId === userId ? { ...run, failureDetails: input.brief ? readCompactRunFailure(run.failureDetails) : readRunFailure(run.failureDetails), ...(waitFor ? { waitFor } : {}) } : workspaceRunView(run)
+    return ownerId === userId ? { ...run, failureDetails: input.brief ? readCompactRunFailure(run.failureDetails) : readRunFailure(run.failureDetails), ...(waitFor ? { waitFor } : {}) } : sharedContentRunView(run)
   })
 }
 
-export async function readRun(userId: string, runId: string): Promise<RunDetail | null> {
-  const [run] = await visibleRuns(userId, { runIds: [runId], limit: 1 })
+export async function readRun(reader: IssueReader, runId: string): Promise<RunDetail | null> {
+  const userId = typeof reader === 'string' ? reader : reader.id
+  const [run] = await visibleRuns(reader, { runIds: [runId], limit: 1 })
   if (!run) return null
-  // Empty agentId is the deliberately restricted teammate projection.
-  if (!run.agentId) return { run, chunks: [], messages: [] }
   const chunks = await db.select({ chunk: runChunks.chunk }).from(runChunks)
     .where(eq(runChunks.runId, run.id)).orderBy(asc(runChunks.seq))
-  const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt })
-    .from(runMessages).where(eq(runMessages.runId, run.id)).orderBy(asc(runMessages.createdAt))
+  const messages = await db.select({ id: runMessages.id, text: runMessages.text, createdAt: runMessages.createdAt,
+    userId: runMessages.userId, author: users.name })
+    .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId)).where(eq(runMessages.runId, run.id)).orderBy(asc(runMessages.createdAt))
   const decisionWarnings = await runDecisionWarnings(pool, userId, run.id)
   return { run, chunks: chunks.map(row => row.chunk), messages, decisionWarnings }
 }

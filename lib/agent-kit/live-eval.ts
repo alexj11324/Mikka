@@ -26,7 +26,9 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
   const coordinator = await isCoordinatorBot((await import('@/lib/db')).pool, scope.ownerId, botId)
   const hostInstructions = mode === 'live' ? await botInstructions(scope.ownerId,botId,COORDINATOR_INSTRUCTIONS) : ''
   const dependencies = { service:() => subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace }
-  const job = await store.beginEvaluation(scope,proposalId,requestId,mode,model,mode === 'live' ? { hostInstructions,resolveRuntime:definition => freezeHostedModelSelection(scope,{ harness:'ai_sdk',model:COORDINATOR_MODEL },definition.modelSelection,dependencies) } : undefined)
+  // The definition route authenticates this owner; a proposal cannot supply an actor.
+  const modelScope = { ...scope, actorId: scope.ownerId }
+  const job = await store.beginEvaluation(scope,proposalId,requestId,mode,model,mode === 'live' ? { hostInstructions,resolveRuntime:definition => freezeHostedModelSelection(modelScope,{ harness:'ai_sdk',model:COORDINATOR_MODEL },definition.modelSelection,dependencies) } : undefined)
   if (job.replayed) return { ...job.evaluation,replayed:true }
   const cases = [...CORE_EVAL_CASES,...job.evidence.slice(0,3).map(caseFromFailure)]
   try {
@@ -42,7 +44,7 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
       const tools = evaluationTools(registry,testCase,observations,definition)
       if (!job.execution) throw new AgentKitError('agentEvaluationSnapshotMissing')
       const frozenRuntime = job.execution.snapshot.runtime
-      const resolvedModel = await resolveFrozenHostedModel(scope,frozenRuntime,dependencies,signal)
+      const resolvedModel = await resolveFrozenHostedModel(modelScope,frozenRuntime,dependencies,signal)
       let failed=false
       const options = {
         model:resolvedModel,

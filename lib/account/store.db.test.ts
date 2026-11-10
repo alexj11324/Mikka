@@ -225,7 +225,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
       if (['bots', 'agent_runs', 'agents', 'run_messages', 'artifacts'].includes(table)) continue
       // Access evidence and the ACL of retained sources stay without turning
       // those sources public; verify those privacy guarantees below.
-      if (['resource_access_policies', 'resource_access_events'].includes(table)) continue
+      if (['resource_access_policies', 'resource_access_events', 'run_resource_disclosures'].includes(table)) continue
       const { rowCount } = await pool.query(`select 1 from "${table}" where "${column}" = $1 limit 1`, [alice])
       if (rowCount) left.push(`${table}.${column}`)
     }
@@ -265,8 +265,8 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
 
     // The bot list shows it with no owner, and 用量 groups it under 「待接管」.
     const { workspaceBots } = await import('../workspace-admin/bots')
-    const listed = (await workspaceBots(shared)).find(row => row.id === bot)
-    assert.deepEqual(listed && { ownerId: listed.ownerId, ownerName: listed.ownerName }, { ownerId: null, ownerName: null })
+    const listed = (await workspaceBots(shared, bob)).find(row => row.id === bot)
+    assert.equal(listed, undefined, 'admin metadata authority does not expose a departed owner\'s private Bot')
     const { workspaceUsage } = await import('../usage/read')
     const month = new Date().toISOString().slice(0, 7)
     const usage = await workspaceUsage(bob, shared, month)

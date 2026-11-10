@@ -2,9 +2,11 @@ import type { State } from 'swr'
 import { persistentReadData, persistentReadKey } from './cache-policy'
 import { IndexedReadStorage, type ReadStorage } from './indexed-db'
 
-export type ReadCacheScope = { userId: string; workspaceId: string; build: string; role: string; server?: string | null }
+export type ReadCacheScope = { userId: string; workspaceId: string; build: string; role: string; server?: string | null; accessProof?: string }
 export type ReadCacheState = State<unknown, unknown> & { _k?: unknown }
-export const readCacheNamespace = (scope: ReadCacheScope) => JSON.stringify(scope.server
+export const readCacheNamespace = (scope: ReadCacheScope) => JSON.stringify(scope.accessProof
+  ? [3, scope.server ?? '', scope.userId, scope.workspaceId, scope.build, scope.role, scope.accessProof]
+  : scope.server
   ? [2, scope.server, scope.userId, scope.workspaceId, scope.build, scope.role]
   : [1, scope.userId, scope.workspaceId, scope.build, scope.role])
 type Restore = (key: string, data: unknown) => Promise<unknown>
@@ -27,7 +29,11 @@ export function readAccessFailure(error: unknown): 'session' | 'workspace' | 're
  * cursor. Hydration never overwrites a newer server result or optimistic write. */
 export class PersistentReadCache extends Map<string, ReadCacheState> {
   readonly namespace: string | null
+  /** Authority for invalidation also survives the non-persistent fallback. */
+  private readonly authorityNamespace: string | null
   readonly ownerId: string | undefined
+  readonly workspaceId: string | undefined
+  readonly accessProof: string | undefined
   readonly hydrated: Promise<void>
   private finishHydration!: () => void
   private started = false
@@ -42,10 +48,13 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
   private invalidated?: (documentNavigation: boolean) => void
   private channel?: BroadcastChannel
 
-  constructor(scope: ReadCacheScope | null, private storage: ReadStorage = new IndexedReadStorage()) {
+  constructor(scope: ReadCacheScope | null, private storage: ReadStorage = new IndexedReadStorage(), persistent = true) {
     super()
     this.ownerId = scope?.userId
-    this.namespace = scope ? readCacheNamespace(scope) : null
+    this.workspaceId = scope?.workspaceId
+    this.accessProof = scope?.accessProof
+    this.authorityNamespace = scope ? readCacheNamespace(scope) : null
+    this.namespace = scope && persistent ? readCacheNamespace(scope) : null
     this.hydrated = new Promise(resolve => { this.finishHydration = resolve })
   }
 
@@ -147,13 +156,13 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
   connect(onInvalidated: (documentNavigation: boolean) => void) {
     this.invalidated = onInvalidated
     activeCaches.add(this)
-    if (typeof BroadcastChannel !== 'undefined' && this.namespace) {
+    if (typeof BroadcastChannel !== 'undefined' && this.authorityNamespace) {
       this.channel = new BroadcastChannel('mikka-read-cache')
       this.channel.onmessage = event => {
         const value = event.data as { type?: unknown; scope?: unknown } | null
-        if (value?.type === 'clear' && (!value.scope || value.scope === this.namespace) || value?.type === 'scope' && value.scope !== this.namespace) this.invalidate(false)
+        if (value?.type === 'clear' && (!value.scope || value.scope === this.authorityNamespace) || value?.type === 'scope' && value.scope !== this.authorityNamespace) this.invalidate(false)
       }
-      this.channel.postMessage({ type: 'scope', scope: this.namespace })
+      this.channel.postMessage({ type: 'scope', scope: this.authorityNamespace })
     }
     return () => {
       activeCaches.delete(this)
@@ -179,8 +188,8 @@ export class PersistentReadCache extends Map<string, ReadCacheState> {
     this.finishHydration()
     // Clear after any writes already in flight; future writes are disabled.
     // Retiring an old tab must not clear a newly activated account's namespace.
-    void this.enqueue(() => this.storage.clear(this.namespace ?? undefined)).catch(() => undefined)
-    if (broadcast) this.channel?.postMessage({ type: 'clear', scope: this.namespace })
+    if (this.namespace) void this.enqueue(() => this.storage.clear(this.namespace!)).catch(() => undefined)
+    if (broadcast) this.channel?.postMessage({ type: 'clear', scope: this.authorityNamespace })
     this.invalidated?.(documentNavigation)
   }
 
@@ -199,6 +208,13 @@ export function readCacheShareNamespace(cache: object, ownerId: string): string 
 
 /** Successful logout, account deletion and workspace/account switches share
  * this path. No token, account content or credential is broadcast. */
+/** Validated access events retire in-flight requests and mounted child state. */
+export async function invalidateResourceAccessCaches(workspaceId: string, proof?: string) {
+  const affected=[...activeCaches].filter(cache => cache.workspaceId === workspaceId && (!proof || cache.accessProof !== proof))
+  if(affected.length)(await import('../chat-drafts')).clearChatDrafts()
+  await Promise.all(affected.map(cache => cache.invalidate()))
+}
+
 export async function clearPersistentReadCaches(options: { documentNavigation?: boolean } = {}) {
   // Invalidating calls React subscribers, which may unregister or create a
   // provider. Work on one snapshot so none of its pending writes escape the wait.

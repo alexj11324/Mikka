@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedProject, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
@@ -28,6 +28,77 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const stored = async (id: string) => { const { rows: [row] } = await pool.query('select * from workspace_secrets where id=$1', [id]); return secretCrypto.openSecret(row, secretCrypto.secretAad(row)) }
   const META_KEYS = ['delivery', 'id', 'kind', 'name', 'note', 'scopeRef', 'scopeType', 'updatedAt', 'updatedBy']
   const DIRECT = { mode: 'direct', exposeToAgent: true } as const
+
+  await t.test('Project and Thread Secrets use canonical ACLs; Admin metadata cannot reveal private names or grant execution', async () => {
+    const owner = await seedUser(pool, 'scoped-owner'), peer = await seedUser(pool, 'scoped-peer'), administrator = await seedUser(pool, 'scoped-admin')
+    const tenant = await seedWorkspace(pool, administrator, [{ userId: administrator, role: 'admin' }, { userId: owner, role: 'member' }, { userId: peer, role: 'member' }])
+    const team = await seedTeam(pool, tenant.id, administrator)
+    const project = await seedProject(pool, owner, [{ teamId: team.id, workspaceId: tenant.id }])
+    const task = await seedIssue(pool, owner, tenant.id), agentId = await seedAgent(pool, owner), runId = randomUUID()
+    await pool.query('update resource_access_policies set visibility=\'private\' where kind=\'project\' and id=$1', [project])
+    await pool.query('update resource_access_policies set "parentKind"=\'project\',"parentId"=$2 where kind=\'task\' and id=$1', [task, project])
+    await pool.query('insert into agent_runs(id,"userId","workspaceId","agentId","issueId",status) values($1,$2,$3,$4,$5,\'queued\')', [runId, owner, tenant.id, agentId, task])
+    await pool.query('update resource_access_policies set visibility=\'shared\' where kind=\'thread\' and id=$1', [runId])
+    const privateName = 'PRIVATE_PROJECT_TOKEN', threadName = 'PRIVATE_THREAD_TOKEN'
+    const { secretAuditHook } = await import('../lib/secrets/audit')
+    const audit = secretAuditHook({ id: owner, name: 'Owner' })
+    const projectSecret = await store.createWorkspaceSecret(owner, tenant.id, { name: privateName, kind: 'secret', value: 'synthetic-project-only', scope: { type: 'project', projectId: project } }, audit)
+    const threadSecret = await store.createWorkspaceSecret(owner, tenant.id, { name: threadName, kind: 'secret', value: 'synthetic-thread-only', scope: { type: 'thread', threadId: runId } }, audit)
+    const events = (await pool.query('select "targetLabel",metadata from workspace_audit_events where "workspaceId"=$1', [tenant.id])).rows
+    assert.deepEqual(events.map(row => row.targetLabel).sort(), [projectSecret.id, threadSecret.id].sort())
+    assert.ok(!JSON.stringify(events).includes(privateName) && !JSON.stringify(events).includes(threadName), 'administrative audits contain opaque references, not private Secret names')
+    for (const actor of [peer, administrator]) {
+      assert.deepEqual(await store.listWorkspaceSecrets(actor, tenant.id), [])
+      await rejects(store.replaceWorkspaceSecret(actor, tenant.id, { id: projectSecret.id, note: 'not authorized' }), 'secretNotFound')
+      await rejects(store.deleteWorkspaceSecret(actor, tenant.id, { id: threadSecret.id }), 'secretNotFound')
+      await rejects(store.createWorkspaceSecret(actor, tenant.id, { name: 'FORGED_SCOPE', kind: 'env', value: 'x', scope: { type: 'project', projectId: project } }), 'secretNotFound')
+    }
+    await rejects(store.createWorkspaceSecret(administrator, other.id, { name: 'FOREIGN_SCOPE', kind: 'env', value: 'x', scope: { type: 'thread', threadId: runId } }), 'secretNotFound')
+    await pool.query('insert into resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities) values(\'project\',$1,\'account\',$2,$3)', [project, peer, ['canReadContent']])
+    assert.deepEqual((await store.listWorkspaceSecrets(peer, tenant.id)).map(row => row.name).sort(), [privateName, threadName].sort())
+    await rejects(store.replaceWorkspaceSecret(peer, tenant.id, { id: threadSecret.id, value: 'denied-change' }), 'secretNotFound')
+    await pool.query('delete from resource_access_grants where "resourceKind"=\'project\' and "resourceId"=$1', [project])
+    assert.deepEqual(await store.listWorkspaceSecrets(peer, tenant.id), [], 'revocation is inherited immediately')
+    await store.deleteWorkspaceSecret(owner, tenant.id, { id: projectSecret.id })
+    await store.deleteWorkspaceSecret(owner, tenant.id, { id: threadSecret.id })
+  })
+
+  await t.test('effective private ancestry and actual Actor determine Secret inheritance; Thread scope overrides Personal without exposing it to peers', async () => {
+    const owner = await seedUser(pool, 'inherit-owner'), peer = await seedUser(pool, 'inherit-peer')
+    const tenant = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
+    const team = await seedTeam(pool, tenant.id, owner)
+    const project = await seedProject(pool, owner, [{ teamId: team.id, workspaceId: tenant.id }])
+    const task = await seedIssue(pool, owner, tenant.id), agentId = await seedAgent(pool, owner), runId = randomUUID()
+    await pool.query('update resource_access_policies set visibility=\'private\' where kind=\'project\' and id=$1', [project])
+    await pool.query('update resource_access_policies set "parentKind"=\'project\',"parentId"=$2 where kind=\'task\' and id=$1', [task, project])
+    await pool.query('insert into agent_runs(id,"userId","workspaceId","agentId","issueId",status) values($1,$2,$3,$4,$5,\'queued\')', [runId, owner, tenant.id, agentId, task])
+    await pool.query('update resource_access_policies set visibility=\'shared\' where kind=\'thread\' and id=$1', [runId])
+    const runtime = await import('../lib/secrets/runtime'), personal = await import('../lib/secrets/user-store')
+    const inject = () => runtime.taskSecretInjection(tenant.id, 'fixture/scoped', process.env, undefined, owner, { runId })
+    const common = { name: 'SCOPED_VALUE', kind: 'env' as const }
+    await store.createWorkspaceSecret(owner, tenant.id, { ...common, value: 'workspace' })
+    await store.createWorkspaceSecret(owner, tenant.id, { ...common, value: 'repository', scope: { type: 'repository', repository: 'fixture/scoped' } })
+    assert.equal((await inject()).env.SCOPED_VALUE, 'repository')
+    await store.createWorkspaceSecret(owner, tenant.id, { ...common, value: 'project', scope: { type: 'project', projectId: project } })
+    assert.equal((await inject()).env.SCOPED_VALUE, 'project')
+    await personal.createUserSecret(owner, { ...common, value: 'personal', overrideWorkspace: true }, { workspaceId: tenant.id })
+    await personal.createUserSecret(owner, { name: 'PERSONAL_ONLY', kind: 'env', value: 'private-marker' }, {})
+    assert.equal((await inject()).env.SCOPED_VALUE, 'personal')
+    const threadSecret = await store.createWorkspaceSecret(owner, tenant.id, { ...common, value: 'thread', scope: { type: 'thread', threadId: runId } })
+    assert.equal((await inject()).env.SCOPED_VALUE, 'thread')
+    await pool.query('insert into resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities) values(\'project\',$1,\'account\',$2,$3)', [project, peer, ['canReadContent', 'canSteer']])
+    assert.equal((await inject()).env.PERSONAL_ONLY, undefined, 'Owner acting in a shared readable thread must not leak Personal values')
+    await pool.query('update agent_runs set "agentDefinition"=$2 where id=$1', [runId, { executionIdentity: { actor: peer } }])
+    const collaborative = await inject()
+    assert.equal(collaborative.env.SCOPED_VALUE, 'thread')
+    assert.equal(collaborative.env.PERSONAL_ONLY, undefined)
+    assert.equal(collaborative.resourceContext?.actorId, peer)
+    const before = collaborative.snapshot
+    await store.replaceWorkspaceSecret(owner, tenant.id, { id: threadSecret.id, value: 'thread-rotated' })
+    assert.notEqual((await inject()).snapshot, before, 'the claim fence changes with scoped Secret revisions')
+    await pool.query('update resource_access_grants set "expiresAt"=now()-interval \'1 second\' where "resourceKind"=\'project\' and "resourceId"=$1', [project])
+    await assert.rejects(inject(), (error: unknown) => (error as { code?: string }).code === 'issueNotFound')
+  })
   const consumer = async (owner: string, workspaceId: string | null, options: { repository?: string; status?: string; legacyWorkspaceId?: string; legacy?: boolean } = {}) => {
     const deviceId = randomUUID(), runId = randomUUID(), agentId = await seedAgent(pool, owner)
     await pool.query('insert into devices (id,"ownerId",name,kind) values ($1,$2,$3,$4)', [deviceId, owner, 'secret-consumer', options.legacyWorkspaceId ? 'cloud' : 'local'])

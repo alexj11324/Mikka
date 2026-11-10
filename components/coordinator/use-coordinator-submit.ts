@@ -7,12 +7,13 @@ import { sendCoordinatorMessage } from '@/app/actions/coordinator'
 import { createCoordinatorSubmitter, readActionOutcome, type SubmitOutcome } from '@/lib/coordinator-client-submission'
 import type { ArtifactQuote } from '@/lib/artifacts/quote'
 import type { BrowserNote } from '@/lib/browser/note'
-import type { TaskDestination } from '@/lib/task-destination'
+import type { TaskDestination, TaskCreation } from '@/lib/task-destination'
 
 export type CoordinatorMessageContext = {
   quote?: ArtifactQuote | null
   botId?: string | null
   taskDestination?: TaskDestination
+  taskCreation?: TaskCreation
   profileId?: string
   /** The composer's captured target; the server checks it against its trusted selection. */
   expectedWorkspaceId?: string
@@ -38,7 +39,7 @@ export function useCoordinatorSubmit() {
   const submit = useCallback((text: string, context?: CoordinatorMessageContext) => {
     submitter.current ??= createCoordinatorSubmitter({ currentOwner, transport: async submission => {
       const details = submission.context as CoordinatorMessageContext | undefined
-      const expectation: [expectedWorkspaceId?: string] = details?.expectedWorkspaceId === undefined ? [] : [details.expectedWorkspaceId]
+      const expectation: [expectedWorkspaceId?: string,taskCreation?:TaskCreation] = details?.taskCreation ? [details.expectedWorkspaceId,details.taskCreation] : details?.expectedWorkspaceId === undefined ? [] : [details.expectedWorkspaceId]
       const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf, details?.profileId, ...expectation)
       return readActionOutcome(result)
     } })

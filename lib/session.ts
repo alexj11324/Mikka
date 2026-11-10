@@ -4,4 +4,4 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 
 // React cache is scoped to one server render, never shared between users or requests.
-export const getSession = cache(async () => auth.api.getSession({ headers: await headers() }))
+export const getSession = cache(async () => auth.api.getSession({ headers: await headers(),query:{disableCookieCache:true} }))

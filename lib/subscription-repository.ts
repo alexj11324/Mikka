@@ -128,24 +128,17 @@ export class SubscriptionRepository {
   async nativeBinding(ownerId: string, consumerId: string, harness: string, bindingId?: string, workspaceId?: string, options: { currentConnection?: true } = {}) {
     if (harness !== 'codex' && harness !== 'claude_code') return null
     const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
-    // The task's Agent belongs to the caller. A binding may still belong to a different person
-    // who shared a subscription in this workspace; retain that owner for quota, leases and revocation.
+    // Both the Agent and subscription belong to the execution Owner. Legacy
+    // workspace grants cannot authorize another person's subscription.
     const { rows: [row] } = await this.pool.query<{ id: string; ownerId: string; workspaceId: string }>(
       `SELECT b.id,b."ownerId",b."workspaceId" FROM byos_bindings b JOIN agents a ON a.id::text=b."consumerId" AND a."userId"=$1
         WHERE b."consumerId"=$2 AND b.route=$3 AND ($4::uuid IS NULL OR b.id=$4) AND ($5::text IS NULL OR b."workspaceId"=$5)
           AND ${runMayUseCredentialSql('b."ownerId"', '$1', 'b."workspaceId"')}
         ORDER BY b."createdAt" DESC,b.id DESC LIMIT 1`, [ownerId, consumerId, route, bindingId ?? null, workspaceId ?? null])
-    if (!row) return null
-    if (row.ownerId !== ownerId) {
-      try {
-        const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
-        await authorizeSubscriptionWorkspace(ownerId, row.workspaceId)
-        await authorizeSubscriptionWorkspace(row.ownerId, row.workspaceId, ownerId)
-      } catch { return null }
-    }
+    if (!row || row.ownerId !== ownerId) return null
     if (!options.currentConnection) return this.binding(row.ownerId, row.id)
-    // Membership may have awaited a different database. Re-read this exact
-    // binding, its original scope and its current connection together after it;
+    // Re-read the exact selected binding, its original scope and its current
+    // connection after discovery;
     // never fall through to an older binding if the selected one was revoked.
     const { rows: [current] } = await this.pool.query(`SELECT b.id,b."ownerId",b."workspaceId",b."consumerId",b."connectionId",b."connectionRevision",b.route,b."modelId"
       FROM byos_bindings b JOIN agents a ON a.id::text=b."consumerId" AND a."userId"=$1

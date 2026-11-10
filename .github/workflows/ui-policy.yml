@@ -214,6 +214,13 @@ jobs:
           ffmpeg-github-token: ${{ github.token }}
       - name: Daemon unit and transport regression tests
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
+      - name: Official native CLI credential and tool isolation
+        # Real namespace/process/file attacks. No skips, host-policy changes,
+        # provider credentials, fabricated model success or sandbox fallback.
+        timeout-minutes: 6
+        run: pnpm --filter @mikka/daemon test:native-isolation | tee "$RUNNER_TEMP/pr1849-native-isolation.txt"
+        env:
+          MIKKA_NATIVE_ISOLATION_HARNESSES: ${{ runner.temp }}/mikka-native-isolation-harnesses
       - name: Existing mailbox CLI integration tests
         run: pnpm --filter @mikka/daemon test:mailbox-cli
       # Part of the daemon's own test script, which otherwise runs only when main publishes.
@@ -232,7 +239,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pr13-cli-diagnostics-${{ github.sha }}
-          path: ${{ runner.temp }}/pr13-daemon-unit-results.json
+          path: |
+            ${{ runner.temp }}/pr13-daemon-unit-results.json
+            ${{ runner.temp }}/pr1849-native-isolation.txt
           if-no-files-found: warn
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/daemon build

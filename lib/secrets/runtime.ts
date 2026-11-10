@@ -11,6 +11,7 @@ import { isReservedEnvName, repositoryRef } from './format'
 import type { SecretAuditHook } from './store'
 import { createSecretMasker, identityMasker, maskDeep, withCredentialMasking, type Masker } from './mask'
 import { effectiveSecretDelivery, type SecretDelivery } from './delivery'
+import { runResourceContext, type RunResourceContext } from '@/lib/run-private-resources'
 
 // The settings store (and its workspace-access chain) loads only when the encryption key is configured and a query runs.
 const guardSecretsDb: typeof import('./store').guardSecretsDb = async (work, onUnique) => (await import('./store')).guardSecretsDb(work, onUnique)
@@ -25,36 +26,64 @@ export function secretRevision(row: SecretRevisionRow): string {
     row.scopeRef ?? null, row.ciphertext, row.iv, row.keyVersion, effectiveSecretDelivery(row.delivery)])).digest('hex')
 }
 
-function snapshotOf(secrets: Array<{ name: string; revision?: string }>): string {
-  return createHash('sha256').update(JSON.stringify(secrets.map(secret => [secret.name, secret.revision])
-    .sort((a, b) => a[0]!.localeCompare(b[0]!)))).digest('hex')
+function snapshotOf(secrets: Array<{ name: string; revision?: string }>, context?: RunResourceContext): string {
+  return createHash('sha256').update(JSON.stringify([context?.snapshot ?? null, secrets.map(secret => [secret.name, secret.revision])
+    .sort((a, b) => a[0]!.localeCompare(b[0]!))])).digest('hex')
+}
+
+export type TaskSecretRun = { runId: string }
+type SecretQuery = Pick<typeof db, 'select' | 'execute'>
+
+async function contextFor(workspaceId: string | null, ownerId: string | null | undefined, run: TaskSecretRun | undefined, query: SecretQuery) {
+  if (!run) return undefined
+  if (!workspaceId || !ownerId) throw new E2BKeyError('e2b_unavailable', 'task scope unavailable')
+  return runResourceContext(run.runId, workspaceId, ownerId, query)
+}
+
+function sharedScope(repository: string | null, context?: RunResourceContext) {
+  return or(eq(workspaceSecrets.scopeType, 'workspace'),
+    repository ? and(eq(workspaceSecrets.scopeType, 'repository'), eq(workspaceSecrets.scopeRef, repository.toLowerCase())) : undefined,
+    ...(context?.scopes.map(scope => and(eq(workspaceSecrets.scopeType, scope.kind), eq(workspaceSecrets.scopeRef, scope.id))) ?? []))
+}
+
+function scopeRank(row: { scopeType: string; scopeRef: string }, context?: RunResourceContext) {
+  if (row.scopeType === 'workspace') return 0
+  if (row.scopeType === 'repository') return 1
+  const depth = context?.scopes.find(scope => scope.kind === row.scopeType && scope.id === row.scopeRef)?.depth ?? 32
+  return (row.scopeType === 'thread' ? 1000 : 100) - depth
 }
 
 /** Metadata only, in the caller's claim/renewal transaction. No plaintext is
  * opened and no data-plane request calls this function. */
 export async function taskSecretMetadata(workspaceId: string | null, repository: string | null, ownerId: string,
-  query: Pick<typeof db, 'select'> = db, names?: readonly string[]): Promise<Array<{ id: string; name: string; kind: 'secret' | 'env'; revision: string; delivery: SecretDelivery }>> {
+  query: SecretQuery = db, names?: readonly string[], run?: TaskSecretRun): Promise<Array<{ id: string; name: string; kind: 'secret' | 'env'; revision: string; delivery: SecretDelivery }>> {
+  const context = await contextFor(workspaceId, ownerId, run, query)
+  return metadataFor(workspaceId, repository, ownerId, query, names, context)
+}
+
+async function metadataFor(workspaceId: string | null, repository: string | null, ownerId: string,
+  query: SecretQuery, names?: readonly string[], context?: RunResourceContext) {
   if (names && !names.length) return []
-  const scope = repository
-    ? or(eq(workspaceSecrets.scopeType, 'workspace'), and(eq(workspaceSecrets.scopeType, 'repository'), eq(workspaceSecrets.scopeRef, repository.toLowerCase())))
-    : eq(workspaceSecrets.scopeType, 'workspace')
   const shared = workspaceId ? await query.select({ id: workspaceSecrets.id, name: workspaceSecrets.name, kind: workspaceSecrets.kind,
     ciphertext: workspaceSecrets.ciphertext, iv: workspaceSecrets.iv, keyVersion: workspaceSecrets.keyVersion, delivery: workspaceSecrets.delivery,
     scopeType: workspaceSecrets.scopeType, scopeRef: workspaceSecrets.scopeRef }).from(workspaceSecrets)
-    .where(and(eq(workspaceSecrets.workspaceId, workspaceId), scope, names ? inArray(workspaceSecrets.name, [...names]) : undefined)) : []
-  const own = await query.select({ id: userSecrets.id, name: userSecrets.name, kind: userSecrets.kind, ciphertext: userSecrets.ciphertext,
+    .where(and(eq(workspaceSecrets.workspaceId, workspaceId), sharedScope(repository, context), names ? inArray(workspaceSecrets.name, [...names]) : undefined)) : []
+  const own = context?.personalResources ? await query.select({ id: userSecrets.id, name: userSecrets.name, kind: userSecrets.kind, ciphertext: userSecrets.ciphertext,
     iv: userSecrets.iv, keyVersion: userSecrets.keyVersion, delivery: userSecrets.delivery }).from(userSecrets)
-    .where(and(eq(userSecrets.userId, ownerId), names ? inArray(userSecrets.name, [...names]) : undefined))
+    .where(and(eq(userSecrets.userId, ownerId), names ? inArray(userSecrets.name, [...names]) : undefined)) : []
   const effective = new Map<string, typeof shared[number] | typeof own[number]>()
-  for (const row of [...shared].sort((a, b) => Number(a.scopeType === 'repository') - Number(b.scopeType === 'repository'))) effective.set(row.name, row)
+  const ordered = [...shared].sort((a, b) => scopeRank(a, context) - scopeRank(b, context))
+  for (const row of ordered.filter(row => row.scopeType !== 'thread')) effective.set(row.name, row)
   for (const row of own) effective.set(row.name, row)
+  for (const row of ordered.filter(row => row.scopeType === 'thread')) effective.set(row.name, row)
   return [...effective.values()].map(row => ({ id: row.id, name: row.name, kind: row.kind,
     revision: secretRevision(row), delivery: effectiveSecretDelivery(row.delivery) }))
 }
 
 export async function taskSecretSnapshot(workspaceId: string | null, repository: string | null, ownerId: string,
-  query: Pick<typeof db, 'select'> = db): Promise<string> {
-  return snapshotOf(await taskSecretMetadata(workspaceId, repository, ownerId, query))
+  query: SecretQuery = db, run?: TaskSecretRun): Promise<string> {
+  const context = await contextFor(workspaceId, ownerId, run, query)
+  return snapshotOf(await metadataFor(workspaceId, repository, ownerId, query, undefined, context), context)
 }
 
 /** Workspace-scoped secrets and env vars, decrypted. Repository-scoped rows are not included. */
@@ -125,17 +154,15 @@ export async function loadUserRuntimeSecrets(ownerId: string, env: Env = process
   })
 }
 
-export async function loadTaskRuntimeSecrets(workspaceId: string | null, repository: string | null, env: Env = process.env, ownerId?: string | null): Promise<RuntimeSecret[]> {
-  const repo = repository?.toLowerCase() ?? null
-  const scope = repo
-    ? or(eq(workspaceSecrets.scopeType, 'workspace'), and(eq(workspaceSecrets.scopeType, 'repository'), eq(workspaceSecrets.scopeRef, repo)))
-    : eq(workspaceSecrets.scopeType, 'workspace')
-  const rows = workspaceId ? await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), scope))) : []
-  const rank = (row: typeof rows[number]) => row.scopeType === 'repository' ? 1 : 0
+export async function loadTaskRuntimeSecrets(workspaceId: string | null, repository: string | null, env: Env = process.env, ownerId?: string | null,
+  context?: RunResourceContext): Promise<RuntimeSecret[]> {
+  const rows = workspaceId ? await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), sharedScope(repository, context)))) : []
+  const ordered = [...rows].sort((a, b) => scopeRank(a, context) - scopeRank(b, context))
   const merged = new Map<string, RuntimeSecret>()
-  for (const row of [...rows].sort((a, b) => rank(a) - rank(b))) merged.set(row.name, openRuntime(row, env))
-  // The run owner's own secrets win over workspace and repository values of the same name.
-  if (ownerId) for (const secret of await loadUserRuntimeSecrets(ownerId, env)) merged.set(secret.name, secret)
+  for (const row of ordered.filter(row => row.scopeType !== 'thread')) merged.set(row.name, openRuntime(row, env))
+  // Owner identity alone cannot grant private values to a shared execution.
+  if (ownerId && context?.personalResources) for (const secret of await loadUserRuntimeSecrets(ownerId, env)) merged.set(secret.name, secret)
+  for (const row of ordered.filter(row => row.scopeType === 'thread')) merged.set(row.name, openRuntime(row, env))
   return [...merged.values()]
 }
 
@@ -151,15 +178,18 @@ export interface TaskSecretInjection {
   protectedSecrets: RuntimeSecret[]
   unavailable: string[]
   snapshot?: string
+  /** Server-only authorization snapshot, also used for Git/MCP delivery. */
+  resourceContext?: RunResourceContext
 }
 
-export async function taskSecretInjection(workspaceId: string | null, repository: string | null, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }, ownerId?: string | null): Promise<TaskSecretInjection> {
-  if (!workspaceSecretsConfigured(env)) return { env: {}, secretNames: [], protectedSecrets: [], unavailable: [] }
-  const secrets = await loadTaskRuntimeSecrets(workspaceId, repository, env, ownerId)
+export async function taskSecretInjection(workspaceId: string | null, repository: string | null, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }, ownerId?: string | null, run?: TaskSecretRun): Promise<TaskSecretInjection> {
+  const resourceContext = await contextFor(workspaceId, ownerId, run, db)
+  if (!workspaceSecretsConfigured(env)) return { env: {}, secretNames: [], protectedSecrets: [], unavailable: [], ...(resourceContext ? { resourceContext } : {}) }
+  const secrets = await loadTaskRuntimeSecrets(workspaceId, repository, env, ownerId, resourceContext)
   const direct = secrets.filter(secret => secret.kind === 'env' || effectiveSecretDelivery(secret.delivery).mode === 'direct')
   const injected = await reservedInjectionFilter(workspaceId ?? 'personal', direct, workspaceId ? skipped : undefined)
   const protectedSecrets = secrets.filter(secret => secret.kind === 'secret' && effectiveSecretDelivery(secret.delivery).mode === 'protected' && !isReservedEnvName(secret.name))
-  return { env: injected, secretNames: direct.filter(secret => secret.kind === 'secret' && Object.hasOwn(injected, secret.name)).map(secret => secret.name), snapshot: snapshotOf(secrets),
+  return { env: injected, secretNames: direct.filter(secret => secret.kind === 'secret' && Object.hasOwn(injected, secret.name)).map(secret => secret.name), snapshot: snapshotOf(secrets, resourceContext), resourceContext,
     protectedSecrets: protectedSecrets.filter(secret => effectiveSecretDelivery(secret.delivery).mode === 'protected' && secret.delivery?.mode === 'protected' && secret.delivery.http),
     unavailable: protectedSecrets.filter(secret => secret.delivery?.mode !== 'protected' || !secret.delivery.http).map(secret => secret.name) }
 }

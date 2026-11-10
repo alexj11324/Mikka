@@ -4,8 +4,10 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ChevronDown, ChevronRight, ScanSearch } from 'lucide-react-native'
-import { BotBubble, MyBubble } from '@/components/chat'
+import { ChevronDown, ChevronRight, ScanSearch, UsersRound } from 'lucide-react-native'
+import { BotBubble } from '@/components/chat'
+import { ThreadPersonMessage } from '@/components/ThreadPersonMessage'
+import { ResourceAccessSheet, ThreadExecutionChoice } from '@/components/ResourceAccessSheet'
 import { Spinner } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -22,7 +24,8 @@ import { api, ApiError } from '@/lib/api'
 import { useHome } from '@/lib/home'
 import { tasksLive, threadLive } from '@/lib/live-keys'
 import { composerStops } from '@/lib/stop'
-import { threadSendErrorLine } from '@/lib/thread-send-error'
+import { useThreadSend } from '@/lib/useThreadSend'
+import { apiCache } from '@/lib/api-cache'
 import { runErrorLine } from '@/lib/run-error'
 import type { TaskDetail, ThreadDetail, ThreadItem } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
@@ -65,27 +68,12 @@ export function TaskConversationScreen() {
   const segments = data ? conversationSegments(data.detail.activity, new Map(Object.entries(data.threads))) : []
   const newest = segments.at(-1)?.attempt.runId ?? null
   const live = newest ? data?.threads[newest] ?? null : null
-  const [sending, setSending] = useState(false)
-  const [sendFailed, setSendFailed] = useState<string | null>(null)
+  const [accessOpen,setAccessOpen]=useState(false),[executionGrantId,setExecutionGrantId]=useState('')
+  const {send,sending,sendFailed}=useThreadSend(newest,executionGrantId,reload)
+  const owned=live?.thread.ownedByCurrentUser!==false
   const stopper = useStop(() => api(`/api/mobile/threads/${newest}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(live?.active), reload)
-
-  const send = async (text: string) => {
-    if (!newest) return false
-    setSending(true)
-    setSendFailed(null)
-    try {
-      await api(`/api/mobile/threads/${newest}`, { method: 'POST', body: { text } })
-      await reload()
-      return true
-    } catch (failure) {
-      setSendFailed(threadSendErrorLine(failure instanceof ApiError && failure.status < 500 ? failure.code : null))
-      return false
-    } finally {
-      setSending(false)
-    }
-  }
 
   const task = data?.detail.task
   const agent = currentAgent(segments)
@@ -112,6 +100,7 @@ export function TaskConversationScreen() {
             {agent ? <Text style={styles.subtitle} numberOfLines={1}>{agent}</Text> : null}
           </View>
         ) : undefined}
+        right={newest?{icon:'person.2',label:mobileMessages.ResourceAccess.manage,web:<UsersRound size={18} color={colors.ink} />,onPress:()=>setAccessOpen(true)}:undefined}
       />
       <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
@@ -138,8 +127,10 @@ export function TaskConversationScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
-      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id: newest }}
-        onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {live&&newest&&live.thread.canContribute!==false?<Composer key={`${newest}:${apiCache.context()}`} placeholder={mobileMessages.MobileCore.messageTask} onSend={send} disabled={sending} sendDisabled={!owned&&!!executionGrantId&&live.active}
+        notice={!owned?<ThreadExecutionChoice id={newest} value={executionGrantId} active={live.active} onChange={setExecutionGrantId} />:undefined}
+        attach attachmentScope={{kind:'thread',id:newest}} onStop={owned&&composerStops(live)&&!stopper.sending?()=>void stopper.stop():undefined} />:live?<Text style={styles.subtitle}>{mobileMessages.ResourceAccess.readOnly}</Text>:null}
+      {live&&newest?<ResourceAccessSheet kind="thread" id={newest} open={accessOpen} onDismiss={()=>setAccessOpen(false)} />:null}
     </View>
   )
 }
@@ -150,7 +141,7 @@ function Item({ item, live }: { item: ThreadItem; live: boolean }) {
       return <ThreadSteps steps={item.steps} count={item.count} live={live} />
     case 'agent': return <View style={styles.message}><BotBubble><Markdown text={item.text} /></BotBubble></View>
     case 'error': return <AttemptError raw={item.text} />
-    case 'person': return <View style={styles.message}><MyBubble text={item.text} /></View>
+    case 'person': return <View style={styles.message}><ThreadPersonMessage item={item} /></View>
   }
 }
 

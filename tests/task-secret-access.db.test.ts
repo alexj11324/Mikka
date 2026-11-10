@@ -62,8 +62,9 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
     const definition = freezeWorkerDefinition({ harness: 'codex', instructions: '', prompt: 'Synthetic secret fixture', parent: null, executionId: null, subscription })
     if (!options.legacy) definition.executionIdentity = await freezeExecutionIdentity(pool, { userId: owner, botId: null, deviceId, agentDefinition: definition }, pool, workspaceId)
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","deviceTokenId","agentDefinition",status,"leaseExpiresAt",attempt,"workspaceId") values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1,$11)', [runId, owner, issueId, agentId, deviceId, repoId, tokenId, definition, options.status ?? 'running', lease, workspaceId])
+    await pool.query('update resource_access_policies set visibility=\'private\' where kind=\'thread\' and id=$1', [runId])
     const caller: DeviceCaller = { userId: owner, tokenId, ...(kind === 'cloud' ? { scopeDeviceId: deviceId, scopeWorkspaceId: workspaceId } : {}) }
-    const injection = await runtime.taskSecretInjection(workspaceId, 'acme/secret-fixture', env, undefined, owner)
+    const injection = await runtime.taskSecretInjection(workspaceId, 'acme/secret-fixture', env, undefined, owner, { runId })
     const secret = injection.protectedSecrets.find(item => item.id === saved.id)
     assert.ok(secret?.revision)
     assert.match(injection.snapshot!, /^[a-f0-9]{64}$/)
@@ -86,9 +87,9 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
   await t.test('the original owner/device/attempt/scope receives an opaque renewed grant; note edits preserve its security revision', async () => {
     const f = await fixture()
     assert.deepEqual(f.injection.env, {})
-    const before = await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner)
+    const before = await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner, undefined, { runId: f.runId })
     await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id, note: 'description changed' })
-    assert.equal(await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner), before)
+    assert.equal(await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner, undefined, { runId: f.runId }), before)
     const renewed = await f.renew()
     assert.deepEqual(renewed.revoked, [])
     const access = renewed.taskSecrets[f.runId]
@@ -412,14 +413,14 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
       const result = await authorizedClaimResponse(f.owner, { id: f.runId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId }, f.lease.toISOString(), () => {
         responses++
         return Response.json({ grant: f.grant })
-      }, async (_run, tx) => await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner, tx) === prepared)
+      }, async (_run, tx) => await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner, tx, { runId: f.runId }) === prepared)
       assert.equal(result, null, mutation)
       assert.equal(responses, 0, 'no prepared credentials leave a refused claim')
     }
     const f = await fixture({ status: 'preparing' })
     await store.replaceWorkspaceSecret(f.owner, f.ws.id, { id: f.saved.id, note: 'safe metadata edit' })
     const result = await authorizedClaimResponse(f.owner, { id: f.runId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId }, f.lease.toISOString(), () => Response.json({ grant: f.grant }),
-      async (_run, tx) => await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner, tx) === f.injection.snapshot)
+      async (_run, tx) => await runtime.taskSecretSnapshot(f.workspaceId, f.binding.repository, f.owner, tx, { runId: f.runId }) === f.injection.snapshot)
     assert.equal(result?.status, 200, 'an unchanged security snapshot may finish the claim')
     assert.ok(!(await result!.text()).includes(f.value))
   })

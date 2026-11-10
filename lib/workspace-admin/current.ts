@@ -1,6 +1,9 @@
 import 'server-only'
 import { requireUser } from '@/lib/issue-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import type { IssueReader } from '@/lib/issue-visibility'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 
 export interface WorkspaceActor {
   userId: string
@@ -9,6 +12,8 @@ export interface WorkspaceActor {
   /** The workspace this request is in (cookie, else the first active membership). */
   workspaceId: string
   role: 'admin' | 'member'
+  /** Request-local authority; never substitute the account id for its SSO/token proof. */
+  reader: IssueReader
 }
 
 /**
@@ -20,5 +25,6 @@ export interface WorkspaceActor {
 export async function currentWorkspaceActor(workspaceId?: string): Promise<WorkspaceActor> {
   const user = await requireUser()
   const context = await loadWorkspaceContext(workspaceId || undefined, user)
-  return { userId: user.id, email: user.email, name: user.name, workspaceId: context.workspace.id, role: context.role }
+  return { userId: user.id, email: user.email, name: user.name, workspaceId: context.workspace.id, role: context.role,
+    reader: { id: user.id, [tokenWorkspace]: context.workspace.id, [enterprisePrincipal]: user[enterprisePrincipal] } }
 }

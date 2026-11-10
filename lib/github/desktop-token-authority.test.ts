@@ -10,9 +10,14 @@ const runId = '10000000-0000-4000-8000-000000000003'
 let caller: { userId: string; tokenId: string; scopeDeviceId?: string; scopeWorkspaceId?: string } | null
 let machineOwner: string | null
 let runAvailable = true
+let personalAllowed = true
 const queries: unknown[][] = []
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
-stub('../db/index.ts', { pool: { query: async (sql: string, params: unknown[]) => {
+stub('../db/index.ts', { db: {}, pool: { query: async (sql: string, params: unknown[]) => {
+  if (sql.includes('mikka_run_personal_resources_allowed')) {
+    assert.deepEqual(params, [runId, caller?.userId])
+    return { rows: [{ allowed: personalAllowed }] }
+  }
   if (sql.includes('FROM agent_runs r')) {
     assert.match(sql, /r\."stopRequestedAt" IS NULL AND r\."leaseExpiresAt">now\(\)/)
     assert.match(sql, /d\."ownerId"=r\."userId" AND d\.enabled/)
@@ -30,7 +35,7 @@ stub('../device-link.ts', { authenticateDevice: async () => caller })
 let authorize: typeof import('./desktop-token-authority')['authorizeDesktopGitHubToken']
 let authorizeRun: typeof import('./desktop-token-authority')['authorizeDeviceRunGitHubToken']
 before(async () => { ({ authorizeDesktopGitHubToken: authorize, authorizeDeviceRunGitHubToken: authorizeRun } = await import('./desktop-token-authority')) })
-beforeEach(() => { caller = { userId: 'owner', tokenId: 't', scopeDeviceId: device, scopeWorkspaceId: workspace }; machineOwner = 'owner'; runAvailable = true; queries.length = 0 })
+beforeEach(() => { caller = { userId: 'owner', tokenId: 't', scopeDeviceId: device, scopeWorkspaceId: workspace }; machineOwner = 'owner'; runAvailable = true; personalAllowed = true; queries.length = 0 })
 const request = () => new Request(`https://mikka.test/v1/devices/${device}/github-token`, { method: 'POST' })
 
 test('the desktop gets only its owner\'s own GitHub credential', async () => {
@@ -82,4 +87,10 @@ test('a mismatched device token or invalid run identifier cannot refresh any cre
   caller = null
   assert.equal(await authorizeRun(request(), device, runId), null)
   assert.deepEqual(queries, [])
+})
+
+test('an owned Shared cloud task cannot renew a personal GitHub credential', async () => {
+  personalAllowed = false
+  assert.equal(await authorizeRun(request(), device, runId), null)
+  assert.deepEqual(queries, [], 'no GitHub machine or run credential lookup follows denial')
 })

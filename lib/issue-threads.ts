@@ -3,9 +3,8 @@ import { runIsActive, runSummaryView } from './issue-run-conversation'
 import type { RunChain } from './run-chain'
 
 /**
- * A thread is one agent run on an issue, and its content is its owner's alone (R-62):
- * current collaborators see whose thread it is, its status and time, never its prompt,
- * agent, output or messages, and cannot open or join it.
+ * A thread is one authorized run chain on a task. Content rows have passed the
+ * resource ACL; private work is absent, including its status and count.
  */
 export interface IssueThread {
   failureDetails?: CompactRunFailure | null
@@ -20,6 +19,10 @@ export interface IssueThread {
   createdAt: Date
   finishedAt: Date | null
   ownedByCurrentUser: boolean
+  /** Content permission and execution permission are separate. The server
+   * rechecks the selected model, machine and budget before accepting work. */
+  canContribute?: boolean
+  canManageAccess?: boolean
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
   /** `bot`: the dispatching Bot's own bloub look, so every copy of it matches the bot list (R-36); null for the Coordinator's own runs. */
@@ -166,10 +169,10 @@ export function taskFreeThreadMembers(ownerId: string, bot: { workspaceMemberIds
   return new Set(bot.workspaceMemberIds ?? [])
 }
 
-export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThreadListRow)[], issueId: string | null, viewerId: string, memberIds: ReadonlySet<string>): IssueThread[] {
+export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThreadListRow)[], issueId: string | null, viewerId: string, memberIds: ReadonlySet<string>, readableRunIds?: ReadonlySet<string>): IssueThread[] {
   if (!memberIds.has(viewerId)) return []
   // One row per run here; chains are folded once, by root, on the read path (lib/run-chain.ts).
-  return rows.filter(row => row.issueId === issueId && memberIds.has(row.userId))
+  return rows.filter(row => row.issueId === issueId && (readableRunIds ? readableRunIds.has(row.id) : row.userId === viewerId))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id))
     .slice(0, ISSUE_THREAD_LIMIT)
     .map(row => ({
@@ -177,7 +180,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
       id: row.id, status: row.status, outcome: row.outcome ?? null, ...(row.kind ? { kind: row.kind } : {}), createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
-      detail: canReadThread(row.userId, viewerId, memberIds)
+      detail: (readableRunIds ? readableRunIds.has(row.id) : canReadThread(row.userId, viewerId, memberIds))
         ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null }
         : null,
       rootRunId: row.id, latestRunId: row.id,

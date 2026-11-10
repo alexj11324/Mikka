@@ -6,7 +6,8 @@ import { clearPersistentReadCaches, PersistentReadCache, readCacheNamespace, typ
 import type { ReadStorage, StoredRead } from './indexed-db'
 import { registerLiveKeyConnection } from './live-focus'
 
-const scope: ReadCacheScope = { userId: 'owner', workspaceId: 'team', build: 'build-one', role: 'admin' }
+const scope: ReadCacheScope = { userId: 'owner', workspaceId: 'team', build: 'build-one', role: 'admin', accessProof: 'acl-revision-one' }
+const authorizedWorkspace = { workspaceId: scope.workspaceId, role: 'admin' as const, accessProof: scope.accessProof! }
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
   return { promise: new Promise<T>(done => { resolve = done }), resolve: (value: T) => resolve(value) }
@@ -69,7 +70,7 @@ test('installed UI may supply its build identity while retaining server workspac
     return <output>shared cache</output>
   }
   const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
-  const workspace = { workspaceId: scope.workspaceId, role: 'admin' as const }
+  const workspace = authorizedWorkspace
   const nativeBuild = 'desktop:installed-content-hash:https://mikka.example'
   try {
     await act(async () => root.render(<AuthenticatedReadCache ownerId={scope.userId} workspace={workspace}><Read /></AuthenticatedReadCache>))
@@ -95,6 +96,36 @@ test('fresh server seed and an optimistic write both win over a late disk hydrat
     assert.equal(cache.get('preferences')?.data, fresh)
     assert.equal(cache.isHydrated, true)
   }
+})
+
+test('an authorized workspace without a disk proof still retires its memory view on access changes', async () => {
+  const { invalidateResourceAccessCaches } = await import('./persistent-cache')
+  let current: PersistentReadCache | undefined, reads = 0
+  function Read() {
+    const cache = swr.useSWRConfig().cache
+    if (cache instanceof PersistentReadCache) current = cache
+    const { data } = swr.default('preferences', async () => ({ theme: `read ${++reads}` }))
+    return <output>{data?.theme}</output>
+  }
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  try {
+    await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId}
+      workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
+    const first = current!
+    assert.equal(first.namespace, null)
+    assert.equal(first.workspaceId, scope.workspaceId)
+    await act(async () => { await invalidateResourceAccessCaches(scope.workspaceId) })
+    assert.equal(first.isEnabled, false)
+    assert.equal(first.size, 0)
+    first.set('preferences', { data: { theme: 'late private content' } })
+    assert.equal(first.size, 0)
+    assert.notEqual(current, first)
+    assert.equal(container.textContent, 'read 2')
+    const second = current!
+    await act(async () => { await invalidateResourceAccessCaches(scope.workspaceId) })
+    assert.equal(second.isEnabled, false)
+    assert.equal(container.textContent, 'read 3')
+  } finally { await act(async () => root.unmount()); await current?.flushed() }
 })
 
 test('deleting a key while disk opens prevents its resurrection', async () => {
@@ -272,7 +303,7 @@ test('the authenticated boundary seeds real SWR before an inner fallback can be 
   const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
   try {
     await act(async () => root.render(<swr.SWRConfig value={swrDefaults}>
-      <AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }} initialReads={[{ key: 'preferences', data: fresh }]}>
+      <AuthenticatedReadCache ownerId={scope.userId} workspace={authorizedWorkspace} initialReads={[{ key: 'preferences', data: fresh }]}>
         <swr.SWRConfig value={{ fallback: { preferences: fresh } }}><Read /></swr.SWRConfig>
       </AuthenticatedReadCache>
     </swr.SWRConfig>))
@@ -368,7 +399,7 @@ test('a document workspace departure retires readers instead of reading again be
   const container = browser.document.createElement('div') as unknown as HTMLDivElement
   let root = createRoot(container)
   const beforeRefresh = refreshes
-  const content = () => <swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>
+  const content = () => <swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={authorizedWorkspace}><Read /></AuthenticatedReadCache></swr.SWRConfig>
   try {
     await act(async () => root.render(content()))
     assert.equal(reads, 1)
@@ -411,7 +442,7 @@ test('document retirement disables and clears synchronously but still waits for 
   }
   const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
   try {
-    await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
+    await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={authorizedWorkspace}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
     assert.equal(reads, 1)
     await act(async () => {
       clearing = clearPersistentReadCaches({ documentNavigation: true }).then(() => { finished = true })
@@ -454,18 +485,24 @@ test('document departure still broadcasts clear while remote and denied scopes k
       const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
       const beforeRefresh = refreshes, firstMessage = messages.length
       try {
-        await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
+        await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={authorizedWorkspace}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
         assert.equal(reads, 1)
         const receiver = channels.find(channel => !channel.closed && channel.onmessage)
         assert.ok(receiver)
+        const retired = cache!
         await act(async () => {
           if (mode === 'document') await clearPersistentReadCaches({ documentNavigation: true })
           else if (mode === 'ordinary') await clearPersistentReadCaches()
           else if (mode === 'remote') receiver.onmessage!({ data: { type: 'clear' } } as MessageEvent)
           else cache!.set('preferences', { _k: 'preferences', error: { status: 403 } })
         })
-        assert.equal(cache?.isEnabled, false)
-        assert.equal(cache?.size, 0)
+        assert.equal(retired.isEnabled, false)
+        assert.equal(retired.size, 0)
+        if (mode !== 'document') {
+          assert.notEqual(cache, retired)
+          assert.equal(cache?.namespace, null, 'fresh authorized network reads cannot persist under the retired proof')
+          assert.equal(cache?.isEnabled, true, 'the memory fallback still receives later revocations')
+        }
         assert.equal(reads, mode === 'document' ? 1 : 2)
         assert.equal(refreshes - beforeRefresh, mode === 'document' ? 0 : 1)
         if (mode === 'document') {

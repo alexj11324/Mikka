@@ -23,15 +23,16 @@ async function ticket(request: Request) {
   if (!LIVE_ID.test(workspaceId)) return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
   const [workspace] = await activeTaskWorkspaces(session.user, workspaceId)
   if (!workspace) return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
+  const access = await (await import('@/lib/resource-access/cache-proof')).readResourceAccessProof(session.user.id,workspaceId)
   const config = liveGatewayConfig(process.env)
-  if (!config) return NextResponse.json({ url: null, protocol: null, expiresAt: null }, { headers })
+  if (!config) return NextResponse.json({ url: null, protocol: null, expiresAt: null, ...access }, { headers })
   const scope = { ownerId: session.user.id, workspaceId }
   const result = await workspaceLiveTicket(scope, session.session?.id ?? '', config)
   if (result.status === 'denied') return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
-  if (result.status === 'pending') return NextResponse.json({ url: null, protocol: null, expiresAt: null }, { headers })
+  if (result.status === 'pending') return NextResponse.json({ url: null, protocol: null, expiresAt: null, ...access }, { headers })
   const issued = result.ticket
   const homeScope = workspace.kind === 'personal' ? homeScopeProof(scope, issued.expiresAt, config.secret) : null
-  return NextResponse.json({ ...issued, ...(homeScope ? { homeScope } : {}) }, { headers })
+  return NextResponse.json({ ...issued, ...access, ...(homeScope ? { homeScope } : {}) }, { headers })
 }
 
 export const GET = withRequestLog('/api/live/ticket', ticket)

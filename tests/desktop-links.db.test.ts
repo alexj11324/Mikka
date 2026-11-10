@@ -9,7 +9,7 @@ const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs isolated PostgreSQL')
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
-test('desktop links preserve real workspace membership and public share permissions', { skip: !url, timeout: 120_000 }, async t => {
+test('desktop links preserve real workspace membership and current resource ACL', { skip: !url, timeout: 120_000 }, async t => {
   const database = new Pool({ connectionString: url, max: 2 })
   const client = await database.connect()
   const stream = (client as unknown as { connection: { stream: { bytesRead: number } } }).connection.stream
@@ -36,12 +36,20 @@ test('desktop links preserve real workspace membership and public share permissi
     const { readWorkspaceLink, readWorkspaceSlug } = await import('../lib/workspace-admin/links')
     const { resolveSlugRedirect } = await import('../lib/workspace-admin/general')
     const { sharedArtifact } = await import('../lib/artifacts/store')
-    const readShared = (token: string) => withDatabaseClient(measuredClient, () => sharedArtifact(token))
+    const readShared = (token: string, viewer = owner) => withDatabaseClient(measuredClient, () => sharedArtifact(token,viewer))
+    mocks.push(mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') }))
+    const context = await import('../apps/api/src/context')
     const { GET } = await import('../app/api/artifacts/shared/[token]/route')
+    const tokens = new Map<string,string>()
     for (const id of [owner, peer]) await database.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [id, `${id}@example.invalid`])
     for (const [id, userId, name] of [[workspaceId, owner, slug], [foreignWorkspaceId, peer, foreignSlug]]) {
       await database.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,$3,$3)', [id, userId, name])
       await database.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [id, userId, `${userId}@example.invalid`])
+    }
+    for (const userId of [owner,peer]) {
+      const token = randomBytes(32).toString('base64url')
+      tokens.set(userId,token)
+      await database.query('INSERT INTO session(id,token,"userId","expiresAt","createdAt","updatedAt") VALUES($1,$2,$3,now()+interval \'1 hour\',now(),now())',[randomUUID(),token,userId])
     }
     await database.query('INSERT INTO mikka_workspace_slug_redirects(slug,"workspaceId") VALUES($1,$2)', [oldSlug, workspaceId])
     const artifact = async (kind: 'markdown' | 'html') => {
@@ -54,7 +62,14 @@ test('desktop links preserve real workspace membership and public share permissi
       return { id, token, content }
     }
     const markdown = await artifact('markdown'), html = await artifact('html')
-    const get = (token: string) => withDatabaseClient(measuredClient, () => GET(new Request(`http://127.0.0.1/mikka/api/artifacts/shared/${encodeURIComponent(token)}`), { params: Promise.resolve({ token }) }))
+    const get = async (token: string, viewer: string | null = owner) => {
+      const request = new Request(`http://127.0.0.1/mikka/api/artifacts/shared/${encodeURIComponent(token)}`, {
+        headers: { ...(viewer ? { authorization: `Bearer ${tokens.get(viewer)}` } : {}), 'x-mikka-workspace-id': workspaceId },
+      })
+      const scope = context.createRequestScope(request)
+      try { return await context.runRequestScope(scope,()=>withDatabaseClient(measuredClient,()=>GET(request,{params:Promise.resolve({token})}))) }
+      finally { await scope.after.finish() }
+    }
 
     await t.test('current and historical workspace links keep the original member reads and byte budget', async () => {
       const before = stream.bytesRead
@@ -88,25 +103,22 @@ test('desktop links preserve real workspace membership and public share permissi
       assert.equal(queries.length, 0)
       await database.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [workspaceId, owner, `${owner}@example.invalid`])
     })
-    await t.test('a signed-out reader receives only the original shared props without additional database reads', async () => {
-      await readShared(markdown.token)
-      queries.length = 0
-      const before = stream.bytesRead
-      const original = (await readShared(markdown.token))!
-      const browserBytes = stream.bytesRead - before, originalQueries = [...queries]
-      queries.length = 0
-      const nativeStart = stream.bytesRead
-      const response = await get(markdown.token)
-      const nativeBytes = stream.bytesRead - nativeStart
-      assert.equal(response.status, 200)
-      assert.equal(response.headers.get('cache-control'), 'private, no-store')
-      assert.equal(response.headers.get('referrer-policy'), 'no-referrer')
-      assert.equal(response.headers.has('set-cookie'), false)
-      const { content, ...detail } = original
-      assert.deepEqual(await response.json(), { artifact: detail, markdown: content })
-      assert.deepEqual(queries, originalQueries, 'the metadata route calls the existing share reader once')
-      assert.ok(nativeBytes <= browserBytes, 'public metadata adds no database bytes')
-      t.diagnostic(JSON.stringify({ browserShareBytes: browserBytes, nativeShareBytes: nativeBytes }))
+    await t.test('signed-out readers and foreign principals cannot use a copied private share URL', async () => {
+      assert.equal(await sharedArtifact(markdown.token),null)
+      for (const viewer of [null,peer]) {
+        const response=await get(markdown.token,viewer)
+        assert.equal(response.status,404)
+        assert.deepEqual(await response.json(),{error:'not_found'})
+      }
+      const original=(await readShared(markdown.token))!
+      assert.ok(original)
+      const response=await get(markdown.token)
+      assert.equal(response.status,200)
+      assert.equal(response.headers.get('cache-control'),'private, no-store')
+      assert.equal(response.headers.get('referrer-policy'),'no-referrer')
+      assert.equal(response.headers.has('set-cookie'),false)
+      const {content,...detail}=original
+      assert.deepEqual(await response.json(),{artifact:detail,markdown:content})
     })
     await t.test('HTML bytes stay in the existing sandboxed frame endpoint', async () => {
       const response = await get(html.token)
@@ -133,6 +145,7 @@ test('desktop links preserve real workspace membership and public share permissi
     await database.query('DELETE FROM mikka_workspace_slug_redirects WHERE "workspaceId"=ANY($1::uuid[])', [[workspaceId, foreignWorkspaceId]])
     await database.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [[workspaceId, foreignWorkspaceId]])
     await database.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[workspaceId, foreignWorkspaceId]])
+    await database.query('DELETE FROM session WHERE \"userId\"=ANY($1::text[])', [[owner,peer]])
     await database.query('DELETE FROM "user" WHERE id=ANY($1)', [[owner, peer]])
     client.release()
     await Promise.all([database.end(), applicationPool?.end()])

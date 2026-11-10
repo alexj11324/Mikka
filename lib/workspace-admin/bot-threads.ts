@@ -58,7 +58,7 @@ export function botThreadTitle(input: { issueTitle: string | null; issueVisible:
  * task alone; or the viewer's own chat with the bot. Null when the viewer may
  * not open it.
  */
-export function botThreadHref(thread: { issueId: string | null; ownerId: string; botId: string; runId: string }, viewer: { id: string; issueVisible: boolean }): string | null {
-  if (thread.issueId) return viewer.issueVisible ? workspaceLink({ issue: thread.issueId, thread: thread.ownerId === viewer.id ? thread.runId : null }) : null
+export function botThreadHref(thread: { issueId: string | null; ownerId: string; botId: string; runId: string }, viewer: { id: string; issueVisible: boolean; threadReadable?: boolean }): string | null {
+  if (thread.issueId) return viewer.issueVisible ? workspaceLink({ issue: thread.issueId, thread: thread.ownerId === viewer.id || viewer.threadReadable ? thread.runId : null }) : null
   return thread.ownerId === viewer.id ? workspaceLink({ bot: thread.botId }) : null
 }

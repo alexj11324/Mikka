@@ -34,11 +34,12 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], userNa
   const [initial] = useState<ProjectDraft>(() => ({ name: project?.name ?? '', summary: project?.summary ?? '', description: project?.description || project?.summary || '', status: (project?.status ?? 'backlog') as ProjectDraft['status'], priority: (project?.priority ?? 'none') as ProjectDraft['priority'], lead: (project?.lead ?? '') as '' | 'me', team: WORKSPACE_NAME, startDate: project?.startDate ?? '', targetDate: project?.targetDate ?? '', properties: project?.properties ?? DEFAULT_PROJECT_PROPERTIES }))
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
   const [teamId, setTeamId] = useState(initialTeamId)
+  const [visibility, setVisibility] = useState<'shared'|'private'>('shared')
   const [draft, setDraft] = useState(initial)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
   const submitting = useRef(false)
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || teamId !== initialTeamId
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || teamId !== initialTeamId || visibility !== 'shared'
   useEffect(() => {
     if (!dirty) return
     const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault() }
@@ -50,7 +51,7 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], userNa
     if (submitting.current) return
     submitting.current = true; setPending(true); setError('')
     try {
-      const result = await saveProject({ ...draft, id: project?.id, revision: project?.revision })
+      const result = await saveProject({ ...draft, id: project?.id, revision: project?.revision, ...!project ? {visibility} : {} })
       if (!('project' in result) || !result.project) { setError(result.error ?? i18nText("FeatureCopy.c_052ebc86")); return }
       if (!project && teamId) {
         try {
@@ -70,6 +71,7 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], userNa
         <div className="self-start"><ProjectPicker label={i18nText("Projects.form.iconColor")} title={i18nText("Projects.form.iconColor")} choices={PROJECT_COLORS.map(item => ({ value: item.value, label: ({ green: i18nText("Projects.color.green"), purple: i18nText("Projects.color.purple"), yellow: i18nText("Projects.color.yellow"), gray: i18nText("Projects.color.gray") } as const)[item.value], icon: Box }))} selected={[draft.properties.color]} onChange={value => setDraft(current => ({ ...current, properties: { ...current.properties, color: value as ProjectDraft['properties']['color'] } }))} disabled={pending} plain><span className={cn('flex size-8 items-center justify-center rounded-md', PROJECT_ICON_COLORS[draft.properties.color])}><Box data-icon="inline-start" /></span></ProjectPicker></div>
         <FieldGroup><Field className="gap-0"><FieldLabel className="sr-only" htmlFor="project-name">{i18nText("Projects.textEditor.namePlaceholder")}</FieldLabel><Input id="project-name" className="h-10 rounded-none border-0 bg-transparent! px-0 text-2xl font-semibold shadow-none md:text-2xl focus-visible:ring-0" value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} maxLength={200} required disabled={pending} placeholder={i18nText("Projects.textEditor.namePlaceholder")} /></Field></FieldGroup>
         <div className="flex flex-wrap items-center gap-2">{FIELDS.map(field => <ProjectPropertyControl key={field} field={field} value={draft} userName={resolvedUserName} projects={projects} projectId={project?.id} disabled={pending} onChange={changes => setDraft(current => ({ ...current, ...changes }))} />)}</div>
+        {!project && <Field><FieldLabel htmlFor="project-visibility">{i18nText('ResourceAccess.visibility')}</FieldLabel><NativeSelect id="project-visibility" value={visibility} disabled={pending} onChange={event=>setVisibility(event.target.value as 'shared'|'private')}><NativeSelectOption value="shared">{i18nText('ResourceAccess.shared')}</NativeSelectOption><NativeSelectOption value="private">{i18nText('ResourceAccess.private')}</NativeSelectOption></NativeSelect><p className="text-xs text-muted-foreground">{i18nText('ResourceAccess.creationHint')}</p></Field>}
         {!project && <FieldGroup><Field><FieldLabel htmlFor="new-project-team">{i18nText("FeatureCopy.c_7968c9e3")}</FieldLabel><NativeSelect id="new-project-team" value={teamId} disabled={pending || !!teamsError} onChange={event => setTeamId(event.target.value)}><NativeSelectOption value="">{i18nText("FeatureCopy.c_479e026f")}</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect></Field></FieldGroup>}
         <section aria-labelledby="project-form-description-heading" className="flex min-w-0 flex-col gap-4 pt-4"><h2 id="project-form-description-heading" className="text-sm font-medium text-muted-foreground">{i18nText("Projects.form.descriptionHeading")}</h2><IssueEditor layout="description" label={i18nText("Projects.textEditor.descriptionLabel")} content={readProjectDescription(initial.description)} disabled={pending} onChange={content => setDraft(current => ({ ...current, description: JSON.stringify(content) }))} /></section>
         <ProjectMilestones value={draft.properties.milestones} disabled={pending} onChange={milestones => setDraft(current => ({ ...current, properties: { ...current.properties, milestones } }))} />

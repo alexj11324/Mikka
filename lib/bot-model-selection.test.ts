@@ -5,14 +5,17 @@ import type { SubscriptionService } from './subscription-service'
 import type { BotSubscriptionChoice } from './bot-model-choice'
 
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
-const scope = { ownerId: 'alice', botId: null, workspaceId: id(2) }
+const scope = { ownerId: 'alice', actorId: 'alice', botId: null, workspaceId: id(2) }
 const binding = { id: id(3), ownerId: 'alice', consumerId: id(1), workspaceId: id(2), connectionId: id(4), connectionRevision: 7, modelId: 'subscription-model', route: 'claude_cpa' }
 let selected: string | undefined
 let available: { bindingId: string; provider?: string }[] = []
-let savedBinding: { bindingId: string } | undefined
+let savedBinding: Pick<BotSubscriptionChoice, 'bindingId'> & Partial<BotSubscriptionChoice> | undefined
 let sharedAvailable: BotSubscriptionChoice[] = []
 let sharedSaved: BotSubscriptionChoice | undefined
 let settingsError: Error | undefined
+let catalogueError: Error | undefined
+let catalogueReads = 0
+const bindingReads: unknown[][] = []
 let workspaceCalls = 0
 let botActive = true
 const workspaceBots: (string | null)[] = []
@@ -34,9 +37,9 @@ mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExp
   ExecutionSettings: class {
     async botActive() { return botActive }
     async botModel() { if (settingsError) throw settingsError; return selected }
-    async chatModels() { return available }
+    async chatModels() { catalogueReads++; if (catalogueError) throw catalogueError; return available }
     async pooledBindings() { return sharedAvailable }
-    async chatBinding() { return savedBinding }
+    async chatBinding(...args: unknown[]) { bindingReads.push(args); return savedBinding }
     async sharedChatBinding(_scope: unknown, botId: string, bindingId: string) {
       return botId === id(1) && sharedSaved?.bindingId === bindingId ? sharedSaved : undefined
     }
@@ -45,11 +48,14 @@ mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExp
   },
 } })
 let keyChoice: { keyId: string; model: string; harness: string } | undefined
-let usableKeys: { id: string; provider: string; baseUrl: string | null; protocol: string; models: string[] }[] = []
+let usableKeys: { id: string; provider: string; baseUrl: string | null; protocol: string; models: string[]; ownerId?: string; mine?: boolean; ownership?: 'organization'; organizationId?: string; organizationName?: string; revision?: number; name?: string | null; last4?: string }[] = []
+
 const chatModels: unknown[] = []
 mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports: {
+  assertHostedApiKeyAuthority: async (_query: unknown, actual: {ownerId:string;actorId:string}) => { assert.equal(actual.actorId, actual.ownerId) },
   botApiKeyChoice: async () => keyChoice,
   usableApiKeys: async () => usableKeys,
+  apiKeyAfterQuota: async () => true,
 } })
 mock.module(new URL('./model-api-key-chat.ts', import.meta.url).href, { namedExports: {
   resolveApiKeyChatModel: async (frozen: unknown) => { chatModels.push(frozen); return { modelId: 'api-key-fixture' } },
@@ -89,6 +95,9 @@ beforeEach(() => {
   sharedAvailable = []
   sharedSaved = undefined
   settingsError = undefined
+  catalogueError = undefined
+  catalogueReads = 0
+  bindingReads.length = 0
   workspaceCalls = 0
   workspaceBots.length = 0
   hostedCalls.length = 0
@@ -99,41 +108,49 @@ beforeEach(() => {
   fallback = null
 })
 
-test('A bot saved on an API key model freezes that key and resolves through it; an unusable key falls back', async () => {
+test('A bot freezes its chosen API key; a revoked or unavailable explicit choice requires a new choice', async () => {
   const botScope = { ...scope, botId: id(1) }
   keyChoice = { keyId: id(9), model: 'deepseek-chat', harness: 'claude_code' }
   usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
   const frozen = await freezeBotModel(botScope, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: 'deepseek-chat', modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat' } })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: 'deepseek-chat', actorId: 'alice', modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', actorId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat' } })
   assert.deepEqual(await resolveFrozenHostedModel(botScope, frozen, noSubscription), { modelId: 'api-key-fixture' })
   assert.equal(chatModels.length, 1)
   await assert.rejects(resolveFrozenHostedModel({ ...botScope, ownerId: 'mallory' }, frozen, noSubscription), { code: 'binding_mismatch' })
   await assert.rejects(resolveFrozenHostedModel({ ...botScope, botId: id(5) }, frozen, noSubscription), { code: 'binding_mismatch' })
-  // The key was withdrawn: the usual order, here Mikka 默认.
+  // A withdrawn key cannot silently select a different payer or model.
   usableKeys = []
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), { code: 'executionModelUnknown' })
   usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['different-model'] }]
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), { code: 'executionModelUnknown' })
   // An Anthropic-only custom provider cannot serve a bot chat.
   usableKeys = [{ id: id(9), provider: 'custom', baseUrl: 'https://llm.example/anthropic', protocol: 'anthropic', models: ['deepseek-chat'] }]
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), { code: 'executionModelUnknown' })
 })
 
 test('Coordinator without a subscription freezes and resolves the configured hosted default', async () => {
   const frozen = await freezeBotModel({ ...scope, workspaceId: null }, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL, actorId: 'alice' })
   assert.equal(workspaceCalls, 1)
   assert.equal(await resolveFrozenHostedModel(scope, frozen, noSubscription), hostedModel)
   assert.deepEqual(hostedCalls, [[scope, COORDINATOR_MODEL]])
 })
+test('a caller without an actual actor cannot select a model, and another actor cannot use a personal choice', async () => {
+  await assert.rejects(freezeBotModel({ ...scope, actorId: undefined } as unknown as typeof scope, noSubscription), { code: 'binding_mismatch' })
+  const peer = { ...scope, actorId: 'bob' }
+  await assert.rejects(freezeBotModel(peer, noSubscription), { code: 'executionModelUnknown' })
+  keyChoice = { keyId: id(9), model: 'deepseek-chat', harness: 'claude_code' }
+  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'], ownerId: 'alice' }]
+  await assert.rejects(freezeBotModel(peer, noSubscription), { code: 'executionModelUnknown' })
+  assert.deepEqual(chatModels, [])
+})
 
-test('a saved choice whose account is gone, with no subscription bound, replies on Mikka 默认', async () => {
-  // The Settings page showed 未连接账号 and these bots refused (binding_required) instead of replying.
+test('a saved choice whose account is gone requires a new explicit choice', async () => {
+  // No subscription fallback may charge another source merely because an account disappeared.
   selected = id(9)
   available = []
   for (const botId of [null, id(1)]) {
-    const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
-    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+    await assert.rejects(freezeBotModel({ ...scope, botId }, noSubscription), { code: 'executionModelUnknown' })
   }
 })
 
@@ -143,21 +160,21 @@ test('Mikka 默认 picked in the composer stays hosted while a subscription is b
   savedBinding = { bindingId: binding.id }
   for (const botId of [null, id(1)]) {
     const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
-    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL, actorId: 'alice' })
   }
 })
 
 test('Bot without a subscription replies on the same hosted default as the Coordinator, in its own workspace', async () => {
   const bot = { ...scope, botId: id(1) }
   const frozen = await freezeBotModel({ ...bot, workspaceId: null }, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL, actorId: 'alice' })
   assert.deepEqual(workspaceBots, [bot.botId])
   // Same hosted path as the Coordinator: the hosted model applies admission and billing for this bot's workspace.
   assert.equal(await resolveFrozenHostedModel(bot, frozen, noSubscription), hostedModel)
   assert.deepEqual(hostedCalls, [[bot, COORDINATOR_MODEL]])
 })
 
-test('a saved choice whose account is gone switches to a bound subscription, Claude first, not Mikka 默认', async () => {
+test('a lost saved choice cannot silently switch to another bound subscription', async () => {
   const dependencies = {
     service: () => ({ repository: {
       binding: async () => ({ ...binding }),
@@ -168,9 +185,7 @@ test('a saved choice whose account is gone switches to a bound subscription, Cla
   selected = id(9)
   savedBinding = undefined
   available = [{ bindingId: id(8), provider: 'codex' }, { bindingId: binding.id, provider: 'claude' }]
-  const frozen = await freezeBotModel(scope, dependencies)
-  assert.equal((frozen.modelSelection as { bindingId?: string } | undefined)?.bindingId, binding.id)
-  assert.equal(frozen.model, binding.modelId)
+  await assert.rejects(freezeBotModel(scope, dependencies), { code: 'executionModelUnknown' })
   assert.equal(hostedCalls.length, 0)
 })
 
@@ -207,7 +222,8 @@ test('settings errors propagate instead of selecting the hosted fallback', async
   assert.equal(hostedCalls.length, 0)
 })
 
-test('an explicit shared subscription freezes its exact saved model before own or pooled defaults', async () => {
+test('an explicit legacy shared subscription is refused before any credential is frozen', async () => {
+
   const botScope = { ...scope, botId: id(1) }
   available = [{ bindingId: binding.id, provider: 'claude' }]
   const shared = { ...binding, id: id(21), ownerId: 'bob', connectionId: id(22),
@@ -234,15 +250,12 @@ test('an explicit shared subscription freezes its exact saved model before own o
       assert.equal(workspaceId, botScope.workspaceId)
     },
   }
-  const frozen = await freezeBotModel(botScope, dependencies)
-  assert.equal(frozen.model, 'gpt-6-luna')
-  assert.equal(frozen.modelSelection?.type, 'subscription')
-  assert.deepEqual(frozen.modelSelection, { type: 'subscription', bindingId: shared.id,
-    ownerId: 'bob', runOwnerId: 'alice', consumerId: botScope.botId, workspaceId: botScope.workspaceId,
-    connectionId: shared.connectionId, connectionRevision: 7, modelId: 'gpt-6-luna', route: 'codex_cpa' })
+  await assert.rejects(freezeBotModel(botScope, dependencies), { code: 'executionModelUnknown' })
+  assert.equal(hostedCalls.length, 0)
+
 })
 
-test('shared subscription menu exposes both providers without private account or quota details', async () => {
+test('legacy shared subscription preferences and catalogues expose no teammate connection', async () => {
   const { botModelMenu } = await import('./bot-model-menu')
   const { ExecutionSettings } = await import('./execution-settings')
   const { ownSubscriptionOption } = await import('./bot-model-menu-view')
@@ -258,20 +271,17 @@ test('shared subscription menu exposes both providers without private account or
   selected = sharedSaved.bindingId
   const query = { query: async () => ({ rows: [{ bindingId: selected }] }) } as never
   const menu = await botModelMenu(query, new ExecutionSettings(query), scope, id(1))
-  const shared = menu.groups.filter(group => group.kind === 'subscription')
-  assert.deepEqual(shared.map(group => [group.provider, group.owner, group.credentialLabel, group.plan]),
-    [['claude', 'Public teammate', 'Public teammate', undefined], ['codex', 'Public teammate', 'Public teammate', undefined]])
-  assert.deepEqual(shared.flatMap(group => group.options), sharedAvailable.map(row => ({ id: row.bindingId, modelId: row.modelId, provider: row.provider })))
-  assert.deepEqual([menu.current.id, menu.current.modelId, menu.current.chosen, menu.current.credentialLabel],
-    [id(33), 'gpt-6-luna', true, 'Public teammate'])
+  assert.deepEqual(menu.groups.filter(group => group.kind === 'subscription'), [])
+  assert.equal(menu.current.kind, 'hosted')
+  assert.equal(menu.current.chosen, false)
+  assert.equal(menu.current.fallback, 'preference')
   assert.equal(menu.current.quota, undefined)
   assert.ok(!JSON.stringify(menu).includes('PRIVATE-'))
   assert.ok(!JSON.stringify(menu).includes('2099-01-01'))
+  assert.ok(!JSON.stringify(menu).includes('Public teammate'))
   assert.equal(ownSubscriptionOption(menu), null)
   sharedAvailable = []
-  const withoutCatalogue = await botModelMenu(query, new ExecutionSettings(query), scope, id(1))
-  assert.deepEqual([withoutCatalogue.current.modelId, withoutCatalogue.current.chosen, withoutCatalogue.current.credentialLabel],
-    ['gpt-6-luna', true, 'Public teammate'])
+  assert.deepEqual(await botModelMenu(query, new ExecutionSettings(query), scope, id(1)), menu)
 })
 
 test('an archived bot (its owner left the team) is refused before any model is chosen', async () => {
@@ -282,32 +292,16 @@ test('an archived bot (its owner left the team) is refused before any model is c
   } finally { botActive = true }
 })
 
-test('Mikka 默认 with no points here runs on the next allowed model and says so; with none, it stays and is refused', async () => {
+test('exhausted platform points never silently switch a hosted choice to BYO billing or another model', async () => {
   selected = '00000000-0000-0000-0000-000000000000'
   pointsRefusal = 'verification_required'
-  // Nothing else can run: Mikka 默认 stays, and its refusal explains (decision 2026-11-02-1450).
-  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
-  // The person's own key is next in 允许使用的模型: this turn runs on it, marked.
-  fallback = { kind: 'api_key', keyId: id(9), model: 'deepseek-chat' }
-  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
-  assert.deepEqual(await freezeBotModel({ ...scope, botId: id(1) }, noSubscription), { harness: 'ai_sdk', model: 'deepseek-chat',
-    modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat', afterPoints: true } })
-  // A subscription is next: frozen as usual, marked.
-  fallback = { kind: 'subscription', bindingId: binding.id, model: binding.modelId }
-  savedBinding = { bindingId: binding.id }
-  const dependencies = {
-    service: () => ({ repository: {
-      binding: async () => ({ ...binding }),
-      connection: async () => ({ ownerId: scope.ownerId, workspaceId: scope.workspaceId, epoch: '7', state: 'connected' }),
-    } }) as unknown as SubscriptionService,
-    workspace: async () => {},
+  for (const alternative of [null, { kind: 'api_key' as const, keyId: id(9), model: 'deepseek-chat' },
+    { kind: 'subscription' as const, bindingId: binding.id, model: binding.modelId }]) {
+    fallback = alternative
+    usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
+    savedBinding = { bindingId: binding.id }
+    assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL, actorId: 'alice' })
   }
-  const frozen = await freezeBotModel(scope, dependencies)
-  assert.equal(frozen.model, binding.modelId)
-  assert.deepEqual([(frozen.modelSelection as { bindingId?: string }).bindingId, (frozen.modelSelection as { afterPoints?: true }).afterPoints], [binding.id, true])
-  // Points left: Mikka 默认, whatever else could run.
-  pointsRefusal = null
-  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
 })
 
  test('a disabled hosted source never starts a new hosted turn', async () => {
@@ -317,15 +311,108 @@ test('Mikka 默认 with no points here runs on the next allowed model and says s
   } finally { hostedEnabled = true }
 })
 
- test('an unavailable saved model follows the preferred source and preserves its old frozen turn', async () => {
+ test('an unavailable saved model requires a new choice and preserves the historical frozen turn', async () => {
   const botScope = { ...scope, botId: id(1) }
   keyChoice = { keyId: id(9), model: 'old-model', harness: 'claude_code' }
   usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['old-model', 'next-model'] }]
   const frozen = await freezeBotModel(botScope, noSubscription)
   usableKeys[0].models = ['next-model']
   fallback = { kind: 'api_key', keyId: id(9), model: 'next-model' }
-  const next = await freezeBotModel(botScope, noSubscription)
-  assert.equal(next.model, 'next-model')
+  await assert.rejects(freezeBotModel(botScope, noSubscription), { code: 'executionModelUnknown' })
   assert.equal(frozen.model, 'old-model')
   assert.deepEqual(await resolveFrozenHostedModel(botScope, frozen, noSubscription), { modelId: 'api-key-fixture' })
+})
+
+
+test('Organization connections appear with their billing owner and freeze the exact credential revision', async () => {
+  const { botModelMenu } = await import('./bot-model-menu')
+  const { ExecutionSettings } = await import('./execution-settings')
+  const organizationId = id(50)
+  usableKeys = [{ id: id(51), ownerId: `organization:${organizationId}`, ownership: 'organization',
+    organizationId, organizationName: 'Fixture organization', mine: false, revision: 3,
+    provider: 'deepseek', name: 'Shared gateway', last4: 'test', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
+  keyChoice = { keyId: id(51), model: 'deepseek-chat', harness: 'claude_code' }
+  const query = { query: async () => ({ rows: [] }) } as never
+  const menu = await botModelMenu(query, new ExecutionSettings(query), scope, id(1))
+  const connection = menu.groups.find(group => group.kind === 'shared')
+  assert.equal(connection?.owner, 'Fixture organization')
+  assert.equal(connection?.credentialLabel, 'Shared gateway ····test')
+  assert.equal(connection?.options[0].modelId, 'deepseek-chat')
+  assert.equal(menu.current.credentialLabel, 'Fixture organization · Shared gateway ····test')
+  const frozen = await freezeBotModel({ ...scope, botId: id(1) }, noSubscription)
+  assert.deepEqual(frozen.modelSelection, { type: 'api_key', consumerId: id(1), keyId: id(51), ownerId: 'alice', actorId: 'alice',
+    workspaceId: scope.workspaceId, modelId: 'deepseek-chat', credentialOwnerId: `organization:${organizationId}`,
+    credentialRevision: 3, organizationId })
+})
+
+test('a saved subscription freezes its exact model without unrelated catalogue work and still checks current authority', async () => {
+  catalogueError = new Error('unrelated catalogue unavailable')
+  let connectionState = 'connected'
+  let authorityReads = 0
+  for (const [modelId, route] of [['claude-haiku-5-5', 'claude_cpa'], ['gpt-6-luna', 'codex_cpa']]) {
+    const current = { ...binding, modelId, route }
+    selected = current.id
+    savedBinding = { bindingId: current.id }
+    const dependencies = {
+      service: () => ({ repository: {
+        binding: async (ownerId: string, bindingId: string) => {
+          assert.equal(ownerId, scope.ownerId)
+          assert.equal(bindingId, current.id)
+          return current
+        },
+        connection: async (ownerId: string, connectionId: string) => {
+          assert.equal(ownerId, scope.ownerId)
+          assert.equal(connectionId, current.connectionId)
+          return { ownerId, epoch: '7', state: connectionState }
+        },
+      } }) as unknown as SubscriptionService,
+      workspace: async (ownerId: string, workspaceId: string) => {
+        assert.equal(ownerId, scope.ownerId)
+        assert.equal(workspaceId, scope.workspaceId)
+        authorityReads++
+      },
+    }
+    connectionState = 'connected'
+    const frozen = await freezeBotModel(scope, dependencies)
+    assert.deepEqual(frozen, { harness: 'ai_sdk', model: modelId, actorId: 'alice', modelSelection: {
+      coordinator: true, type: 'subscription', bindingId: current.id, ownerId: scope.ownerId, actorId: 'alice',
+      consumerId: current.consumerId, workspaceId: scope.workspaceId, connectionId: current.connectionId,
+      connectionRevision: 7, modelId, route,
+    } })
+    connectionState = 'disconnected'
+    await assert.rejects(freezeBotModel(scope, dependencies), { code: 'binding_mismatch' })
+  }
+  assert.equal(authorityReads, 4)
+  assert.equal(catalogueReads, 0)
+  assert.deepEqual(bindingReads, Array.from({ length: 4 }, () => [{ ownerId: scope.ownerId, workspaceId: scope.workspaceId }, binding.id]))
+})
+
+test('an unavailable saved subscription still reads the fallback catalogue and propagates its failure', async () => {
+  selected = binding.id
+  const unavailable = new Error('fallback catalogue unavailable')
+  catalogueError = unavailable
+  await assert.rejects(freezeBotModel(scope, noSubscription), error => error === unavailable)
+  assert.equal(catalogueReads, 1)
+  assert.deepEqual(bindingReads, [[{ ownerId: scope.ownerId, workspaceId: scope.workspaceId }, binding.id]])
+})
+
+test('a saved exhausted subscription retains its same-model quota fallback without reading the catalogue', async () => {
+  selected = binding.id
+  catalogueError = new Error('unrelated catalogue unavailable')
+  savedBinding = {
+    ...binding, bindingId: binding.id, provider: 'claude', plan: 'Max',
+    quota: { vendor: 'claude_code', source: 'official', status: 'ok', plan: 'Max',
+      windows: [{ kind: 'five_hour', used: 1, resetsAt: '2099-01-01T00:00:00.000Z' }],
+      observedAt: new Date().toISOString() },
+  }
+  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic',
+    models: [binding.modelId], mine: true, name: 'Own fallback key' }]
+  const frozen = await freezeBotModel(scope, noSubscription)
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: binding.modelId, actorId: 'alice', modelSelection: {
+    coordinator: true, type: 'api_key', keyId: id(9), ownerId: scope.ownerId, actorId: 'alice',
+    workspaceId: scope.workspaceId, modelId: binding.modelId,
+    afterQuota: { subscription: 'claude', plan: 'Max', keyProvider: 'deepseek', keyName: 'Own fallback key' },
+  } })
+  assert.equal(catalogueReads, 0)
+
 })

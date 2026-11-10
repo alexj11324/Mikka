@@ -10,6 +10,7 @@ import { credentialStates, dispatchOrder, orderCandidates, selectedOrderCandidat
 import { entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation, type SkippedEntry } from './model-order-plan'
 import { modelTier, supportedModelEfforts, type ModelRoutingSnapshot } from './model-routing'
 import { routeModelCandidates, type ModelRoutingContext } from './model-routing-server'
+import { modelFallbackAllowed, type FallbackSource } from './model-fallback-policy'
 import type { invokeDecision } from './coordinator/decide'
 
 /**
@@ -67,6 +68,8 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   /** Actual task dispatch only. Catalogue/settings/availability reads omit it. */
   routing?: ModelRoutingContext
   decision?: typeof invokeDecision
+  /** A continuation may change its source only within the frozen model, Harness and payer. */
+  recoverySource?: FallbackSource
 } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   if (!dependencies.skipCatalogueRefresh) await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
@@ -102,7 +105,24 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const named = explicit && !canRoute ? { agent: HARNESS_NAMES[explicit.harness], model: explicit.model } : null
   // The thread's model is the only one tried: no subscription or key offers it on that Agent, so nothing runs and the card says so.
   if (named && !picked) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
-  const entries = picked ? [picked] : order.entries
+  let entries = picked ? [picked] : order.entries
+  if ((!picked && entries.length) || dependencies.recoverySource) {
+    const origin = dependencies.recoverySource ?? (() => {
+      const entry = entries[0], candidate = candidates.find(item => entry && entryKey(item) === entryKey(entry))
+      return entry && candidate ? { entry, credentialOwnerId: candidate.credentialOwnerId } : null
+    })()
+    if (origin) {
+      const [{ apiKeyAfterQuota }, { workspaceModelPolicy }] = await Promise.all([import('./model-api-keys'), import('./organization-connections-access')])
+      const personalPaidFallback = await apiKeyAfterQuota(pool, scope.ownerId)
+      const organizationPaidFallback = (await workspaceModelPolicy(scope.workspaceId)).paidFallback === 'same_payer'
+      entries = entries.filter(entry => {
+        const candidate = candidates.find(item => entryKey(item) === entryKey(entry))
+        return candidate && modelFallbackAllowed(origin, { entry, credentialOwnerId: candidate.credentialOwnerId },
+          { personalPaidFallback, organizationPaidFallback, recovery: Boolean(dependencies.recoverySource) })
+      })
+    }
+  }
+  if (picked && !entries.some(entry => entryKey(entry) === entryKey(picked))) return { kind: 'none', reason: 'pickedUnavailable', card: modelUnavailableCard('pickedUnavailable', { agent: HARNESS_NAMES[picked.harness], model: picked.model }) }
   const deferStaleQuota = dependencies.deferStaleQuota === true && dependencies.probeQuota === false
     && dependencies.bindSubscription === false && dependencies.skipCatalogueRefresh === true && !dependencies.routing
   const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota, probe: dependencies.probeQuota, ...(deferStaleQuota ? { deferStaleQuota: true } : {}) })

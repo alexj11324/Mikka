@@ -16,6 +16,7 @@ import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeLease } from '@mikka/protocol/subscription'
+import { NATIVE_CREDENTIAL_ISOLATION_HEADER, NATIVE_CREDENTIAL_ISOLATION_VERSION } from '@mikka/protocol/native-isolation'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
 import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud-issuer'
@@ -56,6 +57,7 @@ import { githubMachineConfigured, githubMachineCredential } from '@/lib/github/m
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection, taskSecretSnapshot, type TaskSecretInjection } from '@/lib/secrets/runtime'
+import { recordRunResourceDisclosure, runResourceContext, runPersonalResourcesAllowed, runCleanExecutionAllowed } from '@/lib/run-private-resources'
 import { issueTaskSecretAccess } from '@/lib/secrets/task-access'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 import { executionMembersActive } from '@/lib/execution-identity'
@@ -147,6 +149,20 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     || caller.scopeWorkspaceId && caller.scopeWorkspaceId !== run.workspaceId
     || run.agentDefinition?.executionIdentity !== undefined && run.agentDefinition.executionIdentity?.workspaceId !== run.workspaceId)
     return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
+  const supportsNativeIsolation = request.headers.get(NATIVE_CREDENTIAL_ISOLATION_HEADER) === NATIVE_CREDENTIAL_ISOLATION_VERSION
+  const rejectIsolation = async (expectedLease?: string) => {
+    const reason = new CodedError('run_clean_isolation_required')
+    const summary = messages.RunErrors.run_clean_isolation_required.default
+    const rejected = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: summary,
+      failureDetails: serverRunFailure(runId, new Date(), reason), finishedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.deviceId, deviceId), isNull(agentRuns.stopRequestedAt),
+        eq(agentRuns.status, expectedLease ? 'preparing' : 'queued'), expectedLease ? eq(agentRuns.leaseExpiresAt, new Date(expectedLease)) : undefined))
+      .returning({ id: agentRuns.id })
+    if (rejected.length) { await runListChanged(db, runId); await runChanged(db, runId); await afterRunEnded(caller.userId, runId) }
+    return NextResponse.json({ error: summary, code: reason.code }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+  }
+  const personalResources = await runPersonalResourcesAllowed(pool, runId, caller.userId)
+  if (!await runCleanExecutionAllowed(pool, runId, deviceId) || !personalResources && !supportsNativeIsolation) return rejectIsolation()
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
@@ -225,6 +241,8 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   const beforeClaim = async (tx: import('pg').PoolClient) => {
     // Scope may change while publication/policy preparation awaits. Recheck the same frozen
     // binding, including both members and the share, before taking the lease.
+    if (!await runCleanExecutionAllowed(tx, runId, deviceId)
+      || !supportsNativeIsolation && !await runPersonalResourcesAllowed(tx, runId, caller.userId)) return false
     if (subscription && !await nativeRunBinding(tx, caller.userId, agent.id, harness, subscription.workspaceId, subscription.id)) return false
     if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return true
     const { guardFactoryClaim } = await import('@/lib/factory/runtime')
@@ -280,7 +298,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     || taskWorkspaceId && taskWorkspaceId !== caller.scopeWorkspaceId)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
   let taskInjection: TaskSecretInjection
   try {
-    taskInjection = await taskSecretInjection(taskWorkspaceId, taskRepository, process.env, undefined, run.userId)
+    taskInjection = await taskSecretInjection(taskWorkspaceId, taskRepository, process.env, undefined, run.userId, { runId: run.id })
     taskEnv = taskInjection.env
     taskSecretNames = taskInjection.secretNames
   } catch { return NextResponse.json({ code: 'task_secret_unavailable', detail: 'configuration' }, { status: 409 }) }
@@ -368,7 +386,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
         request.headers.get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER) === '1')
     }),
     cloudStartupSpan('cloud.worker.claim.github_credentials', startupAttributes, async () => {
-      if (!githubRepository || !await githubMachineConfigured(caller.userId)) return undefined
+      if (!taskInjection.resourceContext?.personalResources || !githubRepository || !await githubMachineConfigured(caller.userId)) return undefined
       const issued = await githubMachineCredential(caller.userId, { remoteKey: repo.repoPath })
       return { token: issued.token, expiresAt: issued.expiresAt?.toISOString() ?? null }
     }),
@@ -379,7 +397,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       .then(async ({ token }) => {
         const tools = personalMailboxEnabled() ? await (await import('@/lib/personal-mailbox-runtime')).personalWorkerMailboxAdvertised(caller.userId, run.id) : []
         // Connected apps, one MCP entry each on the device; best effort, never blocking the run.
-        let apps = harness === 'claude_code' || harness === 'codex'
+        let apps = taskInjection.resourceContext?.personalResources && (harness === 'claude_code' || harness === 'codex')
           ? await (await import('@/lib/app-tools-server')).runAppToolkits(caller.userId, run.botId ?? null).catch(() => [])
           : []
         if ((harness === 'claude_code' || harness === 'codex') && run.agentDefinition?.customMcp) {
@@ -421,8 +439,8 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   const threadContinuation = earlier && run.continuesRunId
     ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId && earlierHarness === harness && profileNativeSessionMatches(earlier.agentDefinition, run.agentDefinition) ? { resumeSessionId: earlier.sessionId } : {}) }
     : {}
-  const settings = repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
-  const verifyCommand = settings ? settings.verifyCommand : device.kind === 'cloud' ? repo.verifyCommand : null
+  const settings = taskInjection.resourceContext?.personalResources && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
+  const verifyCommand = taskInjection.resourceContext?.personalResources ? settings ? settings.verifyCommand : device.kind === 'cloud' ? repo.verifyCommand : null : null
   // Whether the daemon itself pushes the verified task branch: a run with a
   // task branch does. The agent's own push is never withheld; it works with the
   // owner's own GitHub credential (decision 2026-11-02-1600). `ask` is never forwarded.
@@ -467,8 +485,9 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     if (github.status === 'fulfilled') githubCredential = github.value
   }
   const githubConnected = receivesRunCredentials ? Boolean(githubCredential)
-    : repo.repoPath.startsWith('v2/github.com/') && await githubMachineConfigured(caller.userId)
+    : Boolean(taskInjection.resourceContext?.personalResources) && repo.repoPath.startsWith('v2/github.com/') && await githubMachineConfigured(caller.userId)
   timings.next('response_fence')
+  let isolationRevoked = false
   const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => {
     const taskSecrets = issueTaskSecretAccess({ injection: taskInjection,
       endpoint: new URL(withBasePath(`/v1/task-secrets/${runId}`), request.url).toString(), leaseExpiresAt,
@@ -493,6 +512,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),
     ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: current.prompt,
     kind: current.kind, leaseExpiresAt, policyRevision: cliPolicy.revision,
+    ...(!taskInjection.resourceContext?.personalResources ? { nativeCredentialIsolation: NATIVE_CREDENTIAL_ISOLATION_VERSION } : {}),
     ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
     ...(verifyCommand ? { verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
@@ -532,12 +552,22 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       || current.agentDefinition?.executionIdentity?.workspaceId !== run.agentDefinition?.executionIdentity?.workspaceId
       || current.agentDefinition?.executionIdentity !== undefined && current.agentDefinition.executionIdentity?.workspaceId !== workspaceId
       || caller.scopeWorkspaceId && caller.scopeWorkspaceId !== workspaceId) return false
-    if (taskInjection.snapshot === undefined) return true
+    const context = await runResourceContext(current.id, workspaceId, current.userId, tx)
+    if (!taskInjection.resourceContext || context.snapshot !== taskInjection.resourceContext.snapshot) return false
+    if (!context.personalResources && !supportsNativeIsolation) { isolationRevoked = true; return false }
+    const recordDisclosure = async () => {
+      const allowed = await recordRunResourceDisclosure(tx, context, current)
+      if (!allowed) isolationRevoked = true
+      return allowed
+    }
+    if (taskInjection.snapshot === undefined) return recordDisclosure()
     if (workspaceId && !current.agentDefinition?.executionIdentity && !await executionMembersActive(workspaceId, [current.userId])) return false
     const [currentRepo] = await tx.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, repo.id)).limit(1)
     if (!currentRepo || remoteRepositoryRef(currentRepo.remoteUrl) !== taskRepository) return false
-    return await taskSecretSnapshot(workspaceId, taskRepository, current.userId, tx) === taskInjection.snapshot
+    if (await taskSecretSnapshot(workspaceId, taskRepository, current.userId, tx, { runId: current.id }) !== taskInjection.snapshot) return false
+    return recordDisclosure()
   })
+  if (!response && isolationRevoked) return rejectIsolation(leaseExpiresAt)
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }
 

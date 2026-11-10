@@ -26,6 +26,19 @@ test('personal secrets', { skip: !dbUrl }, async t => {
   const VALUE = 'sk_personal_' + randomBytes(12).toString('hex')
   const META = ['delivery', 'id', 'kind', 'name', 'note', 'updatedAt']
   const DIRECT = { mode: 'direct', exposeToAgent: true } as const
+  const privateRuns = new Map<string, string>()
+  const privateContext = async (ownerId: string, workspaceId: string = ws.id) => {
+    const key = `${workspaceId}:${ownerId}`
+    let runId = privateRuns.get(key)
+    if (!runId) {
+      runId = randomUUID()
+      const agentId = await seedAgent(pool, ownerId)
+      await pool.query('insert into agent_runs(id,"userId","workspaceId","agentId",status) values($1,$2,$3,$4,\'queued\')', [runId, ownerId, workspaceId, agentId])
+      await pool.query('update resource_access_policies set visibility=\'private\' where kind=\'thread\' and id=$1', [runId])
+      privateRuns.set(key, runId)
+    }
+    return { runId }
+  }
 
   await t.test('owner-only: list, create, replace, delete; ids of others are indistinguishable from missing ones', async () => {
     const saved = await personal.createUserSecret(alex, { name: 'OPENROUTER_API_KEY', kind: 'secret', value: VALUE, note: '测试用' }, { workspaceId: ws.id })
@@ -53,12 +66,12 @@ test('personal secrets', { skip: !dbUrl }, async t => {
     await personal.createUserSecret(alex, { name: 'VERCEL_TOKEN', kind: 'secret', value: 'alex-value-1234', overrideWorkspace: true, delivery: DIRECT }, { workspaceId: ws.id })
     await personal.createUserSecret(alex, { name: 'ALEX_ONLY', kind: 'env', value: 'plain-config' }, { workspaceId: ws.id })
 
-    const alexRun = await runtime.taskSecretInjection(ws.id, 'alexj11324/mikka', process.env, undefined, alex)
+    const alexRun = await runtime.taskSecretInjection(ws.id, 'alexj11324/mikka', process.env, undefined, alex, await privateContext(alex))
     assert.equal(alexRun.env.VERCEL_TOKEN, 'alex-value-1234', 'personal beats workspace')
     assert.equal(alexRun.env.REPO_ONLY, 'repo-value-1234')
     assert.equal(alexRun.env.ALEX_ONLY, 'plain-config')
     assert.deepEqual(alexRun.secretNames.sort(), ['REPO_ONLY', 'VERCEL_TOKEN'], 'only masked kinds are secret names')
-    const linRun = await runtime.taskSecretInjection(ws.id, 'alexj11324/mikka', process.env, undefined, lin)
+    const linRun = await runtime.taskSecretInjection(ws.id, 'alexj11324/mikka', process.env, undefined, lin, await privateContext(lin))
     assert.equal(linRun.env.VERCEL_TOKEN, 'team-value-1234', 'another member never gets it')
     assert.equal(linRun.env.ALEX_ONLY, undefined)
     const noOwner = await runtime.taskSecretInjection(ws.id, null)
@@ -115,15 +128,18 @@ test('personal secrets', { skip: !dbUrl }, async t => {
     const name = 'PERSONAL_PROTECTED_OVERRIDE'
     await store.createWorkspaceSecret(alex, ws.id, { name, kind: 'secret', value: 'workspace-direct-canary', delivery: DIRECT })
     const own = await personal.createUserSecret(alex, { name, kind: 'secret', value: VALUE, overrideWorkspace: true }, { workspaceId: ws.id })
-    const mine = await runtime.taskSecretInjection(ws.id, null, process.env, undefined, alex)
+    const mine = await runtime.taskSecretInjection(ws.id, null, process.env, undefined, alex, await privateContext(alex))
     assert.equal(mine.env[name], undefined, 'protected personal metadata must not expose either value')
     assert.ok(mine.unavailable.includes(name))
-    const teammate = await runtime.taskSecretInjection(ws.id, null, process.env, undefined, lin)
+    const teammate = await runtime.taskSecretInjection(ws.id, null, process.env, undefined, lin, await privateContext(lin))
     assert.equal(teammate.env[name], 'workspace-direct-canary')
     assert.ok(!JSON.stringify(teammate).includes(VALUE))
-    const personalOnly = await runtime.taskSecretInjection(null, null, process.env, undefined, alex)
+    const personalWorkspace = await seedPersonalWorkspace(pool, alex)
+    const personalOnly = await runtime.taskSecretInjection(personalWorkspace, null, process.env, undefined, alex, await privateContext(alex, personalWorkspace))
     assert.equal(personalOnly.env[name], undefined)
     assert.ok(personalOnly.unavailable.includes(name))
+    const unbound = await runtime.taskSecretInjection(null, null, process.env, undefined, alex)
+    assert.deepEqual(unbound.unavailable, [], 'an Owner id without a real private run does not authorize personal values')
     await personal.deleteUserSecret(alex, { id: own.id })
   })
 
@@ -131,7 +147,7 @@ test('personal secrets', { skip: !dbUrl }, async t => {
     const temp = await seedUser(pool, 'temp')
     const saved = await personal.createUserSecret(temp, { name: 'TEMP_KEY', kind: 'secret', value: 'temp-value-1234' }, {})
     await pool.query('update user_secrets set "userId"=$2 where id=$1', [saved.id, alex])
-    await assert.rejects(runtime.taskSecretInjection(ws.id, null, process.env, undefined, alex))
+    await assert.rejects(runtime.taskSecretInjection(ws.id, null, process.env, undefined, alex, await privateContext(alex)))
     await pool.query('delete from user_secrets where id=$1', [saved.id])
     await personal.createUserSecret(temp, { name: 'TEMP_KEY', kind: 'secret', value: 'temp-value-1234' }, {})
     await pool.query('delete from "user" where id=$1', [temp])

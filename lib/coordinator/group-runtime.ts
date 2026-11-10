@@ -43,7 +43,7 @@ export const groupRuntime: GroupRuntime = {
         const key=JSON.stringify([executionBotId,bot.repository])
         const cached=availability.get(key)
         if (cached) return cached
-        if (bot.repository && !await (await import('@/lib/workspace-admin/bots')).repositoryAvailable(workspaceId,bot.repository)) return {available:false,reason:'repositoryNotFound'}
+        if (bot.repository && !await (await import('@/lib/workspace-admin/bots')).repositoryAvailable(workspaceId,bot.repository,ownerId)) return {available:false,reason:'repositoryNotFound'}
         const result=await agentProfileDispatchAvailability(pool,{ownerId,workspaceId,botId:executionBotId},{location:bot.repository?undefined:'cloud',cloudPurpose:bot.repository?'task':'desktop'},{deferStaleQuota:true})
         availability.set(key,result)
         return result
@@ -63,7 +63,7 @@ export const groupRuntime: GroupRuntime = {
     const scope = hostedBillingScope.getStore()
     // Same code the chat shows today; the detail tells the two missing scopes apart in the stored error and logs.
     if (!scope) throw new CodedError('verification_required', { detail: 'billing_scope_missing' })
-    if (agent.memberType === 'bot' && !scope.ownerId) throw new CodedError('verification_required', { detail: 'billing_owner_missing' })
+    if (agent.memberType === 'bot' && (!scope.ownerId || !scope.actorId)) throw new CodedError('verification_required', { detail: 'billing_actor_missing' })
     // 停止 in the group aborts it too (lib/coordinator/group-turns.ts).
     const signal = input.signal ? AbortSignal.any([AbortSignal.timeout(20000), input.signal]) : AbortSignal.timeout(20000)
     let streamFailure: unknown
@@ -77,7 +77,7 @@ export const groupRuntime: GroupRuntime = {
     }
     const options = {
       model: agent.memberType === 'bot'
-        ? await resolveGroupBotModel({ ownerId: scope.ownerId!, workspaceId: scope.workspaceId, botId: agent.id }, input.modelRuntime ?? (() => { throw Error('group_bot_model_unavailable') })(), signal)
+        ? await resolveGroupBotModel({ ownerId: scope.ownerId!, actorId: scope.actorId!, workspaceId: scope.workspaceId, botId: agent.id }, input.modelRuntime ?? (() => { throw Error('group_bot_model_unavailable') })(), signal)
         : await hostedModel(scope.workspaceId,COORDINATOR_MODEL,undefined,scope.ownerId),
       system: groupReplySystemPrompt(agent),
       messages: [{ role: 'user' as const, content }],

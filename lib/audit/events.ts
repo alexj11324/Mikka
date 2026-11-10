@@ -62,6 +62,7 @@ export const AUDIT_ACTIONS = {
   'billing.auto_recharge_changed': 'billing',
   'billing.limits_changed': 'billing',
   'billing.payment_method_changed': 'billing',
+  'billing.credit_share_changed': 'billing',
 } as const satisfies Record<string, AuditCategory>
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS
@@ -72,7 +73,8 @@ export type AuditAction = keyof typeof AUDIT_ACTIONS
 const label = z.string().trim().min(1).max(120)
 const role = z.enum(['owner', 'admin', 'member', 'guest'])
 const access = z.enum(['allow', 'ask', 'deny', 'read', 'write', 'none'])
-const scope = z.enum(['workspace', 'project', 'repo', 'bot', 'user'])
+const scope = z.enum(['workspace', 'project', 'thread', 'repo', 'bot', 'user'])
+const secretCustody = { scope, resourceId: z.uuid(), previousScope: scope, previousResourceId: z.uuid() }
 const cents = z.number().int().min(0).max(100_000_000)
 const currency = z.string().regex(/^[A-Z]{3}$/)
 const none = z.object({}).strict()
@@ -100,12 +102,12 @@ export const AUDIT_METADATA = {
   'skill.registered': z.object({ versionId: z.uuid(), sha256: z.string().regex(/^[a-f0-9]{64}$/), format: z.literal('single-skill-md-v1') }).strict(),
   'skill.reviewed': z.object({ versionId: z.uuid(), sha256: z.string().regex(/^[a-f0-9]{64}$/), format: z.literal('single-skill-md-v1') }).strict(),
   'skill.withdrawn': z.object({ versionId: z.uuid(), sha256: z.string().regex(/^[a-f0-9]{64}$/), format: z.literal('single-skill-md-v1') }).strict(),
-  'secret.created': z.object({ scope, delivery: z.enum(['protected', 'direct']), previousDelivery: z.enum(['protected', 'direct']) }).partial().strict(),
-  'secret.replaced': z.object({ scope, delivery: z.enum(['protected', 'direct']), previousDelivery: z.enum(['protected', 'direct']) }).partial().strict(),
-  'secret.deleted': z.object({ scope }).partial().strict(),
-  'env.created': z.object({ scope }).partial().strict(),
-  'env.updated': z.object({ scope }).partial().strict(),
-  'env.deleted': z.object({ scope }).partial().strict(),
+  'secret.created': z.object({ ...secretCustody, delivery: z.enum(['protected', 'direct']), previousDelivery: z.enum(['protected', 'direct']) }).partial().strict(),
+  'secret.replaced': z.object({ ...secretCustody, delivery: z.enum(['protected', 'direct']), previousDelivery: z.enum(['protected', 'direct']) }).partial().strict(),
+  'secret.deleted': z.object(secretCustody).partial().strict(),
+  'env.created': z.object(secretCustody).partial().strict(),
+  'env.updated': z.object(secretCustody).partial().strict(),
+  'env.deleted': z.object(secretCustody).partial().strict(),
   'token.created': z.object({ tokenName: label, expiresAt: z.string().datetime({ offset: true }).nullable() }).partial().strict(),
   'token.revoked': none,
   'auth.signed_in': z.object({ newDevice: z.boolean().optional(), method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']) }).strict(),
@@ -125,10 +127,11 @@ export const AUDIT_METADATA = {
   'billing.card_verified': z.object({ allowanceGranted:z.boolean() }).strict(),
   'billing.checkout_started': z.object({ amountCents: cents, currency }).partial().strict(),
   'billing.credits_purchased': z.object({ amountCents: cents, currency, credits: z.number().int().min(0) }).partial().strict(),
-  'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable() }).partial().strict(),
+  'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable(), monthlyCapCents: cents.nullable(), revision: z.number().int().nonnegative() }).partial().strict(),
   'billing.limits_changed': z.object({ fromCents: cents.nullable(), toCents: cents.nullable() }).partial().strict(),
   // 由我的卡支付这个团队: a member's card designated, or released (they stopped it or left) with a grace period.
   'billing.payment_method_changed': z.object({ change: z.enum(['designated', 'released']), graceDays: z.number().int().min(0).max(30).optional() }).strict(),
+  'billing.credit_share_changed': z.object({ enabled: z.boolean() }).strict(),
 } as const satisfies Record<AuditAction, z.ZodType>
 
 /** Allowlisted metadata for one action (named params for that action's ICU template). */

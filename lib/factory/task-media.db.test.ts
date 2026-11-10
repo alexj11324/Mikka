@@ -114,16 +114,19 @@ test('task media uses real owner/task/run relations and private cached video cov
     } finally { await database.query('UPDATE agent_runs SET "workspaceId"=$2 WHERE id=$1',[runs[0],workspace]) }
   })
 
-  await t.test('original videos use scoped short-lived object downloads; inline files keep byte ranges',async()=>{
-    const id=await capture(runs[1],{kind:'video',inline:false}),signed:unknown[][]=[]
-    const read=createCaptureDownloads(database,async(...args)=>{signed.push(args);return 'https://private-storage.example.invalid/capture?signature=fixture'})
+  await t.test('original videos stream behind current Thread ACL; inline files keep byte ranges',async()=>{
+    const id=await capture(runs[1],{kind:'video',inline:false}),reads:Array<{key:string;range:string|null}>=[]
+    const read=createCaptureDownloads(database,async(key,request)=>{reads.push({key,range:request.headers.get('range')});return new Response(new Uint8Array([1,2]),{status:206,headers:{'content-range':'bytes 0-1/20','content-length':'2'}})})
     const request=new Request('https://app.example.invalid/media',{headers:{range:'bytes=0-1'}})
     const response=await read(request,owner,id)
-    assert.equal(response?.status,307)
+    assert.equal(response?.status,206)
     assert.equal(response?.headers.get('cache-control'),'private, no-store')
-    assert.deepEqual(signed,[[`${owner}/source/${id}`,'video/mp4','inline; filename="capture.mp4"',60]])
+    assert.equal(response?.headers.get('location'),null)
+    assert.equal(response?.headers.get('content-range'),'bytes 0-1/20')
+    assert.deepEqual(new Uint8Array(await response!.arrayBuffer()),new Uint8Array([1,2]))
+    assert.deepEqual(reads,[{key:`${owner}/source/${id}`,range:'bytes=0-1'}])
     assert.equal(await read(request,peer,id),null)
-    assert.equal(signed.length,1,'another owner cannot obtain a signed URL')
+    assert.equal(reads.length,1,'an unauthorized reader cannot open the object')
     const inlineResponse=await read(request,owner,oldImage)
     assert.equal(inlineResponse?.status,206)
     assert.deepEqual(new Uint8Array(await inlineResponse!.arrayBuffer()),new Uint8Array(png.subarray(0,2)))

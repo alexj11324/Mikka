@@ -51,7 +51,8 @@ async function persistProject(reader: Exclude<IssueReader, string>, input: unkno
       if (patch?.success && !current) return { error: i18nText("Errors.projectNotFound") }
       const parsed = projectInput.safeParse(patch?.success ? { ...current, ...patch.data.changes, id: patch.data.id, revision: patch.data.revision } : input)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? i18nText("Errors.projectCheckFields") }
-      const { id, revision, ...values } = parsed.data
+      const { id, revision, visibility, ...values } = parsed.data
+      if (id && visibility !== undefined) throw new ActionFailureError('validationGeneric')
       if (id && (!revision || !owned.some(item => item.id === id && item.revision === revision))) return { error: i18nText("Errors.projectStale") }
       if (values.properties.dependencyIds.some(value => !owned.some(item => item.id === value))) return { error: i18nText("Errors.projectDependencyNotFound") }
       const projectOwner = id ? owned.find(item => item.id === id)!.userId : owner
@@ -65,7 +66,7 @@ async function persistProject(reader: Exclude<IssueReader, string>, input: unkno
       const save = async () => {
       const [project] = id ? await tx.update(projects).set({ ...values, revision: revision! + 1, updatedAt: new Date() }).where(and(eq(projects.id, id), eq(projects.userId, projectOwner), eq(projects.revision, revision!))).returning() : await tx.insert(projects).values({ ...values, id: nextId, userId: owner, issueIds: [], revision: 1 }).returning()
       if (!project) return { error: i18nText("Errors.projectSaveConflict") }
-      if (!id) await registerProjectAccess(reader, project.id, workspaceId)
+      if (!id) await registerProjectAccess(reader, project.id, workspaceId, visibility)
       const names: Record<string, string> = { status: i18nText("Projects.fields.status"), priority: i18nText("Projects.fields.priority"), lead: i18nText("Projects.fields.lead"), startDate: i18nText("Projects.fields.startDate"), targetDate: i18nText("Projects.fields.targetDate"), properties: i18nText("Projects.detail.detailsLabel"), name: i18nText("Settings.workspaceForm.name"), summary: i18nText("Projects.fields.summary"), description: i18nText("Projects.form.descriptionHeading"), team: i18nText("Settings.sections.teams.title") }
       const message = patch?.success ? i18nText("FeatureCopy.c_976c2152", { value0: (Object.keys(patch.data.changes).map(key => names[key]).join('、')) }) : id ? i18nText("Projects.activity.updatedOverview") : i18nText("Projects.activity.created")
       await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: projectOwner, projectId: project.id, message })

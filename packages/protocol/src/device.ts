@@ -28,6 +28,7 @@ import { sanitizeTraceContext } from './trace-context'
 import { nativeLeaseSchema } from './subscription'
 import { mailboxCatalogueSchema } from './mailbox'
 import { taskSecretAccessSchema, taskSecretRenewalSchema } from './task-secrets'
+import { NATIVE_CREDENTIAL_ISOLATION_VERSION } from './native-isolation'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
@@ -453,6 +454,9 @@ export const runAssignmentSchema = z.object({
   taskSecretNames: z.array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/)).max(500).optional(),
   /** Third-party HTTP capabilities. Never persisted in the daemon journal. */
   taskSecrets: taskSecretAccessSchema.optional(),
+  /** Server-required separation of native model authentication from tools.
+   * A daemon without the verified capability must reject, never downgrade. */
+  nativeCredentialIsolation: z.literal(NATIVE_CREDENTIAL_ISOLATION_VERSION).optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**

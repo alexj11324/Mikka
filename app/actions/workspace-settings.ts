@@ -7,7 +7,7 @@ import { auditRequestContext } from '@/lib/audit/record'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { deleteWorkspaceData, readWorkspaceGeneral, transferWorkspaceOwnership, updateWorkspaceGeneral, workspaceDeletionImpact, workspaceTransferTargets, type UpdateWorkspaceInput, type WorkspaceDeletion, type WorkspaceDeletionImpact, type WorkspaceGeneral, type WorkspaceTransferTarget } from '@/lib/workspace-admin/general'
-import { archivedBots, removeMember, takeOverBot, type AssetTransfer, type MemberRemoval } from '@/lib/workspace-admin/members'
+import { archivedBots, removeMember, takeOverBot, transferOwnedBot, type AssetTransfer, type MemberRemoval } from '@/lib/workspace-admin/members'
 
 const COOKIE = 'mikka-workspace'
 
@@ -103,9 +103,18 @@ async function takeOverArchivedBotBody(botId: string, workspaceId?: string): Pro
   })
 }
 
+/** The current owner explicitly transfers one Bot; private history is separate. */
+async function transferMyBotBody(botId: string, toUserId: string, input: { expectedRevision: number; confirmPrivateTransfer?: boolean }, workspaceId?: string): Promise<ActionResult<AssetTransfer>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return transferOwnedBot(actor.userId, actor.workspaceId, botId, toUserId, input)
+  })
+}
+
 // Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
 export async function updateWorkspace(...args: Parameters<typeof updateWorkspaceBody>) { return withFreshSession(() => updateWorkspaceBody(...args)) }
 export async function transferWorkspace(...args: Parameters<typeof transferWorkspaceBody>) { return withFreshSession(() => transferWorkspaceBody(...args)) }
 export async function deleteWorkspace(...args: Parameters<typeof deleteWorkspaceBody>) { return withFreshSession(() => deleteWorkspaceBody(...args)) }
 export async function removeWorkspaceMember(...args: Parameters<typeof removeWorkspaceMemberBody>) { return withFreshSession(() => removeWorkspaceMemberBody(...args)) }
 export async function takeOverArchivedBot(...args: Parameters<typeof takeOverArchivedBotBody>) { return withFreshSession(() => takeOverArchivedBotBody(...args)) }
+export async function transferMyBot(...args: Parameters<typeof transferMyBotBody>) { return withFreshSession(() => transferMyBotBody(...args)) }

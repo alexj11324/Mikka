@@ -22,7 +22,7 @@ export const projectFields = z.object({
   team: z.literal(WORKSPACE_NAME), startDate: date, targetDate: date,
   properties: projectProperties.default(DEFAULT_PROJECT_PROPERTIES),
 })
-export const projectInput = projectFields.extend({ id: z.uuid().optional(), revision: z.number().int().positive().optional() }).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, 'validationProjectDateOrder')
+export const projectInput = projectFields.extend({ id: z.uuid().optional(), revision: z.number().int().positive().optional(), visibility: z.enum(['shared','private']).optional() }).refine(value => !value.startDate || !value.targetDate || value.startDate <= value.targetDate, 'validationProjectDateOrder')
 export const projectPatch = z.object({ id: z.uuid(), revision: z.number().int().positive(), changes: projectFields.partial().extend({ properties: projectProperties.optional() }).refine(value => Object.keys(value).length > 0, 'validationProjectChangesRequired') })
 export type ProjectDraft = z.output<typeof projectFields>
 export type ProjectChanges = z.input<typeof projectPatch>['changes']

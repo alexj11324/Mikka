@@ -59,7 +59,9 @@ const workspace = {
   },
 }
 class WorkspaceError extends Error {}
-mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { db: drizzle(application as never), pool: application } })
+mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { db: drizzle(application as never), pool: application,
+  withDatabaseTransaction: () => { throw new Error('Masking must not open an ACL write transaction') },
+} })
 mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspaceDb: drizzle(workspace as never), workspacePool: workspace } })
 mock.module(new URL('../workspace-access.ts', import.meta.url).href, { namedExports: { WorkspaceError, requireWorkspace: () => { throw new Error('Not a settings mutation') } } })
 const legacy = import('./runtime')

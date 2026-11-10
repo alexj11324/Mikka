@@ -22,7 +22,7 @@ export function TasksScreen() {
         right={[
           { icon: 'line.3.horizontal.decrease', label: mobileMessages.MobileCore.filter, web: <ListFilter size={20} color={colors.ink} strokeWidth={2} />, onOpen: () => {},
             items: [{ id: 'all' as const, title: mobileMessages.MobileCore.all }, ...TASK_GROUPS].map(group => ({ label: group.title, on: filter === group.id, onPress: () => setFilter(group.id) })) },
-          { icon: 'plus', label: mobileMessages.Nav.newTask, web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onPress: () => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', compose: '1' } }) },
+          { icon: 'plus', label: mobileMessages.Nav.newTask, web: <Plus size={22} color={colors.ink} strokeWidth={2} />, onPress: () => openChat({ pathname: '/bots/[id]', params: { id: 'coordinator', compose: '1',taskRequest:'1' } }) },
         ]}
       />
       <TaskList filter={filter} />

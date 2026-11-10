@@ -164,10 +164,10 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     attemptId: attempt.id, runId: attempt.runId!, candidateId: attempt.candidateId, ...presentation.get(attempt.id)!,
     status: attempt.runStatus, createdAt: iso(attempt.runCreatedAt), startedAt: iso(attempt.startedAt), endedAt: iso(attempt.runFinishedAt),
     agentId: attempt.agentId, name: text(attempt.agentName), harness: text(attempt.harness), model: text(attempt.model),
-    machine: attempt.deviceId ? { id: attempt.deviceId, name: text(attempt.deviceName), kind: attempt.deviceKind } : null,
+    machine: (!actor || actor.userId === task.userId) && attempt.deviceId ? { id: attempt.deviceId, name: text(attempt.deviceName), kind: attempt.deviceKind } : null,
     artifactIds: [] as string[], plan: null as PlanReference | null,
   }))
-  const computers = (await readFactoryComputerSessions(tx, task)).filter(session => !hiddenRuns.has(session.runId))
+  const computers = !actor || actor.userId === task.userId ? (await readFactoryComputerSessions(tx, task)).filter(session => !hiddenRuns.has(session.runId)) : []
   const media = await readFactoryTaskMedia(tx, task)
   const documents = (await readFactoryActivityDocuments(tx, task)).filter(document => !hiddenRuns.has(document.runId))
   const { rows: publications } = await tx.query<{ runId: string; attemptId: string; candidateId: string | null; url: string; title: string | null; state: string | null; createdAt: Instant }>(

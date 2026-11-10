@@ -12,11 +12,11 @@ import { useModelMenu } from '@/lib/model-menu'
  * composer carries the bot's model menu (decision 2026-10-31-2330).
  */
 export default function BotChat() {
-  const { id, action, draft, compose } = useLocalSearchParams<{ id: string; action?: string; draft?: string; compose?: string }>()
+  const { id, action, draft, compose,taskRequest } = useLocalSearchParams<{ id: string; action?: string; draft?: string; compose?: string;taskRequest?:string }>()
   const bot = useHome().data?.bots.find(item => item.id === id)
   const coordinator = id === 'coordinator'
   const model = useModelMenu(coordinator ? null : id)
   const composer = { composerAccessory: (running: boolean) => <ModelMenu model={model} running={running} />, composerNotice: <ModelNotice model={model} /> }
-  if (coordinator) return <ChatScreen botId={null} name="Coordinator" draft={draft} focus={action} compose={compose === '1'} {...composer} />
+  if (coordinator) return <ChatScreen botId={null} name="Coordinator" draft={draft} focus={action} compose={compose === '1'} taskRequest={taskRequest==='1'} {...composer} />
   return <ChatScreen botId={id} name={bot?.name ?? ''} color={bot?.color} shape={bot?.shape} draft={draft} focus={action} compose={compose === '1'} {...composer} />
 }

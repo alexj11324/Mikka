@@ -14,7 +14,7 @@ async function handleGET(request: Request) {
   // This optional proof routes presence only; PATs retain their ordinary scoped data read.
   const homeScope = user[tokenWorkspace] ? undefined : request.headers.get('x-mikka-presence-scope') ?? undefined
   const workspaceId = await effectiveRequestWorkspace(user)
-  return json(await mobileThreads(user.id, 60, homeScope, workspaceId))
+  return json(await mobileThreads(user, 60, homeScope, workspaceId))
 }
 
 export const GET = withRequestLog('/api/mobile/threads', handleGET)

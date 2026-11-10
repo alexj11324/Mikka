@@ -14,6 +14,7 @@ import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -63,12 +64,13 @@ function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: s
  * for which bot, and that bot (the Coordinator by default) turns it into the task (title, status, assignee…). The
  * request goes into the Coordinator conversation, where its reply shows up.
  */
-export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId, initialText = '' }: {
+export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, workspaceId, initialText = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSent?: () => void
   /** Project page the request came from. */
   project?: string | null
+  projectId?:string|null
   workspaceId?: string
   /** Keys typed before the dialog finished opening. */
   initialText?: string
@@ -77,6 +79,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const tShell = useTranslations('Shell')
   const tDevices = useTranslations('Devices')
   const tCommon = useTranslations('Common')
+  const sharing=useTranslations('ResourceAccess')
+  const [visibility,setVisibility]=useState<'shared'|'private'>('shared')
   const locationT = useTranslations('Settings.modelOrder')
   const { submit: submitMessage, failureMessage } = useCoordinatorSubmit()
   const { mutate } = useSWRConfig()
@@ -146,14 +150,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
     setSending(true)
     setCoordinatorUnavailable(false)
     try {
-      const key = JSON.stringify([text, picked, project ?? null, handler?.id ?? null, profileId ?? null])
+      const key = JSON.stringify([text, picked, project ?? null, projectId??null, visibility, handler?.id ?? null, profileId ?? null])
       if (composed.current?.key !== key) {
         const destination = pickedTaskDestination(picked)
         const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
         composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }),
           ...(destination ? { taskDestination: destination } : {}) }
       }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId })
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId,expectedWorkspaceId:workspaceId,taskCreation:{visibility,...projectId?{projectId}:{}} })
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
@@ -172,6 +176,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')} finalFocus={openerFocus}>
+      <Field><FieldLabel htmlFor={`${fileId}-visibility`}>{sharing('visibility')}</FieldLabel><NativeSelect id={`${fileId}-visibility`} value={visibility} disabled={sending} onChange={event=>setVisibility(event.target.value as 'shared'|'private')}><NativeSelectOption value="shared">{sharing('shared')}</NativeSelectOption><NativeSelectOption value="private">{sharing('private')}</NativeSelectOption></NativeSelect><p className="text-xs text-muted-foreground">{sharing(projectId?'parentBoundary':'creationHint')}</p></Field>
       <div className="flex flex-wrap items-center gap-2 pr-8 text-sm">
         {device
           ? <Select value={picked ?? 'auto'} onValueChange={value => { if (value) pick(value) }} items={[defaults, ...machines].map(({ value, label }) => ({ value, label }))}>

@@ -23,6 +23,9 @@ let selectedModel = model
 let deviceId = 'device', repoId = 'repo'
 let previous: { id: string; status: string; stopRequestedAt: null; agentId: string; readOnly: boolean } | null = null
 let pendingSpec = false
+let collaborationAllowed = true
+const queuedAuthorities: unknown[] = []
+const collaborationAuthority = { actorId: 'synthetic-member', threadOwnerId: owner, collaborationAuthorizationId: '10000000-0000-4000-8000-000000000009' }
 const selectedStages: (string | undefined)[] = []
 const selectedProfiles: (string | undefined)[] = []
 const selectedLocations: (string | undefined)[] = []
@@ -132,12 +135,19 @@ stub('../lib/computer/auto-runtime.ts', { ensureBotCloudRuntime: async (_pool: u
   }
   return { botId, harness: selectedHarness, agentId: replaceAgent ? 'different-agent' : agentId }
 } })
+stub('../lib/computer/cloud-task-target.ts', { cloudTaskTarget: unused, ownedCloudTaskTarget: unused, collaborativeCloudTaskTarget: async (_query: unknown, userId: string, input: Record<string, unknown>, authority: unknown) => {
+  calls.push('collaboration-proof')
+  assert.equal(userId, owner); assert.deepEqual(authority, collaborationAuthority)
+  assert.deepEqual(input, { sourceRunId: priorRunId, botId, issueId, harness: 'codex', model, keyId })
+  return collaborationAllowed ? { workspaceId, agentId: 'dedicated-agent', repoId: 'dedicated-repo', deviceId: 'dedicated-device', instructions: 'disclosed task instructions', harness: 'codex', baseBranch: 'main', remoteUrl: null } : null
+} })
 stub('../lib/computer/queue-run.ts', { queueCloudRun: unused })
-stub('../lib/factory/queue-cloud.ts', { queueFactoryCloudRun: async (_pool: unknown, _actor: unknown, input: Record<string, unknown>) => {
+stub('../lib/factory/queue-cloud.ts', { queueFactoryCloudRun: async (_pool: unknown, _actor: unknown, input: Record<string, unknown>, authority?: unknown) => {
   calls.push('queue')
-  if (!awake || !credentialAvailable) throw new ComputerError(409, 'Bot subscription unavailable')
-  assert.equal(input.agentId, agentId)
-  assert.equal(input.deviceRepoId, repoId, 'queue uses the prepared runtime, not the pre-wake repository')
+  if ((!authority && !awake) || !credentialAvailable) throw new ComputerError(409, 'Bot subscription unavailable')
+  assert.equal(input.agentId, authority ? 'dedicated-agent' : agentId)
+  assert.equal(input.deviceRepoId, authority ? 'dedicated-repo' : repoId, 'queue uses its authorized runtime')
+  if (authority) queuedAuthorities.push(structuredClone(authority))
   if (queueFailure) throw queueFailure
   const key = input.idempotencyKey as string
   if (queued.has(key)) assert.deepEqual(input, queued.get(key), 'the same retry retains its exact request')
@@ -166,7 +176,7 @@ beforeEach(() => {
   calls.length = 0; failure = null; queueFailure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
-  previous = null; pendingSpec = false; requestSource = null; preferLocal = false
+  previous = null; pendingSpec = false; requestSource = null; preferLocal = false; collaborationAllowed = true; queuedAuthorities.length = 0
   selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
 })
 
@@ -418,4 +428,45 @@ test('a working thread receives its message without waking or reselecting anythi
   assert.equal(credentialReads, 0)
   assert.equal(modelResolutions, 0)
   assert.equal(queued.size, 0)
+})
+
+
+test('a shared native turn carries its real actor and receipt without waking the owner Bot or borrowing a subscription', async () => {
+  awake = false
+  const result = await dispatch(owner, { botId, issueId, harness: 'codex', model, apiKeyId: keyId, threadRunId: priorRunId },
+    'shared-call', undefined, undefined, undefined, collaborationAuthority)
+  assert.ok('runId' in result, JSON.stringify(result))
+  assert.deepEqual(calls, ['collaboration-proof', 'queue', 'machine', 'lifecycle'])
+  assert.equal(bindingSelections, 0); assert.equal(credentialReads, 0); assert.equal(modelResolutions, 0)
+  assert.equal(awake, false, 'the generic owner Bot remains asleep')
+  assert.deepEqual(queuedAuthorities, [collaborationAuthority])
+  const input = queued.get('coordinator:shared-call')!
+  assert.equal(input.apiKeyId, keyId); assert.equal(input.threadRunId, priorRunId)
+  assert.equal(input.subscriptionBindingId, undefined); assert.equal(input.allowLocalRecovery, undefined)
+})
+
+test('an expired shared receipt never queues, wakes or prepares a machine', async () => {
+  collaborationAllowed = false
+  const result = await dispatch(owner, { botId, issueId, harness: 'codex', model, apiKeyId: keyId, threadRunId: priorRunId },
+    'expired-shared', undefined, undefined, undefined, collaborationAuthority)
+  assert.deepEqual(result, { error: 'cloudComputerUnavailable' })
+  assert.deepEqual(calls, ['collaboration-proof']); assert.equal(queued.size, 0)
+})
+
+for (const invalid of ['owner', 'subscription', 'local-recovery', 'missing-source'] as const) test(`a shared ${invalid} request fails before credential or machine side effects`, async () => {
+  const input = { botId, issueId, harness: 'codex' as const, model, apiKeyId: keyId, threadRunId: priorRunId,
+    ...(invalid === 'subscription' ? { subscriptionBindingId: bindingId } : {}) }
+  if (invalid === 'missing-source') delete (input as { threadRunId?: string }).threadRunId
+  const result = await dispatch(owner, input, 'invalid-shared', undefined, undefined, invalid === 'local-recovery' ? true : undefined,
+    invalid === 'owner' ? { ...collaborationAuthority, actorId: owner } : collaborationAuthority)
+  assert.deepEqual(result, { error: 'threadExecutionAuthorizationRequired' })
+  assert.deepEqual(calls, []); assert.equal(queued.size, 0)
+})
+
+test('personal GitHub refusal remains distinct and starts no shared machine', async () => {
+  queueFailure = new ComputerError(409, 'personal_git_authorization_required')
+  const result = await dispatch(owner, { botId, issueId, harness: 'codex', model, apiKeyId: keyId, threadRunId: priorRunId },
+    'private-git-shared', undefined, undefined, undefined, collaborationAuthority)
+  assert.deepEqual(result, { error: 'personal_git_authorization_required' })
+  assert.deepEqual(calls, ['collaboration-proof', 'queue'])
 })

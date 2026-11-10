@@ -13,6 +13,7 @@ export class SubscriptionWorkflowModel implements V4Model {
   private readonly selection: HostedModelSelection
   constructor(selection: HostedModelSelection) {
     this.selection = hostedModelSelectionSchema.parse(selection)
+    if (!this.selection.actorId || this.selection.type === 'subscription' && (this.selection.actorId !== this.selection.ownerId || this.selection.runOwnerId !== undefined)) throw new Error('verification_required')
     this.modelId = this.selection.modelId
   }
   static [WORKFLOW_SERIALIZE](value: SubscriptionWorkflowModel) { return { ...value.selection } }

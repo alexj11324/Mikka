@@ -9,17 +9,17 @@ type Store = ReturnType<typeof createFactoryStore>
 /** Human APIs select the task's persisted Bot; model/runtime stores retain their fixed Bot scope. */
 export function createFactoryHumanStore(pool: Pool, forBot: (botId: string | null) => Store, dispatchCompleted?: FactoryCompletionDispatch, observeRetained?: ObserveRetainedDeliverable): Store {
   const base = forBot(null)
-  async function taskStore(userId: string, taskId: string, tx: Pick<PoolClient, 'query'> = pool) {
+  async function taskStore(userId: string, taskId: string, tx: Pick<PoolClient, 'query'> = pool, sharedRead = false) {
     if (!z.uuid().safeParse(taskId).success) throw new FactoryError('factoryNotFound')
-    const { rows: [task] } = await tx.query('SELECT "botId" FROM factory_tasks WHERE id=$1 AND "userId"=$2', [taskId, userId])
+    const { rows: [task] } = await tx.query('SELECT "botId" FROM factory_tasks WHERE id=$1 AND ("userId"=$2 OR $3::boolean)', [taskId, userId, sharedRead])
     if (!task) throw new FactoryError('factoryNotFound')
     // The canonical store still checks current issue visibility, source and Bot ownership.
     return forBot(task.botId)
   }
   return {
     ...base,
-    readTask: async (tx, userId, taskId) => (await taskStore(userId, taskId, tx)).readTask(tx, userId, taskId),
-    read: async (userId, taskId) => (await taskStore(userId, taskId)).read(userId, taskId),
+    readTask: async (tx, userId, taskId) => (await taskStore(userId, taskId, tx, true)).readTask(tx, userId, taskId),
+    read: async (userId, taskId) => (await taskStore(userId, taskId, pool, true)).read(userId, taskId),
     recheckCandidate: async (userId, binding, eventId, reason) => {
       const result = await (await taskStore(userId, binding.taskId)).recheckCandidate(userId, binding, eventId, reason, dispatchCompleted)
       await result.start?.()

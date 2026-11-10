@@ -28,6 +28,7 @@ export interface LiveClientDeps {
   monotonicNow?: () => number
   later?: (callback: () => void, milliseconds: number) => unknown
   cancel?: (timer: unknown) => void
+  invalidateAccess?: (workspaceId:string) => void
 }
 
 /** One key a screen listens to: what changed (`kind`, `id`) on which owner/workspace channel (`scope`). */
@@ -68,6 +69,7 @@ export function liveRuntime(deps: LiveClientDeps, workspaceId: string | null): L
     monotonicNow: deps.monotonicNow,
     later,
     cancel,
+    invalidateAccess: id => { if (id === workspaceId) deps.invalidateAccess?.(id) },
   }
 }
 

@@ -8,13 +8,14 @@ import { questionAnswerPrompt } from '../factory/questions/answer-prompt'
 const id = { project: randomUUID(), workspace: randomUUID(), issue: randomUUID(), outside: randomUUID(), run: randomUUID(), otherRun: randomUUID(), bot: randomUUID(), otherBot: randomUUID(), chunk: randomUUID(), message: randomUUID(), task: randomUUID(), attempt: randomUUID(), candidate: randomUUID(), question: randomUUID(), artifact: randomUUID(), version: randomUUID(), group: randomUUID(), event: randomUUID(), acceptance: randomUUID(), mailbox: randomUUID() }
 const now = new Date('2026-11-04T10:00:00Z')
 const scope = { reader: 'owner', userId: 'owner', workspaceId: id.workspace, projectId: id.project, issueIds: [id.issue], project: {} } as ProjectScope
-let visible = true, personalWorkspace = false, runOutside = false
+let visible = true, personalWorkspace = false, runOutside = false, resourceVisible = true
+let resourceReaders: string[] = []
 let records: Record<string, Record<string, unknown>>
 let queries: { sql: string; values: unknown[] }[]
 let masks: { type: string; target: unknown; value: unknown }[]
 let reads = 0
 const masked = (value: unknown) => JSON.parse(JSON.stringify(value).replaceAll('fixture-secret-value', '[REDACTED]'))
-mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: { query: async (sql: string, values: unknown[] = []) => {
+mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { db: {}, pool: { query: async (sql: string, values: unknown[] = []) => {
   queries.push({ sql, values })
   let key = ''
   if (sql.includes('FROM agent_runs')) key = 'run'
@@ -37,7 +38,7 @@ mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { p
   const row = key === 'run' && values[0] === records.currentRun?.id ? records.currentRun : records[key]
   if (!row) return { rows: [], rowCount: 0 }
   if (key === 'run' && (values[0] !== row.id || values[1] !== row.userId)) return { rows: [], rowCount: 0 }
-  if (['task', 'message', 'botMessage', 'question', 'acceptance'].includes(key) && values[1] !== row.userId) return { rows: [], rowCount: 0 }
+  if (['task', 'botMessage', 'question', 'acceptance'].includes(key) && values[1] !== row.userId) return { rows: [], rowCount: 0 }
   if (key === 'botMessage' && row.botId !== null && values[2] !== row.workspaceId) return { rows: [], rowCount: 0 }
   if (key === 'artifact' && (values[0] !== row.artifactId || values[1] !== row.versionId || values[2] !== row.userId)) return { rows: [], rowCount: 0 }
   if (key === 'mailbox' && (values[0] !== row.id || values[1] !== row.userId || row.kind !== 'run')) return { rows: [], rowCount: 0 }
@@ -52,12 +53,14 @@ mock.module(new URL('../secrets/runtime.ts', import.meta.url).href, { namedExpor
   maskForRun: async (target: unknown, value: unknown) => { masks.push({ type: 'run', target, value }); return masked(value) },
 } })
 mock.module(new URL('../artifacts/storage.ts', import.meta.url).href, { namedExports: { getArtifactObject: async () => { reads++; return 'Original fixture-secret-value document' } } })
+mock.module(new URL('../resource-access/store.ts', import.meta.url).href, { namedExports: { botChatResourceId: (_owner: string, botId: string) => botId, resourceActionAllowed: async (_db: unknown, reader: string) => { resourceReaders.push(reader); return resourceVisible } } })
+mock.module(new URL('../factory/resource-access.ts', import.meta.url).href, { namedExports: { factoryContentReadable: async () => resourceVisible } })
 const sourceModule = import('./sources')
 const readDecisionSource = (...args: Parameters<typeof import('./sources').readDecisionSource>) => sourceModule.then(module => module.readDecisionSource(...args))
 const resolveDecisionSources = (...args: Parameters<typeof import('./sources').resolveDecisionSources>) => sourceModule.then(module => module.resolveDecisionSources(...args))
 
 beforeEach(() => {
-  visible = true; personalWorkspace = false; runOutside = false; queries = []; masks = []; reads = 0
+  visible = true; personalWorkspace = false; runOutside = false; resourceVisible = true; resourceReaders = []; queries = []; masks = []; reads = 0
   records = {
     mailbox: { id: id.mailbox, userId: 'owner', workspaceId: id.workspace, kind: 'run', sessionKey: id.run },
     run: { id: id.run, mailboxId: id.mailbox, userId: 'owner', issueId: id.issue, botId: id.bot, sessionId: 'runtime-session', prompt: 'fixture-secret-value prompt', report: null, status: 'completed', createdAt: now },
@@ -400,4 +403,22 @@ test('an exact artifact version uses its submitter for authority, attribution an
   await readDecisionSource(scope, resolved.locator)
   assert.equal(masks[0].type, 'run')
   assert.equal(masks[0].target, id.otherRun)
+})
+
+test('shared project evidence rechecks the actual viewer on each private Thread and Artifact', async () => {
+  const member = { ...scope, reader: { id: 'member' } }
+  assert.equal((await readDecisionSource(member, { type: 'run', id: id.run })).locator.id, id.run)
+  assert.deepEqual(resourceReaders, ['member'])
+  resourceVisible = false
+  await missing(readDecisionSource(member, { type: 'run_chunk', id: id.chunk }))
+  await missing(readDecisionSource(member, { type: 'artifact_version', id: id.artifact, versionId: id.version }))
+  assert.equal(reads, 0)
+})
+test('a shared message keeps its actual author, and private Bot or Factory evidence is not inherited from its owner', async () => {
+  records.message.userId = 'member'
+  const source = await readDecisionSource(scope, { type: 'run_message', id: id.message })
+  assert.equal(source.authorId, 'member')
+  resourceVisible = false
+  await missing(readDecisionSource({ ...scope, reader: { id: 'member' } }, { type: 'bot_message', id: id.message }))
+  await missing(readDecisionSource({ ...scope, reader: { id: 'member' } }, { type: 'factory_event', id: id.event, taskId: id.task }))
 })

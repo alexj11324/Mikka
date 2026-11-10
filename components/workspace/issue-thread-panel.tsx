@@ -45,6 +45,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useAcceptanceTasks } from './factory-acceptance'
 import { FactoryAcceptancePane } from './factory-acceptance-pane'
 import { ChangesTabLabel, ThreadChangesPane } from './thread-changes'
+import { ResourceAccessDialog } from './resource-access-dialog'
+import { ThreadExecutionChoice } from './thread-execution-access'
 
 import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
@@ -165,6 +167,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const [replyQuote, setReplyQuote] = useViewState<string | null>(`thread:${runId}:quote`, null)
   const rootRef = useRef<HTMLElement>(null)
   const [sending, setSending] = useState(false)
+  const [executionGrantId,setExecutionGrantId] = useState('')
+  const [accessOpen,setAccessOpen] = useState(false)
   // false, or what to say: the refusal's reason when the server gave one (threadReplaced…), else 发送失败.
   const [sendFailed, setSendFailed] = useState<string | false>(false)
   useEffect(() => { if (submission && !sending) setSendFailed(t('sendFailed')) }, [submission, sending, t])
@@ -185,6 +189,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const displayOutcome = data ? acceptedProducerOutcome(data.thread, issueId, allTasks) : null
   const question = view?.question ?? null
   const liveRunId = view?.runId ?? runId
+  const collaboration = !!data && !data.thread.ownedByCurrentUser
+  const workspaceId = liveRuns.find(item=>item.id===runId)?.workspaceId ?? data?.live?.issueWorkspaceId ?? null
   const active = !!view && question !== 'resuming' && runIsActive(view.status)
   // Only a run that is generating or running turns send into stop; one waiting for an answer sends (N1).
   const working = active && runIsWorking(view.status)
@@ -236,7 +242,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (changeRequest && retry === undefined) return sendChangeRequest(changeRequest)
     const text = retry ?? draft.trim()
     const questionWake = retryOriginalSession ? data?.thread.questionWake : null
-    if (!text || sending || stopRequested || (question === 'resuming' && !questionWake)) return
+    if (!text || sending || ((!collaboration || executionGrantId) && (stopRequested || question === 'resuming' && !questionWake))) return
     if (retryOriginalSession ? !canRetry : replyBlocked) return
     setSending(true); setSendFailed(false)
     try {
@@ -245,7 +251,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession,
         ...(questionWake ? { questionWakeGeneration: questionWake.generation } : {}) } : prepareThreadReply(submission, liveRunId, words)
       if ('requestId' in request) setSubmission(request)
-      const result = await sendIssueThreadReply({ issueId, ...request })
+      const result = await sendIssueThreadReply({ issueId, ...request, ...(collaboration && executionGrantId ? {executionGrantId} : {}) })
       if (result.error) { setSendFailed(actionError(result.error)); if ('requestId' in request) setSubmission(null); return }
       if ('requestId' in request) setSubmission(null)
       if (retry === undefined) { setDraft(current => current.trim() === text ? '' : current); setReplyQuote(null) }
@@ -385,13 +391,15 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   useEffect(() => { if (collect && Screen) collect(runId, entries) }, [collect, Screen, runId, entriesKey]) // eslint-disable-line react-hooks/exhaustive-deps
   if (collect && Screen) return null
   if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
+  const executionChoice = collaboration && workspaceId && !replyBlocked ? <ThreadExecutionChoice threadId={liveRunId} workspaceId={workspaceId} value={executionGrantId} active={active} onChange={value=>{setExecutionGrantId(value);setSubmission(null)}} /> : null
   const screen = Screen && !bare && detail ? <Screen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries] : null}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
     composer={{ ref: inputRef, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
-      attachmentScope: { kind: 'thread', id: liveRunId }, sending: sending || stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || stopRequested || question === 'resuming',
-      running: working || (question === 'resuming' && !data?.thread.questionWake), thread: true }}
+      attachmentScope: { kind: 'thread', id: liveRunId }, sending: sending || !collaboration && stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || (!collaboration || !!executionGrantId) && (stopRequested || question === 'resuming'),
+      running: !collaboration && (working || (question === 'resuming' && !data?.thread.questionWake)), thread: true }}
     pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, onRemove: () => setReplyQuote(null) }] : []]}
     notices={<>
+      {executionChoice}
       {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />}
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
@@ -405,6 +413,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       place={detail ? <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} /> : null}
       acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
       identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
+      onManageAccess={!readRejected&&workspaceId ? ()=>setAccessOpen(true) : undefined}
       artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} /> : null}
       tabs={acceptance && !hasChanges ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
         <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
@@ -429,15 +438,17 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {/* R-10: an open thread always ends in the composer, finished or not. A message to an ended thread runs it
         again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
+      {executionChoice}
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={changeRequest ? <QuoteChip slot="change-request-chip" text={changeRequest.label} icon={<MessageSquareDiff aria-hidden="true" className="size-3.5 shrink-0" />} onRemove={changeRequest.onCancel} />
           : replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
-        sending={sending || stopPending} editableWhileSending submitDisabled={changeRequest ? false : replyBlocked || stopRequested || question === 'resuming'} running={working || (question === 'resuming' && !data?.thread.questionWake)} thread onStop={working && canStop ? () => { void stop() } : undefined} />
+        sending={sending || !collaboration && stopPending} editableWhileSending submitDisabled={changeRequest ? false : replyBlocked || (!collaboration || !!executionGrantId) && (stopRequested || question === 'resuming')} running={!collaboration && (working || (question === 'resuming' && !data?.thread.questionWake))} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>}
     {detail && <SelectionQuote root={rootRef} onQuote={text => { setReplyQuote(text); inputRef.current?.focus() }} />}
+    {!readRejected&&workspaceId&&<ResourceAccessDialog reference={{kind:'thread',id:runId,workspaceId}} open={accessOpen} onOpenChange={setAccessOpen} />}
   </section>
 }

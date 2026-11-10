@@ -27,3 +27,17 @@ test('transport failures stay unconfirmed while known validation/auth refusals a
   for (const status of [400, 401, 403, 404, 409, 413]) assert.equal(sendFailureState({ status }), 'failed')
   assert.equal(outgoingKey(() => 'native-uuid'), 'native-uuid', 'Expo supplies the native UUID implementation without a new native module')
 })
+
+test('task creation visibility is immutable through a lost response; editing scope starts another submission',()=>{
+  const creation={visibility:'private' as const,projectId:'e68ce783-25e8-459a-a071-ed5dad443917'}
+  const [held]=queued([],outgoingKey(),'Create a private task',[],{botId:'bot',context:4,taskCreation:creation})
+  const first=submissionBody(held)
+  creation.projectId='c0d1cda8-7cb9-4c38-be53-01a3e2d62959'
+  assert.equal(first.taskCreation?.projectId,'e68ce783-25e8-459a-a071-ed5dad443917')
+  const again=unsettled([held],held.text,[],'bot',4,first.taskCreation)
+  assert.equal(again?.submissionId,held.submissionId)
+  assert.deepEqual(submissionBody(again!),first)
+  assert.equal(unsettled([held],held.text,[],'bot',4),undefined,'ordinary chat cannot reuse a task creation receipt')
+  assert.equal(unsettled([held],held.text,[],'bot',4,{...first.taskCreation!,visibility:'shared'}),undefined)
+  assert.equal(unsettled([held],held.text,[],'bot',4,creation),undefined,'switching project cannot mutate an unsettled request')
+})

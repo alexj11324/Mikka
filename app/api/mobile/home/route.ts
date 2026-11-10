@@ -35,7 +35,7 @@ async function handleGET(request: Request) {
     sql`${agentRuns.createdAt} > now() - interval '30 days'`)
   const [botRows, chats, suggestions, perBot, preferences, live] = await Promise.all([
     // The Coordinator first, marked `coordinator` (lib/coordinator/coordinator-bot.ts listOwnerBots).
-    listOwnerBots(user.id, context.workspace.id),
+    listOwnerBots(user.id, context.workspace.id, user),
     botChats(user.id),
     listSuggestions(user.id),
     // One read for 线程's counts and each bot's waiting mark: the counts per bot, summed here for the drawer.

@@ -67,14 +67,13 @@ export async function getSubscriptionShare(actorId: string, workspaceId: string)
     const byId = new Map(names.map(member => [member.userId, member.name]))
     available = owners.flatMap(owner => providers.rows.filter(row => row.ownerId === owner && byId.has(owner)).map(row => ({ name: byId.get(owner)!, provider: row.provider })))
   }
-  return { personal: false, shared: Boolean(row.rowCount), allowOthers: Boolean(row.rows[0]?.allowOthers), allowed, available, own: own.rows.map(r => r.provider) }
+  return { personal: false, shared: Boolean(row.rowCount), allowOthers: false, allowed, available, own: own.rows.map(r => r.provider) }
 }
 
 export async function setOwnSubscriptionShare(actorId: string, workspaceId: string, input: unknown): Promise<SubscriptionShareView> {
   const { shared, allowOthers } = shareInput.parse(input)
   const { workspace } = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   if (workspace.kind === 'personal') return getSubscriptionShare(actorId, workspaceId)
-  if (shared && !(await memberSubscriptionsAllowed(pool, workspaceId))) throw new WorkspaceError('workspaceAccessDenied')
   await setSubscriptionShare(pool, actorId, workspaceId, shared, shared ? (allowOthers ?? false) : undefined)
   return getSubscriptionShare(actorId, workspaceId)
 }

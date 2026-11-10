@@ -26,6 +26,9 @@ export interface ThreadStartParams {
   cwd?: string | null
   approvalPolicy?: AskForApproval | null
   sandbox?: SandboxMode | null
+  /** Official experimental named permission profile (0.163+). */
+  permissions?: string | null
+  config?: Record<string, unknown> | null
   model?: string | null
   developerInstructions?: string | null
 }
@@ -39,6 +42,7 @@ export interface ThreadResumeParams extends Omit<ThreadStartParams, 'dynamicTool
 export interface ThreadResponse {
   thread: { id: string; path?: string | null }
   model?: string
+  activePermissionProfile?: { id: string; [key: string]: unknown } | null
 }
 
 export interface TurnStartParams {

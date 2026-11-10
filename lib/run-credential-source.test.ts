@@ -36,6 +36,9 @@ mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: 
       // resource-policy reader still runs; no unrelated query is authorized.
       return { rows: [{ kind: 'team', organizationId: null, modelCredentialSharing: null, mcpSharing: null, allowedModelProviders: null }], rowCount: 1 }
     }
+    if (sql.startsWith("SELECT to_jsonb(p)->'modelPolicy'")) {
+      assert.deepEqual(args, [id(2)]); return { rows: [], rowCount: 0 }
+    }
     assert.match(sql, /FROM mikka_workspace_members/)
     assert.deepEqual(args, [id(2), ['alice']])
     return { rows: [{ userId: 'alice' }], rowCount: 1 }
@@ -88,25 +91,27 @@ test('Codex quota fallback requires Responses API support for the same model', a
   assert.equal(await quotaFallbackApiKey(query, { ...scope, harness: 'codex', model: 'gpt-fixture' }), undefined)
 })
 
-for (const localLogin of [true, false]) test(`${localLogin ? 'local' : 'cloud'}: the actual shared subscription retains its supported model with quota fallback off`, async () => {
+for (const localLogin of [true, false]) test(`${localLogin ? 'local' : 'cloud'}: a borrowed subscription is refused without reading its model or quota`, async () => {
   catalogOffers = false
   afterQuotaAllowed = false
   const shared = { ...subscription, ownerId: 'bob' }
-  assert.deepEqual(await runCredentialSource(query, { ...scope, model: shared.modelId, subscription: shared, localLogin }), { subscription: shared })
-  assert.ok(catalogReads.some(args => args[0] === 'bob' && args[3] === shared.connectionId && args[4] === shared.connectionRevision), 'check the lender and exact connection revision')
+  await assert.rejects(runCredentialSource(query, { ...scope, model: shared.modelId, subscription: shared, localLogin }), { code: 'executionAccountUnavailable' })
+  assert.equal(catalogReads.length, 0)
 })
 test('an existing shared binding cannot claim a model outside its own catalogue', async () => {
   catalogOffers = true
   sharedCatalogOffers = false
   const shared = { ...subscription, ownerId: 'bob' }
-  assert.deepEqual(await runCredentialSource(query, { ...scope, model: shared.modelId, subscription: shared }), { subscription: null, apiKey: { keyId: id(4), model: shared.modelId } })
+  await assert.rejects(runCredentialSource(query, { ...scope, model: shared.modelId, subscription: shared }), { code: 'executionAccountUnavailable' })
+  assert.equal(catalogReads.length, 0)
 })
 test('an exhausted shared subscription respects disabled paid fallback', async () => {
   catalogOffers = false
   afterQuotaAllowed = false
   quota = { ...(quota as object), windows: [{ kind: 'five_hour', used: 1, resetsAt: '2099-01-01T00:00:00.000Z' }] }
   const shared = { ...subscription, ownerId: 'bob' }
-  assert.deepEqual(await runCredentialSource(query, { ...scope, model: shared.modelId, subscription: shared }), { subscription: shared })
+  await assert.rejects(runCredentialSource(query, { ...scope, model: shared.modelId, subscription: shared }), { code: 'executionAccountUnavailable' })
+  assert.equal(catalogReads.length, 0)
 })
 
 /** Real queue admission and credential selection; only storage reads/writes are replaced. */
@@ -159,9 +164,9 @@ test('cloud queue rejects a selected key removed after preflight instead of free
   assert.deepEqual(await runCredentialSource(query, input), { subscription: null, apiKey: { keyId: selected.id, model: subscription.modelId } })
   // The selected key is withdrawn while the provider is waking the computer.
   keys = [other]
-  assert.deepEqual(await runCredentialSource(query, input), { subscription: null, apiKey: { keyId: other.id, model: subscription.modelId } }, 'the existing selector can fall back, so queue admission must enforce an explicit choice')
+  await assert.rejects(runCredentialSource(query, input), { code: 'executionModelUnknown' })
   const fixture = cloudQueueFixture()
-  await assert.rejects(fixture.queue({ apiKeyId: selected.id }), { status: 409 })
+  await assert.rejects(fixture.queue({ apiKeyId: selected.id }), { code: 'executionModelUnknown' })
   assert.equal(fixture.calls.some(call => call.sql.startsWith('INSERT INTO ')), false)
   assert.equal(fixture.calls.at(-1)?.sql, 'ROLLBACK')
   assert.equal(fixture.released(), true)

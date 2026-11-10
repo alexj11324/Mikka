@@ -3,7 +3,7 @@ import { integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'dri
 import type { SecretDelivery } from '@/lib/secrets/delivery'
 
 export const WORKSPACE_SECRET_KINDS = ['secret', 'env'] as const
-export const WORKSPACE_SECRET_SCOPES = ['workspace', 'repository'] as const
+export const WORKSPACE_SECRET_SCOPES = ['workspace', 'repository', 'project', 'thread'] as const
 export const E2B_KEY_ERROR_CODES = ['invalid', 'rate_limited', 'template_unavailable', 'unavailable'] as const
 
 export const workspaceSecrets = pgTable('workspace_secrets', {
@@ -12,7 +12,7 @@ export const workspaceSecrets = pgTable('workspace_secrets', {
   name: text('name').notNull(),
   kind: text('kind').$type<(typeof WORKSPACE_SECRET_KINDS)[number]>().notNull(),
   scopeType: text('scopeType').$type<(typeof WORKSPACE_SECRET_SCOPES)[number]>().notNull(),
-  /** '' for workspace scope, owner/repo for repository scope. */
+  /** Empty for Workspace, owner/repo for repository, resource UUID for Project/Thread. */
   scopeRef: text('scopeRef').notNull().default(''),
   /** Shown to members and readable by Agents; never part of the value (drizzle/20261102220000_workspace_secret_notes.sql). */
   note: text('note').notNull().default(''),

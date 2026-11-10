@@ -331,7 +331,10 @@ export async function configureFactoryCheck(
         FROM factory_acceptance_artifacts fa JOIN artifacts ar ON ar.id=fa."artifactId"
         JOIN artifact_versions av ON av."artifactId"=ar.id AND av.version=ar."latestVersion"
         WHERE fa."taskId"=c."taskId" AND fa."candidateId"=c.id) AS "acceptanceArtifact",
-       r."agentId",r."questionContinuation",r."agentDefinition"->'policyCeiling' AS "policyCeiling",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId"
+       r."agentId",r."questionContinuation",r."agentDefinition" AS "runDefinition",
+       (SELECT authorization."sourceRunId" FROM thread_execution_authorizations authorization
+         WHERE authorization.id::text=r."agentDefinition"->'executionIdentity'->>'collaborationAuthorizationId' AND authorization."runId"=r.id) AS "collaborationSourceRunId",
+       r."agentDefinition"->'policyCeiling' AS "policyCeiling",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId"
      FROM factory_candidates c JOIN agent_runs r ON r.id=$3
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4
      JOIN device_repos repo ON repo.id=r."deviceRepoId"
@@ -352,11 +355,18 @@ export async function configureFactoryCheck(
     throw new FactoryError("factoryEvidenceMismatch");
   // New task VMs get their harness from the official template. A retained
   // session must still prove its own VM custody and installed worker capability.
-  const freshCloudTarget = !row.questionContinuation && row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
+  const identity = row.runDefinition?.executionIdentity
+  const collaborating = identity?.actor && identity.actor !== task.userId
+  const sharedTarget = collaborating && row.collaborationSourceRunId && row.runDefinition.apiKey
+    ? await (await import('@/lib/computer/cloud-task-target')).collaborativeCloudTaskTarget(tx, task.userId, {
+      sourceRunId: row.collaborationSourceRunId, botId: row.runtimeBotId, issueId: task.issueId, harness: row.harness,
+      model: row.runDefinition.model, keyId: row.runDefinition.apiKey.keyId,
+    }, { actorId: identity.actor, threadOwnerId: identity.threadOwner, collaborationAuthorizationId: identity.collaborationAuthorizationId }) : null
+  const freshCloudTarget = sharedTarget ?? (!collaborating && !row.questionContinuation && row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
     ? await cloudTaskTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
       { botId: row.runtimeBotId, agentId: row.agentId, deviceRepoId: row.deviceRepoId })
-    : null
-  const cloudTarget = freshCloudTarget ?? (row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
+    : null)
+  const cloudTarget = freshCloudTarget ?? (!collaborating && row.deviceKind === 'cloud' && row.runtimeBotId && row.runtimeWorkspaceId
       ? await ownedCloudTaskTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
         { botId: row.runtimeBotId, agentId: row.agentId, deviceRepoId: row.deviceRepoId, runId, issueId: task.issueId })
       : null)

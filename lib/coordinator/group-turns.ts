@@ -27,7 +27,7 @@ export type GroupReply = { text: string; mentions: string[]; privateTo?: string 
 export type GroupRuntime = {
   agents(ownerId: string, ids: string[], client: PoolClient): Promise<GroupAgent[]>
   bots?(ownerId: string, workspaceId: string, ids: string[], client: PoolClient): Promise<GroupAgent[]>
-  prepareBot?(actor: GroupAgent, scope: { ownerId: string; workspaceId: string }, client: PoolClient): Promise<HostedRuntimeSnapshot>
+  prepareBot?(actor: GroupAgent, scope: { ownerId: string; actorId: string; workspaceId: string }, client: PoolClient): Promise<HostedRuntimeSnapshot>
   authorized(workspaceId: string, userId: string): Promise<boolean>
   route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[], retain?: import('./group-decision-chain').GroupDecisionRetain): Promise<GroupRoute>
   /** Production classifies the action even for an explicit @mention; member selection stays constrained. */
@@ -160,7 +160,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     }
     const modelScope = <T>(work: () => Promise<T>) => {
       session.assertHeld()
-      return hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.userId }, work)
+      return hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.userId, actorId: root.userId }, work)
     }
     messageId = root.messageId
     // Listen before the claim: a stop that commits after it is pushed to this
@@ -258,11 +258,13 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
             let selected = selections.get(agent.id) ?? root.modelSelections?.[agent.id]
             if (!selected) {
               if (!runtime.prepareBot) throw Error('group_bot_model_unavailable')
-              const value = await runtime.prepareBot(agent, { ownerId: root.userId, workspaceId: root.workspaceId }, client)
-              selected = { harness: value.harness, model: value.model, ...(value.modelSelection === undefined ? {} : { modelSelection: value.modelSelection }) }
+              const value = await runtime.prepareBot(agent, { ownerId: root.userId, actorId: root.userId, workspaceId: root.workspaceId }, client)
+              if (value.actorId !== root.userId) throw Error('group_bot_actor_mismatch')
+              selected = { harness: value.harness, model: value.model, actorId: value.actorId, ...(value.modelSelection === undefined ? {} : { modelSelection: value.modelSelection }) }
               await client.query(`UPDATE group_turns SET "modelSelections"=jsonb_set("modelSelections",ARRAY[$2::text],$3::jsonb,true) WHERE "messageId"=$1`, [messageId, agent.id, JSON.stringify(selected)])
               selections.set(agent.id, selected!)
             }
+            if (selected.actorId !== root.userId) throw Error('group_bot_actor_mismatch')
             return modelScope(() => generate({ ...input, modelRuntime: selected }))
           })
         }),

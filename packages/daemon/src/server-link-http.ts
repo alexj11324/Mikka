@@ -19,6 +19,7 @@ import { ToolApprovalGate, type RunControlMode } from "./agents/tool-approval"
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
+import { NATIVE_CREDENTIAL_ISOLATION_HEADER, NATIVE_CREDENTIAL_ISOLATION_VERSION } from '@mikka/protocol/native-isolation'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 import { nativeBrokerContextSchema, nativeLeaseSchema, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeBrokerRequest } from '@mikka/protocol/subscription'
@@ -126,6 +127,8 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  private nativeCredentialIsolation = false
+  setNativeCredentialIsolation(available: boolean) { this.nativeCredentialIsolation = available === true }
   private readonly runControls = new Set<ToolApprovalGate>()
   private runControlMode: RunControlMode = 'legacy'
 
@@ -301,6 +304,7 @@ export class HttpServerLink implements ServerLink {
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
           [TASK_SECRETS_HEADER]: TASK_SECRETS_VERSION,
+          ...(this.nativeCredentialIsolation ? { [NATIVE_CREDENTIAL_ISOLATION_HEADER]: NATIVE_CREDENTIAL_ISOLATION_VERSION } : {}),
           [RUN_CREDENTIALS_HEADER]: '1',
           ...(initialRepository ? { [INITIAL_REPOSITORY_HEADER]: '1' } : {}),
           [SUBSCRIPTION_MODEL_CATALOGUE_HEADER]: '1',

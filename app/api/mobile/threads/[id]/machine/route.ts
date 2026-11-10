@@ -21,8 +21,9 @@ async function handleGET(request: Request, { params }: Params) {
   if (!user) return unauthorized()
   const id = z.uuid().safeParse((await params).id)
   if (!id.success || await runOutsideToken(user, id.data)) return json({ error: 'runNotFound' }, 404)
-  // mobileThread reads only the person's own runs.
-  if (!await mobileThread(user.id, id.data)) return json({ error: 'runNotFound' }, 404)
+  const thread = await mobileThread(user, id.data)
+  if (!thread) return json({ error: 'runNotFound' }, 404)
+  if (!thread.ownedByCurrentUser) return json({ machine: null })
   const chain = await readRunChain(pool, user.id, id.data)
   const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [id.data]
   return json({ machine: await readThreadMachine(pool, user.id, runIds) })

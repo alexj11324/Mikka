@@ -8,6 +8,7 @@ import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
+import { NATIVE_CREDENTIAL_ISOLATION_HEADER, NATIVE_CREDENTIAL_ISOLATION_VERSION } from '@mikka/protocol/native-isolation'
 
 import {
   DaemonError,
@@ -89,6 +90,19 @@ const assignment = (runId: string) => ({
 })
 
 describe("HttpServerLink", () => {
+  it('never claims native credential isolation until the host reports a successful real probe', async () => {
+    const observations: Array<string | null> = []
+    const link = new HttpServerLink('http://server.test', (async (_url, init) => {
+      observations.push(new Headers(init?.headers).get(NATIVE_CREDENTIAL_ISOLATION_HEADER))
+      return json(assignment('run-1'))
+    }) as typeof fetch)
+    await link.claimRun('dev-1', 'run-1')
+    link.setNativeCredentialIsolation(true)
+    await link.claimRun('dev-1', 'run-1')
+    link.setNativeCredentialIsolation(false)
+    await link.claimRun('dev-1', 'run-1')
+    expect(observations).toEqual([null, NATIVE_CREDENTIAL_ISOLATION_VERSION, null])
+  })
   it('returns the authoritative checkpoint receipt through the authenticated upload', async () => {
     const checkpoint = { baseCommit: 'a'.repeat(40), patch: 'H4sIAAAAAAAAAwMAAAAAAAAAAAA=', files: 0, takenAt: '2099-01-01T00:00:00.000Z' }
     const receipt = { runId: 'run-1', takenAt: '2026-01-02T03:04:05.678Z' }

@@ -40,11 +40,12 @@ import { executionBotName, runBotId, runBotName, threadNameLines } from '@/lib/r
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
-import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
+import { ISSUE_THREAD_LIMIT, projectIssueThreads, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
+import { authorizedThread, authorizedThreadCapabilities, readAuthorizedRunChain, readAuthorizedRunCheckpoint, threadReadAccess } from '@/lib/resource-access/thread'
 import { readThreadQuestionState, type ThreadQuestionDeadline } from '@/lib/issue-thread-questions'
 import { runIsActive } from '@/lib/issue-run-conversation'
 import { issueThreadListText } from '@/lib/issue-thread-list-projection'
-import { listIssueRunChains, readRunChain, readRunChainCheckpoint } from '@/lib/run-chain'
+import { listIssueRunChains } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
 import { threadPromptView } from '@/lib/thread-prompt'
@@ -54,13 +55,13 @@ import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { actAs } from '@/lib/acting-user'
 
 async function getUserId(): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await auth.api.getSession({ headers: await headers(),query:{disableCookieCache:true} })
   if (!session?.user) throw new ActionFailureError('authRequired')
   return session.user.id
 }
 
 async function getWorkspaceReader() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  const session = await auth.api.getSession({ headers: await headers(),query:{disableCookieCache:true} })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const context = await loadWorkspaceContext(undefined, session.user)
   return { id: session.user.id, [tokenWorkspace]: context.workspace.id, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
@@ -230,7 +231,7 @@ async function issueThreadAccess(issueId: string) {
 }
 
 const threadColumns = {
-  id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength,
+  id: agentRuns.id, issueId: agentRuns.issueId, workspaceId: agentRuns.workspaceId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength,
   // Only the report's summary: runSummaryText reads nothing else of it.
   sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, failureDetails: agentRuns.failureDetails, report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
   agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome, kind: agentRuns.kind,
@@ -241,7 +242,7 @@ const threadColumns = {
 const threadCursorColumns = { ...threadColumns, prompt: sql<string>`coalesce(${threadNameLines}, '')` }
 
 // Read-only location and changes need authority, not conversation content.
-const threadIdentityColumns = { id: agentRuns.id, userId: agentRuns.userId }
+const threadIdentityColumns = { id: agentRuns.id, userId: agentRuns.userId, workspaceId: agentRuns.workspaceId }
 
 const { prompt: _prompt, promptTaskStart: _promptTaskStart, promptTaskLength: _promptTaskLength, sessionId: _sessionId, deviceRepoId: _deviceRepoId, report: _report, error: _error, ...threadListColumns } = threadColumns
 
@@ -266,13 +267,15 @@ async function readIssueThreads(issueId: string) {
   if (!memberIds.has(user.id)) return result([])
   // BE-18: fold continuation chains by root first, then take the newest ISSUE_THREAD_LIMIT
   // roots, so continuations never use up a slot (lib/run-chain.ts). Read-only, no locks.
-  const chains = await listIssueRunChains(pool, issue.id, [...memberIds], ISSUE_THREAD_LIMIT)
+  const owners = await db.selectDistinct({ id: agentRuns.userId }).from(agentRuns)
+    .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.workspaceId, issue.workspaceId!), await threadReadAccess(user)))
+  const chains = await listIssueRunChains(pool, issue.id, owners.map(owner => owner.id), ISSUE_THREAD_LIMIT, user.id)
   if (!chains.length) return result([])
   const rows = await db.select({ ...threadListColumns, ...issueThreadListText(user.id) }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-    .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.workspaceId, issue.workspaceId!), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
+    .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.workspaceId, issue.workspaceId!), inArray(agentRuns.id, chains.map(chain => chain.rootRunId)), await threadReadAccess(user)))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
   const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
-  return result((await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads)
+  return result((await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds, new Set(rows.map(row => row.id))).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads)
 }
 
 /**
@@ -284,7 +287,7 @@ async function readIssueThreads(issueId: string) {
 type ThreadColumns = typeof threadColumns | typeof threadCursorColumns | typeof threadIdentityColumns
 type ReadableThreadResult<T extends ThreadColumns> = {
   row: SelectResult<T, 'partial', { agent_runs: 'not-null'; agents: 'not-null'; user: 'nullable' }>
-  user: { id: string }
+  user: import('@/lib/issue-visibility').IssueReader & { id: string }
 }
 
 function readableThread(issueId: string | null, runId: string, columns: typeof threadColumns): Promise<ReadableThreadResult<typeof threadColumns>>
@@ -295,15 +298,15 @@ async function readableThread(issueId: string | null, runId: string, columns: Th
     const access = await issueThreadAccess(issueId)
     if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
     const [row] = await db.select(columns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.issueId, access.issue.id), eq(agentRuns.workspaceId, access.issue.workspaceId!))).limit(1)
-    if (!row || !canReadThread(row.userId, access.user.id, access.memberIds)) throw new ActionFailureError('runNotFound')
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.issueId, access.issue.id), eq(agentRuns.workspaceId, access.issue.workspaceId!), await threadReadAccess(access.user))).limit(1)
+    if (!row) throw new ActionFailureError('runNotFound')
     return { row, user: access.user }
   }
   const user = await getWorkspaceReader()
   if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
   const [row] = await db.select(columns)
     .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-    .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, user.id), eq(agentRuns.workspaceId, user[tokenWorkspace]), isNull(agentRuns.issueId))).limit(1)
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.workspaceId, user[tokenWorkspace]), isNull(agentRuns.issueId), await threadReadAccess(user))).limit(1)
   if (!row) throw new ActionFailureError('runNotFound')
   return { row, user }
 }
@@ -327,7 +330,9 @@ async function readThreadIssue(runId: string): Promise<{ issueId: string | null 
       const user = await getWorkspaceReader()
       // The first read already has the task-free identity. Authorization still
       // selects the current workspace and checks active membership on every call.
-      return run.userId === user.id && run.workspaceId === user[tokenWorkspace] ? { issueId: null } : null
+      if (run.workspaceId !== user[tokenWorkspace]) return null
+      await authorizedThread(user, run.id)
+      return { issueId: null }
     }
     await readableThread(run.issueId, runId, threadIdentityColumns)
     return { issueId: run.issueId }
@@ -408,7 +413,7 @@ export async function getThreadMachine(issueId: string | null, runId: string): P
   return withDatabaseOperation('/actions/threads/machine', async () => {
     const { row, user } = await readableThread(issueId, runId, threadIdentityColumns)
     if (row.userId !== user.id) return null
-    const chain = await readRunChain(pool, row.userId, row.id)
+    const chain = await readAuthorizedRunChain(user, row.id)
     const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
     return (await import('@/lib/thread-machine-view')).readThreadMachine(pool, user.id, runIds)
   })
@@ -428,8 +433,9 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
   // Named by its task, not by system text prepended to the prompt (lib/thread-prompt.ts); a cursor read's prompt is already its name lines.
   const named = cursor ? row : { ...row, prompt: threadPromptView(row.prompt, row.promptTaskStart, row.promptTaskLength).task }
-  const [projected] = projectIssueThreads([named], row.issueId, user.id, new Set([user.id]))
-  const chain = projected ? await readRunChain(pool, row.userId, row.id) : null
+  const [projected] = projectIssueThreads([named], row.issueId, user.id, new Set([user.id]), new Set([row.id]))
+  const chain = projected ? await readAuthorizedRunChain(user, row.id) : null
+  const { capabilities } = await authorizedThreadCapabilities(user, row.id)
   // The conversation is the thread's, across its runs from this one on, oldest first.
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
   const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
@@ -466,18 +472,18 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   const questionWake = thread.questionWake ?? null
   if (questionWake) error = questionWake.error
   const liveStatus = live?.status ?? row.status
-  let replyAvailable = true
-  let retryAvailable = !!questionWake || liveStatus === 'failed'
+  let replyAvailable = capabilities.canComment
+  let retryAvailable = row.userId === user.id && (!!questionWake || liveStatus === 'failed')
   if (!runIsActive(liveStatus)) {
     // Independent checks cannot enter ordinary continuation (latestTaskRun).
     // Read the latest run's host binding, never a report or the root's stage.
     const { rows: [target] } = await pool.query<{ independentCheck: boolean }>(`SELECT EXISTS (
       SELECT 1 FROM factory_attempts a WHERE a."runId"=r.id AND a.stage IN ('review','verify','monitor')
       ) AS "independentCheck" FROM agent_runs r
-      WHERE r.id=$1 AND r."userId"=$2 AND r."issueId" IS NOT DISTINCT FROM $3::uuid`, [thread.latestRunId, user.id, row.issueId])
-    replyAvailable = !!target && (!target.independentCheck || thread.question === 'waiting')
+      WHERE r.id=$1 AND r."userId"=$2 AND r."issueId" IS NOT DISTINCT FROM $3::uuid`, [thread.latestRunId, row.userId, row.issueId])
+    replyAvailable = capabilities.canComment && !!target && (!target.independentCheck || (row.userId === user.id && thread.question === 'waiting'))
     if (!target) retryAvailable = false
-    else if (target.independentCheck) {
+    else if (target.independentCheck && row.userId === user.id) {
       const recovery = liveStatus === 'failed' && row.issueId
         ? await originalSessionRetry(user.id, thread.latestRunId, row.issueId) : null
       retryAvailable = originalSessionRetryAvailable(recovery?.question, thread.latestRunId)
@@ -497,7 +503,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   ])
   return {
     live: { runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
-    thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, canContribute: capabilities.canComment, canManageAccess: capabilities.canManageAccess, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
@@ -524,8 +530,8 @@ export async function getThreadChanges(issueId: string | null, runId: string): P
 }
 
 async function readThreadChanges(issueId: string | null, runId: string): Promise<ThreadChangesResult> {
-  const { row } = await readableThread(issueId, runId, threadIdentityColumns)
-  const { runIds, checkpoint } = await readRunChainCheckpoint(pool, row.userId, row.id)
+  const { row, user } = await readableThread(issueId, runId, threadIdentityColumns)
+  const { runIds, checkpoint } = await readAuthorizedRunCheckpoint(user, row.id)
   if (!checkpoint) return { state: 'none' }
   if (checkpoint.unavailableReason) return { state: 'tooLarge' }
   let text: string
@@ -547,7 +553,7 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<{ runId: string; continued: boolean }> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string; executionGrantId?: string }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId, threadColumns)
@@ -555,7 +561,13 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(!desktopHumanSessionId()&&(requestHeaders.has('authorization')||!requestHeaders.get('cookie')))throw new ActionFailureError('authRequired')
   const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
   if(!session?.user||!session.session?.id||session.user.id!==user.id)throw new ActionFailureError('authRequired')
-  if(row.userId!==user.id)throw new ActionFailureError('runNotFound')
+  if(row.userId!==user.id){
+    if(input.retryOriginalSession||input.questionWakeGeneration)throw new ActionFailureError('runNotFound')
+    const {sendCollaborativeThreadMessage}=await import('@/lib/thread-collaboration')
+    return sendCollaborativeThreadMessage(user,{runId:row.id,text:text.data,requestId:input.requestId??crypto.randomUUID(),
+      sessionId:session.session.id,...(input.executionGrantId?{executionGrantId:input.executionGrantId}:{})})
+  }
+  if(input.executionGrantId)throw new ActionFailureError('validationGeneric')
   if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
   if(input.requestId!==undefined && !z.uuid().safeParse(input.requestId).success)throw new ActionFailureError('validationGeneric')
   if(input.requestId!==undefined && input.retryOriginalSession)throw new ActionFailureError('validationGeneric')
@@ -599,7 +611,7 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; requestId?: string; retryOriginalSession?: true; questionWakeGeneration?: string; executionGrantId?: string }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
   return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
 }
 

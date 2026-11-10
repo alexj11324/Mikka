@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { SWRConfig, unstable_serialize, useSWRConfig, type Cache, type Key } from 'swr'
 import { useSearchParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
 import { APP_BUILD } from '@/lib/app-build'
 import { selectedWebServer } from '@/lib/web-connection/selection'
 import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
-import { clearPersistentReadCaches, PersistentReadCache, readCacheNamespace, type ReadCacheScope, type ReadCacheState } from '@/lib/swr/persistent-cache'
+import { clearPersistentReadCaches, invalidateResourceAccessCaches, PersistentReadCache, readCacheNamespace, type ReadCacheScope, type ReadCacheState } from '@/lib/swr/persistent-cache'
 
 type InitialRead = { key: unknown; data: unknown }
 
@@ -17,16 +17,18 @@ export function AuthenticatedReadCache({ ownerId, workspace, build = APP_BUILD, 
   const requested = useSearchParams().get('workspace')
   // A pushState to a different workspace must not borrow this one's authority.
   // Its normal reads still work; persistence waits for an authorized server render.
-  const scope: ReadCacheScope | null = build && workspace && (!requested || requested === workspace.workspaceId)
-    ? { userId: ownerId, workspaceId: workspace.workspaceId, role: workspace.role, build, server: selectedWebServer() } : null
+  const server = selectedWebServer()
+  const scope = useMemo<ReadCacheScope | null>(() => build && workspace && (!requested || requested === workspace.workspaceId)
+    ? { userId: ownerId, workspaceId: workspace.workspaceId, role: workspace.role, accessProof: workspace.accessProof, build, server } : null,
+  [ownerId, workspace?.workspaceId, workspace?.role, workspace?.accessProof, requested, build, server])
   const unauthorized = Boolean(build && (!workspace || requested && requested !== workspace.workspaceId))
-  return <ReadCacheBoundary key={scope ? readCacheNamespace(scope) : `${ownerId}:${requested ?? ''}:memory`} scope={scope} unauthorized={unauthorized} initialReads={initialReads}>{children}</ReadCacheBoundary>
+  return <ReadCacheBoundary key={scope ? readCacheNamespace(scope) : `${ownerId}:${requested ?? ''}:memory`} scope={scope} expiresAt={workspace?.accessExpiresAt} expiresAfterMs={workspace?.accessExpiresAfterMs} unauthorized={unauthorized} initialReads={initialReads}>{children}</ReadCacheBoundary>
 }
 
-function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { scope: ReadCacheScope | null; unauthorized: boolean; initialReads?: readonly InitialRead[]; children: ReactNode }) {
+function ReadCacheBoundary({ scope, expiresAt, expiresAfterMs, unauthorized, initialReads, children }: { scope: ReadCacheScope | null; expiresAt?: string | null; expiresAfterMs?: number | null; unauthorized: boolean; initialReads?: readonly InitialRead[]; children: ReactNode }) {
   const router = useRouter()
   const [state, setState] = useState<{ cache: Cache; generation: number; retired?: boolean }>(() => {
-    const cache: Cache = scope ? new PersistentReadCache(scope) : new Map()
+    const cache: Cache = new PersistentReadCache(scope, undefined, Boolean(scope?.accessProof))
     // SWR fallback is not necessarily stored in the provider. Put authorized
     // server reads there before the asynchronous disk snapshot can arrive.
     for (const read of initialReads ?? []) {
@@ -37,6 +39,20 @@ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { sc
   })
   const config = useMemo(() => ({ provider: () => state.cache }), [state.cache])
   useEffect(() => { if (unauthorized) void clearPersistentReadCaches() }, [unauthorized])
+  const retiredExpiry = useRef<string | null>(null)
+  useEffect(() => {
+    if (!expiresAt || retiredExpiry.current === expiresAt || !(state.cache instanceof PersistentReadCache) || !state.cache.workspaceId) return
+    const cache = state.cache
+    const workspaceId=cache.workspaceId!
+    // The server TTL is anchored conservatively to this Document's start.
+    // A slow response or a skewed wall clock can shorten access, never extend it.
+    const serverRemaining = typeof expiresAfterMs === 'number' && Number.isFinite(expiresAfterMs)
+      ? expiresAfterMs - (typeof performance !== 'undefined' ? performance.now() : 0) : 0
+    const remaining = Math.min(Date.parse(expiresAt) - Date.now(), serverRemaining)
+    if (!Number.isFinite(remaining)) return
+    const timer = setTimeout(() => { retiredExpiry.current = expiresAt; void invalidateResourceAccessCaches(workspaceId) }, Math.min(2_147_483_647, Math.max(0, remaining)))
+    return () => clearTimeout(timer)
+  }, [expiresAt, expiresAfterMs, state.cache])
   useEffect(() => {
     if (state.retired || !(state.cache instanceof PersistentReadCache)) return
     return state.cache.connect(documentNavigation => {
@@ -49,10 +65,10 @@ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { sc
       // Retire the whole provider, including in-flight requests and component
       // refs. Remounted children use an empty in-memory cache until the server
       // confirms the new account/workspace. An old fetch cannot refill it.
-      setState(current => ({ cache: new Map(), generation: current.generation + 1 }))
+      setState(current => ({ cache: new PersistentReadCache(scope, undefined, false), generation: current.generation + 1 }))
       router.refresh()
     })
-  }, [state.cache, state.retired, router])
+  }, [state.cache, state.retired, router, scope])
   if (state.retired) return null
   return <SWRConfig key={state.generation} value={config}><HydrateReadCache />{children}</SWRConfig>
 }

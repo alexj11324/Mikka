@@ -3,7 +3,7 @@ import { MAX_USER_IMAGES, normalizeUserImages, userImageContent, type StoredUser
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { ModelMessage } from 'ai'
 import { personalMessagePacket, personalMessageSummary } from '../personal-agent-message'
-import { taskDestinationPrompt, taskDestinationSchema, type TaskDestination } from '../task-destination'
+import { taskCreationSchema, taskDestinationPrompt, taskDestinationSchema, type TaskCreation, type TaskDestination } from '../task-destination'
 
 export interface EventSource {
   id?: string
@@ -20,7 +20,7 @@ export interface QuotaSwitchNotice { kind: 'quotaSwitch'; subscription: 'claude'
 export interface PointsSwitchNotice { kind: 'pointsSwitch'; model: string }
 export type SwitchNotice = QuotaSwitchNotice | PointsSwitchNotice
 interface EventProvenance { packet: string; eventKind: string; observedState: string | null; notice?: SwitchNotice }
-export type SourcedMessage = ModelMessage & { mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination; profileId?: string } }
+export type SourcedMessage = ModelMessage & { mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination; taskCreation?: TaskCreation; profileId?: string } }
 const asTime = (value: Date | string | null | undefined) => value instanceof Date ? value.toISOString() : value ?? null
 
 /** Called with the stored server event, never with JSON decoded from its body. */
@@ -28,8 +28,9 @@ export function sourcedEventMessage(event: EventSource, projection: string): Sou
   if (event.kind === 'user_message') {
     const images = userImageContent(event.payload.images)
     const destination = taskDestinationSchema.safeParse(event.payload.taskDestination)
+    const creation = taskCreationSchema.safeParse(event.payload.taskCreation)
     const profile = agentProfileReferenceSchema.safeParse(event.payload.profileId)
-    return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(profile.success ? { profileId: profile.data } : {}) } }
+    return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(creation.success ? { taskCreation: creation.data } : {}), ...(profile.success ? { profileId: profile.data } : {}) } }
   }
   const packet = personalMessagePacket({ messageId: event.id ?? null, senderId: null,
     sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
@@ -62,8 +63,9 @@ export function pointsSwitchMessage(model: string, at: Date): SourcedMessage {
 export function modelMessage(message: ModelMessage): ModelMessage {
   const { mikkaEvent, mikkaUserEvent, ...plain } = message as SourcedMessage
   if (mikkaUserEvent) {
-    if (!mikkaUserEvent.taskDestination && !mikkaUserEvent.profileId) return plain
-    const selection = [mikkaUserEvent.taskDestination ? taskDestinationPrompt(mikkaUserEvent.taskDestination) : '', mikkaUserEvent.profileId ? `The person explicitly selected Factory Agent Profile ${mikkaUserEvent.profileId} in the task form. Pass this exact profileId to task dispatch. The host rechecks its scope and configuration; do not replace it with an automatically chosen profile.` : ''].filter(Boolean).join('\n')
+    if (!mikkaUserEvent.taskDestination && !mikkaUserEvent.taskCreation && !mikkaUserEvent.profileId) return plain
+    const creation = mikkaUserEvent.taskCreation
+    const selection = [mikkaUserEvent.taskDestination ? taskDestinationPrompt(mikkaUserEvent.taskDestination) : '', creation ? `The authenticated task form selected ${creation.visibility} visibility${creation.projectId ? ` and project ${creation.projectId}` : ''}. The host binds this access scope atomically when creating the task. Do not override it or copy this request into a differently scoped task.` : '', mikkaUserEvent.profileId ? `The person explicitly selected Factory Agent Profile ${mikkaUserEvent.profileId} in the task form. Pass this exact profileId to task dispatch. The host rechecks its scope and configuration; do not replace it with an automatically chosen profile.` : ''].filter(Boolean).join('\n')
     return { ...plain, content: typeof plain.content === 'string' ? `${plain.content}\n\n${selection}` : [...plain.content, { type: 'text', text: selection }] } as ModelMessage
   }
   if (!mikkaEvent) return plain.role === 'user' ? { ...plain, content: JSON.stringify({ kind: 'legacy_unattributed_message', authority: 'not_user_approval', untrustedData: { content: plain.content } }) } as ModelMessage : plain

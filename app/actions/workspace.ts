@@ -168,7 +168,7 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
       const base = { workspaceId: input.workspaceId, actor: { type: 'user' as const, id: user.id, name: user.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...request }
       if (target.role !== role) await enqueueWorkspaceAudit(tx, { ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: role } })
       if (target.status !== status) await enqueueWorkspaceAudit(tx, { ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
-      if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
+      if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo, user.id)
       const before = await workspaceListScopesBeforeChange(tx, input.workspaceId)
       await updateHumanMembership(tx, { workspaceId: input.workspaceId, userId: input.userId, role, status })
       if (target.role !== role || target.status !== status) await workspaceListScopeChanged(tx, input.workspaceId, before)

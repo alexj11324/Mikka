@@ -3,8 +3,8 @@ import test from 'node:test'
 import type { SecretScopeType } from './format'
 import { memberMayWrite, SECRET_POLICY, secretActionAllowed, type SecretAction } from './permissions'
 
-const scopes: SecretScopeType[] = ['workspace', 'repository']
-const expectedMemberWrite = (scopeType: SecretScopeType) => scopeType === 'repository'
+const scopes: SecretScopeType[] = ['workspace', 'repository', 'project', 'thread']
+const expectedMemberWrite = (scopeType: SecretScopeType) => scopeType !== 'workspace'
 
 test('matrix: admin may do everything', () => {
   const actions: SecretAction[] = ['secret.list', 'secret.create', 'secret.replace', 'secret.delete', 'e2b.status', 'e2b.write']
@@ -20,7 +20,7 @@ test('matrix: member cells (defaults from plan 1.3 / 7.12)', () => {
     assert.equal(secretActionAllowed('member', 'secret.create', [t]), want, `create ${scopeType}`)
     assert.equal(secretActionAllowed('member', 'secret.replace', [t, t]), want, `replace own ${scopeType}`)
     assert.equal(secretActionAllowed('member', 'secret.replace', [t, t], false), want, `replace others' ${scopeType}`)
-    assert.equal(secretActionAllowed('member', 'secret.delete', [t]), false, `delete ${scopeType}`)
+    assert.equal(secretActionAllowed('member', 'secret.delete', [t]), scopeType === 'project' || scopeType === 'thread', `delete ${scopeType}; store additionally requires canManageAccess`)
   }
   assert.equal(secretActionAllowed('member', 'e2b.status'), true)
   assert.equal(secretActionAllowed('member', 'e2b.write'), false)
@@ -36,6 +36,6 @@ test('matrix: replace checks old and new, so a member cannot move an entry up or
 })
 
 test('the pending defaults are single constants', () => {
-  assert.deepEqual(SECRET_POLICY.memberScopes, ['repository'])
+  assert.deepEqual(SECRET_POLICY.memberScopes, ['repository', 'project', 'thread'])
   assert.equal(SECRET_POLICY.memberMayReplaceOthers, true)
 })

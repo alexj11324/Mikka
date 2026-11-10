@@ -128,7 +128,7 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
       await revokeRunTokens(run.id)
       await acceptLocalRun({ id: retryId, userId: run.userId, issueId: run.issueId, botId: run.botId, source: run.source,
         deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentId: target.agentId, prompt: recovery.prompt,
-        definition: retryWorkerDefinition(definition, recovery.prompt)!, continuation: true,
+        definition: retryWorkerDefinition(definition, recovery.prompt)!, continuation: true, threadRunId: run.id,
         ...(admission.requestEventId ? { requestEventId: admission.requestEventId } : {}) }, tx)
       const { rows: [retry] } = await tx.query<Run>(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,cli_policy_hierarchy=$6 WHERE id=$1 RETURNING *`,
         [retryId, run.id, run.attempt + 1, run.kind, run.baseBranch, originalPolicy.hierarchy ?? null])

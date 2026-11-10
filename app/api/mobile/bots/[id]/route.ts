@@ -9,6 +9,7 @@ import { mobileBot } from '@/lib/mobile-threads'
 import { coordinatorBot, openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { botOutsideToken } from '@/lib/tokens/scope'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,11 +21,12 @@ async function handleGET(request: Request, context: { params: Promise<{ id: stri
   const { id } = await context.params
   const workspace = (await loadWorkspaceContext(undefined, user)).workspace
   // `coordinator` names the Coordinator of the workspace the app has open, an ordinary bot row of that workspace.
-  if (id === 'coordinator') { const coordinator = await coordinatorBot(user.id, workspace.id); return json(await mobileBot(user.id, workspace.id, coordinator.botId)) }
+  if (id === 'coordinator') { const coordinator = await coordinatorBot(user.id, workspace.id); return json(await mobileBot(user, workspace.id, coordinator.botId)) }
   if (!z.uuid().safeParse(id).success) return json({ error: 'Not found' }, 404)
-  const [bot] = await db.select({ id: bots.id }).from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, user.id), eq(bots.workspaceId, workspace.id))).limit(1)
+  const [bot] = await db.select({ id: bots.id }).from(bots).where(and(eq(bots.id, id), eq(bots.workspaceId, workspace.id),
+    resourceAccessPredicate(user.id, bots.workspaceId, 'bot', bots.id))).limit(1)
   if (!bot) return json({ error: 'Not found' }, 404)
-  return json(await mobileBot(user.id, workspace.id, bot.id))
+  return json(await mobileBot(user, workspace.id, bot.id))
 }
 
 const change = z.object({ pinned: z.boolean().optional(), muted: z.boolean().optional(), hidden: z.boolean().optional(), markedUnread: z.boolean().optional() })

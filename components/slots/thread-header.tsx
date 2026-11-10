@@ -3,15 +3,16 @@
 // The default thread-header slot (docs/ui-overlay.md): the thread panel's header row and status line as the
 // community layer draws them.
 import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowLeft, Square, SquareKanban, X } from 'lucide-react'
+import { ArrowLeft, Square, SquareKanban, UsersRound, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'
 import { cn } from '@/lib/utils'
 import type { ThreadHeaderProps, ThreadStatusLineProps } from './thread-header-contract'
 
-export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpenTask, place, acceptanceBadge, identity, artifact, tabs, wraps }: ThreadHeaderProps) {
+export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpenTask, onManageAccess, place, acceptanceBadge, identity, artifact, tabs, wraps }: ThreadHeaderProps) {
   const t = useTranslations('IssueThreads')
+  const access = useTranslations('ResourceAccess')
   return <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', wraps && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
     {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
     <h2 ref={headingRef} tabIndex={-1} className="min-w-0 truncate text-sm font-semibold outline-none">{title}</h2>
@@ -20,6 +21,7 @@ export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpe
     {acceptanceBadge}
     <span className="flex-1" />
     {identity}
+    {onManageAccess && <Button variant="ghost" size="icon-sm" aria-label={access('manage')} onClick={onManageAccess}><UsersRound /></Button>}
     {/* Always there, left of stop: off until the thread hands an Artifact over (decision 2026-11-06-1615). */}
     {artifact}
     {/* Stop lives here for every live run, also one waiting for an answer, whose composer button sends. */}

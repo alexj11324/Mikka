@@ -12,6 +12,8 @@ import { revalidateExecutionIdentity, executionMembersActive, ExecutionIdentityE
 import { LEASED_RUN_STATUSES } from '@/lib/run-retry'
 import { issueEgressCapability, openEgressCapability, type EgressCapabilityBinding } from './egress-capability'
 import { remoteRepositoryRef, taskSecretMetadata } from './runtime'
+import { lockResourceAccess } from '@/lib/resource-access/store'
+import { ActionFailureError } from '@/lib/action-error'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const currentToken = alias(deviceTokens, 'task_secret_current_token')
@@ -43,6 +45,7 @@ export async function renewTaskSecretAccess(input: {
         const client = await pool.connect()
         try {
           return await withDatabaseClient(client, () => db.transaction(async tx => {
+            await lockResourceAccess(tx, input.caller.userId, { kind: 'thread', id: reported.runId, workspaceId: stored.workspaceId! }, 'canSteer')
             // Match claim/completion's Task -> Run order. A soft delete must
             // finish before this read, or wait until this grant is committed.
             const [issue] = await tx.select({ id: issues.id, workspaceId: issues.workspaceId,
@@ -89,7 +92,7 @@ export async function renewTaskSecretAccess(input: {
               openEgressCapability(capability, binding, Math.max(now.getTime(), clock()), env).name)
             // Read only the at-most-32 granted names during a heartbeat. A large
             // vault must not be scanned/decrypted for every active run or API call.
-            const metadata = await taskSecretMetadata(workspaceId, repository, row.run.userId, tx, requestedNames)
+            const metadata = await taskSecretMetadata(workspaceId, repository, row.run.userId, tx, requestedNames, { runId: row.run.id })
             // SQL's initial snapshot is not the issuance time: locks, membership
             // and metadata reads may have waited. Never revive an old capability
             // or issue from an authority/lease which expired during those awaits.
@@ -116,7 +119,7 @@ export async function renewTaskSecretAccess(input: {
       if (renewed) taskSecrets[reported.runId] = renewed
       else revoked.push(reported.runId)
     } catch (error) {
-      if (!(error instanceof ExecutionIdentityError) && !(error instanceof CodedError && error.code === 'task_secret_unavailable')) throw error
+      if (!(error instanceof ExecutionIdentityError) && !(error instanceof ActionFailureError) && !(error instanceof CodedError && error.code === 'task_secret_unavailable')) throw error
       // A refused grant stops this task; no plaintext fallback or grant repair.
       revoked.push(reported.runId)
     }

@@ -120,3 +120,33 @@ it('late identity settlement cannot change an already timed-out pre-read snapsho
   expect(frozen.streamPreRead).toMatchObject({ outcome: 'timeout', identityMs: 35_000, parentProjectionReadCalls: 1, parentProjectionReadMs: null })
   expect(frozen.workers).toEqual([])
 })
+
+it('HTTP receipts stay separate from legacy stages and freeze independently after settlement', () => {
+  const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+  const before = call.snapshot()
+  worker.terminalTransport({ version: 1, dnsCalls: 0, dnsStartMs: null, firstByteMs: 0, reused: false, connectCalls: 2 }, true)
+  expect(call.snapshot()).toEqual(before)
+  expect(call.transportSnapshot()).toEqual([{ ordinal: 1, outcome: 'pending', state: 'reported', timing: { version: 1, dnsCalls: 0, dnsStartMs: null, firstByteMs: 0, reused: false, connectCalls: 2 } }])
+  worker.settle('cancelled')
+  const frozen = call.transportSnapshot()
+  worker.terminalTransport({ version: 1, firstByteMs: 99 }, true)
+  expect(call.transportSnapshot()).toEqual(frozen)
+  call.startWorker('prepare')!.terminalTransport({ version: 1 }, true)
+  expect(call.transportSnapshot()).toHaveLength(1)
+})
+
+it('HTTP terminal diagnostics reject unknown fields and malformed values without touching the original Go receipt', () => {
+  for (const value of [null, [], 'fixture-private', { version: 2 }, { version: 1, url: 'fixture-private' }, { version: 1, getConnMs: -1 }, { version: 1, firstByteMs: Infinity }, { version: 1, firstByteMs: NaN }, { version: 1, tlsDoneMs: 3_600_001 }, { version: 1, connectCalls: 0.5 }, { version: 1, connectCalls: 1_000_001 }, { version: 1, reused: 'false' }]) {
+    const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+    worker.terminal({ version: 1, readCalls: 0 }, true)
+    const before = call.snapshot()
+    worker.terminalTransport(value, true)
+    expect(call.snapshot()).toEqual(before)
+    expect(call.transportSnapshot()).toEqual([{ ordinal: 1, outcome: 'pending', state: 'invalid' }])
+    expect(JSON.stringify(call.transportSnapshot())).not.toContain('fixture-private')
+  }
+  const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+  worker.terminalTransport(undefined, false)
+  worker.settle('cancelled')
+  expect(call.transportSnapshot()).toEqual([{ ordinal: 1, outcome: 'cancelled', state: 'missing' }])
+})

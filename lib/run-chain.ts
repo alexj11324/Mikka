@@ -92,16 +92,17 @@ const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text
  * The newest `limit` chains on an issue among `userIds`' runs. Runs are folded by root
  * first and the limit applies to roots, so continuations and reruns never use up a slot.
  */
-export async function listIssueRunChains(q: RunChainQueryable, issueId: string, userIds: readonly string[], limit: number): Promise<RunChain[]> {
+export async function listIssueRunChains(q: RunChainQueryable, issueId: string, userIds: readonly string[], limit: number, readerId?: string): Promise<RunChain[]> {
   const { rows } = await q.query(`
     WITH RECURSIVE ${chainSql(`r."issueId" = $1 AND r."userId" = ANY($2::text[])
-      AND EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=r."workspaceId")`, '$4')},
+      AND EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=r."workspaceId")
+      ${readerId === undefined ? '' : `AND mikka_resource_acl_allowed('account',$5,r."workspaceId",'thread',r.id,'canReadContent')`}`, '$4')},
     roots AS (
       SELECT DISTINCT a.root, n."createdAt" FROM assigned a JOIN runs n ON n.id = a.root
       ORDER BY n."createdAt" DESC, a.root DESC LIMIT $3
     )
     SELECT ${selectAttempts()}, roots."createdAt" AS "rootCreatedAt"
-    FROM assigned a JOIN roots ON roots.root = a.root JOIN agent_runs x ON x.id = a.id`, [issueId, [...userIds], limit, RUN_CHAIN_MAX_DEPTH])
+    FROM assigned a JOIN roots ON roots.root = a.root JOIN agent_runs x ON x.id = a.id`, [issueId, [...userIds], limit, RUN_CHAIN_MAX_DEPTH, ...(readerId === undefined ? [] : [readerId])])
   return foldChains(rows)
 }
 
@@ -154,22 +155,23 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
 }
 
 /** Shared by attempt and checkpoint reads, with identical tenant/depth fences. */
-function selectedChainSql() {
+function selectedChainSql(withReader = false) {
   return `start AS (
       SELECT "issueId","workspaceId" FROM agent_runs WHERE id = $1::uuid AND "userId" = $2 AND "workspaceId" IS NOT NULL
-    ), ${chainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId" AND r."workspaceId"=s."workspaceId")`, '$3')},
+    ), ${chainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId" AND r."workspaceId"=s."workspaceId")
+      ${withReader ? `AND mikka_resource_acl_allowed('account',$4,r."workspaceId",'thread',r.id,'canReadContent')` : ''}`, '$3')},
     selected AS (
       SELECT * FROM assigned WHERE root = (SELECT root FROM assigned WHERE id = $1::uuid)
     )`
 }
 
 /** The whole chain containing `runId`, if `userId` owns that run; null otherwise. */
-export async function readRunChain(q: RunChainQueryable, userId: string, runId: string): Promise<RunChain | null> {
+export async function readRunChain(q: RunChainQueryable, userId: string, runId: string, readerId?: string): Promise<RunChain | null> {
   if (!new RegExp(UUID.slice(1, -1)).test(runId)) return null
   const { rows } = await q.query(`
-    WITH RECURSIVE ${selectedChainSql()}
+    WITH RECURSIVE ${selectedChainSql(readerId !== undefined)}
     SELECT ${selectAttempts(true)}, now() AS "rootCreatedAt"
-    FROM selected a JOIN agent_runs x ON x.id = a.id`, [runId, userId, RUN_CHAIN_MAX_DEPTH])
+    FROM selected a JOIN agent_runs x ON x.id = a.id`, [runId, userId, RUN_CHAIN_MAX_DEPTH, ...(readerId === undefined ? [] : [readerId])])
   const [chain] = foldChains(rows)
   return chain && chain.attempts.some(attempt => attempt.runId === runId) ? chain : null
 }
@@ -177,13 +179,13 @@ export async function readRunChain(q: RunChainQueryable, userId: string, runId: 
 /** Read one checkpoint for the authorized chain without transporting every
  * attempt or issuing another query for its ids. A malformed chain still fails
  * before checkpoint content is read. */
-export async function readRunChainCheckpoint(q: RunChainQueryable, userId: string, runId: string): Promise<{
+export async function readRunChainCheckpoint(q: RunChainQueryable, userId: string, runId: string, readerId?: string): Promise<{
   runIds: string[]
   checkpoint: { patch: Buffer; unavailableReason: string | null } | null
 }> {
   if (!new RegExp(UUID.slice(1, -1)).test(runId)) return { runIds: [], checkpoint: null }
   const { rows: [row] } = await q.query(`
-    WITH RECURSIVE ${selectedChainSql()}, grouped AS (
+    WITH RECURSIVE ${selectedChainSql(readerId !== undefined)}, grouped AS (
       SELECT coalesce(array_agg(id::text ORDER BY id), ARRAY[]::text[]) AS "runIds",
         coalesce(bool_or("depthExceeded"), false) AS "depthExceeded" FROM selected
     )
@@ -192,7 +194,7 @@ export async function readRunChainCheckpoint(q: RunChainQueryable, userId: strin
       SELECT patch,"unavailableReason" FROM run_checkpoints
       WHERE NOT grouped."depthExceeded" AND "runId"=ANY(grouped."runIds"::uuid[])
       ORDER BY "updatedAt" DESC LIMIT 1
-    ) checkpoint ON true`, [runId, userId, RUN_CHAIN_MAX_DEPTH])
+    ) checkpoint ON true`, [runId, userId, RUN_CHAIN_MAX_DEPTH, ...(readerId === undefined ? [] : [readerId])])
   if (row.depthExceeded) throw new Error('runChainDepthExceeded')
   return {
     runIds: row.runIds as string[],

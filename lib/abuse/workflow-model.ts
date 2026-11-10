@@ -10,23 +10,27 @@ export class HostedWorkflowModel implements Model {
     readonly ownerId: string,
     readonly botId: string | null,
     readonly modelId: string,
+    readonly actorId: string,
   ) {}
   static [WORKFLOW_SERIALIZE](value: HostedWorkflowModel) {
     return {
       ownerId: value.ownerId,
       botId: value.botId,
       modelId: value.modelId,
+      actorId: value.actorId,
     }
   }
   static [WORKFLOW_DESERIALIZE](value: {
     ownerId: string
     botId: string | null
     modelId: string
+    actorId: string
   }) {
-    return new HostedWorkflowModel(value.ownerId, value.botId, value.modelId)
+    return new HostedWorkflowModel(value.ownerId, value.botId, value.modelId, value.actorId)
   }
   async doGenerate(options: Parameters<Model['doGenerate']>[0]) {
     'use step'
+    if (!this.actorId || this.actorId !== this.ownerId) throw new Error('verification_required')
     const { executionWorkspace } = await import('../execution-settings')
     const { hostedModel } = await import('./model')
     const { workflowFailureCall } = await import('../workflow-run-failure')
@@ -45,6 +49,7 @@ export class HostedWorkflowModel implements Model {
   }
   async doStream(options: Parameters<Model['doStream']>[0]) {
     'use step'
+    if (!this.actorId || this.actorId !== this.ownerId) throw new Error('verification_required')
     const startedAt = Date.now()
     const { executionWorkspace } = await import('../execution-settings')
     const { hostedModel } = await import('./model')

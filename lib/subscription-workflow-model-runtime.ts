@@ -3,6 +3,6 @@ import { resolveFrozenHostedModel, selectionScope, type HostedModelSelection } f
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from './subscription-runtime'
 export function resolveSubscriptionWorkflowModel(selection: HostedModelSelection, signal?: AbortSignal) {
   return resolveFrozenHostedModel(selectionScope(selection),
-    { harness: 'ai_sdk', model: selection.modelId, modelSelection: selection },
+    { harness: 'ai_sdk', model: selection.modelId, actorId: selection.actorId, modelSelection: selection },
     { service: () => subscriptionRuntime(), workspace: authorizeSubscriptionWorkspace }, signal)
 }

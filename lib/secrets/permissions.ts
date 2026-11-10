@@ -1,6 +1,6 @@
 // 设置 › 密钥与环境 permission matrix (plan 1.3). Pure: no DB, shared by store, UI and tests.
-// Five defaults below are still being confirmed with Alex (plan 7.12); each is one constant so a
-// decision flips one line here, and tests/secret-permissions read the same constants.
+// This is the coarse settings-role matrix. Resource-scoped Secrets additionally
+// require the canonical Project/Thread ACL in the store, including for Admins.
 import type { SecretScopeType } from './format'
 
 export type WorkspaceRole = 'admin' | 'member'
@@ -12,10 +12,13 @@ export type SecretAction =
 
 export const SECRET_POLICY = {
   /** Default 1+2 (7.12): "workspace-shared" means scopeType 'workspace', for secret and env alike; members can't write it. */
-  memberScopes: ['repository'] as readonly SecretScopeType[],
+  // Resource scopes additionally require canManageAccess at the authoritative
+  // resource boundary, including for Workspace admins. This matrix is only the
+  // coarse settings role; it cannot authorize a private Project/Thread itself.
+  memberScopes: ['repository', 'project', 'thread'] as readonly SecretScopeType[],
   /** Default 4 (7.12): members may replace entries someone else created (shared team values; audit is the backstop). */
   memberMayReplaceOthers: true,
-  /** Deletes stay admin only (decided). */
+  /** Shared Workspace/Repository deletion stays admin only. Resource owners use canManageAccess. */
   memberMayDelete: false,
   /** Members see the E2B card status (configured + last error only). */
   memberMayViewE2BStatus: true,
@@ -35,7 +38,7 @@ export function secretActionAllowed(role: WorkspaceRole, action: SecretAction, t
     case 'secret.list': return true
     case 'secret.create': return targets.length > 0 && targets.every(memberMayWrite)
     case 'secret.replace': return targets.length > 0 && targets.every(memberMayWrite) && (ownsAll || SECRET_POLICY.memberMayReplaceOthers)
-    case 'secret.delete': return SECRET_POLICY.memberMayDelete
+    case 'secret.delete': return SECRET_POLICY.memberMayDelete || targets.length > 0 && targets.every(target => target.scopeType === 'project' || target.scopeType === 'thread')
     case 'e2b.status': return SECRET_POLICY.memberMayViewE2BStatus
     case 'e2b.write': return false
   }

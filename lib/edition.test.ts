@@ -27,7 +27,7 @@ test('community own-provider usage never touches hosted billing, including beyon
     await usage.settle(String(index), null, 100, 20)
   }
   assert.equal(await usage.trialLeft('workspace', { verified: false, purchased: 0 }), null)
-  assert.deepEqual(await usage.status('workspace'), { state: 'ready', balance: { verified: true, free: 0, purchased: 0 }, trialLeft: null })
+  assert.deepEqual(await usage.status('workspace'), { state: 'ready', balance: { verified: true, free: 0, plan: 0, purchased: 0 }, trialLeft: null })
   assert.deepEqual(await usage.recent('workspace'), [])
   assert.equal(new HostedUsageStore(pool).metered, true)
 })

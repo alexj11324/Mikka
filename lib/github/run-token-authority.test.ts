@@ -17,6 +17,7 @@ function fixture() {
 
 let row: ReturnType<typeof fixture> | null = fixture()
 let runTokenValid = true
+let personalAllowed = true
 /** Whose run the run token names. */
 let tokenUser = owner
 const select = mock.fn(() => {
@@ -30,12 +31,16 @@ const verify = mock.fn(async (_request: Request, token?: string) => runTokenVali
 function stub(relative: string, namedExports: Record<string, unknown>) {
   mock.module(new URL(relative, import.meta.url).href, { namedExports })
 }
-stub('../db/index.ts', { db: { select } })
+stub('../db/index.ts', { db: { select }, pool: { query: async (text: string, args: unknown[]) => {
+  assert.match(text, /mikka_run_personal_resources_allowed/)
+  assert.deepEqual(args, [ids.run, tokenUser])
+  return { rows: [{ allowed: personalAllowed }] }
+} } })
 stub('../mcp/worker.ts', { verifyRunToken: verify, workerRun: () => ({ id: ids.run, userId: tokenUser, botId: null, issueId: null }) })
 
 let authorize: typeof import('./run-token-authority')['authorizeRunGitHubToken']
 before(async () => { ({ authorizeRunGitHubToken: authorize } = await import('./run-token-authority')) })
-beforeEach(() => { row = fixture(); runTokenValid = true; tokenUser = owner })
+beforeEach(() => { row = fixture(); runTokenValid = true; tokenUser = owner; personalAllowed = true })
 
 const request = (authorization = 'Bearer mkw_synthetic') => new Request('https://mikka.test/api/runs/github-token', { method: 'POST', headers: { authorization } })
 
@@ -80,6 +85,14 @@ test('a run token of one person never reaches another person\'s run or credentia
   const exchange = createRunGitHubTokenExchange({ authorize, issue: async userId => { issued.push(userId); return { token: 'synthetic-peer-token', expiresAt: null } } })
   const response = await exchange(request())
   assert.equal(response.status, 403)
+  assert.deepEqual(issued, [])
+})
+
+test('an Owner-executed Shared run cannot fetch the Owner private GitHub token', async () => {
+  personalAllowed = false
+  const issued: string[] = []
+  const exchange = createRunGitHubTokenExchange({ authorize, issue: async userId => { issued.push(userId); return { token: 'synthetic-never-issued', expiresAt: null } } })
+  assert.equal((await exchange(request())).status, 403)
   assert.deepEqual(issued, [])
 })
 

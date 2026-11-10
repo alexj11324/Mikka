@@ -5,6 +5,7 @@ import { db, pool } from '@/lib/db'
 import { agentRuns, bots, factoryAttempts, factoryTasks, issues, projectDecisions, projectDecisionSources, runTokens } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
+import type { IssueReader } from '@/lib/issue-visibility'
 import { issueForUser } from '@/lib/issue-access'
 import { isPersonalWorkspace } from '@/lib/tokens/scope'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -25,14 +26,15 @@ function unavailable(): never { throw new ProjectMapError('SOURCE_NOT_FOUND', 40
 
 async function actorContext(actor: DecisionActor, input: ReturnType<typeof recordDecisionSchema.parse>) {
   const userId = actor.kind === 'human' ? readerId(actor.user) : actor.userId
-  const reader = actor.kind === 'human' ? actor.user : userId
+  let reader: IssueReader = actor.kind === 'human' ? actor.user : userId
   let workspaceId = actor.workspaceId
   let run: typeof agentRuns.$inferSelect | undefined
   if (actor.kind === 'run') {
     if (!actor.token) throw new ProjectMapError('RUN_NOT_AUTHORIZED', 403)
-    const { verifyRunToken } = await import('@/lib/mcp/worker')
+    const { verifyRunToken, workerActorReader } = await import('@/lib/mcp/worker')
     const authorization = await verifyRunToken(new Request('http://localhost'), actor.token)
     if (authorization?.extra?.runId !== actor.runId || authorization.extra.userId !== userId) throw new ProjectMapError('RUN_NOT_AUTHORIZED', 403)
+    reader = workerActorReader(authorization)
     ;[run] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, actor.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run?.issueId) throw new ProjectMapError('RUN_PROJECT_REQUIRED')
     const identity = await revalidateExecutionIdentity(pool, run)
@@ -115,7 +117,7 @@ export async function recordProjectDecision(actor: DecisionActor, raw: RecordDec
   }
   const requestedDecider = input.decidedBy ?? (input.provenance === 'inferred' ? { kind: 'unknown' as const, id: 'unknown' } : { kind: recordedBy.kind, id: recordedBy.id })
   const captureMode = input.provenance === 'inferred' ? 'reconstructed' as const : actor.kind === 'human' ? 'human_marked' as const : 'live' as const
-  const sourceScope = { ...context.scope, ...(actor.kind === 'run' ? { runId: actor.runId } : {}), ...(actor.kind === 'bot' ? { botId: actor.botId } : {}) }
+  const sourceScope = { ...context.scope, userId, ...(actor.kind === 'run' ? { runId: actor.runId } : {}), ...(actor.kind === 'bot' ? { botId: actor.botId } : {}) }
     const resolved = await resolveDecisionSources(sourceScope, sources)
     const humanAuthors = [...new Set(resolved.filter(source => source.authorKind === 'human' && source.authorId).map(source => source.authorId!))]
     const deciderId = requestedDecider.id ?? (requestedDecider.kind === 'human'
@@ -216,7 +218,7 @@ export async function recordProjectDecision(actor: DecisionActor, raw: RecordDec
 /** Decisions keep their original content ownership, including after a project is shared. */
 export async function listProjectDecisions(scope: ProjectScope, limit = 100) {
   const rows = await db.select().from(projectDecisions).where(and(eq(projectDecisions.workspaceId, scope.workspaceId),
-    eq(projectDecisions.projectId, scope.projectId), eq(projectDecisions.ownerId, scope.userId))).orderBy(desc(projectDecisions.recordedAt), desc(projectDecisions.id)).limit(limit)
+    eq(projectDecisions.projectId, scope.projectId))).orderBy(desc(projectDecisions.recordedAt), desc(projectDecisions.id)).limit(limit)
   const visible = rows.filter(row => !row.issueId || scope.issueIds.includes(row.issueId))
   const sources = visible.length ? await db.select().from(projectDecisionSources).where(inArray(projectDecisionSources.decisionId, visible.map(row => row.id))) : []
   const readable = []
@@ -225,7 +227,7 @@ export async function listProjectDecisions(scope: ProjectScope, limit = 100) {
     let hidden = false
     for (const source of sources.filter(source => source.decisionId === row.id)) {
       try {
-        await resolveDecisionSources(scope, [{ role: source.role, ...(source.optionId ? { optionId: source.optionId } : {}), source: source.locator }])
+        await resolveDecisionSources({ ...scope, userId: row.ownerId }, [{ role: source.role, ...(source.optionId ? { optionId: source.optionId } : {}), source: source.locator }])
         references.push({ sourceRef: source.id, role: source.role, optionId: source.optionId, relation: source.relation, availability: 'available' as const, locator: source.locator })
       } catch (error) {
         if (!(error instanceof ProjectMapError && [400, 404].includes(error.status))) throw error
@@ -240,9 +242,9 @@ export async function listProjectDecisions(scope: ProjectScope, limit = 100) {
     }
     if (hidden) continue
     const { payloadHash: _payloadHash, idempotencyKey: _key, ...decision } = row
-    readable.push({ ...decision, sources: references })
+    readable.push(await maskFor({ workspaceId: scope.workspaceId, ownerId: row.ownerId }, { ...decision, sources: references }))
   }
-  return maskFor({ workspaceId: scope.workspaceId, ownerId: scope.userId }, readable)
+  return readable
 }
 
 export async function markMessageAsDecision(actor: Extract<DecisionActor, { kind: 'human' }>, projectId: string, input: RecordDecisionInput, locator: Parameters<typeof readDecisionSource>[1]) {

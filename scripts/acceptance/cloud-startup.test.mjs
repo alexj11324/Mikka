@@ -280,6 +280,32 @@ test('startup failure projection is closed, preserves only bounded HTTP status, 
 const oneCodexCandidate = () => parseOptions(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
   '--device-id', deviceId, '--agent-id', agentId, '--timeout-ms', '1000'], {})
 
+test('the selected dispatch refusal retains its code before queueing and still cleans the owned issue', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+  io.fetchImpl = async (url, init) => {
+    const response = await original(url, init)
+    if (!url.pathname.endsWith('/api/coordinator/stream')) return response
+    const events = (await response.text()).trim().split('\n').map(line => {
+      const event = JSON.parse(line)
+      return event.call === 'call_1' && event.state === 'done'
+        ? { type: 'tool', name: 'dispatch_run', call: event.call, state: 'error', errorCode: 'machineUnavailable',
+          errorDetail: 'PRIVATE_DISPATCH_DETAIL', output: 'PRIVATE_DISPATCH_BODY' } : event
+    })
+    return new Response(events.map(event => JSON.stringify(event)).join('\n') + '\n', { headers: response.headers })
+  }
+  let queued = 0
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io, onCandidateRunQueued: () => { queued++ } }), sample = report.samples[0]
+  assert.equal(report.status, 'failed')
+  assert.equal(sample.runId, undefined); assert.equal(queued, 0)
+  assert.equal(sample.error, 'startup_dispatch_refused')
+  assert.deepEqual(sample.failure, { phase: 'coordinator_stream', code: 'startup_dispatch_refused' })
+  assert.deepEqual(sample.dispatchRefusal, { code: 'machineUnavailable' })
+  assert.equal(io.calls.some(call => call.action === 'agents.pollIssueThreads'), false)
+  assert.equal(sample.cleanup.status, 'passed')
+  assert.ok(io.samples[0].cancelled && io.samples[0].deleted)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_DISPATCH|PRIVATE_COOKIE|PRIVATE_PASSWORD/)
+})
+
 test('a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue', async () => {
   for (const [name, code] of [['AbortError', 'startup_aborted'], ['TimeoutError', 'startup_timeout']]) {
     const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl

@@ -33,3 +33,14 @@ test('secret delivery changes are auditable without copying secret-bearing confi
   assert.ok(!JSON.stringify(changed).includes('synthetic-canary'))
   assert.ok(!JSON.stringify(changed).includes('opaque-bearer'))
 })
+
+test('Project and Thread custody keeps exact opaque scope references and rejects private data as metadata', () => {
+  const projectId = '22222222-2222-4222-8222-222222222222', threadId = '33333333-3333-4333-8333-333333333333'
+  const moved = secretAuditEvent({ workspaceId, actorId: actor.id, action: 'secret.replaced', target: { type: 'secret', id: 's1', label: 's1' },
+    metadata: { scope: 'thread', resourceId: threadId, previousScope: 'project', previousResourceId: projectId, name: 'PRIVATE_SECRET_NAME', value: 'synthetic-private-value' } }, actor)
+  assert.deepEqual(moved && toAuditRow(moved).metadata, { scope: 'thread', resourceId: threadId, previousScope: 'project', previousResourceId: projectId })
+  assert.ok(!JSON.stringify(moved).includes('PRIVATE_SECRET_NAME') && !JSON.stringify(moved).includes('synthetic-private-value'))
+  const invalid = secretAuditEvent({ workspaceId, actorId: actor.id, action: 'env.created', target: { type: 'env', id: 's1', label: 's1' },
+    metadata: { scope: 'synthetic-private-value', resourceId: 'synthetic-private-value' } }, actor)
+  assert.deepEqual(invalid && toAuditRow(invalid).metadata, {})
+})

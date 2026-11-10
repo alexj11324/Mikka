@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { resourceReferenceInput,resourceAccessChangeSchema,threadExecutionGrantInput } from '@/lib/resource-access/input'
 import { projectInput, projectPatch } from '@/lib/project-input'
 import { assigneeSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
 import { ISSUE_STATUS_CODES, ISSUE_PRIORITY_CODES } from '@/lib/issue-meta'
-import { taskDestinationSchema } from '@/lib/task-destination'
+import { taskDestinationSchema,taskCreationSchema } from '@/lib/task-destination'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
@@ -25,7 +26,8 @@ const oneId = tuple(uuid)
 const none = tuple()
 const inWorkspace = tuple(workspace)
 const secret = text(65_536)
-const scope = z.discriminatedUnion('type', [object({ type: z.literal('workspace') }), object({ type: z.literal('repository'), repository: text(2048).min(1) })])
+const scope = z.discriminatedUnion('type', [object({ type: z.literal('workspace') }), object({ type: z.literal('repository'), repository: text(2048).min(1) }),
+  object({ type: z.literal('project'), projectId: uuid }), object({ type: z.literal('thread'), threadId: uuid })])
 const secretBase = { name: text(200).min(1), kind: z.enum(['secret', 'env']), value: secret, note: text(2000).optional() }
 const importBase = { text: text(2 * 1024 * 1024), masked: bool, onConflict: z.enum(['replace', 'skip']) }
 const json: z.ZodType = z.lazy(() => z.union([z.null(), z.string(), z.boolean(), z.number().finite(), z.array(json), z.record(z.string(), json)]))
@@ -85,6 +87,11 @@ const readBatch: z.ZodType = tuple(z.array(object({ action: z.enum(READ_BATCH_AC
 /** Explicit transport whitelist. Optional parameters and array lengths are
  * checked here before the original action performs its ownership checks. */
 export const desktopActionSchemas = {
+  'resource-access.getResourceAccess':tuple(resourceReferenceInput),
+  'resource-access.saveResourceAccess':tuple(resourceReferenceInput,resourceAccessChangeSchema),
+  'resource-access.getThreadExecutionAccess':tuple(uuid,uuid),
+  'resource-access.saveThreadExecutionGrant':tuple(uuid,uuid,threadExecutionGrantInput),
+  'resource-access.revokeThreadExecutionGrant':tuple(uuid,uuid,uuid),
   'desktop.readBatch': readBatch,
   'desktop.bootstrap': inWorkspace,
   'desktop.session': none,
@@ -113,7 +120,7 @@ export const desktopActionSchemas = {
   'agents.getThreadChanges': tuple(uuid.nullable(), uuid),
   'agents.getThreadMachine': tuple(uuid.nullable(), uuid),
   'agents.getThreadInstructions': tuple(uuid.nullable(), uuid),
-  'agents.sendIssueThreadReply': tuple(object({ issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional() })),
+  'agents.sendIssueThreadReply': tuple(object({ issueId: uuid.nullable(), runId: uuid, text: text(10_000).min(1), requestId: uuid.optional(), retryOriginalSession: z.literal(true).optional(), questionWakeGeneration: uuid.optional(),executionGrantId:uuid.optional() })),
   'agents.getThreadName': oneId,
   'agents.stopRun': oneId,
   'agents.resumeQuotaPausedRunOnApiKey': oneId,
@@ -152,7 +159,7 @@ export const desktopActionSchemas = {
   'coordinator.coordinatorCitationSources': tuple(z.array(uuid).min(1).max(50)),
   'coordinator.coordinatorReasoning': tuple(bot, z.array(positive).min(1).max(50)),
   'coordinator.pollBotChatSummaries': none,
-  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional(), workspace),
+  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional(), workspace,taskCreationSchema.optional()),
   'coordinator.welcomeCoordinator': tuple(bot.optional()),
   'coordinator.stopCoordinatorTurn': tuple(bot.optional()),
   'coordinator.retryCoordinatorTurn': tuple(bot.optional()),
@@ -178,7 +185,7 @@ export const desktopActionSchemas = {
   'issues.listWorkspaceIssues': oneId,
   'issues.getIssue': oneId,
   'issues.pollIssue': tuple(uuid, version.optional()),
-  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
+  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES), visibility:z.enum(['shared','private']).optional(),projectId:uuid.optional() })),
   'issues.promoteIssueToTeam': tuple(object({ requestId: uuid, issueId: uuid, revision: positive, teamId: uuid, expectedTeamId: uuid.nullable() })),
   'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), revision: positive })),
   'issues.changeIssuePriority': tuple(object({ id: uuid, priority: z.enum(ISSUE_PRIORITY_CODES), revision: positive })),
@@ -278,6 +285,7 @@ export const desktopActionSchemas = {
   'workspace-settings.transferWorkspace': tuple(id, workspace),
   'workspace-settings.deleteWorkspace': tuple(uuid, text(120).min(1)),
   'workspace-settings.takeOverArchivedBot': tuple(uuid, workspace),
+  'workspace-settings.transferMyBot': tuple(uuid, id, object({ expectedRevision: positive, confirmPrivateTransfer: bool.optional() }), workspace),
   'workspace.createWorkspace': tuple(z.union([text(120).trim().min(1), object({ name: text(120).trim().min(1), slug })])),
   'workspace.switchWorkspace': tuple(z.union([uuid, object({ workspaceId: workspace, accountId: id.optional() })])),
   'workspace.createWorkspaceInvitation': tuple(object({ workspaceId: uuid, emails: z.array(z.email().max(254)).min(1).max(20), role: z.enum(['admin', 'member']) })),

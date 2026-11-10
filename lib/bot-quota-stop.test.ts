@@ -25,7 +25,7 @@ mock.module(new URL("./model-admission/runtime.ts", import.meta.url).href, {
   },
 });
 
-const scope = { ownerId: "alice", botId: id(1), workspaceId: id(2) };
+const scope = { ownerId: "alice", actorId: "alice", botId: id(1), workspaceId: id(2) };
 function fixture(reason = "quota_exhausted") {
   const binding = (key: string) => ({
     id: key,

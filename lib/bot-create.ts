@@ -20,11 +20,12 @@ export async function createOwnedBot(owner: { ownerId: string; workspaceId: stri
   if (!parsed.success) throw new ActionFailureError(parsed.error.issues[0]?.path[0] === 'name' ? 'validationNameRequired' : 'validationGeneric')
   const { model, repository, ...look } = parsed.data
   // A bot works only in a repository the workspace has installed; never trust the client's choice.
-  if (repository && !(await repositoryAvailable(owner.workspaceId, repository))) throw new ActionFailureError('botDefaultRepositoryUnavailable')
+  if (repository && !(await repositoryAvailable(owner.workspaceId, repository, owner.ownerId))) throw new ActionFailureError('botDefaultRepositoryUnavailable')
   const defaults = model === undefined || repository === undefined ? await workspaceBotDefaults(owner.workspaceId) : null
+  const defaultRepository = defaults?.defaultRepository && await repositoryAvailable(owner.workspaceId, defaults.defaultRepository, owner.ownerId) ? defaults.defaultRepository : null
   const bot = { id: crypto.randomUUID(), ...look }
   try {
-    await db.insert(bots).values({ ...bot, ...owner, model: model === undefined ? defaults!.defaultModel : model, repository: repository === undefined ? defaults!.defaultRepository : repository })
+    await db.insert(bots).values({ ...bot, ...owner, model: model === undefined ? defaults!.defaultModel : model, repository: repository === undefined ? defaultRepository : repository })
   } catch (error) {
     // 23505 is the per-person, per-workspace name index.
     if ((error as { code?: string }).code === '23505') throw new ActionFailureError('botDuplicateName')

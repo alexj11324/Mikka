@@ -167,6 +167,15 @@ describe("device link schemas", () => {
     }
   })
 
+  it('preserves required native credential isolation without accepting a downgrade', () => {
+    const assignment = { runId: 'r1', issueId: 'i1', deviceId: 'd1', repoId: 'repo', harness: 'codex', prompt: 'p' }
+    expect(runAssignmentSchema.parse(assignment).nativeCredentialIsolation).toBeUndefined()
+    expect(runAssignmentSchema.parse({ ...assignment, nativeCredentialIsolation: 'tools_v1' }).nativeCredentialIsolation).toBe('tools_v1')
+    for (const invalid of [true, 'none', 'tools_v0', 'redaction', { version: 1 }]) {
+      expect(runAssignmentSchema.safeParse({ ...assignment, nativeCredentialIsolation: invalid }).success).toBe(false)
+    }
+  })
+
   it('bounds opaque assignment and heartbeat payloads while retaining renewal metadata', () => {
     const grant = { name: 'VENDOR_KEY', capability: 'synthetic-opaque-grant', expiresAt: '2030-01-01T00:00:00.000Z', origin: 'https://api.example.com' }
     const taskSecrets = { version: 1, endpoint: 'https://mikka.example.com/v1/task-secrets/r1', grants: [grant], unavailable: [] }

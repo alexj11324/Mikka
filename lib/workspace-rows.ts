@@ -37,6 +37,7 @@ export const KEPT_WITH_WORKSPACE = new Map<string, string>([
   ['workspace_audit_events', 'kept 90 days after deletion; the audit-retention job removes them'],
   ['workspace_audit_retention', 'kept 90 days after deletion; the audit-retention job removes them'],
   ['resource_access_events', 'append-only access audit without private content or credential values'],
+  ['run_resource_disclosures', 'immutable machine disclosure evidence; contains no private values'],
   // Append-only skill ledgers: triggers reject every DELETE.
   ['improvement_team_skill_metadata', 'append-only'],
   ['improvement_team_skill_reviews', 'append-only'],

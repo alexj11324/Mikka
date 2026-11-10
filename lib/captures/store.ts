@@ -1,7 +1,7 @@
 import type { RunAgentProfile } from '@/lib/agent-runs'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, isNull, lt, sql } from 'drizzle-orm'
 import {
   CAPTURE_EXTENSIONS, CAPTURE_MAX_BYTES, captureKind, captureProblem, cleanCaptureTitle, sniffCaptureType,
   type CaptureContentType, type CaptureSource, type CaptureUploadRequest, type CaptureUploadResponse, type CaptureView,
@@ -14,6 +14,10 @@ import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
 import { modelRoutingEvidenceSchema } from '@/lib/thread-execution-identity-view'
 import { taskActivityChanged } from '@/lib/factory/activity-live'
+import type { IssueReader } from '@/lib/issue-visibility'
+import { threadReadAccess } from '@/lib/resource-access/thread'
+import { taskReaderScope } from '@/lib/task-workspace'
+import { withResourceAccess } from '@/lib/resource-access/store'
 
 // Screenshots and screen recordings in Neon (whose, which run, share links)
 // with their files in the artifacts bucket. Every read is scoped to the run's
@@ -291,8 +295,9 @@ export async function failRecording(id: string, error: string) {
  * documents it handed over, oldest first. Null when the run is not the
  * person's own.
  */
-export async function runEvidence(userId: string, runId: string) {
-  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status, issueId: agentRuns.issueId, botId: agentRuns.botId,
+export async function runEvidence(reader: IssueReader, runId: string) {
+  const viewerId = taskReaderScope(reader).userId
+  const [run] = await db.select({ id: agentRuns.id, userId: agentRuns.userId, status: agentRuns.status, issueId: agentRuns.issueId, botId: agentRuns.botId,
     harness: sql<string | null>`${agentRuns.agentDefinition}->>'harness'`,
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
@@ -303,17 +308,18 @@ export async function runEvidence(userId: string, runId: string) {
       'source',${agentRuns.agentDefinition}->'agentProfile'->'source','reason',${agentRuns.agentDefinition}->'agentProfile'->'reason') end`,
     credentialType: sql<'subscription' | 'api_key' | 'unknown'>`CASE WHEN ${agentRuns.agentDefinition}->'apiKey' IS NOT NULL AND ${agentRuns.agentDefinition}->'apiKey'<>'null'::jsonb THEN 'api_key' WHEN ${agentRuns.agentDefinition}->'subscription' IS NOT NULL AND ${agentRuns.agentDefinition}->'subscription'<>'null'::jsonb THEN 'subscription' ELSE 'unknown' END`,
     subscriptionRoute: sql<string | null>`${agentRuns.agentDefinition}->'subscription'->>'route'` })
-    .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
+    .from(agentRuns).where(and(eq(agentRuns.id, runId), await threadReadAccess(reader))).limit(1)
   if (!run) return null
+  const userId = run.userId
   // This is the frozen provenance of completed work, not a live resource
   // authorization check. Schema projection strips private/unknown fields.
-  const identity = executionIdentitySchema.safeParse(run.executionIdentity)
+  const identity = executionIdentitySchema.safeParse(viewerId === userId ? run.executionIdentity : null)
   const routing = modelRoutingEvidenceSchema.safeParse(run.modelRouting)
   // Names for the identity's references, so the owner reads people and machines, not IDs.
   const labels = identity.success ? await (await import('@/lib/execution-identity-labels')).executionIdentityLabels(pool, (await import('@/lib/workspace-db')).workspacePool, userId, identity.data) : null
   const captures = await db.select().from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'ready'))).orderBy(asc(runCaptures.createdAt))
-  const documents = await runArtifactSubmissions(pool, userId, [runId])
+  const documents = await runArtifactSubmissions(pool, userId, [runId], viewerId)
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
   return {
@@ -330,9 +336,10 @@ async function fileOf(row: Pick<Row, 'storageKey' | 'inlineContent'>): Promise<U
 }
 
 /** The person's ready capture with its bytes. */
-export async function readCapture(userId: string, captureId: string) {
-  const [row] = await db.select().from(runCaptures)
-    .where(and(eq(runCaptures.id, captureId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'ready'))).limit(1)
+export async function readCapture(reader: IssueReader, captureId: string) {
+  const [row] = await db.select(getTableColumns(runCaptures)).from(runCaptures)
+    .innerJoin(agentRuns, and(eq(agentRuns.id, runCaptures.runId), eq(agentRuns.userId, runCaptures.userId)))
+    .where(and(eq(runCaptures.id, captureId), await threadReadAccess(reader), eq(runCaptures.status, 'ready'))).limit(1)
   if (!row) return null
   const bytes = await fileOf(row)
   return bytes ? { ...captureView(row), bytes } : null
@@ -343,31 +350,51 @@ export async function readCapture(userId: string, captureId: string) {
 const SHARE_PREFIX = 'mkc_'
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
 
-/** A new link anyone can open; returns the token once. */
-export async function createCaptureShare(userId: string, captureId: string): Promise<{ token: string } | null> {
-  const [row] = await db.select({ id: runCaptures.id }).from(runCaptures)
-    .where(and(eq(runCaptures.id, captureId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'ready'))).limit(1)
-  if (!row) return null
-  const token = `${SHARE_PREFIX}${randomBytes(24).toString('base64url')}`
-  await db.insert(runCaptureShares).values({ id: crypto.randomUUID(), captureId, tokenHash: hashToken(token), createdBy: userId })
-  return { token }
+async function manageableCapture(reader: IssueReader, captureId: string) {
+  const [row] = await db.select({ id: runCaptures.id, runId: runCaptures.runId, workspaceId: agentRuns.workspaceId }).from(runCaptures)
+    .innerJoin(agentRuns, and(eq(agentRuns.id, runCaptures.runId), eq(agentRuns.userId, runCaptures.userId)))
+    .where(and(eq(runCaptures.id, captureId), await threadReadAccess(reader,'canManageAccess'), eq(runCaptures.status, 'ready'))).limit(1)
+  return row?.workspaceId ? { kind: 'thread' as const, id: row.runId, workspaceId: row.workspaceId } : null
+}
+
+/** An authenticated permalink, never an independent content grant. */
+export async function createCaptureShare(reader: IssueReader, captureId: string): Promise<{ token: string } | null> {
+  const reference = await manageableCapture(reader,captureId)
+  if (!reference) return null
+  const userId = taskReaderScope(reader).userId
+  return withResourceAccess(reader,reference,'canManageAccess',async policy => {
+    const token = `${SHARE_PREFIX}${randomBytes(24).toString('base64url')}`, linkId = crypto.randomUUID()
+    await db.insert(runCaptureShares).values({ id: linkId, captureId, tokenHash: hashToken(token), createdBy: userId })
+    await db.execute(sql`insert into resource_access_events("resourceKind","resourceId","workspaceId","actorId","ownerId",revision,source,action,detail)
+      values('thread',${reference.id}::uuid,${reference.workspaceId}::uuid,${userId},${policy.ownerId},${policy.revision},'capture_link','link_created',jsonb_build_object('captureId',${captureId}::text,'linkId',${linkId}::text))`)
+    return { token }
+  })
 }
 
 /** Ends every live link to the capture. */
-export async function revokeCaptureShares(userId: string, captureId: string): Promise<number> {
-  const revoked = await db.update(runCaptureShares).set({ revokedAt: new Date() })
-    .where(and(eq(runCaptureShares.captureId, captureId), isNull(runCaptureShares.revokedAt), sql`exists (select 1 from ${runCaptures} where ${runCaptures.id} = ${runCaptureShares.captureId} and ${runCaptures.userId} = ${userId})`))
-    .returning({ id: runCaptureShares.id })
-  return revoked.length
+export async function revokeCaptureShares(reader: IssueReader, captureId: string): Promise<number> {
+  const reference = await manageableCapture(reader,captureId)
+  if (!reference) return 0
+  const userId = taskReaderScope(reader).userId
+  return withResourceAccess(reader,reference,'canManageAccess',async policy => {
+    const revoked = await db.update(runCaptureShares).set({ revokedAt: new Date() })
+      .where(and(eq(runCaptureShares.captureId, captureId), isNull(runCaptureShares.revokedAt))).returning({ id: runCaptureShares.id })
+    if (revoked.length) await db.execute(sql`insert into resource_access_events("resourceKind","resourceId","workspaceId","actorId","ownerId",revision,source,action,detail)
+      values('thread',${reference.id}::uuid,${reference.workspaceId}::uuid,${userId},${policy.ownerId},${policy.revision},'capture_link','links_revoked',jsonb_build_object('captureId',${captureId}::text,'count',${revoked.length}::integer))`)
+    return revoked.length
+  })
 }
 
 /** The capture a live share token opens. */
-export async function sharedCapture(token: string) {
-  if (!token.startsWith(SHARE_PREFIX)) return null
-  const [share] = await db.select({ captureId: runCaptureShares.captureId }).from(runCaptureShares)
+export async function sharedCapture(token: string, reader?: IssueReader | null) {
+  if (!reader || !token.startsWith(SHARE_PREFIX)) return null
+  const [share] = await db.select({ captureId: runCaptureShares.captureId, createdBy: runCaptureShares.createdBy }).from(runCaptureShares)
     .where(and(eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt))).limit(1)
   if (!share) return null
-  const [row] = await db.select().from(runCaptures).where(and(eq(runCaptures.id, share.captureId), eq(runCaptures.status, 'ready'))).limit(1)
+  const [row] = await db.select(getTableColumns(runCaptures)).from(runCaptures)
+    .innerJoin(agentRuns, and(eq(agentRuns.id, runCaptures.runId), eq(agentRuns.userId, runCaptures.userId)))
+    .where(and(eq(runCaptures.id, share.captureId), eq(runCaptures.status, 'ready'),
+      await threadReadAccess(reader), await threadReadAccess(share.createdBy))).limit(1)
   if (!row) return null
   const bytes = await fileOf(row)
   return bytes ? { ...captureView(row), bytes } : null

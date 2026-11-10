@@ -6,6 +6,10 @@ export const taskDestinationSchema = z.discriminatedUnion('kind', [
 ])
 export type TaskDestination = z.infer<typeof taskDestinationSchema>
 
+/** Stored on an authenticated task-form event, never supplied by model tools. */
+export const taskCreationSchema=z.object({visibility:z.enum(['shared','private']),projectId:z.uuid().optional()}).strict()
+export type TaskCreation=z.infer<typeof taskCreationSchema>
+
 /** Model-only context. The person's displayed message keeps its normal copy. */
 export function taskDestinationPrompt(destination: TaskDestination): string {
   return destination.kind === 'cloud'

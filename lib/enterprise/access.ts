@@ -83,6 +83,13 @@ async function organizationAccess(userId: string, workspaceId: string, organizat
       and "agentDefinition"->'executionIdentity'->>'workspaceId'=$3::text
       and "agentDefinition"->'executionIdentity'->>'requester'=$2`, [principal.runId, userId, workspaceId])
     state.credentialValid = !!runs[0]
+  } else if (principal?.kind === 'collaboration' && principal.workspaceId === workspaceId) {
+    const { collaborationExecutionProof } = await import('./collaboration-authority')
+    const proof = await collaborationExecutionProof(appExecutor, { ownerId: userId, workspaceId, authorizationId: principal.authorizationId })
+    // The actor retains their own live SSO/SCIM proof. The owner's delegated
+    // execution must additionally satisfy the organization's machine policy.
+    state.credentialValid = !!proof && await organizationAccess(proof.actorId, workspaceId, organizationId,
+      { kind: 'session', sessionId: proof.sessionId }, appExecutor)
   }
   return enterpriseAccessAllowed(state, principal)
 }

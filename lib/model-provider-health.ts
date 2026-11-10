@@ -49,15 +49,17 @@ export async function providerHealthStates(query: Query, scope: Scope, candidate
   }])).values()]
   const states = new Map<string, ProviderHealthBlock>()
   if (!requested.length) return states
+  const organization = requested.some(source => source.ownerId.startsWith('organization:'))
+    ? await (await import('./organization-connections-access')).organizationConnectionAuthority(scope.workspaceId, scope.ownerId) : null
   const { rows } = await query.query<{ kind: EntrySource['kind']; id: string; harness: OrderHarness | null; model: string | null; failure: unknown; observedAt: Date }>(`
     WITH requested AS (
       SELECT * FROM unnest($3::text[],$4::text[],$5::text[],$6::text[],$7::text[]) AS allowed(kind,id,owner,harness,model)
     ), sources AS (
       SELECT DISTINCT requested.kind,requested.id,requested.owner,k."updatedAt" AS "validAfter",NULL::bigint AS epoch
       FROM requested JOIN model_api_keys k ON requested.kind='api_key' AND k.id::text=requested.id AND k."ownerId"=requested.owner
-      WHERE k."ownerId"=$1 OR (
+      WHERE to_jsonb(k)->>'revokedAt' IS NULL AND (k."ownerId"=$1 OR (to_jsonb(k)->>'ownership'='organization' AND to_jsonb(k)->>'organizationId'=$8) OR (COALESCE(to_jsonb(k)->>'ownership','personal')='personal' AND
         EXISTS (SELECT 1 FROM model_api_key_shares sh WHERE sh."keyId"=k.id AND sh."workspaceId"::text=$2)
-        AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"::text=$2 AND NOT p.subscriptions))
+        AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"::text=$2 AND NOT p.subscriptions)))
       UNION ALL
       SELECT DISTINCT requested.kind,requested.id,requested.owner,NULL::timestamptz AS "validAfter",c.epoch
       FROM requested JOIN byos_connections c ON requested.kind='subscription' AND c.id::text=requested.id AND c."ownerId"=requested.owner
@@ -95,7 +97,7 @@ export async function providerHealthStates(query: Query, scope: Scope, candidate
       ORDER BY h.kind,h.id,h.harness,h.model,h."beganAt" DESC,h."observedAt" DESC,h."runId" DESC
     )
     SELECT * FROM permanent UNION ALL SELECT * FROM transient`,
-  [scope.ownerId, scope.workspaceId, requested.map(source => source.kind), requested.map(source => source.id), requested.map(source => source.ownerId), requested.map(source => source.harness), requested.map(source => source.model)])
+  [scope.ownerId, scope.workspaceId, requested.map(source => source.kind), requested.map(source => source.id), requested.map(source => source.ownerId), requested.map(source => source.harness), requested.map(source => source.model), organization?.organizationId ?? null])
   for (const row of rows) {
     const block = providerFailureBlock(row.kind, row.failure, row.observedAt, now)
     if (!block) continue

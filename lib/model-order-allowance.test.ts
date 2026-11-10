@@ -42,11 +42,11 @@ test('forced startup refresh uses allowance after its original owner checks', as
   assert.deepEqual([...calls], ['member', 'workspace', 'allowance'])
 })
 
-test('shared startup still checks requester, payer and the share before allowance', async () => {
+test('a legacy shared startup cannot inspect the lender allowance', async () => {
   credentialOwner = 'payer'
   const state = await read()
-  assert.equal(state.get(entry.id)?.credential.usable, true)
-  assert.deepEqual([...calls], ['share', 'member', 'workspace', 'share', 'allowance', 'share'])
+  assert.equal(state.get(entry.id)?.credential.usable, false)
+  assert.deepEqual([...calls], [])
 })
 
 test('membership denial cannot start either allowance or Settings usage', async () => {
@@ -60,7 +60,7 @@ test('share withdrawal cannot start allowance or switch to the requester account
   credentialOwner = 'payer'; shareAllowed = false
   const state = await read()
   assert.equal(state.get(entry.id)?.credential.usable, false)
-  assert.deepEqual([...calls], ['share', 'share'])
+  assert.deepEqual([...calls], [])
 })
 
 test('each completed forced refresh still performs a fresh allowance call', async () => {

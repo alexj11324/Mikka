@@ -10,6 +10,8 @@ import { ActionFailureError } from './action-error'
 import { apiKeyHarnesses } from './model-api-key-providers'
 import { hasStaleOfficialAllowance, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
+import { organizationConnectionAuthority, workspaceModelPolicy } from './organization-connections-access'
+import { organizationModelAllowed, type ModelSource } from './organization-model-policy'
 import {
   agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
   type CredentialState, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
@@ -82,23 +84,16 @@ const sourceId = (entry: Pick<OrderEntry, 'source'>) => entry.source.kind === 's
 export async function orderCandidates(query: Query, scope: OrderScope): Promise<(OrderCandidate & { provider: string; credentialOwnerId: string })[]> {
   const { ExecutionSettings } = await import('./execution-settings')
   const { usableApiKeys } = await import('./model-api-keys')
+  const policy = await workspaceModelPolicy(scope.workspaceId)
   const settings = new ExecutionSettings(query as Pool)
   const rows = await settings.modelCandidates(scope, query)
-  const { pooledOwners } = await import('./personal-policy')
-  const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
-  // Sharing grants use in this workspace, never ownership of the account. Both parties must still
-  // be active members; the owner is derived from server records, never an EntrySource supplied by a client.
-  for (const ownerId of await pooledOwners(query, scope.ownerId, scope.workspaceId)) {
-    try { await authorizeSubscriptionWorkspace(ownerId, scope.workspaceId) } catch { continue }
-    rows.push(...await settings.modelCandidates({ ...scope, ownerId }, query))
-  }
   // Each account's models in the order the account listed them (its catalogue): the default takes the first Codex model.
   const connectionIds = [...new Set(rows.map(row => String(row.connectionId)))]
   const listed = new Map((connectionIds.length ? (await query.query<{ id: string; models: unknown }>(
     `SELECT id::text AS id,"modelCatalog"->'models' AS models FROM byos_connections WHERE id::text = ANY($1) AND "ownerId"=ANY($2::text[])`, [connectionIds, [...new Set(rows.map(row => String(row.ownerId)))]] )).rows : [])
     .map(row => [row.id, Array.isArray(row.models) ? row.models.map(String) : []]))
   const rank = (connectionId: string, model: string) => { const at = listed.get(connectionId)?.indexOf(model) ?? -1; return at < 0 ? Number.MAX_SAFE_INTEGER : at }
-  const subscriptions = rows.map(row => ({
+  const subscriptions = rows.filter(row => row.ownerId === scope.ownerId && organizationModelAllowed(policy, String(row.modelId), 'personal_subscription')).map(row => ({
     harness: (row.provider === 'codex' ? 'codex' : 'claude_code') as OrderHarness, model: String(row.modelId), name: String(row.modelId),
     source: { kind: 'subscription' as const, connectionId: String(row.connectionId) }, provider: String(row.provider), credentialOwnerId: String(row.ownerId),
   })).map((item, at) => ({ item, at })).sort((a, b) => a.item.source.connectionId === b.item.source.connectionId
@@ -110,7 +105,10 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
     source: { kind: 'api_key' as const, keyId: key.id }, provider: key.provider, credentialOwnerId: key.ownerId,
   }))))
   // Claude first, then ChatGPT/Codex, then keys (orchestration.md § 2).
+  const sourceKind = (item: { source: OrderEntry['source']; credentialOwnerId: string }): ModelSource => item.source.kind === 'subscription' ? 'personal_subscription'
+    : item.credentialOwnerId.startsWith('organization:') ? 'organization' : item.credentialOwnerId === scope.ownerId ? 'personal_api_key' : 'shared_api_key'
   const ordered = [...subscriptions.filter(item => item.provider === 'claude'), ...subscriptions.filter(item => item.provider !== 'claude'), ...keys]
+    .sort((a, b) => policy.sourceOrder.indexOf(sourceKind(a)) - policy.sourceOrder.indexOf(sourceKind(b)))
   return [...new Map(ordered.map(item => [entryKey(item), item])).values()]
 }
 
@@ -127,17 +125,14 @@ export async function selectedOrderCandidates(query: Query, scope: OrderScope, e
       .map(key => ({ harness: entry.harness, model: entry.model, name: entry.model,
         source: { kind: 'api_key' as const, keyId: key.id }, provider: key.provider, credentialOwnerId: key.ownerId }))
   }
+  if (!organizationModelAllowed(await workspaceModelPolicy(scope.workspaceId), entry.model, 'personal_subscription')) return []
   const { runMayUseCredentialSql } = await import('./personal-policy')
-  // Derive the payor only from the exact source and its current workspace share.
-  // The source owner's active membership is still checked before its catalogue.
+  // Only the exact personal Owner source is eligible; historical workspace
+  // grants cannot authorize a foreign catalogue read.
   const { rows: [source] } = await query.query<{ ownerId: string }>(`SELECT c."ownerId" FROM byos_connections c
     WHERE c.id=$1 AND ${runMayUseCredentialSql('c."ownerId"', '$2', '$3')}`,
   [entry.source.connectionId, scope.ownerId, scope.workspaceId])
-  if (!source) return []
-  if (source.ownerId !== scope.ownerId) {
-    const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
-    try { await authorizeSubscriptionWorkspace(source.ownerId, scope.workspaceId) } catch { return [] }
-  }
+  if (!source || source.ownerId !== scope.ownerId) return []
   const { executionModelOptions } = await import('./execution-model-options')
   return (await executionModelOptions(query, { ...scope, ownerId: source.ownerId }, true,
     { connectionId: entry.source.connectionId, model: entry.model }))
@@ -158,7 +153,7 @@ export async function readOrder(query: Query, scope: OrderScope, candidates?: (O
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
     const available = latestDefaultCandidates(candidates ?? await orderCandidates(query, scope))
-    const defaults = defaultOrderByAgent(available, settings.preferredHarness)
+    const defaults = defaultOrderByAgent(available, settings.preferredHarness, true)
     // Include lighter reported models from the default credentials without
     // silently adding a different paid key. Turning routing off restores each
     // Agent's default list; saved lists remain exactly as set.
@@ -185,11 +180,11 @@ export { dispatchOrder } from './model-order-plan'
 
 export type RefreshOrderQuota = (scope: OrderScope, connectionId: string, signal: AbortSignal, credentialOwnerId?: string) => Promise<void>
 const quotaRefreshes = new WeakMap<Query, Map<string, Promise<void>>>()
-const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, connectionId, signal, credentialOwnerId = scope.ownerId) => {
+const refreshOrderQuota = (_query: Query): RefreshOrderQuota => async (scope, connectionId, signal, credentialOwnerId = scope.ownerId) => {
+  if (credentialOwnerId !== scope.ownerId) throw new ActionFailureError('executionAccountUnavailable')
   const service = (await import('./subscription-runtime')).subscriptionRuntime()
   await service.member(scope.ownerId, scope.workspaceId)
   await service.workspace(credentialOwnerId, scope.workspaceId)
-  if (credentialOwnerId !== scope.ownerId && !(await (await import('./personal-policy')).othersMayUse(query, credentialOwnerId, scope.workspaceId))) throw new ActionFailureError('executionAccountUnavailable')
   await service.allowance(credentialOwnerId, connectionId, signal)
 }
 
@@ -215,7 +210,7 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     ? [[candidate.source.keyId, candidate.credentialOwnerId ?? scope.ownerId] as const] : []))
   const readConnections = async () => {
     const authorized = [] as [string, string][]
-    for (const [id, owner] of owners) if (owner === scope.ownerId || await (await import('./personal-policy')).othersMayUse(query, owner, scope.workspaceId)) authorized.push([id, owner])
+    for (const [id, owner] of owners) if (owner === scope.ownerId) authorized.push([id, owner])
     return new Map((authorized.length ? (await query.query<{ id: string; ownerId: string; state: string; paused: boolean; quota: unknown; provider: 'claude' | 'codex'; epoch: string; removed: boolean }>(
       'SELECT c.id::text AS id,c."ownerId",c.state,c.paused,c.quota,c.provider,c.epoch::text AS epoch,c."removedAt" IS NOT NULL AS removed FROM byos_connections c JOIN unnest($1::text[],$2::text[]) AS authorized(id,owner) ON c.id::text=authorized.id AND c."ownerId"=authorized.owner', [authorized.map(([id]) => id), authorized.map(([, owner]) => owner)])).rows : []).map(row => [row.id, row]))
   }
@@ -238,12 +233,14 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     connections = await readConnections()
     checkedAt = now ?? Date.now()
   }
+  const organization = [...keyOwners.values()].some(owner => owner.startsWith('organization:')) ? await organizationConnectionAuthority(scope.workspaceId, scope.ownerId) : null
   const keys = new Map((keyOwners.size ? (await query.query<{ id: string; modelsError: string | null; provider: string }>(
     `SELECT k.id::text AS id,k."modelsError",k.provider FROM model_api_keys k
       JOIN unnest($1::text[],$2::text[]) AS authorized(id,owner) ON k.id::text=authorized.id AND k."ownerId"=authorized.owner
-      WHERE k."ownerId"=$3 OR (EXISTS (SELECT 1 FROM model_api_key_shares sh WHERE sh."keyId"=k.id AND sh."workspaceId"::text=$4)
-        AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"::text=$4 AND NOT p.subscriptions))`,
-    [[...keyOwners.keys()], [...keyOwners.values()], scope.ownerId, scope.workspaceId])).rows : []).map(row => [row.id, row]))
+      WHERE to_jsonb(k)->>'revokedAt' IS NULL AND (k."ownerId"=$3 OR (to_jsonb(k)->>'ownership'='organization' AND to_jsonb(k)->>'organizationId'=$5)
+        OR (COALESCE(to_jsonb(k)->>'ownership','personal')='personal' AND EXISTS (SELECT 1 FROM model_api_key_shares sh WHERE sh."keyId"=k.id AND sh."workspaceId"::text=$4)
+        AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"::text=$4 AND NOT p.subscriptions)))`,
+    [[...keyOwners.keys()], [...keyOwners.values()], scope.ownerId, scope.workspaceId, organization?.organizationId ?? null])).rows : []).map(row => [row.id, row]))
   const health = await providerHealthStates(query, scope, authorizedCandidates, checkedAt)
   const states = new Map<string, { credential: CredentialState; provider: string; quotaCheckPending?: true }>()
   for (const entry of entries) {

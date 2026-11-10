@@ -1,9 +1,10 @@
 import { mobileMessages } from '@/lib/messages'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { CalendarClock, ChevronRight, Sparkles } from 'lucide-react-native'
+import { CalendarClock, ChevronRight, Sparkles, UsersRound } from 'lucide-react-native'
+import { ResourceAccessSheet } from '@/components/ResourceAccessSheet'
 import { BotAvatar, MachineIcon, Spinner } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -44,6 +45,7 @@ export function TaskScreen() {
   const home = useHome().data
   const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
   const task = data?.task
+  const [accessOpen,setAccessOpen]=useState(false)
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null
   // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
@@ -60,7 +62,7 @@ export function TaskScreen() {
 
   return (
     <View style={styles.screen}>
-      <NavBar scrolled={bar.scrolled} />
+      <NavBar scrolled={bar.scrolled} right={task?{icon:'person.2',label:mobileMessages.ResourceAccess.manage,web:<UsersRound size={18} color={colors.ink} />,onPress:()=>setAccessOpen(true)}:undefined} />
       <ScrollView {...underBar} onScroll={bar.onScroll} scrollEventThrottle={16} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 96 }]}>
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />
         {loading && !data ? <View style={styles.center}><Spinner /></View> : null}
@@ -87,12 +89,13 @@ export function TaskScreen() {
           </>
         ) : null}
       </ScrollView>
-      {task ? (
+      {task&&data.capabilities?.canComment!==false ? (
         <View pointerEvents="box-none" style={[styles.commentWrap, { bottom: insets.bottom + 12 }]}>
           {/* Comments are written on the web for now: the app has no comment route yet (#1671). */}
           <GlassButton label={mobileMessages.MobileCore.comment} onPress={() => void openOnWeb(`/?issue=${task.id}`)} />
         </View>
       ) : null}
+      {task?<ResourceAccessSheet kind="task" id={id} open={accessOpen} onDismiss={()=>setAccessOpen(false)} />:null}
     </View>
   )
 }

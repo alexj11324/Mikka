@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { auth } from '@/lib/api-auth'
+import { authenticatedArtifactReader } from '@/lib/artifacts/route'
 import { runEvidence } from '@/lib/captures/store'
 import { withBasePath } from '@/lib/base-path'
 import { runOutsideToken } from '@/lib/tokens/scope'
@@ -13,11 +13,11 @@ export const dynamic = 'force-dynamic'
  * documents it handed over. Only the run's owner reads it (R-62).
  */
 export async function GET(request: Request, { params }: { params: Promise<{ runId: string }> }) {
-  const session = await auth.api.getSession({ headers: request.headers })
+  const reader = await authenticatedArtifactReader(request.headers)
   const headers = { 'cache-control': 'private, no-store' }
-  if (!session?.user) return NextResponse.json({ error: 'Sign in required' }, { status: 401, headers })
+  if (!reader) return NextResponse.json({ error: 'Sign in required' }, { status: 401, headers })
   const { runId } = await params
-  const found = z.uuid().safeParse(runId).success && !await runOutsideToken(session.user, runId) ? await runEvidence(session.user.id, runId) : null
+  const found = z.uuid().safeParse(runId).success && !await runOutsideToken(reader, runId) ? await runEvidence(reader, runId) : null
   if (!found) return NextResponse.json({ error: 'Not found' }, { status: 404, headers })
   // This opt-in view is for a real candidate's one-use bootstrap. Ordinary
   // evidence retains its original query and response, without loading this path.
@@ -29,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ runI
     if (!parsed.success || [...query.keys()].length !== Object.keys(parsed.data).length)
       return NextResponse.json({ error: 'Invalid bootstrap evidence request' }, { status: 400, headers })
     const { pool } = await import('@/lib/db')
-    bootstrap = await readRunBootstrapEvidence(pool, session.user.id, runId, parsed.data)
+    bootstrap = await readRunBootstrapEvidence(pool, reader.id, runId, parsed.data)
     if (!bootstrap) return NextResponse.json({ error: 'Not found' }, { status: 404, headers })
   }
   return NextResponse.json({

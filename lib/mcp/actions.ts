@@ -18,7 +18,8 @@ import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import { editMemory } from '@/lib/coordinator/store'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, runChunks, teamIssuePromotions } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorSessions, coordinatorEvents, devices, issueMembers, issues, runChunks, teamIssuePromotions } from '@/lib/db/schema'
+import { taskCreationSchema } from '@/lib/task-destination'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -138,10 +139,13 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     // multi-action write without the durable transaction and access checks.
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     if (teamId && toolCallId === undefined) return { error: 'validationGeneric' }
-    const mutate = async () => {
-      const fields = { title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' }
+    const mutate = async (source?:typeof coordinatorEvents.$inferSelect) => {
+      const creation=source?taskCreationSchema.optional().parse(source.payload.taskCreation):undefined
+      const projectId=creation?.projectId??input.projectId??undefined
+      const fields = { title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal',
+        ...(creation?{visibility:creation.visibility}:source?{visibility:source.payload.taskDestination?'shared' as const:'private' as const}:{}),...(projectId?{projectId}:{}) }
       const created = unwrap(await saveIssue(fields)).issue
-      return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))
+      return issueResult(await applyChanges(userId, created.id, { projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))
     }
     if (toolCallId === undefined) return mutate()
     if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }

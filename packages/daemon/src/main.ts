@@ -457,6 +457,7 @@ export class Daemon {
         })
       : undefined
     this.hostedBinaries = hosted?.binaries
+    this.options.link.setNativeCredentialIsolation?.(hosted?.nativeCredentialIsolation === true)
     const preloadedModels = hosted && this.modelProbeOn()
       ? reusableHostedModels(this.options.preloadedModels, hosted.binaries) : undefined
     if (preloadedModels) {
@@ -511,6 +512,7 @@ export class Daemon {
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,
+      ...(hosted?.nativeCredentialIsolation ? { nativeCredentialIsolation: 'tools_v1' as const } : {}),
       startSubscription: hosted?.start ?? this.localSubscriptions()?.start,
       startCredential: hosted?.start,
       prepareSubscription: hosted?.prepare,
@@ -528,7 +530,7 @@ export class Daemon {
         return this.options.link.verifyRunPolicy!(assignment,signal)
       } : undefined,
       bootstrap: hosted
-        ? async (worktree, repo) => {
+        ? async (worktree, repo, assignment) => {
             if (
               repo.setup?.copyFiles.some((path) =>
                 /(^|\/)(\.git|\.codex\/auth\.json|\.claude\/\.credentials\.json)(\/|$)/.test(
@@ -547,7 +549,10 @@ export class Daemon {
                 worktree,
                 repo.setup.command,
                 false,
-                30 * 60_000
+                30 * 60_000,
+                undefined,
+                assignment ? { runId: assignment.runId, nativeCredentialIsolation: assignment.nativeCredentialIsolation,
+                  readRoots: [repo.path], taskEnv: assignment.taskEnv } : undefined
               )
               if (checked.exitCode !== 0) throw new Error("hosted_setup_failed")
             }
@@ -576,7 +581,8 @@ export class Daemon {
               run.command,
               run.readOnly,
               run.timeoutMs,
-              run.signal
+              run.signal,
+              { runId: run.runId, nativeCredentialIsolation: run.nativeCredentialIsolation, readRoots: [run.repo.path], taskEnv: run.taskEnv }
             )
         : this.verifier(),
       publisher: {

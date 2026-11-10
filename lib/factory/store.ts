@@ -1,4 +1,5 @@
 import { factoryEventId } from "./event-id";
+import { factoryContentReadable } from './resource-access';
 import { readIssueMetadata } from "../issue-metadata";
 import type { JSONContent } from "@tiptap/core";
 import { factoryNextStage, factoryReviewPerformed } from './flow'
@@ -207,6 +208,8 @@ export type FactoryGates = Partial<
 >;
 /** Host-installed callbacks run inside the authorized task transaction. */
 export interface FactoryLifecycle {
+  /** Installed only by the authenticated human facade; no runtime write authority. */
+  sharedReads?: boolean;
   gates?: FactoryGates;
   onTransition?: (tx: PoolClient, task: FactoryTask) => Promise<void>;
   independent?: (tx: PoolClient, task: FactoryTask, runId: string) => Promise<boolean>;
@@ -279,8 +282,8 @@ export function createFactoryStore(
     } = await tx.query<FactoryTask>(
       lock
         ? 'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE'
-        : 'SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2',
-      [taskId, userId],
+        : 'SELECT * FROM factory_tasks WHERE id=$1 AND ("userId"=$2 OR $3::boolean)',
+      lock ? [taskId, userId] : [taskId, userId, lifecycle?.sharedReads === true],
     );
     const issue = task ? await lockedIssue(tx, task.issueId, lock) : undefined;
     if (
@@ -288,7 +291,8 @@ export function createFactoryStore(
       (task.botId !== botId && (lock || readScope === "bot")) ||
       !factoryScopeAllows(task, issue) ||
       !(await authorize(userId, task.issueId, tx)) ||
-      !(await sourceAllowed(tx, userId, task.sourceEventId, task.issueId, lock, task.botId))
+      !(await sourceAllowed(tx, task.userId, task.sourceEventId, task.issueId, lock, task.botId)) ||
+      (!lock && !(await factoryContentReadable(tx, task, userId)))
     )
       fail("factoryNotFound");
     return task;
@@ -421,14 +425,18 @@ export function createFactoryStore(
       if (!issue || !(await authorize(userId, issueId, tx, issue))) fail("factoryNotFound");
       // The newest 50 count every task of the issue; the issue's current scope then decides which are listed.
       const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null; candidateSha: string | null; publication: PublicationRow | null; inScope: boolean }>(
-        'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate", (i."ownershipState"=\'bound\' AND t."workspaceId"=i."workspaceId") AS "inScope" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND ($4::boolean OR (t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."ownershipState"=\'bound\' AND t."workspaceId"=i."workspaceId"))) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
-        [userId, issueId, botId, anyBot],
+        'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate", (i."ownershipState"=\'bound\' AND t."workspaceId"=i."workspaceId") AS "inScope" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE (t."userId"=$1 OR $5::boolean) AND t."issueId"=$2 AND ($4::boolean OR (t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."ownershipState"=\'bound\' AND t."workspaceId"=i."workspaceId"))) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
+        [userId, issueId, botId, anyBot, lifecycle?.sharedReads === true],
       );
-      const listed = rows.filter(row => row.inScope && factoryScopeAllows(row, issue));
+      const structural = rows.filter(row => row.inScope && factoryScopeAllows(row, issue));
+      const { factoryReadableTasks } = await import('./resource-access');
+      const readable = await factoryReadableTasks(tx, structural, userId);
+      const listed = structural.filter(row => readable.has(row.id));
       // Each task's source message, from its own Bot's chat (or the unscoped chat), in one read.
       const sources = listed.some(row => row.sourceEventId) ? (await tx.query<{ id: string; botId: string | null }>(
-        `SELECT e.id,e."botId" FROM coordinator_events e WHERE e.id=ANY($1::uuid[]) AND e."userId"=$2 AND e.kind='user_message' AND (e."issueId" IS NULL OR e."issueId"=$3) AND (e."botId" IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=e."botId" AND b."ownerId"=$2))`,
-        [[...new Set(listed.flatMap(row => row.sourceEventId ? [row.sourceEventId] : []))], userId, issueId],
+        `SELECT e.id,e."botId" FROM coordinator_events e WHERE e.id=ANY($1::uuid[])
+          AND (e."userId"=$2 OR ($4::boolean AND EXISTS(SELECT 1 FROM factory_tasks t WHERE t."sourceEventId"=e.id AND t."issueId"=$3 AND t."userId"=e."userId"))) AND e.kind='user_message' AND (e."issueId" IS NULL OR e."issueId"=$3) AND (e."botId" IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=e."botId" AND b."ownerId"=e."userId"))`,
+        [[...new Set(listed.flatMap(row => row.sourceEventId ? [row.sourceEventId] : []))], userId, issueId, lifecycle?.sharedReads === true],
       )).rows : [];
       const authorized = listed.filter(row => sources.some(source => source.id === row.sourceEventId && source.botId === (row.botId ?? null)));
       const states = await readFactoryFlowStates(tx, publicFlow ? authorized.filter(row => factoryFlowVersion(row) === 2) : []);
@@ -440,7 +448,7 @@ export function createFactoryStore(
           continue;
         }
         const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
-        const completionRecovery = (await completedRunForRecovery(tx, row)) || (await retainedDeliverableForRecovery(tx, row)) ? { binding: { taskId: id, revision } } : undefined;
+        const completionRecovery = row.userId === userId && ((await completedRunForRecovery(tx, row)) || (await retainedDeliverableForRecovery(tx, row))) ? { binding: { taskId: id, revision } } : undefined;
         tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication),...(completionRecovery ? { completionRecovery } : {})});
       }
       return { contractVersion: 1 as const, issueId, tasks };
@@ -537,6 +545,11 @@ export function createFactoryStore(
         const task = await owned(tx, userId, taskId, false);
         const value = await snapshot(tx, task);
         const dispatchRecovery = await checkDispatchRecovery(tx, value);
+        if (task.userId !== userId) {
+          const detail = await factoryTaskDetail(tx, task);
+          return { ...value, attempts: value.attempts.map(attempt => ({ ...attempt, sessionId: null })),
+            ...detail, delivery: { ...detail.delivery, machineName: null, environment: null, mergeAs: null } };
+        }
         return {
           ...value,
           ...(await factoryTaskDetail(tx, task)),

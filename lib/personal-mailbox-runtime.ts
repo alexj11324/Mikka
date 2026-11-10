@@ -17,6 +17,7 @@ import { workspacePool } from './workspace-db'
 import { acquireWorkspaceMembership } from './workspace-membership-guard'
 import type { MailboxTransactionGuard } from './mailbox-transaction-guard'
 import { mailboxTriggerDepth, MAILBOX_NOTIFICATION_LIMIT } from './mailbox-notification-budget'
+import { runPersonalResourcesAllowed } from './run-private-resources'
 export { personalMailboxEnabled } from './personal-mailbox-config'
 
 // Both personal Coordinator and Bot calls get cancellation/deadline custody.
@@ -51,6 +52,7 @@ export async function personalConversationMailboxAdvertised(userId: string, botI
  * independently of model arguments. A global flag cannot widen old snapshots. */
 export async function personalWorkerMailboxAdvertised(userId: string, runId: string): Promise<MailboxToolName[]> {
   if (!personalMailboxEnabled()) return []
+  if (!await runPersonalResourcesAllowed(pool, runId, userId)) return []
   const run = await workerRecord(userId, runId)
   const lease = run?.leaseExpiresAt == null ? NaN : new Date(run.leaseExpiresAt).getTime()
   const valid = Boolean(run?.deviceId && (!run.botId || run.workspaceId) && !run.stopRequestedAt && Number.isFinite(lease) && lease > Date.now()
@@ -70,6 +72,7 @@ export async function maskWorkerMailboxInput(runId: string, rawInput: unknown): 
 export async function personalWorkerMailbox(userId: string, runId: string, rawInput: unknown, verifiedToken: string, signal?: AbortSignal) {
   // 4e2 item 4: a run's outgoing peer message text is stored; mask it with the run's secret set (MCP and HTTP paths).
   if (!personalMailboxEnabled()) return { status: 503, body: { error: 'personal_mailbox_unavailable' } }
+  if (!await runPersonalResourcesAllowed(pool, runId, userId)) return { status: 403, body: { error: 'Personal mailbox is unavailable in a shared execution' } }
   // Resolve the existing private Bot namespace from trusted records, never a
   // body field. Unbound runs retain main's existing device namespace.
   const run = await workerRecord(userId, runId)

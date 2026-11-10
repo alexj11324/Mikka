@@ -21,6 +21,8 @@ export type ThreadHeaderProps = {
   onStop: (() => void) | null
   /** Open its task, beside a chat; undefined elsewhere. */
   onOpenTask?: () => void
+  /** Opens the existing resource access dialog from the header's actions menu. */
+  onManageAccess?: () => void
   /** Where it runs and its Agent (ThreadRunPlace); null before the thread is read. */
   place: ReactNode
   /** The acceptance state badge, for a Factory candidate; null otherwise. */

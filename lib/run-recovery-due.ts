@@ -23,13 +23,20 @@ const MACHINE_RECHECK = '10 minutes'
 export const OUTCOME_RETRY_AT_SQL = `("outcomeAt" + greatest(interval '1 hour', "outcomeAt" - coalesce("finishedAt", "updatedAt")))`
 
 /** The run-recovery sweeps (lib/run-recovery.ts), as RUN_RECOVERY_DUE_SQL labels each due time. */
-export const RUN_RECOVERY_SWEEPS = ['leases', 'machines', 'outcomes', 'taskMachines', 'sandboxKills', 'groupTurns', 'tasks'] as const
+export const RUN_RECOVERY_SWEEPS = ['leases', 'machines', 'outcomes', 'taskMachines', 'sandboxKills', 'groupTurns', 'tasks', 'resourceAccess'] as const
 export type RunRecoverySweep = typeof RUN_RECOVERY_SWEEPS[number]
 
 /** Each run-recovery due time, as rows of `at` and the `sweep` that does it; parameters $1-$4 come from runRecoveryDueParams. */
 export const RUN_RECOVERY_DUE_SQL = `
+    SELECT min("expiresAt") AS at, 'resourceAccess' AS sweep FROM resource_access_grants WHERE "expiresAt" IS NOT NULL
+    UNION ALL SELECT min("expiresAt"), 'resourceAccess' FROM thread_execution_grants WHERE "revokedAt" IS NULL
+    UNION ALL SELECT min(least(a."expiresAt",g."expiresAt",coalesce(s."expiresAt",now()),
+      CASE WHEN g."revokedAt" IS NOT NULL THEN now() END)), 'resourceAccess'
+      FROM thread_execution_authorizations a JOIN thread_execution_grants g ON g.id=a."grantId"
+      LEFT JOIN "session" s ON s.id=a."sessionId" AND s."userId"=a."actorId" WHERE a."releasedAt" IS NULL
+    UNION ALL SELECT min("createdAt"), 'resourceAccess' FROM resource_session_revocations WHERE "deliveredAt" IS NULL
     -- sweepExpiredRunLeases: a lease is lost once leaseExpiresAt < now.
-    SELECT min("leaseExpiresAt") + interval '1 millisecond' AS at, 'leases' AS sweep FROM agent_runs WHERE status = ANY($1::text[]) AND "leaseExpiresAt" IS NOT NULL
+    UNION ALL SELECT min("leaseExpiresAt") + interval '1 millisecond', 'leases' FROM agent_runs WHERE status = ANY($1::text[]) AND "leaseExpiresAt" IS NOT NULL
     -- ... and a queued retry whose device stopped being seen (the gateway is asked again each minute).
     UNION ALL SELECT min(CASE WHEN d."lastSeenAt" <= now() AND d."lastSeenAt" + $2::interval > now() THEN d."lastSeenAt" + $2::interval + interval '1 millisecond' ELSE now() + interval '${RECHECK}' END), 'leases'
       FROM agent_runs r LEFT JOIN devices d ON d.id = r."deviceId" WHERE r.status = 'queued' AND r."retryOf" IS NOT NULL

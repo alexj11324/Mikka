@@ -14,6 +14,7 @@ import { issueForUser } from "@/lib/issue-access";
 import { issueTeamAccess } from "@/lib/issue-team-access";
 import { activeTaskWorkspaces, taskReaderScope } from "@/lib/task-workspace";
 import { factoryWorkspaceReader } from './workspace-reader';
+import { resourceActionAllowed } from '@/lib/resource-access/store';
 import { lockCliAgentPolicy, prelockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
 import { createFactoryStore } from "./store";
 import { createFactoryHumanStore } from './human-store';
@@ -47,7 +48,8 @@ const authorize: FactoryAuthorize = (userId, issueId, tx, lockedIssue) => withDa
       const link = await issueTeamAccess(issueId, userId);
       const allowed = await activeTaskWorkspaces(reader, workspaceId);
       return allowed.some(workspace => workspace.id === workspaceId)
-        && (!link.linked || link.workspaceId === workspaceId);
+        && (!link.linked || link.workspaceId === workspaceId)
+        && await resourceActionAllowed(drizzle(tx), userId, { kind: 'task', id: issueId, workspaceId }, 'canReadContent');
     }
     return Boolean(await issueForUser(reader, issueId, false, drizzle(tx)));
   }
@@ -62,7 +64,7 @@ const humanGates = {
 };
 const backgroundWorkspace = factoryTaskWorkspaceBoundary(pool, null);
 export const factoryStore = bindFactoryStoreWorkspace(pool, createFactoryStore(pool, authorize, humanGates, { onTransition: syncFactoryPresentation }), null);
-const humanStoreForBot = (botId: string | null) => createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: humanGates, onTransition: syncFactoryPresentation });
+const humanStoreForBot = (botId: string | null) => createFactoryStore(pool, authorize, botId, { sharedReads: true, independent: factoryCheckIndependent, gates: humanGates, onTransition: syncFactoryPresentation });
 export const factoryHumanStore = createFactoryHumanStore(pool, humanStoreForBot, automaticFactoryDispatch(pool),
   createRetainedDeliverableObserver(pool, (tx, scope) => humanStoreForBot(scope.botId).lockTask(tx, scope.ownerId, scope.taskId)));
 // #528: a code candidate is accepted by the person's merge of its PR

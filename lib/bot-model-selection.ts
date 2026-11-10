@@ -3,10 +3,11 @@ import { pool } from "./db";
 import { ActionFailureError } from "./action-error";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { COORDINATOR_MODEL } from "./coordinator/model";
-import { botApiKeyChoice, usableApiKeys } from "./model-api-keys";
+import { assertHostedApiKeyAuthority, botApiKeyChoice, usableApiKeys } from "./model-api-keys";
 import { apiKeyServesBotModel, resolveBotModelChoice } from "./bot-model-choice";
 import {
   freezeHostedModelSelection,
+  assertHostedActor,
   hostedApiKeySnapshotSchema,
   type HostedModelDependencies,
   type HostedModelScope,
@@ -18,6 +19,7 @@ export async function freezeBotModel(
   scope: HostedModelScope,
   dependencies: HostedModelDependencies,
 ): Promise<HostedRuntimeSnapshot> {
+  assertHostedActor(scope);
   const workspaceId =
     scope.workspaceId ?? (await executionWorkspace(scope.ownerId, scope.botId));
   const settings = new ExecutionSettings(pool);
@@ -30,17 +32,28 @@ export async function freezeBotModel(
   // botModel creates the initial per-bot binding; a valid saved key keeps its
   // existing precedence and needs no subscription default written.
   const savedKey = keyChoice && keys.find(key => key.id === keyChoice.keyId && apiKeyServesBotModel(key, keyChoice.model));
+  if (scope.actorId !== scope.ownerId && savedKey?.ownership !== 'organization') throw new ActionFailureError('executionModelUnknown');
   const selected = savedKey ? undefined : await settings.botModel(settingsScope, scope.botId);
   const choice = await resolveBotModelChoice(pool, settings, settingsScope, scope.botId,
     { selected, key: keyChoice }, { keys });
-  if (choice.kind === "hosted") return { harness: "ai_sdk", model: COORDINATOR_MODEL };
-  if (choice.kind === "apiKey")
+  // A disappeared/revoked explicit credential needs a new choice. It cannot
+  // silently move the next turn to another model or payer.
+  if (choice.fallback === 'preference' && (keyChoice || selected)) throw new ActionFailureError('executionModelUnknown');
+  if (choice.kind === "hosted") {
+    if (scope.actorId !== scope.ownerId) throw new ActionFailureError('executionModelUnknown');
+    return { harness: "ai_sdk", model: COORDINATOR_MODEL, actorId: scope.actorId };
+  }
+  if (choice.kind === "apiKey") {
+    await assertHostedApiKeyAuthority(pool, { ...scope, workspaceId }, choice.key.id, choice.model);
     return {
       harness: "ai_sdk",
       model: choice.model,
+      actorId: scope.actorId,
       modelSelection: hostedApiKeySnapshotSchema.parse({
         ...(scope.botId === null ? { coordinator: true } : { consumerId: scope.botId }),
-        type: "api_key", keyId: choice.key.id, ownerId: scope.ownerId, workspaceId, modelId: choice.model,
+        type: "api_key", keyId: choice.key.id, ownerId: scope.ownerId, actorId: scope.actorId, workspaceId, modelId: choice.model,
+        ...(choice.key.revision !== undefined ? { credentialOwnerId: choice.key.ownerId, credentialRevision: choice.key.revision } : {}),
+        ...(choice.key.organizationId ? { organizationId: choice.key.organizationId } : {}),
         ...(choice.fallback === "points" ? { afterPoints: true } : {}),
         ...(choice.quota ? { afterQuota: {
           subscription: choice.quota.subscription === "codex" ? "codex" : "claude",
@@ -50,15 +63,13 @@ export async function freezeBotModel(
         } } : {}),
       }),
     };
-  const bindingId = choice.sharedOwnerId && scope.botId
-    ? await settings.bindingForOthersBot(settingsScope, scope.botId, choice.sharedOwnerId, choice.binding.bindingId)
-    : await settings.bindingForBot(settingsScope, scope.botId, choice.binding.bindingId);
+  }
+  const bindingId = await settings.bindingForBot(settingsScope, scope.botId, choice.binding.bindingId);
   const frozen = await freezeHostedModelSelection(
     { ...scope, workspaceId },
     { harness: "ai_sdk", model: null },
     { type: "subscription", bindingId },
     dependencies,
-    choice.sharedOwnerId,
   );
   return choice.fallback === "points" && frozen.modelSelection
     ? { ...frozen, modelSelection: { ...frozen.modelSelection, afterPoints: true } }

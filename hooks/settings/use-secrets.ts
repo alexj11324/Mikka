@@ -20,9 +20,12 @@ import { useActionError } from '@/lib/use-action-error'
 // Shared by the open-source page and the hosted layer (docs/ui-overlay.md); the
 // pages keep only their markup.
 
-export type SecretScope = 'workspace' | 'repository'
+export type SecretScope = 'workspace' | 'repository' | 'project' | 'thread'
 export const SECRET_REPOSITORY = /^[^/\s]+\/[^/\s]+$/
-export const secretScopeInput = (scope: SecretScope, repository: string) => scope === 'workspace' ? { type: 'workspace' as const } : { type: 'repository' as const, repository: repository.trim() }
+export const secretScopeInput = (scope: SecretScope, reference: string) => scope === 'workspace' ? { type: 'workspace' as const }
+  : scope === 'project' ? { type: 'project' as const, projectId: reference.trim() }
+    : scope === 'thread' ? { type: 'thread' as const, threadId: reference.trim() }
+      : { type: 'repository' as const, repository: reference.trim() }
 
 /** The scopes this reader may write: admins pick; a member writes repository entries only. */
 export function writableScopes(role: WorkspaceRole): SecretScope[] {

@@ -22,6 +22,8 @@ const value = z.string().min(1).refine(text => Buffer.byteLength(text) <= SECRET
 export const secretScope = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workspace') }).strict(),
   z.object({ type: z.literal('repository'), repository: repositoryRef }).strict(),
+  z.object({ type: z.literal('project'), projectId: z.uuid() }).strict(),
+  z.object({ type: z.literal('thread'), threadId: z.uuid() }).strict(),
 ])
 export type SecretScope = z.infer<typeof secretScope>
 export type SecretScopeType = SecretScope['type']
@@ -70,6 +72,8 @@ export const USER_SECRETS_LIMIT = 500
 
 export const scopeColumns = (scope: SecretScope) => scope.type === 'workspace'
   ? { scopeType: 'workspace' as const, scopeRef: '' }
-  : { scopeType: 'repository' as const, scopeRef: scope.repository }
+  : scope.type === 'repository' ? { scopeType: 'repository' as const, scopeRef: scope.repository }
+    : scope.type === 'project' ? { scopeType: 'project' as const, scopeRef: scope.projectId.toLowerCase() }
+      : { scopeType: 'thread' as const, scopeRef: scope.threadId.toLowerCase() }
 
 export const e2bKeyInput = z.object({ apiKey: z.string().trim().min(8).max(200).regex(/^\S+$/) }).strict()

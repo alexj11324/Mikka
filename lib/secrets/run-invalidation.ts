@@ -8,10 +8,11 @@ import type { SecretsTx } from './store'
 
 export type SecretChange = { name: string } & (
   | { ownerId: string }
-  | { workspaceId: string; scopeType: 'workspace' | 'repository'; scopeRef: string }
+  | { workspaceId: string; scopeType: 'workspace' | 'repository' | 'project' | 'thread'; scopeRef: string }
 )
 
-type Candidate = { id: string; userId: string; deviceId: string; workspaceId: string | null; remoteUrl: string | null }
+type Candidate = { id: string; userId: string; deviceId: string; workspaceId: string | null; remoteUrl: string | null;
+  personalResources: boolean; scopes: string[] }
 const key = (...parts: (string | null)[]) => JSON.stringify(parts)
 
 /**
@@ -28,7 +29,12 @@ export async function stopRunsForSecretChanges(tx: SecretsTx, changes: readonly 
   // null nor a device-token change can move a task's Secret consumption.
   const workspace = sql`r."workspaceId"::text`
   const { rows: candidates } = await tx.execute<Candidate>(sql`
-    SELECT r.id,r."userId",r."deviceId",${workspace} AS "workspaceId",
+    SELECT r.id,r."userId",r."deviceId",${workspace} AS "workspaceId",mikka_run_personal_resources_allowed(r.id) AS "personalResources",
+      ARRAY(WITH RECURSIVE ancestry AS (
+        SELECT p.*,0 AS depth FROM resource_access_policies p WHERE p.kind='thread' AND p.id=r.id
+        UNION ALL SELECT p.*,a.depth+1 FROM ancestry a JOIN resource_access_policies p
+          ON p.kind=a."parentKind" AND p.id=a."parentId" WHERE a.depth<32
+      ) SELECT kind||':'||id::text FROM ancestry) AS scopes,
       CASE WHEN r."agentDefinition" ? 'repositoryAdmission' THEN r."agentDefinition"->'repositoryAdmission'->>'remoteUrl'
         ELSE repo."remoteUrl" END AS "remoteUrl"
     FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
@@ -49,8 +55,10 @@ export async function stopRunsForSecretChanges(tx: SecretsTx, changes: readonly 
   const ids = candidates.filter(run => {
     const repository = remoteRepositoryRef(run.remoteUrl)
     return changes.some(change => {
-      if ('ownerId' in change) return change.ownerId === run.userId
-      if (run.workspaceId !== change.workspaceId || personal.has(key(run.userId, change.name))) return false
+      if ('ownerId' in change) return change.ownerId === run.userId && run.personalResources
+      if (run.workspaceId !== change.workspaceId) return false
+      if (change.scopeType === 'project' || change.scopeType === 'thread') return run.scopes.includes(`${change.scopeType}:${change.scopeRef}`)
+      if (run.personalResources && personal.has(key(run.userId, change.name))) return false
       return change.scopeType === 'repository' ? repository === change.scopeRef
         : !repository || !repositories.has(key(change.workspaceId, repository, change.name))
     })

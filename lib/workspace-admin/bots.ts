@@ -7,14 +7,16 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { issueVisibility } from '@/lib/issue-visibility'
+import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
+import { activeTaskWorkspaces, taskReaderScope } from '@/lib/task-workspace'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 import { botThreadsInput, botThreadHref, botThreadTitle, decodeBotThreadCursor, encodeBotThreadCursor } from '@/lib/workspace-admin/bot-threads'
 
 export interface BotDefaults { defaultModel: WorkspaceBotModel | null; defaultRepository: string | null }
 export interface BotDefaultOptions extends BotDefaults {
   /** 'mikka' is Mikka's hosted model; 'codex' / 'claude' use the bot owner's connected subscription. */
   models: readonly WorkspaceBotModel[]
-  /** owner/repo remote keys from the GitHub App installations of the workspace's active members. */
+  /** Repositories this actor has installed. Membership never shares personal Git access. */
   repositories: string[]
 }
 
@@ -29,20 +31,20 @@ async function activeMemberIds(workspaceId: string) {
   return rows.map(row => row.userId)
 }
 
-async function installedRepositories(workspaceId: string) {
+async function installedRepositories(workspaceId: string, viewerId: string) {
   const members = await activeMemberIds(workspaceId)
-  if (!members.length) return []
+  if (!members.includes(viewerId)) return []
   const rows = await db.selectDistinct({ remoteKey: githubRepositoryInstallations.remoteKey }).from(githubRepositoryInstallations)
-    .where(inArray(githubRepositoryInstallations.userId, members)).orderBy(asc(githubRepositoryInstallations.remoteKey))
+    .where(eq(githubRepositoryInstallations.userId, viewerId)).orderBy(asc(githubRepositoryInstallations.remoteKey))
   const cloud = await pool.query<{ remote_key: string }>(`SELECT DISTINCT r.remote_key FROM cloud_github_repositories r
     WHERE r.user_id=ANY($1::text[]) AND EXISTS(SELECT 1 FROM cloud_service_bindings b JOIN cloud_service_registration s ON s.server_id=b.server_id
-      WHERE b.revoked=false AND 'github'=ANY(b.scopes) AND (b.owner='user:'||r.user_id OR b.owner='server'))`, [members])
+      WHERE b.revoked=false AND 'github'=ANY(b.scopes) AND (b.owner='user:'||r.user_id OR b.owner='server'))`, [[viewerId]])
   return [...new Set([...rows.map(row => row.remoteKey), ...cloud.rows.map(row => row.remote_key)])].sort()
 }
 
-/** True when an active member of the workspace has installed this repository. */
-export async function repositoryAvailable(workspaceId: string, repository: string): Promise<boolean> {
-  return (await installedRepositories(workspaceId)).includes(repository)
+/** The execution actor must independently have installed the repository. */
+export async function repositoryAvailable(workspaceId: string, repository: string, viewerId: string): Promise<boolean> {
+  return (await installedRepositories(workspaceId, viewerId)).includes(repository)
 }
 
 /** The stored defaults; createBot falls back to these. */
@@ -53,9 +55,11 @@ export async function workspaceBotDefaults(workspaceId: string): Promise<BotDefa
 }
 
 /** 新 Bot 默认值 and what can be chosen. Any active member may read them. */
-export async function botDefaultOptions(workspaceId: string): Promise<BotDefaultOptions> {
-  const [defaults, repositories] = await Promise.all([workspaceBotDefaults(workspaceId), installedRepositories(workspaceId)])
-  return { ...defaults, models: WORKSPACE_BOT_MODELS, repositories }
+export async function botDefaultOptions(workspaceId: string, reader: IssueReader): Promise<BotDefaultOptions> {
+  if (!(await activeTaskWorkspaces(reader, workspaceId)).length) throw new WorkspaceError('workspaceAccessDenied')
+  const [defaults, repositories] = await Promise.all([workspaceBotDefaults(workspaceId), installedRepositories(workspaceId, taskReaderScope(reader).userId)])
+  return { ...defaults, defaultRepository: defaults.defaultRepository && repositories.includes(defaults.defaultRepository) ? defaults.defaultRepository : null,
+    models: WORKSPACE_BOT_MODELS, repositories }
 }
 
 /** Admins only. A repository must be installed by an active member; null clears a default. */
@@ -63,7 +67,7 @@ export async function saveBotDefaults(actorId: string, workspaceId: string, inpu
   const values = botDefaultsInput.parse(input)
   return workspaceDb.transaction(async tx => {
     await requireWorkspace(tx, workspaceId, actorId, true)
-    if (values.defaultRepository && !(await repositoryAvailable(workspaceId, values.defaultRepository))) {
+    if (values.defaultRepository && !(await repositoryAvailable(workspaceId, values.defaultRepository, actorId))) {
       throw new WorkspaceError('botDefaultRepositoryUnavailable')
     }
     const changes = { ...values, updatedAt: new Date() }
@@ -89,16 +93,19 @@ export interface WorkspaceBotView {
   runningThreads: number
 }
 
-/** Every bot in the workspace with its live thread count. Any active member may read it. */
-export async function workspaceBots(workspaceId: string): Promise<WorkspaceBotView[]> {
+/** Content-authorized bots only; private runs do not contribute activity or counts. */
+export async function workspaceBots(workspaceId: string, reader: IssueReader): Promise<WorkspaceBotView[]> {
+  if (!(await activeTaskWorkspaces(reader, workspaceId)).length) throw new WorkspaceError('workspaceAccessDenied')
+  const { userId } = taskReaderScope(reader)
   const [rows, names] = await Promise.all([
     db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, model: bots.model, repository: bots.repository })
-      .from(bots).where(eq(bots.workspaceId, workspaceId)).orderBy(asc(bots.createdAt)),
+      .from(bots).where(and(eq(bots.workspaceId, workspaceId), resourceAccessPredicate(userId, bots.workspaceId, 'bot', bots.id))).orderBy(asc(bots.createdAt)),
     workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId)),
   ])
   if (!rows.length) return []
   const live = await db.select({ botId: agentRuns.botId, total: count() }).from(agentRuns)
-    .where(and(inArray(agentRuns.botId, rows.map(row => row.id)), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).groupBy(agentRuns.botId)
+    .where(and(inArray(agentRuns.botId, rows.map(row => row.id)), eq(agentRuns.workspaceId, workspaceId),
+      resourceAccessPredicate(userId, agentRuns.workspaceId, 'thread', agentRuns.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).groupBy(agentRuns.botId)
   const threads = new Map(live.map(row => [row.botId, row.total]))
   const owners = new Map(names.map(row => [row.userId, row.name]))
   return rows.map(row => {
@@ -145,10 +152,13 @@ const iso = (column: ReturnType<typeof sql>) => sql<string>`to_char(${column} at
  */
 // TODO(audit): reading threads is not audited; if bot settings writes need audit, call
 // recordAudit(tx, …) from lib/audit/record (PR #432) inside the bot/defaults update transaction.
-export async function listBotThreadsFor(viewerId: string, workspaceId: string, input: unknown): Promise<BotThreadPage> {
+export async function listBotThreadsFor(reader: IssueReader, workspaceId: string, input: unknown): Promise<BotThreadPage> {
   const { botId, limit, cursor } = botThreadsInput.parse(input)
+  const { userId: viewerId } = taskReaderScope(reader)
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, viewerId))
-  const [bot] = await db.select({ id: bots.id, name: bots.name }).from(bots).where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId))).limit(1)
+  if (!(await activeTaskWorkspaces(reader, workspaceId)).length) throw new WorkspaceError('workspaceAccessDenied')
+  const [bot] = await db.select({ id: bots.id, name: bots.name }).from(bots).where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId),
+    resourceAccessPredicate(viewerId, bots.workspaceId, 'bot', bots.id))).limit(1)
   if (!bot) throw new WorkspaceError('botNotFound')
   const position = cursor ? decodeBotThreadCursor(cursor) : null
   if (cursor && !position) throw new WorkspaceError('validationGeneric')
@@ -164,9 +174,9 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
     createdAt: agentRuns.createdAt,
     id: agentRuns.id,
     activity: sql<Date>`${activity}`.as('activity'),
-    // The prompt leaves the database only for the viewer's own chat runs.
-    prompt: sql<string | null>`case when ${agentRuns.issueId} is null and ${agentRuns.userId} = ${viewerId} then ${agentRuns.prompt} end`.as('prompt'),
-  }).from(agentRuns).where(eq(agentRuns.botId, botId)))
+    prompt: sql<string | null>`case when ${agentRuns.issueId} is null then ${agentRuns.prompt} end`.as('prompt'),
+  }).from(agentRuns).where(and(eq(agentRuns.botId, botId), eq(agentRuns.workspaceId, workspaceId),
+    resourceAccessPredicate(viewerId, agentRuns.workspaceId, 'thread', agentRuns.id))))
   const threads = db.$with('bot_threads').as(db.with(runs).selectDistinctOn([runs.threadId], {
     threadId: runs.threadId, runId: runs.id, issueId: runs.issueId, ownerId: runs.ownerId, status: runs.status,
     lastActivity: sql<Date>`max(${runs.activity}) over (partition by ${runs.threadId})`.as('lastActivity'),
@@ -187,7 +197,7 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
   const issueIds = [...new Set(page.flatMap(row => row.issueId && row.issueTitle !== null ? [row.issueId] : []))]
   let visible = new Set<string>()
   if (issueIds.length) {
-    const { predicate } = await issueVisibility(viewerId, false, workspaceId)
+    const { predicate } = await issueVisibility(reader, false, workspaceId)
     const seen = await db.select({ id: issues.id }).from(issues).where(and(inArray(issues.id, issueIds), predicate))
     visible = new Set(seen.map(row => row.id))
   }
@@ -202,11 +212,11 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
   const unfinished = new Set<string>(UNFINISHED_RUN_STATUSES)
   const views = page.map(row => {
     const issueVisible = !!row.issueId && visible.has(row.issueId)
-    const href = botThreadHref({ issueId: row.issueId, ownerId: row.ownerId, botId, runId: row.runId }, { id: viewerId, issueVisible })
+    const href = botThreadHref({ issueId: row.issueId, ownerId: row.ownerId, botId, runId: row.runId }, { id: viewerId, issueVisible, threadReadable: true })
     return {
       threadId: row.threadId,
       initiator: { id: row.initiatorId, name: memberName.get(row.initiatorId) ?? profile.get(row.initiatorId)?.name ?? null, avatarUrl: profile.get(row.initiatorId)?.image ?? null },
-      title: botThreadTitle({ issueTitle: row.issueTitle, issueVisible, prompt: row.opening, startedByViewer: row.ownerId === viewerId }),
+      title: botThreadTitle({ issueTitle: row.issueTitle, issueVisible, prompt: row.opening, startedByViewer: true }),
       status: unfinished.has(row.status) ? 'running' as const : 'done' as const,
       lastActivityAt: row.lastActivityAt,
       canOpen: href !== null,

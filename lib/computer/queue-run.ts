@@ -3,7 +3,7 @@ import { personalMailboxEnabled } from '../personal-mailbox-config'
 import 'server-only'
 import { admitProfileSelection } from '@/lib/factory/profile-admission'
 import type { ProfileFactoryContext } from '@/lib/factory/profile-watchdog'
-import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from '../execution-identity'
+import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError, type CollaborativeRunAuthority } from '../execution-identity'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
@@ -14,9 +14,11 @@ import type { AgentExecution } from '@/lib/agent-kit/store'
 import { ComputerError } from './store'
 import { RunModelMissingError } from './run-model'
 import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
-import { cloudTaskTarget } from './cloud-task-target'
+import { cloudTaskTarget, collaborativeCloudTaskTarget } from './cloud-task-target'
 import { runListChanged } from '@/lib/live/lists'
 import { runChanged } from '@/lib/live/panels'
+import { lockRunContextAdmission } from '@/lib/run-context-admission'
+import { isBuiltinAgentProfileSelection } from '@/lib/factory/agent-profile-definition'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
  * together so the cloud worker never observes an unbound queued run. The
@@ -49,9 +51,13 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   /** Internal host placement grant, never a model/tool argument. The current owner source can only narrow it. */
   allowLocalRecovery?: true
   sourceEventId?: string
-}, existing?: PoolClient, factoryContext?: Pick<ProfileFactoryContext, 'attemptId' | 'sourceEventId'>) {
+}, existing?: PoolClient, factoryContext?: Pick<ProfileFactoryContext, 'attemptId' | 'sourceEventId'>, authority?: CollaborativeRunAuthority) {
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
   if (input.subscriptionBindingId !== undefined && (!z.uuid().safeParse(input.subscriptionBindingId).success || input.apiKeyId || input.apiKey)) throw new ComputerError(400, 'Invalid task request')
+  if (authority && (!authority.actorId || authority.actorId === actor.userId || authority.threadOwnerId !== actor.userId
+    || !z.uuid().safeParse(authority.collaborationAuthorizationId).success || !input.threadRunId
+    || !(input.apiKeyId || input.apiKey?.keyId) || input.subscriptionBindingId || input.allowLocalRecovery || input.execution || input.agentProfile))
+    throw new ComputerError(409, 'Execution identity or resource unavailable')
   const digest = input.idempotencyKey === undefined ? undefined : createHash('sha256').update(JSON.stringify([actor.userId, input.idempotencyKey])).digest('hex')
   const runId = digest ? `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}` : randomUUID()
   // A run is never frozen without its model: a caller that left it out fails here, before anything is written.
@@ -71,17 +77,26 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const allowLocalRecovery = request && request.destination == null ? true as const : undefined
     // Absent stays byte-compatible with historical fingerprints; a replay
     // cannot upgrade an old cloud-only run to a newly inferred permission.
-    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
-    const target = await cloudTaskTarget(client, actor, input)
+    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : []), ...(authority ? [{ authority }] : [])])).digest('hex')
+    const exclusive = await lockRunContextAdmission(client, { ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: input.issueId, sourceRunId: input.threadRunId })
+    const personalContext = !authority && exclusive
+    if (!personalContext && input.agentProfile && !isBuiltinAgentProfileSelection(input.agentProfile)) throw new ComputerError(409, 'private_context_authorization_required')
+    const collaborativeTarget = authority ? await collaborativeCloudTaskTarget(client, actor.userId, {
+      sourceRunId: input.threadRunId!, botId: input.botId, issueId: input.issueId, model, keyId: (input.apiKeyId ?? input.apiKey?.keyId)!,
+    }, authority) : null
+    const target = authority ? collaborativeTarget : await cloudTaskTarget(client, actor, input)
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
-    const instructions = [target.instructions, input.agentProfile?.instructions].filter(Boolean).join('\n\n')
+    if (authority && (!collaborativeTarget || collaborativeTarget.workspaceId !== actor.workspaceId
+      || collaborativeTarget.agentId !== input.agentId || collaborativeTarget.repoId !== input.deviceRepoId)) throw new ComputerError(409, 'Task request changed')
+    const instructions = personalContext ? [target.instructions, input.agentProfile?.instructions].filter(Boolean).join('\n\n') : ''
     const { prompt, taskLength: promptTaskLength } = runPromptParts(input.title, input.body, instructions, input.note)
     if (digest) {
       const priorRun = (await client.query(`SELECT r."userId",r."issueId",r."agentId",r."deviceId",r."deviceRepoId",r.prompt,r."agentDefinition",r."dispatchFingerprint",r."botId" AS "runBotId",b."botId",b."workspaceId"
         FROM agent_runs r LEFT JOIN computer_run_bindings b ON b."runId"=r.id WHERE r.id=$1`, [runId])).rows[0]
       if (priorRun) {
         if (priorRun.userId !== actor.userId || priorRun.issueId !== input.issueId || priorRun.agentId !== input.agentId || priorRun.deviceId !== target.deviceId || priorRun.deviceRepoId !== input.deviceRepoId || priorRun.runBotId !== (input.withoutBot ? null : input.botId) || priorRun.botId !== input.botId || priorRun.workspaceId !== actor.workspaceId || priorRun.prompt !== prompt) throw new ComputerError(409, 'Task request changed')
-        if ((!priorRun.agentDefinition || priorRun.agentDefinition.harness !== target.harness || (priorRun.agentDefinition.parent?.executionId ?? null) !== (input.execution?.id ?? null))) throw new ComputerError(409,'Task request changed')
+        if ((!priorRun.agentDefinition || priorRun.agentDefinition.harness !== target.harness || (priorRun.agentDefinition.parent?.executionId ?? null) !== (personalContext ? input.execution?.id ?? null : null)
+          || (!personalContext && priorRun.agentDefinition.contextIsolation !== 'shared_clean'))) throw new ComputerError(409,'Task request changed')
         if (priorRun.dispatchFingerprint ? priorRun.dispatchFingerprint !== selectionFingerprint : input.subscriptionBindingId && priorRun.agentDefinition.subscription?.bindingId !== input.subscriptionBindingId) throw new ComputerError(409, 'Task request changed')
         await revalidateExecutionIdentity(client, { ...priorRun, botId: priorRun.runBotId })
         if (!existing) await client.query('COMMIT')
@@ -90,7 +105,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     }
     // Every cloud run freezes its definition (Agent, model, credential source) when it is created (orchestration.md § 5):
     // the Agent's subscription bound here, else the person's API key. The key is opened only when the run is claimed.
-    const binding = await (await import('./native-run-binding')).nativeRunBinding(client, actor.userId, input.agentId, target.harness, actor.workspaceId, input.subscriptionBindingId)
+    const binding = authority ? null : await (await import('./native-run-binding')).nativeRunBinding(client, actor.userId, input.agentId, target.harness, actor.workspaceId, input.subscriptionBindingId)
     if (input.subscriptionBindingId && (!binding || model !== binding.modelId)) throw new ComputerError(409, 'Bot subscription unavailable')
     const runBotId = input.withoutBot ? null : input.botId
     const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model, keyId: input.apiKeyId,
@@ -100,19 +115,23 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
-    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,modelDispatch:input.modelDispatch,agentProfile:input.agentProfile,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
-    frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen }, undefined, actor.workspaceId)
+    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions,prompt,parent:personalContext ? input.execution?.snapshot ?? null : null,executionId:personalContext ? input.execution?.id ?? null : null,subscription,apiKey,model,modelDispatch:input.modelDispatch,agentProfile:input.agentProfile,policyCeiling:input.policyCeiling,allowLocalRecovery:personalContext ? allowLocalRecovery : undefined,mailboxEnabled:personalContext && personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    if (!personalContext) { frozen.contextIsolation = 'shared_clean'; frozen.definitionDigest = workerDefinitionDigest(frozen) }
+    frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen, ...authority }, undefined, actor.workspaceId)
     const profileOriginRunId = await admitProfileSelection(client, { ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: input.issueId, harness: target.harness, model: frozen.model, apiKeyId: frozen.apiKey?.keyId, subscriptionBindingId: frozen.subscription?.bindingId, selection: input.agentProfile, sourceRunId: input.threadRunId,
       ...(factoryContext ? { factoryContext } : {}) })
     if (profileOriginRunId) { frozen.profileOriginRunId = profileOriginRunId; frozen.definitionDigest = workerDefinitionDigest(frozen) }
     // A writable github.com run gets its task branch here, like a local run's (decision 2026-11-02-1600).
     const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
+    if (!personalContext && github) throw new ComputerError(409, 'personal_git_authorization_required')
     const push = !github ? null : await (await import('./cloud-push')).admitCloudPush(client, { userId: actor.userId, issueId: input.issueId, agentId: input.agentId, deviceId: target.deviceId, deviceRepoId: input.deviceRepoId, ...(runBotId ? { workspaceId: actor.workspaceId } : {}), now: new Date() })
     const agentDefinition = push ? { ...frozen, repositoryAdmission: push.admission } : frozen
     const traceContext = captureTraceContext({ runId, threadId: input.threadRunId ?? runId, taskId: input.issueId, posthogDistinctId: actor.userId, ...(push?.publication.identifier ? { taskNumber: push.publication.identifier } : {}) })
     if (traceContext) agentDefinition.traceContext = traceContext
     await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength","workspaceId")
       VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12,$13)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, runBotId,JSON.stringify(agentDefinition), digest ? selectionFingerprint : null, promptTaskLength, actor.workspaceId])
+    if (input.threadRunId) await (await import('@/lib/resource-access/thread-inheritance')).inheritThreadAccess(client,
+      { sourceRunId: input.threadRunId, newRunId: runId, ownerId: actor.userId, workspaceId: actor.workspaceId })
     if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`, [runId, push.publication.userId, push.publication.issueId, push.publication.scopeVersion, push.publication.issueTitle, push.publication.remoteUrl, push.publication.remoteKey, push.publication.identifier, push.publication.branch, push.publication.baseBranch])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])

@@ -2,6 +2,7 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { ownerListChanged } from '@/lib/live/lists'
 import { botChatChanged } from '@/lib/live/chats'
+import type { IssueReader } from '@/lib/issue-visibility'
 
 /**
  * The person's Coordinator is an ordinary bot (glossary), one per person per
@@ -90,12 +91,14 @@ export async function openChatBotId(user: { id: string; email: string; name: str
  * The bot list (web left column, mobile home): the person's bots in this
  * workspace with this workspace's Coordinator first, marked `coordinator`.
  */
-export async function listOwnerBots(ownerId: string, workspaceId: string) {
+export async function listOwnerBots(ownerId: string, workspaceId: string, reader: IssueReader = ownerId) {
+  await (await import('@/lib/task-workspace')).requireTaskWorkspace(reader, workspaceId)
   const [{ db }, { bots }, { and, asc, desc, eq, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
   const { botId } = await coordinatorBot(ownerId, workspaceId)
   const isCoordinator = sql<boolean>`${bots.id} = ${botId}`
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator }).from(bots)
-    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId)))
+    .where(and(eq(bots.workspaceId, workspaceId), sql`(mikka_resource_acl_allowed('account',${ownerId},${bots.workspaceId},'bot',${bots.id},'canReadContent')
+      or mikka_resource_acl_allowed('account',${ownerId},${bots.workspaceId},'chat',mikka_chat_resource_id(${bots.ownerId},${bots.id}),'canReadContent'))`))
     .orderBy(desc(isCoordinator), asc(bots.createdAt))
 }
 

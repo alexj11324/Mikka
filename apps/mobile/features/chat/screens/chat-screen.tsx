@@ -58,6 +58,7 @@ import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { runInfoLine } from '@/lib/run-info'
 import { useHome } from '@/lib/home'
 import { colors } from '@/lib/theme'
+import { Segmented } from '@/components/Segmented'
 
 /**
  * A chat with a bot; the Coordinator is one (R-06): the bot's name in a pill,
@@ -66,8 +67,11 @@ import { colors } from '@/lib/theme'
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
+export function ChatScreen({ botId, name, color, shape, draft, focus, compose, taskRequest, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean;taskRequest?:boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
   const [quote, setQuote] = useState<string | null>(null)
+  const [creatingTask,setCreatingTask]=useState(Boolean(taskRequest))
+  const [taskVisibility,setTaskVisibility]=useState<'shared'|'private'>('shared')
+  useEffect(()=>{if(taskRequest)setCreatingTask(true)},[taskRequest])
   const self = botId ?? 'coordinator'
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -106,7 +110,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
     pendingSends.current = change(pendingSends.current)
     setOutbox(pendingSends.current)
   }
-  useEffect(() => { pendingSends.current = []; setOutbox([]) }, [botId, apiContext])
+  useEffect(() => { pendingSends.current = []; setOutbox([]);setText('');setQuote(null) }, [botId, apiContext])
   const [text, setText] = useState(draft ?? '')
   const working = Boolean(data?.working) || inFlight(outbox)
   const push = usePushState()
@@ -190,7 +194,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
         const receipt = await api<{ queued?: boolean }>('/api/mobile/chat', { method: 'POST', body: submissionBody(item) })
         if (receipt?.queued !== true) throw new Error('sendUnconfirmed')
         await reload()
-        return apiCache.commit(item.context, () => updateOutbox(list => delivered(list, item.key)))
+        return apiCache.commit(item.context, () => {updateOutbox(list => delivered(list, item.key));if(item.taskCreation)setCreatingTask(false)})
       } catch (error) {
         apiCache.commit(item.context, () => updateOutbox(list => marked(list, item.key, sendFailureState(error))))
         return false
@@ -212,8 +216,9 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
     if (working) sentWhileWorking.current.add(message)
     const context = apiCache.context()
     const targetBotId = data?.botId ?? botId
-    const held = unsettled(pendingSends.current, message, images, self, context)
-    const item = held ?? queued([], outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context })[0]
+    const taskCreation=creatingTask?{visibility:taskVisibility}:undefined
+    const held = unsettled(pendingSends.current, message, images, self, context,taskCreation)
+    const item = held ?? queued([], outgoingKey(uuid.v4), message, images, { botId: targetBotId, chatKey: self, context,taskCreation })[0]
     updateOutbox(list => held ? marked(list, item.key, 'sending') : [...list, item])
     return deliver(item)
   }
@@ -353,9 +358,10 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       </View>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+      <Composer key={apiContext} value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={creatingTask?mobileMessages.ResourceAccess.taskPrompt:selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
           <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={data?.working ? () => void stopper.stop() : undefined} />
+          {creatingTask?<View style={styles.serviceNotice}><Text style={styles.serviceMessage}>{mobileMessages.ResourceAccess.visibility}</Text><Segmented value={taskVisibility} onChange={setTaskVisibility} options={[{value:'shared',label:mobileMessages.ResourceAccess.shared},{value:'private',label:mobileMessages.ResourceAccess.private}]} /><Text style={styles.serviceMessage}>{taskVisibility==='shared'?mobileMessages.ResourceAccess.sharedDescription:mobileMessages.ResourceAccess.privateDescription}</Text></View>:null}
           <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )

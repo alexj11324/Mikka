@@ -24,6 +24,9 @@ import { mayCompleteIssue, withRunWorkspace } from './run-completion'
 import type { QuotaPlan } from './run-quota'
 import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
 import { launchProviderContinuation, pendingProviderFallback, providerCompletion, recoverProviderFailure } from './run-provider-fallback'
+import { lockResourceAccess } from './resource-access/store'
+import { runPersonalResourcesAllowed } from './run-private-resources'
+import { ActionFailureError } from './action-error'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Run = typeof agentRuns.$inferSelect
@@ -305,8 +308,16 @@ async function withPublicationAuthority<T>(claim: Publication, work: (value: { p
   const [hint] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
     .where(and(eq(agentRuns.id, claim.runId), eq(agentRuns.userId, claim.userId), eq(agentRuns.issueId, claim.issueId))).limit(1)
   if (!hint?.workspaceId) throw new PublicationError('issue_unavailable')
-  return withPublicationWorkspace(claim.userId, hint.workspaceId, () => db.transaction(async tx => {
+  return withPublicationWorkspace(claim.userId, hint.workspaceId, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
     await tx.execute(sql`set local lock_timeout = '8s'`)
+    try { await lockResourceAccess(tx, claim.userId, { kind: 'thread', id: claim.runId, workspaceId: hint.workspaceId! }, 'canSteer') }
+    catch (error) {
+      if (error instanceof ActionFailureError) throw Object.assign(new PublicationError('issue_unavailable'), { cause: error })
+      throw error
+    }
+    // Publishing a shared execution is not authority to spend the owner's
+    // private GitHub account. Organization Git custody needs its own grant.
+    if (!await runPersonalResourcesAllowed(pool, claim.runId, claim.userId)) throw new PublicationError('github_identity_required')
     const [task] = await tx.select().from(issues).where(eq(issues.id, claim.issueId)).for('update')
     const [run] = await tx.select().from(agentRuns).where(and(eq(agentRuns.id, claim.runId), eq(agentRuns.userId, claim.userId))).for('update')
     const [publication] = await tx.select().from(runPublications).where(and(eq(runPublications.runId, claim.runId), eq(runPublications.leaseToken, claim.leaseToken!))).for('update')
@@ -328,7 +339,7 @@ async function withPublicationAuthority<T>(claim: Publication, work: (value: { p
     // The pull request opens with the run owner's own GitHub credential
     // (decision 2026-11-02-1600); no Mikka setting or approval gates it.
     return work({ publication, run, report, allowCreate: readIssueMetadata(task.content).pullRequests.length < 10 })
-  }))
+  })))
 }
 
 /** What publication hands GitHub: the pull request, for the run owner `userId`. */

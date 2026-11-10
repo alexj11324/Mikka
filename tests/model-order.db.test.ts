@@ -116,7 +116,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     t.diagnostic(JSON.stringify({ kind: 'order_projection_pg_query_budget', allowed, full: fullStatements.length, context: contextStatements.length, saved }))
   })
 
-  await t.test('prompt order facts freshly enforce shared-owner membership, grants, policy and binding epochs', async () => {
+  await t.test('prompt order facts freshly enforce personal subscription isolation through membership, grants, policy and binding changes', async () => {
     const scope = await person('order-context-borrower')
     const lender = await person('order-context-lender')
     const unrelated = await person('order-context-unrelated')
@@ -124,9 +124,9 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
     await order.changeOrder(pool, unrelated, { kind: 'location', location: 'local' })
     await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [scope.workspaceId, lender.ownerId, `${lender.ownerId}@example.invalid`])
-    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [lender.ownerId, scope.workspaceId])
+    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,false)', [lender.ownerId, scope.workspaceId])
     const offered = async (checked = scope) => (await order.orderView(pool, checked, async () => [], 'context')).candidates.some(row => row.source.kind === 'subscription' && row.source.connectionId === connection)
-    assert.equal(await offered(), true)
+    assert.equal(await offered(), false)
     assert.equal(await offered(unrelated), false, 'a different owner and workspace cannot inherit these facts')
     for (const revoke of ['share', 'policy', 'member', 'pause', 'epoch'] as const) {
       if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [lender.ownerId, scope.workspaceId])
@@ -135,12 +135,12 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
       else if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [connection])
       else await pool.query('UPDATE byos_connections SET epoch=2 WHERE id=$1', [connection])
       assert.equal(await offered(), false, `${revoke}: no prior projection bypasses a fresh refusal`)
-      if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [lender.ownerId, scope.workspaceId])
+      if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [lender.ownerId, scope.workspaceId])
       else if (revoke === 'policy') await pool.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [scope.workspaceId])
       else if (revoke === 'member') await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [scope.workspaceId, lender.ownerId])
       else if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [connection])
       else await pool.query('UPDATE byos_connections SET epoch=1 WHERE id=$1', [connection])
-      assert.equal(await offered(), true, `${revoke}: a subsequent invocation is fresh rather than a cached refusal`)
+      assert.equal(await offered(), false, `${revoke}: a restored legacy grant never makes another member subscription available`)
     }
   })
 

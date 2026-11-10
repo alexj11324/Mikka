@@ -16,6 +16,8 @@ import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { mobileTaskActivity, mobileTaskGroup } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
+import { readResourceCapabilities } from '@/lib/resource-access/store'
 
 /** Locate the persisted tenant through the full reader, then hold fresh
  * membership and re-read every projection. Cookie/default choices are not pins. */
@@ -37,7 +39,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
   const metadata = readIssueMetadata(issue.content)
   const blockerIds = metadata.blockedByIds ?? []
   const visibleBlockers = blockerIds.length ? await issueVisibility(user, false, workspaceId, db, { onlyIssueIds: blockerIds }) : null
-  const [identifiers, runs, [decoration], versions, labels, blockers] = await Promise.all([
+  const [identifiers, runs, [decoration], versions, labels, blockers, capabilities] = await Promise.all([
     taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number }], db, teamId === null ? new Map() : undefined),
     db.select({ runId: agentRuns.id, status: agentRuns.status, outcome: agentRuns.outcome,
       createdAt: agentRuns.createdAt, threadReplacedBy: agentRuns.threadReplacedBy,
@@ -46,10 +48,10 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
       bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape },
       device: { name: devices.name, kind: devices.kind, deviceType: devices.deviceType },
       location: sql<string | null>`${agentRuns.agentDefinition}->'modelDispatch'->>'location'`,
-    }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    }).from(agentRuns).innerJoin(agents, and(eq(agents.id, agentRuns.agentId),eq(agents.userId,agentRuns.userId)))
       .leftJoin(bots, and(eq(bots.id, runBotId), eq(bots.ownerId, user.id), eq(bots.workspaceId, workspaceId)))
       .leftJoin(devices, and(eq(devices.id, agentRuns.deviceId), eq(devices.ownerId, user.id)))
-      .where(and(eq(agentRuns.issueId, id), eq(agentRuns.userId, user.id), eq(agentRuns.workspaceId, workspaceId)))
+      .where(and(eq(agentRuns.issueId, id), eq(agentRuns.workspaceId, workspaceId),resourceAccessPredicate(user.id,agentRuns.workspaceId,'thread',agentRuns.id,'canReadContent')))
       .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)),
     db.select({ schedule: taskSchedule(issues.id, user.id, workspaceId), owner: users.name }).from(issues)
       .leftJoin(users, eq(users.id, issues.userId))
@@ -60,6 +62,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     taskScheduleLabels(),
     visibleBlockers ? db.select({ id: issues.id, status: issues.status }).from(issues)
       .where(and(inArray(issues.id, blockerIds), visibleBlockers.predicate)) : [],
+    readResourceCapabilities(user,{kind:'task',id,workspaceId}),
   ])
   const [creation] = await enrichActivityActors(versions, issue.userId)
   const task = { ...issue, metadata }
@@ -77,5 +80,6 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     },
     activity: mobileTaskActivity(task, runs, { by: creation?.actor ? creation.actor.name : decoration?.owner ?? null, createdAt: issue.createdAt }),
     live: { workspaceId },
+    capabilities,
   }
 }

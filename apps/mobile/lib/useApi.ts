@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { AppState } from 'react-native'
 import { api, ApiError, onWorkspaceChange } from '@/lib/api'
 import { apiCache as cache } from './api-cache'
@@ -42,6 +42,7 @@ export function useLiveApi<T>(path: string | null, spec: (data: T | null) => Liv
 }
 
 function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, pushed: boolean) {
+  const cacheGeneration = useSyncExternalStore(cache.watch,cache.snapshot,cache.snapshot)
   const [data, setStored] = useState<T | null>(() => path ? cache.get<T>(path) : null)
   const [source, setSource] = useState(() => ({ path, context: cache.context() }))
   const [error, setError] = useState<ApiError | Error | null>(null)
@@ -82,7 +83,14 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
         const next = await read(path)
         accept(() => { cache.set(path, next, context); setStored(next); setError(null); failed.current = false; loadedAt.current = Date.now(); setRequestedAt(started) })
       } catch (failure) {
-        accept(() => { setError(failure as Error); failed.current = true })
+        accept(() => {
+          // A fresh denial retires content immediately, including offline
+          // copies; a stale-while-revalidate view is only for network errors.
+          if(failure instanceof ApiError&&[401,403,404,410].includes(failure.status)) {
+            cache.forget(path,context);setStored(null)
+          }
+          setError(failure as Error); failed.current = true
+        })
       } finally {
         accept(() => setLoading(false))
         if (pending.current?.ticket === ticket) pending.current = null
@@ -101,7 +109,7 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
     setLoading(Boolean(path))
     void load()
     return () => { alive.current = false; request.current++ }
-  }, [load, path])
+  }, [load, path, cacheGeneration])
 
   useEffect(() => onWorkspaceChange(() => {
     setSource({ path, context: cache.context() })

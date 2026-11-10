@@ -3,8 +3,10 @@ import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Square } from 'lucide-react-native'
-import { BotBubble, MyBubble } from '@/components/chat'
+import { Square, UsersRound } from 'lucide-react-native'
+import { BotBubble } from '@/components/chat'
+import { ThreadPersonMessage } from '@/components/ThreadPersonMessage'
+import { ResourceAccessSheet, ThreadExecutionChoice } from '@/components/ResourceAccessSheet'
 import { Spinner, StatusIcon } from '@/components/icons'
 import { ThreadPlace } from '@/components/ThreadPlace'
 import { Markdown } from '@/components/Markdown'
@@ -20,7 +22,9 @@ import { StopFailed } from '@/components/StopFailed'
 import { ThreadQuotaPaused } from '@/components/ThreadQuotaPaused'
 import { useStop } from '@/lib/useStop'
 import { composerStops } from '@/lib/stop'
-import { threadSendErrorLine } from '@/lib/thread-send-error'
+import { useThreadSend } from '@/lib/useThreadSend'
+import { mobileMessages } from '@/lib/messages'
+import { apiCache } from '@/lib/api-cache'
 import type { ThreadDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { threadLive } from '@/lib/live-keys'
@@ -37,30 +41,15 @@ export default function ThreadScreen() {
   // Read again when one of its runs writes text or changes state (the web's thread and run keys); an
   // ended thread changes only when it runs again. Each read is the whole conversation.
   const { data, error, reload } = useLiveApi<ThreadDetail>(`/api/mobile/threads/${id}`, current => threadLive(current, id))
-  const [sending, setSending] = useState(false)
-  // What to say when a message was not sent: the server's reason when it gave one (threadReplaced…).
-  const [sendFailed, setSendFailed] = useState<string | null>(null)
+  const [accessOpen,setAccessOpen]=useState(false),[executionGrantId,setExecutionGrantId]=useState('')
+  const {send,sending,sendFailed}=useThreadSend(id,executionGrantId,reload)
   const thread = data?.thread
+  const owned=thread?.ownedByCurrentUser!==false
+  const canComment=thread?.canContribute!==false
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
   const stopper = useStop(() => api(`/api/mobile/threads/${id}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(data?.active), reload)
-
-  const send = async (text: string) => {
-    setSending(true)
-    setSendFailed(null)
-    try {
-      await api(`/api/mobile/threads/${id}`, { method: 'POST', body: { text } })
-      await reload()
-      return true
-    } catch (failure) {
-      // The composer keeps the words, so sending again is one tap.
-      setSendFailed(threadSendErrorLine(failure instanceof ApiError && failure.status < 500 ? failure.code : null))
-      return false
-    } finally {
-      setSending(false)
-    }
-  }
 
   return (
     <View style={styles.screen}>
@@ -81,7 +70,10 @@ export default function ThreadScreen() {
           </View>
         ) : undefined}
         // Stop for every live thread, also one waiting for your answer, whose composer sends (N1).
-        right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: '停止', web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
+        right={thread?[
+          {icon:'person.2',label:mobileMessages.ResourceAccess.manage,web:<UsersRound size={18} color={colors.ink} />,onPress:()=>setAccessOpen(true)},
+          ...owned&&data?.active&&!stopper.sending?[{icon:'stop.fill' as const,label:mobileMessages.IssueThreads.stop,web:<Square size={18} color={colors.ink} fill={colors.ink} />,onPress:()=>void stopper.stop()}]:[],
+        ]:undefined}
       />
       <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
@@ -92,7 +84,7 @@ export default function ThreadScreen() {
               return <ThreadSteps key={item.id} steps={item.steps} count={item.count} live={data.active && index === data.items.length - 1} />
             case 'agent': return <View key={item.id} style={{ marginVertical: 4 }}><BotBubble><Markdown text={item.text} /></BotBubble></View>
             case 'error': return <Text key={item.id} style={styles.error}>{item.text}</Text>
-            case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} /></View>
+            case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><ThreadPersonMessage item={item} /></View>
           }
         })}
         {sendFailed ? <Text style={styles.error}>{sendFailed}</Text> : null}
@@ -102,7 +94,10 @@ export default function ThreadScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
-      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {data&&canComment ? <Composer key={`${id}:${apiCache.context()}`} placeholder={mobileMessages.ResourceAccess.threadMessage} onSend={send} disabled={sending} sendDisabled={!owned&&!!executionGrantId&&data.active}
+        notice={!owned?<ThreadExecutionChoice id={id} value={executionGrantId} active={data.active} onChange={setExecutionGrantId} />:undefined}
+        attach attachmentScope={{ kind: 'thread', id }} onStop={owned&&composerStops(data)&&!stopper.sending?()=>void stopper.stop():undefined} /> : data?<Text style={styles.subtitle}>{mobileMessages.ResourceAccess.readOnly}</Text>:null}
+      {data?<ResourceAccessSheet kind="thread" id={id} open={accessOpen} onDismiss={()=>setAccessOpen(false)} />:null}
     </View>
   )
 }

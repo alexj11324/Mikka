@@ -11,7 +11,7 @@ let freezeHostedModelSelection:typeof import('./subscription-model-snapshot')['f
 before(async()=>{({freezeHostedModelSelection,resolveFrozenHostedModel}=await import('./subscription-model-snapshot'))})
 
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
-const scope = { ownerId:'alice',botId:id(1),workspaceId:id(2) }
+const scope = { ownerId:'alice',actorId:'alice',botId:id(1),workspaceId:id(2) }
 function fixture() {
   managedSubscriptionDenied = false
   const binding = { id:id(3),ownerId:'alice',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'fixture-model',route:'claude_cpa' as const }
@@ -40,13 +40,36 @@ test('an unverified managed subscription transport fails before model constructi
 test('first selection freezes authoritative model, route, owner, consumer, workspace, connection and epoch', async () => {
   const f=fixture()
   const result=await freezeHostedModelSelection(scope,{harness:'ai_sdk',model:'default'}, {type:'subscription',bindingId:id(3)},f.deps)
-  assert.deepEqual(result,{harness:'ai_sdk',model:'fixture-model',modelSelection:{type:'subscription',bindingId:id(3),ownerId:'alice',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'fixture-model',route:'claude_cpa'}})
+  assert.deepEqual(result,{harness:'ai_sdk',model:'fixture-model',actorId:'alice',modelSelection:{type:'subscription',bindingId:id(3),ownerId:'alice',actorId:'alice',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'fixture-model',route:'claude_cpa'}})
 })
 test('default stays frozen and never constructs a subscription backend', async () => {
   const f=fixture();f.deps.service=() => {throw new Error('backend called')}
   const frozen=await freezeHostedModelSelection(scope,{harness:'ai_sdk',model:'original-default'},undefined,f.deps)
   assert.equal((await resolveFrozenHostedModel(scope,frozen,f.deps) as {modelId:string}).modelId,'original-default')
   assert.deepEqual(defaults.at(-1),{scope,model:'original-default'})
+})
+test('missing or different actors never borrow the owner subscription, even with an owner binding', async () => {
+  for (const actorId of [undefined, '', 'member']) {
+    const f = fixture()
+    await assert.rejects(freezeHostedModelSelection({ ...scope, actorId } as typeof scope,
+      { harness: 'ai_sdk', model: null }, { type: 'subscription', bindingId: id(3) }, f.deps), { code: 'binding_mismatch' })
+    assert.deepEqual(f.reads, { binding: 0, connection: 0, pair: 0 }, 'actor authority is checked before reading personal custody')
+  }
+})
+test('replay cannot drop or replace the frozen actor or revive a legacy borrowed owner', async () => {
+  const f = fixture()
+  const frozen = await freezeHostedModelSelection(scope, { harness: 'ai_sdk', model: null }, { type: 'subscription', bindingId: id(3) }, f.deps)
+  assert.ok(frozen.modelSelection)
+  const reads = { ...f.reads }
+  for (const runtime of [
+    { ...frozen, actorId: undefined }, { ...frozen, actorId: 'member' },
+    { ...frozen, modelSelection: { ...frozen.modelSelection, actorId: undefined } },
+    { ...frozen, modelSelection: { ...frozen.modelSelection, actorId: 'member' } },
+    { ...frozen, modelSelection: { ...frozen.modelSelection, runOwnerId: 'member' } },
+  ]) await assert.rejects(resolveFrozenHostedModel(scope, runtime, f.deps), { code: 'binding_mismatch' })
+  await assert.rejects(resolveFrozenHostedModel({ ...scope, actorId: 'member' }, frozen, f.deps), { code: 'binding_mismatch' })
+  assert.deepEqual(f.reads, reads)
+  assert.equal(f.calls(), 0)
 })
 test('internal coordinator key, foreign scope and native route cannot become a hosted subscription selection', async () => {
   for(const changed of [{...scope,botId:null,workspaceId:null},{...scope,botId:'coordinator'},{...scope,ownerId:'other'}]) {

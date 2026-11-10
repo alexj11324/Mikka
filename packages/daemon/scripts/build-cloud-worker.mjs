@@ -26,7 +26,7 @@ export async function buildCloudWorker(out = resolve(root, 'dist/cloud')) {
     await mkdir(dirname(resolve(out, path)), { recursive: true })
     await copyFile(resolve(root, 'src', path), resolve(out, path))
   }
-  for (const path of ['mikka-mcp.mjs', 'mikka-mcp-context.mjs', 'mikka-mcp-backend.mjs', 'mikka-mcp-worker.mjs', 'capture-copy.mjs', 'github-credentials.mjs']) {
+  for (const path of ['mikka-mcp.mjs', 'mikka-mcp-context.mjs', 'mikka-mcp-backend.mjs', 'mikka-mcp-worker.mjs', 'capture-copy.mjs', 'github-credentials.mjs', 'native-tool-isolation.mjs']) {
     await copyFile(resolve(root, 'src/agents', path), resolve(out, path))
   }
   await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })

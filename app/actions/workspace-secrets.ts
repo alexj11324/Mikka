@@ -24,7 +24,7 @@ const withActor = <T>(fn: (userId: string, workspaceId: string, audit: SecretAud
 export async function listSecrets(workspaceId?: string): Promise<SettingsActionResult<{ secrets: WorkspaceSecretView[]; role: WorkspaceRole }>> {
   return withActor(async (u, w) => { const [secrets, role] = await Promise.all([listWorkspaceSecrets(u, w), workspaceRole(u, w)]); return { secrets, role } }, workspaceId)
 }
-type ScopeInput = { type: 'workspace' } | { type: 'repository'; repository: string }
+type ScopeInput = import('@/lib/secrets/format').SecretScope
 async function createSecretBody(input: { name: string; kind: 'secret' | 'env'; value: string; note?: string; scope?: ScopeInput; delivery?: SecretDeliveryInput }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
   return withActor((u, w, audit) => createWorkspaceSecret(u, w, input, audit), workspaceId)
 }

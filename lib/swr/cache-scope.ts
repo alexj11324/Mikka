@@ -8,12 +8,12 @@ import { workspaceSelection } from '@/lib/workspace-selection'
 import { enterpriseWorkspaceAllowed } from '@/lib/enterprise/access'
 import { enterprisePrincipal, type EnterprisePrincipal, type EnterpriseReader } from '@/lib/enterprise/principal'
 
-export type AuthorizedCacheWorkspace = { workspaceId: string; role: 'admin' | 'member' }
+export type AuthorizedCacheWorkspace = { workspaceId: string; role: 'admin' | 'member'; accessProof?: string; accessExpiresAt?: string | null; accessExpiresAfterMs?: number | null }
 
 /** A small, read-only authorization check before any disk data is shown. It
  * deliberately does not load members, invitations, task bodies or credentials.
  * A removed membership or downgraded role cannot hydrate its previous namespace. */
-export async function authorizedCacheWorkspace(reader: EnterpriseReader & { [enterprisePrincipal]: EnterprisePrincipal }, requestedId?: string): Promise<AuthorizedCacheWorkspace | null> {
+export async function authorizedCacheWorkspace(reader: EnterpriseReader & { [enterprisePrincipal]: EnterprisePrincipal }, requestedId?: string, includeAccessProof = true): Promise<AuthorizedCacheWorkspace | null> {
   const userId = reader.id
   const selection = workspaceSelection(currentRequestScope()?.headers)
   if (selection.present && !selection.workspaceId) return null
@@ -30,5 +30,6 @@ export async function authorizedCacheWorkspace(reader: EnterpriseReader & { [ent
   const match = memberships.find(item => item.workspaceId === selected)
   const workspace = match ?? (requestedId || selection.present ? null : memberships[0] ?? null)
   if (!workspace) return null
-  return await enterpriseWorkspaceAllowed(userId, workspace.workspaceId, reader[enterprisePrincipal]) ? workspace : null
+  if (!await enterpriseWorkspaceAllowed(userId, workspace.workspaceId, reader[enterprisePrincipal])) return null
+  return includeAccessProof ? { ...workspace, ...await (await import('@/lib/resource-access/cache-proof')).readResourceAccessProof(userId, workspace.workspaceId) } : workspace
 }

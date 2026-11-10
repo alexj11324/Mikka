@@ -132,6 +132,8 @@ export interface SupervisorDeps {
   outbox: Outbox
   worktrees: WorktreeManager
   adapters: ReadonlyMap<Harness, AgentAdapter>
+  /** A real host probe, not the assignment's assertion. */
+  nativeCredentialIsolation?: 'tools_v1'
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   /** Hosted fresh Claude only: no task frame before start consumes final options. */
@@ -144,7 +146,7 @@ export interface SupervisorDeps {
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   /** Once per local run, retained through verification and publication. */
   prepareRunGitHub?(assignment: RunAssignment, signal: AbortSignal, onCredential: (name: string, value: string) => void): Promise<PreparedRunGitHub | undefined>
-  bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
+  bootstrap?(worktree:string,repo:DeviceRepo,assignment?:RunAssignment):Promise<string>
   /** Resolve only daemon-owned cache paths (or a trusted hosted workspace). */
   repository: (assignment: RunAssignment) => DeviceRepo
   /** A fresh hosted claim may overlap remote reads with policyReady. Any
@@ -176,6 +178,8 @@ export interface SupervisorDeps {
     /** A read-only check: verify may not write the worktree (ADR 0046). */
     readOnly: boolean
     githubEnvironment?: Record<string, string>
+    nativeCredentialIsolation?: 'tools_v1'
+    taskEnv?: Record<string, string>
   }) => Promise<VerifyResult>
   /**
    * Commits (and, if the repo allows, pushes) a verified hand-in; the
@@ -1267,6 +1271,8 @@ export class RunSupervisor {
       signal,
       readOnly: runPolicy(assignment.policy).readOnly === true,
       githubEnvironment: this.active.get(runId)?.github?.env,
+      nativeCredentialIsolation: assignment.nativeCredentialIsolation,
+      taskEnv: { ...assignment.taskEnv, ...this.active.get(runId)?.secretBridge?.env },
     })
     this.assertFinishingRunLive(runId, signal)
     execution = {
@@ -1463,6 +1469,8 @@ export class RunSupervisor {
     } })
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
+    if (assignment.nativeCredentialIsolation && (this.deps.nativeCredentialIsolation !== assignment.nativeCredentialIsolation ||
+      !['claude_code', 'codex'].includes(assignment.harness))) throw Error('native_tool_isolation_unavailable')
     if ((assignment.policySnapshotRequired || assignment.policySnapshot) && !this.deps.verifyRunPolicy) throw new Error('Run policy verification unavailable')
     // Claim already authorized this exact remote and, where needed, handed
     // over its GitHub credential. Only a new hosted task can read ahead: local
@@ -1570,6 +1578,7 @@ export class RunSupervisor {
       mcp: runMcp(assignment.mcp, traceContext),
       runId,
       requireSessionResume: assignment.requireSessionResume,
+      nativeCredentialIsolation: assignment.nativeCredentialIsolation,
       kind: assignment.kind,
       factoryCheck: assignment.factoryCheck,
       verifyCommand: assignment.verifyCommand,
@@ -1691,7 +1700,7 @@ export class RunSupervisor {
           "checkpoint from the earlier attempt",
         )
       }
-      const setup = runPolicy(assignment.policy).readOnly === true ? 'read-only' : continued ? 'continued' : this.deps.bootstrap ? await this.deps.bootstrap(worktree,repo) : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
+      const setup = runPolicy(assignment.policy).readOnly === true ? 'read-only' : continued ? 'continued' : this.deps.bootstrap ? await this.deps.bootstrap(worktree,repo,assignment) : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
       log.info({ worktree, setup }, "worktree ready")
       this.deps.journal.update(runId, { worktree, baseCommit })
     }

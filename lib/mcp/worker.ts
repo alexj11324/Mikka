@@ -18,6 +18,8 @@ import { activeTaskWorkspaces, withTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 import { tokenWorkspace } from '@/lib/tokens/principal'
+import { resourceActionAllowed } from '@/lib/resource-access/store'
+import type { IssueReader } from '@/lib/issue-visibility'
 
 // The worker side of the MCP server: the agent inside a run reports progress,
 // asks the person something or says it is blocked. Each call becomes an event
@@ -87,14 +89,46 @@ export async function verifyRunToken(_request: Request, bearerToken?: string): P
     try { await agentScope(row.userId, row.botId) }
     catch (error) { if (error instanceof AgentKitError) return undefined; throw error }
   }
+  const actorId = identity?.actor ?? row.userId
+  let actorSessionId: string | undefined
+  if (actorId !== row.userId) {
+    if (!identity?.collaborationAuthorizationId) return undefined
+    const { rows: [authorization] } = await pool.query<{ sessionId: string }>(
+      'SELECT "sessionId" FROM thread_execution_authorizations WHERE id=$1 AND "actorId"=$2 AND "ownerId"=$3 AND "workspaceId"=$4 AND "releasedAt" IS NULL AND "expiresAt">clock_timestamp()',
+      [identity.collaborationAuthorizationId, actorId, row.userId, row.workspaceId])
+    if (!authorization) return undefined
+    actorSessionId = authorization.sessionId
+    const actorReader = { id: actorId, [tokenWorkspace]: row.workspaceId,
+      [enterprisePrincipal]: { kind: 'session' as const, sessionId: actorSessionId } }
+    if (!(await activeTaskWorkspaces(actorReader, row.workspaceId)).length) return undefined
+  }
+  const reference = { kind: 'thread' as const, id: row.runId, workspaceId: row.workspaceId }
+  if (!await resourceActionAllowed(db, row.userId, reference, 'canSteer')
+    || !await resourceActionAllowed(db, actorId, reference, 'canSteer')) return undefined
   // Permission reads may wait on the workspace DB. STOP, token revocation and
   // lease expiry must still take effect before authority is returned.
-  if ((row.issueId || row.botId) && !await currentRunToken(bearerToken)) return undefined
+  if (!await currentRunToken(bearerToken)) return undefined
   return {
     token: bearerToken, clientId: `run:${row.runId}`, scopes: [],
     expiresAt: Math.floor(row.expiresAt.getTime() / 1000),
-    extra: { userId: row.userId, credentialKind: 'run', credentialId: row.credentialId, workspaceId: row.workspaceId, runId: row.runId, issueId: row.issueId, agentId: row.agentId, botId: row.botId, executionIdentity: identity },
+    extra: { userId: row.userId, actorId, actorSessionId, credentialKind: 'run', credentialId: row.credentialId, workspaceId: row.workspaceId, runId: row.runId, issueId: row.issueId, agentId: row.agentId, botId: row.botId, executionIdentity: identity },
   }
+}
+
+/** The human content authority behind a verified worker. Resource ownership
+ * remains on workerRun.userId; this reader must be used for cited content. */
+export function workerActorReader(authInfo: AuthInfo | undefined): IssueReader {
+  const extra = authInfo?.extra
+  if (typeof extra?.runId !== 'string' || typeof extra.userId !== 'string'
+    || typeof extra.actorId !== 'string' || typeof extra.workspaceId !== 'string') throw new Error('MCP request is not an authorized run')
+  if (extra.actorId !== extra.userId) {
+    if (typeof extra.actorSessionId !== 'string') throw new Error('MCP collaboration has no live actor')
+    return { id: extra.actorId, [tokenWorkspace]: extra.workspaceId,
+      [enterprisePrincipal]: { kind: 'session', sessionId: extra.actorSessionId } }
+  }
+  if (typeof extra.credentialId !== 'string') throw new Error('MCP run has no delegation')
+  return { id: extra.actorId, [tokenWorkspace]: extra.workspaceId,
+    [enterprisePrincipal]: { kind: 'delegation', credentialKind: 'run', credentialId: extra.credentialId, workspaceId: extra.workspaceId } }
 }
 
 /** The run a worker request comes from. */

@@ -1,9 +1,10 @@
 import 'server-only'
 import { and, eq } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { agentRuns, deviceRepos, devices } from '@/lib/db/schema'
 import { verifyRunToken, workerRun } from '@/lib/mcp/worker'
 import type { RunGitHubScope } from './run-token-exchange'
+import { runPersonalResourcesAllowed } from '@/lib/run-private-resources'
 
 const LIVE = ['preparing', 'running']
 
@@ -27,6 +28,7 @@ export async function authorizeRunGitHubToken(request: Request): Promise<RunGitH
   const { run, device } = row
   if (run.userId !== worker.userId || !LIVE.includes(run.status) || run.stopRequestedAt || !run.leaseExpiresAt || run.leaseExpiresAt.getTime() <= Date.now() ||
     !device.enabled || device.ownerId !== worker.userId) return null
+  if (!await runPersonalResourcesAllowed(pool, run.id, worker.userId)) return null
   const remoteKey = row.repoUserId === worker.userId && row.repoPath?.startsWith('v2/github.com/') ? row.repoPath : undefined
   return { runId: run.id, userId: worker.userId, ...(remoteKey ? { remoteKey } : {}) }
 }

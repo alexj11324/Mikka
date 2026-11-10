@@ -1,18 +1,19 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import { z } from 'zod'
+import type { z } from 'zod'
 import { db, withDatabaseTransaction } from '@/lib/db'
 import { ActionFailureError } from '@/lib/action-error'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { activeTaskWorkspaces, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceDb } from '@/lib/workspace-db'
 import type { IssueReader } from '@/lib/issue-visibility'
-import { RESOURCE_ACTIONS, RESOURCE_KINDS, SHARING_GRANT_ACTIONS, deniedResourceCapabilities, resourceManagementMetadata,
+import { RESOURCE_ACTIONS, SHARING_GRANT_ACTIONS, deniedResourceCapabilities, resourceManagementMetadata,
   type ResourceAction, type ResourceCapabilities, type ResourceKind, type ResourcePolicy, type ResourceReference } from './contract'
 
 export type ResourceExecutor = Pick<typeof db, 'execute'>
-const referenceSchema = z.object({ kind: z.enum(RESOURCE_KINDS), id: z.uuid(), workspaceId: z.uuid() }).strict()
+import { resourceReferenceInput as referenceSchema, resourceAccessChangeSchema } from './input'
+export { resourceAccessChangeSchema } from './input'
 const columns = sql`kind,id,"workspaceId","ownerId",visibility,revision,"parentKind","parentId",provenance,"createdAt","updatedAt"`
 
 /** Historical bot chats use their real owner+bot identity; null legacy bots
@@ -114,14 +115,11 @@ export async function readResourceCapabilities(reader: IssueReader, reference: R
 }
 
 export async function readResourceManagementMetadata(reader: IssueReader, reference: ResourceReference) {
-  if (!(await readResourceCapabilities(reader, reference)).canReadMetadata) return null
+  const capabilities = await readResourceCapabilities(reader, reference)
+  if (!capabilities.canReadMetadata && !capabilities.canReadContent) return null
   const { rows: [policy] } = await db.execute<ResourcePolicy>(sql`select ${columns} from resource_access_policies where kind=${reference.kind} and id=${reference.id}::uuid and "workspaceId"=${reference.workspaceId}::uuid`)
   return policy ? resourceManagementMetadata(policy) : null
 }
-
-const grantSchema = z.object({ subjectId: z.string().min(1).max(256), capabilities: z.array(z.enum(RESOURCE_ACTIONS)).min(1).max(RESOURCE_ACTIONS.length), expiresAt: z.iso.datetime().nullable().optional() }).strict()
-export const resourceAccessChangeSchema = z.object({ expectedRevision: z.number().int().positive(), visibility: z.enum(['shared', 'private']),
-  grants: z.array(grantSchema).max(200), confirmExpansion: z.boolean().default(false) }).strict()
 
 /** Owner-managed sharing. This never transfers ownership or grants access to
  * a model, machine, private key, personal memory or billing account. */
@@ -140,6 +138,11 @@ export async function changeResourceAccess(reader: IssueReader, reference: Resou
     return db.transaction(tx => withDatabaseTransaction(tx, async () => {
       const current = await lockResourceAccess(tx, userId, reference, 'canManageAccess', true)
       if (current.revision !== value.expectedRevision) throw new ActionFailureError('issueOutdated')
+      const members = await membership.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+        .where(and(eq(workspaceMembers.workspaceId,reference.workspaceId),eq(workspaceMembers.status,'active')))
+      const audience = async () => (await tx.execute<{id:string}>(sql`select id from unnest(${sql.param(members.map(member=>member.id))}::text[]) id
+        where mikka_resource_acl_allowed('account',id,${reference.workspaceId}::uuid,${reference.kind},${reference.id}::uuid,'canReadContent')`)).rows.map(row=>row.id)
+      const before = await audience()
       const { rows: previous } = await tx.execute<{ subjectId: string; capabilities: ResourceAction[]; expiresAt: Date | null }>(sql`select "subjectId",capabilities,"expiresAt" from resource_access_grants where "resourceKind"=${reference.kind} and "resourceId"=${reference.id}::uuid and "subjectKind"='account'`)
       const expansion = current.visibility !== 'shared' && value.visibility === 'shared'
         || value.grants.some(grant => {
@@ -148,6 +151,30 @@ export async function changeResourceAccess(reader: IssueReader, reference: Resou
             || old.expiresAt !== null && (!grant.expiresAt || new Date(grant.expiresAt).getTime() > old.expiresAt.getTime())
         })
       if (expansion && !value.confirmExpansion) throw new ActionFailureError('validationGeneric')
+      if (expansion) {
+        // A running private environment cannot become clean retroactively.
+        // Keep the old audience until its native/hosted execution has actually
+        // ended, including pending inbox work that can acquire the next lease.
+        // Admission holds the same policy ancestry while it creates its run.
+        const { rows: [execution] } = await tx.execute<{ active: boolean }>(sql`with recursive descendants as (
+          select kind,id,0 as depth from resource_access_policies where kind=${reference.kind} and id=${reference.id}::uuid
+          union all select p.kind,p.id,d.depth+1 from resource_access_policies p join descendants d
+            on p."parentKind"=d.kind and p."parentId"=d.id where d.depth<32
+        ), affected_bots as (
+          select b.id,b."ownerId" from bots b where b."workspaceId"=${reference.workspaceId}::uuid and (
+            b.id in(select id from descendants where kind='bot')
+            or mikka_chat_resource_id(b."ownerId",b.id) in(select id from descendants where kind='chat'))
+        ) select exists(select 1 from agent_runs r where r."workspaceId"=${reference.workspaceId}::uuid
+          and r.status in('queued','preparing','running','paused','waiting_input','finishing') and (
+            r.id in(select id from descendants where kind='thread')
+            or r."issueId" in(select id from descendants where kind='task')
+            or r."botId" in(select id from affected_bots)))
+          or exists(select 1 from coordinator_sessions s join affected_bots b on b.id=s."botId" and b."ownerId"=s."userId"
+            where s."leaseHolder" is not null and s."leaseUntil">clock_timestamp())
+          or exists(select 1 from coordinator_events e join affected_bots b on b.id=e."botId" and b."ownerId"=e."userId"
+            where e."deliveredAt" is null and (e.kind='user_message' or e.tier is distinct from 'background')) as active`)
+        if (execution?.active) throw new ActionFailureError('resourceSharingExecutionActive')
+      }
       const restriction = current.visibility === 'shared' && value.visibility === 'private'
         || previous.some(old => {
           const grant = value.grants.find(item => item.subjectId === old.subjectId)
@@ -178,7 +205,12 @@ export async function changeResourceAccess(reader: IssueReader, reference: Resou
       await tx.execute(sql`delete from resource_access_grants where "resourceKind"=${reference.kind} and "resourceId"=${reference.id}::uuid and "subjectKind"='account'`)
       for (const grant of value.grants) await tx.execute(sql`insert into resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities,"expiresAt")
         values(${reference.kind},${reference.id}::uuid,'account',${grant.subjectId},${sql.param([...new Set(grant.capabilities)])}::text[],${grant.expiresAt ?? null}::timestamptz)`)
+      if (value.grants.some(grant => grant.expiresAt)) (await import('@/lib/due-timer')).armDueTimerAfterCommit(tx, 'run-recovery')
       const { rows: [policy] } = await tx.execute<ResourcePolicy>(sql`select ${columns} from resource_access_policies where kind=${reference.kind} and id=${reference.id}::uuid`)
+      const { notifyResourceAccessChanged } = await import('@/lib/live/resource-access')
+      notifyResourceAccessChanged(tx,reference.workspaceId,[...before,...await audience()])
+      const { armDueTimerAfterCommit } = await import('@/lib/due-timer')
+      armDueTimerAfterCommit(tx,'run-recovery')
       if (reference.kind === 'task') await (await import('@/lib/live/panels')).documentChanged(tx, reference.id)
       return resourceManagementMetadata(policy)
     }))

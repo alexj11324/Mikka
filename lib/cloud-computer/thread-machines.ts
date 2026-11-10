@@ -43,12 +43,14 @@ async function options(ownerId: string) {
   return { apiKey: await e2bApiKey(ownerId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 }
 /** Register only while this provisioning lease still owns a non-ended row. */
-export async function recordThreadSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, leaseId: string) {
+export async function recordThreadSandbox(pool: Pick<Pool, 'query'>, runId: string, sandboxId: string, leaseId: string, freshOfficialInstance = false) {
   // The history INSERT checks its run FK. Acquire that parent lock before the
   // machine, matching park/ensure even when this is one autocommitted query.
   const recorded = Boolean((await pool.query(`WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
-    UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp())
-    FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`, [runId, sandboxId, leaseId])).rowCount)
+    UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp()),
+      "resourceIsolation"=CASE WHEN $4 AND m."sandboxId" IS NULL AND m."deviceId" IS NULL AND m."resourceIsolation"='legacy_unknown'
+        THEN 'shared_clean' ELSE m."resourceIsolation" END
+    FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`, [runId, sandboxId, leaseId, freshOfficialInstance])).rowCount)
   if (recorded) taskActivityChanged(pool, runId)
   return recorded
 }
@@ -272,10 +274,10 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
     WHERE "runId"=$1 RETURNING lifecycle->>'transferredAt' AS "transferredAt"`, [previous.runId])
   taskActivityChanged(client, previous.runId)
   taskActivityChanged(client, runId)
-  return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId","templateKind",epoch,"runningSince")
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,CASE WHEN $12='running' THEN $14::timestamptz ELSE NULL END)
-    ON CONFLICT ("runId") DO UPDATE SET "issueId"=EXCLUDED."issueId","snapshotId"=EXCLUDED."snapshotId","templateKind"=EXCLUDED."templateKind",state=EXCLUDED.state,"sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId","repoId"=EXCLUDED."repoId",epoch=EXCLUDED.epoch,"runningSince"=EXCLUDED."runningSince","lifecycleAt"=now(),lifecycle='{}'::jsonb
-    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId, threadMachineTemplateKind(previous), previous.state, previous.epoch + 1, transfer.transferredAt])).rows[0]
+  return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId","templateKind",epoch,"runningSince","resourceIsolation")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,CASE WHEN $12='running' THEN $14::timestamptz ELSE NULL END,$15)
+    ON CONFLICT ("runId") DO UPDATE SET "issueId"=EXCLUDED."issueId","snapshotId"=EXCLUDED."snapshotId","templateKind"=EXCLUDED."templateKind",state=EXCLUDED.state,"sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId","repoId"=EXCLUDED."repoId",epoch=EXCLUDED.epoch,"runningSince"=EXCLUDED."runningSince","resourceIsolation"=EXCLUDED."resourceIsolation","lifecycleAt"=now(),lifecycle='{}'::jsonb
+    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId, threadMachineTemplateKind(previous), previous.state, previous.epoch + 1, transfer.transferredAt, previous.resourceIsolation])).rows[0]
 }
 
 /** An already admitted next run gets a short transfer window.
@@ -812,7 +814,8 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId, operationId: machine.operationId }, actor.userId)
     connected = null
     refreshPhase = timings.next('record_sandbox')
-    const recorded = await recordThreadSandbox(pool, runId, sandbox.sandboxId, leaseId)
+    const recorded = await recordThreadSandbox(pool, runId, sandbox.sandboxId, leaseId,
+      !machine.sandboxId && !machine.deviceId && Boolean(cloudTemplateOrigin(machine.snapshotId)))
     if (!recorded) {
       // An end can win while Sandbox.create is in flight. The just-created
       // sandbox is not in the row end observed, so this worker must clean it up.

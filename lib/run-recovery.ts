@@ -17,6 +17,7 @@ import type { RunRecoverySweep } from '@/lib/run-recovery-due'
  */
 export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => unknown, only?: ReadonlySet<RunRecoverySweep>) {
   const runs = (sweep: RunRecoverySweep) => !only || only.has(sweep)
+  const resourceAccess = runs('resourceAccess') ? await (await import('@/lib/resource-access/lifecycle')).expireResourceAuthority() : null
   const leases = runs('leases') ? await sweepExpiredRunLeases() : null
   // Bot computers whose sandbox E2B no longer has stop claiming to run.
   const machines = runs('machines') ? await reconcileCloudMachines(pool).catch(() => null) : null
@@ -32,5 +33,5 @@ export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => 
   // Group turns left queued when their request ended: they no longer wait for someone to read the group.
   const started = Date.now()
   if (runs('groupTurns')) await groupTurns(() => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))
-  return { ...(leases ?? { owners: 0, failed: 0 }), machines, outcomes, taskMachines, sandboxKills, tasks }
+  return { ...(leases ?? { owners: 0, failed: 0 }), machines, outcomes, taskMachines, sandboxKills, tasks, resourceAccess }
 }

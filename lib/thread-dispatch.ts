@@ -108,6 +108,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   sourceEventId?: string
   /** A browser submission already bound its original target before taking the task lock. */
   expectedRunId?: string
+  /** A collaborator's grant funds a new bounded turn, never the owner's live mailbox. */
+  requireIdle?: true
   /** The caller asked for a new thread; it is granted only when `explicit()` says the person asked for it. */
   newThread?: boolean
   /** The dispatch names another place than where the thread ran: moving a thread is a new thread, granted the same way. */
@@ -128,6 +130,7 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     const chain = await readRunChain(pool, userId, previous.id)
     const threadId = chain?.rootRunId ?? previous.id
     const working = UNFINISHED_RUN_STATUSES.some(status => status === previous.status)
+    if (working && input.requireIdle) throw new ActionFailureError('threadExecutionBusy')
     // A move is judged even when the caller asked for a new thread: the person naming the other place is what grants it.
     const moves = await input.moves?.(previous) ?? false
     const wantsNew = input.newThread || moves

@@ -1,4 +1,6 @@
 import type { RunFailure } from '@mikka/protocol/run-failure'
+import type { CollaborativeRunAuthority } from '@/lib/execution-identity'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { AgentProfileError, builtinAgentProfileSelection } from '@/lib/factory/agent-profile-definition'
 import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { queueTaskRun } from '@/lib/factory/queue-local'
@@ -895,19 +897,27 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { sourceEventId?: string; factoryBotId?: string | null; botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model: string; modelDispatch?: WorkerModelDispatch; agentProfile?: WorkerDefinitionSnapshot['agentProfile']; policyCeiling?: WorkerDefinitionSnapshot['policyCeiling']; threadRunId?: string; repo?:string; suggestionId?: string; readOnly?: boolean; needsSpec?: boolean; apiKeyId?: string; subscriptionBindingId?: string; /** An MCP-owned thread retains its original result destination. */ withoutBot?: boolean }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, allowLocalRecovery?: true) {
+export async function dispatchComputerTask(userId: string, input: { sourceEventId?: string; factoryBotId?: string | null; botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model: string; modelDispatch?: WorkerModelDispatch; agentProfile?: WorkerDefinitionSnapshot['agentProfile']; policyCeiling?: WorkerDefinitionSnapshot['policyCeiling']; threadRunId?: string; repo?:string; suggestionId?: string; readOnly?: boolean; needsSpec?: boolean; apiKeyId?: string; subscriptionBindingId?: string; /** An MCP-owned thread retains its original result destination. */ withoutBot?: boolean }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, allowLocalRecovery?: true, authority?: CollaborativeRunAuthority) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' as const }
   if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
-  const readTarget = async () => (await pool.query<{ workspaceId: string; agentId: string; repoId: string; deviceId: string }>(`SELECT b."workspaceId",r."agentId",r."repoId",a."deviceId" FROM bots b
+  if (authority && (authority.actorId === userId || authority.threadOwnerId !== userId || !input.threadRunId || !input.apiKeyId
+    || input.subscriptionBindingId || input.suggestionId || allowLocalRecovery || execution || input.agentProfile)) return { error: 'threadExecutionAuthorizationRequired' as const }
+  const readTarget = async () => authority
+    ? await (await import('@/lib/computer/cloud-task-target')).collaborativeCloudTaskTarget(pool, userId, {
+      sourceRunId: input.threadRunId!, botId: input.botId, issueId: input.issueId, harness: input.harness, model: input.model, keyId: input.apiKeyId!,
+    }, authority)
+    : (await pool.query<{ workspaceId: string; agentId: string; repoId: string; deviceId: string }>(`SELECT b."workspaceId",r."agentId",r."repoId",a."deviceId" FROM bots b
     JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
     JOIN agents a ON a.id=r."agentId" AND a."userId"=b."ownerId" AND a.harness=r.harness
     JOIN devices d ON d.id=a."deviceId" AND d."ownerId"=b."ownerId" AND d.kind='cloud' AND d.enabled=true
     JOIN cloud_machines m ON m."deviceId"=d.id AND m."ownerId"=b."ownerId" AND m."workspaceId"=b."workspaceId"
     WHERE b.id=$1 AND b."ownerId"=$2 AND b."archivedAt" IS NULL AND r.harness=$3`, [input.botId, userId, input.harness])).rows[0]
-  let target = await readTarget()
-  if (!target) return { error: 'cloudComputerUnavailable' }
+  const initialTarget = await readTarget()
+  if (!initialTarget) return { error: 'cloudComputerUnavailable' }
+  const work = async () => {
+  let target = initialTarget
   const { timedPhase } = await import('@/lib/dispatch-timing')
   try { await timedPhase('authorizeSubscriptionWorkspace', async () => (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, target.workspaceId)) } catch { return { error: 'cloudComputerUnavailable' } }
   const issue = await timedPhase('issueForUser', () => issueForUser(userId, input.issueId))
@@ -916,6 +926,7 @@ export async function dispatchComputerTask(userId: string, input: { sourceEventI
   try {
     if (input.suggestionId && !(await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("botId" IS NULL OR "botId"=$4)', [input.suggestionId, userId, target.workspaceId, input.botId])).rowCount) return { error: 'suggestionUnavailable' }
     const actor = { userId, workspaceId: target.workspaceId }
+    if (!authority) {
     const runtime = await timedPhase('ensureBotCloudRuntime', async () => (await import('@/lib/computer/dispatch-runtime')).prepareBotCloudTaskRuntime(pool, actor, { ...input, agentId: target.agentId }))
     if (!runtime || runtime.botId !== input.botId || runtime.harness !== input.harness || runtime.agentId !== target.agentId) return { error: 'cloudComputerUnavailable' }
     // A wake may move this Bot's unchanged Agent to its replacement computer.
@@ -924,8 +935,9 @@ export async function dispatchComputerTask(userId: string, input: { sourceEventI
     if (!prepared || prepared.workspaceId !== target.workspaceId || prepared.agentId !== target.agentId) return { error: 'cloudComputerUnavailable' }
     await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, target.workspaceId)
     target = prepared
-    const deviceRepoId = input.repo ? (await timedPhase('ensureDeviceRepository', async () => (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo!))).id : target.repoId
-    const result = await timedPhase('queueCloudRun', () => queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, factoryBotId: input.factoryBotId, sourceEventId: input.sourceEventId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model: input.model, needsSpec: input.needsSpec, ...(input.modelDispatch ? { modelDispatch: input.modelDispatch } : {}), ...(input.agentProfile ? { agentProfile: input.agentProfile } : {}), ...(input.policyCeiling ? { policyCeiling: input.policyCeiling } : {}), ...(input.threadRunId ? { threadRunId: input.threadRunId } : {}), ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), ...(input.subscriptionBindingId ? { subscriptionBindingId: input.subscriptionBindingId } : {}), ...(input.withoutBot ? { withoutBot: true } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(allowLocalRecovery === true ? { allowLocalRecovery } : {}), ...(input.readOnly ? { readOnly: true } : {}) }))
+    }
+    const deviceRepoId = !authority && input.repo ? (await timedPhase('ensureDeviceRepository', async () => (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo!))).id : target.repoId
+    const result = await timedPhase('queueCloudRun', () => queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, factoryBotId: input.factoryBotId, sourceEventId: input.sourceEventId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model: input.model, needsSpec: input.needsSpec, ...(input.modelDispatch ? { modelDispatch: input.modelDispatch } : {}), ...(input.agentProfile ? { agentProfile: input.agentProfile } : {}), ...(input.policyCeiling ? { policyCeiling: input.policyCeiling } : {}), ...(input.threadRunId ? { threadRunId: input.threadRunId } : {}), ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), ...(input.subscriptionBindingId ? { subscriptionBindingId: input.subscriptionBindingId } : {}), ...(input.withoutBot ? { withoutBot: true } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(allowLocalRecovery === true ? { allowLocalRecovery } : {}), ...(input.readOnly ? { readOnly: true } : {}) }, authority))
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
     queuedRunId = result.runId
     await timedPhase('ensureThreadMachine', async () => (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, result.runId))
@@ -942,6 +954,7 @@ export async function dispatchComputerTask(userId: string, input: { sourceEventI
     const { FactoryError } = await import('@/lib/factory/contract')
     if (error instanceof FactoryError) return { error: error.code }
     const { ComputerError } = await import('@/lib/computer/store')
+    if (error instanceof ComputerError && ['personal_git_authorization_required','private_context_authorization_required'].includes(error.message)) return { error: error.message }
     console.warn('cloud task dispatch refused', { error: error instanceof Error ? error.constructor.name : typeof error, code: error instanceof ComputerError ? error.status : undefined })
     if (input.threadRunId && error instanceof ComputerError && error.message === 'Bot subscription unavailable') return { error: 'threadModelUnavailable' as const, threadRunId: input.threadRunId }
     // A machine startup failure is not an Owner stop. Finalize only a still
@@ -955,6 +968,10 @@ export async function dispatchComputerTask(userId: string, input: { sourceEventI
     }
     return { error: 'cloudComputerUnavailable' }
   }
+  }
+  return authority ? actAs({ id: userId, [tokenWorkspace]: initialTarget.workspaceId,
+    [enterprisePrincipal]: { kind: 'collaboration', authorizationId: authority.collaborationAuthorizationId, workspaceId: initialTarget.workspaceId } },
+  work, { actorType: 'user', actorId: authority.actorId }) : work()
 }
 
 /** Start only an owned Bot's computer after workspace authorization. */

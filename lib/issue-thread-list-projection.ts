@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { agentRuns } from '@/lib/db/schema'
 import { runFailureBrief } from './run-failure-projection'
 import { runBotName, runTaskPrompt } from '@/lib/run-bot-name'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 
 // The same whitespace set as JavaScript trim/\s, including NBSP and BOM.
 // PostgreSQL's default btrim and locale-dependent \s are not that contract.
@@ -30,11 +31,11 @@ const summary = sql<string | null>`coalesce(
     where btrim(raw.line, ${whitespace})<>'' order by raw.position limit 1)
 )`
 
-/** List-only text; teammate rows never transfer their private prompt, report or error. */
+/** Lists and details resolve the same ACL; private rows never become summaries. */
 export function issueThreadListText(viewerId: string) {
   return {
     failureDetails: runFailureBrief,
-    name: sql<string>`case when ${agentRuns.userId}=${viewerId} then coalesce(${title}, ${runBotName}) else '' end`,
-    summary: sql<string | null>`case when ${agentRuns.userId}=${viewerId} then ${summary} end`,
+    name: sql<string>`case when ${resourceAccessPredicate(viewerId, agentRuns.workspaceId, 'thread', agentRuns.id)} then coalesce(${title}, ${runBotName}) else '' end`,
+    summary: sql<string | null>`case when ${resourceAccessPredicate(viewerId, agentRuns.workspaceId, 'thread', agentRuns.id)} then ${summary} end`,
   }
 }

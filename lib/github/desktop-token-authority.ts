@@ -3,6 +3,7 @@ import { pool } from '@/lib/db'
 import { authenticateDevice } from '@/lib/device-link'
 import type { RunGitHubScope } from './run-token-exchange'
 import { z } from 'zod'
+import { runPersonalResourcesAllowed } from '@/lib/run-private-resources'
 
 /**
  * A Bot's cloud desktop asks with its own worker device credential, scoped to
@@ -27,6 +28,7 @@ export async function authorizeDeviceRunGitHubToken(request: Request, deviceId: 
   if (!z.uuid().safeParse(deviceId).success || !z.uuid().safeParse(runId).success) return null
   const caller = await authenticateDevice(request)
   if (!caller || (caller.scopeDeviceId && caller.scopeDeviceId !== deviceId)) return null
+  if (!await runPersonalResourcesAllowed(pool, runId, caller.userId)) return null
   const { rows: [run] } = await pool.query<{ remoteKey: string | null }>(`SELECT repo."repoPath" AS "remoteKey" FROM agent_runs r
     JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId" AND d.enabled AND d."removedAt" IS NULL
     LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" AND repo."deviceId"=d.id

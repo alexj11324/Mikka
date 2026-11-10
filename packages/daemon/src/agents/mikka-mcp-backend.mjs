@@ -8,6 +8,7 @@ import { isAbsolute, join, resolve, sep } from "node:path"
 import { request as httpRequest } from 'node:http'
 import { isDeepStrictEqual } from 'node:util'
 import { copyCaptureFd } from './capture-copy.mjs'
+import { runNativeToolCommand } from './native-tool-isolation.mjs'
 
 // Acceptance-only, best-effort observation of the two business fetch paths
 // below. The receiver is the host's existing loopback OTLP server, not an
@@ -104,6 +105,7 @@ function readPreparedDecisionCatalogue(raw) {
 }
 
 const VERIFY_TOOL = { name: 'verify_command', description: 'Run this Factory check’s frozen command, or the command inferred from repository scripts when the host explicitly enabled inference. Use this tool for real command observations when native shell is unavailable. It does not submit or accept the task.', inputSchema: { type: 'object', properties: { command: { type: 'string' }, basis: { type: 'string' } }, required: ['command'] } }
+const COMMAND_TOOL = { name: 'run_command', description: 'Run a shell command in this task’s isolated worktree. Use it to read and edit files, inspect Git changes, install dependencies and run tests. Native model credentials, personal HOME and host processes are outside the tool environment. The current worktree is fixed by the host.', inputSchema: { type: 'object', properties: { command: { type: 'string', minLength: 1, maxLength: 65536 }, timeout_ms: { type: 'integer', minimum: 1, maximum: 300000 } }, required: ['command'], additionalProperties: false } }
 
 const REPOSITORY_TOOL = { name: 'switch_repository', description: 'When this checkout does not match the task, choose the correct owner/repo after inspecting the task, Git origin and repository files. The host rechecks your owner’s live GitHub authorization, preserves this checkout, clones the selected repository into a new bound execution, and continues with the same model and credential. End your turn only if the response confirms a repository selection was recorded. If it reports already_active, continue the task in this checkout. Do not change origin or clone a nested delivery in the wrong worktree. Independent checks cannot switch their fixed candidate.', inputSchema: { type: 'object', properties: { repository: { type: 'string', description: 'Exact GitHub owner/repo or GitHub clone URL.' }, reason: { type: 'string', description: 'Task and repository evidence explaining the mismatch and chosen target.' } }, required: ['repository', 'reason'], additionalProperties: false } }
 
@@ -401,6 +403,7 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
   }
 
   const factoryVerify = config.factoryVerify ? structuredClone(config.factoryVerify) : null
+  const toolIsolation = config.toolIsolation ? structuredClone(config.toolIsolation) : null
 
   const artifactRoot = config.artifactRoot ? realpathSync(config.artifactRoot) : null
   // Metadata belongs to the bound worktree, never the CLI's shadow Git context.
@@ -574,9 +577,10 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
       ...(expectedBytes === undefined ? {} : { matchesExpectedUtf8: bytes.equals(expectedBytes) }) }) }] }
   }
 
-  function verifyCommand(args) {
+  async function verifyCommand(args) {
     const command = typeof args.command === 'string' ? args.command.trim() : ''
     if (!command || command.length > 2000 || (factoryVerify.command ? command !== factoryVerify.command.trim() : !factoryVerify.infer || !args.basis?.trim())) throw new Error('Use the frozen command, or provide repository evidence for inference.')
+    if (toolIsolation) return isolatedCommand({ command, timeout_ms: 300000 })
     const home = mkdtempSync(join(tmpdir(), 'mikka-verify-tool-'))
     try {
       const env = { PATH: environment.PATH, HOME: home, TMPDIR: home, LANG: 'C.UTF-8' }
@@ -584,6 +588,19 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
       const result = spawnSync(command, { shell: true, cwd: factoryVerify.cwd, env, timeout: 300000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
       return { isError: result.status !== 0, content: [{ type: 'text', text: JSON.stringify({ command, exitCode: result.status, signal: result.signal, stdout: result.stdout?.slice(-8000) ?? '', stderr: result.stderr?.slice(-4000) ?? '', ...(result.error ? { error: 'verification_process_failed' } : {}) }) }] }
     } finally { rmSync(home, { recursive: true, force: true }) }
+  }
+
+  async function isolatedCommand(args) {
+    if (!toolIsolation || !args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(key => !['command', 'timeout_ms'].includes(key))) throw Error('native_tool_input_invalid')
+    if (args.timeout_ms !== undefined && (!Number.isInteger(args.timeout_ms) || args.timeout_ms < 1 || args.timeout_ms > 300000)) throw Error('native_tool_input_invalid')
+    assertLive?.(); lifetime.signal.throwIfAborted()
+    const result = await runNativeToolCommand(toolIsolation, args.command, { signal: lifetime.signal, timeoutMs: args.timeout_ms ?? 120000, inherited: environment })
+    assertLive?.(); lifetime.signal.throwIfAborted()
+    return { isError: result.exitCode !== 0 || result.timedOut || result.overflow, content: [{ type: 'text', text: JSON.stringify({
+      exitCode: result.exitCode, signal: result.signal, timedOut: result.timedOut,
+      stdout: result.stdout.slice(-24000), stderr: result.stderr.slice(-8000),
+      truncated: result.overflow || result.stdout.length > 24000 || result.stderr.length > 8000,
+    }) }] }
   }
 
   const handoffFile = config.handoffFile
@@ -755,8 +772,12 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
           catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Repository inspection refused or unavailable.' }] }) }
         }
         if (factoryVerify && params?.name === VERIFY_TOOL.name) {
-          try { return reply(id, verifyCommand(params.arguments ?? {})) }
+          try { return reply(id, await verifyCommand(params.arguments ?? {})) }
           catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Verification command refused.' }] }) }
+        }
+        if (toolIsolation && params?.name === COMMAND_TOOL.name) {
+          try { return reply(id, await isolatedCommand(params.arguments ?? {})) }
+          catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Isolated command unavailable.' }] }) }
         }
         if (capturesDir && params?.name === CAPTURE_TOOL.name) {
           try {
@@ -796,6 +817,7 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
       ...TOOLS, ...decisions, ...(repositoryRoot ? [REPOSITORY_TOOL] : []),
       ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : []),
       ...(artifactRoot ? [ARTIFACT_TOOL, INSPECT_REPOSITORY_TOOL] : []),
+      ...(toolIsolation ? [COMMAND_TOOL] : []),
     ]))
   }
   function handle(message) {
@@ -835,11 +857,13 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
 export function mikkaMcpToolCatalogue({
   decisionCatalogue, repositorySelection = false, captures = false,
   factoryVerify = false, artifactInspection = false,
+  nativeToolIsolation = false,
 } = {}) {
   return structuredClone([
     ...TOOLS, ...(decisionCatalogue === undefined ? [] : [readPreparedDecisionCatalogue(decisionCatalogue)]),
     ...(repositorySelection ? [REPOSITORY_TOOL] : []), ...(captures ? [CAPTURE_TOOL] : []),
     ...(factoryVerify ? [VERIFY_TOOL] : []), ...(artifactInspection ? [ARTIFACT_TOOL, INSPECT_REPOSITORY_TOOL] : []),
+    ...(nativeToolIsolation ? [COMMAND_TOOL] : []),
   ])
 }
 

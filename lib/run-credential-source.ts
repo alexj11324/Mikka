@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import { apiKeyAfterQuota, botApiKeyChoice, usableApiKeys } from '@/lib/model-api-keys'
 import { apiKeyHarnesses, type ApiKeyView } from '@/lib/model-api-key-providers'
 import { subscriptionAvailability } from './subscription-quota'
+import { ActionFailureError } from './action-error'
 
 type Query = Pick<Pool | PoolClient, 'query'>
 
@@ -16,9 +17,10 @@ interface Binding { id: string; ownerId: string; connectionId: string; connectio
  * workspace its owner's own keys, then teammates' shared ones; with no bot
  * (the Coordinator), the owner's own keys only.
  */
-async function runKeys(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>[]> {
+type RunKey = Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'> & { ownerId: string }
+async function runKeys(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<RunKey[]> {
   if (botWorkspaceId) return usableApiKeys(query, ownerId, botWorkspaceId)
-  return (await query.query<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>>('SELECT id,provider,protocol,"responsesApi",models FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id', [ownerId])).rows
+  return (await query.query<RunKey>('SELECT id,"ownerId",provider,protocol,"responsesApi",models FROM model_api_keys WHERE "ownerId"=$1 AND to_jsonb(model_api_keys)->>\'revokedAt\' IS NULL ORDER BY "createdAt",id', [ownerId])).rows
 }
 
 /** The first compatible key serving the asked model; a default is chosen only with no model. */
@@ -42,6 +44,7 @@ async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView
   if (keyId) {
     const named = keys.find(item => item.id === keyId)
     if (named && serves(named)) return { keyId: named.id, model }
+    throw new ActionFailureError('executionModelUnknown')
   }
   const key = keys.find(serves)
   if (!key) return
@@ -93,6 +96,7 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   /** A device run: the device's own CLI login is a subscription too, so only the bot's saved key choice uses a key. */
   localLogin?: boolean
 }): Promise<{ subscription: S | null; apiKey?: RunApiKey }> {
+  if (input.subscription && input.subscription.ownerId !== input.ownerId) throw new ActionFailureError('executionAccountUnavailable')
   const kept = { subscription: input.subscription }
   if (input.harness !== 'codex' && input.harness !== 'claude_code') return kept
   const keys = await runKeys(query, input.ownerId, input.botWorkspaceId)
@@ -108,8 +112,8 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   const model = input.model ?? input.subscription?.modelId
   const state = input.subscription ? await subscriptionState(query, input.subscription, input.harness, model ?? '') : 'unusable'
   if (state === 'usable') return kept
-  if (state === 'exhausted' && !(await apiKeyAfterQuota(query, input.ownerId))) return kept
-  const apiKey = firstKey(keys, input.harness, model)
+  if (input.subscription && !(await apiKeyAfterQuota(query, input.ownerId))) return kept
+  const apiKey = firstKey(input.subscription ? keys.filter(key => key.ownerId === input.ownerId) : keys, input.harness, model)
   return apiKey ? { subscription: null, apiKey } : kept
 }
 
@@ -126,6 +130,6 @@ export async function quotaFallbackApiKey(query: Query, input: {
   if (!input.model || (input.harness !== 'codex' && input.harness !== 'claude_code')) return undefined
   const keys = await runKeys(query, input.ownerId, input.botWorkspaceId)
   if (!keys.length) return undefined
-  return firstKey(keys, input.harness, input.model)
+  return firstKey(keys.filter(key => key.ownerId === input.ownerId), input.harness, input.model)
 }
 

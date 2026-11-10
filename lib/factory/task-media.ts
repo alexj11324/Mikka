@@ -37,7 +37,8 @@ export async function readFactoryTaskMedia(tx: Pick<PoolClient, 'query'>, task: 
     FROM run_captures c JOIN agent_runs r ON r.id=c."runId" AND r."userId"=c."userId"
     WHERE c."userId"=$2 AND r."issueId"=$3 AND r."workspaceId"=$4 AND (c."issueId" IS NULL OR c."issueId"=$3) AND c.status='ready'
       AND EXISTS (SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1 AND a."runId"=r.id)
-    ORDER BY c."createdAt",c.id`, [task.id,task.userId,task.issueId,task.workspaceId ?? null])
+      AND mikka_resource_acl_allowed('account',$5,r."workspaceId",'thread',r.id,'canReadContent')
+    ORDER BY c."createdAt",c.id`, [task.id,task.userId,task.issueId,task.workspaceId ?? null,actingContext.getStore()?.userId ?? task.userId])
   const reader=tokenReader(task.userId)
   // readFactoryActivity keeps this helper inside withDatabaseClient(tx), so
   // the existing capture/run scope reads share its repeatable-read snapshot.
@@ -61,8 +62,9 @@ export async function authorizeFactoryTaskCapture(pool: Pool, store: Pick<Return
     const { rows:[capture] } = await tx.query<{runId:string}>(`SELECT c."runId" FROM run_captures c
       JOIN agent_runs r ON r.id=c."runId" AND r."userId"=c."userId"
       WHERE c.id=$1 AND c."userId"=$2 AND r."issueId"=$3 AND r."workspaceId"=$5 AND (c."issueId" IS NULL OR c."issueId"=$3) AND c.status='ready'
-        AND EXISTS (SELECT 1 FROM factory_attempts a WHERE a."taskId"=$4 AND a."runId"=r.id)`,
-    [captureId,task.userId,task.issueId,task.id,task.workspaceId ?? null])
+        AND EXISTS (SELECT 1 FROM factory_attempts a WHERE a."taskId"=$4 AND a."runId"=r.id)
+        AND mikka_resource_acl_allowed('account',$6,r."workspaceId",'thread',r.id,'canReadContent')`,
+    [captureId,task.userId,task.issueId,task.id,task.workspaceId ?? null,userId])
     if (!capture) throw new FactoryError('factoryNotFound')
     const reader=tokenReader(task.userId)
     if(reader){

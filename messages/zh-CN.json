@@ -1116,6 +1116,7 @@
     "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
     "executionCommandNotFound": "找不到这次检测。",
     "executionAccountUnavailable": "此账号不可用。",
+    "subscriptionPersonalOnly": "个人订阅只能由本人使用。请添加组织 API Key 来共享模型访问。",
     "threadModelUnavailable": "这个线程原来的模型已不可用。",
     "runModelMissing": "这个运行没有指定模型。",
     "generic": "操作未成功，请稍后重试。",
@@ -1243,6 +1244,11 @@
     "runNotActive": "此运行已结束，且没有可回答的问题。",
     "threadReplaced": "这个任务已经换到新的线程，请在那里发送。",
     "threadCannotContinue": "这个线程没有关联任务，无法再次运行。",
+    "threadExecutionAuthorizationRequired": "需要所有者授权模型连接和云端执行预算。",
+    "threadExecutionBudgetExceeded": "此线程获授权的执行预算已用完。",
+    "resourceSharingExecutionActive": "请先停止此资源的活动执行和待处理回复，再更改共享范围。现有访问权限尚未改变。",
+    "threadExecutionBusy": "当前运行尚未结束。可以先留言，结束后继续执行。",
+    "threadExecutionPrivateEnvironment": "此会话使用过个人资源。请使用干净的云环境新建共享线程。",
     "threadRecoveryUnavailable": "暂时无法恢复原会话。",
     "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
     "savedLoginNotFound": "此登录信息不存在或已删除。",
@@ -1264,6 +1270,11 @@
     "usageLimitReached": "已达到用量上限，新任务已暂停，运行中的任务会继续完成。",
     "usageCreditsExhausted": "点数已用完，新任务已暂停，运行中的任务会继续完成。",
     "billingNotConfigured": "计费尚未开通。",
+    "billingOrganizationAccountRequired": "此组织使用指定的计费账户，请在组织计费中管理点数。",
+    "billingResourcePlanUnavailable": "资源套餐尚未开通。现有订阅和点数保持不变。",
+    "billingAutoRechargeUnavailable": "当前支付渠道不支持自动充值。请使用「充值」逐次授权购买点数。",
+    "billingPolicyChanged": "计费限制在编辑期间已变更，请重新读取当前设置后再试。",
+    "billingCheckoutPending": "上一笔结账仍在对账，请稍后回到计费页继续同一笔购买。",
     "billingNoSubscription": "工作区还没有订阅。",
     "billingPlanInvalid": "无法选择这个方案。",
     "billingProviderFailed": "支付服务暂时无法完成请求。",
@@ -2626,7 +2637,7 @@
     },
     "billing": {
       "notConfiguredTitle": "此服务器未设置计费",
-      "notConfiguredBody": "套餐、席位和点数需要支付服务，由部署此服务器的人开启。",
+      "notConfiguredBody": "套餐和点数需要部署者开通支付服务。",
       "notConfiguredAction": "如何设置计费",
       "loading": "正在加载计费",
       "loadFailed": "读不到计费信息",
@@ -2639,6 +2650,10 @@
       "subscribe": "订阅 Team",
       "seats": "席位",
       "seatsUsed": "已用 {used} / {total}",
+      "legacySubscription": "这是历史订阅。在你明确更改或取消前，Stripe 原有的计费条款继续有效。",
+      "membersNotBilled": "成员数量不影响资源套餐的价格。",
+      "autoRecharge": "自动充值",
+      "members": "成员",
       "points": "点数",
       "planPoints": "本期方案点数",
       "purchasedPoints": "另购点数",
@@ -4681,7 +4696,7 @@
     "frameTitle": "{title}（网页）",
     "share": "分享",
     "createLink": "创建链接",
-    "shareAccess": "拿到链接的人可查看",
+    "shareAccess": "仅有访问权限的人可查看",
     "copyLink": "复制链接",
     "linkCopied": "链接已复制",
     "stopSharing": "停止分享",
@@ -4691,7 +4706,7 @@
     "shareRecheckFailed": "分享状态还没确认，请稍后再查一次。",
     "shareStillShared": "链接仍在分享中",
     "shareLink": "分享链接",
-    "sharedNotFoundHint": "分享已停止，或者链接不完整。",
+    "sharedNotFoundHint": "请登录对应工作区，或向所有者申请访问权限。",
     "notFoundTitle": "链接已失效",
     "roles": {
       "image": "图片",
@@ -5110,6 +5125,87 @@
     }
   },
   "Billing": {
+    "management": {
+      "scope": "计费范围",
+      "workspaceScope": "工作区",
+      "organizationScope": "组织",
+      "account": "组织付款账户",
+      "accountNone": "尚未指定付款账户",
+      "accountHelp": "选择已关联的共享工作区账户。存量余额和账单仍归原账户，不会转移资金。",
+      "accountOwnerOnly": "仅同时管理当前与目标工作区账户的组织所有者可以修改此设置。",
+      "saveAccount": "保存付款账户",
+      "balanceAccount": "余额与账单归属：{name}。",
+      "noAccount": "请先指定组织付款账户，再使用平台点数。",
+      "readOnly": "你可以查看计费元数据；管理此付款账户需要相应工作区的管理员权限。",
+      "usage": "资源用量",
+      "platformActual": "已确认的平台费用",
+      "platformReserved": "待结算或费用未知的预留",
+      "platformUnknown": "费用未知的平台调用",
+      "externalUnknown": "费用未知的外部运行",
+      "unknown": "未知",
+      "unknownHelp": "自带模型、订阅、E2B 和设备的费用归资源所有者，Mikka 不为这些外部费用重复扣点。",
+      "memberUsage": "费用归因",
+      "noMemberUsage": "本月尚无平台用量。",
+      "unattributed": "未记录执行成员的历史用量",
+      "member": "成员",
+      "actualCost": "已确认费用",
+      "budgets": "预算与阈值",
+      "budgetWorkspace": "预算工作区",
+      "budgetScope": "适用范围",
+      "budgetTarget": "资源或成员",
+      "budgetPeriod": "周期",
+      "budgetLimit": "点数上限",
+      "budgetLimitHint": "设为 0 将停止该范围的平台消费。移除上限会保留用量历史。",
+      "budgetWarning": "预警阈值（%）",
+      "budgetSave": "保存预算",
+      "budgetRemove": "移除上限",
+      "budgetEdit": "编辑预算",
+      "budgetNew": "新增预算",
+      "noBudgets": "尚未设置资源预算。",
+      "budgetReadOnly": "工作区管理员可以修改本工作区的资源预算。",
+      "resourceUnavailable": "资源元数据尚不可用，仍可设置工作区与成员预算。",
+      "resourceId": "资源 ID",
+      "resourceIdHelp": "选择资源或输入其 ID；此处不显示私人标题和对话内容。",
+      "budgetSpent": "已消费",
+      "budgetReserved": "已预留",
+      "budgetRemaining": "剩余",
+      "budgetExhausted": "已达上限",
+      "budgetThreshold": "已达预警阈值",
+      "budgetHealthy": "未达阈值",
+      "recharge": "充值限制",
+      "rechargeHelp": "当前支付渠道不支持自动扣款。可以保存限制，每次购买仍需在 Stripe 结账页授权。",
+      "rechargeThreshold": "余额阈值（点）",
+      "rechargeAmount": "单次充值点数",
+      "rechargeCap": "每月充值上限（点）",
+      "rechargeSave": "保存限制",
+      "rechargeOwnerOnly": "仅付款账户所有者可以保存这些限制。",
+      "saved": "已保存",
+      "saving": "保存中…",
+      "invalid": "请输入有效的整数限制，并选择资源。",
+      "reload": "刷新计费",
+      "periods": {
+        "month": "自然月（UTC）",
+        "day": "自然日（UTC）",
+        "lifetime": "累计"
+      },
+      "scopes": {
+        "workspace": "工作区",
+        "member": "成员",
+        "project": "项目",
+        "thread": "对话",
+        "run": "运行"
+      },
+      "billingEntry": "计费与预算",
+      "historyEmpty": "暂无账单记录。",
+      "newSubscriptionUnavailable": "资源订阅尚未配置，现有余额与订阅仍可使用。",
+      "membersNotBilled": "成员不按席位收费。",
+      "activePlan": "生效中的资源套餐",
+      "inactiveCreditShare": "组织账户付款期间，此前的个人点数共享不生效。关闭此项可撤销原授权。",
+      "capacity": "平台并发执行数",
+      "plans": { "free": "免费版", "pro": "专业版", "enterprise": "企业版" },
+      "removeLimitHelp": "移除此范围的消费上限，保留既有用量与审计记录。",
+      "differentPayer": "平台执行使用另一个组织付款账户。此页显示当前工作区保留的余额与历史，请切换组织范围管理平台购买。"
+    },
     "allowance": {
       "section": "免费额度",
       "title": "银行卡验证",
@@ -5137,6 +5233,7 @@
       "receipt": "收据",
       "types": {
         "topup": "充值",
+        "subscription": "套餐点数",
         "verification": "验卡赠送",
         "refund": "退款"
       },
@@ -5153,6 +5250,8 @@
       "free_allowance_used": "免费额度已用完",
       "points_exhausted": "点数已用完",
       "platform_paused": "免费额度暂时停用",
+      "usage_budget_exhausted": "用量预算已达到上限，请联系管理员查看预算。",
+      "billing_authorization_revoked": "付款授权已变更，请选择获授权的计费账户后继续。",
       "unavailable": "Mikka 默认暂时不可用",
       "trialUsed": "免费对话已用完",
       "bindSubscription": "绑定订阅",
@@ -5331,18 +5430,43 @@
       "limit_exceeded": "密钥请求超出支持的数据大小或授权数量。",
       "configuration": "请配置该密钥的受保护 HTTP 规则，或明确允许 Agent 直接读取此密钥。"
     },
-    "run_subscription_expired": { "default": "模型订阅需要重新连接。" },
-    "run_api_key_invalid": { "default": "服务商拒绝了 API 密钥，请在模型设置中检查密钥。" },
-    "run_quota_exceeded": { "default": "服务商用量额度或余额已用尽，请查看用量。" },
-    "run_rate_limited": { "default": "服务商正在限制请求频率，请稍后重试。" },
-    "run_invalid_request": { "default": "服务商无法接受这次请求，请查看错误详情。" },
-    "run_access_denied": { "default": "服务商拒绝访问，请检查账号权限。" },
-    "run_model_unavailable": { "default": "此模型当前不可用或已退役，请选择其他模型。" },
-    "run_context_length_exceeded": { "default": "请求超出了模型的上下文长度限制，请缩短输入或选择其他模型。" },
-    "run_timeout": { "default": "服务商响应超时，请重试。" },
-    "run_network_error": { "default": "无法连接模型服务商，请检查连接后重试。" },
-    "run_provider_error": { "default": "模型服务商未能完成这次请求，请重试。" },
-    "run_failed": { "default": "任务未能完成，请查看错误详情或重试。" },
+    "run_subscription_expired": {
+      "default": "模型订阅需要重新连接。"
+    },
+    "run_api_key_invalid": {
+      "default": "服务商拒绝了 API 密钥，请在模型设置中检查密钥。"
+    },
+    "run_quota_exceeded": {
+      "default": "服务商用量额度或余额已用尽，请查看用量。"
+    },
+    "run_rate_limited": {
+      "default": "服务商正在限制请求频率，请稍后重试。"
+    },
+    "run_invalid_request": {
+      "default": "服务商无法接受这次请求，请查看错误详情。"
+    },
+    "run_access_denied": {
+      "default": "服务商拒绝访问，请检查账号权限。"
+    },
+    "run_model_unavailable": {
+      "default": "此模型当前不可用或已退役，请选择其他模型。"
+    },
+    "run_context_length_exceeded": {
+      "default": "请求超出了模型的上下文长度限制，请缩短输入或选择其他模型。"
+    },
+    "run_timeout": {
+      "default": "服务商响应超时，请重试。"
+    },
+    "run_network_error": {
+      "default": "无法连接模型服务商，请检查连接后重试。"
+    },
+    "run_provider_error": {
+      "default": "模型服务商未能完成这次请求，请重试。"
+    },
+    "run_failed": {
+      "default": "任务未能完成，请查看错误详情或重试。"
+    },
+    "run_clean_isolation_required": {"default": "此共享线程需要具备原生凭证保护能力的干净云环境。请新建私人线程，或选择兼容的干净云电脑。"},
     "governance_denied": {
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
@@ -5351,38 +5475,93 @@
       "feature_unavailable": "此功能需要 Team Pro 或 Enterprise。",
       "last_owner": "组织至少需要保留一位活跃所有者。",
       "workspace_attached": "此工作区已属于另一个组织。",
+      "billing_account_attached": "请先更换或解除组织的计费账户，再解绑此工作区。",
       "personal_workspace": "个人工作区不能使用共享工作区权益或加入组织。",
       "invalid_request": "请检查填写的信息后重试。",
       "template_limit": "审批模板数量已达到当前套餐上限。",
       "not_found": "此组织、工作区或模板不可用。"
     },
-    "web_auth_invalid_request": { "default": "登录请求无效，请重新连接。" },
-    "web_auth_forbidden": { "default": "服务器拒绝了这个登录来源。" },
-    "web_auth_state_unavailable": { "default": "这个登录请求已被使用，请重新连接。" },
-    "web_auth_exchange_rejected": { "default": "登录交接被拒绝或已过期，请重新连接。" },
-    "web_auth_session_expired": { "default": "登录会话已失效，请重新登录服务器。" },
-    "web_connection_account_conflict": { "default": "这个账号 ID 已属于另一个服务器，请使用独立账号。" },
-    "web_connection_app_invalid": { "default": "官方应用地址无效。" },
-    "web_connection_auth_unavailable": { "default": "服务器暂时无法验证登录，请重试。" },
-    "web_connection_cloud_selected": { "default": "请切换回云端账号。" },
-    "web_connection_disabled": { "default": "管理员已关闭官方网页连接。" },
-    "web_connection_download_failed": { "default": "无法读取服务器文件，请重试。" },
-    "web_connection_handoff_expired": { "default": "登录交接已过期，请重新连接。" },
-    "web_connection_handoff_rejected": { "default": "服务器拒绝了登录交接，请重新连接。" },
-    "web_connection_https_required": { "default": "连接服务器需要 HTTPS 地址。" },
-    "web_connection_method_refused": { "default": "服务器不允许这种请求方式。" },
-    "web_connection_origin_refused": { "default": "请求地址不属于当前服务器。" },
-    "web_connection_popup_blocked": { "default": "请允许登录弹窗后重试。" },
-    "web_connection_preflight_refused": { "default": "服务器拒绝了跨域请求，请检查应用版本。" },
-    "web_connection_probe_required": { "default": "请先重新检查服务器地址。" },
-    "web_connection_revoke_unconfirmed": { "default": "浏览器已清除凭据，但无法确认服务器撤销。请在该服务器的会话设置中检查。" },
-    "web_connection_route_refused": { "default": "当前连接不允许访问这个接口。" },
-    "web_connection_server_limit": { "default": "已保存 20 个服务器，请先断开一个。" },
-    "web_connection_session_changed": { "default": "服务器或账号已切换，请重试。" },
-    "web_connection_session_expired": { "default": "服务器登录已失效，请重新登录。" },
-    "web_connection_session_invalid": { "default": "服务器返回的账号信息无效，请重新连接。" },
-    "web_connection_session_unavailable": { "default": "无法读取服务器会话，请重试。" },
-    "web_connection_sign_in_required": { "default": "请先登录这个服务器。" },
+    "web_auth_invalid_request": {
+      "default": "登录请求无效，请重新连接。"
+    },
+    "web_auth_forbidden": {
+      "default": "服务器拒绝了这个登录来源。"
+    },
+    "web_auth_state_unavailable": {
+      "default": "这个登录请求已被使用，请重新连接。"
+    },
+    "web_auth_exchange_rejected": {
+      "default": "登录交接被拒绝或已过期，请重新连接。"
+    },
+    "web_auth_session_expired": {
+      "default": "登录会话已失效，请重新登录服务器。"
+    },
+    "web_connection_account_conflict": {
+      "default": "这个账号 ID 已属于另一个服务器，请使用独立账号。"
+    },
+    "web_connection_app_invalid": {
+      "default": "官方应用地址无效。"
+    },
+    "web_connection_auth_unavailable": {
+      "default": "服务器暂时无法验证登录，请重试。"
+    },
+    "web_connection_cloud_selected": {
+      "default": "请切换回云端账号。"
+    },
+    "web_connection_disabled": {
+      "default": "管理员已关闭官方网页连接。"
+    },
+    "web_connection_download_failed": {
+      "default": "无法读取服务器文件，请重试。"
+    },
+    "web_connection_handoff_expired": {
+      "default": "登录交接已过期，请重新连接。"
+    },
+    "web_connection_handoff_rejected": {
+      "default": "服务器拒绝了登录交接，请重新连接。"
+    },
+    "web_connection_https_required": {
+      "default": "连接服务器需要 HTTPS 地址。"
+    },
+    "web_connection_method_refused": {
+      "default": "服务器不允许这种请求方式。"
+    },
+    "web_connection_origin_refused": {
+      "default": "请求地址不属于当前服务器。"
+    },
+    "web_connection_popup_blocked": {
+      "default": "请允许登录弹窗后重试。"
+    },
+    "web_connection_preflight_refused": {
+      "default": "服务器拒绝了跨域请求，请检查应用版本。"
+    },
+    "web_connection_probe_required": {
+      "default": "请先重新检查服务器地址。"
+    },
+    "web_connection_revoke_unconfirmed": {
+      "default": "浏览器已清除凭据，但无法确认服务器撤销。请在该服务器的会话设置中检查。"
+    },
+    "web_connection_route_refused": {
+      "default": "当前连接不允许访问这个接口。"
+    },
+    "web_connection_server_limit": {
+      "default": "已保存 20 个服务器，请先断开一个。"
+    },
+    "web_connection_session_changed": {
+      "default": "服务器或账号已切换，请重试。"
+    },
+    "web_connection_session_expired": {
+      "default": "服务器登录已失效，请重新登录。"
+    },
+    "web_connection_session_invalid": {
+      "default": "服务器返回的账号信息无效，请重新连接。"
+    },
+    "web_connection_session_unavailable": {
+      "default": "无法读取服务器会话，请重试。"
+    },
+    "web_connection_sign_in_required": {
+      "default": "请先登录这个服务器。"
+    },
     "installer_failed": {
       "default": "Mikka 未能安装，请查看本机安装日志。",
       "node_required": "请安装 Node.js 22 或更新版本，然后重试。",
@@ -6133,5 +6312,71 @@
     "content": "内容",
     "readFailed": "{label}加载失败。",
     "refreshFailed": "{label}更新失败，仍显示上次内容。"
+  },
+  "ResourceAccess": {
+    "manage": "管理共享权限",
+    "title": "共享与访问权限",
+    "description": "设置谁可以查看和参与。模型连接与执行电脑需要单独授权。",
+    "visibility": "可见性",
+    "shared": "在此工作区共享",
+    "private": "私人：仅所有者及明确授权成员",
+    "sharedDescription": "此工作区成员可查看和参与，同时仍受上级项目和线程权限约束。",
+    "privateDescription": "只有所有者和明确授权的成员可读取内容。管理员身份不会授予内容访问权。",
+    "creationHint": "共享工作区中的新资源默认共享。个人工作区始终保持私人。",
+    "parentBoundary": "资源的授权范围不能超出其上级资源。共享不会授予个人凭证、秘密或设备的访问权。",
+    "members": "明确授权的成员",
+    "noGrants": "尚未向其他成员单独授权。",
+    "permission": "权限",
+    "reader": "查看",
+    "commenter": "查看与评论",
+    "editor": "查看、评论与协作",
+    "approver": "协作与审批",
+    "expiresOptional": "到期时间（本地时间，可选）",
+    "addMember": "添加成员",
+    "chooseMember": "选择成员",
+    "add": "添加",
+    "removeMember": "移除授权",
+    "unavailableMember": "已不可用的成员",
+    "confirmExpansion": "我确认向所选成员开放已有内容，并授予上述参与权限。",
+    "loadFailed": "无法加载当前权限。",
+    "saveFailed": "保存失败。修改仍保留在此处，请检查连接后重试。",
+    "unavailable": "此资源已不可用。",
+    "retry": "重试",
+    "loading": "正在加载权限",
+    "save": "保存权限",
+    "saved": "权限已保存。",
+    "executionTitle": "执行授权",
+    "executionDescription": "授权指定 API 连接和干净的云会话。时间上限约束执行时长，不代表外部提供商的费用上限。此处不允许转授个人订阅。",
+    "connection": "模型连接",
+    "chooseConnection": "选择连接",
+    "model": "模型",
+    "chooseModel": "选择模型",
+    "harness": "原生执行器",
+    "totalMinutes": "累计分钟数",
+    "turnMinutes": "每次执行分钟数",
+    "expiryHours": "有效小时数",
+    "executionConfirm": "我确认授权此成员使用指定模型与执行额度。连接所有者承担提供商费用，外部实际费用可能未知。",
+    "authorize": "授权执行",
+    "revoke": "撤销",
+    "activeGrant": "有效",
+    "inactiveGrant": "已到期或撤销",
+    "remainingMinutes": "剩余 {minutes} 分钟",
+    "externalCostUnknown": "外部费用：未知。实际费用以提供商账单为准。",
+    "noConnections": "请先在模型设置中添加可用的 API 连接，再授予执行权限。",
+    "noMembers": "此工作区没有其他有效成员。",
+    "sendMode": "发送方式",
+    "commentOnly": "仅发表评论",
+    "continueWith": "使用 {model} 继续执行 · 剩余 {minutes} 分钟",
+    "commentHint": "评论对获授权的成员可见，不会启动模型执行。",
+    "commentWhileRunning": "当前执行尚未结束。评论不会向其私人会话发送指令。",
+    "authorizationUnavailable": "执行授权已不可用",
+    "noExpiry": "不过期",
+    "oneHour": "1 小时后",
+    "oneDay": "24 小时后",
+    "oneWeek": "7 天后",
+    "grantUnavailable": "此执行授权已不可用。请选择仅留言或其他有效授权。",
+    "threadMessage": "给这个线程发消息",
+    "readOnly": "你可以阅读此对话；如需参与，请联系 Owner 授权。",
+    "taskPrompt": "描述要创建的任务"
   }
 }

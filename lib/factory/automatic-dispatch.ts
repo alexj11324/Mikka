@@ -80,6 +80,17 @@ export function automaticFactoryDispatch(pool: Pool) {
     // the task/run tenant, including a botless shared task.
     if (!source || !workspaceId || source.workspaceId !== workspaceId || source.userId !== task.userId || source.issueId !== task.issueId ||
       (source.deviceKind === 'cloud' && source.runtimeWorkspaceId !== workspaceId)) throw new FactoryError('factoryRunMismatch')
+    const collaboration = await (await import('./collaborative-dispatch')).dispatchCollaborativeFactoryStage(pool, tx, store, task,
+      { previousRunId: typeof _run.id === 'string' ? _run.id : source.id, producerDefinition: source.agentDefinition })
+    if (collaboration) {
+      if (!collaboration.runId) return
+      const actor = { userId: task.userId, workspaceId }
+      const nextRunId = collaboration.runId
+      return async () => {
+        try { await factoryAutomaticRuntime.enqueue(pool, actor, typeof _run.id === 'string' ? _run.id : source.id, nextRunId) }
+        catch { await (await import('./cloud-stage-handoff')).failFactoryCloudStage(pool, actor, nextRunId, 'Cloud stage handoff could not be queued') }
+      }
+    }
     const check = task.stage !== 'execute'
     const checkStage = task.stage === 'review' || task.stage === 'verify' ? task.stage : undefined
     const candidateId = task.candidateId

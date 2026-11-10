@@ -27,7 +27,7 @@ import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { and, eq, sql } from 'drizzle-orm'
 import { chatBotId, type openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
-import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
+import { taskDestinationSchema, taskCreationSchema, type TaskDestination, type TaskCreation } from '@/lib/task-destination'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { NOTE_MAX, NOTES_MAX, withBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
@@ -43,6 +43,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { actAs } from '@/lib/acting-user'
+import { authorizedBotChat } from '@/lib/resource-access/chat'
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -65,7 +66,7 @@ const expectedWorkspaceIdSchema = z.uuid().transform(value => value.toLowerCase(
  * Coordinator's bot row when the caller names none (the Coordinator's entry
  * in the bot list).
  */
-async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined, expectedWorkspaceId?: string): Promise<{ id: string; name: string; coordinator: boolean; workspaceId: string }> {
+async function ownBot(user: Parameters<typeof openChatBotId>[0] & Exclude<Parameters<typeof authorizedBotChat>[0], string>, botId: string | null | undefined, expectedWorkspaceId?: string) {
   const userId = user.id
   const parsed = botIdSchema.safeParse(botId ?? null)
   const expected = expectedWorkspaceIdSchema.safeParse(expectedWorkspaceId)
@@ -76,10 +77,7 @@ async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string |
   // before ensuring a Coordinator, then resolve in this same trusted context.
   if (expected.data !== undefined && expected.data !== context.workspace.id) throw new ActionFailureError('workspaceAccessDenied')
   const id = await chatBotId(userId, parsed.data, context.workspace.id)
-  const [bot] = await db.select({ id: bots.id, name: bots.name, workspaceId: bots.workspaceId, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
-    .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId), eq(bots.workspaceId, context.workspace.id))).limit(1)
-  if (!bot) throw new ActionFailureError('botNotFound')
-  return bot
+  return authorizedBotChat(user, id, 'canReadContent', context.workspace.id)
 }
 
 /** ownBot has already authorized the actor in this persisted bot workspace.
@@ -98,10 +96,10 @@ async function readFullChat(botId: string | null): Promise<CoordinatorChat> {
   const user = await getUser()
   const userId = user.id
   const bot = await ownBot(user, botId)
-  const enabled = await coordinatorEnabled(user.id, bot.id)
+  const enabled = await coordinatorEnabled(bot.ownerId, bot.id)
   // Before the chat: a push at this revision or below is already in what follows.
   const begun = await beginBotChatRead(userId, bot)
-  const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
+  const { chat, expiries, observedAt } = await chatStore.chatViewState(bot.ownerId, 200, bot.id, {}, bot.reader)
   // The legacy/mobile full reader retains the same authorized bot tenant and
   // deadline as incremental reads; web sidebars use chat summaries instead.
   const live = await ownerListRead(userId, expiries, observedAt, begun)
@@ -131,7 +129,7 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   // Each request is authorized on its own: the session and its ownership of this bot.
   const user = await getUser()
   const bot = await ownBot(user, botId)
-  const enabled = await coordinatorEnabled(user.id, bot.id)
+  const enabled = await coordinatorEnabled(bot.ownerId, bot.id)
   const parsed = versionSchema.safeParse(known)
   const proof = continuationSchema.safeParse(continuation)
   const previous = proof.success && proof.data ? { ...proof.data,
@@ -140,7 +138,7 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   const heldVersion = parsed.success ? parsed.data : undefined
   // Before the chat: a push at this revision or below is already in what follows.
   const begun = await beginBotChatRead(user.id, bot)
-  const { expiries, observedAt, ...current } = await chatVersionState(user.id, 200, bot.id)
+  const { expiries, observedAt, ...current } = await chatVersionState(bot.ownerId, 200, bot.id, bot.reader)
   // The bot's tenant channel says when to read again; a lease running out is the one change with no write.
   const live = await ownerListRead(user.id, expiries, observedAt, begun)
   // Each request observes the current version before joining: a deletion or a
@@ -149,7 +147,7 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   const shared = await singleFlight(['/actions/coordinator/poll', user.id, bot.id, current.version, heldVersion ?? null,
     previous ? JSON.stringify(previous) : null], async (): Promise<CoordinatorChat | UnchangedChat> => {
     if (heldVersion === current.version && !previous?.restoreToolMetadata) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working, live }
-    const chat = await chatStore.chatUpdate(user.id, bot.id, previous)
+    const chat = await chatStore.chatUpdate(bot.ownerId, bot.id, previous, bot.reader)
     // Carry the leader's revision, read before its transcript. A joiner's newer
     // revision must never acknowledge a write absent from this shared data.
     return { ...chat, version: current.version, botId: bot.id, enabled, working: enabled && chat.working, live }
@@ -174,7 +172,7 @@ export async function coordinatorHistory(botId: string | null, through: number, 
   return withDatabaseOperation('/actions/coordinator/history', async () => {
     const user = await getUser()
     const bot = await ownBot(user, botId)
-    return chatView(user.id, limit, bot.id, { through })
+    return chatView(bot.ownerId, limit, bot.id, { through }, bot.reader)
   })
 }
 
@@ -215,8 +213,8 @@ export async function coordinatorReasoning(botId: string | null, positions: read
   if (!parsed.success) return null
   const user = await getUser()
   const bot = await ownBot(user, botId)
-  const fingerprints = await credentialChatFingerprints(user.id)
-  const texts = (await storedReasoning(user.id, bot.id, parsed.data)).flatMap(text => reasoningText(user.id, text, fingerprints) ?? [])
+  const fingerprints = await credentialChatFingerprints(bot.ownerId)
+  const texts = (await storedReasoning(bot.ownerId, bot.id, parsed.data, bot.reader)).flatMap(text => reasoningText(bot.ownerId, text, fingerprints) ?? [])
   return texts.length ? texts.join('\n\n') : null
 }
 
@@ -242,7 +240,7 @@ async function readBotChatSummaries() {
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string, taskCreation?:TaskCreation): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -254,7 +252,8 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         if(['http:','https:'].includes(origin.protocol)&&origin.host===host)humanSessionId=session.session.id
       }catch{/* Missing/malformed origin is no approval provenance. */}
     }
-    const bot = await ownBot(session.user, botId, expectedWorkspaceId)
+    const bot = await ownBot({ ...session.user, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }, botId, expectedWorkspaceId)
+    if (bot.ownerId !== userId) throw new ActionFailureError('threadExecutionAuthorizationRequired')
     const parsed = personalSubmissionInput.safeParse({ text, submissionId, ...(images?.length ? { images } : {}) })
     if (!parsed.success) throw new ActionFailureError('messageRequired')
     const quoted = quote ? quoteSchema.safeParse(quote) : null
@@ -267,7 +266,10 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (!destination.success) throw new ActionFailureError('validationGeneric')
     const profile = agentProfileReferenceSchema.optional().safeParse(profileId)
     if (!profile.success) throw new ActionFailureError('validationGeneric')
-    const taskSubmission = Boolean(destination.data || profile.data)
+    const creation=taskCreationSchema.optional().safeParse(taskCreation)
+    if(!creation.success)throw new ActionFailureError('validationGeneric')
+    if(creation.data?.projectId)await (await import('@/lib/resource-access/store')).requireResourceAccess(session.user,{kind:'project',id:creation.data.projectId,workspaceId:bot.workspaceId},'canSteer')
+    const taskSubmission = Boolean(destination.data || profile.data || creation.data)
     if (profile.data && profile.data !== BUILTIN_AGENT_PROFILE_ID) {
       try {
         const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
@@ -290,7 +292,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
     if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
     const reader = { id: userId, [tokenWorkspace]: bot.workspaceId, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
-    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, taskCreation:creation.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
     try {
       // Already retried (a double click, two sends at once): nothing more is sent.
       if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }
@@ -315,6 +317,7 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
+    if (bot.ownerId !== session.user.id) return { queued: false as const, reason: 'unavailable' as const }
     if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false }
     const chat = await chatView(session.user.id, 1, bot.id)
     if (chat.items.length || chat.working || chat.error) return { queued: false }
@@ -330,8 +333,10 @@ export async function stopCoordinatorTurn(botId: string | null = null): Promise<
   return runAction(async () => {
     const user = await getUser()
     const bot = await ownBot(user, botId)
+    const { requireResourceAccess } = await import('@/lib/resource-access/store')
+    await requireResourceAccess(bot.reader, bot.reference, 'canSteer')
     const { stopChatTurn } = await import('@/lib/coordinator/stop-turn')
-    return { stopped: await stopChatTurn(user.id, bot.id) }
+    return { stopped: await stopChatTurn(bot.ownerId, bot.id) }
   })
 }
 
@@ -341,6 +346,7 @@ export async function retryCoordinatorTurn(botId: string | null = null): Promise
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
+    if (bot.ownerId !== session.user.id) return { queued: false as const, reason: 'unavailable' as const }
     if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false as const, reason: 'unavailable' as const }
     const queued = await retryFailedTurn(session.user.id, bot.id)
     if (queued) {

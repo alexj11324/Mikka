@@ -21,6 +21,7 @@ import { DAEMON_VERSION } from "../paths"
 // credentials (decision 2026-11-06-1800); no extra inner environment is made.
 import { claudeQuotaSignal, mergeQuota, type QuotaSignal } from "../runs/quota-exhausted"
 import { spawn } from "node:child_process"
+import { setTimeout as delay } from 'node:timers/promises'
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
@@ -41,6 +42,7 @@ import {
   type Options,
   type SpawnOptions,
   type SpawnedProcess,
+  type Query,
 } from "@anthropic-ai/claude-agent-sdk"
 
 import {
@@ -88,6 +90,8 @@ import type {
 } from "./types"
 
 export interface ClaudeAdapterOptions {
+  /** Host-selected official Codex sandbox helper, not a model provider. */
+  nativeIsolationBinary?: string
   /** @deprecated Ignored: the SDK starts the CLI directly (no sandbox, decision 2026-11-01-2335). */
   sandbox?: AgentSandbox
   /** The daemon's adapter state dir (per-run dirs live under it). */
@@ -465,7 +469,39 @@ function claudePrewarmOptionsKey(options: SessionOptions) {
     kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume } = options
   return JSON.stringify({ cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
     kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume,
-    mailbox: options.mailbox?.tools })
+    mailbox: options.mailbox?.tools, nativeCredentialIsolation: options.nativeCredentialIsolation })
+}
+
+/** tools=[] removes builtins. The local hook independently rejects any
+ * unexpected/internal builtin even if a native client changes its catalogue.
+ * No control-plane request or model proxy is introduced by this gate. */
+export function claudeIsolatedTools(): Pick<Options, 'tools' | 'allowedTools' | 'hooks' | 'permissionMode' | 'allowDangerouslySkipPermissions'> {
+  return { tools: [], allowedTools: ['mcp__mikka__*'], permissionMode: 'dontAsk', allowDangerouslySkipPermissions: false,
+    hooks: { PreToolUse: [{ matcher: '.*', hooks: [async input => {
+      if (input.hook_event_name !== 'PreToolUse' || !input.tool_name.startsWith('mcp__mikka__'))
+        return { hookSpecificOutput: { hookEventName: 'PreToolUse' as const, permissionDecision: 'deny' as const, permissionDecisionReason: 'Use this task’s isolated Mikka tools.' } }
+      return {}
+    }] }] } }
+}
+
+/** MCP starts after initialize resolves. Bound this local startup wait; never
+ * release the first model prompt while the guarded transport is still pending. */
+export async function requireClaudeIsolatedTransport(session: Pick<Query, 'initializationResult' | 'mcpServerStatus'>, signal: AbortSignal) {
+  const initialized = await session.initializationResult()
+  if (initialized.hooks_applied !== true) throw Error('native_tool_hook_unverified')
+  const deadline = Date.now() + 10_000
+  while (true) {
+    signal.throwIfAborted()
+    const servers = await session.mcpServerStatus()
+    if (servers.length !== 1 || servers[0]?.name !== MCP_SERVER_NAME ||
+      !['sdk', 'dynamic'].includes(servers[0]?.source ?? servers[0]?.scope ?? '')) throw Error('native_tool_transport_unverified')
+    if (servers[0].status === 'connected') {
+      if (!servers[0].tools?.some(tool => tool.name === 'run_command')) throw Error('native_tool_transport_unverified')
+      return servers
+    }
+    if (servers[0].status !== 'pending' || Date.now() >= deadline) throw Error('native_tool_transport_unverified')
+    await delay(50, undefined, { signal })
+  }
 }
 
 export class ClaudeAdapter implements AgentAdapter {
@@ -553,11 +589,16 @@ export class ClaudeAdapter implements AgentAdapter {
     }
     // Never the host's login or config. This is config isolation only; a
     // hosted runner still requires an owner security boundary.
-    const nativeHome = options.machineEnvironment ? options.env.HOME : join(runDir, "native-home")
+    const isolated = options.nativeCredentialIsolation === 'tools_v1'
+    // Reuse the existing isolated native HOME for shared execution so a CLI
+    // cannot load another person's private CLAUDE.md, plugins or history.
+    // The actual model credential stays in the official CLI's direct path.
+    const machineHome = options.machineEnvironment && !isolated
+    const nativeHome = machineHome ? options.env.HOME : join(runDir, "native-home")
     if (!nativeHome) throw new Error('Cloud machine HOME unavailable')
-    const configDir = options.machineEnvironment ? options.env.CLAUDE_CONFIG_DIR ?? join(nativeHome, '.claude') : join(nativeHome, ".claude")
-    if (!options.machineEnvironment) { ownDir(nativeHome); ownDir(configDir) }
-    if (!options.machineEnvironment && mode === "continue" && options.continueSession) {
+    const configDir = machineHome ? options.env.CLAUDE_CONFIG_DIR ?? join(nativeHome, '.claude') : join(nativeHome, ".claude")
+    if (!machineHome) { ownDir(nativeHome); ownDir(configDir) }
+    if (!machineHome && mode === "continue" && options.continueSession) {
       carryHistory(join(runPaths(this.options.stateDir, options.continueSession.runId).runDir, "native-home", ".claude"), configDir, ["projects"])
     }
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_ERROR)
@@ -565,6 +606,8 @@ export class ClaudeAdapter implements AgentAdapter {
     const providerDomain = credentialDomain(options.credential)
     const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const binary = this.options.binary ?? (this.options.spawnHosted ? undefined : await this.options.ensureBinary?.())
+    if (isolated && (!options.machineEnvironment || !this.options.nativeIsolationBinary || computerMcp || options.mailbox || options.apps?.apps.length))
+      throw Error('native_tool_isolation_unavailable')
     const contextOptions = (preparing = false): RunContextOptions => ({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
@@ -574,6 +617,8 @@ export class ClaudeAdapter implements AgentAdapter {
       apps: options.apps,
       githubRuntime: options.githubRuntime,
       machineEnvironment: options.machineEnvironment,
+      ...(isolated ? { nativeIsolationBinary: this.options.nativeIsolationBinary,
+        nativeIsolationTaskEnv: { ...options.taskEnv, ...options.taskSecretEnv } } : {}),
       childPath: options.env.PATH,
       mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",
@@ -703,9 +748,9 @@ export class ClaudeAdapter implements AgentAdapter {
           ...CLAUDE_RUN_ENV,
           CLAUDE_CODE_TMPDIR: context.tmpDir,
           ...credentialEnv,
-          ...(!options.machineEnvironment ? { HOME: nativeHome, CLAUDE_CONFIG_DIR: configDir } : {}),
+          ...(!machineHome ? { HOME: nativeHome, CLAUDE_CONFIG_DIR: configDir } : {}),
         },
-        settingSources: options.machineEnvironment ? ["user", "project", "local"] : [],
+        settingSources: options.machineEnvironment && !isolated ? ["user", "project", "local"] : [],
         settings: {
           ...claudeSettings(options.policy),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
@@ -716,15 +761,16 @@ export class ClaudeAdapter implements AgentAdapter {
           ...(computerMcp ? { [COMPUTER_MCP_SERVER_NAME]: { type: "stdio" as const, ...computerMcp } } : {}),
           ...claudeAppServers(options.apps),
         },
-        strictMcpConfig: !options.machineEnvironment,
+        strictMcpConfig: isolated || !options.machineEnvironment,
         systemPrompt: {
           type: "preset" as const,
           preset: "claude_code" as const,
-          append: append,
+          append: append + (isolated ? '\nUse mcp__mikka__run_command for every shell command and file operation. Its worktree is the task workspace. The tool HOME is separate from native model authentication.\n' : ''),
         },
         // Nothing is asked per tool (decision 2026-11-01-2335).
         permissionMode: "bypassPermissions" as const,
         allowDangerouslySkipPermissions: true,
+        ...(isolated ? claudeIsolatedTools() : {}),
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
         ...(options.effort ? { effort: options.effort } : {}),
@@ -752,7 +798,7 @@ export class ClaudeAdapter implements AgentAdapter {
         prepare: async abortController => {
             const sdk = sdkOptions(files!, '')
             const candidate = this.options.anonymousClaudeCandidate
-            if (candidate && this.options.anonymousClaudeFresh && nativeToken && refreshOptions.getOAuthToken) {
+            if (!isolated && candidate && this.options.anonymousClaudeFresh && nativeToken && refreshOptions.getOAuthToken) {
               const value = await candidate.adopt({ identity: this.options.anonymousClaudeFresh, options: sdk,
                 context: runMcpBackendContext(contextOptions(true), files!, sdk.env ?? {}),
                 authority: { signal: control.signal, assertLive: () => { control.signal.throwIfAborted(); if (approval.revoked) throw Error('Run tool approval unavailable') } },
@@ -866,6 +912,9 @@ export class ClaudeAdapter implements AgentAdapter {
     void (async () => {
       try {
         for await (const message of session) {
+          if (isolated && message.type === 'system' && message.subtype === 'init' &&
+            (!Array.isArray(message.tools) || message.tools.some(name => !name.startsWith('mcp__mikka__'))))
+            throw Error('native_tool_catalogue_unverified')
           generations.observe(message)
           if (
             options.requireSessionResume &&
@@ -1012,6 +1061,14 @@ export class ClaudeAdapter implements AgentAdapter {
         clearTimeout(timer)
         offRevoke?.()
       }
+    }
+    if (isolated) {
+      const startup = new AbortController()
+      const off = approval.onRevoke(() => startup.abort())
+      try {
+        await requireClaudeIsolatedTransport(session, startup.signal)
+      } catch (error) { await end(null); throw error }
+      finally { off() }
     }
     firstPromptId = prompts.push(firstMessage)
     written++

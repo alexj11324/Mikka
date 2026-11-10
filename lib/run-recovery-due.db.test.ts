@@ -15,7 +15,8 @@ const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL &
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Run recovery tests require matching isolated loopback _e2e URLs')
 
 const TABLES = ['agent_runs', 'devices', 'cloud_machines', 'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns',
-  'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events', 'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges']
+  'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events', 'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges',
+  'resource_access_grants', 'thread_execution_grants', 'thread_execution_authorizations', 'session', 'resource_session_revocations']
 
 test('run-recovery due times match what each sweep selects', { skip: !valid }, async t => {
   const schema = `run_recovery_due_${randomUUID().replaceAll('-', '')}`
@@ -39,6 +40,38 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
 
   await t.test('an idle database has nothing due, so no timer runs', async () => {
     assert.equal(await due(), null)
+  })
+
+  await t.test('an expiring content grant arms the existing timer exactly once and an empty authority set leaves it idle', async () => {
+    const expiry = new Date(Date.now() + 35_000)
+    await pool.query('insert into resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities,"expiresAt") values(\'thread\',$1,\'account\',\'peer\',$2,$3)', [randomUUID(), ['canReadContent'], expiry])
+    assert.equal(await due(), expiry.getTime())
+    await pool.query('update resource_access_grants set "expiresAt"=now()-interval \'1 second\'')
+    assert.deepEqual([...(await runRecoveryDueSweeps(pool, { factoryLifecycle: true })).due], ['resourceAccess'])
+    await clear()
+    assert.equal(await due(), null)
+  })
+
+  await t.test('a human Session expiry or deletion supersedes a longer execution receipt without a polling interval', async () => {
+    const workspaceId = randomUUID(), threadId = randomUUID(), grantId = randomUUID(), sessionId = randomUUID()
+    const sessionExpiry = new Date(Date.now() + 45_000), grantExpiry = new Date(Date.now() + 600_000)
+    await pool.query(`insert into thread_execution_grants(id,"workspaceId","threadId","ownerId","actorId","policyRevision","credentialId","credentialOwnerId",model,harness,"computeOwnerId","totalComputeSeconds","maxTurnSeconds","expiresAt")
+      values($1,$2,$3,'owner','peer',1,$4,'owner','fixture','codex','owner',60,30,$5)`, [grantId, workspaceId, threadId, randomUUID(), grantExpiry])
+    await pool.query('insert into "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") values($1,\'peer\',$2,$3,now(),now())', [sessionId, randomUUID(), sessionExpiry])
+    await pool.query(`insert into thread_execution_authorizations(id,"grantId","grantRevision","requestId","requestFingerprint","workspaceId","threadId","sourceRunId","ownerId","actorId","sessionId","reservedSeconds","expiresAt")
+      values($1,$2,1,$3,$4,$5,$6,$6,'owner','peer',$7,30,$8)`, [randomUUID(), grantId, randomUUID(), 'a'.repeat(64), workspaceId, threadId, sessionId, grantExpiry])
+    assert.equal(await due(), sessionExpiry.getTime())
+    await pool.query('delete from "session" where id=$1', [sessionId])
+    near(await due(), await dbNow())
+    await pool.query('update thread_execution_authorizations set "releasedAt"=now()')
+    await pool.query('update thread_execution_grants set "revokedAt"=now()')
+    assert.equal(await due(), null, 'released authority leaves no recurring wake')
+    const createdAt = new Date(Date.now() - 2_000)
+    await pool.query('insert into resource_session_revocations("sessionId","actorId","createdAt") values($1,\'peer\',$2)', [sessionId, createdAt])
+    assert.equal(await due(), createdAt.getTime(), 'the durable after-commit retry itself is due')
+    await pool.query('update resource_session_revocations set "deliveredAt"=now()')
+    assert.equal(await due(), null)
+    await clear()
   })
 
   await t.test('a leased run is due one millisecond after its lease (the sweep selects leaseExpiresAt < now)', async () => {

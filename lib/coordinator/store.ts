@@ -44,7 +44,7 @@ import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 import { botChatChanged } from '../live/chats'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { activeTaskWorkspaces, requireTaskWorkspace } from '@/lib/task-workspace'
+import { activeTaskWorkspaces } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
 import type { CoordinatorStartupReceipt, CoordinatorStartupSettingsCandidate, CoordinatorStartupSettings, CoordinatorStartupTake } from './startup-receipt'
 
@@ -66,11 +66,10 @@ const sessionOf = (userId: string, botId: string) => and(eq(coordinatorSessions.
 const messagesOf = (userId: string, botId: string) => and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId))
 const eventsOf = (userId: string, botId: string) => and(eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.botId, botId))
 
-async function chatReader(userId: string, botId: string): Promise<IssueReader> {
-  const [bot] = await db.select({ workspaceId: bots.workspaceId }).from(bots).where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1)
-  if (!bot) throw new ActionFailureError('botNotFound')
-  await requireTaskWorkspace(userId, bot.workspaceId)
-  return { id: userId, [tokenWorkspace]: bot.workspaceId }
+async function chatReader(userId: string, botId: string, viewer: IssueReader = userId): Promise<IssueReader> {
+  const access = await (await import('@/lib/resource-access/chat')).authorizedBotChat(viewer, botId)
+  if (access.ownerId !== userId) throw new ActionFailureError('botNotFound')
+  return access.reader
 }
 
 async function nextPosition(executor: Executor, userId: string, botId: string): Promise<number> {
@@ -285,7 +284,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
     const direct = eligible.filter(event => event.kind === 'user_message')
     let due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(direct.length ? direct : eligible)
     if (!due.length) return finish({ held: true, ...NO_TAKE })
-    let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
+    let taskEventId = due.length === 1 && due[0].kind === 'user_message' && (due[0].payload.taskDestination !== undefined || due[0].payload.taskCreation !== undefined) ? due[0].id : undefined
     const source = due.findLast(event => event.kind === 'user_message' && event.payload.postedToChat !== true)
       ?? due.findLast(event => event.kind === 'user_message')
     let sourceEventId = scheduled ? undefined : source?.id
@@ -298,7 +297,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
         .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.message}->>'role' = 'user'`)).orderBy(desc(coordinatorMessages.position)).limit(1)
       if (original) {
         sourceEventId = original.id
-        if (original.payload.taskDestination !== undefined) { taskEventId = original.id; due = [source] }
+        if (original.payload.taskDestination !== undefined || original.payload.taskCreation !== undefined) { taskEventId = original.id; due = [source] }
       }
     }
     const isolatedTask = Boolean(taskEventId) || Boolean(scheduled)
@@ -630,6 +629,7 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
 
 export interface ChatView {
   items: ChatItem[]
+  access?: Awaited<ReturnType<typeof import('@/lib/resource-access/chat').botChatReadAccess>>
   /** Active Workflow lease for this exact owner and bot. */
   streamRunId?: string
   /** Last stored message position, excluding pending inbox items. */
@@ -657,8 +657,8 @@ export interface ChatView {
 }
 
 /** The reasoning text of this person's stored messages at `positions` in one chat, in order; stored messages are already masked (appendMessages). */
-export async function storedReasoning(userId: string, botId: string, positions: readonly number[]): Promise<string[]> {
-  await chatReader(userId, botId)
+export async function storedReasoning(userId: string, botId: string, positions: readonly number[], viewer: IssueReader = userId): Promise<string[]> {
+  await chatReader(userId, botId, viewer)
   if (!positions.length) return []
   const rows = await db.select({ message: coordinatorMessages.message }).from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), inArray(coordinatorMessages.position, [...positions]))).orderBy(asc(coordinatorMessages.position))
@@ -693,7 +693,7 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
     ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt,
       steps: sql<number>`(select count(*) from ${runChunks} c where c."runId" = agent_runs.id
         and c.chunk->>'type' = 'tool-input-available')`.mapWith(Number),
-    }).from(agentRuns).where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : [],
+    }).from(agentRuns).where(and(inArray(agentRuns.id, ownIds), await (await import('@/lib/resource-access/thread')).threadReadAccess(reader))) : [],
     issuesForUser(reader, runIssueIds, false, db, { projection: 'citation', withTeamLinks: false }),
   ])
   const prompts = new Map(ownedRuns.map(row => [row.id, row.prompt]))
@@ -765,13 +765,13 @@ function chatReadObservation(session: Parameters<typeof coordinatorChatState>[0]
 }
 
 /** The latest of the conversation for the chat, oldest first. */
-export async function chatView(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<ChatView> {
-  return (await chatViewState(userId, limit, botId, window)).chat
+export async function chatView(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}, viewer: IssueReader = userId): Promise<ChatView> {
+  return (await chatViewState(userId, limit, botId, window, viewer)).chat
 }
 
 /** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
-export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
-  const reader = await chatReader(userId, botId)
+export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}, viewer: IssueReader = userId): Promise<{ chat: ChatView } & ChatReadObservation> {
+  const reader = await chatReader(userId, botId, viewer)
   const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, lastFailure: coordinatorSessions.lastFailure })
     .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
@@ -812,6 +812,7 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   const now = new Date()
   const chat: ChatView = {
     items,
+    access: await (await import('@/lib/resource-access/chat')).botChatReadAccess(reader, userId, botId),
     cursor: last,
     persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
@@ -852,15 +853,16 @@ async function chatPrefixMetadata(userId: string, botId: string, through: number
 export const CHAT_FIRST_PAGE = 50
 
 /** Replay the last rendered item too, so tool results and multi-step replies merge exactly as a full read. */
-export async function chatUpdate(userId: string, botId: string, continuation?: NonNullable<ChatView['continuation']> & { restoreToolMetadata?: true }) {
+export async function chatUpdate(userId: string, botId: string, continuation?: NonNullable<ChatView['continuation']> & { restoreToolMetadata?: true }, viewer: IssueReader = userId) {
+  await chatReader(userId, botId, viewer)
   const prefix = continuation && continuation.after <= continuation.cursor
     ? continuation.restoreToolMetadata ? await chatPrefixMetadata(userId, botId, continuation.after, continuation.cursor)
       : { hash: await chatPrefix(userId, botId, continuation.after), rows: undefined }
     : undefined
   if (continuation && prefix && prefix.hash === continuation.prefix) {
-    const latest = await chatVersion(userId, 200, botId)
+    const latest = await chatVersion(userId, 200, botId, viewer)
     if (continuation.cursor <= latest.cursor) {
-      const tail = await chatView(userId, 200, botId, { after: continuation.after })
+      const tail = await chatView(userId, 200, botId, { after: continuation.after }, viewer)
       // A reconnect after a long absence must not silently skip a window of messages.
       // The tail carries its own coherent state. The earlier version read may
       // predate an inbox claim and must not overwrite a now-running tail.
@@ -868,7 +870,7 @@ export async function chatUpdate(userId: string, botId: string, continuation?: N
         ...(prefix.rows ? { toolMetadata: { baseCursor: continuation.cursor, prefix: continuation.prefix, rows: prefix.rows } } : {}) }
     }
   }
-  return chatView(userId, CHAT_FIRST_PAGE, botId)
+  return chatView(userId, CHAT_FIRST_PAGE, botId, {}, viewer)
 }
 
 /** What a chat poll needs to know without reading the conversation: its version and live state. */
@@ -891,13 +893,13 @@ export type ChatVersionState = ChatVersion & ChatReadObservation
  * and state. Only a few dozen bytes leave the database, where `chatView`
  * sends the messages themselves.
  */
-export async function chatVersion(userId: string, limit = 200, botId: string): Promise<ChatVersion> {
-  const { expiries: _expiries, observedAt: _observedAt, ...version } = await chatVersionState(userId, limit, botId)
+export async function chatVersion(userId: string, limit = 200, botId: string, viewer: IssueReader = userId): Promise<ChatVersion> {
+  const { expiries: _expiries, observedAt: _observedAt, ...version } = await chatVersionState(userId, limit, botId, viewer)
   return version
 }
 
-export async function chatVersionState(userId: string, limit = 200, botId: string): Promise<ChatVersionState> {
-  await chatReader(userId, botId)
+export async function chatVersionState(userId: string, limit = 200, botId: string, viewer: IssueReader = userId): Promise<ChatVersionState> {
+  await chatReader(userId, botId, viewer)
   const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, failureVersion: sql<string>`md5(coalesce(${coordinatorSessions.lastFailure}::text, ''))`.as('failureVersion') })
     .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
   const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
@@ -948,15 +950,20 @@ export async function botChats(reader: IssueReader): Promise<Record<string, BotC
 export async function botChatSnapshot(reader: IssueReader) {
   const userId = typeof reader === 'string' ? reader : reader.id
   const workspaces = await activeTaskWorkspaces(reader)
-  const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
+  const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(
+    inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)),
+    sql`mikka_resource_acl_allowed('account',${userId},${bots.workspaceId},'chat',mikka_chat_resource_id(${bots.ownerId},${bots.id}),'canReadContent')`)) : []
   if (!readableBots.length) return { items: {} as Record<string, BotChatSummary>, expiries: [] as Date[], observedAt: Date.now() }
   const botIds = readableBots.map(bot => bot.id)
   const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
+    .from(coordinatorMessages).innerJoin(bots,and(eq(bots.id,coordinatorMessages.botId),eq(bots.ownerId,coordinatorMessages.userId)))
+    .where(and(inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
-  const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), inArray(coordinatorSessions.botId, botIds)))
+  const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).innerJoin(bots,and(eq(bots.id,coordinatorSessions.botId),eq(bots.ownerId,coordinatorSessions.userId)))
+    .where(inArray(coordinatorSessions.botId, botIds))
   const waiting = await db.select({ botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError })
-    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), inArray(coordinatorEvents.botId, botIds), isNull(coordinatorEvents.deliveredAt)))
+    .from(coordinatorEvents).innerJoin(bots,and(eq(bots.id,coordinatorEvents.botId),eq(bots.ownerId,coordinatorEvents.userId)))
+    .where(and(inArray(coordinatorEvents.botId, botIds), isNull(coordinatorEvents.deliveredAt)))
   const now = new Date()
   const expiries = [
     ...sessions.flatMap(session => coordinatorLeaseActive(session, now) && session.leaseUntil ? [session.leaseUntil] : []),

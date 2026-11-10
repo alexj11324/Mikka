@@ -12,3 +12,11 @@ export function workspaceRunView(run: RunView): RunView {
     createdAt: run.createdAt, startedAt: run.startedAt, finishedAt: run.finishedAt,
   }
 }
+
+/** Only for a row that passed canReadContent. A collaborator sees the actual
+ * work but does not receive private credential/account references or device
+ * control hints through the content DTO. */
+export function sharedContentRunView(run: RunView): RunView {
+  const { executionIdentity: _identity, waitFor: _waitFor, ...content } = run
+  return { ...content, failureDetails: readCompactRunFailure(run.failureDetails) }
+}

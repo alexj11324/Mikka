@@ -8,6 +8,7 @@ import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { withTaskWorkspace } from '@/lib/task-workspace'
+import { taskCreationSchema } from '@/lib/task-destination'
 
 const inputSchema = z.object({ sourceEventId: z.uuid(), title: z.string().trim().min(1).max(200) }).strict()
 
@@ -36,11 +37,14 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
       if (!issue || issue.workspaceId !== source.workspaceId) throw new FactoryError('factoryNotFound')
       return { issueId: issue.id, title: issue.title }
     }
+    const creation=taskCreationSchema.optional().parse(event.payload.taskCreation)
     const issue = await createIssueForUserInTransaction(tx, userId, {
       title: parsed.data.title,
       content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: event.payload.text }] }] },
       status: 'todo',
       priority: 'normal',
+      visibility:creation?.visibility??(event.payload.taskDestination?'shared':'private'),
+      ...(creation?.projectId?{projectId:creation.projectId}:{}),
     }, systemActor('coordinator'), { workspaceId: source.workspaceId })
     if (!issue) throw new FactoryError('factoryInvalid')
     await tx.update(coordinatorEvents).set({ issueId: issue.id }).where(eq(coordinatorEvents.id, event.id))

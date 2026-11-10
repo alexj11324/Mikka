@@ -566,7 +566,7 @@ test(
           assert.equal(f.fallbackCalls(),0);
           assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,2);
         });
-        await t.test('shared subscription answer preserves its lender and session, and revoked or foreign grants fail closed',async()=>{
+        await t.test('legacy borrowed subscription answers fail closed; Owner answers preserve session and machine',async()=>{
           const f=await cloudFixture('running'),lender='question-subscription-lender',custodyWorkspace=randomUUID();
           await pool.query(`UPDATE thread_machines SET "templateKind"='codex' WHERE "runId"=$1`,[f.runId]);
           await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Lender','question-lender@example.invalid',true,now(),now())`,[lender]);
@@ -574,12 +574,12 @@ test(
           // where the lender authorizes this run's frozen consumer binding.
           await pool.query('UPDATE byos_connections SET "ownerId"=$2,"workspaceId"=$3 WHERE id=$1',[f.connectionId,lender,custodyWorkspace]);
           await pool.query('UPDATE byos_bindings SET "ownerId"=$2 WHERE id=$1',[f.credentialId,lender]);
-          await pool.query('INSERT INTO workspace_subscription_shares("ownerId","workspaceId","allowOthers") VALUES($1,$2,true)',[lender,f.workspaceId]);
+          await pool.query('INSERT INTO workspace_subscription_shares("ownerId","workspaceId","allowOthers") VALUES($1,$2,false)',[lender,f.workspaceId]);
           const answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue the same native session using its original shared subscription'};
           type Mutation = [string,string,string,unknown[]];
           const mutations:Mutation[]=[
-            ['deleted grant','DELETE FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2','INSERT INTO workspace_subscription_shares("ownerId","workspaceId","allowOthers") VALUES($1,$2,true)',[lender,f.workspaceId]],
-            ['sharing disabled','UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2','UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2',[lender,f.workspaceId]],
+            ['deleted grant','DELETE FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2','INSERT INTO workspace_subscription_shares("ownerId","workspaceId","allowOthers") VALUES($1,$2,false)',[lender,f.workspaceId]],
+            ['sharing disabled','UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2','UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2',[lender,f.workspaceId]],
             ['admin disabled','INSERT INTO workspace_personal_policies("workspaceId",subscriptions) VALUES($1,false)','DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1',[f.workspaceId]],
             ['another workspace grant','UPDATE workspace_subscription_shares SET "workspaceId"=$3 WHERE "ownerId"=$1 AND "workspaceId"=$2','UPDATE workspace_subscription_shares SET "workspaceId"=$2 WHERE "ownerId"=$1 AND "workspaceId"=$3',[lender,f.workspaceId,custodyWorkspace]],
             ['foreign binding workspace','UPDATE byos_bindings SET "workspaceId"=$3 WHERE id=$1 AND "workspaceId"=$2','UPDATE byos_bindings SET "workspaceId"=$2 WHERE id=$1 AND "workspaceId"=$3',[f.credentialId,f.workspaceId,custodyWorkspace]],
@@ -596,12 +596,17 @@ test(
               assert.equal((await pool.query('SELECT "answerId" FROM factory_questions WHERE id=$1',[f.q.id])).rows[0].answerId,null,label);
             } finally { await pool.query(restore,args); }
           }
+          await assert.rejects(f.service.answer(human,answer),{code:'factoryQuestionContinuationUnavailable'});
+          // Restore this fixture's original personal ownership. The same account
+          // may use its connection from another custody workspace.
+          await pool.query('UPDATE byos_connections SET "ownerId"=$2 WHERE id=$1',[f.connectionId,userId]);
+          await pool.query('UPDATE byos_bindings SET "ownerId"=$2 WHERE id=$1',[f.credentialId,userId]);
           const result=await f.service.answer(human,answer);
           const edge=await questionExecutionContinuation(pool,result.task,result.task.attemptId);
           assert.equal(edge?.sourceRunId,f.runId);
           assert.equal(edge?.originSessionId,f.q.originSessionId);
           assert.equal(edge?.continuationRunId,result.continuationRunId);
-          for(const [label,change,restore,args] of mutations) {
+          for(const [label,change,restore,args] of mutations.filter(([label])=>['foreign binding workspace','connection epoch'].includes(label))) {
             await pool.query(change,args);
             try { assert.equal(await questionExecutionContinuation(pool,result.task,result.task.attemptId),null,label); }
             finally { await pool.query(restore,args); }
@@ -610,7 +615,7 @@ test(
           assert.deepEqual(child.agentDefinition.subscription,f.definition.subscription);
           assert.equal(child.agentDefinition.definitionDigest,f.definition.definitionDigest);
           assert.equal(child.questionContinuation.requireSessionResume,true);
-          assert.equal((await pool.query('SELECT "ownerId","consumerId" FROM byos_bindings WHERE id=$1',[f.credentialId])).rows[0].ownerId,lender);
+          assert.equal((await pool.query('SELECT "ownerId","consumerId" FROM byos_bindings WHERE id=$1',[f.credentialId])).rows[0].ownerId,userId);
           const {rows:[machine]}=await pool.query('SELECT "sandboxId","templateKind" FROM thread_machines WHERE "runId"=$1',[result.continuationRunId]);
           assert.equal(machine.sandboxId,f.sandboxId);
           assert.equal(machine.templateKind,'codex');

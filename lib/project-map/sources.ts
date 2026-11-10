@@ -12,6 +12,9 @@ import { getArtifactObject } from '@/lib/artifacts/storage'
 import { ARTIFACT_MAX_BYTES } from '@/lib/artifacts/limits'
 import { decisionSourceLocatorSchema, ProjectMapError, type DecisionSourceInput, type DecisionSourceLocator } from './contracts'
 import type { ProjectScope } from './scope'
+const readerId = (reader: ProjectScope['reader']) => typeof reader === 'string' ? reader : reader.id
+import { botChatResourceId, resourceActionAllowed } from '@/lib/resource-access/store'
+import { db } from '@/lib/db'
 
 type SourceMetadata = {
   locator: DecisionSourceLocator
@@ -29,7 +32,7 @@ type LoadedSource = Omit<SourceMetadata, 'normalizedKey'> & {
   maskRunId?: string
 }
 type Run = { id: string; userId: string; issueId: string | null; botId: string | null; sessionId: string | null; mailboxId: string | null; questionContinuation: { questionId: string; originRunId: string } | null; createdAt: Date; status: string }
-type Task = { id: string; userId: string; issueId: string; botId: string | null; revision: number; createdAt: Date; stage: string; status: string }
+type Task = { id: string; userId: string; workspaceId: string; issueId: string; botId: string | null; revision: number; createdAt: Date; stage: string; status: string }
 type Context = { scope: ProjectScope; issues: Set<string>; runs: Map<string, Run>; tasks: Map<string, Task> }
 function unavailable(): never { throw new ProjectMapError('SOURCE_NOT_FOUND', 404) }
 const uuid = (id: string) => { if (!z.uuid().safeParse(id).success) unavailable(); return id }
@@ -56,6 +59,7 @@ async function requireRun(ctx: Context, id: string, question?: { id: string; con
   const { rows: [run] } = await pool.query<Run>('SELECT id,"userId","issueId","botId","sessionId","mailboxId","questionContinuation","createdAt",status FROM agent_runs WHERE id=$1 AND "userId"=$2', [id, ctx.scope.userId])
   if (!run || (botScoped(ctx.scope) && run.botId !== ctx.scope.botId)) unavailable()
   await requireIssue(ctx, run.issueId)
+  if (!await resourceActionAllowed(db, readerId(ctx.scope.reader), { kind: 'thread', id: run.id, workspaceId: ctx.scope.workspaceId }, 'canReadContent')) unavailable()
   if (await runOutsideToken({ id: ctx.scope.userId, [tokenWorkspace]: ctx.scope.workspaceId }, id)) unavailable()
   ctx.runs.set(id, run)
   return run
@@ -64,9 +68,10 @@ async function requireTask(ctx: Context, id: string): Promise<Task> {
   uuid(id)
   const prior = ctx.tasks.get(id)
   if (prior) return prior
-  const { rows: [task] } = await pool.query<Task>('SELECT id,"userId","issueId","botId",revision,"createdAt",stage,status FROM factory_tasks WHERE id=$1 AND "userId"=$2', [id, ctx.scope.userId])
+  const { rows: [task] } = await pool.query<Task>('SELECT id,"userId","workspaceId","issueId","botId",revision,"createdAt",stage,status FROM factory_tasks WHERE id=$1 AND "userId"=$2', [id, ctx.scope.userId])
   if (!task || (botScoped(ctx.scope) && task.botId !== ctx.scope.botId)) unavailable()
   await requireIssue(ctx, task.issueId)
+  if (!await (await import('../factory/resource-access')).factoryContentReadable(pool, task, readerId(ctx.scope.reader))) unavailable()
   if (ctx.scope.runId) {
     const run = await requireRun(ctx, ctx.scope.runId)
     if (run.issueId !== task.issueId) unavailable()
@@ -161,7 +166,7 @@ async function loadSource(ctx: Context, raw: DecisionSourceLocator): Promise<Loa
       return { locator: constrain(input, { type: input.type, id: row.id, ...runCoordinates(run), seq: row.seq }), relation: 'host_verified', occurredAt: row.createdAt, authorKind: 'agent', authorId: run.id, maskRunId: run.id, content: row.chunk }
     }
     case 'run_message': {
-      const { rows: [row] } = await pool.query<{ id: string; runId: string | null; mailboxId: string | null; userId: string; text: string; origin: string; createdAt: Date }>('SELECT id,"runId","mailboxId","userId",text,origin,"createdAt" FROM run_messages WHERE id=$1 AND "userId"=$2', [input.id, scope.userId])
+      const { rows: [row] } = await pool.query<{ id: string; runId: string | null; mailboxId: string | null; userId: string; text: string; origin: string; createdAt: Date }>('SELECT id,"runId","mailboxId","userId",text,origin,"createdAt" FROM run_messages WHERE id=$1', [input.id])
       if (!row) unavailable()
       const run = row.runId ? await requireRun(ctx, row.runId) : await requireMailboxRun(ctx, row.mailboxId)
       return { locator: constrain(input, { type: input.type, id: row.id, ...runCoordinates(run) }), relation: 'host_verified', occurredAt: row.createdAt, ...(row.origin === 'owner' && !isCoordinationMessage(row.text) ? { authorKind: 'human' as const, authorId: row.userId } : {}), maskRunId: run.id, content: row.text }
@@ -173,7 +178,8 @@ async function loadSource(ctx: Context, raw: DecisionSourceLocator): Promise<Loa
         FROM coordinator_messages m LEFT JOIN bots b ON b.id=m."botId" AND b."ownerId"=m."userId" AND b."workspaceId"=$3
         WHERE m.id=$1 AND m."userId"=$2 AND (m."botId" IS NULL OR b.id IS NOT NULL)`, [input.id, scope.userId, scope.workspaceId])
       if (!row || (botScoped(scope) && row.botId !== scope.botId)) unavailable()
-      if (row.botId === null && !await isPersonalWorkspace(scope.userId, scope.workspaceId)) unavailable()
+      if (row.botId === null && (readerId(scope.reader) !== row.userId || !await isPersonalWorkspace(scope.userId, scope.workspaceId))) unavailable()
+      if (row.botId && !await resourceActionAllowed(db, readerId(scope.reader), { kind: 'chat', id: botChatResourceId(row.userId, row.botId), workspaceId: scope.workspaceId }, 'canReadContent')) unavailable()
       const author = row.message.role === 'user' && row.humanEvent ? { authorKind: 'human' as const, authorId: row.userId }
         : row.message.role === 'assistant' ? { authorKind: 'bot' as const, authorId: row.botId ?? row.userId } : {}
       return { locator: constrain(input, { type: input.type, id: row.id, botId: row.botId, position: row.position }), relation: 'declared', occurredAt: row.createdAt, ...author, ownerId: row.userId, content: row.message.content ?? row.message }
@@ -184,7 +190,7 @@ async function loadSource(ctx: Context, raw: DecisionSourceLocator): Promise<Loa
         FROM conversation_messages m JOIN conversations c ON c.id=m."conversationId" AND c.kind='group' AND c."workspaceId"=$3
         JOIN conversation_members cm ON cm."conversationId"=c.id AND cm."memberType"='user' AND cm."memberId"=$2 AND cm."leftAt" IS NULL
         LEFT JOIN group_turns t ON t."messageId"=m.id AND t."conversationId"=c.id
-        WHERE m.id=$1`, [input.id, scope.userId, scope.workspaceId])
+        WHERE m.id=$1`, [input.id, readerId(scope.reader), scope.workspaceId])
       if (!row) unavailable()
       if (botScoped(scope)) {
         if (!scope.botId) unavailable()
@@ -268,6 +274,7 @@ async function loadSource(ctx: Context, raw: DecisionSourceLocator): Promise<Loa
              AND jsonb_typeof(e.payload->'version')='number' AND e.payload->>'version'=v.version::text))`, [input.id, input.versionId ? uuid(input.versionId) : unavailable(), scope.userId])
       if (!row) unavailable()
       await requireIssue(ctx, row.issueId)
+      if (!await resourceActionAllowed(db, readerId(scope.reader), { kind: 'artifact', id: row.artifactId, workspaceId: scope.workspaceId }, 'canReadContent')) unavailable()
       const run = row.runId ? await requireRun(ctx, row.runId) : undefined
       if (run && run.issueId !== row.issueId) unavailable()
       if (scope.runId && !run) unavailable()

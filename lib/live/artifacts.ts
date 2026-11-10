@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import { afterDatabaseCommit } from '../db/commit-effects'
 import { LIVE_ID, type LiveInvalidation } from './events'
 import { liveGatewayConfig, type LiveScope } from './scope'
+import { resourceLiveScopes } from './resource-scopes'
 
 type Database = Pick<PoolClient, 'query'>
 
@@ -13,10 +14,8 @@ export async function artifactTargets(database: Database, workspaceDatabase: Dat
   if (row && row.userId !== ownerId) return []
   const workspaceId = row?.workspaceId ?? (!row ? deletedWorkspaceId : undefined)
   if (!workspaceId) return []
-  const { rows: [scope] } = await workspaceDatabase.query<LiveScope>(`SELECT m."userId" AS "ownerId",w.id AS "workspaceId"
-    FROM mikka_workspace_members m JOIN mikka_workspaces w ON w.id=m."workspaceId"
-    WHERE m."userId"=$1 AND m."workspaceId"=$2 AND m.status='active' AND (w.kind='team' OR w."userId"=m."userId")`, [ownerId, workspaceId])
-  return scope ? [{ scope, events: [{ kind: 'artifact', id: artifactId }] }] : []
+  const scopes = await resourceLiveScopes(database, workspaceDatabase, 'artifact', artifactId, workspaceId)
+  return scopes.map(scope => ({ scope, events: [{ kind: 'artifact', id: artifactId }] }))
 }
 
 /** A new version, a title, a share link or deletion. Sent after COMMIT; a rollback sends nothing. */

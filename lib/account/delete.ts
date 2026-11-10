@@ -67,6 +67,7 @@ const SKIPPED = new Map<string, string>([
   ['mikka_organization_members', 'workspace database'],
   ['resource_access_policies', 'authority follows retained source rows; source deletion triggers retire it'],
   ['resource_access_events', 'append-only access audit; contains no content or credential values'],
+  ['run_resource_disclosures', 'immutable machine disclosure evidence; deletion cannot relabel a retained machine clean'],
 ])
 /**
  * Append-only skill-evaluation ledgers: triggers reject every DELETE

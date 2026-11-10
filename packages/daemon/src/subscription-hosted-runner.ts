@@ -33,6 +33,7 @@ import { runDiagnosticsEnabled, runRuntimeTimings } from './run-runtime-timing'
 import { startCliTimingCollector } from './official-cli-timing'
 import { hostedBinaries } from './hosted-binaries'
 import { stopGroup } from './process-group'
+import { nativeRunToolConfig, probeNativeToolIsolation, runNativeToolCommand } from './agents/native-tool-isolation.mjs'
 export { hostedBinaries } from './hosted-binaries'
 
 const computerProxy = fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url))
@@ -109,6 +110,7 @@ export async function createHostedBotRunner(host: {
   if (host.dockerSocket !== undefined && host.dockerSocket !== 'unix:///run/mikka-container/docker.sock') throw unavailable('host_unsupported')
   const binaries = hostedBinaries(host.binaries)
   if (!binaries.codex && !binaries.claude_code) throw unavailable('cli_missing')
+  const nativeCredentialIsolation = await probeNativeToolIsolation(binaries.codex)
   const anonymousFor = (assignment: RunAssignment, options: StartOptions) => {
     const fresh: FreshCandidate = { runId: assignment.runId, deviceId: assignment.deviceId,
       workspaceId: assignment.subscriptionBinding?.workspaceId ?? '', model: options.model, effort: options.effort,
@@ -117,6 +119,7 @@ export async function createHostedBotRunner(host: {
     const candidate = assignment.harness === 'codex' ? host.anonymousCodexCandidate : host.anonymousClaudeCandidate
     const offered = candidate?.runId === assignment.runId ? candidate : undefined
     const anonymous = offered && offered.state !== 'closed' && offered.matchesFresh(fresh) &&
+      !assignment.nativeCredentialIsolation &&
       !assignment.requireSessionResume && !assignment.continuesRunId && !assignment.resumeSessionId && !options.continueSession &&
       Object.entries(assignment.taskEnv ?? {}).every(([key, value]) => key === 'CLOUD_STARTUP_TIMING' && value === '1') &&
       !options.apps?.apps.length && !assignment.computer && !options.factoryCheck ? offered : undefined
@@ -127,6 +130,8 @@ export async function createHostedBotRunner(host: {
       const selected = assignment.subscriptionBinding
       const apiKey = assignment.modelCredential
       const kind = assignment.harness
+      if (assignment.nativeCredentialIsolation !== options.nativeCredentialIsolation ||
+        assignment.nativeCredentialIsolation && (!nativeCredentialIsolation || !binaries.codex)) throw unavailable('host_unsupported')
       const protocol = kind === 'codex' ? 'openai' : 'anthropic'
       if (Boolean(selected) === Boolean(apiKey) || options.runId !== assignment.runId ||
         (kind !== 'codex' && kind !== 'claude_code') || !binaries[kind] ||
@@ -306,6 +311,7 @@ export async function createHostedBotRunner(host: {
             } } : {}),
           })
           : new ClaudeAdapter({ stateDir: host.stateDir, binary: binaries.claude_code,
+            nativeIsolationBinary: binaries.codex,
             computerMcp, onHostedSession: record, spawnHosted, anonymousClaudeCandidate: anonymous as AnonymousClaudeCandidate | undefined, anonymousClaudeFresh: fresh,
             ...(subscription ? { subscriptionAuth: { accountId: subscription.first.accountId, automaticRefresh: true as const,
               token: async () => { assertOpen(); return subscription!.current() },
@@ -359,7 +365,17 @@ export async function createHostedBotRunner(host: {
   }
   return {
     harnesses: Object.keys(binaries).filter(kind => binaries[kind as keyof typeof binaries]) as ('codex' | 'claude_code')[],
-    binaries: { ...binaries }, command: runHostedCommand, start,
+    binaries: { ...binaries }, nativeCredentialIsolation, start,
+    async command(worktree: string, script: string, readOnly: boolean, timeoutMs: number, signal?: AbortSignal,
+      scope?: { runId: string; nativeCredentialIsolation?: 'tools_v1'; readRoots?: string[]; taskEnv?: Record<string, string> }) {
+      if (!scope?.nativeCredentialIsolation) return runHostedCommand(worktree, script, readOnly, timeoutMs, signal)
+      if (!nativeCredentialIsolation || !binaries.codex) throw unavailable('host_unsupported')
+      const paths = runPaths(host.stateDir, scope.runId)
+      const result = await runNativeToolCommand(nativeRunToolConfig({ binary: binaries.codex, worktree: realpathSync(worktree), runDir: paths.runDir,
+        readRoots: scope.readRoots, readOnly, taskEnv: scope.taskEnv }), script, { signal, timeoutMs })
+      return { exitCode: result.exitCode, signal: result.signal, timedOut: result.timedOut,
+        output: (result.stdout + result.stderr).slice(-4000) }
+    },
     prepare(assignment: RunAssignment, options: StartOptions, signal: AbortSignal) {
       if (!['claude_code', 'codex'].includes(assignment.harness) || !assignment.subscriptionBinding || !assignment.subscriptionLease ||
         assignment.modelCredential || assignment.requireSessionResume || assignment.continuesRunId || assignment.resumeFrom ||

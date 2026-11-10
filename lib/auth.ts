@@ -51,8 +51,14 @@ export const auth = betterAuth({
     session: {
       create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId) } }) },
       // Native hooks run after the deletion transaction commits. The durable
-      // trigger already stopped fan-out; transport retries must not hold auth.
-      delete: { after: async session => { (await import('@/lib/enterprise/live-authority')).scheduleSessionLiveRevocation(session.userId) } },
+      // trigger already persisted revocation; transport retries must not hold auth.
+      delete: { after: async session => {
+        (await import('@/lib/enterprise/live-authority')).scheduleSessionLiveRevocation(session.userId)
+        await (await import('@/lib/resource-access/lifecycle')).sessionResourceAuthorityChanged(session.userId)
+      } },
+      update: { after: async session => {
+        await (await import('@/lib/resource-access/lifecycle')).sessionResourceAuthorityChanged(session.userId)
+      } },
     },
     // A new account without a picture gets a default avatar now; older accounts are left as they are.
     user: { create: {

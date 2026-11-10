@@ -5,10 +5,22 @@ import { artifactOutsideToken } from '@/lib/tokens/scope'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
+import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
+
+/** Share URLs have the same current session, tenant and SSO boundary as files. */
+export async function authenticatedArtifactReader(headers: Headers) {
+  const session = await auth.api.getSession({ headers, query: { disableCookieCache: true } })
+  if (!session?.user) return null
+  const principal = session.user[enterprisePrincipal]
+  if (!principal) return null
+  const context = await authorizedCacheWorkspace({ id: session.user.id, [enterprisePrincipal]: principal },session.user[tokenWorkspace],false)
+  if (!context) return null
+  return { id: session.user.id, [tokenWorkspace]: context.workspaceId, [enterprisePrincipal]: principal }
+}
 
 /** The signed-in person's artifact file for a route's `[artifactId]/versions/[version]`, or a response to send instead. */
 export async function routeArtifact(request: Request, params: Promise<{ artifactId: string; version: string }>) {
-  const session = await auth.api.getSession({ headers: request.headers })
+  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   if (!session?.user) return new Response('Sign in to view this.', { status: 401 })
   const { artifactId, version } = await params
   const number = Number(version)

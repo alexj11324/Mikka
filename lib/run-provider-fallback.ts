@@ -66,6 +66,7 @@ export function pendingProviderFallback(run: Run, failure: ProviderFailure): Mod
 }
 
 const standingIdentity = (identity: ExecutionIdentity) => ({ requester: identity.requester, botId: identity.botId, botOwner: identity.botOwner,
+  actor: identity.actor, threadOwner: identity.threadOwner, collaborationAuthorizationId: identity.collaborationAuthorizationId,
   executionPrincipal: identity.executionPrincipal, workspaceId: identity.workspaceId, outputOwner: identity.outputOwner,
   personalResourcePolicy: identity.personalResourcePolicy, mcp: identity.resourceBindings.filter(binding => binding.kind === 'mcp') })
 
@@ -96,9 +97,10 @@ export function providerContinuationMatches(prior: Run, next: Run): boolean {
     receipt?.state !== 'switched' || receipt.retryRunId !== next.id || receipt.nextDefinitionDigest !== after.definitionDigest ||
     next.retryOf !== prior.id || next.userId !== prior.userId || next.botId !== prior.botId || next.issueId !== prior.issueId ||
     !after.modelDispatch?.entry || !isDeepStrictEqual(receipt.to, choice(after.modelDispatch.entry)) ||
-    (before.pinnedDeviceId && before.pinnedDeviceId !== next.deviceId) || after.modelDispatch.mode !== 'preference') return false
+    (before.pinnedDeviceId && before.pinnedDeviceId !== next.deviceId) || after.modelDispatch.mode !== 'preference' ||
+    before.harness !== after.harness || (before.apiKey?.model ?? before.subscription?.modelId ?? before.model) !== (after.apiKey?.model ?? after.subscription?.modelId ?? after.model)) return false
   const first = executionIdentitySchema.safeParse(before.executionIdentity), second = executionIdentitySchema.safeParse(after.executionIdentity)
-  if (!first.success || !second.success || !isDeepStrictEqual(standingIdentity(first.data), standingIdentity(second.data))) return false
+  if (!first.success || !second.success || first.data.billingAccount.model.ownerId !== second.data.billingAccount.model.ownerId || !isDeepStrictEqual(standingIdentity(first.data), standingIdentity(second.data))) return false
   const { executionIdentity: _identity, ...actual } = after
   return isDeepStrictEqual(actual, providerContinuationDefinition(before, after, next.prompt, after.policyCeiling))
 }
@@ -269,9 +271,9 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         if (!queued?.agentDefinition) throw new ActionFailureError('runInvalid')
         const prompt = providerContinuationPrompt(source.prompt)
         const definition = providerContinuationDefinition(source.agentDefinition, queued.agentDefinition, prompt, policyCeiling)
-        const identity = await freezeExecutionIdentity(client, { ...queued, agentDefinition: definition }, undefined, source.agentDefinition.executionIdentity?.workspaceId)
         const previous = executionIdentitySchema.parse(source.agentDefinition.executionIdentity)
-        if (!isDeepStrictEqual(standingIdentity(previous), standingIdentity(identity))) throw new ActionFailureError('executionAccountUnavailable')
+        const identity = await freezeExecutionIdentity(client, { ...queued, agentDefinition: { ...definition, executionIdentity: previous }, actorId: previous.actor, threadOwnerId: previous.threadOwner }, undefined, previous.workspaceId)
+        if (previous.billingAccount.model.ownerId !== identity.billingAccount.model.ownerId || !isDeepStrictEqual(standingIdentity(previous), standingIdentity(identity))) throw new ActionFailureError('executionAccountUnavailable')
         definition.executionIdentity = identity
         await client.query(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,prompt=$6,"agentDefinition"=$7,"source"=$8,"updatedAt"=now() WHERE id=$1`,
           [runId, source.id, source.attempt, source.kind, source.baseBranch, prompt, JSON.stringify(definition), source.source])
@@ -313,6 +315,14 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
       ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
   }
   if (initial.state !== 'pending') return null
+  // A shared run's bounded receipt pins one connection. Its provider failure
+  // cannot authorize discovery or preparation of the owner's private pool.
+  if (source.agentDefinition?.executionIdentity?.actor && source.agentDefinition.executionIdentity.actor !== source.userId) {
+    const card = modelUnavailableCard('unavailable')
+    card.description = 'The shared execution connection is unavailable. A new explicit resource authorization is required before changing connections.'
+    return settle(pool, source, { ...initial, state: 'blocked', card,
+      reasons: [{ choice: initial.from, reason: 'execution_authorization_required' }] })
+  }
   // The order dispatch tried (优先使用的 Agent's list first, decision 2026-11-05-0400), so what came before this run is what was tried.
   const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
   const { autoModelRouting } = stored
@@ -324,6 +334,9 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [], true))
   if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || source.agentDefinition?.agentProfile?.definition.model.mode === 'fixed')
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
+  const frozen = executionIdentitySchema.safeParse(source.agentDefinition.executionIdentity)
+  const originalEntry = source.agentDefinition.modelDispatch.entry
+  if (!frozen.success || !originalEntry) return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [], true))
   const { rows: [origin] } = await pool.query<{ kind: string; remoteUrl: string | null }>(`SELECT d.kind,repo."remoteUrl" FROM devices d
     LEFT JOIN device_repos repo ON repo.id=$3 AND repo."userId"=$2 WHERE d.id=$1 AND d."ownerId"=$2`, [source.deviceId, source.userId, source.deviceRepoId])
   if (!origin) return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
@@ -337,6 +350,7 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   for (let index = 0; index <= stored.entries.length; index++) {
     const selected: ModelDispatch = await resolveModelDispatch(pool, scope, null, location, source.agentDefinition.pinnedDeviceId ?? ((monitor || checkpointUnavailable) && origin.kind === 'local' ? source.deviceId ?? undefined : undefined),
       { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop',
+        recoverySource: { entry: originalEntry, credentialOwnerId: frozen.data.billingAccount.model.ownerId },
         ...(autoModelRouting && source.agentDefinition.modelDispatch.routing ? { routing: { issueId: source.issueId ?? undefined,
           previous: source.agentDefinition.modelDispatch.routing, escalate: true, effort: source.agentDefinition.agentProfile?.effort } } : {}),
         ...(source.agentDefinition.agentProfile?.definition.harness && source.agentDefinition.agentProfile.definition.harness !== 'auto' ? { harness: source.agentDefinition.agentProfile.definition.harness } : {}) })

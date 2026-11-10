@@ -129,7 +129,10 @@ export async function revokeVerifiedSamlSessions(input: VerifiedSamlLogout): Pro
   if (audited) {
     armDueTimerSoon('audit-retention')
     const { scheduleSessionLiveRevocation } = await import('./live-authority')
-    for (const userId of revokedUsers) scheduleSessionLiveRevocation(userId)
+    for (const userId of revokedUsers) {
+      scheduleSessionLiveRevocation(userId)
+      await (await import('@/lib/resource-access/lifecycle')).sessionResourceAuthorityChanged(userId)
+    }
   }
   return true
 }
@@ -151,5 +154,8 @@ export async function finishDerivedSamlLogout(proof: { rootSessionId: string; id
   const deleted = await pool.query(`delete from session root where root.id=$1 and root."userId"=$2 and root."enterpriseOrganizationId"=$3
     and root."enterpriseProviderId"=$4 and root."enterpriseIdentityId"=$6 and not exists(select 1 from session child where child.id=$5)`,
   [proof.rootSessionId, proof.userId, proof.organizationId, proof.providerId, proof.sessionId, proof.identityId])
-  if (deleted.rowCount) (await import('./live-authority')).scheduleSessionLiveRevocation(proof.userId)
+  if (deleted.rowCount) {
+    (await import('./live-authority')).scheduleSessionLiveRevocation(proof.userId)
+    await (await import('@/lib/resource-access/lifecycle')).sessionResourceAuthorityChanged(proof.userId)
+  }
 }

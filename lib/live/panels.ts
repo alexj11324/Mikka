@@ -5,6 +5,7 @@ import { liveGatewayConfig, type LiveScope } from './scope'
 import { batchStreamInvalidation } from './stream-batch'
 import { wakeTokens, wakeWorkflowAfterCommit } from '../workflow-wake'
 import { armDueTimerAfterCommit } from '../due-timer'
+import { resourceLiveScopes } from './resource-scopes'
 
 type Database = Pick<PoolClient, 'query'>
 type Source = { id: string; userId: string; issueId: string | null; botId: string | null; scope: string | null; workspaceId: string | null }
@@ -25,10 +26,11 @@ async function sourceScopes(workspaceDatabase: Database, sources: Source[]): Pro
   return new Map(rows.map(row => [row.id, { ownerId: row.ownerId, workspaceId: row.workspaceId }]))
 }
 
-export async function threadLiveReferences(database: Database, workspaceDatabase: Database, runIds: string[], ownerId: string): Promise<ThreadLiveReference[]> {
-  if (!runIds.length) return []
+async function threadSources(database: Database, runIds: string[], readerIds: string[]): Promise<Source[]> {
+  if (!runIds.length || !readerIds.length) return []
   const { rows } = await database.query<Source>(
-    `SELECT r.id,r."userId",r."issueId",b.id AS "botId",i.scope,r."workspaceId" FROM agent_runs r
+    `SELECT r.id,viewer.id AS "userId",r."issueId",b.id AS "botId",i.scope,r."workspaceId" FROM agent_runs r
+     CROSS JOIN unnest($2::text[]) viewer(id)
      LEFT JOIN issues i ON i.id=r."issueId"
      LEFT JOIN bots b ON b.id=coalesce(
        (SELECT owned.id FROM computer_run_bindings crb JOIN bots owned ON owned.id=crb."botId" AND owned."ownerId"=crb."ownerId"
@@ -36,15 +38,20 @@ export async function threadLiveReferences(database: Database, workspaceDatabase
        (SELECT owned.id FROM bots owned WHERE owned.id=r."botId" AND owned."ownerId"=r."userId"),
        (SELECT owned.id FROM bot_cloud_runtimes runtime JOIN bots owned ON owned.id=runtime."botId" AND owned."ownerId"=runtime."ownerId"
          WHERE runtime."agentId"=r."agentId" AND runtime."ownerId"=r."userId" LIMIT 1))
-     WHERE r.id=ANY($1::uuid[]) AND r."userId"=$2
+     WHERE r.id=ANY($1::uuid[]) AND mikka_resource_acl_allowed('account',viewer.id,r."workspaceId",'thread',r.id,'canReadContent')
        AND (r."issueId" IS NULL OR i."ownershipState"='bound')
        AND r."workspaceId" IS NOT NULL
        AND (r."issueId" IS NULL OR i."workspaceId"=r."workspaceId")
        AND (b."workspaceId" IS NULL OR r."workspaceId"=b."workspaceId")
-       AND (r."botId" IS NULL OR b.id IS NOT NULL)`, [runIds, ownerId],
+       AND (r."botId" IS NULL OR b.id IS NOT NULL)`, [runIds, readerIds],
   )
+  return rows
+}
+
+export async function threadLiveReferences(database: Database, workspaceDatabase: Database, runIds: string[], ownerId: string): Promise<ThreadLiveReference[]> {
+  const rows = await threadSources(database,runIds,[ownerId])
   const scopes = await sourceScopes(workspaceDatabase, rows)
-  return runIds.map(id => ({ id, workspaceId: scopes.get(id)?.workspaceId ?? null }))
+  return rows.filter(row => scopes.has(row.id)).map(row => ({ id: row.id, workspaceId: scopes.get(row.id)!.workspaceId }))
 }
 
 /** Body visibility follows issueVisibilityPredicate: a personal body's owner,
@@ -55,18 +62,12 @@ export async function documentLiveTargets(database: Database, workspaceDatabase:
        AND coalesce(content->'attrs'->'mikka',content->'attrs'->'orvilo')->>'deletedAt' IS NULL`, [issueId],
   )
   if (!issue) return []
-  const scopes = await documentScopes(workspaceDatabase, issueId, issue, viewerId)
+  const scopes = await documentScopes(database, workspaceDatabase, issueId, issue, viewerId)
   return scopes.map(scope => ({ scope, events: [{ kind: 'issue_document', id: issueId }] as LiveInvalidation[] }))
 }
 
-async function documentScopes(workspaceDatabase: Database, issueId: string, issue: { userId: string; scope: string; workspaceId: string | null }, viewerId: string | null = null) {
-  const { rows } = await workspaceDatabase.query<LiveScope>(
-    `SELECT m."userId" AS "ownerId",w.id AS "workspaceId" FROM mikka_workspaces w
-     JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m.status='active'
-     WHERE w.id=$1 AND (w.kind='team' OR w."userId"=m."userId")
-       AND ($2::text IS NULL OR m."userId"=$2)`, [issue.workspaceId, viewerId],
-  )
-  return rows
+async function documentScopes(database: Database, workspaceDatabase: Database, issueId: string, issue: { userId: string; scope: string; workspaceId: string | null }, viewerId: string | null = null) {
+  return resourceLiveScopes(database, workspaceDatabase, 'task', issueId, issue.workspaceId, viewerId)
 }
 
 /** Called after the action's ordinary task authorization, without sending content. */
@@ -76,8 +77,8 @@ export async function documentLiveWorkspace(database: Database, workspaceDatabas
 }
 
 export async function runLiveTargets(database: Database, workspaceDatabase: Database, runId: string, kind: 'run' | 'thread') {
-  const { rows: [run] } = await database.query<{ userId: string; issueId: string | null; retryOf: string | null; continuesRunId: string | null; origin: string | null }>(
-    `SELECT "userId","issueId","retryOf","continuesRunId","questionContinuation"->>'originRunId' AS origin FROM agent_runs WHERE id=$1`, [runId],
+  const { rows: [run] } = await database.query<{ userId: string; workspaceId: string | null; issueId: string | null; retryOf: string | null; continuesRunId: string | null; origin: string | null }>(
+    `SELECT "userId","workspaceId","issueId","retryOf","continuesRunId","questionContinuation"->>'originRunId' AS origin FROM agent_runs WHERE id=$1`, [runId],
   )
   if (!run) return []
   const ids = [runId]
@@ -88,14 +89,17 @@ export async function runLiveTargets(database: Database, workspaceDatabase: Data
       ids.push(...rows.map(row => row.id))
     }
   }
-  const references = await threadLiveReferences(database, workspaceDatabase, [...new Set(ids)], run.userId)
+  const recipients = await resourceLiveScopes(database, workspaceDatabase, 'thread', runId, run.workspaceId)
+  const recipientScopes = new Map(recipients.map(scope => [JSON.stringify([scope.ownerId,scope.workspaceId]),scope]))
   const targets = new Map<string, { scope: LiveScope; events: LiveInvalidation[] }>()
-  for (const reference of references) {
-    if (!reference.workspaceId) continue
-    let target = targets.get(reference.workspaceId)
+  for (const reference of await threadSources(database,[...new Set(ids)],recipients.map(scope=>scope.ownerId))) {
+    const recipient = recipientScopes.get(JSON.stringify([reference.userId,reference.workspaceId]))
+    if (!recipient) continue
+    const key = JSON.stringify(recipient)
+    let target = targets.get(key)
     if (!target) {
-      target = { scope: { ownerId: run.userId, workspaceId: reference.workspaceId }, events: [] }
-      targets.set(reference.workspaceId, target)
+      target = { scope: recipient, events: [] }
+      targets.set(key, target)
     }
     target.events.push({ kind, id: reference.id })
   }
@@ -118,7 +122,8 @@ export async function runChangeTargets(database: Database, workspaceDatabase: Da
   if (run?.issueId) for (const target of await issueThreadTargets(database, workspaceDatabase, run.issueId)) {
     const key = JSON.stringify(target.scope)
     const current = merged.get(key)
-    if (current) current.events.push(...target.events); else merged.set(key, target)
+    // A private run must not reveal even its activity to other task readers.
+    if (current) current.events.push(...target.events)
   }
   return [...merged.values()]
 }
@@ -162,8 +167,8 @@ export const threadChanged = (executor: object, runId: string) => changed(execut
 export async function documentScopesBeforeChange(issue: { id: string; userId: string; scope: string; workspaceId: string | null }): Promise<LiveScope[]> {
   if (!liveGatewayConfig(process.env)) return []
   try {
-    const { workspacePool } = await import('../workspace-db')
-    return await documentScopes(workspacePool, issue.id, issue)
+    const [{ workspacePool }, { pool }] = await Promise.all([import('../workspace-db'), import('../db/request-scope')])
+    return await documentScopes(pool, workspacePool, issue.id, issue)
   } catch {
     console.warn('[live] document scope capture unavailable')
     return []

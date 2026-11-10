@@ -4,6 +4,8 @@ import { db, pool, withDatabaseClient } from '@/lib/db'
 import { revalidateExecutionIdentity, ExecutionIdentityError } from '@/lib/execution-identity'
 import { agentRuns, devices, issues } from '@/lib/db/schema'
 import { mayCompleteIssue, withRunWorkspace } from '@/lib/run-completion'
+import { lockResourceAccess } from '@/lib/resource-access/store'
+import { ActionFailureError } from '@/lib/action-error'
 
 type Run = typeof agentRuns.$inferSelect
 type ClaimTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -37,6 +39,8 @@ async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | '
   try {
     return await withDatabaseClient(client, () => db.transaction(async tx => {
       if (!hint.issueId) return null
+      try { await lockResourceAccess(tx, userId, { kind: 'thread', id: hint.id, workspaceId }, 'canSteer') }
+      catch (error) { if (error instanceof ActionFailureError) return null; throw error }
       const [issue] = await tx.select().from(issues).where(eq(issues.id, hint.issueId)).for('update')
       if (!issue || !await mayCompleteIssue(issue, userId, workspaceId)) return null
       const [row] = await tx.select({ run: agentRuns, enabled: devices.enabled }).from(agentRuns)
@@ -51,7 +55,8 @@ async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | '
         if (identity && identity.workspaceId !== workspaceId) return null
       }
       catch (error) { if (error instanceof ExecutionIdentityError) return null; throw error }
-      if (authorizeResources && !await authorizeResources(run, tx)) return null
+      try { if (authorizeResources && !await authorizeResources(run, tx)) return null }
+      catch (error) { if (error instanceof ActionFailureError) return null; throw error }
       return respond(run)
     }))
   } finally { client.release() }

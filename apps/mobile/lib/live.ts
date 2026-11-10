@@ -4,6 +4,7 @@ import { apiConnection, authHeaders } from '@/lib/api'
 import { onServerChange } from '@/lib/config'
 import { createLiveClient, type LiveRef, type LiveSpecOptions } from './live-client'
 import { presenceScope } from './presence-scope'
+import { apiCache } from './api-cache'
 import type { PresenceProof } from '../../../lib/live/presence'
 
 export { UNRESOLVED_LIVE_ID, type LiveRef } from './live-client'
@@ -13,8 +14,11 @@ const TICKET_TIMEOUT_MS = 15_000
 
 /** The live ticket for one owner/workspace channel, as the signed-in person (the same session cookie `api` sends). */
 async function ticket(workspaceId: string, signal: AbortSignal): Promise<unknown> {
+  apiCache.expireAccess()
+  const context = apiCache.context()
   const connection = apiConnection()
   const request = presenceScope.begin()
+  const requestedAt = typeof performance !== 'undefined' ? performance.now() : Date.now()
   const controller = new AbortController()
   const abort = () => controller.abort()
   const timer = setTimeout(abort, TICKET_TIMEOUT_MS)
@@ -27,6 +31,11 @@ async function ticket(workspaceId: string, signal: AbortSignal): Promise<unknown
       signal: controller.signal,
     })
     const value = response.ok ? await response.json() : null
+    if (!controller.signal.aborted && !signal.aborted) apiCache.commit(context,() => {
+      if ([401,403].includes(response.status)) apiCache.clear()
+      else if (typeof value?.accessProof === 'string' && /^[a-f0-9]{64}$/.test(value.accessProof))
+        apiCache.accessProof(workspaceId,value.accessProof,typeof value.accessExpiresAt === 'string' ? value.accessExpiresAt : null, typeof value.accessExpiresAfterMs === 'number' ? value.accessExpiresAfterMs : null, requestedAt)
+    })
     if (!controller.signal.aborted && !signal.aborted) presenceScope.remember(workspaceId, value, request)
     return value
   } finally {
@@ -39,6 +48,7 @@ export const live = createLiveClient({
   appState: AppState,
   ticket,
   socket: (url, protocol) => new WebSocket(url, protocol),
+  invalidateAccess: () => apiCache.clear(),
   monotonicNow: typeof performance !== 'undefined' && typeof performance.now === 'function' ? () => performance.now() : undefined,
 })
 onServerChange(() => { presenceScope.clear(); live.reset() })

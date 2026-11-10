@@ -53,6 +53,7 @@ import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
 import { taskExecutionEnv } from '../task-env'
+import { NATIVE_TOOL_PROFILE, nativeToolConfigArgs, prepareNativeToolDirectories } from '../agents/native-tool-isolation.mjs'
 import { mailboxToolResult } from '../run-mailbox'
 import { codexMailboxCatalogue, codexMailboxResumeVersion, recordCodexMailboxSession, verifyCodexMailboxResume } from './codex-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
@@ -375,6 +376,7 @@ export class CodexAdapter implements AgentAdapter {
     const mailboxCatalogue = options.mailbox ? codexMailboxCatalogue(options.mailbox) : undefined
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
+    const isolated = options.nativeCredentialIsolation === 'tools_v1'
     const externalAuth = this.options.subscriptionAuth
     const brokerAuth = this.options.hostedSubscriptionBroker
     const managedAuth = Boolean(externalAuth || brokerAuth)
@@ -392,7 +394,7 @@ export class CodexAdapter implements AgentAdapter {
       )
         throw new Error(SUBSCRIPTION_AUTH_ERROR)
     }
-    if (!options.machineEnvironment && mode === "continue" && options.continueSession) {
+    if ((!options.machineEnvironment || isolated) && mode === "continue" && options.continueSession) {
       try {
         const earlier = runPaths(
           this.options.stateDir,
@@ -412,10 +414,14 @@ export class CodexAdapter implements AgentAdapter {
       }
     }
     // Inside the run dir: one run's home is never another run's.
-    const codexHome = options.machineEnvironment
+    // Shared tools must not cause a credential-bearing CLI to load personal
+    // MCP servers, skills, hooks or instructions from the machine's config.
+    // Reuse the existing per-run native session store; authentication still
+    // goes straight to the official CLI through its native login protocol.
+    const codexHome = options.machineEnvironment && !isolated
       ? { home: options.env.CODEX_HOME ?? join(options.env.HOME, '.codex') }
       : prepareCodexHome(join(runDir, "codex-home"), log)
-    if (options.machineEnvironment) mkdirSync(codexHome.home, { recursive: true, mode: 0o700 })
+    if (options.machineEnvironment && !isolated) mkdirSync(codexHome.home, { recursive: true, mode: 0o700 })
     const mailboxResumeVersion = mailboxCatalogue && threadId ? verifyCodexMailboxResume(
       this.options.stateDir,
       mode === 'continue' ? options.continueSession!.runId : options.runId,
@@ -423,6 +429,8 @@ export class CodexAdapter implements AgentAdapter {
     ) : null
     const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
+    if (isolated && (!options.machineEnvironment || !isAbsolute(binary) || computerMcp || options.mailbox || options.apps?.apps.length))
+      throw Error('native_tool_isolation_unavailable')
     // The official platform package includes code-mode helpers beside Codex.
     // Only an absolute host-selected CLI directory enters the filtered PATH.
     const childPath = isAbsolute(binary) ? dirname(binary) + delimiter + (options.env.PATH ?? '') : options.env.PATH
@@ -440,6 +448,7 @@ export class CodexAdapter implements AgentAdapter {
       apps: options.apps,
       githubRuntime: options.githubRuntime,
       machineEnvironment: options.machineEnvironment,
+      ...(isolated ? { nativeIsolationBinary: binary, nativeIsolationTaskEnv: { ...options.taskEnv, ...options.taskSecretEnv } } : {}),
       childPath,
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
@@ -460,6 +469,8 @@ export class CodexAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
+    const toolIsolation = ctx.nativeToolIsolation()
+    if (toolIsolation) prepareNativeToolDirectories(toolIsolation)
     const mcp = ctx.mcpServer()
     const traceContext = options.traceContext ?? daemonTracer.capture()
     let nativeGenerations: Awaited<ReturnType<typeof startCodexGenerationCollector>> | undefined
@@ -477,6 +488,8 @@ export class CodexAdapter implements AgentAdapter {
       "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.command=${toml(mcp.command)}`,
+      // Hand-in tools must be ready before the first turn, including native resume.
+      "-c", `mcp_servers.${MCP_SERVER_NAME}.required=true`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.args=${toml(mcp.args)}`,
       ...(options.mcp ? ["-c", `mcp_servers.${MCP_SERVER_NAME}.env_vars=${toml(Object.keys(ctx.decisionMcpEnv()))}`] : []),
@@ -502,23 +515,26 @@ export class CodexAdapter implements AgentAdapter {
         "-c", "model_providers.mikka.requires_openai_auth=false",
         "-c", "model_providers.mikka.supports_websockets=false",
       ] : []),
-      ...(options.machineEnvironment ? ["-c", 'shell_environment_policy.inherit="all"', "-c", 'shell_environment_policy.ignore_default_excludes=true'] : []),
+      ...(options.machineEnvironment && !isolated ? ["-c", 'shell_environment_policy.inherit="all"', "-c", 'shell_environment_policy.ignore_default_excludes=true'] : []),
       // Personal devices retain their own run temp paths.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
         `shell_environment_policy.set.${key}=${toml(value)}`,
       ]),
       ...(this.options.cliTiming?.args ?? []),
+      ...(toolIsolation ? nativeToolConfigArgs(toolIsolation, options.env) : []),
     ]
     const spawnOptions = {
       cwd: ctx.worktree,
       env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...ctx.decisionMcpEnv(), ...credential.env, CODEX_HOME: codexHome.home,
+        ...(isolated ? { HOME: join(runDir, 'native-home') } : {}),
         ...this.options.cliTiming?.env },
       policy: ctx.policy(),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     }
-    const adopted = mode === 'new' && externalAuth && options.machineEnvironment && !computerMcp && !options.apps?.apps.length &&
+    if (isolated) mkdirSync(join(runDir, 'native-home'), { recursive: true, mode: 0o700 })
+    const adopted = !isolated && mode === 'new' && externalAuth && options.machineEnvironment && !computerMcp && !options.apps?.apps.length &&
       this.options.anonymousCodexFresh ? await this.options.anonymousCodexCandidate?.adopt({
         fresh: this.options.anonymousCodexFresh, cwd: ctx.worktree, env: spawnOptions.env, binary, mcp, traceContext,
         repositoryRoot: options.gitWritePaths?.length === 1 ? options.gitWritePaths[0] : undefined,
@@ -592,6 +608,7 @@ export class CodexAdapter implements AgentAdapter {
       ...(mcp.args.includes('--repository-selection') ? ['switch_repository'] : []),
       ...(mcp.args.includes('--factory-artifacts') ? ['inspect_artifact', 'inspect_repository'] : []),
       ...(mcp.args.includes('--factory-verify') ? ['verify_command'] : []),
+      ...(toolIsolation ? ['run_command'] : []),
     ])
     const registeredMcpTool = (server: string, tool: string) =>
       (server === MCP_SERVER_NAME && handInTools.has(tool)) ||
@@ -674,6 +691,9 @@ export class CodexAdapter implements AgentAdapter {
         }
       }
       if (method === "item/commandExecution/requestApproval" || method === "item/fileChange/requestApproval") {
+        // A request to escape a required native sandbox is never an ordinary
+        // run lease check, even when the same actor still owns the task.
+        if (isolated) return { decision: 'decline' }
         if (!options.toolApproval) return { decision: "decline" }
         if (pendingTurnStart) await pendingTurnStart
         const call = params as { threadId?: unknown; turnId?: unknown; itemId?: unknown; approvalId?: unknown; grantRoot?: unknown; availableDecisions?: unknown } | null
@@ -914,7 +934,7 @@ export class CodexAdapter implements AgentAdapter {
             title: "Mikka",
             version: DAEMON_VERSION,
           },
-          capabilities: managedAuth || options.mailbox ? { experimentalApi: true } : null
+          capabilities: isolated || managedAuth || options.mailbox ? { experimentalApi: true } : null
         }),
         "initialize",
       ))
@@ -950,7 +970,7 @@ export class CodexAdapter implements AgentAdapter {
         // Nothing is asked and Codex's own sandbox is off: the equivalent of
         // `--dangerously-bypass-approvals-and-sandbox` (decision 2026-11-01-2335).
         approvalPolicy: "never",
-        sandbox: "danger-full-access",
+        ...(isolated ? { permissions: NATIVE_TOOL_PROFILE, config: { default_permissions: NATIVE_TOOL_PROFILE } } : { sandbox: "danger-full-access" as const }),
         developerInstructions: ctx.instructions(),
         ...(options.model ? { model: options.model } : {}),
       }
@@ -982,6 +1002,8 @@ export class CodexAdapter implements AgentAdapter {
           response = await newThread()
         }
       }
+      if (isolated && response.activePermissionProfile?.id !== NATIVE_TOOL_PROFILE)
+        throw Error('native_tool_profile_unverified')
       sessionId = response.thread.id
       if ((options.requireSessionResume || (options.mailbox && threadId)) && sessionId !== threadId)
         throw new Error("Codex resumed a different question thread")

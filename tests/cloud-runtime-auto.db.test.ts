@@ -446,7 +446,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [mapped[0].botId]), 1, 'no duplicate runtime')
     // An ordinary bot row: it is listed with the workspace's bots.
     const { workspaceBots } = await import('../lib/workspace-admin/bots')
-    assert.ok((await workspaceBots(c.workspaceId)).some(bot => bot.id === mapped[0].botId))
+    assert.ok((await workspaceBots(c.workspaceId, c.id)).some(bot => bot.id === mapped[0].botId))
     const { agentRuns, agents } = await import('../lib/db/schema')
     const { runBotId } = await import('../lib/run-bot-name')
     const { db } = await import('../lib/db')

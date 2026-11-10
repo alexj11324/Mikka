@@ -3,7 +3,7 @@ import { useTranslations } from 'next-intl'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { JSONContent } from '@tiptap/react'
-import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, LockKeyhole, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
+import { ChartNoAxesColumnIncreasing, ChevronRight, CircleDashed, Maximize2, Minimize2, SquareUserRound, X } from 'lucide-react'
 import { saveIssue } from '@/app/actions/issues'
 import useSWR from 'swr'
 import { toast } from 'sonner'
@@ -38,6 +38,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   const i18nText = useTranslations();
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
   const [teamId, setTeamId] = useState(initialTeamId)
+  const [visibility, setVisibility] = useState<'shared'|'private'>('shared')
   const [title, setTitle] = useState(initialTitle)
   const seenAhead = useRef(initialTitle)
   const [content, setContent] = useState<JSONContent>(EMPTY)
@@ -58,7 +59,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   }, [])
   const submitting = useRef(false)
   const [defaults, setDefaults] = useState({ status: initialStatus, priority: 'normal' })
-  const dirty = !!title.trim() || JSON.stringify(content) !== JSON.stringify(EMPTY) || status !== defaults.status || priority !== defaults.priority || teamId !== initialTeamId
+  const dirty = !!title.trim() || JSON.stringify(content) !== JSON.stringify(EMPTY) || status !== defaults.status || priority !== defaults.priority || teamId !== initialTeamId || visibility !== 'shared'
   const [expanded, setExpanded] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
 
@@ -110,7 +111,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
     setError('')
     setNotice('')
     try {
-      const result = await saveIssue({ title: currentTitle, content, status, priority })
+      const result = await saveIssue({ title: currentTitle, content, status, priority, visibility })
       if (!('issue' in result) || !result.issue) {
         setError(result.error ?? i18nText("Issue.create.createFailed"))
         return
@@ -169,8 +170,8 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <div className="flex flex-wrap items-center gap-2">
             <IssuePropertyMenu pill label={i18nText("Issue.statusLabel")} value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={setStatus} />
             <IssuePropertyMenu pill label={i18nText("Issue.priorityLabel")} value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
-            <Badge variant="outline" className="h-7 gap-1.5 rounded-full px-2.5"><LockKeyhole />{teamId ? i18nText("FeatureCopy.c_c30fccc5") : i18nText("Issue.create.private")}</Badge>
           </div>
+          <Field><FieldLabel htmlFor="task-visibility">{i18nText('ResourceAccess.visibility')}</FieldLabel><NativeSelect id="task-visibility" value={visibility} disabled={pending} onChange={event=>setVisibility(event.target.value as 'shared'|'private')}><NativeSelectOption value="shared">{i18nText('ResourceAccess.shared')}</NativeSelectOption><NativeSelectOption value="private">{i18nText('ResourceAccess.private')}</NativeSelectOption></NativeSelect><p className="text-xs text-muted-foreground">{i18nText('ResourceAccess.creationHint')}</p></Field>
           <FieldGroup><Field><FieldLabel htmlFor="new-issue-team">{i18nText("FeatureCopy.c_53d4919c")}</FieldLabel><NativeSelect id="new-issue-team" value={teamId} disabled={pending || !!teamsError} onChange={event => setTeamId(event.target.value)}><NativeSelectOption value="">{i18nText("FeatureCopy.c_a0860f69")}</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect>{teamsError && <p className="text-xs text-muted-foreground">{i18nText("FeatureCopy.c_d7d814ec")}</p>}</Field></FieldGroup>
           {error && <FieldError className="text-xs">{error}</FieldError>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}

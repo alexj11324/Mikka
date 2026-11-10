@@ -312,12 +312,12 @@ test('group read routes advance actual group history without opening private DMs
       routeMention: mentionJudgment.route,
       async correction() { return { kind: 'not_correction' } },
       async prepareBot(actor, scope, client) {
-        assert.deepEqual(scope, { ownerId: owner, workspaceId: w })
+        assert.deepEqual(scope, { ownerId: owner, actorId: owner, workspaceId: w })
         assert.ok(client)
         prepared.set(actor.id, (prepared.get(actor.id) ?? 0) + 1)
         const model = `fixture-selected-${actor.id}-${version}`
         initialModels.set(actor.id, model)
-        return { harness: 'ai_sdk', model, fixtureSecret: 'must-not-enter-modelSelections' }
+        return { harness: 'ai_sdk', model, actorId: scope.actorId, fixtureSecret: 'must-not-enter-modelSelections' }
       },
       async generate(actor, input) {
         assert.equal(actor.memberType, 'bot')

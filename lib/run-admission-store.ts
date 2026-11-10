@@ -25,12 +25,13 @@ import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { notifyDeviceWork } from './device-gateway-notify'
 import type { RunInvalidReason } from './run-invalid-reason'
 import { captureTraceContext } from './tracing/context'
+import { lockRunContextAdmission } from './run-context-admission'
 
 /** Existing rows and JSON only: admission, run and publication commit together. */
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
   source?: 'mcp' | null; botId: string | null; prompt: string; /** The task's length at the start of `prompt` (lib/run-prompt.ts). */ promptTaskLength?: number; definition: WorkerDefinitionSnapshot; requestEventId?: string
-  dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string; profileSourceRunId?: string
+  dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string; profileSourceRunId?: string; threadRunId?: string
   factoryContext?: { sourceEventId: string; attemptId: string }
 }, existing?: PoolClient): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
   const client = existing ?? await pool.connect()
@@ -41,6 +42,11 @@ export async function acceptLocalRun(input: {
     // The reason travels with the code so the caller acts on it instead of guessing (RUN_INVALID_REASONS).
     const invalid = (reason: RunInvalidReason) => new ActionFailureError('runInvalid', { reason })
     const readOnly = input.definition.readOnly === true
+    const threadSourceRunId = input.threadRunId ?? input.sourceRunId ?? input.profileSourceRunId
+    const { rows: [contextTask] } = await client.query<{ workspaceId: string }>('SELECT "workspaceId" FROM issues WHERE id=$1 AND "ownershipState"=\'bound\'', [input.issueId])
+    if (!contextTask?.workspaceId) throw invalid('issueUnavailable')
+    if (!await lockRunContextAdmission(client, { ownerId: input.userId, workspaceId: contextTask.workspaceId, issueId: input.issueId, sourceRunId: threadSourceRunId }))
+      throw invalid('sharedRequiresIsolatedCloud')
     // The setters acquire these locks before reading runs or updating workers.
     // Internal hosts prelock the same policy before taking their domain locks.
     const taskScope = await lockCliTaskScope(client, input.userId, input.issueId)
@@ -84,7 +90,7 @@ export async function acceptLocalRun(input: {
     const profileOriginRunId = await admitProfileSelection(client, { ownerId: input.userId, workspaceId: executionIdentity.workspaceId ?? '', issueId: task.id, harness: input.definition.harness, model: input.definition.model, apiKeyId: input.definition.apiKey?.keyId, subscriptionBindingId: input.definition.subscription?.bindingId, selection: input.definition.agentProfile, sourceRunId: questionSource ?? input.profileSourceRunId, factoryContext: input.factoryContext })
     // A question's host receipt grants the same native execution. Its origin,
     // child and wake receipt must keep the exact original definition digest.
-    const traceContext = captureTraceContext({ runId: input.id, threadId: input.sourceRunId ?? input.id, taskId: task.id, posthogDistinctId: input.userId })
+    const traceContext = captureTraceContext({ runId: input.id, threadId: threadSourceRunId ?? input.id, taskId: task.id, posthogDistinctId: input.userId })
     const definition = { ...input.definition, ...(traceContext ? { traceContext } : {}), executionIdentity, ...(profileOriginRunId && !questionSource ? { profileOriginRunId } : {}) }
     if (profileOriginRunId && !questionSource) definition.definitionDigest = workerDefinitionDigest(definition)
     const context = { workspaceId: task.workspaceId!, ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
@@ -127,6 +133,8 @@ export async function acceptLocalRun(input: {
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     if (readOnly) {
       await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, ...(input.promptTaskLength ? { promptTaskStart: 0, promptTaskLength: input.promptTaskLength } : {}), agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
+      if (threadSourceRunId) await (await import('./resource-access/thread-inheritance')).inheritThreadAccess(client,
+        { sourceRunId: threadSourceRunId, newRunId: input.id, ownerId: input.userId, workspaceId: task.workspaceId })
       await runListChanged(tx, input.id)
       await runChanged(tx, input.id)
       return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
@@ -143,6 +151,8 @@ export async function acceptLocalRun(input: {
     const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), ne(runPublications.issueId, task.id))).limit(1)
     if (collision) throw invalid('branchInUse')
     await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, ...(input.promptTaskLength ? { promptTaskStart: 0, promptTaskLength: input.promptTaskLength } : {}), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
+    if (threadSourceRunId) await (await import('./resource-access/thread-inheritance')).inheritThreadAccess(client,
+      { sourceRunId: threadSourceRunId, newRunId: input.id, ownerId: input.userId, workspaceId: task.workspaceId })
     await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: repo.baseBranch, pushApproved: true })
     await runListChanged(tx, input.id)
     await runChanged(tx, input.id)

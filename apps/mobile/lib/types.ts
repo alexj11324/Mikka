@@ -2,6 +2,7 @@
 import type { SubscriptionRefusalNotice } from '../../../lib/subscription-refusal'
 import type { CloudErrorCode } from '../../../lib/cloud-services/errors'
 import type { PresenceProof } from '../../../lib/live/presence'
+import type { ResourceCapabilities, ResourceKind, ResourceAction, ResourceVisibility } from '../../../lib/resource-access/contract'
 export type Source = 'gmail' | 'github' | 'slack' | 'notion' | 'linear' | 'googlecalendar'
 export type MachineKind = 'cloud' | 'laptop' | 'server'
 export type ThreadStatus = 'running' | 'waiting' | 'paused' | 'failed' | 'done' | 'stopped'
@@ -138,6 +139,9 @@ export interface Thread {
   group?: ThreadGroup
   /** How many threads its task has had; the list shows only the newest. */
   attempts?: number
+  /** Missing on a legacy owner-only server. New servers always supply both. */
+  ownedByCurrentUser?: boolean
+  canContribute?: boolean
 }
 
 /** 等待你, 进行中, 受阻, 空闲, 已解决, in that order (R-52). */
@@ -166,11 +170,25 @@ export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
   | { kind: 'steps'; id: string; count: number; steps?: ThreadStep[]; at: number }
   | { kind: 'error'; id: string; text: string; at: number }
-  | { kind: 'person'; id: string; text: string; mine: boolean; at: number }
+  | { kind: 'person'; id: string; text: string; mine: boolean; author?: string; at: number }
 
 /** A thread paused because its subscription ran out (the web's ThreadQuotaPausedCard). */
 export interface ThreadPaused { runId: string; subscription: 'claude' | 'codex'; plan: string | null; resetsAt: string | null; keyReady: boolean }
 export interface ThreadDetail { /** Each run's live channel (lib/live/panels.ts threadLiveReferences); absent from a server older than it. */ live?: { runs: { id: string; workspaceId: string | null }[] }; thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
+
+/** GET /api/resources/:kind/:id/access. No token, secret or content appears in management metadata. */
+export interface ResourceAccess {
+  policy: {kind:ResourceKind;id:string;workspaceId:string;ownerId:string|null;visibility:ResourceVisibility;revision:number}|null
+  capabilities: ResourceCapabilities
+  members: {id:string;name:string|null;image:string|null}[]
+  grants: {subjectId:string;capabilities:ResourceAction[];expiresAt:string|null}[]
+}
+export interface ThreadExecutionAccess {
+  workspaceId:string;ownerId:string;canManage:boolean;canContinue:boolean
+  members: ResourceAccess['members']
+  connections:{id:string;name:string|null;provider:string;models:string[];harnesses:string[];ownerId:string}[]
+  grants:{id:string;threadId:string;actorId:string;model:string;harness:'claude_code'|'codex';remainingComputeSeconds:number;maxTurnSeconds:number;current:boolean;expiresAt:string;externalCost:null}[]
+}
 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }
@@ -219,6 +237,7 @@ export type TaskActivity =
 
 /** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
+  capabilities?: ResourceCapabilities
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
     bot: TaskBot | null
     schedule: TaskSchedule | null
@@ -252,6 +271,8 @@ export interface Preferences {
 }
 
 export interface Settings {
+  /** Fresh finance entry scope; absent on older servers. */
+  billingScope?: { kind: 'workspace' | 'organization'; id: string } | null
   user: Person
   workspace: Workspace
   workspaces: Workspace[]

@@ -64,6 +64,19 @@ export async function getArtifactObjectStream(key: string, signal: AbortSignal):
   return response.body
 }
 
+/** Keep the S3 capability on the server. Each media request passes current
+ * resource authorization, including every subsequent video range request. */
+export async function getArtifactObjectRange(key: string, request: Request): Promise<Response> {
+  const config = objectStorageConfig()
+  if (!config) throw new Error('Object storage is not configured')
+  const range = request.headers.get('range')
+  const headers: Record<string, string> = {}
+  if (range && /^bytes=(?:\d+-\d*|-\d+)$/.test(range)) headers.range = range
+  const response = await config.client.fetch(objectUrl(config, key), { signal: request.signal, redirect: 'error', headers })
+  if (![200, 206, 416].includes(response.status)) throw new Error(`Object storage get failed: ${response.status}`)
+  return response
+}
+
 /** The object's bytes, for binary files such as run captures. */
 export async function getArtifactObjectBytes(key: string): Promise<Uint8Array<ArrayBuffer>> {
   const config = objectStorageConfig()

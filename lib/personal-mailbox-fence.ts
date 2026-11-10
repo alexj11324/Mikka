@@ -30,6 +30,7 @@ export function workerMailboxFence(identity: {
         AND to_jsonb(r)->'agentDefinition'=$7::jsonb
         AND EXISTS (SELECT 1 FROM agents a WHERE a.id=r."agentId" AND a."userId"=r."userId")
         AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">clock_timestamp()
+        AND mikka_run_personal_resources_allowed(r.id)
         AND EXISTS (SELECT 1 FROM run_tokens t WHERE t."runId"=r.id AND t."userId"=r."userId"
           AND t."tokenHash"=$5 AND t."revokedAt" IS NULL AND t."expiresAt">clock_timestamp())`,
     [identity.runId, identity.userId, identity.botId, identity.deviceId, identity.tokenHash, identity.agentId, JSON.stringify(identity.snapshot)])

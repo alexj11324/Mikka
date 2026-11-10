@@ -26,5 +26,19 @@ export async function accessibleProjectReferences(reader: IssueReader, workspace
 
 export async function accessibleProjects(reader: IssueReader, tx: ProjectTransaction | typeof projectDb, workspaceId: string) {
   const references = await accessibleProjectReferences(reader, workspaceId)
-  return references.length ? tx.select().from(projects).where(inArray(projects.id, references.map(row => row.id))) : []
+  if(!references.length)return []
+  const ids=references.map(row=>row.id)
+  const [source,{rows:tasks}]=await Promise.all([
+    tx.select().from(projects).where(inArray(projects.id,ids)),
+    db.execute<{id:string;projectId:string}>(sql`select p.id,p."parentId" as "projectId" from resource_access_policies p
+      join issues i on i.id=p.id and i."workspaceId"=p."workspaceId" and i."ownershipState"='bound'
+      where p.kind='task' and p."parentKind"='project' and p."parentId"=any(${sql.param(ids)}::uuid[])
+        and coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' is null
+        and mikka_resource_acl_allowed('account',${taskReaderScope(reader).userId},p."workspaceId",p.kind,p.id,'canReadContent')`),
+  ])
+  // Source relation arrays are projections, never a way to expose a private
+  // child's ID/count. The APP parent is also established before a new Task's
+  // content can commit, including the Coordinator/Factory creation path.
+  return source.map(project=>({...project,issueIds:tasks.filter(task=>task.projectId===project.id).map(task=>task.id),
+    properties:{...project.properties,dependencyIds:project.properties.dependencyIds.filter(id=>ids.includes(id))}}))
 }

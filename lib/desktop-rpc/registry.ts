@@ -40,9 +40,15 @@ import * as actions32 from '@/app/actions/user-secrets'
 import * as actions33 from '@/app/actions/workspace'
 import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
+import * as resourceAccess from '@/app/actions/resource-access'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
+  'resource-access.getResourceAccess':resourceAccess.getResourceAccess,
+  'resource-access.saveResourceAccess':resourceAccess.saveResourceAccess,
+  'resource-access.getThreadExecutionAccess':resourceAccess.getThreadExecutionAccess,
+  'resource-access.saveThreadExecutionGrant':resourceAccess.saveThreadExecutionGrant,
+  'resource-access.revokeThreadExecutionGrant':resourceAccess.revokeThreadExecutionGrant,
   'desktop.readBatch': createReadBatch(() => desktopActions),
   'desktop.bootstrap': desktopBootstrap,
   'desktop.session': desktopSession,
@@ -236,6 +242,7 @@ const functions = {
   'workspace-settings.transferWorkspace': actions35.transferWorkspace,
   'workspace-settings.deleteWorkspace': actions35.deleteWorkspace,
   'workspace-settings.takeOverArchivedBot': actions35.takeOverArchivedBot,
+  'workspace-settings.transferMyBot': actions35.transferMyBot,
   'workspace.createWorkspace': actions33.createWorkspace,
   'workspace.switchWorkspace': actions33.switchWorkspace,
   'workspace.createWorkspaceInvitation': actions33.createWorkspaceInvitation,

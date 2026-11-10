@@ -19,6 +19,7 @@ const schema = z.object({
   requestId: z.uuid(), teamId: z.uuid(), title: z.string().trim().min(1).max(200),
   content: z.custom<JSONContent>(value => !!value && typeof value === 'object' && (value as JSONContent).type === 'doc' && JSON.stringify(value).length <= 250000),
   status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES),
+  visibility: z.enum(['shared','private']).optional(),
 })
 type WorkspaceTx = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 class TeamCreateError extends Error { constructor(readonly code: 'teamIssueAccessDenied' | 'teamIssueRequestConflict' | 'teamIssueChanged') { super(code) } }

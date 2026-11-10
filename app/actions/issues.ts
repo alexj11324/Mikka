@@ -64,6 +64,8 @@ const inputSchema = z.object({
   content: documentSchema,
   status: z.enum(ISSUE_STATUS_CODES),
   priority: z.enum(ISSUE_PRIORITY_CODES),
+  visibility: z.enum(['shared','private']).optional(),
+  projectId:z.uuid().optional(),
 })
 
 function validationCode(error: z.ZodError): ActionErrorCode {
@@ -214,12 +216,13 @@ async function readIssue(id: string) {
   })
 }
 
-export async function saveIssue(input: { id?: string; revision?: number; workspaceId?: string; title: string; content: JSONContent; status: string; priority: string }): Promise<ActionResult<{ issue: IssueView }>> {
+export async function saveIssue(input: { id?: string; revision?: number; workspaceId?: string; title: string; content: JSONContent; status: string; priority: string; visibility?: 'shared' | 'private'; projectId?: string }): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
     const user = await requireUser()
     const userId = user.id
     const parsed = inputSchema.safeParse(input)
     if (!parsed.success) return { error: validationCode(parsed.error) }
+    if (input.id && (input.visibility !== undefined || input.projectId !== undefined)) return { error:'validationGeneric' }
     let id: string | undefined
     if (input.id) {
       const parsedId = z.uuid().safeParse(input.id)
@@ -275,7 +278,7 @@ export async function saveIssue(input: { id?: string; revision?: number; workspa
 
 /** Explicit local team choice. Use a stable requestId on retries. No Linear
  * destination is inferred; the returned task is blocked from provider sync. */
-export async function createIssueForTeam(input: { requestId: string; teamId: string; title: string; content: JSONContent; status: string; priority: string }) {
+export async function createIssueForTeam(input: { requestId: string; teamId: string; title: string; content: JSONContent; status: string; priority: string; visibility?: 'shared' | 'private' }) {
   return runAction(async () => {
     // An actAs context can represent an agent or a trusted internal caller;
     // neither is evidence of a signed-in human choosing this team.

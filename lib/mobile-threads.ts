@@ -18,6 +18,10 @@ import { readHomeScopeProof } from '@/lib/live/home-scope-proof'
 import { liveGatewayConfig } from '@/lib/live/scope'
 import type { ListLiveRead } from '@/lib/live/list-read'
 import type { PresenceDevice } from '@/lib/live/presence'
+import type { IssueReader } from '@/lib/issue-visibility'
+import { taskReaderScope } from '@/lib/task-workspace'
+import { threadReadAccess } from '@/lib/resource-access/thread'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 
 export { mobileThreadStatus, type MobileThreadStatus } from '@/lib/mobile-thread-status'
 import { mobileThreadStatus, type MobileThreadStatus } from '@/lib/mobile-thread-status'
@@ -44,6 +48,8 @@ export interface MobileThread {
   group: ThreadGroup
   /** How many threads its task has had (第 N 次尝试); a list shows only the newest of them. */
   attempts: number
+  ownedByCurrentUser: boolean
+  canContribute: boolean
 }
 
 /**
@@ -62,8 +68,8 @@ function nameOf(source: RunSource | undefined, prompt: string, agentName: string
 
 type MachineKind = ReturnType<typeof machineKind>
 
-async function threadRows(userId: string, filter: SQL | undefined, limit: number): Promise<MobileThread[]> {
-  return (await runRows(userId, filter, limit)).map(row => row.thread)
+async function threadRows(reader: IssueReader, filter: SQL | undefined, limit: number): Promise<MobileThread[]> {
+  return (await runRows(reader, filter, limit)).map(row => row.thread)
 }
 
 /** A list's rows: a task's threads fold into its newest, with the task's attempt count, newest first (R-52). */
@@ -76,17 +82,20 @@ function listed(rows: Awaited<ReturnType<typeof runRows>>): MobileThread[] {
 }
 
 /** Threads with what their task links: its id, title and pull requests, as far as this person can see it. */
-async function runRows(userId: string, filter: SQL | undefined, limit: number) {
+async function runRows(reader: IssueReader, filter: SQL | undefined, limit: number) {
+  const { userId } = taskReaderScope(reader)
   const rows = await db.select({
     id: agentRuns.id, prompt: sql<string>`left(${runTaskPrompt}, 300)`, status: agentRuns.status,
     agentName: runBotName, harness: agents.harness,
     deviceId: devices.id, deviceName: devices.name, platform: devices.platform, deviceKind: devices.kind,
     createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt, outcome: agentRuns.outcome,
+    ownerId: agentRuns.userId,
+    canContribute: resourceAccessPredicate(userId, agentRuns.workspaceId, 'thread', agentRuns.id, 'canComment'),
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
-    .leftJoin(devices, eq(devices.id, agentRuns.deviceId))
-    .where(and(eq(agentRuns.userId, userId), filter))
+    .leftJoin(devices, and(eq(devices.id, agentRuns.deviceId), eq(devices.ownerId, userId)))
+    .where(and(await threadReadAccess(reader), filter))
     .orderBy(desc(agentRuns.createdAt)).limit(limit)
-  const sources = rows.length ? await citationSources(userId, [], rows.map(row => row.id)) : {}
+  const sources = rows.length ? await citationSources(reader, [], rows.map(row => row.id)) : {}
   // The tasks' state and PRs, for the group; only tasks the person can see (citationSources checked them).
   const issueIds = [...new Set(Object.values(sources).flatMap(source => source?.kind === 'run' && source.issue ? [source.issue.id] : []))]
   const tasks = new Map<string, GroupIssue>((issueIds.length ? await db.select({ id: issues.id, status: issues.status, content: issueAttrsContent }).from(issues).where(inArray(issues.id, issueIds)) : [])
@@ -107,15 +116,18 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
       finishedAt: row.finishedAt?.toISOString() ?? null,
       group: threadGroup({ id: row.id, status: row.status, issueId: source?.issue?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: row.outcome }, source?.issue ? tasks.get(source.issue.id) : undefined),
       attempts: 1,
+      ownedByCurrentUser: row.ownerId === userId,
+      canContribute: row.canContribute,
     }
     return { thread, status: row.status, issue: source?.issue ?? null, pullRequests: source?.pullRequests ?? [], task: source?.issue ? tasks.get(source.issue.id) : undefined, outcome: row.outcome }
   })
 }
 
 /** The person's threads from the last 30 days, newest first, and their machines with whether each is online (R-24). */
-export async function mobileThreads(userId: string, limit = 60, homeScopeToken?: string, workspaceId?: string | null): Promise<{ threads: MobileThread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[]; live: ListLiveRead }> {
+export async function mobileThreads(reader: IssueReader, limit = 60, homeScopeToken?: string, workspaceId?: string | null): Promise<{ threads: MobileThread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[]; live: ListLiveRead }> {
+  const { userId } = taskReaderScope(reader)
   const [threads, machines] = await Promise.all([
-    runRows(userId, and(sql`${agentRuns.createdAt} > now() - interval '30 days'`,
+    runRows(reader, and(sql`${agentRuns.createdAt} > now() - interval '30 days'`,
       workspaceId === undefined ? undefined : workspaceId ? eq(agentRuns.workspaceId, workspaceId) : sql`false`), limit).then(listed),
     // A task's own cloud sandbox is not one of the person's machines (Alex, 2026-11-01).
     db.select({ id: devices.id, name: devices.name, platform: devices.platform, kind: devices.kind, lastSeenAt: devices.lastSeenAt }).from(devices)
@@ -143,8 +155,8 @@ export async function mobileThreads(userId: string, limit = 60, homeScopeToken?:
 }
 
 /** One of the person's threads, for its page. */
-export async function mobileThread(userId: string, runId: string): Promise<MobileThread | null> {
-  return (await threadRows(userId, eq(agentRuns.id, runId), 1))[0] ?? null
+export async function mobileThread(reader: IssueReader, runId: string): Promise<MobileThread | null> {
+  return (await threadRows(reader, eq(agentRuns.id, runId), 1))[0] ?? null
 }
 
 export type MobilePullRequest = { url: string; number: number; title: string; group: PrGroup }
@@ -157,11 +169,12 @@ export type MobileArtifact = { id: string; title: string; kind: 'markdown' | 'ht
  * threads handed over) and the person's 置顶 / 通知 for it, as the web's right
  * panel shows them. The Coordinator is one of the bots: its threads carry its bot row's id.
  */
-export async function mobileBot(userId: string, workspaceId: string, botId: string): Promise<{ threads: MobileThread[]; pullRequests: MobilePullRequest[]; schedules: MobileSchedule[]; library: MobileArtifact[]; pinned: boolean; muted: boolean }> {
+export async function mobileBot(reader: IssueReader, workspaceId: string, botId: string): Promise<{ threads: MobileThread[]; pullRequests: MobilePullRequest[]; schedules: MobileSchedule[]; library: MobileArtifact[]; pinned: boolean; muted: boolean }> {
+  const { userId } = taskReaderScope(reader)
   // An MCP client's runs are the Coordinator's too, but its page lists only the threads it dispatched, as before.
   const own = and(eq(agentRuns.botId, botId), eq(agentRuns.workspaceId, workspaceId), sql`${agentRuns.source} IS DISTINCT FROM 'mcp'`)
   const [rows, schedules] = await Promise.all([
-    runRows(userId, own, 60),
+    runRows(reader, own, 60),
     pool.query<{ id: string; title: string; status: 'active' | 'paused'; next_at: Date | null }>(
       `SELECT id, definition->>'title' AS title, status, next_at FROM user_schedules
        WHERE owner_id=$1 AND workspace_id=$2::uuid AND bot_id=$3::uuid AND status IN ('active','paused')
@@ -172,7 +185,9 @@ export async function mobileBot(userId: string, workspaceId: string, botId: stri
   const [library, preference] = await Promise.all([
     runIds.length ? pool.query<{ id: string; title: string; kind: 'markdown' | 'html'; version: number; updated_at: Date }>(
       `SELECT id, title, kind, "latestVersion" AS version, "updatedAt" AS updated_at FROM artifacts
-       WHERE "userId"=$1 AND "runId" = ANY($2::uuid[]) ORDER BY "updatedAt" DESC LIMIT 30`, [userId, runIds]) : { rows: [] },
+       WHERE "workspaceId"=$3 AND "runId" = ANY($2::uuid[])
+         AND mikka_resource_acl_allowed('account',$1,"workspaceId",'artifact',id,'canReadContent')
+       ORDER BY "updatedAt" DESC LIMIT 30`, [userId, runIds, workspaceId]) : { rows: [] },
     pool.query<{ pinned: boolean; muted: boolean }>('SELECT pinned, muted FROM chat_preferences WHERE "userId"=$1 AND "chatKey"=$2', [userId, botId]),
   ])
   // A PR's own title when it was published with one, else its task's.

@@ -2,7 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, isNull, inArray } from 'drizzle-orm'
 import { z } from 'zod'
-import { organizationAuditEvents, organizationEntitlements, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
+import { organizationAuditEvents, organizationBillingAccounts, organizationEntitlements, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
 import { requireWorkspace, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { invalidateTaskWorkspaceOrganization } from '@/lib/task-workspace'
@@ -84,6 +84,8 @@ export async function detachOrganizationWorkspace(organizationId: string, worksp
   await workspaceDb.transaction(async tx => {
     await requireWorkspace(tx, z.uuid().parse(workspaceId), userId, true)
     await requireOrganizationAdmin(tx, organizationId, userId)
+    const [billingAccount] = await tx.select().from(organizationBillingAccounts).where(and(eq(organizationBillingAccounts.organizationId, organizationId), eq(organizationBillingAccounts.workspaceId, workspaceId))).limit(1)
+    if (billingAccount) throw new GovernanceError('billing_account_attached')
     const rows = await tx.delete(organizationWorkspaces).where(and(eq(organizationWorkspaces.workspaceId, workspaceId), eq(organizationWorkspaces.organizationId, organizationId))).returning()
     if (!rows.length) throw new GovernanceError('not_found')
     invalidateTaskWorkspaceOrganization(workspaceId)

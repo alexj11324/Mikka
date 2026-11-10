@@ -46,6 +46,7 @@ import { CAPTURES_DIR } from "../captures"
 import { ownDir } from "./harness-home"
 import type { SandboxPolicy } from "./sandbox"
 import { localGitOrigin } from './local-git-origin'
+import { nativeRunToolConfig, type NativeToolIsolationConfig } from './native-tool-isolation.mjs'
 
 /**
  * Model API and login domains per harness: always reachable from that
@@ -114,6 +115,9 @@ export interface RunContextOptions {
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** A task VM uses its ordinary HOME, git and gh environment. */
   machineEnvironment?: true
+  /** Exact host-selected official sandbox executable, never from an assignment. */
+  nativeIsolationBinary?: string
+  nativeIsolationTaskEnv?: Record<string, string>
   /** Clean caller PATH, before adding a run-local gh wrapper. */
   childPath?: string
   /** Only the host may advertise this bound control-channel capability. */
@@ -265,6 +269,7 @@ function runMcpServer(options: RunContextOptions, files: Pick<RunContext, 'workt
         ...(options.factoryCheck && (!options.factoryCheck.reportOnly || options.factoryCheck.inferCommand) ? ['--factory-verify', JSON.stringify({ cwd: files.worktree, command: options.verifyCommand ?? null, infer: options.factoryCheck.inferCommand })] : []),
         ...(options.factoryCheck?.reportOnly || readOnlyInspection ? ['--factory-artifacts', files.worktree] : []),
         ...(repositoryExecution ? ['--repository-selection', files.worktree] : []),
+        ...(options.nativeIsolationBinary ? ['--tool-isolation', JSON.stringify(runNativeToolIsolation(options, files.worktree))] : []),
       ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
       env: { ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}), ...decisionMcpEnvironment(options.mcp),
@@ -288,7 +293,16 @@ export function runMcpBackendContext(options: RunContextOptions, files: Pick<Run
       ...(options.mcp.decisionCatalogue ? { decisionCatalogue: JSON.stringify(options.mcp.decisionCatalogue) } : {}) } : {}),
     ...(options.mcpHttpObservationUrl ? { observationUrl: options.mcpHttpObservationUrl } : {}),
     env,
+    ...(options.nativeIsolationBinary ? { toolIsolation: runNativeToolIsolation(options, files.worktree) } : {}),
   }
+}
+
+export function runNativeToolIsolation(options: RunContextOptions, worktree = options.worktree): NativeToolIsolationConfig {
+  if (!options.nativeIsolationBinary) throw Error('native_tool_isolation_unavailable')
+  return nativeRunToolConfig({ binary: options.nativeIsolationBinary, worktree, runDir: options.runDir,
+    readRoots: [...options.gitWritePaths ?? []],
+    privateRoots: [join(homedir(), '.codex'), join(homedir(), '.claude')],
+    readOnly: runPolicy(options.policy).readOnly === true, taskEnv: options.nativeIsolationTaskEnv })
 }
 
 export class RunContext {
@@ -379,6 +393,10 @@ export class RunContext {
 
   get harness() {
     return this.options.harness
+  }
+
+  nativeToolIsolation(): NativeToolIsolationConfig | undefined {
+    return this.options.nativeIsolationBinary ? runNativeToolIsolation(this.options, this.worktree) : undefined
   }
 
   policy(): SandboxPolicy {

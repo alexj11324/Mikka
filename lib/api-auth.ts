@@ -12,7 +12,7 @@ export async function getApiSession(options: { headers: Headers; query?: { disab
   const authorization = options.headers.get('authorization')
   // An explicitly supplied PAT wins over a cookie, including when invalid.
   if (!/^Bearer\s+mkp_/i.test(authorization ?? '')) {
-    const session = await sessionAuth.api.getSession(options)
+    const session = await sessionAuth.api.getSession({...options,query:{...options.query,disableCookieCache:true}})
     if (session) Object.defineProperty(session.user, enterprisePrincipal, { value: { kind: 'session', sessionId: session.session.id }, configurable: true })
     return session
   }

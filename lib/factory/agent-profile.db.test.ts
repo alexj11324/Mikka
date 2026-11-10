@@ -80,7 +80,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const who = await person('fixed-entry-owner'), payor = await person('fixed-entry-payor'), unrelated = await person('fixed-entry-unrelated')
     for (const member of [payor, unrelated]) {
       await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,'Fixed entry fixture',$3,'member','active')`, [who.workspaceId, member.ownerId, `${member.ownerId}@example.invalid`])
-      await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [member.ownerId, who.workspaceId])
+      await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,false)', [member.ownerId, who.workspaceId])
     }
     const own = await subscribe(who, 'codex', ['fixed-entry-model', 'unrelated-model'])
     const shared = await subscribe(payor, 'codex', ['fixed-entry-model', 'unrelated-model'])
@@ -120,7 +120,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const fetch = globalThis.fetch
     globalThis.fetch = async () => { providerCalls++; throw new Error('fixed target must not call a provider') }
     try {
-      for (const [name, selection, expectedQueries] of [['own subscription', ownSelection, 5], ['shared subscription', sharedSelection, 6], ['own key', ownKey, 5], ['shared key', sharedKey, 6]] as const) await t.test(name, async t => {
+      for (const [name, selection, expectedQueries] of [['own subscription', ownSelection, 5], ['own key', ownKey, 5], ['shared key', sharedKey, 6]] as const) await t.test(name, async t => {
         const original = await inspect(selection, true), fixed = await inspect(selection, false)
         assert.deepEqual(original.result, { ok: true }); assert.deepEqual(fixed.result, original.result)
         assert.equal(fixed.statements.length, expectedQueries)
@@ -139,6 +139,10 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
         assert.equal(original.result.ok === true, expected === 'accepted')
         assert.equal(providerCalls, 0)
       }
+      await t.test('a legacy teammate subscription never enters either full or exact-source catalogue', async () => {
+        await compare(sharedSelection)
+        assert.equal(providerCalls, 0)
+      })
       for (const [name, sql, params, restore, restoreParams] of [
         ['paused', 'UPDATE byos_connections SET paused=true WHERE id=$1', [own], 'UPDATE byos_connections SET paused=false WHERE id=$1', [own]],
         ['removed', `UPDATE byos_connections SET state='disconnected',"removedAt"=now() WHERE id=$1`, [own], `UPDATE byos_connections SET state='connected',"removedAt"=NULL WHERE id=$1`, [own]],
@@ -161,7 +165,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
         await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [payor.ownerId, who.workspaceId])
         await pool.query('DELETE FROM model_api_key_shares WHERE "keyId"=$1 AND "workspaceId"=$2', [keys[1], who.workspaceId])
         try { await compare(sharedSelection); await compare(sharedKey) } finally {
-          await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [payor.ownerId, who.workspaceId])
+          await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [payor.ownerId, who.workspaceId])
           await pool.query('INSERT INTO model_api_key_shares ("keyId","workspaceId") VALUES ($1,$2)', [keys[1], who.workspaceId])
         }
       })
@@ -739,12 +743,11 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "userId"=$1', [who.ownerId])).rowCount, 0)
   })
 
-  for (const mode of ['default', 'custom', 'edited-concurrently'] as const) await t.test(mode === 'edited-concurrently' ? 'shared-source dispatch and Profile edits serialize without membership lock cycles' : `${mode} dispatch authorizes a shared source without holding a conflicting membership lease`, async () => {
+  for (const mode of ['default', 'custom', 'edited-concurrently'] as const) await t.test(mode === 'edited-concurrently' ? 'personal-source dispatch and Profile edits serialize without membership lock cycles' : `${mode} dispatch authorizes its personal source without holding a conflicting membership lease`, async () => {
     const who = await person(`profiles-shared-${mode}`)
-    const sourceOwner = await seedUser(pool, `profiles-shared-source-${mode}`); owners.push(sourceOwner)
-    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [who.workspaceId, sourceOwner, `${sourceOwner}@example.invalid`])
+    const sourceOwner = who.ownerId
     const connectionId = await subscribe({ ...who, ownerId: sourceOwner }, 'codex', ['gpt-6-luna'])
-    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [sourceOwner, who.workspaceId])
+    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,false)', [sourceOwner, who.workspaceId])
     const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Shared source','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Shared source','codex')`, [agentId, who.ownerId, device])

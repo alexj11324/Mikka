@@ -1,22 +1,24 @@
 import type { PoolClient } from 'pg'
 import { afterDatabaseCommit } from '../db/commit-effects'
 import { LIVE_ID, type LiveInvalidation } from './events'
-import { coordinatorSessionScope } from './coordinator-session'
+import { resourceLiveScopes } from './resource-scopes'
 import { liveGatewayConfig, type LiveScope } from './scope'
 
 type Database = Pick<PoolClient, 'query'>
 type Target = { scope: LiveScope; events: LiveInvalidation[] }
 
-/** A bot chat is private to its owner within the bot's persisted tenant.
- * Recheck membership when delivering; an owner-wide home channel must never
- * receive a different workspace's bot IDs. Neither key carries a message. */
+/** Every recipient needs fresh membership and this Chat's ACL. Private Bot
+ * activity cannot reach an administrator or a different tenant's channel. */
 export async function botChatTargets(database: Database, workspaceDatabase: Database, ownerId: string, botId: string | null, list = true): Promise<Target[]> {
   if (!botId || !LIVE_ID.test(botId)) return []
-  const scope = await coordinatorSessionScope(database, workspaceDatabase, ownerId, botId)
-  if (!scope) return []
-  const events: LiveInvalidation[] = list ? [{ kind: 'bot_chat_list', id: scope.workspaceId }] : []
-  events.push({ kind: 'bot_chat', id: botId })
-  return events.length ? [{ scope, events }] : []
+  const { rows: [bot] } = await database.query<{ workspaceId: string; chatId: string }>(
+    'select "workspaceId",mikka_chat_resource_id("ownerId",id) as "chatId" from bots where id=$1 and "ownerId"=$2', [botId,ownerId])
+  if (!bot) return []
+  const scopes = await resourceLiveScopes(database,workspaceDatabase,'chat',bot.chatId,bot.workspaceId)
+  return scopes.map(scope => ({ scope, events: [
+    ...(list ? [{ kind: 'bot_chat_list' as const, id: scope.workspaceId }] : []),
+    { kind: 'bot_chat' as const, id: botId },
+  ] }))
 }
 
 /** A run's state shows on its cards in its own bot's chat, for the run's owner only. */

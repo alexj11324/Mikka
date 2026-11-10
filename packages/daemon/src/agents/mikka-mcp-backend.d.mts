@@ -23,6 +23,7 @@ export interface MikkaMcpContext {
   repositoryRoot?: string | null
   artifactRoot?: string | null
   factoryVerify?: Record<string, unknown> | null
+  toolIsolation?: import('./native-tool-isolation.mjs').NativeToolIsolationConfig | null
   decisionUrl?: string
   decisionToken?: string
   decisionCatalogue?: string
@@ -37,6 +38,7 @@ export interface MikkaMcpProfile {
   captures?: boolean
   factoryVerify?: boolean
   artifactInspection?: boolean
+  nativeToolIsolation?: boolean
 }
 export interface MikkaMcpAuthority {
   signal: AbortSignal

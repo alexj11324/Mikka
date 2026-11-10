@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/core'
 import { db } from '@/lib/db'
 import { issueVersions, issues } from '@/lib/db/schema'
@@ -11,6 +12,7 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { issueListChanged } from './live/lists'
 import { scheduleShortTitle } from './short-title-schedule'
 import { requireTaskWorkspace } from './task-workspace'
+import { lockResourceAccess } from './resource-access/store'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -20,6 +22,8 @@ const createIssueSchema = z.object({
   content: z.custom<JSONContent>(value => !!value && typeof value === 'object' && JSON.stringify(value).length <= 250000 && readableIssueContent(value) !== null).transform(value => readableIssueContent(value) as JSONContent),
   status: z.enum(ISSUE_STATUS_CODES),
   priority: z.enum(ISSUE_PRIORITY_CODES),
+  visibility: z.enum(['shared','private']).optional(),
+  projectId: z.uuid().optional(),
 })
 
 /** `actor` is who issue history records as creating it, decided by the caller on the server. */
@@ -30,8 +34,10 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
   const id = options?.id ?? crypto.randomUUID()
   const number = await allocateIssueNumbers(tx, userId)
   const metadata = { ...readIssueMetadata({ type: 'doc' }), number }
+  const { visibility, projectId, ...values } = parsed.data
+  if(projectId)await lockResourceAccess(tx,userId,{kind:'project',id:projectId,workspaceId:workspace.id},'canSteer')
   const [issue] = await tx.insert(issues).values({
-    ...parsed.data,
+    ...values,
     content: withIssueMetadata(parsed.data.content, metadata),
     id,
     userId,
@@ -43,6 +49,17 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     revision: 1,
     linearSyncBlocked: options.linearSyncBlocked ?? true,
   }).returning()
+  // The initial policy is narrowed before this transaction becomes visible.
+  // No other member can observe a transient shared private-task body.
+  if (visibility === 'private') {
+    await tx.execute(sql`select set_config('mikka.acl_actor',${userId},true),set_config('mikka.acl_source','private_task_created',true)`)
+    await tx.execute(sql`update resource_access_policies set visibility='private' where kind='task' and id=${id}::uuid and "ownerId"=${userId}`)
+  }
+  if(projectId){
+    await tx.execute(sql`select set_config('mikka.acl_actor',${userId},true),set_config('mikka.acl_source','project_task_created',true)`)
+    await tx.execute(sql`update resource_access_policies set "parentKind"='project',"parentId"=${projectId}::uuid
+      where kind='task' and id=${id}::uuid and "workspaceId"=${workspace.id}::uuid and "ownerId"=${userId}`)
+  }
   await tx.insert(issueVersions).values({
     id: crypto.randomUUID(),
     issueId: id,

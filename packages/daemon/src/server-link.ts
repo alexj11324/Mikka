@@ -79,6 +79,8 @@ export interface ServerLink {
   invalidateRunControls?(): void
   /** How live runs learn of stops and revocations; see RunControlMode. */
   setRunControlMode?(mode: RunControlMode): void
+  /** Only the trusted host sets this after a real Linux isolation probe. */
+  setNativeCredentialIsolation?(available: boolean): void
   /** The server's Decisions API on behalf of one run (server-decision.ts). */
   decide?: ServerDecide
   /** Optional host-only adapter for the claimed run; never model-supplied. */

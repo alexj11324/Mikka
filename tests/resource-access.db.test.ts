@@ -105,6 +105,64 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
       await assert.rejects(requireResourceAccess(stranger, reference('task', task)), { code: 'issueNotFound' })
     })
 
+    await t.test('new Shared execution and Factory views require every Thread while old history remains private', async () => {
+      const nextTask = randomUUID(), nextRun = randomUUID(), source = randomUUID()
+      await app.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority)
+        VALUES($1,$2,$3,'Collaborative fixture','{"type":"doc"}','todo','normal')`, [nextTask,owner,alpha])
+      await app.query(`INSERT INTO agent_runs(id,"userId","agentId","workspaceId","issueId",status)
+        VALUES($1,$2,$3,$4,$5,'succeeded')`, [nextRun,owner,agent,alpha,nextTask])
+      assert.equal(await allowed(member,'thread',nextRun),true)
+      assert.equal(await allowed(manager,'thread',run),false,'the historical run is still private')
+      const { authorizedThread } = await import('../lib/resource-access/thread')
+      assert.equal((await authorizedThread({id:member,[tokenWorkspace]:alpha},nextRun)).ownerId,owner)
+      await assert.rejects(authorizedThread({id:member,[tokenWorkspace]:beta},nextRun),{code:'issueNotFound'})
+      await app.query(`INSERT INTO coordinator_events(id,"userId",kind,"issueId","dedupeKey",payload)
+        VALUES($1,$2,'user_message',$3,$1::text,'{"text":"Collaborative Factory work"}')`,[source,owner,nextTask])
+      const { createFactoryStore } = await import('../lib/factory/store')
+      const { createFactoryHumanStore } = await import('../lib/factory/human-store')
+      const factory = createFactoryHumanStore(app,botId=>createFactoryStore(app,
+        async (userId,issueId)=>Boolean(await issueForUser({id:userId,[tokenWorkspace]:alpha},issueId)),botId,{sharedReads:true}))
+      const created = await factory.route(owner,{issueId:nextTask,eventId:randomUUID(),sourceEventId:source,rationale:'Shared execution evidence'})
+      await app.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1',[created.task.attemptId,nextRun])
+      assert.equal((await factory.read(member,created.task.id)).task.id,created.task.id)
+      assert.equal((await factory.listForIssue(member,nextTask)).tasks.length,1)
+      await app.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='thread' AND id=$1`,[nextRun])
+      for (const viewer of [member,manager]) {
+        await assert.rejects(factory.read(viewer,created.task.id),{code:'factoryNotFound'})
+        assert.equal((await factory.listForIssue(viewer,nextTask)).tasks.length,0)
+      }
+      assert.equal((await factory.read(owner,created.task.id)).task.id,created.task.id)
+      assert.equal((await issueForUser(member,nextTask))?.id,nextTask,'a hidden attempt does not hide the independently Shared task')
+    })
+
+    await t.test('a live worker token loses write authority when its parent becomes read-only', async () => {
+      const taskId = randomUUID(), runId = randomUUID(), memberAgent = randomUUID()
+      await app.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority)
+        VALUES($1,$2,$3,'Worker ACL fixture','{"type":"doc"}','doing','normal')`,[taskId,owner,alpha])
+      await app.query(`INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,'codex','Member worker')`,[memberAgent,member])
+      await app.query(`INSERT INTO agent_runs(id,"userId","agentId","workspaceId","issueId",status)
+        VALUES($1,$2,$3,$4,$5,'running')`,[runId,member,memberAgent,alpha,taskId])
+      const { issueRunToken,verifyRunToken,workerActorReader } = await import('../lib/mcp/worker')
+      const {token} = await issueRunToken({id:runId,userId:member})
+      const request = new Request('http://127.0.0.1/api/mcp')
+      const authorized = await verifyRunToken(request,token)
+      assert.ok(authorized)
+      assert.equal((workerActorReader(authorized) as {id:string}).id,member)
+      await app.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=$1`,[taskId])
+      await app.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+        VALUES('task',$1,'account',$2,ARRAY['canReadContent'])`,[taskId,member])
+      assert.equal((await issueForUser(member,taskId))?.id,taskId)
+      assert.equal(await verifyRunToken(request,token),undefined,'read permission cannot keep a worker write credential alive')
+    })
+
+    await t.test('opaque legacy Chat UUIDs remain valid ACL resource references',async()=>{
+      const {resourceReferenceInput}=await import('../lib/resource-access/input')
+      const chatId=botChatResourceId(owner,bot)
+      assert.equal(resourceReferenceInput.parse(reference('chat',chatId)).id,chatId)
+      await requireResourceAccess(owner,reference('chat',chatId))
+      await assert.rejects(requireResourceAccess(manager,reference('chat',chatId)),{code:'issueNotFound'})
+    })
+
     await t.test('one SQL action contract; ownership and management do not authorize personal credentials, machines or billing', async () => {
       for (const action of RESOURCE_ACTIONS) {
         assert.equal(await allowed(owner, 'task', task, action), OWNER_RESOURCE_ACTIONS.includes(action), action)

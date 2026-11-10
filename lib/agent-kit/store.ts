@@ -58,7 +58,13 @@ export class AgentKitStore {
   }
   private async head(client: PoolClient, scope: AgentScope, defaults: AgentDefinition): Promise<DefinitionVersion> {
     await this.authority(client, scope)
-    await client.query('insert into agent_kit_heads(owner_id,bot_key,bot_id,workspace_id) values($1,$2,$3,$4) on conflict do nothing', [...params(scope),scope.botId,scope.workspaceId])
+    // A transfer preserves the previous owner's immutable versions. Only that
+    // owner regaining this exact Bot/Workspace may reattach its own head; a new
+    // owner uses a different (owner_id,bot_key) and sees none of the old history.
+    await client.query(`insert into agent_kit_heads(owner_id,bot_key,bot_id,workspace_id) values($1,$2,$3,$4)
+      on conflict(owner_id,bot_key) do update set bot_id=excluded.bot_id,workspace_id=excluded.workspace_id,
+        detached_bot_id=null,detached_workspace_id=null
+      where agent_kit_heads.detached_bot_id=excluded.bot_id and agent_kit_heads.detached_workspace_id=excluded.workspace_id`, [...params(scope),scope.botId,scope.workspaceId])
     const { rows } = await client.query<{ active_version: string | null; workspace_id: string | null }>('select active_version,workspace_id from agent_kit_heads where owner_id=$1 and bot_key=$2 for update', params(scope))
     if (rows[0].workspace_id !== scope.workspaceId) throw new AgentKitError('agentScopeNotFound', 404)
     if (rows[0].active_version) return this.version(client,scope,rows[0].active_version)

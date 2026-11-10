@@ -47,12 +47,13 @@ test('bot thread list', { skip: !dbUrl }, async t => {
   await pool.query(`update "user" set image='/api/avatars/' || id || '/abc' where id=$1`, [owner])
   const tid = (key: string) => botThreadPublicId(bot, key)
   const T = { a: tid(`issue:${issueA}`), b: tid(`issue:${issueB}`), ownerChat: tid(`chat:${owner}`), memberChat: tid(`chat:${member}`) }
-  const allThreads = Object.values(T)
+  const allThreads = [T.a, T.b, T.ownerChat]
+  await pool.query("UPDATE resource_access_policies SET visibility='shared' WHERE kind='bot' AND id=$1", [bot])
 
   await t.test('runs aggregate per thread: latest status, last activity, opening title, href', async () => {
     const page = await botAdmin.listBotThreadsFor(owner, ws.id, { botId: bot })
     assert.deepEqual(page.bot, { id: bot, name: 'Reviewer' })
-    assert.equal(page.summary.totalThreads, 4)
+    assert.equal(page.summary.totalThreads, 3)
     assert.equal(page.nextCursor, null)
     assert.deepEqual(page.threads.map(row => row.threadId).sort(), [...allThreads].sort())
     const by = new Map(page.threads.map(row => [row.threadId, row]))
@@ -62,31 +63,21 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     assert.equal(page.summary.lastActivityAt, page.threads[0].lastActivityAt)
     const chat = by.get(T.ownerChat)!
     assert.deepEqual([chat.title, chat.status, chat.canOpen, chat.href], ['Chat opening', 'done', true, `/?bot=${bot}`])
-    const memberChat = by.get(T.memberChat)!
-    assert.deepEqual([memberChat.title, memberChat.status, memberChat.canOpen, memberChat.href], [null, 'running', false, null])
+    assert.equal(by.has(T.memberChat), false, 'Admin cannot discover another member’s private chat or its activity')
     assert.ok(Date.parse(by.get(T.a)!.lastActivityAt) > Date.parse(chat.lastActivityAt) - 25 * 60_000)
     assert.ok(!JSON.stringify(page).includes('Member private ask'))
   })
 
-  await t.test('another member sees workspace tasks, while other people\'s chats and foreign tasks remain private', async () => {
+  await t.test('shared Bot does not disclose private task Threads or another member’s Bot Chat', async () => {
     const page = await botAdmin.listBotThreadsFor(member, ws.id, { botId: bot })
-    assert.equal(page.summary.totalThreads, 4)
-    const by = new Map(page.threads.map(row => [row.threadId, row]))
-    assert.deepEqual([by.get(T.a)!.title, by.get(T.a)!.canOpen, by.get(T.a)!.href], ['Workspace task', true, `/?issue=${issueA}`])
-    assert.deepEqual([by.get(T.b)!.title, by.get(T.b)!.canOpen, by.get(T.b)!.href], ['Second task', true, `/?issue=${issueB}`])
-    assert.deepEqual([by.get(T.ownerChat)!.title, by.get(T.ownerChat)!.canOpen, by.get(T.ownerChat)!.href], [null, false, null])
-    assert.deepEqual([by.get(T.memberChat)!.title, by.get(T.memberChat)!.href], ['Member private ask', `/?bot=${bot}`])
-    assert.ok(!JSON.stringify(page).includes('Chat opening'))
-    // Membership makes tasks in this workspace visible, never a foreign workspace's task.
-    const json = JSON.stringify(page)
-    assert.ok(!json.includes(foreignIssue), 'foreign issue id leaked')
-    assert.ok(!json.includes(latestA), 'another member\'s private run id leaked')
-    for (const id of [T.a, T.b, T.ownerChat]) assert.equal(by.get(id)!.initiator.id, owner)
-    assert.ok(by.get(T.a)!.initiator.name, 'initiator name shown with a null title')
-    assert.equal(by.get(T.memberChat)!.initiator.avatarUrl, null)
-    // Cursors carry the opaque id only.
-    const first = await botAdmin.listBotThreadsFor(member, ws.id, { botId: bot, limit: 1 })
-    assert.ok(first.nextCursor && !Buffer.from(first.nextCursor, 'base64url').toString().match(/issue:|chat:/))
+    assert.equal(page.summary.totalThreads, 1)
+    assert.equal(page.nextCursor, null)
+    assert.deepEqual(page.threads.map(row => row.threadId), [T.memberChat])
+    assert.equal(page.threads[0].title, 'Member private ask')
+    assert.equal(page.threads[0].href, `/?bot=${bot}`)
+    const serialized = JSON.stringify(page)
+    for (const privateValue of ['Chat opening', issueA, issueB, foreignIssue, latestA, T.ownerChat])
+      assert.equal(serialized.includes(privateValue), false, 'private title, ID, counts and cursor must not leak')
   })
 
   await t.test('keyset paging by threadId covers every thread exactly once, including ties', async () => {
@@ -117,8 +108,21 @@ test('bot thread list', { skip: !dbUrl }, async t => {
     await assert.rejects(botAdmin.listBotThreadsFor(owner, ws.id, { botId: bot, limit: 500 }))
   })
 
+  await t.test('an explicit Thread grant opens execution content without sharing other private Threads', async () => {
+    await pool.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+      VALUES('thread',$1,'account',$2,ARRAY['canReadContent'])`, [latestA, member])
+    const page = await botAdmin.listBotThreadsFor(member, ws.id, { botId: bot })
+    const shared = page.threads.find(row => row.threadId === T.a)
+    assert.ok(shared)
+    assert.equal(shared.title, 'Workspace task')
+    assert.equal(shared.href, `/?issue=${issueA}&thread=${latestA}`)
+    assert.equal(page.summary.totalThreads, 2)
+    await pool.query(`DELETE FROM resource_access_grants WHERE "resourceKind"='thread' AND "resourceId"=$1 AND "subjectId"=$2`, [latestA,member])
+    assert.deepEqual((await botAdmin.listBotThreadsFor(member,ws.id,{botId:bot})).threads.map(row=>row.threadId),[T.memberChat])
+  })
+
   await t.test('existing bot defaults remain compatible', async () => {
-    const options = await botAdmin.botDefaultOptions(ws.id)
+    const options = await botAdmin.botDefaultOptions(ws.id, owner)
     assert.deepEqual(options.models, ['mikka', 'codex', 'claude'])
   })
 })

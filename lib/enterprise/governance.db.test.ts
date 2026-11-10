@@ -55,12 +55,12 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await org.renameOrganization(organizationId, admin.id, { name: 'Renamed Enterprise fixture' })
     const summary = await org.organizationSummary(organizationId, owner.id)
     assert.equal(summary.organization.name, 'Renamed Enterprise fixture')
-    assert.equal(summary.activeHumans, 2, 'the same active humans in two Workspaces consume two Org seats')
+    assert.equal(summary.activeHumans, 2, 'the same active humans in two Workspaces are counted once for management')
     assert.deepEqual(summary.workspaceIds.sort(), [wsA, wsB].sort())
     await assert.rejects(org.archiveOrganization(organizationId, owner.id), error => (error as { detail?: string }).detail === 'workspace_attached')
   })
   const policy = { modelCredentialSharing: 'approval_required', mcpSharing: 'approval_required', allowedModelProviders: null, auditRetentionDays: null, legalHold: false } as const
-  await t.test('operator Enterprise grants serialize expected-plan changes and audit a deduplicated seat limit without payments', async () => {
+  await t.test('operator Enterprise grants serialize expected-plan changes and preserve historical seat metadata without payments', async () => {
     const grant = { organizationId, expectedPlan: 'free', plan: 'enterprise', source: 'cloud', seatLimit: 2,
       expiresAt: new Date(Date.now() + 3600_000).toISOString(), reason: 'evaluation', operator: 'enterprise-fixture' }
     const preview = await provisionOrganizationPlan(pool, grant)
@@ -74,8 +74,9 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     assert.equal((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'entitlement.changed\'', [organizationId])).rows[0].count, '1')
     await assert.rejects(provisionOrganizationPlan(pool, { ...grant, source: 'license' }, { apply: true }), error => (error as { detail?: string }).detail === 'invalid_request')
     const reduced = await provisionOrganizationPlan(pool, { ...grant, expectedPlan: 'enterprise', seatLimit: 1, reason: 'correction' }, { apply: true })
-    assert.equal(reduced.overLimit, true)
-    assert.equal(reduced.activeHumans, 2, 'lowering a contract limit never evicts existing members')
+    assert.equal(reduced.overLimit, false)
+    assert.equal(reduced.after.activeHumanLimit, null)
+    assert.equal(reduced.activeHumans, 2, 'legacy seat metadata cannot restrict or evict members')
     await provisionOrganizationPlan(pool, { ...grant, expectedPlan: 'enterprise', reason: 'correction' }, { apply: true })
   })
   await t.test('a bound Workspace cannot acquire a dormant local grant behind its Organization plan', async () => {
@@ -98,7 +99,7 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     assert.equal(preview.status, 0, preview.stderr); assert.equal(JSON.parse(preview.stdout).applied, false)
     assert.equal((await pool.query('select "seatLimit" from mikka_organization_entitlements where "organizationId"=$1', [organizationId])).rows[0].seatLimit, 2)
     const applied = invoke('organization-plan', grant, ['--apply'])
-    assert.equal(applied.status, 0, applied.stderr); assert.equal(JSON.parse(applied.stdout).after.activeHumanLimit, 3)
+    assert.equal(applied.status, 0, applied.stderr); assert.equal(JSON.parse(applied.stdout).after.activeHumanLimit, null)
     const repeated = invoke('organization-plan', grant, ['--apply'])
     assert.equal(repeated.status, 0, repeated.stderr); assert.equal(JSON.parse(repeated.stdout).changed, false)
     assert.equal(Number((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'entitlement.changed\'', [organizationId])).rows[0].count), before + 1)
@@ -181,16 +182,21 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
   })
   await t.test('resource owners request explicit approval; an Org admin cannot bypass the Workspace source grant', async () => {
     await configureOrganizationResourcePolicy(organizationId, owner.id, policy)
-    const approval = await requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'subscription', resourceId: member.id })
+    await assert.rejects(requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'subscription', resourceId: member.id }))
     assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false)
+    const keyId = randomUUID()
+    await pool.query(`INSERT INTO model_api_keys(id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4)
+      VALUES($1,$2,'openai','openai','synthetic-not-decrypted','synthetic-not-decrypted',1,'only')`, [keyId, member.id])
+    const approval = await requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'api_key', resourceId: keyId })
+    assert.equal(await organizationResourceAllowed(wsA, 'api_key', keyId, member.id), false)
     await assert.rejects(decideOrganizationResourceApproval(organizationId, member.id, { id: approval.id, status: 'approved' }))
     await decideOrganizationResourceApproval(organizationId, admin.id, { id: approval.id, status: 'approved' })
-    assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), true)
+    assert.equal(await organizationResourceAllowed(wsA, 'api_key', keyId, member.id), true)
     await assert.rejects(workspaceDb.transaction(tx => requireWorkspace(tx, wsA, admin.id)))
     await decideOrganizationResourceApproval(organizationId, admin.id, { id: approval.id, status: 'denied' })
-    assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false)
-    await requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'subscription', resourceId: member.id })
-    assert.equal(await organizationResourceAllowed(wsA, 'subscription', member.id, member.id), false, 'replay cannot erase a denial')
+    assert.equal(await organizationResourceAllowed(wsA, 'api_key', keyId, member.id), false)
+    await requestOrganizationResourceApproval(organizationId, member.id, { workspaceId: wsA, kind: 'api_key', resourceId: keyId })
+    assert.equal(await organizationResourceAllowed(wsA, 'api_key', keyId, member.id), false, 'replay cannot erase a denial')
   })
   await t.test('removing Org membership suspends only its Workspaces and revokes scoped PATs without deleting identity', async () => {
     const scoped = randomUUID(), other = randomUUID()

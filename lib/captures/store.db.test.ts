@@ -347,10 +347,12 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(await store.createCaptureShare(bob, saved.id), null)
     const share = await store.createCaptureShare(alice, saved.id)
     assert.ok(share?.token.startsWith('mkc_'))
-    assert.deepEqual((await store.sharedCapture(share!.token))?.bytes, PNG)
+    assert.equal(await store.sharedCapture(share!.token),null,'anonymous links cannot bypass private Thread access')
+    assert.equal(await store.sharedCapture(share!.token,bob),null,'possession of a link grants no teammate content access')
+    assert.deepEqual((await store.sharedCapture(share!.token,alice))?.bytes, PNG)
     assert.equal(await store.revokeCaptureShares(bob, saved.id), 0)
     assert.equal(await store.revokeCaptureShares(alice, saved.id), 1)
-    assert.equal(await store.sharedCapture(share!.token), null)
+    assert.equal(await store.sharedCapture(share!.token,alice), null)
     assert.equal(await store.sharedCapture(`mks_${share!.token.slice(4)}`), null)
 
     // Cloud computer: the run's own desktop, through a fake E2B runtime.
