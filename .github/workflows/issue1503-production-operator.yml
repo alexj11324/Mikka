@@ -54,7 +54,7 @@ jobs:
           node --input-type=module - <<'JS'
           import { createHash } from 'node:crypto'
           import { mkdirSync, writeFileSync } from 'node:fs'
-          
+
           const sha = process.env.GITHUB_SHA
           const runId = process.env.GITHUB_RUN_ID
           const attempt = process.env.GITHUB_RUN_ATTEMPT
