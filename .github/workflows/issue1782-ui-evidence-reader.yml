@@ -1,0 +1,36 @@
+name: Issue 1782 read existing official UI evidence
+
+on:
+  push:
+    branches: [ops/1782-ui-evidence-reader-20261110]
+    paths:
+      - .github/workflows/issue1782-ui-evidence-reader.yml
+      - scripts/ops/ui-evidence-reader-1782.py
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: issue1782-ui-evidence-reader
+  cancel-in-progress: false
+
+jobs:
+  read:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out this owned evidence reader
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check the fixed reader syntax
+        run: python3 -m py_compile scripts/ops/ui-evidence-reader-1782.py
+      - name: Verify and emit only the existing successful UI artifact
+        timeout-minutes: 3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 scripts/ops/ui-evidence-reader-1782.py
