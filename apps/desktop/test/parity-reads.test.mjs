@@ -94,6 +94,10 @@ function observedResponse({ action = 'agents.listDevices', path, flight = false,
   const page = {
     waitForResponse: async predicate => { assert.equal(predicate(response), true); return response },
     evaluate: async () => undefined,
+    // The response is already the one the real Page would emit; the transport
+    // trace listeners only need to exist.
+    on: () => undefined,
+    off: () => undefined,
   }
   return { calls, finish: observeReads(page, [requirement], new Map([['actual-action-id', action]]), '/mikka') }
 }
