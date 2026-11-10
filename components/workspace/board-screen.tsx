@@ -6,7 +6,8 @@ import * as boardSlot from '@ui-slot/board'
 import type { BoardScreenCard, BoardScreenColumn, BoardScreenProps } from '@/components/slots/board-contract'
 import { TaskContextMenu, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { cardStateKind, type BoardColumn, type BoardTask } from '@/components/blocks/kanban-board-1/components/data'
-import { localTaskState, type TaskReason, type TaskState } from '@/hooks/use-bot-tasks'
+import { localTaskState } from '@/hooks/use-bot-tasks'
+import { useTaskStateLabel } from '@/components/workspace/task-state-icon'
 import { blockLabel } from '@/components/workspace/block-label'
 import { displayTaskTitle } from '@/lib/short-title'
 import { formatDateOnly } from '@/lib/date-only'
@@ -38,13 +39,11 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
   const tIssue = useTranslations('Issue')
   const tCard = useTranslations('Shell.board.card')
   const tHosted = useTranslations('HostedBoard')
-  const tPanel = useTranslations('Shell.panel')
+  const stateLabel = useTaskStateLabel()
   const format = useFormatter()
   const saves = useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBusyChange })
   if (!BoardScreen) return null
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
-  // A task state's words as every task row says them (the official build's useStateLabel): its reason, else its state's name.
-  const stateLabel = (state: TaskState, reason: TaskReason | null) => reason ? tPanel(`task.reason.${reason}`) : state === 'waiting' ? tPanel('taskGroup.pending') : tPanel(`task.state.${state}`)
   const show = (property: Parameters<CardContext['properties']['has']>[0]) => context.properties.has(property)
 
   const columns: BoardScreenColumn[] = [
