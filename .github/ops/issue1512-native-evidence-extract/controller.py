@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One admitted retrieval of two immutable Native artifacts; no product execution."""
+"""One admitted extraction of two already-frozen Git ZIPs; no artifact downloads or product execution."""
 import base64
 import datetime as dt
 import hashlib
@@ -29,7 +29,7 @@ RECEIPT = {"schema": "issue1512-native-original-extraction-v1", "status": "start
            "artifacts": [], "cleanup": {"privateDirectoryRemoved": False},
            "limits": {"artifactDownloadsRetried": False, "productExecuted": False,
                       "dependencyInstalls": 0, "persistentResourcesCreated": 0,
-                      "originalJsonParsed": False}}
+                      "originalJsonParsed": False, "originalArtifactDownloads": 0, "frozenGitRecovery": True}}
 
 class GuardFailure(Exception):
     pass
@@ -155,59 +155,29 @@ def source_guard():
 
 def capture(spec, directory):
     global PHASE
-    PHASE = "artifact_metadata_" + str(spec["id"])
-    metadata_bytes = api_bytes("/actions/artifacts/" + str(spec["id"]))
-    metadata = json.loads(metadata_bytes)
-    for key in ("id", "name", "size_in_bytes", "digest", "expires_at"):
-        require(metadata.get(key) == spec[key], "ARTIFACT_METADATA")
-    require(metadata.get("expired") is False, "ARTIFACT_EXPIRED")
-    require(metadata.get("workflow_run", {}).get("id") == MANIFEST["source"]["run"], "ARTIFACT_RUN")
-    require(metadata.get("workflow_run", {}).get("head_sha") == MANIFEST["source"]["head"], "ARTIFACT_HEAD")
-    row = {"id": spec["id"], "name": spec["name"], "metadataBlob": freeze(metadata_bytes),
-           "sourceApiGetCount": 0, "deliveryGetCount": 0, "selected": []}
+    PHASE = "frozen_git_" + str(spec["id"])
+    require(re.fullmatch(r"[0-9a-f]{40}", spec["zipBlob"]) is not None, "FROZEN_GIT_SHA")
+    row = {"id": spec["id"], "name": spec["name"], "selected": [],
+           "sourceApiGetCount": 0, "deliveryGetCount": 0, "frozenGitGetCount": 0,
+           "priorExtractionReceipt": MANIFEST["priorExtractionReceipt"]}
     RECEIPT["artifacts"].append(row)
-    PHASE = "download_" + str(spec["id"])
-    request = urllib.request.Request(API + "/actions/artifacts/" + str(spec["id"]) + "/zip", headers={
-        "Authorization": "Bearer " + TOKEN, "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Mikka-issue1512-original-evidence",
-    })
-    row["sourceApiGetCount"] += 1
-    try:
-        response = OPENER.open(request, timeout=60)
-    except urllib.error.HTTPError as error:
-        require(error.code == 302, "ARTIFACT_REDIRECT_STATUS")
-        location = error.headers.get("Location", "")
-        error.close()
-    else:
-        response.close()
-        raise GuardFailure("ARTIFACT_EXPECTED_REDIRECT")
-    target = urllib.parse.urlsplit(location)
-    require(target.scheme == "https" and not target.username and not target.password and not target.fragment, "ARTIFACT_DELIVERY_URL")
-    require(any(target.hostname and target.hostname.endswith(suffix) for suffix in MANIFEST["deliveryHostSuffixes"]), "ARTIFACT_DELIVERY_HOST")
-    # Never forward the repository token to the signed object-storage URL.
-    delivery = urllib.request.Request(location, headers={"User-Agent": "Mikka-issue1512-original-evidence"})
-    row["deliveryGetCount"] += 1
+    # Read the already-preserved Git object. Never call an artifact/zip endpoint.
+    row["frozenGitGetCount"] += 1
+    frozen = api("/git/blobs/" + spec["zipBlob"])
+    require(frozen.get("sha") == spec["zipBlob"] and frozen.get("encoding") == "base64", "FROZEN_GIT_METADATA")
+    require(frozen.get("size") == spec["size_in_bytes"], "FROZEN_GIT_SIZE")
+    original = base64.b64decode("".join(frozen["content"].split()), validate=True)
+    require(len(original) == spec["size_in_bytes"], "ARTIFACT_LENGTH")
+    sha256 = digest(original)
+    require("sha256:" + sha256 == spec["digest"], "ARTIFACT_DIGEST")
+    require(git_blob_id(original) == spec["zipBlob"], "FROZEN_GIT_BYTES")
     path = directory / (str(spec["id"]) + ".zip")
-    sha256 = hashlib.sha256()
-    length = 0
-    with OPENER.open(delivery, timeout=180) as response, path.open("xb") as out:
-        require(response.status == 200, "ARTIFACT_DELIVERY_STATUS")
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            length += len(chunk)
-            require(length <= spec["size_in_bytes"], "ARTIFACT_TOO_LARGE")
-            sha256.update(chunk)
-            out.write(chunk)
-    require(length == spec["size_in_bytes"], "ARTIFACT_LENGTH")
-    require("sha256:" + sha256.hexdigest() == spec["digest"], "ARTIFACT_DIGEST")
-    original = path.read_bytes()
-    row.update({"bytes": length, "sha256": sha256.hexdigest(), "expectedZipBlob": git_blob_id(original)})
-    PHASE = "freeze_zip_" + str(spec["id"])
-    row["zipBlob"] = freeze(original)
-    row["zipFrozenBeforeOpeningArchive"] = True
-    emit("ZIP_FROZEN", {"id": row["id"], "blob": row["zipBlob"], "bytes": length, "sha256": row["sha256"]})
+    path.write_bytes(original)
+    row.update({"bytes": len(original), "sha256": sha256, "expectedZipBlob": spec["zipBlob"],
+                "zipBlob": spec["zipBlob"], "zipFrozenBeforeOpeningArchive": True,
+                "zipWasFrozenByPriorAdmission": True, "zipRefrozenThisRun": False})
+    emit("FROZEN_GIT_ZIP_VERIFIED", {"id": row["id"], "blob": row["zipBlob"],
+                                  "bytes": row["bytes"], "sha256": sha256})
     return path, row
 
 def extract(spec, path, row):
@@ -236,12 +206,20 @@ def extract(spec, path, row):
         row["members"] = [{"name": info.filename, "bytes": info.file_size,
                            "compressedBytes": info.compress_size, "crc32": format(info.CRC, "08x")}
                           for info in infos]
+        if "members" in spec:
+            require(row["members"] == spec["members"], "FROZEN_MEMBER_METADATA")
+        require(set(spec["jsonBounds"]) == set(spec["jsonMembers"]), "JSON_BOUND_KEYS")
         for name in spec["jsonMembers"]:
             info = archive.getinfo(name)
-            require(0 < info.file_size <= 2 * 1024 * 1024, "JSON_SIZE")
+            bounds = spec["jsonBounds"][name]
+            require(info.file_size == bounds["bytes"] and info.file_size > 0, "JSON_SIZE_EXACT")
+            if "crc32" in bounds:
+                require(format(info.CRC, "08x") == bounds["crc32"], "JSON_CRC_EXPECTED")
             original = archive.read(info)
             # Preserve the exact member bytes before any JSON decoding or parsing.
             blob = freeze(original)
+            if "sha256" in bounds:
+                require(digest(original) == bounds["sha256"], "JSON_AUDIT_DIGEST")
             selected = {"name": name, "bytes": len(original), "sha256": digest(original),
                         "crc32": format(info.CRC, "08x"), "blob": blob}
             row["selected"].append(selected)
