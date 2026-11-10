@@ -9,11 +9,12 @@ import { coordinatorSessionChanged } from '../live/coordinator-session'
 import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 import { scheduleChatMessage } from './chat-result'
 
-export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: () => Promise<T>) => Promise<T>
+export type WorkspaceAccess = { role: 'owner' | 'admin' | 'member' }
+export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: (access: WorkspaceAccess) => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
-export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null }
-export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; report_next_at: Date; report_attempts: number }
+export type Schedule = { id: string; owner_id: string; workspace_id: string | null; bot_id: string | null; visibility: 'owner' | 'workspace'; source_event_id: string; definition: Definition; request_definition: Definition; status: string; version: number; next_at: Date | null }
+export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
 
@@ -50,8 +51,8 @@ export class ScheduleStore {
     if (!(await tx.query('SELECT id FROM "user" WHERE id=$1 FOR SHARE', [actor.ownerId])).rowCount) throw new ScheduleError('scheduleOwnerUnavailable',403)
     if (actor.botId && !(await tx.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR SHARE', [actor.botId,actor.ownerId,actor.workspaceId])).rowCount) throw new ScheduleError('scheduleConversationUnavailable',403)
   }
-  private async source(tx: PoolClient, actor: Actor) {
-    if (!actor.sourceEventId || !(await tx.query(`SELECT id FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid AND kind='user_message'`, [actor.sourceEventId,actor.ownerId,actor.botId])).rowCount) throw new ScheduleError('scheduleUserSourceRequired',403)
+  private async source(tx: PoolClient, actor: Actor, workspaceId: string | null) {
+    if (!actor.sourceEventId || !(await tx.query(`SELECT 1 FROM coordinator_events e LEFT JOIN bots b ON b.id=e."botId" WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message' AND (e."botId" IS NULL OR b."workspaceId" IS NOT DISTINCT FROM $3::uuid)`,[actor.sourceEventId,actor.ownerId,workspaceId])).rowCount) throw new ScheduleError('scheduleUserSourceRequired',403)
   }
   private async permission(tx: PoolClient, owner: string, botId: string | null, def: Definition) {
     if(def.task.kind==='agent_read'&&!await this.agentAvailable(owner,botId))throw new ScheduleError('scheduleAgentReadUnavailable',503)
@@ -64,32 +65,36 @@ export class ScheduleStore {
     const parsed = commandSchema.safeParse(raw)
     if (!parsed.success) throw new ScheduleError('invalidScheduleCommand',400)
     const cmd = parsed.data
-    return this.workspace(actor.ownerId,actor.workspaceId,()=>this.transaction(async tx=>{
+    return this.workspace(actor.ownerId,actor.workspaceId,access=>this.transaction(async tx=>{
       await this.conversation(tx,actor)
       await this.safeMessage(tx,actor.ownerId,cmd)
-      if (cmd.action==='list') return { schedules:(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE owner_id=$1 AND workspace_id IS NOT DISTINCT FROM $2::uuid AND bot_id IS NOT DISTINCT FROM $3::uuid ORDER BY created_at DESC LIMIT 100',[actor.ownerId,actor.workspaceId,actor.botId])).rows }
+      if (cmd.action==='list') return { schedules:(await tx.query<Schedule>(`SELECT * FROM user_schedules WHERE workspace_id IS NOT DISTINCT FROM $1::uuid AND ((visibility='workspace' AND $1::uuid IS NOT NULL) OR (visibility='owner' AND owner_id=$2 AND bot_id IS NOT DISTINCT FROM $3::uuid)) ORDER BY created_at DESC LIMIT 100`,[actor.workspaceId,actor.ownerId,actor.botId])).rows }
       if (cmd.action==='create') {
-        await this.source(tx,actor)
+        if (!actor.workspaceId) throw new ScheduleError('scheduleWorkspaceRequired',400)
+        await this.source(tx,actor,actor.workspaceId)
         const def = definitionSchema.parse(cmd.definition); def.timezone = timezone(def.timezone)
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[JSON.stringify(['schedule',actor.ownerId,actor.botId,cmd.requestId])])
         const old = (await tx.query<Schedule>('SELECT * FROM user_schedules WHERE owner_id=$1 AND bot_id IS NOT DISTINCT FROM $2::uuid AND request_id=$3',[actor.ownerId,actor.botId,cmd.requestId])).rows[0]
         if (old) { if (!isDeepStrictEqual(old.request_definition,def) || old.workspace_id!==actor.workspaceId) throw new ScheduleError('scheduleRequestConflict'); return { schedule:old,replayed:true } }
         await this.permission(tx,actor.ownerId,actor.botId,def)
         const next=nextTime(def,this.clock(),true)
-        const {rows}=await tx.query<Schedule>(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at) VALUES($1,$2,$3,$4,$5,$6,$7,$7,'active',$8) RETURNING *`,[randomUUID(),actor.ownerId,actor.workspaceId,actor.botId,actor.sourceEventId,cmd.requestId,def,next])
+        const {rows}=await tx.query<Schedule>(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,next_at) VALUES($1,$2,$3,$4,'workspace',$5,$6,$7,$7,'active',$8) RETURNING *`,[randomUUID(),actor.ownerId,actor.workspaceId,actor.botId,actor.sourceEventId,cmd.requestId,def,next])
         return {schedule:rows[0],replayed:false}
       }
-      const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 AND owner_id=$2 AND workspace_id IS NOT DISTINCT FROM $3::uuid AND bot_id IS NOT DISTINCT FROM $4::uuid FOR UPDATE',[cmd.scheduleId,actor.ownerId,actor.workspaceId,actor.botId])).rows[0]
+      const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 AND workspace_id IS NOT DISTINCT FROM $2::uuid FOR UPDATE',[cmd.scheduleId,actor.workspaceId])).rows[0]
       if(!row) throw new ScheduleError('scheduleNotFound',404)
+      if(row.visibility==='owner'&&(row.owner_id!==actor.ownerId||row.bot_id!==actor.botId)) throw new ScheduleError('scheduleNotFound',404)
+      if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
+      if((cmd.action==='update'||cmd.action==='resume')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
       if(cmd.action==='history') return {occurrences:(await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])).rows}
-      await this.source(tx,actor)
+      await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
       let def=row.definition, status=row.status, next=row.next_at
-      if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,actor.ownerId,actor.botId,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
+      if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,row.owner_id,row.bot_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
       else if(cmd.action==='pause'){status='paused';next=null}
       else if(cmd.action==='cancel'){status='cancelled';next=null}
-      else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,actor.ownerId,actor.botId,def);next=nextTime(def,this.clock());status=next?'active':'completed'}
+      else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,row.owner_id,row.bot_id,def);next=nextTime(def,this.clock());status=next?'active':'completed'}
       const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
       await this.lockChat(tx,row)
       for(const item of stale.rows){await this.retireEvent(tx,item.event_id);await this.report(tx,row,item,'cancelled',null,'scheduleChanged')}
@@ -124,6 +129,11 @@ export class ScheduleStore {
     wakeCoordinatorAfterCommit(tx,row.owner_id)
     await tx.query('UPDATE schedule_occurrences SET reported_at=$2,report_attempts=report_attempts+1 WHERE id=$1',[o.id,this.clock()])
   }
+  private async concurrencyLimited(tx:PoolClient,o:Occurrence,max:number){
+    const started=o.started_at??o.created_at
+    const {rows}=await tx.query<{n:number}>(`SELECT count(*)::int n FROM schedule_occurrences r WHERE r.schedule_id=$1 AND r.status='running' AND r.id<>$2 AND (COALESCE(r.started_at,r.created_at)<$3 OR (COALESCE(r.started_at,r.created_at)=$3 AND r.id<$2))`,[o.schedule_id,o.id,started])
+    return rows[0].n>=max
+  }
   async execute(claim:Occurrence){
     const row=(await this.pool.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1',[claim.schedule_id])).rows[0]
     if(!row)return
@@ -137,20 +147,22 @@ export class ScheduleStore {
       await this.retireEvent(tx,o.event_id)
       await this.conversation(tx,{ownerId:row.owner_id,workspaceId:row.workspace_id,botId:row.bot_id})
       if(o.attempts>MAX_ATTEMPTS)throw new ScheduleError('scheduleRecoveryExhausted')
-      const skipped=o.execution_decision==='skip'
-      const issue=skipped?null:await this.permission(tx,row.owner_id,row.bot_id,o.definition)
+      const misfireSkipped=o.execution_decision==='skip'
+      const concurrencyLimited=!misfireSkipped&&await this.concurrencyLimited(tx,o,current.definition.maxConcurrent??1)
+      const skipReason=misfireSkipped?'misfireSkipped':concurrencyLimited?'concurrencyLimit':null
+      const issue=skipReason?null:await this.permission(tx,row.owner_id,row.bot_id,o.definition)
       const task=o.definition.task
-      if(!skipped&&task.kind==='agent_read'){
+      if(!skipReason&&task.kind==='agent_read'){
         const eventId=randomUUID()
         await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'run_report',$4,$5,'attention')`,[eventId,row.owner_id,row.bot_id,`schedule_due:${o.id}:${o.attempts}`,{source:'schedule_due',scheduleId:row.id,title:o.definition.title,occurrenceId:o.id,text:task.prompt}])
         await botChatChanged(tx, row.owner_id, row.bot_id)
         await tx.query('UPDATE schedule_occurrences SET event_id=$2 WHERE id=$1',[o.id,eventId])
         return row.owner_id
       }
-      const result=skipped?null:task.kind==='reminder'?{text:task.text}:issue
-      const status=skipped?'skipped':'succeeded'
-      await tx.query('UPDATE schedule_occurrences SET status=$2,result=$3,error=$4,finished_at=$5,lease_token=NULL,lease_until=NULL WHERE id=$1',[o.id,status,result,skipped?'misfireSkipped':null,this.clock()])
-      await this.report(tx,row,o,status,result,skipped?'misfireSkipped':null)
+      const result=skipReason?null:task.kind==='reminder'?{text:task.text}:issue
+      const status=skipReason?'skipped':'succeeded'
+      await tx.query('UPDATE schedule_occurrences SET status=$2,result=$3,error=$4,finished_at=$5,lease_token=NULL,lease_until=NULL WHERE id=$1',[o.id,status,result,skipReason,this.clock()])
+      await this.report(tx,row,o,status,result,skipReason)
     }))}catch(error){await this.fail(claim,error)}
   }
   async fail(claim:Pick<Occurrence,'id'|'lease_token'>,error:unknown){
