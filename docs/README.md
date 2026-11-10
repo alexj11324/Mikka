@@ -58,6 +58,8 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 - [Tracing](operations/tracing.md) locates requests and database queries.
 - [Infisical Cloud](infisical-cloud.md) describes existing credential delivery.
 
+- [Inbox API](inbox-api.md) defines pending, snoozed and completed items, actions, permissions and live refresh.
+
 ## Update documentation
 
 [2026-11-08 全仓审校记录](audits/2026-11-08-documentation-refresh.md)列出本次覆盖的

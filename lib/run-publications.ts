@@ -11,7 +11,7 @@ import { remoteKey } from '@mikka/protocol/repository'
 import { db, pool, withDatabaseClient, withDatabaseTransaction } from '@/lib/db'
 import { agentRuns, devices, issues, issueVersions, runPublications, runTokens, type RunStatus } from '@/lib/db/schema'
 import { taskIdentifiers, taskPrefixInput } from '@/lib/task-identifier-server'
-import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { readIssueMetadata, withIssueMetadata, pullRequestSchema } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { workspaceDb } from '@/lib/workspace-db'
 import { systemActor } from '@/lib/activity-actor'
@@ -111,7 +111,7 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
     const accessible = task && (expectedScopeVersion === undefined || task.scopeVersion === expectedScopeVersion) && await mayCompleteIssue(task, run.userId, run.workspaceId)
     if (task && accessible && !readIssueMetadata(task.content).deletedAt) {
       const metadata = readIssueMetadata(task.content)
-      const pr = attachPullRequest ? publication?.pullRequest : null
+      const pr = attachPullRequest && publication?.pullRequest ? pullRequestSchema.parse(publication.pullRequest) : null
       let content = task.content
       if (pr) {
         const found = metadata.pullRequests.some(existing => existing.url.replace(/\/$/, '') === pr.url)
@@ -129,7 +129,8 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
     } else if (attachPullRequest && publication?.pullRequest) throw new PublicationError('issue_unavailable')
   }
   // A used-up quota has its own event (lib/run-quota.ts): switched to a key, or paused.
-  if (run.stopReason !== 'quota_exhausted' && run.stopReason !== 'provider_failure') await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: run.stopReason ?? 'error', report, publication }))
+  if (run.stopReason !== 'quota_exhausted' && run.stopReason !== 'provider_failure') await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: run.stopReason ?? 'error', report,
+    publication: publication?.pullRequest ? { ...publication, pullRequest: pullRequestSchema.parse(publication.pullRequest) } : publication }))
   return review
 }
 

@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { Agent } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { getEventListeners } from 'node:events'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
@@ -136,6 +140,78 @@ test('a real worker init error fails immediately without an HTTP retry or raw er
   await assert.rejects(pending, { code: 'API_DEV_WORKER_INIT_FAILED', message: 'API_DEV_WORKER_INIT_FAILED' })
   assert.equal(calls, 0)
   assert.equal(api.listenerCount, 0)
+})
+
+test('worker initialization preserves only a closed diagnosis from the actual env-runner message format', async () => {
+  // env-runner 0.3.11 sends Error.message, without its name/code. The worker
+  // can terminate before stderr flushes, so this IPC message is the evidence.
+  const privateDetail = 'private-worker-location-and-credential'
+  const cases = [
+    [`Cannot find package 'pg' imported from /${privateDetail}/entry.mjs`, 'module-missing', 'pg'],
+    [`Cannot find module '/${privateDetail}/mikka-tracing.mjs' imported from /${privateDetail}/index.mjs`, 'module-missing', 'tracing-entry'],
+    [`Cannot find package '${privateDetail}' imported from /private/entry.mjs`, 'module-missing', null],
+    [`The requested module '${privateDetail}' does not provide an export named 'default'`, 'export-missing', null],
+    [`Unexpected token '${privateDetail}' (at /private/entry.mjs:1:2)`, 'module-syntax', null],
+    [`listen EADDRINUSE: address already in use /${privateDetail}`, 'listen-address-in-use', null],
+    [`listen EACCES: permission denied /${privateDetail}`, 'listen-access-denied', null],
+    [`[env-runner] Entry module "/${privateDetail}" must export a \`fetch\` handler (export default { fetch(req) { ... } }).`, 'entry-handler-missing', null],
+    [privateDetail, 'unavailable', null],
+    [{ message: privateDetail, code: 'EADDRINUSE' }, 'unavailable', null],
+  ]
+  for (const [raw, reason, dependency] of cases) {
+    const api = workerMessages(), worker = developmentWorkerReady(api, { phase: 'hot-replacement' })
+    const pending = worker.wait(new AbortController().signal)
+    api.emit({ event: 'init-error', error: raw })
+    await assert.rejects(pending, error => {
+      assert.equal(error.code, 'API_DEV_WORKER_INIT_FAILED')
+      assert.equal(error.message, 'API_DEV_WORKER_INIT_FAILED')
+      assert.deepEqual(error.cause, { phase: 'hot-replacement', reason, dependency })
+      assert.equal(JSON.stringify(error.cause).includes(privateDetail), false)
+      return true
+    })
+    assert.equal(api.listenerCount, 0)
+  }
+})
+
+test('startup diagnostics distinguish initial workers and never forward an untrusted phase', async () => {
+  for (const [options, phase] of [[undefined, 'initial-start'], [{ phase: 'private-phase' }, 'unavailable']]) {
+    const api = workerMessages(), worker = developmentWorkerReady(api, options)
+    const pending = worker.wait(new AbortController().signal)
+    api.emit({ event: 'init-error', error: 'private initialization detail' })
+    await assert.rejects(pending, error => {
+      assert.deepEqual(error.cause, { phase, reason: 'unavailable', dependency: null })
+      return true
+    })
+  }
+})
+
+test('the CI TAP reporter retains the closed worker cause without disclosing the original IPC message', async t => {
+  const privateDetail = 'private-initialization-sentinel'
+  const program = `import test from 'node:test';
+import { developmentWorkerReady } from ${JSON.stringify(new URL('./dev.mjs', import.meta.url).href)};
+test('controlled initialization refusal', async () => {
+  let emit;
+  const api = { onMessage(listener) { emit = listener }, offMessage() {} };
+  const worker = developmentWorkerReady(api, { phase: 'hot-replacement' });
+  const pending = worker.wait(new AbortController().signal);
+  emit({ event: 'init-error', error: ${JSON.stringify(`Cannot find package 'pg' imported from /${privateDetail}/entry.mjs`)} });
+  await pending;
+});`
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-worker-report-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const fixture = join(directory, 'worker.test.mjs')
+  await writeFile(fixture, program, { mode: 0o600 })
+  const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', fixture], {
+    encoding: 'utf8', timeout: 5_000, env: { PATH: process.env.PATH, NODE_OPTIONS: '' },
+  })
+  assert.equal(result.error, undefined)
+  assert.equal(result.status, 1, 'the child must still fail at its first initialization refusal')
+  const output = result.stdout + result.stderr
+  assert.ok(output.includes('API_DEV_WORKER_INIT_FAILED'))
+  const diagnosis = /^# \[dev\] Worker initialization failed (\{.*\})$/m.exec(output)
+  assert.ok(diagnosis, 'the same TAP reporter used by CI must expose the closed cause')
+  assert.deepEqual(JSON.parse(diagnosis[1]), { phase: 'hot-replacement', reason: 'module-missing', dependency: 'pg' })
+  assert.equal(output.includes(privateDetail), false)
 })
 
 test('worker initialization and HTTP share one deadline and always release listeners', async () => {

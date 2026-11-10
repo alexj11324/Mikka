@@ -5,6 +5,7 @@ import { existsSync, mkdirSync } from "node:fs"
 import { createServer } from "node:net"
 import { fileURLToPath } from "node:url"
 import { Pool } from "pg"
+import { BYOS_IMAGES, pullPinnedByosImage } from "./test-subscription-worker-pull.mjs"
 
 if (process.platform !== "linux")
   throw new Error("Run BYOS acceptance on the cloud Agent's Linux environment")
@@ -59,8 +60,13 @@ try {
     ["packages/subscription-worker/bootstrap.mjs"],
     networkEnv
   )
+  // Finish the two immutable image downloads before creating any test resource.
+  // Only registry transport errors may retry; every following run is single-shot.
+  await pullPinnedByosImage(BYOS_IMAGES.postgres, { env: baseEnv })
+  await pullPinnedByosImage(BYOS_IMAGES.golang, { env: baseEnv })
   await run("docker", [
     "run",
+    "--pull=never",
     "-d",
     "--name",
     name,
@@ -74,7 +80,7 @@ try {
     `POSTGRES_PASSWORD=${password}`,
     "-e",
     `POSTGRES_DB=${database}`,
-    "postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb"
+    BYOS_IMAGES.postgres
   ])
   let ready = false
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -99,6 +105,7 @@ try {
   const ca = "/etc/ssl/certs/ca-certificates.crt"
   const dockerArgs = [
     "run",
+    "--pull=never",
     "--memory=6g",
     "--cpus=4",
     "--user",
@@ -128,7 +135,7 @@ try {
       "SSL_CERT_FILE=/etc/ssl/certs/mikka-host-ca.crt"
     )
   dockerArgs.push(
-    "golang:1.26.10-bookworm@sha256:632dff7351799a5a9954a48dc06670ade72ee44e8c351cdc0e5a57af2fea21af",
+    BYOS_IMAGES.golang,
     "sh",
     "-c",
     "CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment && CGO_ENABLED=0 go build -mod=readonly -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && go test -mod=readonly -race -timeout 90s -count=1 -v ./... && go vet -mod=readonly ./... && ./bin/mikka-subscription-worker --version"

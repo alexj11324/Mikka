@@ -3,7 +3,7 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { handleFactoryFlow } from './flow-http';
 import { acceptanceMarkdown } from './acceptance-report';
-import { publicFactoryStage } from './public-flow';
+import { publicFactoryStage, publicReviewSummary } from './public-flow';
 import { AgentProfileError } from './agent-profile-definition';
 import { publicFactoryReceipt } from './public-receipt';
 
@@ -27,6 +27,18 @@ test('public stages require merge evidence and keep cancellation distinct', () =
   assert.equal(publicFactoryStage('monitor','passed',false),'handoff');
   assert.equal(publicFactoryStage('publish','passed',true),'completed');
   assert.equal(publicFactoryStage('execute','cancelled',false),'cancelled');
+});
+
+test('review summary is a cache projection: no PR is empty and historical fields stay unknown', () => {
+  assert.equal(publicReviewSummary(null, 'mikka/mik-1'), null);
+  assert.equal(publicReviewSummary({ url: 'https://other.invalid/pull/1' }, null), null);
+  const url = 'https://github.com/o/r/pull/1', headSha = 'a'.repeat(40), updatedAt = '2026-11-09T14:00:00Z';
+  assert.deepEqual(publicReviewSummary({ url }, 'mikka/mik-1'), { branch: 'mikka/mik-1', additions: null, deletions: null,
+    changedFiles: null, headSha: null, checks: null, checksUpdatedAt: null });
+  const reviewChecks = { headSha, complete: true, updatedAt, entries: { CI: { id: 1, state: 'passed', at: updatedAt } } };
+  assert.deepEqual(publicReviewSummary({ url, branch: 'mikka/mik-2', headSha, additions: 8, deletions: 0, changedFiles: 2, reviewChecks }, null),
+    { branch: 'mikka/mik-2', headSha, additions: 8, deletions: 0, changedFiles: 2, checks: { passed: 1, failed: 0, pending: 0, skipped: 0 }, checksUpdatedAt: updatedAt });
+  assert.equal(publicReviewSummary({ url, headSha: 'b'.repeat(40), reviewChecks }, null)?.checks, null);
 });
 
 test('v2 action receipts keep exact fences and replay metadata without a second task state or a post-commit read', () => {
