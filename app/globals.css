@@ -8,12 +8,14 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+/* muted and accent read --mk-muted / --mk-accent first: a UI layer sets them when a third-party shell around the page
+   uses --muted / --accent for something else (the hosted App Shell: a text tone and its blue). Unset, nothing changes. */
 --color-brand-claude: #D97757;
---color-accent-soft: var(--accent);
+--color-accent-soft: var(--mk-accent, var(--accent));
 --color-accent-soft-foreground: var(--accent-foreground);
 --color-accent-soft-hover: var(--secondary);
 --color-accent-hover: var(--secondary);
---color-default: var(--muted);
+--color-default: var(--mk-muted, var(--muted));
 --color-focus: var(--ring);
 --color-danger: var(--destructive);
 /* Comma's type: Inter then the system stack. No CJK font is named, so Chinese takes the system font (PingFang on a Mac). */
@@ -52,9 +54,9 @@
 --color-primary-foreground: var(--primary-foreground);
 --color-secondary: var(--secondary);
 --color-secondary-foreground: var(--secondary-foreground);
---color-muted: var(--muted);
+--color-muted: var(--mk-muted, var(--muted));
 --color-muted-foreground: var(--muted-foreground);
---color-accent: var(--accent);
+--color-accent: var(--mk-accent, var(--accent));
 --color-accent-foreground: var(--accent-foreground);
 --color-destructive: var(--destructive);
 --color-destructive-foreground: var(--destructive-foreground);

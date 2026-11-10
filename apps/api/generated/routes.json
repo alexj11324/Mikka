@@ -1856,7 +1856,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "5564176cdb07576e4e60b4aa6a6deb0a9e86f226830cfb71765d7b16cda26fe1"
+      "sourceHash": "a73ac42d81c8f719c0d9ca6191e134003408aad921aad3dd24740399b9612076"
     },
     {
       "path": "/mikka/api/suggestions/[id]",

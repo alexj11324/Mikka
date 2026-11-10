@@ -6,21 +6,27 @@
  */
 export type EventLineKind =
   | 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack'
-  | 'issueStatus' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'other'
+  | 'issueStatus' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'scheduleRan' | 'scheduleDue' | 'other'
 
 export interface EventLine {
   kind: EventLineKind
   runId: string | null
   issueId: string | null
-  /** run_finished: succeeded / failed / stopped…; issue_status_changed: the new status; action_decided: done / failed / declined… */
+  /** run_finished: succeeded / failed / stopped…; issue_status_changed: the new status; action_decided: done / failed / declined…;
+   * a schedule's result: succeeded / failed / skipped / cancelled. */
   status: string | null
-  /** A task's or an artifact's title. */
+  /** A task's, an artifact's or a schedule's title. */
   title: string | null
 }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 const RUN = new RegExp(`\\b[Rr]un (${UUID})\\b`)
 const ISSUE = new RegExp(`\\b(?:Issue|issue|task):? (${UUID})\\b`)
+
+/** A schedule's own events (eventPrompt): `[Event] Schedule <id> "<title>" ran with status <status>…` or `… is due.` */
+const SCHEDULE = new RegExp(`^\\[Event\\] Schedule ${UUID}(?: "(.*)")? (?:ran with status (\\w+)|(is due)\\.)`)
+/** A schedule's result before its event named it: it had no text, so the model read this. */
+const LEGACY_SCHEDULE_RESULT = '[Event] An Agent reports coordination data: undefined'
 
 const KINDS: Record<string, EventLineKind> = {
   run_finished: 'runFinished', run_retried: 'runRetried', run_credential_switched: 'runSwitched', run_quota_paused: 'runPaused',
@@ -42,6 +48,11 @@ export function eventLine(eventKind: string | null | undefined, text: string, ob
   }
   if (kind === 'runFinished' && !status) status = /ended with status (\w+)/.exec(first)?.[1] ?? null
   if (kind === 'artifact') title = /"(.*)", version \d+/.exec(first)?.[1] ?? null
+  if (kind === 'runReport') {
+    const schedule = SCHEDULE.exec(first)
+    if (schedule) return { kind: schedule[3] ? 'scheduleDue' : 'scheduleRan', runId: null, issueId: null, status: schedule[2] ?? null, title: schedule[1] ?? null }
+    if (first === LEGACY_SCHEDULE_RESULT) return { kind: 'scheduleRan', runId: null, issueId: null, status: null, title: null }
+  }
   if (kind === 'action' && !status) status = /approved .* and it is done/.test(first) ? 'done' : / but it failed/.test(first) ? 'failed' : /declined/.test(first) ? 'declined' : null
   return { kind, runId, issueId, status, title }
 }
