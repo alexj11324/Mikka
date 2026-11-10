@@ -152,6 +152,16 @@ test('opening the queued child directly keeps its blocked question wake recovera
   assert.equal(threadQuestionView({ ...thread, question: 'resuming', questionWake: null }).status, 'queued', 'an unfailed direct child retains its existing view')
 })
 
+test('the chain badge follows the latest attempt frozen mode', () => {
+  const [child] = projectIssueThreads([{ ...make('child', 'viewer'), status: 'queued', mode: 'execute' }], 'issue', 'viewer', new Set(['viewer']))
+  const thread = withRunChain(child, { rootRunId: 'origin', latestRunId: 'child', attempts: [
+    { runId: 'origin', attempt: 1, status: 'stopped', mode: 'ask', stopRequestedAt: null, createdAt: new Date(0), finishedAt: new Date(1) },
+    { runId: 'child', attempt: 2, status: 'queued', mode: 'plan', stopRequestedAt: null, createdAt: new Date(2), finishedAt: null },
+  ] })
+  assert.equal(thread.mode, 'plan')
+  assert.deepEqual(thread.attempts.map(attempt => attempt.mode), ['ask', 'plan'])
+})
+
 test('a continuation without its origin in view never shows raw markdown as its name', () => {
   // Its origin is outside the chain's scope (another owner or issue), so it is its own root.
   const [orphan] = projectIssueThreads([{ ...make('next', 'viewer'), prompt: '# Thread question abc' }], 'issue', 'viewer', new Set(['viewer']))

@@ -3,17 +3,28 @@
 // The thread's mode as the picker reads it (#1735 slice A). One small read and
 // one transition; the server owns the stored mode, the version and the lock.
 import useSWR, { unstable_serialize } from 'swr'
+import { z } from 'zod'
+import { threadModeSchema, type ThreadMode } from '@mikka/protocol/thread-mode'
 import { withBasePath } from '@/lib/base-path'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { isThreadModeTransitionError, type ThreadModeRead, type ThreadModeTransitionError } from '@/lib/thread-mode/view'
-import type { ThreadMode } from '@mikka/protocol/thread-mode'
 
 export const threadModeKey = (runId: string) => ['thread-mode', runId]
+
+const supportStateSchema = z.strictObject({ state: z.enum(['enforced', 'unsupported']), reason: z.enum(['harness', 'daemon']).optional() })
+const readSchema = z.strictObject({
+  mode: threadModeSchema,
+  version: z.number().int().nonnegative(),
+  frozenMode: threadModeSchema.optional(),
+  locked: z.boolean().optional(),
+  support: z.strictObject({ plan: supportStateSchema, execute: supportStateSchema, ask: supportStateSchema }).nullable().optional(),
+})
 
 async function readThreadModeState(runId: string): Promise<ThreadModeRead> {
   const response = await fetch(withBasePath(`/api/threads/${encodeURIComponent(runId)}/mode`), { cache: 'no-store', credentials: 'same-origin' })
   if (!response.ok) throw Error('threadModeUnavailable')
-  return response.json() as Promise<ThreadModeRead>
+  // The panel renders only a parsed read; an unexpected body is a read failure.
+  return readSchema.parse(await response.json())
 }
 
 export type ThreadModeTransitionResult = { ok: true } | { error: ThreadModeTransitionError }

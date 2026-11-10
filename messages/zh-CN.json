@@ -4117,7 +4117,9 @@
       "locked": "线程运行中不可切换；结束后选择的模式会在下一轮生效。",
       "threadModeChanged": "模式已在其他标签页更改，已刷新为最新。",
       "threadModeLocked": "线程正在运行，结束后再切换模式。",
-      "threadModeUnavailable": "模式切换失败，请重试。"
+      "threadModeUnavailable": "模式切换失败，请重试。",
+      "loadFailed": "线程模式暂不可用。",
+      "retry": "重试"
     },
     "approval": {
       "title": "需要你批准",

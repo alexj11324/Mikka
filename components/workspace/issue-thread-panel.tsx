@@ -39,7 +39,7 @@ import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
-import { ThreadModeNoticeContent, ThreadModePickerContent } from './thread-mode-picker'
+import { ThreadModeBadge, ThreadModeNoticeContent, ThreadModePickerContent } from './thread-mode-picker'
 import { ThreadApprovalCards } from './thread-tool-approval'
 import { useThreadMode } from '@/hooks/use-thread-mode'
 import { threadModePicker, type ThreadModeTransitionError } from '@/lib/thread-mode/view'
@@ -193,11 +193,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const active = !!view && question !== 'resuming' && runIsActive(view.status)
   // Only a run that is generating or running turns send into stop; one waiting for an answer sends (N1).
   const working = active && runIsWorking(view.status)
-  // The thread mode (#1735): the picker sits in the header slot, the notice above the composer.
-  const threadMode = useThreadMode(runId, liveRunId, data?.thread.ownedByCurrentUser === true)
+  // The thread mode (#1735): the live run's mode names the header control; the notice sits above the composer.
+  const threadMode = useThreadMode(liveRunId, liveRunId, data?.thread.ownedByCurrentUser === true)
   const [modePending, setModePending] = useState(false)
   const [modeError, setModeError] = useState<ThreadModeTransitionError | null>(null)
   const modeView = threadModePicker(threadMode.state, active)
+  const modeLoadError = data?.thread.ownedByCurrentUser === true && !!threadMode.error
   async function changeThreadMode(next: ThreadMode) {
     if (modePending || !modeView || modeView.locked) return
     setModePending(true)
@@ -206,6 +207,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if ('error' in result) setModeError(result.error)
     setModePending(false)
   }
+  // Owner: the picker. Another reader: the mode the run froze, read from the thread row.
+  const modeControl = data?.thread.ownedByCurrentUser
+    ? modeView ? <ThreadModePickerContent view={modeView} pending={modePending} onChange={mode => { void changeThreadMode(mode) }} /> : null
+    : data?.thread.mode ? <ThreadModeBadge mode={data.thread.mode} /> : null
   // Stop was asked for; the run keeps its live status until the daemon ends it.
   const requestedAt = stopAttempt ?? (data?.thread.stopRequestedAt ? new Date(data.thread.stopRequestedAt).getTime() : null)
   const stopRequested = active && (requestedAt !== null || !!view?.stopping)
@@ -412,7 +417,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     pending={[...changeRequest ? [{ id: 'change-request', name: changeRequest.label, onRemove: changeRequest.onCancel }] : [], ...replyQuote ? [{ id: 'reply-quote', name: replyQuote, onRemove: () => setReplyQuote(null) }] : []]}
     notices={<>
       {/* What the mode means, over the composer; the picker itself is in the header. */}
-      <ThreadModeNoticeContent view={modeView} error={modeError} onSwitchToExecute={modeView?.selectedUnsupported && !modeView.locked ? () => { void changeThreadMode('execute') } : undefined} />
+      <ThreadModeNoticeContent view={modeView} error={modeError} loadError={modeLoadError} onRetry={() => { void threadMode.mutate() }} onSwitchToExecute={modeView?.selectedUnsupported && !modeView.locked ? () => { void changeThreadMode('execute') } : undefined} />
       {data?.thread.ownedByCurrentUser && (modeView?.mode === 'ask' || modeView?.frozenMode === 'ask') && <ThreadApprovalCards runId={runId} liveRunId={liveRunId} active={active} />}
       {data?.thread.quota?.paused && <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />}
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
@@ -422,11 +427,11 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
   return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
     {!bare && <ThreadHeader issueId={issueId} runId={runId} title={title} headingRef={headingRef} onBack={onBack} onClose={onClose}
-      onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance}
+      onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance || !!modeControl}
       widen={widen ?? undefined} liveRunId={liveRunId} status={data?.thread.status ?? ''} acceptanceTaskId={acceptance?.id ?? null}
       place={detail ? <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} /> : null}
       acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
-      mode={modeView ? <ThreadModePickerContent view={modeView} pending={modePending} onChange={mode => { void changeThreadMode(mode) }} /> : null}
+      mode={modeControl}
       identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
       artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} /> : null}
       tabs={acceptance && !hasChanges ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
@@ -453,7 +458,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* The thread's Plan / Execute / Ask choice is in the header; this says what it means (#1735). */}
-      <ThreadModeNoticeContent view={modeView} error={modeError} onSwitchToExecute={modeView?.selectedUnsupported && !modeView.locked ? () => { void changeThreadMode('execute') } : undefined} />
+      <ThreadModeNoticeContent view={modeView} error={modeError} loadError={modeLoadError} onRetry={() => { void threadMode.mutate() }} onSwitchToExecute={modeView?.selectedUnsupported && !modeView.locked ? () => { void changeThreadMode('execute') } : undefined} />
       {data?.thread.ownedByCurrentUser && (modeView?.mode === 'ask' || modeView?.frozenMode === 'ask') && <ThreadApprovalCards runId={runId} liveRunId={liveRunId} active={active} />}
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}

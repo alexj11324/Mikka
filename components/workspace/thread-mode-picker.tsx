@@ -45,21 +45,37 @@ export function ThreadModePickerContent({ view, pending = false, onChange }: Thr
   </div>
 }
 
+/** The read-only mode badge a reader who cannot switch sees, and the picker's own frozen badge. */
+export function ThreadModeBadge({ mode }: { mode: ThreadMode }) {
+  const t = useTranslations('IssueThreads.mode')
+  return <Badge variant="secondary" data-thread-mode-frozen="">{t('frozen', { mode: t(mode) })}</Badge>
+}
+
 export interface ThreadModeNoticeContentProps {
   view: ThreadModePickerView | null
   /** The last refused transition, if any; a 409 means the read needs a refresh, not a retry. */
   error?: ThreadModeTransitionError | null
+  /** The mode read itself failed: say so and offer a retry instead of disappearing. */
+  loadError?: boolean
+  onRetry?: () => void
   /** Only offered when the stored choice is unsupported and no run holds it. */
   onSwitchToExecute?: () => void
 }
 
 /** What the mode means, above the composer; the picker itself is in the header. */
-export function ThreadModeNoticeContent({ view, error = null, onSwitchToExecute }: ThreadModeNoticeContentProps) {
+export function ThreadModeNoticeContent({ view, error = null, loadError = false, onRetry, onSwitchToExecute }: ThreadModeNoticeContentProps) {
   const t = useTranslations('IssueThreads.mode')
-  if (!view) return null
+  if (!view) {
+    if (!loadError) return null
+    return <div data-slot="thread-mode-notice" className="flex flex-wrap items-center gap-2 px-1 text-xs text-muted-foreground">
+      <span role="alert">{t('loadFailed')}</span>
+      {onRetry && <Button variant="ghost" size="sm" className="h-6 px-2" onClick={onRetry}>{t('retry')}</Button>}
+    </div>
+  }
   const text = view.mode === 'plan' ? t('planNotice') : view.mode === 'ask' ? t('askNotice') : t('executeNotice')
   return <div data-slot="thread-mode-notice" className="flex min-w-0 flex-col gap-0.5 px-1 text-xs text-muted-foreground">
-    <p>{text}{view.locked && !view.selectedUnsupported ? ` ${t('locked')}` : ''}</p>
+    <p>{text}</p>
+    {view.locked && !view.selectedUnsupported && <p>{t('locked')}</p>}
     {view.selectedUnsupported && <div className="flex flex-wrap items-center gap-2">
       <span>{t('unsupportedSelected')}</span>
       {onSwitchToExecute && <Button variant="ghost" size="sm" className="h-6 px-2" onClick={onSwitchToExecute}>{t('switchToExecute')}</Button>}

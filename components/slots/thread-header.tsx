@@ -18,8 +18,8 @@ export function ThreadHeader({ title, headingRef, onBack, onClose, onStop, onOpe
     {/* Icons only after the title: where it runs and its Agent; names on hover (Alex, 2026-11-06). */}
     {place}
     {acceptanceBadge}
-    {/* The run's frozen mode (#1730): read-only here; the switch lives above the composer. */}
-    {mode}
+    {/* The mode control the panel renders (#1730): a picker or a read-only badge, laid out here only. */}
+    {mode && <div data-slot="thread-mode-slot" className={cn('flex min-w-0 items-center', wraps ? 'max-sm:order-last max-sm:w-full' : 'shrink-0')}>{mode}</div>}
     <span className="flex-1" />
     {identity}
     {/* Always there, left of stop: off until the thread hands an Artifact over (decision 2026-11-06-1615). */}

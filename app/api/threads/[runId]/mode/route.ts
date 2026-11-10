@@ -28,6 +28,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ runI
     const runId = z.uuid().parse((await params).runId)
     const found = await target(session.user.id, runId)
     if (!found) return NextResponse.json({ error: 'notFound' }, { status: 404, headers: noStore })
+    // A lost workspace membership makes the thread unavailable, exactly as POST decides.
+    try { await requireTaskWorkspace(session.user.id, found.workspaceId) }
+    catch { return NextResponse.json({ error: 'notFound' }, { status: 404, headers: noStore }) }
     const current = await readThreadMode(pool, session.user.id, found.issueId)
     // An unfinished run keeps the mode it froze; the picker must show that
     // from the first read, not only after a refused transition. Support is

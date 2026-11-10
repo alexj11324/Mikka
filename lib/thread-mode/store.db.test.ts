@@ -5,7 +5,7 @@ import { Pool } from 'pg'
 import { readCliRunPolicy } from '../agent-tool-approval/policy-store'
 import { ApprovalUnavailable } from '../agent-tool-approval/store'
 import { RunToolApprovalStore } from '../agent-tool-approval/approvals'
-import { freezeThreadMode, readThreadMode, threadModeLocked, setThreadMode, ThreadModeConflict } from './store'
+import { freezeThreadMode, readThreadMode, threadModeLocked, threadModeTarget, setThreadMode, ThreadModeConflict } from './store'
 import { readThreadModeSupport } from './support'
 import { workspacePool } from '../workspace-db'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
@@ -183,6 +183,16 @@ test('mode support follows the harness matrix and the daemon report, never a gue
     plan: { state: 'unsupported', reason: 'harness' }, execute: { state: 'enforced' }, ask: { state: 'unsupported', reason: 'harness' },
   })
   await pool.query(`UPDATE agents SET harness='codex' WHERE id=$1`, [agentId])
+})
+
+test('the badge reads the continuation run, not the root it continues', async () => {
+  const id = await issueId()
+  const root = randomUUID(), continuation = randomUUID()
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId","issueId","agentId",status,mode,"leaseExpiresAt")
+    VALUES ($1,$2,$3,$4,$5,'succeeded','ask',NULL),($6,$2,$3,$4,$5,'running','plan',now()+interval '10 minutes')`, [root, owner, deviceId, id, agentId, continuation])
+  await pool.query(`UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1`, [continuation, root])
+  assert.equal((await threadModeTarget(pool, owner, root))?.frozenMode, 'ask')
+  assert.equal((await threadModeTarget(pool, owner, continuation))?.frozenMode, 'plan')
 })
 
 test('a policy revision change fences a pending approval', async () => {

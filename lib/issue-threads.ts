@@ -1,3 +1,4 @@
+import { resolveThreadMode, type ThreadMode } from '@mikka/protocol/thread-mode'
 import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
 import { runIsActive, runSummaryView } from './issue-run-conversation'
 import type { RunChain } from './run-chain'
@@ -13,6 +14,8 @@ export interface IssueThread {
   failureDetails?: CompactRunFailure | null
   id: string
   status: string
+  /** The mode this run froze (#1730); visible wherever the thread row is read, also to a teammate. */
+  mode?: ThreadMode
   /** How the run came out once it ended (R-52); null while running or not judged yet. */
   outcome?: string | null
   /** A requested stop is status metadata, including for teammates. */
@@ -56,6 +59,8 @@ export interface IssueThreadAttempt {
   /** 1-based; the root run is attempt 1. */
   attempt: number
   status: string
+  /** The mode this attempt froze (#1730). */
+  mode?: ThreadMode
   outcome?: string | null
   stopping: boolean
   createdAt: Date
@@ -67,11 +72,13 @@ export type ThreadQuestion = 'waiting' | 'resuming' | null
 /** Attach the run's resolved chain; without one the thread is a one-attempt chain. */
 export function withRunChain(thread: IssueThread, chain: RunChain | null | undefined): IssueThread {
   if (!chain) return thread
-  const attempts = chain.attempts.map(attempt => ({ ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
+  const attempts = chain.attempts.map(attempt => ({ ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, ...(attempt.mode ? { mode: attempt.mode } : {}), outcome: attempt.outcome ?? null,
     stopping: runIsActive(attempt.status) && !!attempt.stopRequestedAt, createdAt: attempt.createdAt, finishedAt: attempt.finishedAt }))
   const latest = attempts.find(attempt => attempt.runId === chain.latestRunId)
   return {
     ...thread, rootRunId: chain.rootRunId, latestRunId: chain.latestRunId, attempts, failureDetails: readCompactRunFailure(latest?.failureDetails),
+    // The badge names what the live continuation froze, not the root's choice.
+    ...(latest?.mode ? { mode: latest.mode } : {}),
     continuation: latest && latest.runId !== thread.id ? { id: latest.runId, status: latest.status, outcome: latest.outcome ?? null, stopping: latest.stopping } : null,
   }
 }
@@ -126,6 +133,8 @@ export const ISSUE_THREAD_LIMIT = 20
 
 export interface IssueThreadRow {
   id: string; issueId: string | null; userId: string; status: string; prompt: string
+  /** agent_runs.mode: the mode this run froze (#1730). */
+  mode?: string | null
   report: unknown; error: string | null; failureDetails?: unknown; createdAt: Date; finishedAt: Date | null
   agentName: string; harness: string; ownerName?: string | null
   stopRequestedAt?: Date | null
@@ -178,7 +187,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
     .slice(0, ISSUE_THREAD_LIMIT)
     .map(row => ({
       failureDetails: readCompactRunFailure(row.failureDetails),
-      id: row.id, status: row.status, outcome: row.outcome ?? null, ...(row.kind ? { kind: row.kind } : {}), createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
+      id: row.id, status: row.status, ...(row.mode ? { mode: resolveThreadMode(row.mode) } : {}), outcome: row.outcome ?? null, ...(row.kind ? { kind: row.kind } : {}), createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)

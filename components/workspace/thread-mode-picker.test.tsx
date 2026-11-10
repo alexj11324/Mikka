@@ -15,8 +15,9 @@ mock.module('next-intl', { namedExports: { useTranslations: copy } })
 
 let Picker: typeof import('./thread-mode-picker')['ThreadModePickerContent']
 let Notice: typeof import('./thread-mode-picker')['ThreadModeNoticeContent']
+let Badge: typeof import('./thread-mode-picker')['ThreadModeBadge']
 before(async () => {
-  ({ ThreadModePickerContent: Picker, ThreadModeNoticeContent: Notice } = await import('./thread-mode-picker'))
+  ({ ThreadModePickerContent: Picker, ThreadModeNoticeContent: Notice, ThreadModeBadge: Badge } = await import('./thread-mode-picker'))
 })
 
 const enforced: ThreadModeSupport = {
@@ -45,6 +46,13 @@ test('the header picker shows three options, the stored mode selected, and the r
   assert.match(html, /本次运行：计划/)
   // The picker is the only switch; no notice markup here.
   assert.doesNotMatch(html, /data-slot="thread-mode-notice"/)
+})
+
+test('a reader who cannot switch sees the run mode as a read-only badge', () => {
+  const html = renderToStaticMarkup(<Badge mode="ask" />)
+  assert.match(html, /data-thread-mode-frozen/)
+  assert.match(html, /本次运行：询问/)
+  assert.doesNotMatch(html, /<button/)
 })
 
 test('a running thread disables every option and names the reason', () => {

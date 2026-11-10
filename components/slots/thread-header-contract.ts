@@ -25,7 +25,7 @@ export type ThreadHeaderProps = {
   place: ReactNode
   /** The acceptance state badge, for a Factory candidate; null otherwise. */
   acceptanceBadge: ReactNode
-  /** The mode the displayed run froze (#1730), read-only; null for a thread carried by a layer without it. */
+  /** The mode control the panel renders (#1730): the owner's picker, or a read-only badge for another reader; null when the layer has none. */
   mode?: ReactNode
   /** The execution identity (ThreadExecutionIdentity), for its owner; null otherwise. */
   identity: ReactNode

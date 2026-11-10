@@ -4117,7 +4117,9 @@
       "locked": "This thread is running. The mode you pick after it ends applies to the next run.",
       "threadModeChanged": "Another tab changed the mode. Showing the latest.",
       "threadModeLocked": "This thread is running. Change the mode after it ends.",
-      "threadModeUnavailable": "Could not change the mode. Try again."
+      "threadModeUnavailable": "Could not change the mode. Try again.",
+      "loadFailed": "Thread mode is unavailable.",
+      "retry": "Retry"
     },
     "approval": {
       "title": "Needs your approval",
