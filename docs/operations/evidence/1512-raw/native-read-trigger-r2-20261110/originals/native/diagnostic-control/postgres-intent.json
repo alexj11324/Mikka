@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "service": "postgresql@17",
+  "host": "127.0.0.1",
+  "port": 5432,
+  "baselineReadyStatus": 2,
+  "startRequestedAt": "2026-11-09T23:39:48.491Z",
+  "startCommandCompletedAt": "2026-11-09T23:39:49.709Z"
+}

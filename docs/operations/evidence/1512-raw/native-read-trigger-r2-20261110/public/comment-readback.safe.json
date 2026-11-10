@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "kind": "CP52 public issue comment exact-body readback",
+  "issue": 1512,
+  "comments": [
+    {
+      "id": 6754512306,
+      "url": "https://github.com/alexj11324/Mikka/issues/1512#issuecomment-6754512306",
+      "createdAt": "2026-11-09T23:42:08Z",
+      "updatedAt": "2026-11-09T23:42:08Z",
+      "observedAtUtc": "2026-11-10T00:13:15.293Z",
+      "body": {
+        "path": "public/issue-1512-comment-6754512306.md",
+        "bytes": 1831,
+        "sha256": "f70c657bae00ef6b16e207aa0611b9fcbcff69f85b5339eab7cecbe1825f969a",
+        "gitBlob": "45786938f798ebf173cf8a583013c8a32ca4bee4",
+        "type": "blob",
+        "mode": "100644",
+        "kind": "exact-public-comment-body"
+      },
+      "bodyPreservedExact": true
+    },
+    {
+      "id": 6754860355,
+      "url": "https://github.com/alexj11324/Mikka/issues/1512#issuecomment-6754860355",
+      "createdAt": "2026-11-10T00:02:52Z",
+      "updatedAt": "2026-11-10T00:02:52Z",
+      "observedAtUtc": "2026-11-10T00:13:15.294Z",
+      "body": {
+        "path": "public/issue-1512-comment-6754860355.md",
+        "bytes": 1313,
+        "sha256": "c2b48e3bc0ad1760c80ff7fc6e22437be39b9d904687e49056346ab57c6f7a29",
+        "gitBlob": "72c69767b65e8efce91ea47c6db85423344aea19",
+        "type": "blob",
+        "mode": "100644",
+        "kind": "exact-public-comment-body"
+      },
+      "bodyPreservedExact": true
+    }
+  ],
+  "scope": {
+    "onlyListedPublicCommentBodies": true,
+    "postedComments": false,
+    "readOriginalActions": false,
+    "downloadedArtifacts": false
+  }
+}

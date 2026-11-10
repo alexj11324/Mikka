@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "enabled": true,
+  "requestId": "07cc69c5-af6a-4da7-a689-9b802e286f46",
+  "createdAt": "2026-11-09T23:31:53.000Z",
+  "expiresAt": "2026-11-10T01:01:53.000Z",
+  "baseCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+  "baseTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+  "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+  "sourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+  "overlay": [
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "beforeBlob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+      "afterBlob": "c4f97ced534634c66a1d840618756464d020be4a"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "beforeBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "afterBlob": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "beforeBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+      "afterBlob": "fc876e7c863724e2048499dbccece9065b6766ff"
+    },
+    {
+      "path": "apps/desktop/test/read-diagnostics.mjs",
+      "beforeBlob": null,
+      "afterBlob": "c41bfc24156ef2b99c10ac08c393f4594b037048"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "beforeBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "afterBlob": "4bf39ecfee54659a75e42456888ca4ee828b00e6"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "beforeBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "afterBlob": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95"
+    },
+    {
+      "path": "lib/swr/read-diagnostics.ts",
+      "beforeBlob": null,
+      "afterBlob": "7dd27cabdd495839bd578613fe36390b81cef69d"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "beforeBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "afterBlob": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21"
+    }
+  ]
+}

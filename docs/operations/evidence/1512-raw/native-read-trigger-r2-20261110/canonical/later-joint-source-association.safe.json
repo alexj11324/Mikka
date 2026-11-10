@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "kind": "unpublished-business-source-union",
+  "commit": "565429bc8749e1007b5ec30c2b4a4b92f43fa5ed",
+  "tree": "845fb6f21f3ec78c94f60888c11e38573e38e3ea",
+  "parents": [
+    "d2c3f63448130443e3e10bb5304417162f585776",
+    "62b5783a61a199f886a2d71d2914f85b3bf6cfc7",
+    "2ff5c07fa1358fb0218aad578ab1032ad3ad351c"
+  ],
+  "originalBusinessRef": "refs/heads/fix/1512-daemon-fixture-executable-20261109",
+  "originalBusinessHead": "d2c3f63448130443e3e10bb5304417162f585776",
+  "published": false,
+  "CIStarted": false,
+  "productionCases": 0,
+  "formalBudgetStill": "d2c Native 424 > Web 358; FAIL",
+  "leafCount": 6844,
+  "directoryCount": 874,
+  "independentComputedTree": "845fb6f21f3ec78c94f60888c11e38573e38e3ea",
+  "apiTreeExact": true,
+  "overlaysVsOwn": [
+    {
+      "path": ".github/workflows/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "64906247dac16a9d6134e4349dc784aace0240d0"
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2aa85fdd0cb12727621b774ab5886804be486605"
+    },
+    {
+      "path": ".github/workflows/e2b-runtime-release.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7a592d975ac7594e723822f597b512defa4526b2"
+    },
+    {
+      "path": "app/api/device-tokens/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d8d8fd72b9cc7717b64839bc971f66dc1edd0881"
+    },
+    {
+      "path": "docs/operations/web-deploy.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5231adc416dc316806becb862e360cb15995048f"
+    },
+    {
+      "path": "lib/background.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "64a92bd9d5d03196f38b65451234b53d7fd95159"
+    },
+    {
+      "path": "lib/db/device-scope.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1344d013c7649547ee347c8e475d9909ecba285e"
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e160aff553928010fcbd9decc0c46b5bed75f2b3"
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7cef8e313ace1807a6fb266ce55d1e978420c221"
+    },
+    {
+      "path": "scripts/acceptance/self-hosted-production-target.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cddd967dd5e53bc4f11f01f30f0d1934af540342"
+    },
+    {
+      "path": "scripts/acceptance/self-hosted-production.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8e3bdc01d3e2629a27952d8e06e49b9a9b24a92"
+    },
+    {
+      "path": "scripts/acceptance/thread-lifecycle-ci.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "993bcc27fb8f3ff46859342e56365372ed3e0af5"
+    },
+    {
+      "path": "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c16fbad9d4628bcf04feffbf46d1938023fd08ce"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "83c9f55c46c896f9ec512773891fea22bb200288"
+    },
+    {
+      "path": "scripts/e2b/runtime-inputs.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0da00d8772987e7caa4da8760902ab84e27ab057"
+    },
+    {
+      "path": "scripts/e2b/runtime-inputs.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ab834fe64618b7d6d60e5f2bc126f6dfa3a0952e"
+    },
+    {
+      "path": "scripts/e2b/runtime-report.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61447607fe3ac1878db4edd4ee5a70c2a36fa91f"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5139cd606467f11e366ad2592fe8e0bdacf84b52"
+    },
+    {
+      "path": "scripts/ops/production-mobile-daemon-recovery.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "070706c5402eb9a305f6aad7ccd8d96ad2f5a811"
+    },
+    {
+      "path": "scripts/ops/production-mobile-daemon.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3fec10057a502dff87142335274a592816d9b2e8"
+    },
+    {
+      "path": "scripts/ops/production-mobile-daemon.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "72245741bba308b7994468a23c3cf76ada963ddc"
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f1309c67c6732c8ad42bc8d5653215a8c0011cfb"
+    },
+    {
+      "path": "scripts/release/web-deploy.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "880a22c315f712aaf72e2620b5d9288092fe3f99"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7c39d3a9b10787393ba93eab30c592bcadd9dbce"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "92aa0815233e9c52e7f3a8f2accd36b21075c4da"
+    }
+  ],
+  "jointInputPlan": "66d87ec3b992d01e918301bc3f11d17661958cbb",
+  "jointInputLeafManifest": "bb97c5d0ce0f3600befbe5cad58267306188149f",
+  "testsIndependentReview": "7947f4177bf4730aae2535cfae9da6e570db5a65",
+  "generated": {
+    "inputs": "98059e2c678a7aac03b742755837cae69582d1f5",
+    "executionProof": "141a7880086c2e483373f682d6dd87ff23946c61",
+    "outputs": {
+      "json": "7c39d3a9b10787393ba93eab30c592bcadd9dbce",
+      "ts": "92aa0815233e9c52e7f3a8f2accd36b21075c4da"
+    },
+    "routeCount": 243,
+    "methods": 315,
+    "versusOurs": [
+      {
+        "path": "/mikka/api/device-tokens",
+        "before": "83690e72095683aef1961e15b399dab4abaac18d56f67e04357e6decf722173d",
+        "after": "2b96bd139451ae1f1abdd1a92ac6cce82af51e64c15aa550f18eeba591271bc3"
+      }
+    ],
+    "versusMain": [
+      {
+        "path": "/mikka/v1/devices/[deviceId]/repos",
+        "before": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+        "after": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"
+      },
+      {
+        "path": "/mikka/v1/devices/[deviceId]/runs",
+        "before": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+        "after": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
+      }
+    ],
+    "nonHashMetadataPreserved": true,
+    "exactTsUnionFromBothParents": true,
+    "errors": []
+  },
+  "diagnosticOverlayAbsent": true,
+  "errors": []
+}

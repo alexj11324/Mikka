@@ -1,0 +1,1257 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.native-read-diagnostic.actual-original-verification",
+  "owner": "/root/native_diag_runner",
+  "verifiedAt": "2026-11-10 00:07:20 UTC",
+  "originals": [
+    {
+      "name": "cleanup.json",
+      "sha": "e102dff33e9b81c55e95abe97d984051009bec83",
+      "bytes": 457,
+      "sha256": "19558ffce4d2f5904e8273339c949c5ee3584a8ee25c600e4c4c2a7dcebf2c8c"
+    },
+    {
+      "name": "postgres-intent.json",
+      "sha": "dd6e1d021f3fef1365aed5f82a75366d6410e124",
+      "bytes": 223,
+      "sha256": "a78f85273912448c39ac42230454ac6c911fe3a1169210c39e890756c88d3eff"
+    },
+    {
+      "name": "source-manifest.json",
+      "sha": "0b14995605cfcfd80b45c660c593987ec5e9bd54",
+      "bytes": 1850,
+      "sha256": "00d6cbc0ccbec1aecbb0bd08d800c267a347014fe5a0c0fdfe0f2f0013e7c031"
+    },
+    {
+      "name": "source.json",
+      "sha": "42796f601fec861dfd8fa95e4fe0bdc55ee123ff",
+      "bytes": 2561,
+      "sha256": "687f677e7723db0d5cf511985b22308eae635062dc8c9c8d2a0989baaced11c7"
+    },
+    {
+      "name": "lifecycle.json",
+      "sha": "15b3e15cc4ad92d0cd3338fd6851c440939c7624",
+      "bytes": 706933,
+      "sha256": "d5eef68057897072cac81a04e42e3f9bf708dcad13fcf16911a391d4b23e3bae"
+    },
+    {
+      "name": "parity.json",
+      "sha": "801639fc2c56133bf57bbc3e0d5f9b11b02b1d42",
+      "bytes": 117887,
+      "sha256": "a4cf234f5f71b6facd9afae731fe40796f887c1f637f8373f890e178fc13e477"
+    },
+    {
+      "name": "read-diagnostics.json",
+      "sha": "7e7b656971af2035ee889f7b6b614c7d329eb761",
+      "bytes": 776126,
+      "sha256": "bba298094faffd59b60c5567a551335014a1dfc58f3424013c2981d84525ae22"
+    },
+    {
+      "name": "smoke.json",
+      "sha": "a063c6ae005c3e534e6f06a83568e9f9710febb7",
+      "bytes": 3144,
+      "sha256": "e7475c7648871baab63318e6885c40de274c418998d0644ef846a1377711aced"
+    },
+    {
+      "name": "mac-acceptance-package.json",
+      "sha": "2d54a61f0bcb8f063bbcf0e58be77dfd03fcb910",
+      "bytes": 957,
+      "sha256": "e963d35dc8b286beabd7045c53011b877750d34bb6b5dabeac1f3a5e34e8c955"
+    },
+    {
+      "name": "native-crypto.json",
+      "sha": "31aa0b1b735747bf1506baaeb6fc49da372e4097",
+      "bytes": 2868,
+      "sha256": "19b7a0dba71293fcb22fcc0090664abd04573ec400db23fa0e45a72d98db52b2"
+    }
+  ],
+  "originalArithmeticVerifier": {
+    "gitBundle": "5cc66fff9c158dcdd23c5dacf4e84f0ef6f89128",
+    "function": "utility:verifyNativeOriginals"
+  },
+  "sourceReceiptChecks": {
+    "errors": [],
+    "source": {
+      "version": 1,
+      "purpose": "native-read-trigger-diagnostic",
+      "requestId": "07cc69c5-af6a-4da7-a689-9b802e286f46",
+      "runId": "42721481301",
+      "runAttempt": 1,
+      "ref": "refs/heads/ops/1512-native-read-diagnostic-memory-20261109",
+      "baseCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+      "baseTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+      "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+      "sourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+      "executionCommit": "33e9aea47726d3d83534d57345eab1f78181e0b6",
+      "executionTree": "a39f0e61c58c9319aff548a232152579322d3f8f",
+      "manifestSha256": "00d6cbc0ccbec1aecbb0bd08d800c267a347014fe5a0c0fdfe0f2f0013e7c031",
+      "workflowBlob": "5052fd36ca972c31475cda872926faca163c8efc",
+      "originalDesktopWorkflowBlob": "1cfd9d8be85015b639809faedc8a68fb83609399",
+      "overlay": [
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "beforeBlob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+          "afterBlob": "c4f97ced534634c66a1d840618756464d020be4a"
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "beforeBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+          "afterBlob": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e"
+        },
+        {
+          "path": "apps/desktop/test/lifecycle.mjs",
+          "beforeBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+          "afterBlob": "fc876e7c863724e2048499dbccece9065b6766ff"
+        },
+        {
+          "path": "apps/desktop/test/read-diagnostics.mjs",
+          "beforeBlob": null,
+          "afterBlob": "c41bfc24156ef2b99c10ac08c393f4594b037048"
+        },
+        {
+          "path": "hooks/use-live-key.tsx",
+          "beforeBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+          "afterBlob": "4bf39ecfee54659a75e42456888ca4ee828b00e6"
+        },
+        {
+          "path": "lib/live/channel.ts",
+          "beforeBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+          "afterBlob": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95"
+        },
+        {
+          "path": "lib/swr/read-diagnostics.ts",
+          "beforeBlob": null,
+          "afterBlob": "7dd27cabdd495839bd578613fe36390b81cef69d"
+        },
+        {
+          "path": "lib/swr/read-observer.ts",
+          "beforeBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+          "afterBlob": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21"
+        }
+      ],
+      "diagnosticOnly": true,
+      "production": false,
+      "runner": {
+        "provider": "github-actions",
+        "os": "macos-26",
+        "timeoutMinutes": 60,
+        "cleanupOwner": "issue1512/native_diag_runner",
+        "deadlineUpperBound": "2026-11-10T00:35:39.061Z"
+      },
+      "checkedAt": "2026-11-09T23:35:39.069Z"
+    },
+    "manifest": {
+      "version": 1,
+      "enabled": true,
+      "requestId": "07cc69c5-af6a-4da7-a689-9b802e286f46",
+      "createdAt": "2026-11-09T23:31:53.000Z",
+      "expiresAt": "2026-11-10T01:01:53.000Z",
+      "baseCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+      "baseTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+      "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+      "sourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+      "overlay": [
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "beforeBlob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+          "afterBlob": "c4f97ced534634c66a1d840618756464d020be4a"
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "beforeBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+          "afterBlob": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e"
+        },
+        {
+          "path": "apps/desktop/test/lifecycle.mjs",
+          "beforeBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+          "afterBlob": "fc876e7c863724e2048499dbccece9065b6766ff"
+        },
+        {
+          "path": "apps/desktop/test/read-diagnostics.mjs",
+          "beforeBlob": null,
+          "afterBlob": "c41bfc24156ef2b99c10ac08c393f4594b037048"
+        },
+        {
+          "path": "hooks/use-live-key.tsx",
+          "beforeBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+          "afterBlob": "4bf39ecfee54659a75e42456888ca4ee828b00e6"
+        },
+        {
+          "path": "lib/live/channel.ts",
+          "beforeBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+          "afterBlob": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95"
+        },
+        {
+          "path": "lib/swr/read-diagnostics.ts",
+          "beforeBlob": null,
+          "afterBlob": "7dd27cabdd495839bd578613fe36390b81cef69d"
+        },
+        {
+          "path": "lib/swr/read-observer.ts",
+          "beforeBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+          "afterBlob": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21"
+        }
+      ]
+    },
+    "expectedOverlayAfter": {
+      "apps/desktop/src/renderer/read-batch.ts": "c4f97ced534634c66a1d840618756464d020be4a",
+      "apps/desktop/src/renderer/rpc.ts": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e",
+      "apps/desktop/test/lifecycle.mjs": "fc876e7c863724e2048499dbccece9065b6766ff",
+      "apps/desktop/test/read-diagnostics.mjs": "c41bfc24156ef2b99c10ac08c393f4594b037048",
+      "hooks/use-live-key.tsx": "4bf39ecfee54659a75e42456888ca4ee828b00e6",
+      "lib/live/channel.ts": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95",
+      "lib/swr/read-diagnostics.ts": "7dd27cabdd495839bd578613fe36390b81cef69d",
+      "lib/swr/read-observer.ts": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21"
+    },
+    "originalsReadbackExact": true
+  },
+  "verification": {
+    "schemaVersion": 1,
+    "head": "33e9aea47726d3d83534d57345eab1f78181e0b6",
+    "tree": "a39f0e61c58c9319aff548a232152579322d3f8f",
+    "actualCheckout": "33e9aea47726d3d83534d57345eab1f78181e0b6",
+    "arithmetic": {
+      "records": 24,
+      "checkpoints": 12,
+      "segments": 8,
+      "bucketCells": 2280,
+      "ordinalRows": 1284,
+      "errors": [
+        {
+          "label": "native full-window exceeds web"
+        }
+      ]
+    },
+    "windows": {
+      "webLogin": {
+        "status": "complete",
+        "phase": "ordinary-login-to-usable-workspace",
+        "pair": null,
+        "checkpoints": 4,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "queryCalls": 19,
+            "receiveBytes": 5902,
+            "sendBytes": 5241
+          },
+          {
+            "phase": "web-navigation-to-dom-content-loaded",
+            "queryCalls": 0,
+            "receiveBytes": 0,
+            "sendBytes": 0
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "queryCalls": 408,
+            "receiveBytes": 83222,
+            "sendBytes": 263910
+          }
+        ],
+        "total": {
+          "queryCalls": 427,
+          "receiveBytes": 89124,
+          "sendBytes": 269151,
+          "unknownReadings": 0
+        },
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 427,
+          "uncaptured": 0,
+          "unknownContext": 87,
+          "unknownStatement": 128,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 35,
+            "completedInWindow": 35,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 35,
+            "completedInWindow": 35,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "nativeLogin": {
+        "status": "complete",
+        "phase": "ordinary-login-to-usable-workspace",
+        "pair": null,
+        "checkpoints": 4,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "queryCalls": 19,
+            "receiveBytes": 5902,
+            "sendBytes": 5241
+          },
+          {
+            "phase": "native-pkce-and-automatic-renderer-to-public-session",
+            "queryCalls": 15,
+            "receiveBytes": 3677,
+            "sendBytes": 5059
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "queryCalls": 397,
+            "receiveBytes": 80988,
+            "sendBytes": 274022
+          }
+        ],
+        "total": {
+          "queryCalls": 431,
+          "receiveBytes": 90567,
+          "sendBytes": 284322,
+          "unknownReadings": 0
+        },
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 431,
+          "uncaptured": 0,
+          "unknownContext": 94,
+          "unknownStatement": 133,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 15,
+            "completedInWindow": 15,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 40,
+            "completedInWindow": 40,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "startup-bundled": {
+        "status": "complete",
+        "phase": "authenticated-launch-to-usable-workspace",
+        "pair": 1,
+        "checkpoints": 2,
+        "segments": [
+          {
+            "phase": "launch-to-usable",
+            "queryCalls": 201,
+            "receiveBytes": 42742,
+            "sendBytes": 135299
+          }
+        ],
+        "total": {
+          "queryCalls": 201,
+          "receiveBytes": 42742,
+          "sendBytes": 135299,
+          "unknownReadings": 0
+        },
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 201,
+          "uncaptured": 0,
+          "unknownContext": 53,
+          "unknownStatement": 70,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 7,
+            "completedInWindow": 7,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      },
+      "startup-hosted": {
+        "status": "complete",
+        "phase": "authenticated-launch-to-usable-workspace",
+        "pair": 1,
+        "checkpoints": 2,
+        "segments": [
+          {
+            "phase": "launch-to-usable",
+            "queryCalls": 225,
+            "receiveBytes": 50871,
+            "sendBytes": 178592
+          }
+        ],
+        "total": {
+          "queryCalls": 225,
+          "receiveBytes": 50871,
+          "sendBytes": 178592,
+          "unknownReadings": 0
+        },
+        "diagnostics": {
+          "status": "incomplete",
+          "ordinalRows": 225,
+          "uncaptured": 0,
+          "unknownContext": 48,
+          "unknownStatement": 76,
+          "reasons": [
+            "query_context_unknown",
+            "statement_structure_unknown"
+          ]
+        },
+        "rpc": {
+          "physical": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          },
+          "logical": {
+            "startedInWindow": 19,
+            "completedInWindow": 19,
+            "crossesStart": 0,
+            "crossesEnd": 0,
+            "completionNotObserved": 0,
+            "completionWithoutStart": 0
+          }
+        }
+      }
+    },
+    "scope": "all actual pg.Client.query calls and PostgreSQL protocol bytes in the primary API process; no sampling",
+    "exclusions": [
+      "test-account lease/session tracking and fixture SQL in the separate harness process",
+      "PostgreSQL connection handshake and TCP/TLS overhead"
+    ],
+    "background": "all concurrent primary API background traffic is included; no guessed subtraction or per-request attribution",
+    "boundary": "query calls started and protocol bytes transferred by each checkpoint; in-flight response bytes can cross a checkpoint",
+    "login": {
+      "authentication": "normal email sign-in and get-session through the original leased-account helper; freshly saved private storageState",
+      "native": "the same email authentication, then real PKCE with the authenticated browser session and initial renderer/workspace selection",
+      "web": "the same email authentication, then a new actual Chromium context and the same workspace selection",
+      "externalOAuthChallenge": false,
+      "sessionCache": "normal signed-cookie cache, no manual flush; cache hits are not measured",
+      "comparable": true,
+      "comparisonBasis": "common ordinary authentication and same usable workspace; native includes its additional PKCE transport",
+      "order": "short Web context closes first; native and hosted retain the final ordinary login through the unchanged lifecycle checks",
+      "protocolPhases": "native handoff overlaps automatic renderer navigation; these concurrent queries are not falsely separated",
+      "accountAndWorkspace": "same leased owner and existing seeded fixture",
+      "locale": "zh-CN"
+    },
+    "startup": {
+      "samples": "first pair only from the unchanged five-pair lifecycle sequence",
+      "clients": "bundled Electron and the preserved hosted Web renderer in the same compiled Electron shell",
+      "sessionCache": "same retained authenticated app profile/workspace; normal profile and OS caches, no purge",
+      "backend": "same primary API and fixed source; server is already warm",
+      "performanceThreshold": "none"
+    },
+    "cold": {
+      "pairs": 5,
+      "bundledMedianMs": 2422.98,
+      "hostedMedianMs": 3193.79,
+      "differenceMs": -770.81,
+      "bundledFaster": true,
+      "improvementPercent": 24.13
+    },
+    "parity": {
+      "screens": 102,
+      "required": 51,
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "maximumChangedRatio": 0.001,
+      "colorThreshold": 0,
+      "totalComparedPixels": 132192000,
+      "changedPixels": 108,
+      "maxObserved": 0.000013117283950617285,
+      "maskedScreens": 56,
+      "masks": [
+        "avatars",
+        "timestamps"
+      ],
+      "excludedDesktopOnly": [
+        "data-desktop-only: server row, Settings › 服务器"
+      ],
+      "pageErrors": []
+    },
+    "crypto": {
+      "version": 1,
+      "passed": true,
+      "platform": "darwin",
+      "architecture": "arm64",
+      "revision": "33e9aea47726d3d83534d57345eab1f78181e0b6",
+      "launches": [
+        {
+          "mode": "bundled",
+          "profile": "a",
+          "phase": "create",
+          "passed": true,
+          "crypto": {
+            "passed": true,
+            "phase": "create",
+            "available": true,
+            "verifiedCanaries": 0,
+            "encrypted": true,
+            "decrypted": true,
+            "identityMatches": true
+          },
+          "processExited": true,
+          "keychainLog": {
+            "observation": "after-launch-return",
+            "lookupFailureCount": 0,
+            "knownStatusCodes": [],
+            "truncated": false
+          }
+        },
+        {
+          "mode": "hosted",
+          "profile": "b",
+          "phase": "continue",
+          "passed": true,
+          "crypto": {
+            "passed": true,
+            "phase": "continue",
+            "available": true,
+            "verifiedCanaries": 1,
+            "encrypted": true,
+            "decrypted": true,
+            "identityMatches": true
+          },
+          "processExited": true,
+          "keychainLog": {
+            "observation": "after-launch-return",
+            "lookupFailureCount": 0,
+            "knownStatusCodes": [],
+            "truncated": false
+          }
+        },
+        {
+          "mode": "bundled",
+          "profile": "b",
+          "phase": "verify",
+          "passed": true,
+          "crypto": {
+            "passed": true,
+            "phase": "verify",
+            "available": true,
+            "verifiedCanaries": 2,
+            "encrypted": true,
+            "decrypted": true,
+            "identityMatches": true
+          },
+          "processExited": true,
+          "keychainLog": {
+            "observation": "after-launch-return",
+            "lookupFailureCount": 0,
+            "knownStatusCodes": [],
+            "truncated": false
+          }
+        }
+      ],
+      "package": {
+        "version": 1,
+        "variant": "acceptance",
+        "passed": true,
+        "signatureVerifiedStrictDeep": true,
+        "bundleIdentifier": "com.aspectlylabs.mikka.dev",
+        "urlScheme": "mikka-dev-auth",
+        "architecture": "arm64",
+        "identity": {
+          "adHoc": true,
+          "teamIdentifier": "none",
+          "hardenedRuntime": true,
+          "cdHash": "9687e977023035e308342f4c5c38e0d788dcba92"
+        },
+        "signedBundleCount": 9,
+        "entitlements": {
+          "hardenedRuntime": true,
+          "devOnlyLibraryValidationException": true,
+          "unexpected": false,
+          "executables": 5,
+          "libraries": 4,
+          "librariesWithoutEntitlements": 4
+        },
+        "fuses": {
+          "RunAsNode": false,
+          "EnableCookieEncryption": false,
+          "EnableNodeOptionsEnvironmentVariable": false,
+          "EnableNodeCliInspectArguments": true,
+          "EnableEmbeddedAsarIntegrityValidation": false,
+          "OnlyLoadAppFromAsar": true,
+          "LoadBrowserProcessSpecificV8Snapshot": false,
+          "GrantFileProtocolExtraPrivileges": true
+        }
+      },
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "smoke": {
+      "version": 1,
+      "revision": "33e9aea47726d3d83534d57345eab1f78181e0b6",
+      "environmentId": "local-eac3d4bc-1376-41eb-929b-43c3977d21cb",
+      "origin": "http://localhost:3000",
+      "database": "mikka_e2e",
+      "startedAt": "2026-11-09T23:44:42.762Z",
+      "checks": [
+        {
+          "name": "packaged local origin and isolated renderer",
+          "result": "passed"
+        },
+        {
+          "name": "local document CSP blocks external renderer fetches",
+          "result": "passed"
+        },
+        {
+          "name": "server choice: probe states, probed-only selection, the page follows the chosen server and returns",
+          "result": "passed"
+        },
+        {
+          "name": "system browser shows the signed-in account, then loopback and single-use PKCE session handoff",
+          "result": "passed"
+        },
+        {
+          "name": "the callback page opens the Dev build's own app link",
+          "result": "passed"
+        },
+        {
+          "name": "opening the app link brings the packaged app to the front",
+          "result": "passed"
+        },
+        {
+          "name": "no browser session credential in renderer-accessible state",
+          "result": "passed"
+        },
+        {
+          "name": "native badge, payload validation, device and quota bridge",
+          "result": "passed"
+        },
+        {
+          "name": "settings deep link and shared devices page",
+          "result": "passed"
+        },
+        {
+          "name": "sign-out clears the main-owned session",
+          "result": "passed"
+        }
+      ],
+      "builtInDiscovery": "ok",
+      "cleanupStages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "electron-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "nativeCleanup": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 0,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 0,
+          "device_tokens": 0,
+          "device_enrollments": 0,
+          "devices": 0
+        }
+      },
+      "workspaceNameCleanup": {
+        "captured": true,
+        "phase": "restored",
+        "restored": true,
+        "initialName": {
+          "en": false,
+          "zhCN": true
+        },
+        "initialOwnerMatchesSealedBaseline": true,
+        "beforeName": {
+          "en": true,
+          "zhCN": false
+        },
+        "peerMatchesSealedBaseline": true,
+        "onlyGeneratedNameDifference": true,
+        "afterName": {
+          "en": false,
+          "zhCN": true
+        },
+        "ownerMatchesSealedBaseline": true
+      },
+      "accountObservation": {
+        "observed": true,
+        "state": "released",
+        "blockedReason": null,
+        "owner": {
+          "matchesSealedBaselineBefore": true,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 0,
+          "changes": []
+        },
+        "peer": {
+          "matchesSealedBaselineBefore": true,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 0,
+          "changes": []
+        }
+      },
+      "finishedAt": "2026-11-09T23:45:10.933Z",
+      "result": "passed"
+    },
+    "cleanup": {
+      "lifecycle": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "fixtures",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "lifecycleNative": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 2,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        }
+      },
+      "lifecycleWorkspace": {
+        "captured": true,
+        "phase": "unchanged",
+        "restored": false,
+        "initialName": {
+          "en": false,
+          "zhCN": true
+        },
+        "initialOwnerMatchesSealedBaseline": false,
+        "beforeName": {
+          "en": false,
+          "zhCN": true
+        },
+        "peerMatchesSealedBaseline": true,
+        "afterName": {
+          "en": false,
+          "zhCN": true
+        },
+        "ownerMatchesSealedBaseline": true
+      },
+      "lifecycleObservation": {
+        "observed": true,
+        "state": "released",
+        "blockedReason": null,
+        "owner": {
+          "matchesSealedBaselineBefore": false,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 1,
+          "changes": [
+            {
+              "table": "workspace_audit_outbox",
+              "beforeRows": 1,
+              "afterRows": 0,
+              "changedFieldValueSets": [
+                "createdAt",
+                "id",
+                "workspaceId"
+              ],
+              "otherChangedFieldCount": 3
+            }
+          ]
+        },
+        "peer": {
+          "matchesSealedBaselineBefore": false,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 1,
+          "changes": [
+            {
+              "table": "workspace_audit_outbox",
+              "beforeRows": 1,
+              "afterRows": 0,
+              "changedFieldValueSets": [
+                "createdAt",
+                "id",
+                "workspaceId"
+              ],
+              "otherChangedFieldCount": 3
+            }
+          ]
+        }
+      },
+      "parity": "passed",
+      "parityNative": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        }
+      },
+      "parityWorkspace": {
+        "captured": true,
+        "phase": "restored",
+        "restored": true,
+        "initialName": {
+          "en": false,
+          "zhCN": true
+        },
+        "initialOwnerMatchesSealedBaseline": false,
+        "beforeName": {
+          "en": true,
+          "zhCN": false
+        },
+        "peerMatchesSealedBaseline": true,
+        "onlyGeneratedNameDifference": true,
+        "afterName": {
+          "en": false,
+          "zhCN": true
+        },
+        "ownerMatchesSealedBaseline": true
+      }
+    },
+    "nativeSetup": [
+      {
+        "mode": "bundled",
+        "ready": true,
+        "deadlineMs": 480000,
+        "elapsedMs": 2745,
+        "reads": 9,
+        "navigationInterruptions": 0,
+        "transitions": [
+          {
+            "elapsedMs": 158,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": false,
+              "signedIn": false,
+              "server": "unregistered"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "running",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          },
+          {
+            "elapsedMs": 1601,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": true,
+              "signedIn": true,
+              "server": "unregistered"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "running",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          },
+          {
+            "elapsedMs": 1889,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": true,
+              "signedIn": true,
+              "server": "online"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "running",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          },
+          {
+            "elapsedMs": 2745,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": true,
+              "signedIn": true,
+              "server": "online"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "online",
+              "step": "connect",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          }
+        ],
+        "overflow": false,
+        "failure": null,
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.566",
+          "protocolVersion": 3
+        },
+        "environment": {
+          "available": true,
+          "profileMatches": true,
+          "overrideMatches": true,
+          "files": {
+            "daemon.sock": "socket",
+            "daemon.secret": "file",
+            "daemon.pid": "file",
+            "daemon.lock": "directory",
+            "device.json": "file"
+          },
+          "service": {
+            "platform": "darwin",
+            "definition": "file",
+            "profile": "matches",
+            "dev": true,
+            "installedVersion": "0.0.566",
+            "installedRevision": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c"
+          }
+        }
+      },
+      {
+        "mode": "hosted",
+        "ready": true,
+        "deadlineMs": 480000,
+        "elapsedMs": 20,
+        "reads": 1,
+        "navigationInterruptions": 0,
+        "transitions": [
+          {
+            "elapsedMs": 20,
+            "bridge": {
+              "device": true,
+              "installer": true
+            },
+            "device": {
+              "read": "fulfilled",
+              "status": "online",
+              "deviceIdPresent": true,
+              "signedIn": true,
+              "server": "online"
+            },
+            "installer": {
+              "read": "fulfilled",
+              "present": true,
+              "status": "online",
+              "step": "service",
+              "target": "this-computer",
+              "reason": "none",
+              "bootstrapErrorCode": null,
+              "retryable": false
+            }
+          }
+        ],
+        "overflow": false,
+        "failure": null,
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.566",
+          "protocolVersion": 3
+        },
+        "environment": {
+          "available": true,
+          "profileMatches": true,
+          "overrideMatches": true,
+          "files": {
+            "daemon.sock": "socket",
+            "daemon.secret": "file",
+            "daemon.pid": "file",
+            "daemon.lock": "directory",
+            "device.json": "file"
+          },
+          "service": {
+            "platform": "darwin",
+            "definition": "file",
+            "profile": "matches",
+            "dev": true,
+            "installedVersion": "0.0.566",
+            "installedRevision": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c"
+          }
+        }
+      }
+    ],
+    "limitations": {
+      "diagnosticsIncomplete": true,
+      "unknownFineAttributionPreserved": true,
+      "installedDaemonSeparateFromCandidate": true,
+      "rootViewedParityPngPixels": false,
+      "productionAcceptance": false,
+      "apiProcessProtocolBytesAreNotWholeNetworkBytes": true
+    }
+  },
+  "separatedVerdicts": {
+    "structuralArithmeticErrors": [],
+    "fullBudget": {
+      "native": 431,
+      "web": 427,
+      "difference": 4,
+      "passed": false
+    },
+    "firstBudget": {
+      "pair": 1,
+      "native": 201,
+      "hosted": 225,
+      "passed": true
+    },
+    "formalFeatureSource": "d2c3f63448130443e3e10bb5304417162f585776",
+    "formalFeatureBudget": {
+      "native": 424,
+      "web": 358,
+      "passed": false
+    },
+    "productionAcceptance": {
+      "passed": 0,
+      "required": 2
+    }
+  },
+  "readDiagnostics": {
+    "status": "incomplete",
+    "rows": 1505,
+    "counts": {
+      "droppedRows": 28,
+      "droppedBytes": 11147,
+      "invalidPackets": 1,
+      "missingDocuments": 0,
+      "duplicateSequences": 0,
+      "sequenceGaps": 0,
+      "sinkFailures": 0,
+      "pendingAtSnapshot": 0,
+      "keyOmissions": 0,
+      "scopeOmissions": 0,
+      "entityOmissions": 0,
+      "referenceOmissions": 0,
+      "actionOmissions": 0,
+      "schemaOther": 213,
+      "networkIdOmissions": 0,
+      "documentOmissions": 0,
+      "unsealedDocuments": 4,
+      "lateDocuments": 1
+    },
+    "windows": {
+      "webLogin": {
+        "startedAt": "2026-11-09T23:51:39.728Z",
+        "finishedAt": "2026-11-09T23:51:43.977Z"
+      },
+      "nativeLogin": {
+        "startedAt": "2026-11-09T23:51:45.748Z",
+        "finishedAt": "2026-11-09T23:51:54.508Z"
+      }
+    },
+    "boundaries": {
+      "budgetPass": false,
+      "extraReadBoundaryCalls": 0,
+      "extraApplicationRequests": 0,
+      "originalCheckpointsChanged": false,
+      "coverage": "webLogin/nativeLogin pages only; capture spans attachment through ordinary context close and can include tail; budgets use only the unchanged two windows; no cold FIRST capture; initial Native document may precede attachment",
+      "identity": "per-document UUID and timeOrigin; CDP loader IDs are separate local identities, not a guessed cross-layer join",
+      "delivery": "asynchronous test binding; missing delivery, other schema values and overflow remain incomplete; failure/pending counters sum observations and can repeat at snapshot/seal",
+      "clocks": "product monotonicMs is relative to its actual document timeOrigin; wallMs and CDP monotonic clocks are separate",
+      "cost": "retained rows/bytes are bounded; per-event CPU/IPC delivery is not capped and occurs inside original windows; no production performance claim",
+      "unknownAssociation": "no user, workspace, raw SWR key, URL query, headers, body or server invocation ID; ambiguous action/time joins remain unknown"
+    },
+    "scope": "Only webLogin/nativeLogin; no cold FIRST diagnostic capture; capture may contain tail outside budget",
+    "doesNotProveOldD2cEvents": true
+  },
+  "pg": {
+    "intent": {
+      "version": 1,
+      "service": "postgresql@17",
+      "host": "127.0.0.1",
+      "port": 5432,
+      "baselineReadyStatus": 2,
+      "startRequestedAt": "2026-11-09T23:39:48.491Z",
+      "startCommandCompletedAt": "2026-11-09T23:39:49.709Z"
+    },
+    "cleanup": {
+      "version": 1,
+      "owner": "issue1512/native_diag_runner",
+      "service": "postgresql@17",
+      "startedAt": "2026-11-09T23:53:10.517Z",
+      "postgresStepOutcome": "success",
+      "observation": "owned_postgres_stopped",
+      "ownedStartRequested": true,
+      "stopRequested": true,
+      "stopExitCode": 0,
+      "readyExitCode": 2,
+      "controlStatusExitCode": 3,
+      "passed": true,
+      "failure": null,
+      "controlEvidenceCopied": true,
+      "finishedAt": "2026-11-09T23:53:16.470Z"
+    }
+  },
+  "actualAudits": {
+    "closedSchema": "2026-11-09T23:53:19.4390710Z read-diagnostics closed schema: passed (not a budget or causal verdict)",
+    "nativePrivacy": [
+      "2026-11-09T23:53:20.8068890Z {",
+      "2026-11-09T23:53:20.8070150Z   \"files\": 319,",
+      "2026-11-09T23:53:20.8070750Z   \"archives\": 0,",
+      "2026-11-09T23:53:20.8072460Z   \"archiveEntries\": 0,",
+      "2026-11-09T23:53:20.8073930Z   \"decodedBytes\": 0,",
+      "2026-11-09T23:53:20.8074640Z   \"result\": \"passed\",",
+      "2026-11-09T23:53:20.8075730Z   \"checked\": \"known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden\"",
+      "2026-11-09T23:53:20.8077040Z }"
+    ],
+    "control": "2026-11-09T23:53:16.7858280Z {\"status\":\"diagnostic_control_audited\",\"files\":[{\"name\":\"cleanup.json\",\"bytes\":457,\"sha256\":\"19558ffce4d2f5904e8273339c949c5ee3584a8ee25c600e4c4c2a7dcebf2c8c\"},{\"name\":\"postgres-intent.json\",\"bytes\":223,\"sha256\":\"a78f85273912448c39ac42230454ac6c911fe3a1169210c39e890756c88d3eff\"},{\"name\":\"source-manifest.json\",\"bytes\":1850,\"sha256\":\"00d6cbc0ccbec1aecbb0bd08d800c267a347014fe5a0c0fdfe0f2f0013e7c031\"},{\"name\":\"source.json\",\"bytes\":2561,\"sha256\":\"687f677e7723db0d5cf511985b22308eae635062dc8c9c8d2a0989baaced11c7\"}]}",
+    "pgStop": "2026-11-09T23:53:16.4746270Z {\"version\":1,\"owner\":\"issue1512/native_diag_runner\",\"service\":\"postgresql@17\",\"startedAt\":\"2026-11-09T23:53:10.517Z\",\"postgresStepOutcome\":\"success\",\"observation\":\"owned_postgres_stopped\",\"ownedStartRequested\":true,\"stopRequested\":true,\"stopExitCode\":0,\"readyExitCode\":2,\"controlStatusExitCode\":3,\"passed\":true,\"failure\":null,\"controlEvidenceCopied\":true,\"finishedAt\":\"2026-11-09T23:53:16.470Z\"}",
+    "sourceLog": {
+      "sha": "6440a638f0f4c08bd5a91236d82aaaf91d5b204c",
+      "bytes": 290684,
+      "sha256": "f053b85424ae12a47a22be0fe8385ae0fc682e5b45b4f04d12af3db605529cf4"
+    }
+  },
+  "environmentDifference": {
+    "actualInstalledDaemon": [
+      {
+        "mode": "bundled",
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.566",
+          "protocolVersion": 3
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.566",
+          "installedRevision": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c"
+        }
+      },
+      {
+        "mode": "hosted",
+        "daemon": {
+          "source": "local_daemon_hello",
+          "status": "connected",
+          "daemonVersion": "0.0.566",
+          "protocolVersion": 3
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.566",
+          "installedRevision": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c"
+        }
+      }
+    ],
+    "baselineDaemon": "0.0.564",
+    "comparison": "Diagnostic application revision and published daemon differ from the original d2c run; do not attribute all budget differences to the observation overlay."
+  },
+  "limitations": [
+    "Workflow success is the observed functional result; query budget remains failed.",
+    "No screenshot pixel inspection performed by this agent; parity conclusions use preserved original report and numeric consistency checks.",
+    "Per-query unknown context and statement structures remain explicit and are not assigned causal meaning.",
+    "Original artefact URLs and authentication material are not included in this proof."
+  ]
+}

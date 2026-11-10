@@ -1,0 +1,195 @@
+{
+  "version": 1,
+  "purpose": "prepare runner-only heap correction after observed prebuild renderer tsc OOM; unpublished",
+  "recordedAt": "2026-11-09 23:33:17 UTC",
+  "branch": "ops/1512-native-read-diagnostic-memory-20261109",
+  "workflow": {
+    "path": ".github/workflows/issue1512-native-read-diagnostic.yml",
+    "sha": "5052fd36ca972c31475cda872926faca163c8efc",
+    "bytes": 29086,
+    "sha256": "ead29f2f6d1f964cf89c2834e38af74cabf735ab8ee7bf9f942de48d121756d0"
+  },
+  "diffFromReviewedRunnerV2": {
+    "branchLiteralCount": 3,
+    "branchBefore": "ops/1512-native-read-diagnostic-20261109",
+    "branchAfter": "ops/1512-native-read-diagnostic-memory-20261109",
+    "concurrencyUnchanged": true,
+    "stepsDelta": [
+      {
+        "index": 3,
+        "name": "Verify the one-shot diagnostic source and request",
+        "runChanged": true,
+        "envBefore": null,
+        "envAfter": null
+      },
+      {
+        "index": 6,
+        "name": "Check diagnostic syntax and renderer types before building",
+        "runChanged": false,
+        "envBefore": null,
+        "envAfter": {
+          "NODE_OPTIONS": "--max-old-space-size=6144"
+        }
+      },
+      {
+        "index": 19,
+        "name": "Audit closed diagnostic control receipts",
+        "runChanged": true,
+        "envBefore": null,
+        "envAfter": null
+      }
+    ],
+    "exactReverseEqualsV2": true
+  },
+  "manifest": {
+    "sha": "0b14995605cfcfd80b45c660c593987ec5e9bd54",
+    "bytes": 1850,
+    "sha256": "00d6cbc0ccbec1aecbb0bd08d800c267a347014fe5a0c0fdfe0f2f0013e7c031",
+    "value": {
+      "version": 1,
+      "enabled": true,
+      "requestId": "07cc69c5-af6a-4da7-a689-9b802e286f46",
+      "createdAt": "2026-11-09T23:31:53.000Z",
+      "expiresAt": "2026-11-10T01:01:53.000Z",
+      "baseCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+      "baseTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+      "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+      "sourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+      "overlay": [
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "beforeBlob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+          "afterBlob": "c4f97ced534634c66a1d840618756464d020be4a"
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "beforeBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+          "afterBlob": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e"
+        },
+        {
+          "path": "apps/desktop/test/lifecycle.mjs",
+          "beforeBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+          "afterBlob": "fc876e7c863724e2048499dbccece9065b6766ff"
+        },
+        {
+          "path": "apps/desktop/test/read-diagnostics.mjs",
+          "beforeBlob": null,
+          "afterBlob": "c41bfc24156ef2b99c10ac08c393f4594b037048"
+        },
+        {
+          "path": "hooks/use-live-key.tsx",
+          "beforeBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+          "afterBlob": "4bf39ecfee54659a75e42456888ca4ee828b00e6"
+        },
+        {
+          "path": "lib/live/channel.ts",
+          "beforeBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+          "afterBlob": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95"
+        },
+        {
+          "path": "lib/swr/read-diagnostics.ts",
+          "beforeBlob": null,
+          "afterBlob": "7dd27cabdd495839bd578613fe36390b81cef69d"
+        },
+        {
+          "path": "lib/swr/read-observer.ts",
+          "beforeBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+          "afterBlob": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21"
+        }
+      ]
+    }
+  },
+  "executionCommitReadback": {
+    "sha": "33e9aea47726d3d83534d57345eab1f78181e0b6",
+    "node_id": "C_kwDOVRYxA9oAKDMzZTlhZWE0NzcyNmQzZDgzNTM0ZDU3MzQ1ZWFiMWY3ODE4MWUwYjY",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/33e9aea47726d3d83534d57345eab1f78181e0b6",
+    "html_url": "https://github.com/alexj11324/Mikka/commit/33e9aea47726d3d83534d57345eab1f78181e0b6",
+    "author": {
+      "name": "Zhixuan Jiang",
+      "email": "zhixuanj@andrew.cmu.edu",
+      "date": "2026-11-09T23:32:01Z"
+    },
+    "committer": {
+      "name": "Zhixuan Jiang",
+      "email": "zhixuanj@andrew.cmu.edu",
+      "date": "2026-11-09T23:32:01Z"
+    },
+    "tree": {
+      "sha": "a39f0e61c58c9319aff548a232152579322d3f8f",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/a39f0e61c58c9319aff548a232152579322d3f8f"
+    },
+    "message": "ci: diagnose native reads 07cc69c5-af6a-4da7-a689-9b802e286f46\n\nUse the reviewed source overlay unchanged. Give only the prebuild renderer typecheck the existing 6144 MiB build heap allowance after the first diagnostic stopped at V8 heap exhaustion. Preserve all application, query-window, fixture and acceptance commands. This is a fresh isolated diagnostic configuration, not a budget pass.",
+    "parents": [
+      {
+        "sha": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/668f1a3543f8d007d0b1cae655a2595c1cfa657f"
+      }
+    ],
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null,
+      "verified_at": null
+    }
+  },
+  "verification": {
+    "head": "33e9aea47726d3d83534d57345eab1f78181e0b6",
+    "tree": "a39f0e61c58c9319aff548a232152579322d3f8f",
+    "parent": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+    "sourceLeaves": 6842,
+    "executionLeaves": 6844,
+    "unchangedSourceLeaves": 6842,
+    "exactNewEntries": [
+      {
+        "path": ".github/issue1512-native-read-diagnostic.json",
+        "before": null,
+        "after": {
+          "sha": "0b14995605cfcfd80b45c660c593987ec5e9bd54",
+          "mode": "100644",
+          "type": "blob"
+        }
+      },
+      {
+        "path": ".github/workflows/issue1512-native-read-diagnostic.yml",
+        "before": null,
+        "after": {
+          "sha": "5052fd36ca972c31475cda872926faca163c8efc",
+          "mode": "100644",
+          "type": "blob"
+        }
+      }
+    ],
+    "gitDirectoriesRecomputed": 874,
+    "sourceBytesChanged": false,
+    "scope": "runner-only new memory configuration, unpublished",
+    "actualRuntimeExecuted": false
+  },
+  "observedAt": {
+    "current_time": "2026-11-09 23:32:10 UTC"
+  },
+  "firstRunFailureProof": {
+    "sha": "98bf9560e77b055655ec3a52eb3c87e833862b94",
+    "bytes": 33663,
+    "sha256": "f724cde7772109fff0d4842dacd6ffc8e00d8302a1fbeaf658b8688ffa3d1294"
+  },
+  "oldBranchClosedProof": {
+    "sha": "209eccf5d6d47166098c5fd99efa476102b7f26b",
+    "bytes": 36390,
+    "sha256": "cd262c59d56708609547ff5bbfc4a7f45ff76f9605ace250284398b6d856527b"
+  },
+  "remainingBoundary": {
+    "newBranchPublished": false,
+    "newRunDispatched": false,
+    "sourceOverlayChanged": false,
+    "measurementsChanged": false,
+    "gateThresholdsChanged": false,
+    "originalRRepeated": false,
+    "secondApplicationSample": 0,
+    "originalBudgetStill": "FAIL 424 > 358",
+    "productionCases": 0,
+    "resourcesRunning": 0
+  },
+  "authorizationBoundary": "Root approved preparation only; do not create the new ref until Root verifies exact R2/manifest and gives GO"
+}

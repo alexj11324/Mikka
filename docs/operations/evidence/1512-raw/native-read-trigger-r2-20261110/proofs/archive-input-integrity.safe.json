@@ -1,0 +1,623 @@
+{
+  "version": 1,
+  "kind": "CP52 archive input integrity verification",
+  "observedAtUtc": "2026-11-10 00:21:29 UTC",
+  "archivePrefix": "docs/operations/evidence/1512-raw/native-read-trigger-r2-20261110",
+  "base": {
+    "commit": "e7d42533c70fab962df2dbaa0e09f0cab75df9a4",
+    "tree": "1abe8e82fcad442a43aa3d78f70b98e65024bb8b",
+    "independentlyReconstructed": {
+      "sha": "1abe8e82fcad442a43aa3d78f70b98e65024bb8b",
+      "leaves": 8801,
+      "directories": 1483
+    },
+    "recursiveResponseTruncated": false
+  },
+  "verifiedInputEntries": 33,
+  "verifiedUniqueInputBlobs": 32,
+  "verifiedInputBytes": 5045021,
+  "allInputBytesSHA256AndGitBlobMatched": true,
+  "originalArtifactJSONs": [
+    {
+      "path": "originals/native/diagnostic-control/cleanup.json",
+      "artifactId": 13721851725,
+      "artifactMember": "diagnostic-control/cleanup.json",
+      "bytes": 457,
+      "gitBlob": "e102dff33e9b81c55e95abe97d984051009bec83",
+      "sha256": "19558ffce4d2f5904e8273339c949c5ee3584a8ee25c600e4c4c2a7dcebf2c8c",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/native/diagnostic-control/postgres-intent.json",
+      "artifactId": 13721851725,
+      "artifactMember": "diagnostic-control/postgres-intent.json",
+      "bytes": 223,
+      "gitBlob": "dd6e1d021f3fef1365aed5f82a75366d6410e124",
+      "sha256": "a78f85273912448c39ac42230454ac6c911fe3a1169210c39e890756c88d3eff",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/native/diagnostic-control/source-manifest.json",
+      "artifactId": 13721851725,
+      "artifactMember": "diagnostic-control/source-manifest.json",
+      "bytes": 1850,
+      "gitBlob": "0b14995605cfcfd80b45c660c593987ec5e9bd54",
+      "sha256": "00d6cbc0ccbec1aecbb0bd08d800c267a347014fe5a0c0fdfe0f2f0013e7c031",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/native/diagnostic-control/source.json",
+      "artifactId": 13721851725,
+      "artifactMember": "diagnostic-control/source.json",
+      "bytes": 2561,
+      "gitBlob": "42796f601fec861dfd8fa95e4fe0bdc55ee123ff",
+      "sha256": "687f677e7723db0d5cf511985b22308eae635062dc8c9c8d2a0989baaced11c7",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/native/lifecycle.json",
+      "artifactId": 13721851725,
+      "artifactMember": "lifecycle.json",
+      "bytes": 706933,
+      "gitBlob": "15b3e15cc4ad92d0cd3338fd6851c440939c7624",
+      "sha256": "d5eef68057897072cac81a04e42e3f9bf708dcad13fcf16911a391d4b23e3bae",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/native/parity/parity.json",
+      "artifactId": 13721851725,
+      "artifactMember": "parity/parity.json",
+      "bytes": 117887,
+      "gitBlob": "801639fc2c56133bf57bbc3e0d5f9b11b02b1d42",
+      "sha256": "a4cf234f5f71b6facd9afae731fe40796f887c1f637f8373f890e178fc13e477",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/native/read-diagnostics.json",
+      "artifactId": 13721851725,
+      "artifactMember": "read-diagnostics.json",
+      "bytes": 776126,
+      "gitBlob": "7e7b656971af2035ee889f7b6b614c7d329eb761",
+      "sha256": "bba298094faffd59b60c5567a551335014a1dfc58f3424013c2981d84525ae22",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/native/smoke.json",
+      "artifactId": 13721851725,
+      "artifactMember": "smoke.json",
+      "bytes": 3144,
+      "gitBlob": "a063c6ae005c3e534e6f06a83568e9f9710febb7",
+      "sha256": "e7475c7648871baab63318e6885c40de274c418998d0644ef846a1377711aced",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/package/mac-acceptance-package.json",
+      "artifactId": 13720574442,
+      "artifactMember": "mac-acceptance-package.json",
+      "bytes": 957,
+      "gitBlob": "2d54a61f0bcb8f063bbcf0e58be77dfd03fcb910",
+      "sha256": "e963d35dc8b286beabd7045c53011b877750d34bb6b5dabeac1f3a5e34e8c955",
+      "fullyParsed": true
+    },
+    {
+      "path": "originals/package/native-crypto.json",
+      "artifactId": 13720574442,
+      "artifactMember": "native-crypto.json",
+      "bytes": 2868,
+      "gitBlob": "31aa0b1b735747bf1506baaeb6fc49da372e4097",
+      "sha256": "19b7a0dba71293fcb22fcc0090664abd04573ec400db23fa0e45a72d98db52b2",
+      "fullyParsed": true
+    }
+  ],
+  "memberManifest": {
+    "gitBlob": "5ed3fcd9dab312ef3d83172a7f398f3a1128ac25",
+    "memberCount": 321,
+    "archives": 2,
+    "missingSelectedOriginals": 0,
+    "unselectedPNGPixelsNotReadByArchivist": true
+  },
+  "originalJobPlainWrapper": {
+    "plain": "6440a638f0f4c08bd5a91236d82aaaf91d5b204c",
+    "wrapper": "e4327e6425a1f59a257ca5cff5e978ae521baa88",
+    "exact": true,
+    "equalityPaths": [
+      "$.structuredContent.content"
+    ]
+  },
+  "sourceChecks": {
+    "run": true,
+    "attempt": true,
+    "source": true,
+    "sourceTree": true,
+    "base": true,
+    "baseTree": true,
+    "execution": true,
+    "executionTree": true,
+    "workflow": true,
+    "manifestSHA256": true,
+    "request": true,
+    "overlay": true
+  },
+  "idRepresentation": {
+    "sourceRunIdType": "string",
+    "indexRunIdType": "number",
+    "comparison": "exact decimal string equality; no ID rewrite"
+  },
+  "privacyScreen": {
+    "mode": "bounded-pattern-screen-on-frozen-Git-bytes; not semantic proof of absence",
+    "rules": [
+      {
+        "name": "private_key",
+        "source": "-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----",
+        "flags": "g"
+      },
+      {
+        "name": "github_token",
+        "source": "\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{30,})\\b",
+        "flags": "g"
+      },
+      {
+        "name": "aws_access_key",
+        "source": "\\b(?:AKIA|ASIA)[A-Z0-9]{16}\\b",
+        "flags": "g"
+      },
+      {
+        "name": "signed_download_url",
+        "source": "https?:\\/\\/[^\\s\"'\\\\<>]*(?:[?&](?:X-Amz-Signature|X-Amz-Credential|X-Goog-Signature|sig|se|token)=)[^\\s\"'\\\\<>]*",
+        "flags": "gi"
+      },
+      {
+        "name": "jwt",
+        "source": "\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{12,}\\.[A-Za-z0-9_-]{20,}\\b",
+        "flags": "g"
+      },
+      {
+        "name": "bearer_value",
+        "source": "\\bBearer[ \\t]+[A-Za-z0-9+/_=-]{24,}",
+        "flags": "gi"
+      },
+      {
+        "name": "named_api_secret",
+        "source": "\\b(?:sk-(?:proj-)?[A-Za-z0-9_-]{32,}|sb_secret_[A-Za-z0-9_-]{20,})\\b",
+        "flags": "g"
+      }
+    ],
+    "files": [
+      {
+        "gitBlob": "d6d4bdd83ce02ee4d4004cf73edb62e0cdc55f3d",
+        "bytes": 56439,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "5ed3fcd9dab312ef3d83172a7f398f3a1128ac25",
+        "bytes": 105426,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "8267c340995c682a169a6a864f26c8f964cfaceb",
+        "bytes": 41314,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "a6ee2f72264248782f865efbf8ce160ecf4516eb",
+        "bytes": 87513,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "141a7880086c2e483373f682d6dd87ff23946c61",
+        "bytes": 81458,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "74fc6902eda500bac0cd3bc1a091c6738ecf6fa5",
+        "bytes": 47632,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "29a2a88d168aa615d255b5d85ca8145ef8042411",
+        "bytes": 446690,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "e102dff33e9b81c55e95abe97d984051009bec83",
+        "bytes": 457,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "dd6e1d021f3fef1365aed5f82a75366d6410e124",
+        "bytes": 223,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "0b14995605cfcfd80b45c660c593987ec5e9bd54",
+        "bytes": 1850,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "42796f601fec861dfd8fa95e4fe0bdc55ee123ff",
+        "bytes": 2561,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "15b3e15cc4ad92d0cd3338fd6851c440939c7624",
+        "bytes": 706933,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "801639fc2c56133bf57bbc3e0d5f9b11b02b1d42",
+        "bytes": 117887,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "7e7b656971af2035ee889f7b6b614c7d329eb761",
+        "bytes": 776126,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "a063c6ae005c3e534e6f06a83568e9f9710febb7",
+        "bytes": 3144,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "2d54a61f0bcb8f063bbcf0e58be77dfd03fcb910",
+        "bytes": 957,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "31aa0b1b735747bf1506baaeb6fc49da372e4097",
+        "bytes": 2868,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "6440a638f0f4c08bd5a91236d82aaaf91d5b204c",
+        "bytes": 290684,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "e4327e6425a1f59a257ca5cff5e978ae521baa88",
+        "bytes": 309282,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "7c39d3a9b10787393ba93eab30c592bcadd9dbce",
+        "bytes": 76186,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "92aa0815233e9c52e7f3a8f2accd36b21075c4da",
+        "bytes": 78570,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "5052fd36ca972c31475cda872926faca163c8efc",
+        "bytes": 29086,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "b7cef55d44bc02a4f38201c3d58fa7a1aa88437f",
+        "bytes": 313906,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "9f5db50ade40d7b3324bf2842538fe2d5931d43c",
+        "bytes": 1349337,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "9a6d1a8bc3c4cc6facfe6f63f66d1fe32f03b43e",
+        "bytes": 6467,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "ffad962a9880b3d44316794ca8583d5e36d3b8ed",
+        "bytes": 7326,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "144428cde6f055521c54104a6ef175623008e8d2",
+        "bytes": 28973,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "943d0bf4486251ceb2f4cc32d58720dd20274431",
+        "bytes": 25232,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "a54dcbdefbb93c4616b33c0101bfa25ec5b9e93f",
+        "bytes": 43938,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "45786938f798ebf173cf8a583013c8a32ca4bee4",
+        "bytes": 1831,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "72c69767b65e8efce91ea47c6db85423344aea19",
+        "bytes": 1313,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      },
+      {
+        "gitBlob": "8208f883358a5f51116d337a03c4d52f5c4272a6",
+        "bytes": 1562,
+        "counts": {
+          "private_key": 0,
+          "github_token": 0,
+          "aws_access_key": 0,
+          "signed_download_url": 0,
+          "jwt": 0,
+          "bearer_value": 0,
+          "named_api_secret": 0
+        }
+      }
+    ],
+    "uniqueObjects": 32,
+    "positiveObjects": 0,
+    "limitations": "Closed credential/signature patterns only; public identifiers and exact original evidence are retained. No redaction or normalization of originals."
+  },
+  "readingBoundary": {
+    "GitBlobsRead": true,
+    "listedPublicCommentBodiesRead": true,
+    "newActionsOriginalLogReads": 0,
+    "newArtifactDownloads": 0,
+    "newTests": 0,
+    "newResources": 0,
+    "newProductionActions": 0
+  },
+  "noClaimOfNewExecution": "All run, PG, VM and generator results are preserved owner originals. This verification performs pure byte/hash/tree/JSON integrity checks, not a replay of tests or acceptance.",
+  "archiveScope": "Only this new prefix is to be added; existing base leaves must remain exact at commit verification.",
+  "excludedFromThisInputCount": [
+    "proofs/archive-input-integrity.safe.json",
+    "README.md",
+    "index.json"
+  ]
+}

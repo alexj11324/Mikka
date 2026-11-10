@@ -1,0 +1,328 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.native-read-diagnostic.r2.terminal-evidence-index",
+  "owner": "/root/native_diag_runner",
+  "completedAt": "2026-11-10 00:08:11 UTC",
+  "execution": {
+    "runId": 42721481301,
+    "attempt": 1,
+    "jobId": 129516256901,
+    "head": "33e9aea47726d3d83534d57345eab1f78181e0b6",
+    "tree": "a39f0e61c58c9319aff548a232152579322d3f8f",
+    "source": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+    "base": "d2c3f63448130443e3e10bb5304417162f585776",
+    "requestId": "07cc69c5-af6a-4da7-a689-9b802e286f46",
+    "workflowBlob": "5052fd36ca972c31475cda872926faca163c8efc",
+    "manifestBlob": "0b14995605cfcfd80b45c660c593987ec5e9bd54",
+    "publishedBranch": "ops/1512-native-read-diagnostic-memory-20261109",
+    "status": "completed",
+    "conclusion": "success",
+    "jobStartedAt": "2026-11-09T23:34:04Z",
+    "jobCompletedAt": "2026-11-09T23:53:29Z",
+    "terminalMetadataObservedAt": "2026-11-09 23:57:08 UTC"
+  },
+  "conclusions": {
+    "functional": "observed passed in original smoke/lifecycle/parity/native-crypto/package JSON and terminal metadata",
+    "diagnosticFullBudget": {
+      "native": 431,
+      "web": 427,
+      "difference": 4,
+      "passed": false
+    },
+    "diagnosticFirstBudget": {
+      "pair": 1,
+      "native": 201,
+      "hosted": 225,
+      "passed": true
+    },
+    "formalSourceBudget": {
+      "source": "d2c3f63448130443e3e10bb5304417162f585776",
+      "native": 424,
+      "web": 358,
+      "passed": false
+    },
+    "productionAcceptance": {
+      "passed": 0,
+      "required": 2
+    },
+    "readDiagnostic": {
+      "status": "incomplete",
+      "rows": 1505,
+      "counts": {
+        "droppedRows": 28,
+        "droppedBytes": 11147,
+        "invalidPackets": 1,
+        "missingDocuments": 0,
+        "duplicateSequences": 0,
+        "sequenceGaps": 0,
+        "sinkFailures": 0,
+        "pendingAtSnapshot": 0,
+        "keyOmissions": 0,
+        "scopeOmissions": 0,
+        "entityOmissions": 0,
+        "referenceOmissions": 0,
+        "actionOmissions": 0,
+        "schemaOther": 213,
+        "networkIdOmissions": 0,
+        "documentOmissions": 0,
+        "unsealedDocuments": 4,
+        "lateDocuments": 1
+      }
+    },
+    "daemon": {
+      "version": "0.0.566",
+      "revision": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c",
+      "priorBaselineVersion": "0.0.564"
+    },
+    "cannotExplainPriorD2cUnrecordedEvents": true
+  },
+  "originals": {
+    "jobLogPlain": {
+      "sha": "6440a638f0f4c08bd5a91236d82aaaf91d5b204c",
+      "bytes": 290684,
+      "sha256": "f053b85424ae12a47a22be0fe8385ae0fc682e5b45b4f04d12af3db605529cf4"
+    },
+    "jobLogToolWrapper": {
+      "sha": "e4327e6425a1f59a257ca5cff5e978ae521baa88",
+      "bytes": 309282,
+      "sha256": "d0ee7831f6b1ffb607c815f19a255e91010f5918c4fe18c64304f812b38ff5fe"
+    },
+    "artifactFiles": [
+      {
+        "name": "cleanup.json",
+        "sha": "e102dff33e9b81c55e95abe97d984051009bec83",
+        "bytes": 457,
+        "sha256": "19558ffce4d2f5904e8273339c949c5ee3584a8ee25c600e4c4c2a7dcebf2c8c"
+      },
+      {
+        "name": "postgres-intent.json",
+        "sha": "dd6e1d021f3fef1365aed5f82a75366d6410e124",
+        "bytes": 223,
+        "sha256": "a78f85273912448c39ac42230454ac6c911fe3a1169210c39e890756c88d3eff"
+      },
+      {
+        "name": "source-manifest.json",
+        "sha": "0b14995605cfcfd80b45c660c593987ec5e9bd54",
+        "bytes": 1850,
+        "sha256": "00d6cbc0ccbec1aecbb0bd08d800c267a347014fe5a0c0fdfe0f2f0013e7c031"
+      },
+      {
+        "name": "source.json",
+        "sha": "42796f601fec861dfd8fa95e4fe0bdc55ee123ff",
+        "bytes": 2561,
+        "sha256": "687f677e7723db0d5cf511985b22308eae635062dc8c9c8d2a0989baaced11c7"
+      },
+      {
+        "name": "lifecycle.json",
+        "sha": "15b3e15cc4ad92d0cd3338fd6851c440939c7624",
+        "bytes": 706933,
+        "sha256": "d5eef68057897072cac81a04e42e3f9bf708dcad13fcf16911a391d4b23e3bae"
+      },
+      {
+        "name": "parity.json",
+        "sha": "801639fc2c56133bf57bbc3e0d5f9b11b02b1d42",
+        "bytes": 117887,
+        "sha256": "a4cf234f5f71b6facd9afae731fe40796f887c1f637f8373f890e178fc13e477"
+      },
+      {
+        "name": "read-diagnostics.json",
+        "sha": "7e7b656971af2035ee889f7b6b614c7d329eb761",
+        "bytes": 776126,
+        "sha256": "bba298094faffd59b60c5567a551335014a1dfc58f3424013c2981d84525ae22"
+      },
+      {
+        "name": "smoke.json",
+        "sha": "a063c6ae005c3e534e6f06a83568e9f9710febb7",
+        "bytes": 3144,
+        "sha256": "e7475c7648871baab63318e6885c40de274c418998d0644ef846a1377711aced"
+      },
+      {
+        "name": "mac-acceptance-package.json",
+        "sha": "2d54a61f0bcb8f063bbcf0e58be77dfd03fcb910",
+        "bytes": 957,
+        "sha256": "e963d35dc8b286beabd7045c53011b877750d34bb6b5dabeac1f3a5e34e8c955"
+      },
+      {
+        "name": "native-crypto.json",
+        "sha": "31aa0b1b735747bf1506baaeb6fc49da372e4097",
+        "bytes": 2868,
+        "sha256": "19b7a0dba71293fcb22fcc0090664abd04573ec400db23fa0e45a72d98db52b2"
+      }
+    ],
+    "allFrozenOriginalsReadbackExact": true,
+    "artifactManifest": {
+      "sha": "5ed3fcd9dab312ef3d83172a7f398f3a1128ac25",
+      "bytes": 105426,
+      "sha256": "01d2c6fb134162a85b3bd0a2a09249b4bca245e09a44ee9e6af1fcb663882cbe",
+      "kind": "derived full 321-entry archive index with byte lengths, SHA256, Git blob SHA1, CRC and compressed sizes"
+    },
+    "archives": [
+      {
+        "artifactId": 13721851725,
+        "name": "desktop-native-evidence-33e9aea47726d3d83534d57345eab1f78181e0b6",
+        "kind": "native",
+        "bytes": 15195538,
+        "sha256": "38a36f132629ba46e6ee04cc37408ed45342f49bed77e921def19f4523a89e36",
+        "apiSize": 15195538,
+        "apiDigest": "sha256:38a36f132629ba46e6ee04cc37408ed45342f49bed77e921def19f4523a89e36",
+        "zipFile": "13721851725.original.zip",
+        "zipTestPassed": true,
+        "fileCount": 319
+      },
+      {
+        "artifactId": 13720574442,
+        "name": "desktop-package-evidence-33e9aea47726d3d83534d57345eab1f78181e0b6",
+        "kind": "package",
+        "bytes": 1599,
+        "sha256": "7c037615e8ddecc022e4fdf4e9628ebf2294842ade7c6c04b8599f84b0fa14cd",
+        "apiSize": 1599,
+        "apiDigest": "sha256:7c037615e8ddecc022e4fdf4e9628ebf2294842ade7c6c04b8599f84b0fa14cd",
+        "zipFile": "13720574442.original.zip",
+        "zipTestPassed": true,
+        "fileCount": 2
+      }
+    ],
+    "unselectedArtifactEntries": "All entries hashed and ZIP CRC checked; preserved per-entry metadata. This evidence index does not claim that PNG pixels were visually inspected.",
+    "readOwnership": {
+      "jobLogOriginalReads": 1,
+      "githubArtifactDownloads": 2,
+      "artifactIds": [
+        13721851725,
+        13720574442
+      ],
+      "noOtherAgentOriginalReadAuthorized": true
+    }
+  },
+  "proofs": {
+    "arithmeticAndSource": {
+      "sha": "8267c340995c682a169a6a864f26c8f964cfaceb",
+      "bytes": 41314,
+      "sha256": "07eee4d24e6ad88b56339fa3e56bfaab120bfd0752e1072a77e59c7bca992b33"
+    },
+    "resourcesAndClosedEntry": {
+      "sha": "a6ee2f72264248782f865efbf8ce160ecf4516eb",
+      "bytes": 87513,
+      "sha256": "51bbb95187d5c2e7afb81fb4f4ab448acf7d47046b9bd7482a2c57f29d2ea664"
+    },
+    "canonicalGenerator": {
+      "sha": "141a7880086c2e483373f682d6dd87ff23946c61",
+      "bytes": 81458,
+      "sha256": "f0431b00afe593c03c2595c9e8a6b2008984c18d60113ef1b27c5ab6a44d298f"
+    }
+  },
+  "canonicalGeneratedOriginals": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "bytes": 76186,
+      "sha256": "0eacc4ac8f6258041538ff10b542fd604bc9599ce967c8d0b958b42f30e1a9bb",
+      "gitBlob": "7c39d3a9b10787393ba93eab30c592bcadd9dbce"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 78570,
+      "sha256": "3ce809b4d2079d80b6425e9866220f3fee977c420f0774bb646d941e2be9a6c9",
+      "gitBlob": "92aa0815233e9c52e7f3a8f2accd36b21075c4da"
+    }
+  ],
+  "transfer": {
+    "path": "/vercel/sandbox/issue1512-r2/transfer.json.gz",
+    "gzipBytes": 174136,
+    "gzipSha256": "d16eb3aac3be410f72b0ef3d22eea54a63ce5c7058a0524f694497a692b28dbd",
+    "jsonBytes": 2086886,
+    "jsonSha256": "bcc907bbc9c2ee067f3fac313a18e11a033736c82c6c615c1e2307bef8d94490",
+    "chunkBytes": 1455,
+    "chunks": 120,
+    "chunksVerified": 120,
+    "originalFileCountVerified": 10,
+    "gzipCrcVerified": true,
+    "gzipSha256Verified": true,
+    "uncompressedJsonSha256Verified": true
+  },
+  "rawTerminalMetadata": {
+    "run": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "content": "{\"id\":42721481301,\"name\":\"Issue 1512 native read-trigger diagnosis\",\"node_id\":\"WFR_kwLOVRYxA88AAAAJ8mYSVQ\",\"head_branch\":\"ops/1512-native-read-diagnostic-memory-20261109\",\"head_sha\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\",\"path\":\".github/workflows/issue1512-native-read-diagnostic.yml\",\"display_title\":\"ci: diagnose native reads 07cc69c5-af6a-4da7-a689-9b802e286f46\",\"run_number\":3,\"event\":\"push\",\"status\":\"completed\",\"conclusion\":\"success\",\"workflow_id\":412683104,\"check_suite_id\":115707828758,\"check_suite_node_id\":\"CS_kwDOVRYxA88AAAAa8LlaFg\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301\",\"html_url\":\"https://github.com/alexj11324/Mikka/actions/runs/42721481301\",\"pull_requests\":[],\"created_at\":\"2026-11-09T23:34:00Z\",\"updated_at\":\"2026-11-09T23:53:29Z\",\"actor\":{\"login\":\"alexj11324\",\"id\":183887963,\"node_id\":\"U_kgDOCvXoWw\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/183887963?v=4\",\"gravatar_id\":\"\",\"url\":\"https://api.github.com/users/alexj11324\",\"html_url\":\"https://github.com/alexj11324\",\"followers_url\":\"https://api.github.com/users/alexj11324/followers\",\"following_url\":\"https://api.github.com/users/alexj11324/following{/other_user}\",\"gists_url\":\"https://api.github.com/users/alexj11324/gists{/gist_id}\",\"starred_url\":\"https://api.github.com/users/alexj11324/starred{/owner}{/repo}\",\"subscriptions_url\":\"https://api.github.com/users/alexj11324/subscriptions\",\"organizations_url\":\"https://api.github.com/users/alexj11324/orgs\",\"repos_url\":\"https://api.github.com/users/alexj11324/repos\",\"events_url\":\"https://api.github.com/users/alexj11324/events{/privacy}\",\"received_events_url\":\"https://api.github.com/users/alexj11324/received_events\",\"type\":\"User\",\"user_view_type\":\"public\",\"site_admin\":false},\"run_attempt\":1,\"referenced_workflows\":[],\"run_started_at\":\"2026-11-09T23:34:00Z\",\"triggering_actor\":{\"login\":\"alexj11324\",\"id\":183887963,\"node_id\":\"U_kgDOCvXoWw\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/183887963?v=4\",\"gravatar_id\":\"\",\"url\":\"https://api.github.com/users/alexj11324\",\"html_url\":\"https://github.com/alexj11324\",\"followers_url\":\"https://api.github.com/users/alexj11324/followers\",\"following_url\":\"https://api.github.com/users/alexj11324/following{/other_user}\",\"gists_url\":\"https://api.github.com/users/alexj11324/gists{/gist_id}\",\"starred_url\":\"https://api.github.com/users/alexj11324/starred{/owner}{/repo}\",\"subscriptions_url\":\"https://api.github.com/users/alexj11324/subscriptions\",\"organizations_url\":\"https://api.github.com/users/alexj11324/orgs\",\"repos_url\":\"https://api.github.com/users/alexj11324/repos\",\"events_url\":\"https://api.github.com/users/alexj11324/events{/privacy}\",\"received_events_url\":\"https://api.github.com/users/alexj11324/received_events\",\"type\":\"User\",\"user_view_type\":\"public\",\"site_admin\":false},\"jobs_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/jobs\",\"logs_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/logs\",\"check_suite_url\":\"https://api.github.com/repos/alexj11324/Mikka/check-suites/115707828758\",\"artifacts_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/artifacts\",\"cancel_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/cancel\",\"rerun_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/rerun\",\"previous_attempt_url\":null,\"workflow_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/workflows/412683104\",\"head_commit\":{\"id\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\",\"tree_id\":\"a39f0e61c58c9319aff548a232152579322d3f8f\",\"message\":\"ci: diagnose native reads 07cc69c5-af6a-4da7-a689-9b802e286f46\\n\\nUse the reviewed source overlay unchanged. Give only the prebuild renderer typecheck the existing 6144 MiB build heap allowance after the first diagnostic stopped at V8 heap exhaustion. Preserve all application, query-window, fixture and acceptance commands. This is a fresh isolated diagnostic configuration, not a budget pass.\",\"timestamp\":\"2026-11-09T23:32:01Z\",\"author\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\"},\"committer\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\"}},\"repository\":{\"id\":1427517699,\"node_id\":\"R_kgDOVRYxAw\",\"name\":\"Mikka\",\"full_name\":\"alexj11324/Mikka\",\"private\":false,\"owner\":{\"login\":\"alexj11324\",\"id\":183887963,\"node_id\":\"U_kgDOCvXoWw\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/183887963?v=4\",\"gravatar_id\":\"\",\"url\":\"https://api.github.com/users/alexj11324\",\"html_url\":\"https://github.com/alexj11324\",\"followers_url\":\"https://api.github.com/users/alexj11324/followers\",\"following_url\":\"https://api.github.com/users/alexj11324/following{/other_user}\",\"gists_url\":\"https://api.github.com/users/alexj11324/gists{/gist_id}\",\"starred_url\":\"https://api.github.com/users/alexj11324/starred{/owner}{/repo}\",\"subscriptions_url\":\"https://api.github.com/users/alexj11324/subscriptions\",\"organizations_url\":\"https://api.github.com/users/alexj11324/orgs\",\"repos_url\":\"https://api.github.com/users/alexj11324/repos\",\"events_url\":\"https://api.github.com/users/alexj11324/events{/privacy}\",\"received_events_url\":\"https://api.github.com/users/alexj11324/received_events\",\"type\":\"User\",\"user_view_type\":\"public\",\"site_admin\":false},\"html_url\":\"https://github.com/alexj11324/Mikka\",\"description\":null,\"fork\":false,\"url\":\"https://api.github.com/repos/alexj11324/Mikka\",\"forks_url\":\"https://api.github.com/repos/alexj11324/Mikka/forks\",\"keys_url\":\"https://api.github.com/repos/alexj11324/Mikka/keys{/key_id}\",\"collaborators_url\":\"https://api.github.com/repos/alexj11324/Mikka/collaborators{/collaborator}\",\"teams_url\":\"https://api.github.com/repos/alexj11324/Mikka/teams\",\"hooks_url\":\"https://api.github.com/repos/alexj11324/Mikka/hooks\",\"issue_events_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues/events{/number}\",\"events_url\":\"https://api.github.com/repos/alexj11324/Mikka/events\",\"assignees_url\":\"https://api.github.com/repos/alexj11324/Mikka/assignees{/user}\",\"branches_url\":\"https://api.github.com/repos/alexj11324/Mikka/branches{/branch}\",\"tags_url\":\"https://api.github.com/repos/alexj11324/Mikka/tags\",\"blobs_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/blobs{/sha}\",\"git_tags_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/tags{/sha}\",\"git_refs_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs{/sha}\",\"trees_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/trees{/sha}\",\"statuses_url\":\"https://api.github.com/repos/alexj11324/Mikka/statuses/{sha}\",\"languages_url\":\"https://api.github.com/repos/alexj11324/Mikka/languages\",\"stargazers_url\":\"https://api.github.com/repos/alexj11324/Mikka/stargazers\",\"contributors_url\":\"https://api.github.com/repos/alexj11324/Mikka/contributors\",\"subscribers_url\":\"https://api.github.com/repos/alexj11324/Mikka/subscribers\",\"subscription_url\":\"https://api.github.com/repos/alexj11324/Mikka/subscription\",\"commits_url\":\"https://api.github.com/repos/alexj11324/Mikka/commits{/sha}\",\"git_commits_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits{/sha}\",\"comments_url\":\"https://api.github.com/repos/alexj11324/Mikka/comments{/number}\",\"issue_comment_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues/comments{/number}\",\"contents_url\":\"https://api.github.com/repos/alexj11324/Mikka/contents/{+path}\",\"compare_url\":\"https://api.github.com/repos/alexj11324/Mikka/compare/{base}...{head}\",\"merges_url\":\"https://api.github.com/repos/alexj11324/Mikka/merges\",\"archive_url\":\"https://api.github.com/repos/alexj11324/Mikka/{archive_format}{/ref}\",\"downloads_url\":\"https://api.github.com/repos/alexj11324/Mikka/downloads\",\"issues_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues{/number}\",\"pulls_url\":\"https://api.github.com/repos/alexj11324/Mikka/pulls{/number}\",\"milestones_url\":\"https://api.github.com/repos/alexj11324/Mikka/milestones{/number}\",\"notifications_url\":\"https://api.github.com/repos/alexj11324/Mikka/notifications{?since,all,participating}\",\"labels_url\":\"https://api.github.com/repos/alexj11324/Mikka/labels{/name}\",\"releases_url\":\"https://api.github.com/repos/alexj11324/Mikka/releases{/id}\",\"deployments_url\":\"https://api.github.com/repos/alexj11324/Mikka/deployments\"},\"head_repository\":{\"id\":1427517699,\"node_id\":\"R_kgDOVRYxAw\",\"name\":\"Mikka\",\"full_name\":\"alexj11324/Mikka\",\"private\":false,\"owner\":{\"login\":\"alexj11324\",\"id\":183887963,\"node_id\":\"U_kgDOCvXoWw\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/183887963?v=4\",\"gravatar_id\":\"\",\"url\":\"https://api.github.com/users/alexj11324\",\"html_url\":\"https://github.com/alexj11324\",\"followers_url\":\"https://api.github.com/users/alexj11324/followers\",\"following_url\":\"https://api.github.com/users/alexj11324/following{/other_user}\",\"gists_url\":\"https://api.github.com/users/alexj11324/gists{/gist_id}\",\"starred_url\":\"https://api.github.com/users/alexj11324/starred{/owner}{/repo}\",\"subscriptions_url\":\"https://api.github.com/users/alexj11324/subscriptions\",\"organizations_url\":\"https://api.github.com/users/alexj11324/orgs\",\"repos_url\":\"https://api.github.com/users/alexj11324/repos\",\"events_url\":\"https://api.github.com/users/alexj11324/events{/privacy}\",\"received_events_url\":\"https://api.github.com/users/alexj11324/received_events\",\"type\":\"User\",\"user_view_type\":\"public\",\"site_admin\":false},\"html_url\":\"https://github.com/alexj11324/Mikka\",\"description\":null,\"fork\":false,\"url\":\"https://api.github.com/repos/alexj11324/Mikka\",\"forks_url\":\"https://api.github.com/repos/alexj11324/Mikka/forks\",\"keys_url\":\"https://api.github.com/repos/alexj11324/Mikka/keys{/key_id}\",\"collaborators_url\":\"https://api.github.com/repos/alexj11324/Mikka/collaborators{/collaborator}\",\"teams_url\":\"https://api.github.com/repos/alexj11324/Mikka/teams\",\"hooks_url\":\"https://api.github.com/repos/alexj11324/Mikka/hooks\",\"issue_events_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues/events{/number}\",\"events_url\":\"https://api.github.com/repos/alexj11324/Mikka/events\",\"assignees_url\":\"https://api.github.com/repos/alexj11324/Mikka/assignees{/user}\",\"branches_url\":\"https://api.github.com/repos/alexj11324/Mikka/branches{/branch}\",\"tags_url\":\"https://api.github.com/repos/alexj11324/Mikka/tags\",\"blobs_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/blobs{/sha}\",\"git_tags_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/tags{/sha}\",\"git_refs_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs{/sha}\",\"trees_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/trees{/sha}\",\"statuses_url\":\"https://api.github.com/repos/alexj11324/Mikka/statuses/{sha}\",\"languages_url\":\"https://api.github.com/repos/alexj11324/Mikka/languages\",\"stargazers_url\":\"https://api.github.com/repos/alexj11324/Mikka/stargazers\",\"contributors_url\":\"https://api.github.com/repos/alexj11324/Mikka/contributors\",\"subscribers_url\":\"https://api.github.com/repos/alexj11324/Mikka/subscribers\",\"subscription_url\":\"https://api.github.com/repos/alexj11324/Mikka/subscription\",\"commits_url\":\"https://api.github.com/repos/alexj11324/Mikka/commits{/sha}\",\"git_commits_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits{/sha}\",\"comments_url\":\"https://api.github.com/repos/alexj11324/Mikka/comments{/number}\",\"issue_comment_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues/comments{/number}\",\"contents_url\":\"https://api.github.com/repos/alexj11324/Mikka/contents/{+path}\",\"compare_url\":\"https://api.github.com/repos/alexj11324/Mikka/compare/{base}...{head}\",\"merges_url\":\"https://api.github.com/repos/alexj11324/Mikka/merges\",\"archive_url\":\"https://api.github.com/repos/alexj11324/Mikka/{archive_format}{/ref}\",\"downloads_url\":\"https://api.github.com/repos/alexj11324/Mikka/downloads\",\"issues_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues{/number}\",\"pulls_url\":\"https://api.github.com/repos/alexj11324/Mikka/pulls{/number}\",\"milestones_url\":\"https://api.github.com/repos/alexj11324/Mikka/milestones{/number}\",\"notifications_url\":\"https://api.github.com/repos/alexj11324/Mikka/notifications{?since,all,participating}\",\"labels_url\":\"https://api.github.com/repos/alexj11324/Mikka/labels{/name}\",\"releases_url\":\"https://api.github.com/repos/alexj11324/Mikka/releases{/id}\",\"deployments_url\":\"https://api.github.com/repos/alexj11324/Mikka/deployments\"}}",
+        "title": "42721481301",
+        "modified_date": null,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301",
+        "display_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301",
+        "display_title": "42721481301",
+        "structuredContent": {
+          "title": "42721481301",
+          "content": "{\"id\":42721481301,\"name\":\"Issue 1512 native read-trigger diagnosis\",\"node_id\":\"WFR_kwLOVRYxA88AAAAJ8mYSVQ\",\"head_branch\":\"ops/1512-native-read-diagnostic-memory-20261109\",\"head_sha\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\",\"path\":\".github/workflows/issue1512-native-read-diagnostic.yml\",\"display_title\":\"ci: diagnose native reads 07cc69c5-af6a-4da7-a689-9b802e286f46\",\"run_number\":3,\"event\":\"push\",\"status\":\"completed\",\"conclusion\":\"success\",\"workflow_id\":412683104,\"check_suite_id\":115707828758,\"check_suite_node_id\":\"CS_kwDOVRYxA88AAAAa8LlaFg\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301\",\"html_url\":\"https://github.com/alexj11324/Mikka/actions/runs/42721481301\",\"pull_requests\":[],\"created_at\":\"2026-11-09T23:34:00Z\",\"updated_at\":\"2026-11-09T23:53:29Z\",\"actor\":{\"login\":\"alexj11324\",\"id\":183887963,\"node_id\":\"U_kgDOCvXoWw\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/183887963?v=4\",\"gravatar_id\":\"\",\"url\":\"https://api.github.com/users/alexj11324\",\"html_url\":\"https://github.com/alexj11324\",\"followers_url\":\"https://api.github.com/users/alexj11324/followers\",\"following_url\":\"https://api.github.com/users/alexj11324/following{/other_user}\",\"gists_url\":\"https://api.github.com/users/alexj11324/gists{/gist_id}\",\"starred_url\":\"https://api.github.com/users/alexj11324/starred{/owner}{/repo}\",\"subscriptions_url\":\"https://api.github.com/users/alexj11324/subscriptions\",\"organizations_url\":\"https://api.github.com/users/alexj11324/orgs\",\"repos_url\":\"https://api.github.com/users/alexj11324/repos\",\"events_url\":\"https://api.github.com/users/alexj11324/events{/privacy}\",\"received_events_url\":\"https://api.github.com/users/alexj11324/received_events\",\"type\":\"User\",\"user_view_type\":\"public\",\"site_admin\":false},\"run_attempt\":1,\"referenced_workflows\":[],\"run_started_at\":\"2026-11-09T23:34:00Z\",\"triggering_actor\":{\"login\":\"alexj11324\",\"id\":183887963,\"node_id\":\"U_kgDOCvXoWw\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/183887963?v=4\",\"gravatar_id\":\"\",\"url\":\"https://api.github.com/users/alexj11324\",\"html_url\":\"https://github.com/alexj11324\",\"followers_url\":\"https://api.github.com/users/alexj11324/followers\",\"following_url\":\"https://api.github.com/users/alexj11324/following{/other_user}\",\"gists_url\":\"https://api.github.com/users/alexj11324/gists{/gist_id}\",\"starred_url\":\"https://api.github.com/users/alexj11324/starred{/owner}{/repo}\",\"subscriptions_url\":\"https://api.github.com/users/alexj11324/subscriptions\",\"organizations_url\":\"https://api.github.com/users/alexj11324/orgs\",\"repos_url\":\"https://api.github.com/users/alexj11324/repos\",\"events_url\":\"https://api.github.com/users/alexj11324/events{/privacy}\",\"received_events_url\":\"https://api.github.com/users/alexj11324/received_events\",\"type\":\"User\",\"user_view_type\":\"public\",\"site_admin\":false},\"jobs_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/jobs\",\"logs_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/logs\",\"check_suite_url\":\"https://api.github.com/repos/alexj11324/Mikka/check-suites/115707828758\",\"artifacts_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/artifacts\",\"cancel_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/cancel\",\"rerun_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/rerun\",\"previous_attempt_url\":null,\"workflow_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/workflows/412683104\",\"head_commit\":{\"id\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\",\"tree_id\":\"a39f0e61c58c9319aff548a232152579322d3f8f\",\"message\":\"ci: diagnose native reads 07cc69c5-af6a-4da7-a689-9b802e286f46\\n\\nUse the reviewed source overlay unchanged. Give only the prebuild renderer typecheck the existing 6144 MiB build heap allowance after the first diagnostic stopped at V8 heap exhaustion. Preserve all application, query-window, fixture and acceptance commands. This is a fresh isolated diagnostic configuration, not a budget pass.\",\"timestamp\":\"2026-11-09T23:32:01Z\",\"author\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\"},\"committer\":{\"name\":\"Zhixuan Jiang\",\"email\":\"zhixuanj@andrew.cmu.edu\"}},\"repository\":{\"id\":1427517699,\"node_id\":\"R_kgDOVRYxAw\",\"name\":\"Mikka\",\"full_name\":\"alexj11324/Mikka\",\"private\":false,\"owner\":{\"login\":\"alexj11324\",\"id\":183887963,\"node_id\":\"U_kgDOCvXoWw\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/183887963?v=4\",\"gravatar_id\":\"\",\"url\":\"https://api.github.com/users/alexj11324\",\"html_url\":\"https://github.com/alexj11324\",\"followers_url\":\"https://api.github.com/users/alexj11324/followers\",\"following_url\":\"https://api.github.com/users/alexj11324/following{/other_user}\",\"gists_url\":\"https://api.github.com/users/alexj11324/gists{/gist_id}\",\"starred_url\":\"https://api.github.com/users/alexj11324/starred{/owner}{/repo}\",\"subscriptions_url\":\"https://api.github.com/users/alexj11324/subscriptions\",\"organizations_url\":\"https://api.github.com/users/alexj11324/orgs\",\"repos_url\":\"https://api.github.com/users/alexj11324/repos\",\"events_url\":\"https://api.github.com/users/alexj11324/events{/privacy}\",\"received_events_url\":\"https://api.github.com/users/alexj11324/received_events\",\"type\":\"User\",\"user_view_type\":\"public\",\"site_admin\":false},\"html_url\":\"https://github.com/alexj11324/Mikka\",\"description\":null,\"fork\":false,\"url\":\"https://api.github.com/repos/alexj11324/Mikka\",\"forks_url\":\"https://api.github.com/repos/alexj11324/Mikka/forks\",\"keys_url\":\"https://api.github.com/repos/alexj11324/Mikka/keys{/key_id}\",\"collaborators_url\":\"https://api.github.com/repos/alexj11324/Mikka/collaborators{/collaborator}\",\"teams_url\":\"https://api.github.com/repos/alexj11324/Mikka/teams\",\"hooks_url\":\"https://api.github.com/repos/alexj11324/Mikka/hooks\",\"issue_events_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues/events{/number}\",\"events_url\":\"https://api.github.com/repos/alexj11324/Mikka/events\",\"assignees_url\":\"https://api.github.com/repos/alexj11324/Mikka/assignees{/user}\",\"branches_url\":\"https://api.github.com/repos/alexj11324/Mikka/branches{/branch}\",\"tags_url\":\"https://api.github.com/repos/alexj11324/Mikka/tags\",\"blobs_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/blobs{/sha}\",\"git_tags_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/tags{/sha}\",\"git_refs_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs{/sha}\",\"trees_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/trees{/sha}\",\"statuses_url\":\"https://api.github.com/repos/alexj11324/Mikka/statuses/{sha}\",\"languages_url\":\"https://api.github.com/repos/alexj11324/Mikka/languages\",\"stargazers_url\":\"https://api.github.com/repos/alexj11324/Mikka/stargazers\",\"contributors_url\":\"https://api.github.com/repos/alexj11324/Mikka/contributors\",\"subscribers_url\":\"https://api.github.com/repos/alexj11324/Mikka/subscribers\",\"subscription_url\":\"https://api.github.com/repos/alexj11324/Mikka/subscription\",\"commits_url\":\"https://api.github.com/repos/alexj11324/Mikka/commits{/sha}\",\"git_commits_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits{/sha}\",\"comments_url\":\"https://api.github.com/repos/alexj11324/Mikka/comments{/number}\",\"issue_comment_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues/comments{/number}\",\"contents_url\":\"https://api.github.com/repos/alexj11324/Mikka/contents/{+path}\",\"compare_url\":\"https://api.github.com/repos/alexj11324/Mikka/compare/{base}...{head}\",\"merges_url\":\"https://api.github.com/repos/alexj11324/Mikka/merges\",\"archive_url\":\"https://api.github.com/repos/alexj11324/Mikka/{archive_format}{/ref}\",\"downloads_url\":\"https://api.github.com/repos/alexj11324/Mikka/downloads\",\"issues_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues{/number}\",\"pulls_url\":\"https://api.github.com/repos/alexj11324/Mikka/pulls{/number}\",\"milestones_url\":\"https://api.github.com/repos/alexj11324/Mikka/milestones{/number}\",\"notifications_url\":\"https://api.github.com/repos/alexj11324/Mikka/notifications{?since,all,participating}\",\"labels_url\":\"https://api.github.com/repos/alexj11324/Mikka/labels{/name}\",\"releases_url\":\"https://api.github.com/repos/alexj11324/Mikka/releases{/id}\",\"deployments_url\":\"https://api.github.com/repos/alexj11324/Mikka/deployments\"},\"head_repository\":{\"id\":1427517699,\"node_id\":\"R_kgDOVRYxAw\",\"name\":\"Mikka\",\"full_name\":\"alexj11324/Mikka\",\"private\":false,\"owner\":{\"login\":\"alexj11324\",\"id\":183887963,\"node_id\":\"U_kgDOCvXoWw\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/183887963?v=4\",\"gravatar_id\":\"\",\"url\":\"https://api.github.com/users/alexj11324\",\"html_url\":\"https://github.com/alexj11324\",\"followers_url\":\"https://api.github.com/users/alexj11324/followers\",\"following_url\":\"https://api.github.com/users/alexj11324/following{/other_user}\",\"gists_url\":\"https://api.github.com/users/alexj11324/gists{/gist_id}\",\"starred_url\":\"https://api.github.com/users/alexj11324/starred{/owner}{/repo}\",\"subscriptions_url\":\"https://api.github.com/users/alexj11324/subscriptions\",\"organizations_url\":\"https://api.github.com/users/alexj11324/orgs\",\"repos_url\":\"https://api.github.com/users/alexj11324/repos\",\"events_url\":\"https://api.github.com/users/alexj11324/events{/privacy}\",\"received_events_url\":\"https://api.github.com/users/alexj11324/received_events\",\"type\":\"User\",\"user_view_type\":\"public\",\"site_admin\":false},\"html_url\":\"https://github.com/alexj11324/Mikka\",\"description\":null,\"fork\":false,\"url\":\"https://api.github.com/repos/alexj11324/Mikka\",\"forks_url\":\"https://api.github.com/repos/alexj11324/Mikka/forks\",\"keys_url\":\"https://api.github.com/repos/alexj11324/Mikka/keys{/key_id}\",\"collaborators_url\":\"https://api.github.com/repos/alexj11324/Mikka/collaborators{/collaborator}\",\"teams_url\":\"https://api.github.com/repos/alexj11324/Mikka/teams\",\"hooks_url\":\"https://api.github.com/repos/alexj11324/Mikka/hooks\",\"issue_events_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues/events{/number}\",\"events_url\":\"https://api.github.com/repos/alexj11324/Mikka/events\",\"assignees_url\":\"https://api.github.com/repos/alexj11324/Mikka/assignees{/user}\",\"branches_url\":\"https://api.github.com/repos/alexj11324/Mikka/branches{/branch}\",\"tags_url\":\"https://api.github.com/repos/alexj11324/Mikka/tags\",\"blobs_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/blobs{/sha}\",\"git_tags_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/tags{/sha}\",\"git_refs_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/refs{/sha}\",\"trees_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/trees{/sha}\",\"statuses_url\":\"https://api.github.com/repos/alexj11324/Mikka/statuses/{sha}\",\"languages_url\":\"https://api.github.com/repos/alexj11324/Mikka/languages\",\"stargazers_url\":\"https://api.github.com/repos/alexj11324/Mikka/stargazers\",\"contributors_url\":\"https://api.github.com/repos/alexj11324/Mikka/contributors\",\"subscribers_url\":\"https://api.github.com/repos/alexj11324/Mikka/subscribers\",\"subscription_url\":\"https://api.github.com/repos/alexj11324/Mikka/subscription\",\"commits_url\":\"https://api.github.com/repos/alexj11324/Mikka/commits{/sha}\",\"git_commits_url\":\"https://api.github.com/repos/alexj11324/Mikka/git/commits{/sha}\",\"comments_url\":\"https://api.github.com/repos/alexj11324/Mikka/comments{/number}\",\"issue_comment_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues/comments{/number}\",\"contents_url\":\"https://api.github.com/repos/alexj11324/Mikka/contents/{+path}\",\"compare_url\":\"https://api.github.com/repos/alexj11324/Mikka/compare/{base}...{head}\",\"merges_url\":\"https://api.github.com/repos/alexj11324/Mikka/merges\",\"archive_url\":\"https://api.github.com/repos/alexj11324/Mikka/{archive_format}{/ref}\",\"downloads_url\":\"https://api.github.com/repos/alexj11324/Mikka/downloads\",\"issues_url\":\"https://api.github.com/repos/alexj11324/Mikka/issues{/number}\",\"pulls_url\":\"https://api.github.com/repos/alexj11324/Mikka/pulls{/number}\",\"milestones_url\":\"https://api.github.com/repos/alexj11324/Mikka/milestones{/number}\",\"notifications_url\":\"https://api.github.com/repos/alexj11324/Mikka/notifications{?since,all,participating}\",\"labels_url\":\"https://api.github.com/repos/alexj11324/Mikka/labels{/name}\",\"releases_url\":\"https://api.github.com/repos/alexj11324/Mikka/releases{/id}\",\"deployments_url\":\"https://api.github.com/repos/alexj11324/Mikka/deployments\"}}",
+          "display_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301"
+        }
+      },
+      "isError": false
+    },
+    "jobs": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "content": "{\"total_count\":1,\"jobs\":[{\"id\":129516256901,\"run_id\":42721481301,\"workflow_name\":\"Issue 1512 native read-trigger diagnosis\",\"head_branch\":\"ops/1512-native-read-diagnostic-memory-20261109\",\"run_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301\",\"run_attempt\":1,\"node_id\":\"CR_kwDOVRYxA88AAAAeJ8U-hQ\",\"head_sha\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129516256901\",\"html_url\":\"https://github.com/alexj11324/Mikka/actions/runs/42721481301/job/129516256901\",\"status\":\"completed\",\"conclusion\":\"success\",\"created_at\":\"2026-11-09T23:34:01Z\",\"started_at\":\"2026-11-09T23:34:04Z\",\"completed_at\":\"2026-11-09T23:53:29Z\",\"name\":\"Isolated native read-trigger diagnosis\",\"steps\":[{\"name\":\"Set up job\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":1,\"started_at\":\"2026-11-09T23:34:05Z\",\"completed_at\":\"2026-11-09T23:34:07Z\"},{\"name\":\"Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":2,\"started_at\":\"2026-11-09T23:34:07Z\",\"completed_at\":\"2026-11-09T23:34:13Z\"},{\"name\":\"Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":3,\"started_at\":\"2026-11-09T23:34:13Z\",\"completed_at\":\"2026-11-09T23:34:16Z\"},{\"name\":\"Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":4,\"started_at\":\"2026-11-09T23:34:16Z\",\"completed_at\":\"2026-11-09T23:35:37Z\"},{\"name\":\"Verify the one-shot diagnostic source and request\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":5,\"started_at\":\"2026-11-09T23:35:37Z\",\"completed_at\":\"2026-11-09T23:35:39Z\"},{\"name\":\"Run test \\\"$(uname -m)\\\" = arm64\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":6,\"started_at\":\"2026-11-09T23:35:39Z\",\"completed_at\":\"2026-11-09T23:35:39Z\"},{\"name\":\"Run pnpm install --frozen-lockfile\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":7,\"started_at\":\"2026-11-09T23:35:39Z\",\"completed_at\":\"2026-11-09T23:37:44Z\"},{\"name\":\"Check diagnostic syntax and renderer types before building\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":8,\"started_at\":\"2026-11-09T23:37:44Z\",\"completed_at\":\"2026-11-09T23:38:56Z\"},{\"name\":\"Keep setup-node 24 in the native installer login shell\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":9,\"started_at\":\"2026-11-09T23:38:56Z\",\"completed_at\":\"2026-11-09T23:38:58Z\"},{\"name\":\"Prepare the pinned native Electron and builder checksum cache\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":10,\"started_at\":\"2026-11-09T23:38:58Z\",\"completed_at\":\"2026-11-09T23:39:03Z\"},{\"name\":\"Run pnpm exec playwright install chromium\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":11,\"started_at\":\"2026-11-09T23:39:03Z\",\"completed_at\":\"2026-11-09T23:39:21Z\"},{\"name\":\"Start an independent local PostgreSQL\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":12,\"started_at\":\"2026-11-09T23:39:21Z\",\"completed_at\":\"2026-11-09T23:39:49Z\"},{\"name\":\"Generate ephemeral test-only auth secret\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":13,\"started_at\":\"2026-11-09T23:39:49Z\",\"completed_at\":\"2026-11-09T23:39:50Z\"},{\"name\":\"Run pnpm migrate && pnpm test:e2e:setup\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":14,\"started_at\":\"2026-11-09T23:39:50Z\",\"completed_at\":\"2026-11-09T23:39:55Z\"},{\"name\":\"Build the production API for the native ARM64 runtime\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":15,\"started_at\":\"2026-11-09T23:39:55Z\",\"completed_at\":\"2026-11-09T23:43:17Z\"},{\"name\":\"Select Xcode 26\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":16,\"started_at\":\"2026-11-09T23:43:17Z\",\"completed_at\":\"2026-11-09T23:43:17Z\"},{\"name\":\"Package an inspector-enabled harness input\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":17,\"started_at\":\"2026-11-09T23:43:17Z\",\"completed_at\":\"2026-11-09T23:44:22Z\"},{\"name\":\"Real Keychain encryption across three independent packaged processes\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":18,\"started_at\":\"2026-11-09T23:44:22Z\",\"completed_at\":\"2026-11-09T23:44:34Z\"},{\"name\":\"Real packaged Apple Silicon native acceptance\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":19,\"started_at\":\"2026-11-09T23:44:34Z\",\"completed_at\":\"2026-11-09T23:53:09Z\"},{\"name\":\"Stop only this diagnostic run's PostgreSQL\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":20,\"started_at\":\"2026-11-09T23:53:09Z\",\"completed_at\":\"2026-11-09T23:53:16Z\"},{\"name\":\"Audit closed diagnostic control receipts\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":21,\"started_at\":\"2026-11-09T23:53:16Z\",\"completed_at\":\"2026-11-09T23:53:16Z\"},{\"name\":\"Keep final package integrity evidence\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":22,\"started_at\":\"2026-11-09T23:53:16Z\",\"completed_at\":\"2026-11-09T23:53:16Z\"},{\"name\":\"Audit closed package and crypto reports\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":23,\"started_at\":\"2026-11-09T23:53:16Z\",\"completed_at\":\"2026-11-09T23:53:17Z\"},{\"name\":\"Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":24,\"started_at\":\"2026-11-09T23:53:17Z\",\"completed_at\":\"2026-11-09T23:53:19Z\"},{\"name\":\"Audit the closed read-trigger diagnostic\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":25,\"started_at\":\"2026-11-09T23:53:19Z\",\"completed_at\":\"2026-11-09T23:53:19Z\"},{\"name\":\"Audit native evidence\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":26,\"started_at\":\"2026-11-09T23:53:19Z\",\"completed_at\":\"2026-11-09T23:53:20Z\"},{\"name\":\"Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":27,\"started_at\":\"2026-11-09T23:53:20Z\",\"completed_at\":\"2026-11-09T23:53:23Z\"},{\"name\":\"Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":52,\"started_at\":\"2026-11-09T23:53:23Z\",\"completed_at\":\"2026-11-09T23:53:24Z\"},{\"name\":\"Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":53,\"started_at\":\"2026-11-09T23:53:24Z\",\"completed_at\":\"2026-11-09T23:53:24Z\"},{\"name\":\"Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":54,\"started_at\":\"2026-11-09T23:53:24Z\",\"completed_at\":\"2026-11-09T23:53:25Z\"},{\"name\":\"Complete job\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":55,\"started_at\":\"2026-11-09T23:53:25Z\",\"completed_at\":\"2026-11-09T23:53:27Z\"}],\"check_run_url\":\"https://api.github.com/repos/alexj11324/Mikka/check-runs/129516256901\",\"labels\":[\"macos-26\"],\"runner_id\":1000240851,\"runner_name\":\"GitHub Actions 1000240851\",\"runner_group_id\":0,\"runner_group_name\":\"GitHub Actions\"}]}",
+        "title": "jobs",
+        "modified_date": null,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/jobs?per_page=100&filter=all",
+        "display_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/jobs?per_page=100&filter=all",
+        "display_title": "jobs",
+        "structuredContent": {
+          "title": "jobs",
+          "content": "{\"total_count\":1,\"jobs\":[{\"id\":129516256901,\"run_id\":42721481301,\"workflow_name\":\"Issue 1512 native read-trigger diagnosis\",\"head_branch\":\"ops/1512-native-read-diagnostic-memory-20261109\",\"run_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301\",\"run_attempt\":1,\"node_id\":\"CR_kwDOVRYxA88AAAAeJ8U-hQ\",\"head_sha\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\",\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129516256901\",\"html_url\":\"https://github.com/alexj11324/Mikka/actions/runs/42721481301/job/129516256901\",\"status\":\"completed\",\"conclusion\":\"success\",\"created_at\":\"2026-11-09T23:34:01Z\",\"started_at\":\"2026-11-09T23:34:04Z\",\"completed_at\":\"2026-11-09T23:53:29Z\",\"name\":\"Isolated native read-trigger diagnosis\",\"steps\":[{\"name\":\"Set up job\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":1,\"started_at\":\"2026-11-09T23:34:05Z\",\"completed_at\":\"2026-11-09T23:34:07Z\"},{\"name\":\"Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":2,\"started_at\":\"2026-11-09T23:34:07Z\",\"completed_at\":\"2026-11-09T23:34:13Z\"},{\"name\":\"Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":3,\"started_at\":\"2026-11-09T23:34:13Z\",\"completed_at\":\"2026-11-09T23:34:16Z\"},{\"name\":\"Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":4,\"started_at\":\"2026-11-09T23:34:16Z\",\"completed_at\":\"2026-11-09T23:35:37Z\"},{\"name\":\"Verify the one-shot diagnostic source and request\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":5,\"started_at\":\"2026-11-09T23:35:37Z\",\"completed_at\":\"2026-11-09T23:35:39Z\"},{\"name\":\"Run test \\\"$(uname -m)\\\" = arm64\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":6,\"started_at\":\"2026-11-09T23:35:39Z\",\"completed_at\":\"2026-11-09T23:35:39Z\"},{\"name\":\"Run pnpm install --frozen-lockfile\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":7,\"started_at\":\"2026-11-09T23:35:39Z\",\"completed_at\":\"2026-11-09T23:37:44Z\"},{\"name\":\"Check diagnostic syntax and renderer types before building\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":8,\"started_at\":\"2026-11-09T23:37:44Z\",\"completed_at\":\"2026-11-09T23:38:56Z\"},{\"name\":\"Keep setup-node 24 in the native installer login shell\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":9,\"started_at\":\"2026-11-09T23:38:56Z\",\"completed_at\":\"2026-11-09T23:38:58Z\"},{\"name\":\"Prepare the pinned native Electron and builder checksum cache\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":10,\"started_at\":\"2026-11-09T23:38:58Z\",\"completed_at\":\"2026-11-09T23:39:03Z\"},{\"name\":\"Run pnpm exec playwright install chromium\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":11,\"started_at\":\"2026-11-09T23:39:03Z\",\"completed_at\":\"2026-11-09T23:39:21Z\"},{\"name\":\"Start an independent local PostgreSQL\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":12,\"started_at\":\"2026-11-09T23:39:21Z\",\"completed_at\":\"2026-11-09T23:39:49Z\"},{\"name\":\"Generate ephemeral test-only auth secret\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":13,\"started_at\":\"2026-11-09T23:39:49Z\",\"completed_at\":\"2026-11-09T23:39:50Z\"},{\"name\":\"Run pnpm migrate && pnpm test:e2e:setup\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":14,\"started_at\":\"2026-11-09T23:39:50Z\",\"completed_at\":\"2026-11-09T23:39:55Z\"},{\"name\":\"Build the production API for the native ARM64 runtime\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":15,\"started_at\":\"2026-11-09T23:39:55Z\",\"completed_at\":\"2026-11-09T23:43:17Z\"},{\"name\":\"Select Xcode 26\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":16,\"started_at\":\"2026-11-09T23:43:17Z\",\"completed_at\":\"2026-11-09T23:43:17Z\"},{\"name\":\"Package an inspector-enabled harness input\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":17,\"started_at\":\"2026-11-09T23:43:17Z\",\"completed_at\":\"2026-11-09T23:44:22Z\"},{\"name\":\"Real Keychain encryption across three independent packaged processes\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":18,\"started_at\":\"2026-11-09T23:44:22Z\",\"completed_at\":\"2026-11-09T23:44:34Z\"},{\"name\":\"Real packaged Apple Silicon native acceptance\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":19,\"started_at\":\"2026-11-09T23:44:34Z\",\"completed_at\":\"2026-11-09T23:53:09Z\"},{\"name\":\"Stop only this diagnostic run's PostgreSQL\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":20,\"started_at\":\"2026-11-09T23:53:09Z\",\"completed_at\":\"2026-11-09T23:53:16Z\"},{\"name\":\"Audit closed diagnostic control receipts\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":21,\"started_at\":\"2026-11-09T23:53:16Z\",\"completed_at\":\"2026-11-09T23:53:16Z\"},{\"name\":\"Keep final package integrity evidence\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":22,\"started_at\":\"2026-11-09T23:53:16Z\",\"completed_at\":\"2026-11-09T23:53:16Z\"},{\"name\":\"Audit closed package and crypto reports\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":23,\"started_at\":\"2026-11-09T23:53:16Z\",\"completed_at\":\"2026-11-09T23:53:17Z\"},{\"name\":\"Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":24,\"started_at\":\"2026-11-09T23:53:17Z\",\"completed_at\":\"2026-11-09T23:53:19Z\"},{\"name\":\"Audit the closed read-trigger diagnostic\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":25,\"started_at\":\"2026-11-09T23:53:19Z\",\"completed_at\":\"2026-11-09T23:53:19Z\"},{\"name\":\"Audit native evidence\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":26,\"started_at\":\"2026-11-09T23:53:19Z\",\"completed_at\":\"2026-11-09T23:53:20Z\"},{\"name\":\"Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":27,\"started_at\":\"2026-11-09T23:53:20Z\",\"completed_at\":\"2026-11-09T23:53:23Z\"},{\"name\":\"Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":52,\"started_at\":\"2026-11-09T23:53:23Z\",\"completed_at\":\"2026-11-09T23:53:24Z\"},{\"name\":\"Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":53,\"started_at\":\"2026-11-09T23:53:24Z\",\"completed_at\":\"2026-11-09T23:53:24Z\"},{\"name\":\"Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":54,\"started_at\":\"2026-11-09T23:53:24Z\",\"completed_at\":\"2026-11-09T23:53:25Z\"},{\"name\":\"Complete job\",\"status\":\"completed\",\"conclusion\":\"success\",\"number\":55,\"started_at\":\"2026-11-09T23:53:25Z\",\"completed_at\":\"2026-11-09T23:53:27Z\"}],\"check_run_url\":\"https://api.github.com/repos/alexj11324/Mikka/check-runs/129516256901\",\"labels\":[\"macos-26\"],\"runner_id\":1000240851,\"runner_name\":\"GitHub Actions 1000240851\",\"runner_group_id\":0,\"runner_group_name\":\"GitHub Actions\"}]}",
+          "display_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/jobs?per_page=100&filter=all"
+        }
+      },
+      "isError": false
+    },
+    "artifacts": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "content": "{\"total_count\":2,\"artifacts\":[{\"id\":13721851725,\"node_id\":\"MDg6QXJ0aWZhY3QxMzcyMTg1MTcyNQ==\",\"name\":\"desktop-native-evidence-33e9aea47726d3d83534d57345eab1f78181e0b6\",\"size_in_bytes\":15195538,\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13721851725\",\"archive_download_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13721851725/zip\",\"expired\":false,\"digest\":\"sha256:38a36f132629ba46e6ee04cc37408ed45342f49bed77e921def19f4523a89e36\",\"created_at\":\"2026-11-09T23:53:23Z\",\"updated_at\":\"2026-11-09T23:53:23Z\",\"expires_at\":\"2026-11-16T23:53:21Z\",\"workflow_run\":{\"id\":42721481301,\"repository_id\":1427517699,\"head_repository_id\":1427517699,\"head_branch\":\"ops/1512-native-read-diagnostic-memory-20261109\",\"head_sha\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\"}},{\"id\":13720574442,\"node_id\":\"MDg6QXJ0aWZhY3QxMzcyMDU3NDQ0Mg==\",\"name\":\"desktop-package-evidence-33e9aea47726d3d83534d57345eab1f78181e0b6\",\"size_in_bytes\":1599,\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13720574442\",\"archive_download_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13720574442/zip\",\"expired\":false,\"digest\":\"sha256:7c037615e8ddecc022e4fdf4e9628ebf2294842ade7c6c04b8599f84b0fa14cd\",\"created_at\":\"2026-11-09T23:53:19Z\",\"updated_at\":\"2026-11-09T23:53:19Z\",\"expires_at\":\"2026-11-16T23:53:17Z\",\"workflow_run\":{\"id\":42721481301,\"repository_id\":1427517699,\"head_repository_id\":1427517699,\"head_branch\":\"ops/1512-native-read-diagnostic-memory-20261109\",\"head_sha\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\"}}]}",
+        "title": "artifacts",
+        "modified_date": null,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/artifacts?per_page=100",
+        "display_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/artifacts?per_page=100",
+        "display_title": "artifacts",
+        "structuredContent": {
+          "title": "artifacts",
+          "content": "{\"total_count\":2,\"artifacts\":[{\"id\":13721851725,\"node_id\":\"MDg6QXJ0aWZhY3QxMzcyMTg1MTcyNQ==\",\"name\":\"desktop-native-evidence-33e9aea47726d3d83534d57345eab1f78181e0b6\",\"size_in_bytes\":15195538,\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13721851725\",\"archive_download_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13721851725/zip\",\"expired\":false,\"digest\":\"sha256:38a36f132629ba46e6ee04cc37408ed45342f49bed77e921def19f4523a89e36\",\"created_at\":\"2026-11-09T23:53:23Z\",\"updated_at\":\"2026-11-09T23:53:23Z\",\"expires_at\":\"2026-11-16T23:53:21Z\",\"workflow_run\":{\"id\":42721481301,\"repository_id\":1427517699,\"head_repository_id\":1427517699,\"head_branch\":\"ops/1512-native-read-diagnostic-memory-20261109\",\"head_sha\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\"}},{\"id\":13720574442,\"node_id\":\"MDg6QXJ0aWZhY3QxMzcyMDU3NDQ0Mg==\",\"name\":\"desktop-package-evidence-33e9aea47726d3d83534d57345eab1f78181e0b6\",\"size_in_bytes\":1599,\"url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13720574442\",\"archive_download_url\":\"https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13720574442/zip\",\"expired\":false,\"digest\":\"sha256:7c037615e8ddecc022e4fdf4e9628ebf2294842ade7c6c04b8599f84b0fa14cd\",\"created_at\":\"2026-11-09T23:53:19Z\",\"updated_at\":\"2026-11-09T23:53:19Z\",\"expires_at\":\"2026-11-16T23:53:17Z\",\"workflow_run\":{\"id\":42721481301,\"repository_id\":1427517699,\"head_repository_id\":1427517699,\"head_branch\":\"ops/1512-native-read-diagnostic-memory-20261109\",\"head_sha\":\"33e9aea47726d3d83534d57345eab1f78181e0b6\"}}]}",
+          "display_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42721481301/artifacts?per_page=100"
+        }
+      },
+      "isError": false
+    }
+  },
+  "operatorScope": {
+    "sourceChangedDuringExecution": false,
+    "applicationRevisionAlwaysR2": true,
+    "temporarySourceOverlayPromoted": false,
+    "sameR2Rerun": false,
+    "mainPR1799EvidenceRefWritten": false,
+    "ownedVMsRunning": 0,
+    "entryEnabled": false,
+    "closingHead": "9a48da1e514fc6f805078607b43630e2d779aba0",
+    "closingRun": 42725531132,
+    "closingJob": 129530076910,
+    "closingRunAndJobSkipped": true
+  },
+  "limitations": [
+    "Only metadata and authorized audited artifacts were inspected. No raw arguments, messages, headers, cookies, URL query strings or live production credentials were added to diagnostic capture.",
+    "Observation counters include explicit invalid, dropped and unsealed records; no complete causal trace is claimed.",
+    "Canonical generator ran once using fixed 244-file source input and TypeScript 5.9.3, under actual Node 24.22.1; it is a separate source-generation check, not a business run.",
+    "Original formal budget and production acceptance gates remain unmet."
+  ]
+}
