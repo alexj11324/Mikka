@@ -319,10 +319,11 @@ test('settings API exposes connection/install state and never credentials', asyn
   const result = await response.json()
   assert.equal(result.installed, true)
   assert.equal(result.viewerId, 'person-1')
+  assert.equal(result.githubAccountId, '42')
   assert.equal('userId' in result, false)
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
   answer = url => url.pathname === '/user' ? json({ id: 42 }) : json({ installations: [] })
-  assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: true, login: null, installed: false, repositories: [] })
+  assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: true, githubAccountId: '42', login: null, installed: false, repositories: [] })
   accounts = []
   assert.deepEqual(await (await call()).json(), { viewerId: 'person-1', configured: true, connected: false, installed: false, repositories: [] })
   // Link GitHub is offered only when the connect route can start GitHub's authorization.

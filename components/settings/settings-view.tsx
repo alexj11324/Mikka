@@ -10,6 +10,7 @@ import { ApiAndSubscriptions } from '@ui-slot/settings-models'
 import { SecurityAndSignIn } from '@ui-slot/settings-security'
 import { PreferencesSettings } from '@ui-slot/settings-preferences'
 import { WorkspaceGeneral } from '@ui-slot/settings-general'
+import * as membersSlot from '@ui-slot/settings-members'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
 import { MembersPanel } from '@/components/settings/members-panel'
@@ -93,6 +94,14 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   }, [preview, roleKnown, resolvedWorkspaceId, section, cache, mutate])
   const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
+  // A UI layer may draw 成员 and 团队 as one page with two tabs (slot settings-members); otherwise each keeps its own.
+  const MembersScreen = membersSlot.MembersScreen ?? null
+  const LayerMembers = MembersScreen && routedBody && !preview ? MembersScreen : null
+  const openSection = (next: SettingsSectionId) => {
+    const href = settingsHref(next, workspaceId)
+    if (!activeSection) setSection(next)
+    else if (!pushSettingsHistory(href, workspaceId)) router.push(href)
+  }
   // Switching sections fades the new one in briefly; the section the page opened on does not (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md).
   const firstSection = useRef(section)
   const switched = useRef(false)
@@ -104,7 +113,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
     <SettingsContentFrame parent={t('title')} title={title}>
 
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
-      {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
+      {LayerMembers ? <SettingsContent className="gap-6 max-md:pt-1">{team && resolvedWorkspaceId ? <LayerMembers key={resolvedWorkspaceId} section={section === 'teams' ? 'teams' : 'members'} workspaceId={resolvedWorkspaceId} inviteInitially={inviteInitially} onSection={openSection} /> : workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>}</SettingsContent> : routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
         {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} community={community} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} onSection={next => { if (!activeSection || !pushSettingsHistory(settingsHref(next, workspaceId), workspaceId)) setSection(next) }} />
       </SettingsContent>}
@@ -132,7 +141,8 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} workspaceId={!preview ? workspaceId : undefined} workspaceName={workspaceName} />
     case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} cloudUserKey={community ? userKey : undefined} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
-    case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    // Admins only, as its read: anyone else (a link, a bookmark, a workspace where they are a member) is told so, and nothing is read.
+    case 'audit': return workspaceId && !preview && team ? admin ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : <p role="status" className="text-sm text-muted-foreground">{t('audit.adminOnly')}</p> : waiting
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} /> : waiting
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}<BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} admin={admin} /></> : waiting
     // Bots of people who left are a team's (decision 2026-11-02-0203); they moved here with Bot 与 Agents' removal (2026-11-02-1400).

@@ -45,5 +45,10 @@ test('workspace audit read API', { skip: !dbUrl }, async t => {
     assert.deepEqual(security.events.map(event => [event.action, event.actorType, event.ip, event.geoCity]), [['token.created', 'token', '198.51.100.23', 'Ashburn']])
     const all = await query.exportWorkspaceAudit(admin, ws.id, 'all', now)
     assert.equal(all.length, 5)
+    // Categories and a period narrow the window; they never reach past it.
+    const secrets = await query.listWorkspaceAudit(admin, ws.id, { categories: ['secret'] }, now)
+    assert.deepEqual(secrets.events.map(event => event.targetLabel).sort(), ['KEY_1', 'KEY_2', 'KEY_3', 'KEY_4'])
+    const earlier = await query.listWorkspaceAudit(admin, ws.id, { until: new Date(now.getTime() - 30_000).toISOString(), from: new Date(now.getTime() - 200 * 86_400_000).toISOString() }, now)
+    assert.deepEqual(earlier.events.map(event => event.targetLabel).sort(), ['KEY_1', 'KEY_2'])
   })
 })

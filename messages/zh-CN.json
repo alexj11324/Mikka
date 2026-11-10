@@ -1225,6 +1225,9 @@
     "inviteInvalidEmails": "邮箱地址无效、为空或数量过多，请检查后重试。",
     "workspaceReadFailed": "无法读取工作区设置，请稍后重试。",
     "suggestionNotFound": "这条建议已经处理过了。",
+    "inboxNotFound": "此收件箱条目不可用。",
+    "inboxInvalid": "请检查请求并选择未来时间。",
+    "inboxConflict": "此收件箱条目已处理。",
     "coordinatorUnavailable": "Coordinator 现在不可用，稍后再试。",
     "messageTooLong": "消息过长，请缩短后重试。",
     "issueScopeTeamRequired": "转到工作区前，请先明确选择 Mikka 团队。",
@@ -1337,6 +1340,16 @@
     "viewProjects": "查看项目"
   },
   "IssueDetail": {
+    "frame": {
+      "delegate": "交给",
+      "open": "打开",
+      "openThread": "打开 {name} 的对话",
+      "subtaskPlaceholder": "输入子任务名称，按回车创建",
+      "subtaskMenu": "{title} 的操作",
+      "subscribe": "关注",
+      "unsubscribe": "取消关注",
+      "created": "创建于{when}"
+    },
     "breadcrumbBoard": "看板",
     "breadcrumbMore": "更多位置",
     "connecting": "正在连接…",
@@ -2409,7 +2422,55 @@
       "shadowConfirmMany": "{workspace} 已有 {names}，在你的运行里用你自己的值？",
       "useMine": "用我的"
     },
+    "permissionsPage": {
+      "accessHint": "点按权限即可更改",
+      "heading": "Bot 和成员可以做什么",
+      "detail": "锁定的项目对这个工作区的所有人禁止。",
+      "allowed": "允许",
+      "blocked": "禁止",
+      "allowedEmpty": "没有允许的项目",
+      "blockedEmpty": "没有禁止的项目",
+      "block": "禁止{name}",
+      "unblock": "允许{name}",
+      "readOnly": "只有管理员可以更改。",
+      "appColumn": "应用",
+      "accessColumn": "权限",
+      "summary": "{allowed} 项允许，{blocked} 项禁止"
+    },
     "audit": {
+      "unknownAction": "记录了「{action}」",
+      "filterMenu": {
+        "clearAll": "全部清除",
+        "remove": "移除{label}",
+        "more": "还有 {count} 项：{labels}"
+      },
+      "tableWords": {
+        "undo": "撤销",
+        "redo": "重做",
+        "values": "{count} 个值"
+      },
+      "adminOnly": "只有管理员可以查看审计日志。",
+      "categoryFilter": "类别",
+      "columns": {
+        "time": "时间",
+        "actor": "操作人",
+        "action": "操作",
+        "category": "类别",
+        "place": "地点"
+      },
+      "range": {
+        "label": "时间范围",
+        "today": "今天",
+        "yesterday": "昨天",
+        "last7": "最近 7 天",
+        "last30": "最近 30 天",
+        "last90": "最近 90 天",
+        "apply": "应用",
+        "pickEnd": "{start} – 选择结束日期",
+        "days": "{count} 天",
+        "choose": "选择时间范围",
+        "presets": "常用范围"
+      },
       "loading": "正在加载审计日志",
       "filter": "筛选",
       "filters": {
@@ -2475,7 +2536,8 @@
         },
         "agent": {
           "approval_decided": "{decision, select, approved {批准工具请求} denied {拒绝工具请求} other {处理工具请求}}",
-          "approval_consumed": "使用工具批准"
+          "approval_consumed": "使用工具批准",
+          "policy_changed": "更改了 Agent 审批规则"
         },
         "workspace": {
           "slug_changed": "把地址从 {from} 改为 {to}",
@@ -2487,7 +2549,9 @@
           "checkout_started": "打开了结账",
           "credits_purchased": "购买了点数",
           "auto_recharge_changed": "修改了自动充值",
-          "limits_changed": "修改了用量上限"
+          "limits_changed": "修改了用量上限",
+          "card_verified": "验证了付款卡",
+          "payment_method_changed": "更改了付款方式"
         },
         "audit": {
           "exported": "导出审计日志",
@@ -4498,7 +4562,12 @@
       "modelUnavailable": "没有可运行的默认模型",
       "loadingPlacement": "正在检查运行设置…",
       "quotaUnchecked": "模型额度待检查",
-      "workspaceDefault": "按工作区设置"
+      "workspaceDefault": "按工作区设置",
+      "machineRow": "机器",
+      "botRow": "交给",
+      "details": "详情",
+      "expand": "放大窗口",
+      "collapse": "缩小窗口"
     },
     "board": {
       "toolbar": "看板工具栏",
@@ -4612,7 +4681,9 @@
         "groups": "群聊",
         "tasks": "任务"
       },
-      "sourceSeparator": "、"
+      "sourceSeparator": "、",
+      "sectionsHint": "在分组间跳转",
+      "openHint": "打开"
     }
   },
   "SuggestionsPage": {
@@ -4639,7 +4710,9 @@
       "all": "全部",
       "documents": "文档",
       "pages": "网页"
-    },
+    ,
+      "pullRequests": "PR",
+      "media": "截图与录屏"},
     "columns": {
       "name": "名称",
       "source": "来源",
@@ -4651,7 +4724,7 @@
     "empty": "还没有 Artifact",
     "threadEntry": "Artifact · {count}",
     "folders": {
-      "sub": "Bot 和 Agent 在任务里交出的文档和网页，按任务分组。",
+      "sub": "Bot 和 Agent 在任务里交出的文档、网页、PR 和截图，按任务分组。",
       "folders": "按任务",
       "search": "搜索任务…",
       "noMatch": "没有和「{query}」匹配的任务。",
@@ -5836,6 +5909,11 @@
       "pending": "读取中"
     }
   },
+  "HostedPlugins": {
+    "manageApp": "管理 {name}",
+    "moreTwo": "{first} 和 {second}",
+    "moreMany": "{first}、{second} 等 {count, number} 个"
+  },
   "HostedTasks": {
     "open": "打开任务",
     "status": "状态",
@@ -6066,6 +6144,48 @@
     "share": "占{month}",
     "open": "打开",
     "runsCount": "{count, plural, other {{formatted} 次}}"
+  },
+  "HostedShell": {
+    "newTab": "新标签页",
+    "searchOrUrl": "搜索或输入网址",
+    "tools": "工具",
+    "noTools": "还没有可用的工具",
+    "moreFor": "{name} 的更多操作",
+    "suggested": "推荐",
+    "noSuggestions": "暂时没有推荐"
+  },
+  "HostedMembers": {
+    "title": "成员与团队",
+    "overview": "概览",
+    "you": "（你）",
+    "changeRole": "更改角色",
+    "clear": "清除",
+    "selectAll": "全选",
+    "select": "选择 {name}",
+    "selected": "已选 {count} 人",
+    "roleOf": "{name} 的角色",
+    "noMatch": "没有与「{query}」匹配的成员。",
+    "membersSub": "{suspended, plural, =0 {全部启用中} other {# 位已停用}}",
+    "adminsSub": "可邀请、调整角色和停用成员",
+    "invitesSub": "{expired, plural, =0 {没有已过期的邀请} other {# 个已过期}}",
+    "yourRole": "你的角色",
+    "yourRoleSub": "仅管理员可邀请成员和更改权限",
+    "status": "状态",
+    "sortAscending": "姓名 A–Z",
+    "sortDescending": "姓名 Z–A",
+    "confirmSuspendMany": "将停用 {count} 位成员。他们将无法访问工作区成员目录；已有任务协作权限不变。",
+    "confirmRoleMany": "将 {count} 位成员设置为{role}并保持启用。",
+    "renewInvite": "重新生成邀请链接",
+    "copy": "复制",
+    "importCsv": "从 CSV 导入",
+    "teamCount": "{count} 个团队",
+    "deleteTeam": "删除团队",
+    "deleteConfirm": "输入 {name} 以确认",
+    "deleteTitle": "删除团队「{name}」？",
+    "deleteImpact": "将一并删除 {tasks} 个任务和 {projects} 个项目。与其他团队共享的项目只会取消关联。",
+    "deleteCounting": "正在统计将被删除的内容…",
+    "deleting": "正在删除…",
+    "teamDeleted": "已删除团队「{name}」。"
   },
   "HostedSettings": {
     "back": "返回",

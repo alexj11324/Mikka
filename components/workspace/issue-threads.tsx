@@ -49,16 +49,20 @@ export type AgentActivityRow = { id: string; at: string; node: ReactNode }
  * 「换」 verb: as Warp does, a change of Agent is read from the next row's name. A row shows the stretch's latest
  * run result and opens the task's one conversation at the stretch's first thread.
  */
-export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true): { rows: AgentActivityRow[]; error: ReactNode } {
+/** An Agent row as data, for a layer that draws the log: its mark (the Agent's, or the result's), name, run result and time. */
+export type AgentActivityItem = { id: string; at: string; name: string; mark: ReactNode; result: string; group: ThreadGroup; time: string; open: boolean; onOpen: (() => void) | null }
+
+export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true): { rows: AgentActivityRow[]; items: AgentActivityItem[]; error: ReactNode; failed: { label: string; retry: () => void } | null } {
   const t = useTranslations('IssueThreads')
   const resultLabel = useRunResultLabel()
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const { data, error, mutate } = useIssueThreads(issueId, enabled)
   const { allTasks } = useAcceptanceTasks(enabled ? issueId : null)
-  if (!enabled) return { rows: [], error: null }
-  if (error) return { rows: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /> }
+  if (!enabled) return { rows: [], items: [], error: null, failed: null }
+  if (error) return { rows: [], items: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />, failed: { label: t('loadFailed'), retry: () => { void mutate() } } }
   const stretches = agentStretches(data ?? [])
+  const items: AgentActivityItem[] = []
   const rows = stretches.map(({ first, last, ids }, index): AgentActivityRow => {
     const harness = last.detail?.harness ?? null
     const name = harness ? harnessName(harness) : (last.ownerName ? t('ownerThread', { name: last.ownerName }) : t('hidden'))
@@ -77,9 +81,11 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
     const node = first.detail
       ? <Button variant="ghost" data-agent-stretch={index + 1} aria-pressed={open} aria-label={t('open', { name })} className={cn('-mx-3 h-auto w-[calc(100%+1.5rem)] justify-start gap-3 rounded-lg px-3 py-2', open && 'bg-muted hover:bg-muted')} onClick={() => onOpen(first.id)}>{body}<ChevronRight data-icon="inline-end" className="text-muted-foreground rtl:rotate-180" /></Button>
       : <div className="flex min-w-0 items-center gap-3 py-2">{body}<span className="size-4" /></div>
-    return { id: `agent:${first.id}`, at: new Date(first.createdAt).toISOString(), node }
+    const at = new Date(first.createdAt).toISOString()
+    items.push({ id: `agent:${first.id}`, at, name, mark: harness ? <HarnessMark harness={harness} /> : <ThreadStatusIcon group={group} />, result: view.stopping ? t('stopping') : resultLabel(result, reason), group, time: format.relativeTime(threadTime(last, now), now), open, onOpen: first.detail ? () => onOpen(first.id) : null })
+    return { id: `agent:${first.id}`, at, node }
   })
-  return { rows, error: null }
+  return { rows, items, error: null, failed: null }
 }
 
 /** The dispatching Bot in its own look (R-36): the same bloub as its bot-list row; the Coordinator's own runs use its mark. */

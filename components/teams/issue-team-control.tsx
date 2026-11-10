@@ -15,8 +15,25 @@ import { useTeamChoices } from './team-choices'
 
 const NO_TEAMS: Awaited<ReturnType<typeof listTeams>> = []
 
-export function IssueTeamControl({ issueId, disabled, onChosen }: { issueId: string; disabled: boolean; onChosen?: (issueId: string, teamId: string | null) => void }) {
-  const i18nText = useTranslations();
+type TeamProps = { issueId: string; disabled: boolean; onChosen?: (issueId: string, teamId: string | null) => void }
+
+export function IssueTeamControl(props: TeamProps) {
+  const { issueId, disabled, onChosen } = props
+  const i18nText = useTranslations()
+  const { choices, selected, data, pending, error, readError, teamsError, currentLabel, setNext, save } = useIssueTeam(props)
+  return <FieldGroup className="gap-0"><Field orientation="horizontal" className="items-start gap-3">
+    <FieldLabel htmlFor={`issue-team-${issueId}`} className={PROPERTY_LABEL}>{i18nText("FeatureCopy.c_53d4919c")}</FieldLabel>
+    <FieldContent className="min-w-0 gap-2">
+      <Select value={selected || 'none'} items={choices} disabled={disabled || pending || data === undefined || !!readError || !!teamsError} onValueChange={value => { if (value) { onChosen?.(issueId, null); setNext(value === 'none' ? '' : value) } }}><SelectTrigger id={`issue-team-${issueId}`} size="sm" className="-ml-1.5 h-7 max-w-full border-transparent bg-transparent pl-1.5 text-xs shadow-none hover:bg-muted dark:bg-transparent [&_svg:not([class*='size-'])]:size-3.5" title={currentLabel}><Users data-icon="inline-start" className="text-muted-foreground" /><SelectValue /></SelectTrigger><SelectContent align="start" className="min-w-56"><SelectGroup>{choices.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent></Select>
+      {selected !== (data ?? '') && <div><Button size="sm" variant="outline" disabled={disabled || pending} onClick={() => void save()}>{pending ? i18nText("FeatureCopy.c_6644f061") : i18nText("FeatureCopy.c_d1394c98")}</Button></div>}
+      {(error || readError || teamsError) && <Alert variant="destructive"><AlertDescription>{error || i18nText("FeatureCopy.c_f4ae1a97")}</AlertDescription></Alert>}
+    </FieldContent>
+  </Field></FieldGroup>
+}
+
+/** 团队's choices and its save, for IssueTeamControl and a layer that draws the row itself (which saves on pick). */
+export function useIssueTeam({ issueId, disabled, onChosen }: TeamProps) {
+  const i18nText = useTranslations()
   const { data: teams = NO_TEAMS, error: teamsError } = useSWR('teams', listTeams)
   const { data, error: readError, mutate } = useSWR(['issue-team', issueId], () => getIssueTeam(issueId))
   const { mutate: refresh } = useSWRConfig()
@@ -27,23 +44,16 @@ export function IssueTeamControl({ issueId, disabled, onChosen }: { issueId: str
   const noTeam = i18nText("FeatureCopy.c_2114e0a1")
   const choices = useTeamChoices(teams, noTeam)
   const currentLabel = choices.find(item => item.value === (selected || 'none'))?.label ?? noTeam
-  async function save() {
+  async function save(value = selected) {
     if (data === undefined || pending || disabled) return
     setPending(true); setError('')
     try {
-      const result = await setIssueTeam({ issueId, teamId: selected || null, expectedTeamId: data })
+      const result = await setIssueTeam({ issueId, teamId: value || null, expectedTeamId: data })
       if (!result.ok) { setError(result.error); return }
       await mutate(result.data, { revalidate: false }); setNext(undefined); await refresh('issues')
       onChosen?.(issueId, result.data)
     } catch { setError(i18nText("FeatureCopy.c_95310b50")) }
     finally { setPending(false) }
   }
-  return <FieldGroup className="gap-0"><Field orientation="horizontal" className="items-start gap-3">
-    <FieldLabel htmlFor={`issue-team-${issueId}`} className={PROPERTY_LABEL}>{i18nText("FeatureCopy.c_53d4919c")}</FieldLabel>
-    <FieldContent className="min-w-0 gap-2">
-      <Select value={selected || 'none'} items={choices} disabled={disabled || pending || data === undefined || !!readError || !!teamsError} onValueChange={value => { if (value) { onChosen?.(issueId, null); setNext(value === 'none' ? '' : value) } }}><SelectTrigger id={`issue-team-${issueId}`} size="sm" className="-ml-1.5 h-7 max-w-full border-transparent bg-transparent pl-1.5 text-xs shadow-none hover:bg-muted dark:bg-transparent [&_svg:not([class*='size-'])]:size-3.5" title={currentLabel}><Users data-icon="inline-start" className="text-muted-foreground" /><SelectValue /></SelectTrigger><SelectContent align="start" className="min-w-56"><SelectGroup>{choices.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent></Select>
-      {selected !== (data ?? '') && <div><Button size="sm" variant="outline" disabled={disabled || pending} onClick={() => void save()}>{pending ? i18nText("FeatureCopy.c_6644f061") : i18nText("FeatureCopy.c_d1394c98")}</Button></div>}
-      {(error || readError || teamsError) && <Alert variant="destructive"><AlertDescription>{error || i18nText("FeatureCopy.c_f4ae1a97")}</AlertDescription></Alert>}
-    </FieldContent>
-  </Field></FieldGroup>
+  return { choices, selected, data, pending, error, readError, teamsError, currentLabel, setNext, save, label: i18nText("FeatureCopy.c_53d4919c"), failed: error || (readError || teamsError ? i18nText("FeatureCopy.c_f4ae1a97") : ''), unavailable: disabled || pending || data === undefined || !!readError || !!teamsError }
 }

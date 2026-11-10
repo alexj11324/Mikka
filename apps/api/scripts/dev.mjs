@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { apiProxyOptions, developmentPages } from './dev-http.mjs'
-import { assertApiBuildConfiguration } from '../build-contract.mjs'
+import { assertApiBuildConfiguration, nodeRuntimePackages } from '../build-contract.mjs'
 
 const execute = promisify(execFile)
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
@@ -46,11 +46,36 @@ export function developmentTracing(nitro, tracing) {
   }
 }
 
-const startupFailure = code => Object.assign(new Error(code), { code })
+const startupFailure = (code, cause) => Object.assign(new Error(code, cause === undefined ? undefined : { cause }), { code })
+
+function workerInitializationCause(raw, phase) {
+  // env-runner 0.3.11 serializes Error.message, not its name/code. Preserve a
+  // closed reason before the runner terminates; never retain that raw message,
+  // which can contain a local path, application data, or a credential.
+  const message = typeof raw === 'string' ? raw.slice(0, 1024) : ''
+  let reason = 'unavailable', dependency = null
+  const missing = /^Cannot find (?:package|module) '([^']+)'/.exec(message)
+  if (missing) {
+    reason = 'module-missing'
+    if (nodeRuntimePackages.includes(missing[1])) dependency = missing[1]
+    else for (const [file, label] of [['mikka-tracing.mjs', 'tracing-entry'], ['mikka-application.mjs', 'application-entry'], ['index.mjs', 'worker-entry']]) {
+      if (missing[1].endsWith(`/${file}`)) { dependency = label; break }
+    }
+  } else if (/^The requested module .+ does not provide an export named /.test(message)
+    || /^Named export .+ not found\./.test(message)) reason = 'export-missing'
+  else if (/^(?:Unexpected (?:token|identifier|end of input)|Invalid or unexpected token)/.test(message)) reason = 'module-syntax'
+  else if (message.startsWith('listen EADDRINUSE:')) reason = 'listen-address-in-use'
+  else if (/^listen (?:EACCES|EPERM):/.test(message)) reason = 'listen-access-denied'
+  else if (message.startsWith('listen EADDRNOTAVAIL:')) reason = 'listen-address-unavailable'
+  else if (message.startsWith('listen ENAMETOOLONG:')) reason = 'listen-path-too-long'
+  else if (message.startsWith('listen ENOENT:')) reason = 'listen-path-missing'
+  else if (/^\[env-runner\] Entry module .+ must export a `fetch` handler/.test(message)) reason = 'entry-handler-missing'
+  return { phase: ['initial-start', 'hot-replacement'].includes(phase) ? phase : 'unavailable', reason, dependency }
+}
 
 /** Subscribe before compilation. Nitro's dev:reload means the bundle exists;
  * only the runner's address message means its application has initialized. */
-export function developmentWorkerReady(api) {
+export function developmentWorkerReady(api, { phase = 'initial-start' } = {}) {
   const pending = Promise.withResolvers()
   void pending.promise.catch(() => {})
   let settled = false, signal
@@ -64,7 +89,13 @@ export function developmentWorkerReady(api) {
     else pending.resolve()
   }
   const message = value => {
-    if (value?.event === 'init-error') finish(startupFailure('API_DEV_WORKER_INIT_FAILED'))
+    if (value?.event === 'init-error') {
+      const cause = workerInitializationCause(value.error, phase)
+      // Node's TAP reporter omits Error.cause; emit the closed fields explicitly
+      // while the same first refusal still rejects readiness immediately.
+      console.error('[dev] Worker initialization failed', JSON.stringify(cause))
+      finish(startupFailure('API_DEV_WORKER_INIT_FAILED', cause))
+    }
     else if (value?.address && typeof value.address === 'object') finish()
   }
   api.onMessage(message)
