@@ -27,7 +27,7 @@ export async function admitCloudQuestionContinuation(
     return null; // The original device continuation keeps its existing adapter.
   }
   const fail = (): never => { throw new FactoryError('factoryQuestionContinuationUnavailable'); };
-  const { rows: [origin] } = await tx.query<typeof agentRuns.$inferSelect & { machineState: string; sandboxId: string; snapshotId: string; templateKind: string | null; machineEpoch: number; targetId: string | null }>(`SELECT r.*,m.state AS "machineState",m."sandboxId",m."snapshotId",m."templateKind",m.epoch AS "machineEpoch",m."targetId"
+  const { rows: [origin] } = await tx.query<typeof agentRuns.$inferSelect & { machineState: string; sandboxId: string; snapshotId: string; templateKind: string | null; machineEpoch: number; targetId: string | null; filesystemSnapshotId: string | null; snapshotOperationId: string | null; snapshotTakenAt: Date | null; snapshotState: string }>(`SELECT r.*,m.state AS "machineState",m."sandboxId",m."snapshotId",m."templateKind",m.epoch AS "machineEpoch",m."targetId",m."filesystemSnapshotId",m."snapshotOperationId",m."snapshotTakenAt",m."snapshotState"
     FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     JOIN bots bot ON bot.id=b."botId" AND bot."ownerId"=b."ownerId" AND bot."workspaceId"=b."workspaceId"
@@ -91,8 +91,13 @@ export async function queueCloudQuestionContinuation(
   // the task's own new run takes custody of the existing sandbox.
   await tx.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL,
     "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL WHERE "runId"=$1`, [originId]);
-  await tx.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId",epoch,"targetId","runningSince","templateKind")
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,CASE WHEN $8='running' THEN now() ELSE NULL END,$14)`, [runId,binding.workspaceId,userId,binding.botId,origin.issueId,origin.snapshotId,randomUUID(),origin.machineState,origin.sandboxId,origin.deviceId,origin.deviceRepoId,origin.machineEpoch,origin.targetId,origin.templateKind]);
+  // An in-flight snapshot is named after the origin run and cannot be
+  // reconciled by this row; only a settled reference transfers.
+  const transferring = origin.snapshotState === 'creating'
+    ? { state: 'none', operationId: null, takenAt: null }
+    : { state: origin.snapshotState, operationId: origin.snapshotOperationId, takenAt: origin.snapshotTakenAt };
+  await tx.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId",epoch,"targetId","runningSince","templateKind","filesystemSnapshotId","snapshotOperationId","snapshotTakenAt","snapshotState")
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,CASE WHEN $8='running' THEN now() ELSE NULL END,$14,$15,$16,$17,$18)`, [runId,binding.workspaceId,userId,binding.botId,origin.issueId,origin.snapshotId,randomUUID(),origin.machineState,origin.sandboxId,origin.deviceId,origin.deviceRepoId,origin.machineEpoch,origin.targetId,origin.templateKind,origin.filesystemSnapshotId,transferring.operationId,transferring.takenAt,transferring.state]);
   await tx.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
     SELECT $1,"userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved"
     FROM run_publications WHERE "runId"=$2 AND "userId"=$3 AND "issueId"=$4`, [runId,originId,userId,origin.issueId]);

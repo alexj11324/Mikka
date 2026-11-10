@@ -866,7 +866,7 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
       const verified = await step(`machineVerified_${runId}`, async () => {
         const machine = await client.rpc('agents.getThreadMachine', [record.issueId, runId])
         const view = { runId, observedAt: iso(now()), kind: ['cloud', 'laptop', 'server'].includes(machine?.kind) ? machine.kind : null,
-          state: ['online', 'offline', 'starting', 'running', 'paused', 'ended', 'error'].includes(machine?.state) ? machine.state : null,
+          state: ['online', 'offline', 'starting', 'running', 'paused', 'restore', 'ended', 'error'].includes(machine?.state) ? machine.state : null,
           sandboxIdHash: typeof machine?.cloud?.sandboxId === 'string' ? sha(machine.cloud.sandboxId).slice(0, 16) : null }
         cleanup.machineViews ??= []
         cleanup.machineViews.push(view)
