@@ -52,7 +52,7 @@ test('a write the shared judge allows runs directly and leaves a record', async 
   assert.deepEqual(judged, [{ action: 'hubspot_create_contact', tool: 'HUBSPOT_CREATE_CONTACT', annotations: ['openWorldHint'], input: { email: 'a@acme.dev' } }])
 })
 
-test('a call the judge asks for (destructive, unjudged or refused) becomes a card', async () => {
+test('a call the judge asks for becomes a card', async () => {
   const { deps: d, calls } = deps({ judge: async () => 'ask' })
   assert.deepEqual(await callAppTool(d, call('HUBSPOT_DELETE_CONTACT')), { status: 'awaiting_approval', actionId: 'card_1' })
   assert.deepEqual(calls, ['card:HUBSPOT_DELETE_CONTACT'])

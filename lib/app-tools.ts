@@ -6,11 +6,14 @@ import type { WriteJudge } from '@/lib/operations/write-judgment'
 
 // Any app a person connected from the 插件 store, through the tools Composio
 // lists for that toolkit; nothing is written per app (decision 2026-10-31).
-// Reads (readOnlyHint) run at once. A write follows R-77 (#658): an explicit
-// ask / deny / allow setting wins; otherwise the shared write judge
+// Every call follows R-77 (#658), reads included: an explicit ask / deny / allow
+// setting wins; otherwise the shared write judge
 // (lib/operations/write-judgment.ts, the Decisions API with the tool's MCP
-// hints) decides, and a call it judges destructive or cannot judge becomes a
-// card. Every other write runs and leaves a record.
+// hints) decides, and only a call it judges destructive becomes a card. The MCP
+// hints, readOnlyHint among them, are evidence for the judge, never a rule that
+// skips the call. A judgment it cannot make (unavailable, refused) is no card
+// either: the call runs and `Write judgment fallback` is logged. A write that
+// runs keeps a record; a read that runs leaves none.
 // Pure: the Composio client, the database and the decision call come in as deps.
 
 const TOOL_SLUG = /^[A-Z][A-Z0-9_]{0,127}$/
@@ -61,7 +64,7 @@ export type AppToolDeps = {
   execute: (call: AppToolCall, accountId: string | null) => Promise<AppToolExecution>
   /** The person's or admin's explicit setting for this tool or app, or null when none names it. */
   setting: (tool: string, toolkit: string) => Promise<AppToolDecision | null>
-  /** The shared R-77 judge: `ask` for a destructive, unjudged or refused call. */
+  /** The shared R-77 judge: `ask` only for a call it judges destructive; unjudged or refused is `allow`, logged as `Write judgment fallback`. */
   judge: WriteJudge
   /** The record of a direct write, written before dispatch. */
   recordStart: (call: AppToolCall, accountId: string | null) => Promise<string>

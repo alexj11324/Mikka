@@ -16,10 +16,11 @@ const MAX_PENDING = 20
  * Sends mail or writes the calendar in the person's connected account, with
  * no card (decision 2026-10-31): the connection's grant is the permission and
  * only a destructive call asks. The Decisions API judges this exact call, with
- * the tool's MCP annotations as input; a destructive, unjudged or refused call
- * goes to `proposeAction` instead. The row is written before dispatch and kept
- * as the record; like other writes the policy allows, it has no `decidedAt`
- * and never shows as a card.
+ * the tool's MCP annotations as input; a call it judges destructive goes to
+ * `proposeAction` instead, while one it cannot judge is no card: the call runs
+ * and logs `Write judgment fallback`. The row is written before dispatch and
+ * kept as the record; like other writes the policy allows, it has no
+ * `decidedAt` and never shows as a card.
  */
 export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId)) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
