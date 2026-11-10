@@ -4,12 +4,14 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { mock, test } from 'node:test'
 import { RUN_DECISION_CATALOGUE } from './mcp-tool'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedUser, seedPersonalWorkspace, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { createApiHandler } from '../../apps/api/src/application'
 import * as apiServer from '../../apps/api/compat/server'
+import { ownLiveRuntime } from '../../tests/support/live-runtime'
 
 test('decision HTTP routes and worker MCP persist through real token authorization', { skip: !dbUrl }, async t => {
   mock.module('next/server', { namedExports: apiServer })
+  const live = await ownLiveRuntime(t)
   mock.module('@/lib/auth', { namedExports: {
     MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => null } },
   } })
@@ -30,7 +32,7 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
   const foreign = await seedWorkspace(connection, other, [{ userId: other, role: 'admin' }])
   const projectId = await seedProject(connection, owner, [])
   const issueId = await seedIssue(connection, owner)
-  await connection.query('update workspace_projects set "issueIds"=$2 where id=$1', [projectId, JSON.stringify([issueId])])
+  await seedProjectTasks(connection, projectId, [issueId])
   const botId = await seedBot(connection, workspace.id, owner)
   const messageId = randomUUID()
   await connection.query('insert into coordinator_messages (id,"userId","botId",position,message) values ($1,$2,$3,0,$4)', [
@@ -64,7 +66,7 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
   const address = server.address()
   assert.ok(address && typeof address === 'object')
   const origin = 'http://127.0.0.1:' + address.port
-  t.after(async () => { server.close(); server.closeAllConnections(); await Promise.all([connection.end(), pool.end(), workspacePool.end()]) })
+  t.after(async () => { server.close(); server.closeAllConnections(); try { await live.close() } finally { await Promise.all([connection.end(), pool.end(), workspacePool.end()]) } })
   const path = '/mikka/api/projects/' + projectId + '/decisions'
   const input = { workspaceId: workspace.id, kind: 'confirm', title: 'Retain the history', summary: 'Keep earlier reasons', reason: 'A later correction must remain auditable', idempotencyKey: 'http-marking-1' }
   const send = (pathname: string, bearer: string | null, body?: unknown) => fetch(origin + pathname, {

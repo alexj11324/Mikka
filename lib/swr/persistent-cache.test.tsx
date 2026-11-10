@@ -172,6 +172,92 @@ test('global clear waits for a provider that unregisters synchronously on invali
   assert.equal(complete, true)
 })
 
+for (const navigationType of ['document', undefined] as const) test(navigationType
+  ? 'full-document navigation retires old readers while private storage finishes clearing'
+  : 'ordinary cache invalidation still refreshes and replaces the retired provider', async () => {
+  const { IndexedReadStorage } = await import('./indexed-db')
+  const { NextIntlClientProvider } = await import('next-intl')
+  const clearing = deferred<void>(), entered = deferred<void>()
+  const activate = mock.method(IndexedReadStorage.prototype, 'activate', async () => [])
+  const write = mock.method(IndexedReadStorage.prototype, 'write', async () => undefined)
+  const clear = mock.method(IndexedReadStorage.prototype, 'clear', async () => { entered.resolve(); await clearing.promise })
+  let reads = 0
+  let retired: PersistentReadCache | undefined
+  function Read() {
+    const { cache } = swr.useSWRConfig()
+    if (cache instanceof PersistentReadCache) retired = cache
+    const { data } = swr.default('preferences', async () => { reads++; return { theme: 'authorized data' } })
+    return <output>{data?.theme ?? 'loading'}</output>
+  }
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  const beforeRefresh = refreshes
+  let navigation: Promise<void> | undefined
+  try {
+    const render = (workspaceId: string) => <NextIntlClientProvider locale="en" timeZone="UTC" messages={{ Workspace: { loadingEditor: 'Loading workspace' } }}><swr.SWRConfig value={swrDefaults}>
+      <AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache>
+    </swr.SWRConfig></NextIntlClientProvider>
+    await act(async () => root.render(render(scope.workspaceId)))
+    assert.equal(reads, 1)
+    assert.equal(container.textContent, 'authorized data')
+    let cleared = false
+    await act(async () => {
+      navigation = clearPersistentReadCaches({ documentNavigation: navigationType === 'document' }).then(() => { cleared = true })
+      await entered.promise
+    })
+    assert.equal(cleared, false, 'the same-document pause must not pretend storage is already cleared')
+    assert.equal(retired?.isEnabled, false)
+    assert.equal(retired?.size, 0)
+    assert.equal(reads, navigationType ? 1 : 2, 'only an ordinary invalidation remounts readers in the current document')
+    assert.equal(refreshes, beforeRefresh + (navigationType ? 0 : 1), 'a full replacement document owns the new bootstrap')
+    if (navigationType) assert.equal(container.querySelector('output'), null, 'old business data and readers are unmounted immediately')
+    await act(async () => { clearing.resolve(); await navigation })
+    assert.equal(cleared, true)
+    assert.equal(reads, navigationType ? 1 : 2)
+    await act(async () => root.render(render('new-authorized-workspace')))
+    assert.equal(reads, navigationType ? 2 : 3, 'the replacement scope must make its own ordinary authorized read')
+    assert.equal(container.textContent, 'authorized data')
+  } finally {
+    clearing.resolve(); await navigation
+    await act(async () => root.unmount())
+    activate.mock.restore(); write.mock.restore(); clear.mock.restore()
+  }
+})
+
+test('a document navigation broadcasts ordinary invalidation to other tabs', async () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel')
+  const channels: FakeChannel[] = []
+  class FakeChannel {
+    onmessage?: (event: { data: unknown }) => void
+    sent: unknown[] = []
+    constructor(readonly name: string) { channels.push(this) }
+    postMessage(value: unknown) { this.sent.push(value) }
+    close() {}
+  }
+  Object.defineProperty(globalThis, 'BroadcastChannel', { configurable: true, writable: true, value: FakeChannel })
+  const local = new PersistentReadCache(scope, new MemoryStorage())
+  const localReasons: boolean[] = [], remoteReasons: boolean[] = []
+  const disconnect = local.connect(reason => localReasons.push(reason))
+  let disconnectRemote = () => {}
+  try {
+    await clearPersistentReadCaches({ documentNavigation: true })
+    assert.deepEqual(localReasons, [true])
+    const clear = channels.flatMap(channel => channel.sent).find(value => (value as { type?: string }).type === 'clear')
+    assert.deepEqual(clear, { type: 'clear' }, 'another tab never inherits this document navigation')
+    disconnect()
+    const remote = new PersistentReadCache(scope, new MemoryStorage())
+    disconnectRemote = remote.connect(reason => remoteReasons.push(reason))
+    channels.at(-1)!.onmessage!({ data: clear })
+    assert.equal(remote.isEnabled, false)
+    assert.equal(remote.size, 0)
+    assert.deepEqual(remoteReasons, [false])
+    await remote.flushed()
+  } finally {
+    disconnect(); disconnectRemote()
+    if (original) Object.defineProperty(globalThis, 'BroadcastChannel', original)
+    else Reflect.deleteProperty(globalThis, 'BroadcastChannel')
+  }
+})
+
 test('unmounted providers retire before late activation, while a StrictMode reconnect stays enabled', async () => {
   for (const reconnect of [false, true]) {
     const cache = new PersistentReadCache(scope, new MemoryStorage())

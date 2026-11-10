@@ -58,7 +58,7 @@ export function publicFactoryState(task: Pick<FactoryTask, 'stage' | 'status'>, 
 }
 
 /** One evidence read for an already-authorized issue list, never a detail read per task. */
-export async function readFactoryFlowStates(tx: Pick<PoolClient, 'query'>, tasks: readonly FactoryTask[]) {
+export async function readFactoryFlowStates(tx: Pick<PoolClient, 'query'>, tasks: readonly Pick<FactoryTask, 'id' | 'stage' | 'status'>[]) {
   if (!tasks.length) return new Map<string, Pick<FactoryFlowView, 'stage' | 'needsYou' | 'completion'>>();
   const { rows } = await tx.query<FlowStateEvidence & { id: string }>(`SELECT t.id,current."createdAt",current."finishedAt",q."updatedAt" AS "questionSince",
     EXISTS(SELECT 1 FROM factory_merges m WHERE m."taskId"=t.id AND m."candidateId"=t."candidateId" AND m."userId"=t."userId" AND m.status='merged' AND candidate.kind='repository') AS merged,

@@ -129,6 +129,7 @@ export async function removeMember(id: string, memberId: string): Promise<Action
       const metadata = readIssueMetadata(latest.content)
       if (metadata.assignee?.kind === 'member' && metadata.assignee.id === parsed.data) {
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, assignee: null }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, user.id))).returning()
+        ;(await import('@/lib/coding-workspace/review-sessions')).reviewTaskChanged(tx, latest, saved)
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
         await issueListChanged(tx, id)
         if (saved.linearSyncPolicy !== 'explicit' || saved.linearSyncBlocked) return false

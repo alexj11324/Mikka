@@ -225,6 +225,7 @@ function workspacePage({ current = false, clickError } = {}) {
   } }
   const page = {
     getByRole: role => { assert.ok(['button', 'menuitem'].includes(role)); return role === 'button' ? menu : item },
+    waitForLoadState: async state => { assert.equal(state, 'domcontentloaded') },
     // Both the old and new documents have this URL and the same ready menu.
     waitForURL: async predicate => { assert.equal(predicate(new URL('http://localhost:3000/mikka/en')), true) },
     waitForEvent: event => { assert.equal(event, 'domcontentloaded'); calls.document++; return document.promise },
@@ -295,6 +296,7 @@ function lifecycleWorkspace({ current = false, clickError } = {}) {
   } }
   const menu = { first: () => menu, click: async () => { f.calls.menu++ } }
   const page = {
+    waitForLoadState: async state => { assert.equal(state, 'domcontentloaded') },
     waitForFunction: async () => {}, evaluate: async () => 'zh-CN',
     getByRole: (role, options) => { selected.push({ role, ...options }); return role === 'button' ? menu : item },
     waitForEvent: event => { assert.equal(event, 'domcontentloaded'); f.calls.document++; return f.document.promise },

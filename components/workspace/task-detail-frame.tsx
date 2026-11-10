@@ -130,7 +130,7 @@ export function FramedTask(props: FramedTaskProps) {
     ...options ? options.members.map(person => ({ id: person.id, label: person.name, mark: { kind: 'person', name: person.name } as const, checked: member?.id === person.id, onSelect: () => { if (member?.id !== person.id) void metadata.persist({ assignee: { kind: 'member', id: person.id } }) } })) : loading(tAssignee('loading')),
     ...options?.isOwner ? [{ id: 'invite', label: tAssignee('invite'), mark: { kind: 'icon', icon: 'mail' }, divider: true, onSelect: () => props.requestProperty('invite') } satisfies TaskMenuItem] : [],
   ]
-  const agent = meta.assignee?.kind === 'agent' ? meta.assignee : null
+  const agent = meta.delegate
   const delegateThread = (agent ? threads?.find(item => item.detail?.agentName === agent.name) : threads?.find(item => item.detail?.bot))?.detail
   const delegate = agent?.name ?? delegateThread?.agentName
 

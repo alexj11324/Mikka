@@ -1,6 +1,6 @@
 import 'server-only'
 import type { PoolClient } from 'pg'
-import { and, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { getTableName, type Table } from 'drizzle-orm'
 import { workspaceDb } from '@/lib/workspace-db'
 import * as workspaceSchema from '@/lib/db/workspace-schema'
@@ -15,7 +15,7 @@ import { workspaceListScopesBeforeChange, workspaceListScopeChanged, workspaceLi
 
 const { workspaces, workspaceMembers, workspaceInvitations } = workspaceSchema
 const { teams, teamMembers, teamIssues, teamProjects, teamIssueCreateReceipts, teamIssuePromotionReceipts } = teamSchema
-const { projects, projectEvents } = projectSchema
+const { projects, projectEvents, projectMembers, projectTasks } = projectSchema
 
 /**
  * 「删除账户」. What goes and what stays (docs/settings-backend/account.md):
@@ -48,9 +48,11 @@ export const OWNER_COLUMNS = ['userId', 'ownerId', 'owner_id', 'user_id'] as con
 
 /** Tables the main transaction must not touch, and why. */
 const SKIPPED = new Map<string, string>([
+  ['coding_review_sessions', 'revoked capability close target; removed only after gateway close or VM-gone acknowledgement'],
   // Workspace tables live in the workspace database (lib/workspace-db.ts), handled below under their own lock.
-  ...[workspaces, workspaceMembers, workspaceInvitations, teams, teamMembers, teamIssues, teamProjects, teamIssueCreateReceipts, teamIssuePromotionReceipts, projects, projectEvents]
+  ...[workspaces, workspaceMembers, workspaceInvitations, teams, teamMembers, teamIssues, teamProjects, teamIssueCreateReceipts, teamIssuePromotionReceipts, projects, projectEvents, projectMembers, projectTasks]
     .map(table => [getTableName(table as Table), 'workspace database'] as [string, string]),
+  ['mikka_task_identifier_aliases', 'workspace history, removed only with its workspace'],
   // Handled explicitly below: team issues in shared workspaces stay.
   ['issues', 'special'], ['issue_documents', 'special'], ['issue_versions', 'special'], ['issue_members', 'special'],
   ['conversations', 'special'],
@@ -158,8 +160,37 @@ export interface Plan {
   keptIssueIds: string[]
   keptProjectIds: string[]
 }
+/** Durable deletion receipts written before Project v2 do not carry this field. */
+type CompatiblePlan = Omit<Plan, 'keptProjectIds'> & { keptProjectIds?: string[] }
 
-type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'insert' | 'delete' | 'execute'>
+type WorkspaceTx = Pick<typeof workspaceDb, 'select' | 'insert' | 'delete' | 'execute' | 'update'>
+
+async function retainedWorkspaceProjects(wtx: WorkspaceTx, userId: string, solo: string[], shared: string[]) {
+  return (await wtx.select({ id: projects.id }).from(projects)
+    .leftJoin(workspaces, eq(workspaces.id, projects.workspaceId))
+    .where(or(
+      // Quarantine is not proof of personal ownership. Keep its repair evidence
+      // inaccessible until a trusted assignment decides the tenant lifecycle.
+      and(isNull(projects.workspaceId), eq(projects.userId, userId)),
+      and(eq(workspaces.kind, 'team'), solo.length ? sql`not (${workspaces.id} = any(${sql.param(solo)}::uuid[]))` : undefined,
+        sql`(${projects.userId} = ${userId} or ${projects.workspaceId} = any(${sql.param(shared)}::uuid[]))`),
+    ))).map(row => row.id)
+}
+
+/** Old journals may contain an explicitly empty Team-derived Project set.
+ * Reconcile it while the Workspace boundary is held, before opening APP, and
+ * retain every prior keep decision without expanding the deletion set. */
+export async function freezeProjectRetention(wtx: WorkspaceTx, userId: string, plan: CompatiblePlan): Promise<Plan> {
+  const keptProjectIds = [...new Set([
+    ...(plan.keptProjectIds ?? []), ...await retainedWorkspaceProjects(wtx, userId, plan.solo, plan.shared),
+  ])].sort()
+  if (keptProjectIds.length && plan.solo.length) {
+    const [conflict] = await wtx.select({ id: projects.id }).from(projects)
+      .where(and(inArray(projects.id, keptProjectIds), inArray(projects.workspaceId, plan.solo))).limit(1)
+    if (conflict) throw new Error('accountDeletionProjectRetentionChanged')
+  }
+  return { ...plan, keptProjectIds }
+}
 
 /** Checks, then deletes the account and everything it owns. The caller has verified the session and the typed email. */
 export async function deleteAccount(userId: string, email: string, options: import('./deletion-jobs').AccountDeletionOptions = {}): Promise<AccountDeletion> {
@@ -177,7 +208,7 @@ export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<
     .from(workspaceMembers).where(eq(workspaceMembers.userId, userId))
   const owned = await wtx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, userId))
   const ids = [...new Set([...memberships.map(row => row.workspaceId), ...owned.map(row => row.id)])].sort()
-  if (!ids.length) return { solo: [], shared: [], keptIssueIds: [], keptProjectIds: [] }
+  if (!ids.length) return { solo: [], shared: [], keptIssueIds: [], keptProjectIds: await retainedWorkspaceProjects(wtx, userId, [], []) }
   // Same lock order as role changes (lib/workspace-access.ts requireWorkspace): the workspace row first.
   const locked = await wtx.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, ownerId: workspaces.userId }).from(workspaces).where(inArray(workspaces.id, ids)).orderBy(workspaces.id).for('update')
   const others = await wtx.select({ workspaceId: workspaceMembers.workspaceId, role: workspaceMembers.role, status: workspaceMembers.status })
@@ -202,11 +233,11 @@ export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<
   // Task ownership is in APP, not a Team link. Freeze that retention set only
   // after these Workspace locks and the APP task row locks have been acquired.
   const keptIssueIds: string[] = []
-  const keptProjectIds = shared.length
-    ? [...new Set((await wtx.select({ id: teamProjects.projectId }).from(teamProjects).where(inArray(teamProjects.workspaceId, shared))).map(row => row.id))] : []
+  // A creator's projects remain in every surviving shared tenant, including
+  // ungrouped projects and workspaces they already left before deleting the account.
+  const keptProjectIds = await retainedWorkspaceProjects(wtx, userId, solo, shared)
   return { solo, shared, keptIssueIds, keptProjectIds }
 }
-
 
 /** The deletion guard already fences new subject-owned writes. Freeze every
  * affected task under APP row locks after the Workspace plan has been locked.
@@ -237,7 +268,8 @@ export async function freezeTaskRetention(client: Pick<PoolClient, 'query'>, use
   return { ...plan, keptIssueIds: [...kept].sort() }
 }
 
-export async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, emailHash: string, plan: Plan) {
+export async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, emailHash: string, plan: CompatiblePlan) {
+  const retained = await freezeProjectRetention(wtx, userId, plan)
   const previousLists = await Promise.all([...plan.solo, ...plan.shared].map(async id => ({ id, scopes: await workspaceListScopesBeforeChange(wtx, id) })))
   if (plan.solo.length) {
     const soloTeams = wtx.select({ id: teams.id }).from(teams).where(inArray(teams.workspaceId, plan.solo))
@@ -249,14 +281,23 @@ export async function deleteWorkspaceData(wtx: WorkspaceTx, userId: string, emai
     await wtx.delete(teams).where(inArray(teams.workspaceId, plan.solo))
     await wtx.delete(workspaceInvitations).where(inArray(workspaceInvitations.workspaceId, plan.solo))
     await wtx.delete(workspaceMembers).where(inArray(workspaceMembers.workspaceId, plan.solo))
+    const soloProjects = wtx.select({ id: projects.id }).from(projects).where(inArray(projects.workspaceId, plan.solo))
+    await wtx.delete(projectEvents).where(inArray(projectEvents.projectId, soloProjects))
+    await wtx.delete(projects).where(inArray(projects.workspaceId, plan.solo))
     await wtx.delete(workspaces).where(inArray(workspaces.id, plan.solo))
   }
+  await wtx.delete(projectMembers).where(eq(projectMembers.userId, userId))
+  await wtx.update(projects).set({ leadUserId: null }).where(eq(projects.leadUserId, userId))
   await wtx.delete(teamMembers).where(eq(teamMembers.userId, userId))
   await wtx.delete(workspaceMembers).where(eq(workspaceMembers.userId, userId))
   await wtx.delete(workspaceInvitations).where(and(sql`encode(sha256(convert_to(lower(${workspaceInvitations.email}), 'UTF8')), 'hex') = ${emailHash}`, eq(workspaceInvitations.status, 'pending')))
-  const kept = plan.keptProjectIds
-  await wtx.delete(projectEvents).where(kept.length ? and(eq(projectEvents.userId, userId), sql`not (${projectEvents.projectId} = any(${kept}::uuid[]))`) : eq(projectEvents.userId, userId))
-  await wtx.delete(projects).where(kept.length ? and(eq(projects.userId, userId), sql`not (${projects.id} = any(${kept}::uuid[]))`) : eq(projects.userId, userId))
+  const kept = retained.keptProjectIds
+  const deletedProjects = wtx.select({ id: projects.id }).from(projects)
+    .where(kept.length ? and(eq(projects.userId, userId), sql`not (${projects.id} = any(${sql.param(kept)}::uuid[]))`) : eq(projects.userId, userId))
+  // Activity belongs to its Project. Authorship alone must not erase another
+  // member's shared project history when the author removes their account.
+  await wtx.delete(projectEvents).where(inArray(projectEvents.projectId, deletedProjects))
+  await wtx.delete(projects).where(kept.length ? and(eq(projects.userId, userId), sql`not (${projects.id} = any(${sql.param(kept)}::uuid[]))`) : eq(projects.userId, userId))
   for (const previous of previousLists) await workspaceListScopeChanged(wtx, previous.id, previous.scopes)
   // Canonical Workspace membership is cleaned here, including split-store
   // retries after the APP user has gone. Historical Org audit rows stay.
@@ -291,7 +332,7 @@ export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, user
   return { keys: [...new Set(rows.map(row => row.key).filter((key): key is string => Boolean(key)))], notBefore: new Date(Math.max(Date.now(), ...rows.map(row => row.expiresAt?.getTime() ?? 0))) }
 }
 
-export async function deleteMainAccountData(client: PoolClient, userId: string, plan: Plan): Promise<void> {
+export async function deleteMainAccountData(client: PoolClient, userId: string, plan: CompatiblePlan): Promise<void> {
   const kept = await keptThreads(client, userId, plan)
   if (kept.mailboxes.length) await client.query('update session_mailboxes set disabled=true,"wakeBudget"=0 where id=any($1::uuid[]) and "userId"=$2', [kept.mailboxes, userId])
   // Nobody is left to run their unfinished threads; they stay as stopped.
@@ -354,11 +395,20 @@ export async function deleteMainAccountData(client: PoolClient, userId: string, 
 }
 
 /** Every delete the account needs in the main database, in no particular order. */
-export async function deletionStatements(client: Pick<PoolClient, 'query'>, userId: string, plan: TaskRetention, threads?: KeptThreads): Promise<Statement[]> {
+export async function deletionStatements(client: Pick<PoolClient, 'query'>, userId: string, plan: CompatiblePlan, threads?: KeptThreads): Promise<Statement[]> {
   const keptRows = threads ?? await keptThreads(client, userId, plan)
+  const retainedProjects = plan.keptProjectIds ?? await retainedWorkspaceProjects(workspaceDb, userId, plan.solo, plan.shared)
   /** The person's rows of `table`, minus those that stay; `$1` is the person. */
   const ownedRows = (table: string, column: string) => {
-    const keep = keptCondition(table, keptRows)
+    // Authorship is historical identity. It cannot erase a surviving tenant's
+    // decision/source or a kept task's published spelling during owner cleanup.
+    const keep = table === 'project_decisions'
+      ? { sql: '"projectId" = any($2::uuid[])', ids: retainedProjects }
+      : table === 'project_decision_sources'
+        ? { sql: '"decisionId" in (select id from project_decisions where "projectId" = any($2::uuid[]))', ids: retainedProjects }
+        : table === 'task_identifier_aliases'
+          ? { sql: '"issueId" = any($2::uuid[])', ids: plan.keptIssueIds }
+          : keptCondition(table, keptRows)
     return keep
       ? { where: `${ident(column)} = $1 and not (${keep.sql})`, values: [userId, keep.ids] }
       : { where: `${ident(column)} = $1`, values: [userId] }

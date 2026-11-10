@@ -1,3 +1,5 @@
+import * as taskDomainActions from '@/app/actions/task-domain'
+import * as projectResourcesActions from '@/app/actions/project-resources'
 import * as enabledModels from '@/app/actions/enabled-models'
 import 'server-only'
 import { desktopActionSchemas, type DesktopActionName } from './schemas'
@@ -186,11 +188,16 @@ const functions = {
   'preferences.getPreferences': actions23.getPreferences,
   'preferences.updatePreferences': actions23.updatePreferences,
   'projects.listProjects': actions24.listProjects,
+  'projects.listWorkspaceProjects': actions24.listWorkspaceProjects,
   'projects.saveProject': actions24.saveProject,
   'projects.updateProjectProperties': actions24.updateProjectProperties,
   'projects.moveIssueToProject': actions24.moveIssueToProject,
   'projects.listProjectEvents': actions24.listProjectEvents,
   'projects.setProjectIssues': actions24.setProjectIssues,
+  'projects.getProjectLifecycleImpact': actions24.getProjectLifecycleImpact,
+  'projects.archiveProject': actions24.archiveProject,
+  'projects.restoreProject': actions24.restoreProject,
+  'projects.deleteProject': actions24.deleteProject,
   'settings-activity.listSavedLogins': actions25.listSavedLogins,
   'settings-activity.deleteSavedLogin': actions25.deleteSavedLogin,
   'settings-activity.saveSavedLogin': actions25.saveSavedLogin,
@@ -203,6 +210,17 @@ const functions = {
   'team-relations.setIssueTeam': actions27.setIssueTeam,
   'team-relations.listProjectTeams': actions27.listProjectTeams,
   'team-relations.setProjectTeams': actions27.setProjectTeams,
+  'task-domain.getTaskPresentation': taskDomainActions.getTaskPresentation,
+  'task-domain.getTaskPresentations': taskDomainActions.getTaskPresentations,
+  'teams.getTeamLifecycleImpact': actions28.getTeamLifecycleImpact,
+  'teams.getTeamLifecycleAudit': actions28.getTeamLifecycleAudit,
+  'teams.archiveTeam': actions28.archiveTeam,
+  'teams.restoreTeam': actions28.restoreTeam,
+  'teams.removeTeamGrouping': actions28.removeTeamGrouping,
+  'project-resources.listProjectResources': projectResourcesActions.listProjectResources,
+  'project-resources.saveEnvironment': projectResourcesActions.saveEnvironment,
+  'project-resources.saveProjectResources': projectResourcesActions.saveProjectResources,
+  'project-resources.saveWorkspaceRepositoryPolicy': projectResourcesActions.saveWorkspaceRepositoryPolicy,
   'teams.listTeams': actions28.listTeams,
   'teams.loadTeamDirectory': actions28.loadTeamDirectory,
   'teams.saveTeam': actions28.saveTeam,

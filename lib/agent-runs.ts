@@ -222,7 +222,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
     }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId, current.source,
     // The wrapper authorizes the failed source above. All target policy,
     // credential, task-destination and publication checks still run normally.
-    { executor, repo, client: tx, workspaceHint: originalIdentity.data.workspaceId })
+    { executor, repo, client: tx, workspaceHint: originalIdentity.data.workspaceId, frozenSourceRunId: current.id })
     const [queued] = await executor.select({ definition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     const definition = queued?.definition
     if (!definition || definition.model !== input.model || (input.apiKeyId && definition.apiKey?.keyId !== input.apiKeyId) ||
@@ -239,7 +239,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
 
 async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 'model'> & { model?: string }, botId: string | null, execution?: AgentExecution,
   requestEventId?: string, source: 'mcp' | null = null,
-  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; workspaceHint?: string | null; factoryContext?: { sourceEventId: string; attemptId: string } }) {
+  internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; frozenSourceRunId?: string; workspaceHint?: string | null; factoryContext?: { sourceEventId: string; attemptId: string } }) {
   const executor = internal?.executor ?? db
   // Every local run is frozen with its model, a Factory or Skill run included: a caller that left it out fails here, before anything is read or written.
   if (typeof input.model !== 'string' || !input.model.trim() || input.model.trim() === 'auto') {
@@ -297,7 +297,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
       .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
   }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId, frozenSourceRunId: internal.frozenSourceRunId } : {}) }, internal?.client)
 }
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */
@@ -338,11 +338,11 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 }
 
 /** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */
-async function runVisibilityPredicate(reader: IssueReader, input: { issueId?: string; runIds?: string[]; teams?: readonly TeamScope[] }) {
+async function runVisibilityPredicate(reader: IssueReader) {
   const userId = typeof reader === 'string' ? reader : reader.id
-  // The persisted run/task tenant and fresh reader authority decide access.
-  // Team links only name tasks; no run-to-task pre-read is needed for this gate.
-  const visibility = await issueVisibility(reader, false, undefined, db, { teams: input.teams, withTeamLinks: false })
+  // Current tenant membership and the joined Task authorize the Run. Team
+  // naming rows and a preliminary Run-to-Task lookup do not enter this gate.
+  const visibility = await issueVisibility(reader, false, undefined, db, { withTeamLinks: false })
   const tenant = visibility.workspaceIds.length ? inArray(agentRuns.workspaceId, visibility.workspaceIds) : sql`false`
   const task = and(visibility.predicate, eq(agentRuns.workspaceId, issues.workspaceId))
   return and(tenant, or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), task)), task))
@@ -354,10 +354,10 @@ async function runVisibilityPredicate(reader: IssueReader, input: { issueId?: st
  * `threadName` reads (`threadNameHead`), and a teammate's run named by its harness
  * as `workspaceRunView` does. No report, error or provenance.
  */
-export async function visibleRunNames(reader: IssueReader, runIds: string[], teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
+export async function visibleRunNames(reader: IssueReader, runIds: string[], _teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
-  const visible = await runVisibilityPredicate(reader, { runIds, teams })
+  const visible = await runVisibilityPredicate(reader)
   const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, agentName: runBotName, harness: runViewColumns.harness,
     promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end` }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
@@ -367,12 +367,13 @@ export async function visibleRunNames(reader: IssueReader, runIds: string[], tea
 
 /** Every surface uses this gate. Workspace membership never grants run control,
  * personal agent/session access, or raw transcript access.
+ * `teams` remains a legacy compatibility hint with no authorization role.
  * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
 export async function visibleRuns(reader: IssueReader, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
-  const visible = await runVisibilityPredicate(reader, input)
+  const visible = await runVisibilityPredicate(reader)
   const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns),
     failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))

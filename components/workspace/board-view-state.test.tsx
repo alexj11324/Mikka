@@ -57,7 +57,7 @@ function issue(owner: string, workspace: string, suffix: string): Issue {
   const prefix = owner === 'owner-one' ? workspace : `${owner}:${workspace}`
   return { id: `${workspace}-${suffix}`, title: `${prefix} task ${suffix}`, ownerId: owner, scope: 'workspace', status: 'todo', priority: 'normal',
     createdAt: '2026-11-07T00:00:00Z', updatedAt: '2026-11-07T00:00:00Z', checklist: { total: 0, checked: 0 },
-    metadata: { assignee: { id: owner, kind: 'user', name: owner }, project: `${prefix} private project ${suffix}`, labels: [{ name: `${prefix} private label ${suffix}`, color: null }], pullRequests: [] } } as unknown as Issue
+    metadata: { assignee: { id: owner, kind: 'member', name: owner }, project: `${prefix} private project ${suffix}`, labels: [{ name: `${prefix} private label ${suffix}`, color: null }], pullRequests: [] } } as unknown as Issue
 }
 async function render({ owner = 'owner-one', workspace = 'workspace-one', visible = true, remount = false } = {}) {
   await act(async () => root.render(<ViewStateProvider scope={`${owner}:${workspace}`}>

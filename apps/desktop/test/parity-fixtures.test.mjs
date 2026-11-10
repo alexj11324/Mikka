@@ -29,6 +29,8 @@ async function fixtureContract(createParityFixtures, mode) {
   const cleaned = []
   const lease = { id: 'this-lease', generation: 1 }
   const refusal = new Error('RESOURCE_OWNER_MISMATCH')
+  const issuedIdentifier = 'WS12AB34CD-17'
+  const invalidIdentity = ['missing-identity', 'empty-identifier', 'wrong-task', 'wrong-workspace', 'wrong-owner'].includes(mode)
   const client = { query: async (sql, args = []) => {
     events.push({ kind: 'sql', sql, args })
     if (sql === 'SELECT clock_timestamp() AS now') return { rows: [{ now: new Date().toISOString() }] }
@@ -38,11 +40,23 @@ async function fixtureContract(createParityFixtures, mode) {
       assert.deepEqual(args, [[owner, peer]])
       return { rows: [{ id: owner, name: 'Owner', email: 'owner@example.invalid' }, { id: peer, name: 'Peer', email: 'peer@example.invalid' }] }
     }
+    if (sql === 'SELECT id,"userId","workspaceId","issuedIdentifier" FROM public."issues" WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3') {
+      assert.equal(rows('issues').length, 1)
+      const task = rows('issues')[0]
+      assert.deepEqual(args, [task.id, owner, task.workspaceId], 'identifier read must bind the reserved Task, owner and Workspace')
+      if (mode === 'missing-identity') return { rows: [] }
+      return { rows: [{ id: mode === 'wrong-task' ? 'foreign-task' : task.id, userId: mode === 'wrong-owner' ? peer : owner,
+        workspaceId: mode === 'wrong-workspace' ? 'foreign-workspace' : task.workspaceId, issuedIdentifier: mode === 'empty-identifier' ? '' : task.issuedIdentifier }] }
+    }
     const insert = /^INSERT INTO public\."([^"]+)" \(([^)]+)\) VALUES \(([^)]+)\)$/.exec(sql)
     if (insert) {
       const columns = [...insert[2].matchAll(/"([^"]+)"/g)].map(match => match[1])
       assert.equal(columns.length, args.length)
       const row = Object.fromEntries(columns.map((column, index) => [column, args[index]]))
+      if (insert[1] === 'issues') {
+        assert.equal(Object.hasOwn(row, 'issuedIdentifier'), false, 'fixtures must not force a legacy display number into the new Task')
+        row.issuedIdentifier = issuedIdentifier // Database-generated result, deliberately unlike the Team alias.
+      }
       rows(insert[1]).push(row)
       return { rows: [], rowCount: 1 }
     }
@@ -88,8 +102,20 @@ async function fixtureContract(createParityFixtures, mode) {
     assert.equal(events.filter(event => event.kind === 'sql').length, 0, 'ownership refusal happens before any fixture SQL')
     return
   }
+  if (invalidIdentity) {
+    await assert.rejects(createParityFixtures(scope, options), { code: 'PARITY_TASK_IDENTITY_INVALID' })
+    assert.equal(events.some(event => event.kind === 'sql' && event.sql.startsWith('INSERT INTO public."agent_runs"')), false, 'invalid identity fails before creating a run or exposing a fixture')
+    assert.equal(rows('issues').length, 0)
+    assert.deepEqual(rows('bots'), baseline)
+    assert.equal(cleaned.length, reserved.length)
+    return
+  }
   const result = await createParityFixtures(scope, options)
   const fixture = result.fixture
+  assert.equal(fixture.issueIdentifier, issuedIdentifier, 'exact UI locators use the issued value returned for this Task')
+  assert.equal(rows('mikka_teams')[0].identifier, 'APP', 'the historical Team label remains unchanged')
+  assert.equal(rows('mikka_team_issues')[0].issueId, fixture.issue)
+  assert.equal(rows('mikka_team_issues')[0].workspaceId, fixture.workspace)
   if (mode === 'default') {
     assert.equal(Object.hasOwn(fixture, 'peerCoordinator'), false)
     assert.equal(rows('coordinator_bots').filter(row => row.workspaceId === fixture.workspace).length, 1)
@@ -137,6 +163,11 @@ for (const [mode, title] of [
   ['members', 'both leased members have separately owned, pre-reserved coordinators before UI reads'],
   ['cleanup', 'cleanup removes only reserved coordinator IDs and leaves personal or untracked peer rows dirty'],
   ['refused', 'a refused peer reservation prevents every fixture insertion and cleanup write'],
+  ['missing-identity', 'missing issued Task identity prevents the parity fixture from being returned'],
+  ['empty-identifier', 'an empty issued identifier never falls back to a guessed Team number'],
+  ['wrong-task', 'a different Task identity cannot supply the exact UI locator'],
+  ['wrong-workspace', 'a different Workspace identity cannot supply the exact UI locator'],
+  ['wrong-owner', 'a different owner identity cannot supply the exact UI locator'],
 ]) test(title, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-parity-coordinator-'))
   const database = 'postgresql://fixture:' + randomBytes(16).toString('hex') + '@127.0.0.1:1/parity_fixture_e2e'

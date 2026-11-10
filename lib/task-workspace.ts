@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, asc, eq, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
+import type { PoolClient } from 'pg'
 import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { actingContext } from '@/lib/activity-actor'
@@ -10,10 +11,10 @@ import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
 import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import * as workspaceDatabase from '@/lib/workspace-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { filterEnterpriseWorkspaceLinks, filterEnterpriseWorkspaces } from '@/lib/enterprise/access'
+import { filterEnterpriseWorkspaceLinks, filterEnterpriseWorkspaces, type EnterpriseAuthExecutor } from '@/lib/enterprise/access'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 
-const { workspaceDb } = workspaceDatabase
+const { workspaceDb, workspacePool } = workspaceDatabase
 // Short aliases keep the repeated fresh membership/Org SELECT bounded on the
 // wire. Locking readers retain their original table references and predicates.
 const readerWorkspace = alias(workspaces, 'w')
@@ -25,6 +26,7 @@ type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction
 export type TaskWorkspace = { id: string; kind: 'personal' | 'team' }
 
 type HeldTaskWorkspace = {
+  reader: Reader;
   userId: string; workspaceId: string; kind: TaskWorkspace['kind']; organizationId: string | null; tx: WorkspaceTransaction; active: boolean;
   changedOrganizationWorkspaces: Set<string> | null;
   workspaceTransactionKey: object | null;
@@ -53,7 +55,7 @@ export function invalidateTaskWorkspaceOrganization(workspaceId: string): void {
   currentOrganizationChanges()?.add(workspaceId)
 }
 
-export type BorrowedTaskWorkspaceMembership = { check(): Promise<void>; close(): Promise<void> }
+export type BorrowedTaskWorkspaceMembership = { workspaceClient: Pick<PoolClient, 'query'>; check(appExecutor?: EnterpriseAuthExecutor): Promise<void>; close(): Promise<void> }
 
 /** A borrow cannot release the owner transaction or authorize another tenant.
  * Its fresh read uses the held WS executor; no second pool checkout occurs. */
@@ -63,14 +65,30 @@ export function borrowTaskWorkspaceMembership(userId: string, workspaceId: strin
   if (lease.userId !== userId || lease.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   let closed = false
   const assertActive = () => { if (closed || !leaseActive(lease)) throw new ActionFailureError('workspaceAccessDenied') }
+  // Capture the current WS executor while its owning transaction is active.
+  // The wrapper refuses use after close or after that transaction completes.
+  const query = workspacePool.query
   return {
-    async check() {
+    workspaceClient: { query: ((...args: unknown[]) => { assertActive(); return Reflect.apply(query, workspacePool, args) }) as PoolClient['query'] },
+    async check(appExecutor) {
       assertActive()
       const [current] = await lease.tx.select({ id: workspaces.id }).from(workspaces)
         .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
         .where(membership(userId, workspaceId)).limit(1)
       assertActive()
       if (!current) throw new ActionFailureError('workspaceAccessDenied')
+      const acting = actingContext.getStore()
+      if (acting && (acting.userId !== userId || acting.tokenWorkspaceId && acting.tokenWorkspaceId !== workspaceId))
+        throw new ActionFailureError('workspaceAccessDenied')
+      // A narrower current actor never inherits the holder's SSO assurance.
+      // Preserve an explicit admission principal only when no actor replaced it.
+      const reader: Reader = acting ? { id: userId, [tokenWorkspace]: acting.tokenWorkspaceId,
+        [enterprisePrincipal]: acting.enterprisePrincipal } : lease.reader
+      const allowed = !lease.changedOrganizationWorkspaces || lease.changedOrganizationWorkspaces.has(workspaceId)
+        ? await filterEnterpriseWorkspaces(reader, [{ id: workspaceId }], appExecutor)
+        : await filterEnterpriseWorkspaceLinks(reader, [{ id: workspaceId, organizationId: lease.organizationId }], appExecutor)
+      assertActive()
+      if (!allowed.length) throw new ActionFailureError('workspaceAccessDenied')
     },
     async close() { closed = true },
   }
@@ -95,7 +113,7 @@ function membership(userId: string, workspaceId?: string,
 
 /** Read on every operation, or reuse only the membership held by this exact
  * active lease. Enterprise policy and principal are checked on every call. */
-export async function activeTaskWorkspaces(reader: Reader, requestedId?: string): Promise<TaskWorkspace[]> {
+export async function activeTaskWorkspaces(reader: Reader, requestedId?: string, appExecutor?: EnterpriseAuthExecutor): Promise<TaskWorkspace[]> {
   const scope = taskReaderScope(reader)
   if (requestedId && !z.uuid().safeParse(requestedId).success) return []
   if (scope.workspaceId && requestedId && scope.workspaceId !== requestedId) return []
@@ -106,15 +124,15 @@ export async function activeTaskWorkspaces(reader: Reader, requestedId?: string)
   // SSO, directory, provider and principal checks remain fresh on every read.
   if (selectedId && lease && leaseActive(lease) && lease.userId === scope.userId && lease.workspaceId === selectedId) {
     if (!lease.changedOrganizationWorkspaces || lease.changedOrganizationWorkspaces.has(selectedId))
-      return filterEnterpriseWorkspaces(reader, [{ id: lease.workspaceId, kind: lease.kind }])
-    const rows = await filterEnterpriseWorkspaceLinks(reader, [{ id: lease.workspaceId, kind: lease.kind, organizationId: lease.organizationId }])
+      return filterEnterpriseWorkspaces(reader, [{ id: lease.workspaceId, kind: lease.kind }], appExecutor)
+    const rows = await filterEnterpriseWorkspaceLinks(reader, [{ id: lease.workspaceId, kind: lease.kind, organizationId: lease.organizationId }], appExecutor)
     return rows.map(({ id, kind }) => ({ id, kind }))
   }
   const rows = await workspaceDb.select({ id: readerWorkspace.id, kind: readerWorkspace.kind, organizationId: readerOrganization.organizationId }).from(readerWorkspace)
     .innerJoin(readerMember, eq(readerMember.workspaceId, readerWorkspace.id))
     .leftJoin(readerOrganization, eq(readerOrganization.workspaceId, readerWorkspace.id))
     .where(membership(scope.userId, selectedId, readerWorkspace, readerMember)).orderBy(asc(readerWorkspace.createdAt))
-  return (await filterEnterpriseWorkspaceLinks(reader, rows)).map(({ id, kind }) => ({ id, kind }))
+  return (await filterEnterpriseWorkspaceLinks(reader, rows, appExecutor)).map(({ id, kind }) => ({ id, kind }))
 }
 
 /** Pin authoritative membership until the app write commits. Call outside the
@@ -150,7 +168,7 @@ export async function withTaskWorkspace<T>(reader: Reader, workspaceId: string, 
     }
     const parent = taskWorkspaceLease.getStore()
     const changedOrganizationWorkspaces = currentOrganizationChanges()
-    const lease: HeldTaskWorkspace = { userId: scope.userId, workspaceId, kind: workspace.kind, organizationId: member.organizationId, tx, active: true,
+    const lease: HeldTaskWorkspace = { reader, userId: scope.userId, workspaceId, kind: workspace.kind, organizationId: member.organizationId, tx, active: true,
       changedOrganizationWorkspaces,
       workspaceTransactionKey: workspaceDatabase.workspaceTransactionKey?.() ?? null,
       ...(parent && leaseActive(parent) ? { parent } : {}) }
@@ -160,9 +178,8 @@ export async function withTaskWorkspace<T>(reader: Reader, workspaceId: string, 
 }
 
 /** Validate an internal creator's explicit tenant; never use title, creator or scope. */
-export async function requireTaskWorkspace(reader: Reader, workspaceId: string): Promise<TaskWorkspace> {
-  const [workspace] = await activeTaskWorkspaces(reader, workspaceId)
+export async function requireTaskWorkspace(reader: Reader, workspaceId: string, appExecutor?: EnterpriseAuthExecutor): Promise<TaskWorkspace> {
+  const [workspace] = await activeTaskWorkspaces(reader, workspaceId, appExecutor)
   if (!workspace) throw new ActionFailureError('workspaceAccessDenied')
   return workspace
 }
-

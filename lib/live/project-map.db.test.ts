@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import type { LiveInvalidation } from './events'
 import type { LiveScope } from './scope'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('project map invalidations use current scope and only committed writes', { skip: !dbUrl }, async t => {
   const pending: (() => Promise<void>)[] = [], sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
@@ -44,7 +44,7 @@ test('project map invalidations use current scope and only committed writes', { 
   const team = await seedTeam(connection, shared.id, owner)
   const privateProject = await seedProject(connection, owner, []), sharedProject = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: shared.id }])
   const issueId = await seedIssue(connection, owner)
-  await connection.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [privateProject, JSON.stringify([issueId])])
+  await seedProjectTasks(connection, privateProject, [issueId])
   const revision = async () => (await connection.query('SELECT revision FROM live_revisions WHERE kind=\'project_map\' AND id=$1', [privateProject])).rows[0]?.revision
   const expected = [{ scope: { ownerId: owner, workspaceId: home.id }, events: [{ kind: 'project_map', id: privateProject }] }]
   await t.test('a private project reaches its owner only; shared project excludes suspended members', async () => {

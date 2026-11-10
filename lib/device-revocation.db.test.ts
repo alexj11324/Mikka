@@ -82,6 +82,19 @@ test('owner revoke stops attributed work, revokes worker access, records once an
   assert.equal((await state(sibling)).revokedAt, null)
 })
 
+test('explicit revoke records intent even when normal parking already revoked the execution token', async () => {
+  const f = await fixture()
+  await raw.query('UPDATE device_tokens SET "revokedAt"=clock_timestamp() WHERE id=$1', [f.tokenId])
+  const parked = await state(f)
+  assert.equal(parked.revokedBy, null)
+  const receipt = await revokeDeviceCredential(raw, f.owner, f.tokenId)
+  assert.equal(receipt?.revokedBy, f.owner)
+  const explicit = await state(f)
+  assert.equal(explicit.revokedAt.getTime(), parked.revokedAt.getTime(), 'the original execution revocation timestamp is preserved')
+  assert.equal(explicit.receipts, 1)
+  assert.ok(explicit.stopRequestedAt && explicit.workerRevokedAt)
+})
+
 test('a receipt write fault rolls token, stop, lease and worker revocation back atomically', async () => {
   const f = await fixture()
   const initial = await state(f)

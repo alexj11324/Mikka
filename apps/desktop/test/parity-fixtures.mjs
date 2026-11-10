@@ -20,7 +20,7 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
   const coordinatorIds = [ids.coordinator, ...(includePeerCoordinator ? [ids.peerCoordinator] : [])]
   const fixture = {
     ...ids, epoch, workspaceName: 'Desktop acceptance', teamName: 'Application', botName: 'Ada', groupName: 'Release review',
-    issueTitle: 'Review the desktop workspace', issueIdentifier: 'APP-1', agentLabel: 'Codex', artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview',
+    agentLabel: 'Codex', issueTitle: 'Review the desktop workspace', issueIdentifier: null, artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview',
     // The address is visible in Settings. Independent baseline/candidate
     // databases need the same display text; fresh UUIDs still own every row.
     workspaceSlug: 'desktop-review',
@@ -126,6 +126,13 @@ export async function createParityFixtures(scope, { epoch = process.env.MIKKA_DE
       // Every application row uses the same freshly reserved, leased Team
       // workspace created above; legacy display scope is not tenant evidence.
       await insert(client, 'issues', { id: ids.issue, userId: owner, workspaceId: ids.workspace, ownershipState: 'bound', title: fixture.issueTitle, content: JSON.stringify(content), status: 'todo', priority: 'normal', scope: 'workspace', scopeSetBy: 'user', linearSyncBlocked: true, createdAt: AT, updatedAt: AT })
+      // APP issues the stable Workspace identifier in the INSERT transaction.
+      // Adding the APP Team below records a historical alias, not a renumbering.
+      const identities = (await client.query('SELECT id,"userId","workspaceId","issuedIdentifier" FROM public."issues" WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3', [ids.issue, owner, ids.workspace])).rows
+      const identity = identities[0]
+      if (identities.length !== 1 || identity.id !== ids.issue || identity.userId !== owner || identity.workspaceId !== ids.workspace
+        || typeof identity.issuedIdentifier !== 'string' || !identity.issuedIdentifier.trim() || identity.issuedIdentifier !== identity.issuedIdentifier.trim()) throw new TestAccountError('PARITY_TASK_IDENTITY_INVALID')
+      fixture.issueIdentifier = identity.issuedIdentifier
       await insert(client, 'issue_versions', { id: ids.version, issueId: ids.issue, userId: owner, revision: 1, title: fixture.issueTitle, content: JSON.stringify(content), status: 'todo', priority: 'normal', actor_type: 'user', actor_id: owner, createdAt: AT })
       await insert(client, 'mikka_team_issues', { issueId: ids.issue, teamId: ids.team, workspaceId: ids.workspace, userId: owner, createdAt: AT })
       await insert(client, 'devices', { id: ids.device, ownerId: owner, name: 'Review laptop', hostname: 'review-laptop', kind: 'local', deviceType: 'laptop', platform: 'darwin', arch: 'arm64', harnesses: '[]', enabled: false, nameLocked: true, lastSeenAt: AT, createdAt: AT, updatedAt: AT })

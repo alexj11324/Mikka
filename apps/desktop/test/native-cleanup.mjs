@@ -11,9 +11,10 @@ function navigationContextLost(error) {
 
 async function bounded(promise, milliseconds, message) {
   let timer
+  const timeout = message instanceof Error ? message : new Error(message)
   try {
     return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(message)), milliseconds)
+      timer = setTimeout(() => reject(timeout), milliseconds)
     })])
   } finally { clearTimeout(timer) }
 }
@@ -191,13 +192,27 @@ export async function stopLocalDaemons(profiles) {
         try {
           assertDaemonPid(client.hello.pid, pid)
           assertDaemonPid(client.hello.pid, await recordedPid(directory))
-          const closed = new Promise(resolve => client.onClose(resolve))
+          let connectionClosed = false
+          const closed = new Promise(resolve => client.onClose(() => { connectionClosed = true; resolve() }))
           const drainBudget = remainingTime(deadline, 5000)
-          await bounded(client.request('daemon.drain'), drainBudget, 'NATIVE_DAEMON_DRAIN_TIMEOUT')
-          await bounded(closed, remainingTime(deadline), 'NATIVE_DAEMON_SOCKET_CLOSE_TIMEOUT')
-          // Socket close precedes outbox/tracing shutdown in the real daemon.
-          // Prove actual process exit within this same cleanup deadline.
-          await waitForExit(client.hello.pid, deadline)
+          const drainTimeout = new Error('NATIVE_DAEMON_DRAIN_TIMEOUT')
+          let drainFailure
+          const drain = client.request('daemon.drain').catch(error => { drainFailure = { error }; throw error })
+          try {
+            try { await bounded(drain, drainBudget, drainTimeout) } catch (error) {
+              // Preserve the full response window, including queued RPC errors.
+              // Only this timer and an observed authenticated close may advance
+              // to exact-PID exit proof; closure alone cannot authorize cleanup.
+              if (error !== drainTimeout || !connectionClosed) throw error
+            }
+            await bounded(closed, remainingTime(deadline), 'NATIVE_DAEMON_SOCKET_CLOSE_TIMEOUT')
+            // Socket close precedes outbox/tracing shutdown in the real daemon.
+            // Prove actual process exit within this same cleanup deadline.
+            await waitForExit(client.hello.pid, deadline)
+          } catch (error) { throw drainFailure ? drainFailure.error : error }
+          // Do not discard a real RPC/parse rejection received while awaiting
+          // process exit. Our own dispose occurs only after this check.
+          if (drainFailure) throw drainFailure.error
         } finally { client.close() }
         break
       }

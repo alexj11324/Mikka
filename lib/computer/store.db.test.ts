@@ -59,6 +59,16 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await seedFixtureWorkspace(pool, actor.userId, 'team', actor.workspaceId)
     await seedFixtureWorkspace(pool, actor.userId, 'team', otherWorkspace.workspaceId)
     await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,\'bob@example.invalid\',\'member\',\'active\')', [actor.workspaceId, bob.userId])
+    await pool.query(`CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid NOT NULL,"ownershipState" text NOT NULL CHECK ("ownershipState"='bound'));
+      CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL REFERENCES mikka_workspaces(id),revision integer NOT NULL DEFAULT 1,"archivedAt" timestamptz,UNIQUE(id,"workspaceId"));
+      CREATE TABLE workspace_project_tasks ("issueId" uuid PRIMARY KEY,"projectId" uuid NOT NULL,"workspaceId" uuid NOT NULL,
+        FOREIGN KEY ("projectId","workspaceId") REFERENCES workspace_projects(id,"workspaceId"));`)
+    await pool.query(await readFile(new URL('../../drizzle/20261109143004_project_resources.sql', import.meta.url), 'utf8'))
+    const queueTask = async () => {
+      const id = randomUUID()
+      await pool.query(`INSERT INTO issues (id,"userId","workspaceId","ownershipState") VALUES ($1,$2,$3,'bound')`, [id, actor.userId, actor.workspaceId])
+      return id
+    }
     await pool.query('CREATE TABLE user_e2b_keys ("userId" text PRIMARY KEY); CREATE TABLE workspace_e2b_keys ("createdBy" text)')
     await pool.query('INSERT INTO user_e2b_keys VALUES ($1),($2)', [actor.userId, bob.userId])
     await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz, "agentDefinition" jsonb, "dispatchFingerprint" text, "promptTaskStart" integer, "promptTaskLength" integer, "workspaceId" uuid)')
@@ -256,18 +266,18 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.deepEqual(linked[0], linked[1], 'a retried bind selects the same subscription binding')
     await assert.rejects(bindBotSubscription(pool, actor, { ...botBinding, modelId: 'changed-model' }), /unavailable/)
     const managedCodex = setups[0].find(row => row.harness === 'codex')!
-    const managedRun = await queueCloudRun(pool, actor, { botId: bot.id, issueId: randomUUID(), agentId: managedCodex.agentId, deviceRepoId: managedCodex.repoId, title: 'Computer task', body: '', model: 'fixture-model' })
+    const managedRun = await queueCloudRun(pool, actor, { botId: bot.id, issueId: await queueTask(), agentId: managedCodex.agentId, deviceRepoId: managedCodex.repoId, title: 'Computer task', body: '', model: 'fixture-model' })
     assert.equal((await pool.query('SELECT "botId" FROM computer_run_bindings WHERE "runId"=$1', [managedRun.runId])).rows[0].botId, bot.id)
     assert.equal((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [managedRun.runId])).rows[0].botId, bot.id, 'the cloud thread belongs to its Bot in the product chat')
     const cloudRepo = randomUUID()
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions,name) VALUES ($1,$2,$3,$4,$5,$6)', [consumer, actor.userId, worker.deviceId, 'codex', 'Follow the task', 'Fixture'])
     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath") VALUES ($1,$2,$3,$4,$5)', [cloudRepo, actor.userId, worker.deviceId, 'main', '/tmp/cloud-repo'])
     await pool.query('UPDATE bot_cloud_runtimes SET "agentId"=$2,"repoId"=$3 WHERE "botId"=$1 AND harness=\'codex\'', [bot.id,consumer,cloudRepo])
-    const cloudInput = { botId: bot.id, issueId: randomUUID(), agentId: consumer, deviceRepoId: cloudRepo, title: 'Task', body: 'Use the desktop', model: 'fixture-model' }
+    const cloudInput = { botId: bot.id, issueId: await queueTask(), agentId: consumer, deviceRepoId: cloudRepo, title: 'Task', body: 'Use the desktop', model: 'fixture-model' }
     // A repository task: its repository has a remote, so it runs on a task machine and the 电脑 policy does not gate it.
     const remoteRepo = randomUUID()
     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5,$6)', [remoteRepo, actor.userId, worker.deviceId, 'main', 'v2/example.test/octo/repo', 'https://example.test/octo/repo.git'])
-    const repositoryInput = { ...cloudInput, issueId: randomUUID(), deviceRepoId: remoteRepo, body: 'Fix the bug' }
+    const repositoryInput = { ...cloudInput, issueId: await queueTask(), deviceRepoId: remoteRepo, body: 'Fix the bug' }
     const allowedRepository = await queueCloudRun(pool, actor, repositoryInput)
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [allowedRepository.runId])).rows[0].status, 'queued', 'an allow workspace queues a repository task')
     await assert.rejects(queueCloudRun(pool, otherWorkspace, cloudInput), { status: 409 })
@@ -459,7 +469,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(await decideComputerReview(pool, actor, laterReview.id, laterReview.digest, true), false)
     await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 20)]), /Run or desktop unavailable/)
     await assert.rejects(queueCloudRun(pool, actor, cloudInput), { status: 409 })
-    const deniedRepository = await queueCloudRun(pool, actor, { ...repositoryInput, issueId: randomUUID() })
+    const deniedRepository = await queueCloudRun(pool, actor, { ...repositoryInput, issueId: await queueTask() })
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [deniedRepository.runId])).rows[0].status, 'queued', 'a deny workspace still queues a repository task')
     await store.operate(actor, bot.id, 'wake')
     assert.equal(computerAllowed, false, 'waking a denied desktop cannot re-enable the driver')

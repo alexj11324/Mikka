@@ -86,9 +86,14 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     import('../agent-kit/worker-digest'), import('../computer/bot-runtime-records'),
   ])
   appPool = modules[0].pool; workspacePool = modules[1].workspacePool
-  const [, , profiles, { bindAgentToConnection }, { queueCloudRun }, { createFactoryStore }, { createFactoryDispatch, factoryBinding },
-    { createFactoryReconciler }, { automaticFactoryDispatch, factoryAutomaticRuntime }, { factoryCheckGates }, { factoryCheckIndependent },
+  const [, , profiles, { bindAgentToConnection }, { queueCloudRun }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding },
+    { createFactoryReconciler: rawReconciler }, { automaticFactoryDispatch, factoryAutomaticRuntime }, { factoryCheckGates }, { factoryCheckIndependent },
     { workerDefinitionDigest }, { ensureRecordedBotHarnessRuntime }] = modules
+  const { resourceBoundFactoryDispatch, factoryResourceWorkspace } = await import('../../tests/helpers/factory-resource-boundary')
+  const { bindFactoryQuestionsWorkspace, bindFactoryStoreWorkspace } = await import('./background-workspace')
+  const createFactoryDispatch: typeof rawDispatch = (...args) => resourceBoundFactoryDispatch(args[0], rawDispatch(...args))
+  const createFactoryReconciler: typeof rawReconciler = (source, store, questions, consumers, botId, automatic, boundary) =>
+    rawReconciler(source, store, questions, consumers, botId, automatic, boundary ?? factoryResourceWorkspace(source))
   const handoffs: { previous: string | null; runId: string }[] = []
   t.mock.method(factoryAutomaticRuntime, 'enqueue', async (_pool: Pool, _actor: unknown, previous: string | null, runId: string) => { handoffs.push({ previous, runId }) })
   t.mock.method(factoryAutomaticRuntime, 'park', async () => { throw new Error('Provider park must stay outside dispatch') })
@@ -427,9 +432,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   }
   const recheckCallsStart = decisionInputs.length
   const { createFactoryHumanStore } = await import('./human-store')
-  const humanStore = (dispatch = automaticFactoryDispatch(pool)) => createFactoryHumanStore(pool, botId => createFactoryStore(pool,
+  const humanStore = (dispatch = automaticFactoryDispatch(pool)) => createFactoryHumanStore(pool, botId => bindFactoryStoreWorkspace(pool, createFactoryStore(pool,
     async (owner, issueId, tx) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issueId, owner])).rowCount === 1,
-    botId, { independent: factoryCheckIndependent, gates: factoryCheckGates }), dispatch)
+    botId, { independent: factoryCheckIndependent, gates: factoryCheckGates }), botId), dispatch)
   const recheckCandidate = async (waiting: boolean, legacy = false) => {
     const f = await exercise(true, false, false, false, 'prepared', 1)
     const { reconcileFactoryCheck } = await import('./reconcile-check')
@@ -654,6 +659,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal(failed.report.modelFallback.retryRunId, undefined)
     // Even a separately queued, otherwise valid host provider receipt cannot
     // adopt another subscription/API source into this Owner's frozen round.
+    await factoryResourceWorkspace(pool)(f.ownerId, task.id, async () => {
     const tx = await pool.connect()
     try {
       await tx.query('BEGIN')
@@ -687,6 +693,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       await assert.rejects(f.store.apply(f.ownerId, factoryBinding(task), randomUUID(), { action: 'adopt_retry', runId: child.id, reason: 'Synthetic forbidden source change' }, tx),
         (error: unknown) => (error as { code?: string }).code === 'factoryRunMismatch')
     } finally { await tx.query('ROLLBACK'); tx.release() }
+    })
     await f.reconcile.run(f.ownerId, run.id)
     const current = (await f.store.read(f.ownerId, f.task.id)).task
     assert.equal(current.stage, stage); assert.equal(current.status, 'blocked'); assert.equal(current.candidateId, f.current.candidateId)
@@ -714,6 +721,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const pending = (retried.body as FactorySnapshot).task
     assert.equal(pending.stage, 'review'); assert.equal(pending.status, 'pending'); assert.equal(pending.candidateId, f.current.candidateId)
     const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('./transaction')
+    await factoryResourceWorkspace(pool)(f.ownerId, pending.id, async () => {
     const tx = await pool.connect()
     try {
       await beginFactoryTransaction(tx)
@@ -722,6 +730,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       await start?.()
     } catch (error) { await rollbackFactoryTransaction(tx); throw error }
     finally { forgetFactoryTransaction(tx); tx.release() }
+    })
     const next = (await pool.query('SELECT r.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" JOIN agent_runs r ON r.id=a."runId" WHERE t.id=$1', [f.task.id])).rows[0]
     assert.notEqual(next.id, queued.id)
     for (const key of ['harness', 'model', 'subscription', 'agentProfile', 'modelDispatch']) assert.deepEqual(next.agentDefinition[key], queued.agentDefinition[key], key)
@@ -1139,18 +1148,32 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       await pool.query('DROP FUNCTION reject_check_start_receipt()')
     }
   })
-  await t.test('Owner frozen-check recovery rechecks membership at the real commit and rolls back revocation', async () => {
+  await t.test('Owner frozen-check recovery holds membership through commit and refuses the next request after revocation', async () => {
     const f = await unclaimedReview(), dispatch = automaticFactoryDispatch(pool)
     const before = await f.store.read(f.ownerId, f.task.id), beforeHandoffs = handoffs.length, beforeDecisions = decisionCounts()
     const beforeEvents = (await pool.query('SELECT 1 FROM factory_events WHERE "taskId"=$1', [f.task.id])).rowCount
-    let queued = false
+    assert.ok(beforeEvents !== null)
+    const previousRuns = (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows
+    const revoker = await pool.connect()
+    const pid = (await revoker.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+    let queued = false, revoked = false, revocation: Promise<unknown> | undefined
     const human = humanStore(async (tx, store, task, run, recovery) => {
       const start = await dispatch(tx, store, task, run, recovery)
       assert.equal((await tx.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 3)
       queued = true
-      // A different workspace connection commits revocation after actual queue
-      // admission, before the APP transaction's final authorization/COMMIT.
-      await pool.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [f.workspaceId, f.ownerId])
+      // The current member lease serializes a real concurrent revocation after
+      // the already admitted APP commit. It cannot slip between queue and commit.
+      revocation = revoker.query("UPDATE mikka_workspace_members SET status='suspended' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [f.workspaceId, f.ownerId])
+        .then(() => { revoked = true })
+      const deadline = Date.now() + 1_000
+      let blocked = false
+      while (Date.now() < deadline) {
+        blocked = (await pool.query('SELECT cardinality(pg_blocking_pids($1))>0 AS blocked', [pid])).rows[0].blocked
+        if (blocked) break
+        await new Promise(resolve => setTimeout(resolve, 5))
+      }
+      assert.equal(blocked, true, 'the real revocation waits on the held Workspace member')
+      assert.equal(revoked, false)
       return start
     })
     const { handleFactory } = await import('./http')
@@ -1158,18 +1181,33 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       url: `https://app.example/api/factory/tasks/${f.task.id}`, body: { binding: { taskId: f.task.id, revision: f.blocked.task.revision },
         eventId: randomUUID(), action: 'retry', reason: 'Retry only the frozen independent review' } }
     try {
-      await assert.rejects(handleFactory(human, request), { code: 'agentProfileScopeNotFound' },
-        'the Owner POST must not commit an already queued check after membership was revoked')
-      assert.equal(queued, true, 'this exercises final commit authority, not an early queue refusal')
-      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 2)
-      assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1', [f.task.id])).rowCount, before.attempts.length)
-      assert.equal((await pool.query('SELECT 1 FROM factory_events WHERE "taskId"=$1', [f.task.id])).rowCount, beforeEvents)
-      assert.equal(handoffs.length, beforeHandoffs)
-      assert.deepEqual(decisionCounts(), beforeDecisions, 'membership revalidation cannot reselect the frozen model')
+      const response = await handleFactory(human, request)
+      assert.equal(response.status, 200, JSON.stringify(response.body))
+      assert.equal(queued, true)
+      await revocation
+      assert.equal(revoked, true)
+      assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 3)
+      assert.equal((await pool.query('SELECT 1 FROM factory_attempts WHERE "taskId"=$1', [f.task.id])).rowCount, before.attempts.length + 1)
+      assert.equal(handoffs.length, beforeHandoffs + 1)
+      const admitted = await f.store.read(f.ownerId, f.task.id)
+      const runHistory = (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows
+      const eventHistory = (await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [f.task.id])).rows
+      assert.ok(eventHistory.length > beforeEvents)
+      assert.equal(eventHistory.filter(event => event.request.kind === 'owner_check_start_recovery').length, 1)
+      assert.deepEqual(runHistory.filter(run => previousRuns.some(previous => previous.id === run.id)), previousRuns,
+        'a newly admitted retry preserves both the producer and failed check history')
+      assert.deepEqual(await handleFactory(human, request), { status: 404, body: { error: 'factoryNotFound' } },
+        'receipt replay after revocation cannot inherit the earlier admission')
+      assert.deepEqual(await f.store.read(f.ownerId, f.task.id), admitted)
+      assert.deepEqual((await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [f.issueId])).rows, runHistory)
+      assert.deepEqual((await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [f.task.id])).rows, eventHistory)
+      assert.equal(handoffs.length, beforeHandoffs + 1)
+      assert.deepEqual(decisionCounts(), beforeDecisions, 'neither an admitted retry nor a refused replay reselects the frozen model')
     } finally {
+      await revocation
+      revoker.release()
       await pool.query("UPDATE mikka_workspace_members SET status='active' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [f.workspaceId, f.ownerId])
     }
-    assert.deepEqual(await f.store.read(f.ownerId, f.task.id), before)
   })
   for (const quotaResult of ['fresh', 'available', 'exhausted', 'unknown', 'disconnect', 'pause', 'epoch'] as const) await t.test({
     fresh: 'default Profile admits explicitly named Codex after another preferred Harness',
@@ -1346,7 +1384,8 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       const result = await (await import('./runtime')).guardFactoryClaim(tx, f.ownerId, f.threadDevice, f.runId, lease.toISOString())
       assert.equal(result.preserveQuestionWorktree, true)
     } : undefined
-    return claimCloudRun(pool, f.actor, f.runId, f.threadDevice, lease, f.subscriptionBindingId, beforeClaim, undefined, false)
+    return factoryResourceWorkspace(pool)(f.ownerId, f.task.id, () =>
+      claimCloudRun(pool, f.actor, f.runId, f.threadDevice, lease, f.subscriptionBindingId, beforeClaim, undefined, false))
   }
   const refreshQuota = async (connectionId: string, used = .1) => {
     await pool.query(`UPDATE byos_connections SET quota=jsonb_set(jsonb_set(quota,'{observedAt}',$2::jsonb),'{windows,0,used}',$3::jsonb) WHERE id=$1`, [connectionId, JSON.stringify(new Date().toISOString()), JSON.stringify(used)])
@@ -1390,17 +1429,18 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       }, tx)
     })
     const authorize = async (owner: string, issue: string, tx: import('pg').PoolClient) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1
-    const questions = createFactoryQuestions(pool, authorize, f.store, dispatch, undefined, undefined, undefined, async (ownerId, scope) => {
+    const questions = bindFactoryQuestionsWorkspace(pool, createFactoryQuestions(pool, authorize, f.store, dispatch, undefined, undefined, undefined, async (ownerId, scope) => {
       // Observe only the existing provider boundary. No VM or model is called.
       assert.equal(ownerId, f.ownerId); assert.equal(scope.workspaceId, f.workspaceId)
       preparations.push({ ownerId, ...scope })
-    })
+    }), f.botId)
     const factoryClaim = createFactoryClaim(f.store, questions)
     let metadata: Record<string, unknown> = {}
     const claimRun = (runId: string) => {
       const lease = new Date(Date.now() + 30_000)
-      return claimCloudRun(pool, f.actor, runId, f.deviceId, lease, subscriptionBindingId,
-        async tx => { metadata = await factoryClaim(tx, f.ownerId, f.deviceId, runId, lease.toISOString()) }, undefined, false)
+      return factoryResourceWorkspace(pool)(f.ownerId, f.task.id, () =>
+        claimCloudRun(pool, f.actor, runId, f.deviceId, lease, subscriptionBindingId,
+          async tx => { metadata = await factoryClaim(tx, f.ownerId, f.deviceId, runId, lease.toISOString()) }, undefined, false))
     }
     const first = await dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.codex, deviceRepoId: f.repoId, profileId: f.review!.id })
     const sandboxId = `synthetic-plan-thread-${first.runId}`
@@ -1662,7 +1702,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       }, tx)
     })
     const authorize = async (owner: string, issue: string, tx: import('pg').PoolClient) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1
-    const questions = createFactoryQuestions(pool, authorize, f.store, dispatch)
+    const questions = bindFactoryQuestionsWorkspace(pool, createFactoryQuestions(pool, authorize, f.store, dispatch), f.botId)
     const factoryClaim = createFactoryClaim(f.store, questions)
     const first = await dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.codex, deviceRepoId: f.repoId, profileId })
     const sandboxId = `synthetic-default-thread-${first.runId}`
@@ -1671,8 +1711,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     await pool.query(`UPDATE thread_machines SET state='running',"deviceId"=$2,"issueId"=$3,"repoId"=$4,"sandboxId"=$5,"snapshotId"='synthetic-codex' WHERE "runId"=$1`, [first.runId, f.deviceId, f.issueId, f.repoId, sandboxId])
     const lease = new Date(Date.now() + 30_000)
     let claimMetadata: Record<string, unknown> = {}
-    const claimRun = (runId: string) => claimCloudRun(pool, f.actor, runId, f.deviceId, lease, subscriptionBindingId,
-      async tx => { claimMetadata = await factoryClaim(tx, f.ownerId, f.deviceId, runId, lease.toISOString()) }, undefined, false)
+    const claimRun = (runId: string) => factoryResourceWorkspace(pool)(f.ownerId, f.task.id, () =>
+      claimCloudRun(pool, f.actor, runId, f.deviceId, lease, subscriptionBindingId,
+        async tx => { claimMetadata = await factoryClaim(tx, f.ownerId, f.deviceId, runId, lease.toISOString()) }, undefined, false))
     assert.equal((await claimRun(first.runId))?.ownerId, f.ownerId)
     const origin = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
     assert.equal(origin.status, 'preparing'); assert.ok(origin.startedAt)

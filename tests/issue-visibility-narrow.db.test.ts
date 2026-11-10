@@ -92,7 +92,8 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
     try {
       // A historical/foreign Team link cannot replace the persisted task
       // tenant or bypass the batch reader's independent token mismatch fence.
-      await pool.query('update mikka_team_issues set "workspaceId"=$2 where "issueId"=$1', [issue.shared, otherWorkspace])
+      assert.equal((await pool.query('update mikka_team_issues set "teamId"=$2,"workspaceId"=$3 where "issueId"=$1',
+        [issue.shared, foreignTeam, otherWorkspace])).rowCount, 1)
       const defaults = await issuesForUser(pinned, [issue.shared], false, db, { withoutBody: true })
       assert.equal(defaults.has(issue.shared), false)
       assert.equal((await batch()).has(issue.shared), false, 'omitting grouping links must still read the exact token/link mismatch')
@@ -101,7 +102,8 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
       assert.ok(run?.kind === 'run')
       assert.equal(run.issue, null, 'the optimized run citation retains the same task denial')
     } finally {
-      await pool.query('update mikka_team_issues set "workspaceId"=$2 where "issueId"=$1', [issue.shared, workspace])
+      assert.equal((await pool.query('update mikka_team_issues set "teamId"=$2,"workspaceId"=$3 where "issueId"=$1',
+        [issue.shared, team, workspace])).rowCount, 1)
     }
     assert.equal((await batch()).has(issue.shared), true, 'another operation sees the restored current link')
     assert.deepEqual(await visibleWith(member, [issue.shared, issue.secondTeam, issue.foreign, issue.personal, issue.unlinked], true), [issue.secondTeam, issue.shared, issue.unlinked].sort(), 'a teammate sees every task in the tenant, including tasks without a Team')

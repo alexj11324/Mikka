@@ -5,6 +5,7 @@ import copy
 from contextlib import redirect_stderr
 import hashlib
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -91,6 +92,56 @@ class ModelSandbox:
     def kill(self): self.calls.append(('kill',))
 
 class Publish(unittest.TestCase):
+    def test_fresh_conservation_command_preserves_order_status_and_closed_failure_phase(self):
+        phases = [name for name, _ in bt.ANONYMOUS_WORKER_CHECKS] + ['official_files']
+        for failed in [*phases, None]:
+            with self.subTest(failed=failed), tempfile.TemporaryDirectory() as directory:
+                order = Path(directory) / 'order'
+                checks = tuple((phase, '(printf "%s\\n" ' + phase + ' >> "$MIKKA_TEST_ORDER"; exit '
+                                + ('23' if failed == phase else '0') + ')') for phase in phases[:-1])
+                with patch.object(bt, 'ANONYMOUS_WORKER_CHECKS', checks):
+                    command = bt.fresh_conservation_command('claude')
+                function = 'python3() { printf "%s\\n" official_files >> "$MIKKA_TEST_ORDER"; return ' + ('23' if failed == 'official_files' else '0') + '; }; '
+                result = subprocess.run(['bash', '-c', function + command], capture_output=True, text=True,
+                                        env={**os.environ, 'MIKKA_TEST_ORDER': str(order)}, timeout=5)
+                self.assertEqual(result.returncode, 23 if failed else 0)
+                self.assertEqual(order.read_text().splitlines(), phases[:phases.index(failed) + 1] if failed else phases)
+                self.assertEqual(result.stderr, f'mikka-conservation-check-failed {failed} 23\n' if failed else '')
+        original = bt.fresh_conservation_command('codex')
+        positions = [original.index(command) for _, command in bt.ANONYMOUS_WORKER_CHECKS]
+        self.assertEqual(positions, sorted(positions))
+        self.assertTrue(all(original.count(command) == 1 for _, command in bt.ANONYMOUS_WORKER_CHECKS))
+
+    def test_conservation_callback_precedes_cleanup_without_replacing_the_error(self):
+        observed, killed = [], []
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, *_args, **_options): return '{}'
+            def kill(self): killed.append(list(observed))
+        def failed_callback(value):
+            observed.append(value)
+            raise RuntimeError('DO-NOT-LOG-CALLBACK-CONTENT')
+        output = io.StringIO()
+        with redirect_stderr(output), self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+            bt.probe_conservation('candidate', 'fixture-key', 'desktop', lambda *_, **__: Probe(), on_diagnostic=failed_callback)
+        self.assertEqual(observed, [{'kind': 'desktop', 'stage': 'preload_validation', 'code': 'official_conservation_invalid'}])
+        self.assertEqual(killed, [observed])
+        self.assertNotIn('DO-NOT-LOG-CALLBACK-CONTENT', output.getvalue())
+
+    def test_conservation_check_diagnostic_accepts_only_one_known_phase_and_original_status(self):
+        failure = RuntimeError('private-provider-error')
+        failure.exit_code = 1
+        for suffix, expected in [('pid_alive 1', 'pid_alive'), ('official_files 1', 'official_files'),
+                                 ('private-value 1', None), ('pid_alive 2', None), ('pid_alive 256', None),
+                                 ('pid_alive 1\nmikka-conservation-check-failed official_files 1', None)]:
+            failure.stderr = 'mikka-conservation-check-failed ' + suffix
+            actual = bt.conservation_diagnostic(failure, 'claude', 'fresh_scan')
+            self.assertEqual(actual.get('check'), expected)
+            self.assertNotIn('private-', json.dumps(actual))
+        failure.exit_code = True
+        failure.stderr = 'mikka-conservation-check-failed pid_alive 1'
+        self.assertNotIn('check', bt.conservation_diagnostic(failure, 'claude', 'fresh_scan'))
+
     def test_conservation_failure_logs_safe_metadata_before_kill_and_keeps_the_original_exception(self):
         digest = {'entries': 5, 'sha256': 'f' * 64}
         final = {'kind': 'codex', 'policySha256': bt.official_files_guard().finalization_policy('codex')[1],
@@ -188,7 +239,7 @@ class Publish(unittest.TestCase):
         result = bt.probe_conservation('candidate', 'fixture-key', 'codex', lambda *_, **__: Probe())
         self.assertEqual(result['preloadFinalization'], final)
         self.assertEqual(result['finalization'], final)
-        self.assertEqual([call[0] for call in calls], ['read', 'read', 'run', 'read', 'kill'])
+        self.assertEqual([call[0] for call in calls], ['read', 'read', 'run', 'kill'])
         self.assertIn('verify /opt/mikka/official-files-before.json --e2b-finalization codex', calls[2][1])
 
     def test_build_name_must_be_absent_and_never_an_official_alias(self):
@@ -558,13 +609,14 @@ with fixture.root_file_metadata():
             self.assertLess(commands.index(bt.NPM_RUNTIME_CHECK), verify)
             self.assertNotIn('--e2b-finalization', commands[verify])
             self.assertIn(f'--e2b-finalization {kind}', called['ready'])
-            self.assertIn(' '.join(['a' * 40, 'b' * 40, kind]), commands[install])
+            self.assertIn(' '.join(['a' * 40, 'b' * 40, kind, 'prebuild']), commands[install])
             self.assertFalse(any('apt-get' in command or 'ln -sf' in command or 'systemctl' in command for command in commands))
             self.assertEqual(called['start'], 'bash /opt/mikka/start-prebuilt.sh')
             self.assertIn('kill -0 "$mikka_preloaded_pid"', called['ready'])
             self.assertIn("grep -Fxq -- '--wait-bootstrap'", called['ready'])
             self.assertIn('test ! -e /home/user/.mikka/bootstrap.json', called['ready'])
             self.assertIn('test ! -e /home/user/.mikka/worker/device.json', called['ready'])
+            self.assertIn('guard.py ready "$mikka_preloaded_pid" > /opt/mikka/ingress-ready.json', called['ready'])
             if kind == 'desktop': self.assertIn('test ! -e /run/mikka-viewer/key', called['ready'])
             self.assertIn((bt.NPM_RUNTIME_CHECK, 'user'), called['users'])
 
@@ -573,9 +625,89 @@ with fixture.root_file_metadata():
         self.assertIn('--wait-bootstrap', text)
         self.assertNotIn('env -i', text)
         self.assertIn('/opt/mikka/runtime/node/bin/node', text)
+        guard = text.index('guard.py prepare')
+        control = text.index('python3 /opt/mikka/worker/packages/daemon/scripts/workspace-control-install.py')
+        self.assertLess(guard, control)
+        self.assertLess(control, text.index('python3 /opt/mikka/computer/viewer-gateway.py'))
+        self.assertLess(control, text.index('exec runuser'))
+        self.assertLess(guard, text.index('python3 /opt/mikka/computer/viewer-gateway.py'))
+        self.assertLess(guard, text.index('exec runuser'))
         self.assertNotIn('rm ', text)
         self.assertNotIn('sleep ', text)
         self.assertNotIn('systemctl', text)
+
+    def test_startup_reports_the_reached_phase_and_preserves_real_shell_exit(self):
+        startup = (bt.ROOT / 'scripts/e2b/start-prebuilt.sh').read_text()
+        for failure, code in ((None, 0), ('entry', 1), ('guard_prepare', 17), ('control_install', 23)):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory(prefix='mikka-start-stage-') as temp:
+                root = Path(temp)
+                runtime, home = root / 'opt', root / 'home/.mikka'
+                guard = runtime / 'runtime/ingress-v1/guard.py'
+                control = runtime / 'worker/packages/daemon/scripts/workspace-control-install.py'
+                node = runtime / 'runtime/node/bin/node'
+                for path in (guard, control, node):
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                home.mkdir(parents=True)
+                if failure == 'entry':
+                    (home / 'bootstrap.json').write_text('{}')
+                guard.write_text('import sys\nsys.exit(' + str(code if failure == 'guard_prepare' else 0) + ')\n')
+                control.write_text('import sys\nsys.exit(' + str(code if failure == 'control_install' else 0) + ')\n')
+                node.write_text('#!/bin/sh\nexit 0\n'); node.chmod(0o700)
+                command = startup.replace('/opt/mikka', str(runtime)).replace('/home/user/.mikka', str(home))
+                command = command.replace('/run/mikka-viewer', str(root / 'viewer')).replace('exec runuser -u user -- env', 'exec env')
+                result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=5,
+                                        env={**os.environ, 'MIKKA_TEST_PRIVATE': 'synthetic-private-stage-value'})
+                self.assertEqual(result.returncode, code, result.stderr)
+                reached = [line.removeprefix('mikka-prebuilt-start ') for line in result.stdout.splitlines()]
+                self.assertTrue(reached and reached[0] == 'entry')
+                self.assertTrue(all(phase in bt.PREBUILT_START_PHASES for phase in reached))
+                self.assertEqual(reached[-1], failure or 'worker_exec')
+                if failure:
+                    self.assertEqual(result.stderr, f'mikka-prebuilt-start-failed {failure} {code}\n')
+                    self.assertNotIn('worker_exec', reached)
+                else:
+                    self.assertEqual(result.stderr, '')
+                    self.assertLess(reached.index('guard_prepare'), reached.index('guard_prepared'))
+                    self.assertLess(reached.index('guard_prepared'), reached.index('control_install'))
+                    self.assertLess(reached.index('control_installed'), reached.index('worker_exec'))
+                self.assertNotIn('synthetic-private-stage-value', result.stdout + result.stderr)
+
+    def test_ready_diagnostics_preserve_each_failed_predicate_and_short_circuit(self):
+        cases = [(kind, None, 0) for kind in bt.KINDS]
+        cases += [('claude', phase, code) for phase, code in (
+            ('pid_file', 1), ('pid_read', 1), ('pid_alive', 1), ('worker_waiting', 1),
+            ('ingress_ready', 17), ('bootstrap_absent', 1), ('device_absent', 1), ('official_files', 31))]
+        cases += [('desktop', 'viewer_key_absent', 1), ('desktop', 'viewer_unauthorized', 1)]
+        for kind, failure, code in cases:
+            with self.subTest(kind=kind, failure=failure), tempfile.TemporaryDirectory(prefix='mikka-ready-stage-') as temp:
+                root = Path(temp)
+                runtime, home, viewer = root / 'opt', root / 'home/.mikka', root / 'viewer'
+                guard, official = runtime / 'runtime/ingress-v1/guard.py', runtime / 'official-files.py'
+                guard.parent.mkdir(parents=True); (home / 'worker').mkdir(parents=True); viewer.mkdir()
+                if failure != 'pid_file':
+                    pid = '2147483647' if failure == 'pid_alive' else str(os.getpid())
+                    (home / 'preloaded.pid').write_text(pid + ('' if failure == 'pid_read' else '\n'))
+                cmdline = root / 'cmdline'
+                cmdline.write_bytes(b'worker\0' + (b'other' if failure == 'worker_waiting' else b'--wait-bootstrap') + b'\0')
+                guard.write_text('import sys\nassert sys.argv[1] == "ready"\nsys.exit(' + str(code if failure == 'ingress_ready' else 0) + ')\n')
+                official.write_text('import sys\nassert sys.argv[-1] == ' + repr(kind) + '\nsys.exit(' + str(code if failure == 'official_files' else 0) + ')\n')
+                if failure == 'bootstrap_absent': (home / 'bootstrap.json').write_text('{}')
+                if failure == 'device_absent': (home / 'worker/device.json').write_text('{}')
+                if failure == 'viewer_key_absent': (viewer / 'key').write_text('synthetic-viewer-key')
+                binary = root / 'bin'; binary.mkdir()
+                curl = binary / 'curl'
+                curl.write_text('#!/bin/sh\nprintf ' + ('403' if failure == 'viewer_unauthorized' else '401') + '\n')
+                curl.chmod(0o700)
+                command = bt.prebuilt_ready_command(kind).replace('/opt/mikka', str(runtime))
+                command = command.replace('/home/user/.mikka', str(home)).replace('/run/mikka-viewer', str(viewer))
+                command = command.replace('"/proc/$mikka_preloaded_pid/cmdline"', shlex.quote(str(cmdline)))
+                result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=5,
+                                        env={**os.environ, 'PATH': str(binary) + os.pathsep + os.environ['PATH']})
+                self.assertEqual(result.returncode, code, result.stderr)
+                diagnostic = [line for line in result.stderr.splitlines() if line.startswith('mikka-prebuilt-')]
+                self.assertEqual(diagnostic, [] if failure is None else [f'mikka-prebuilt-ready-failed {failure} {code}'])
+                self.assertEqual((runtime / 'official-files-ready.json').exists(), failure in (None, 'official_files'))
+                self.assertNotIn('synthetic-viewer-key', result.stdout + result.stderr)
 
     def test_release_gate_rejects_missing_stale_and_non_subscription_receipts(self):
         proof = {'entries': 4, 'sha256': 'f' * 64}
@@ -852,6 +984,180 @@ class WorkerImports(unittest.TestCase):
                         if not any(resolved == top or resolved.startswith(top + os.sep) for top in shipped):
                             escapes.append(f'{source.relative_to(bt.ROOT)} -> {target}')
         self.assertEqual(escapes, [])
+
+
+class FreshConservationTransport(unittest.TestCase):
+    @staticmethod
+    def finalization(kind='claude'):
+        digest = {'entries': 5, 'sha256': 'f' * 64}
+        final = {'kind': kind, 'policySha256': bt.official_files_guard().finalization_policy(kind)[1],
+                 'before': digest, 'after': digest, 'originalBefore': digest, 'originalAfter': digest,
+                 'providerChanges': []}
+        return digest, final
+
+    def invoke(self, result, *, fresh_read=None, raised=None, kill_error=None, on_diagnostic=None):
+        digest, final = self.finalization()
+        calls = []
+        class Probe:
+            def __init__(self): self.files = self.commands = self
+            def read(self, path, **options):
+                calls.append(('read', path, options))
+                if path == '/opt/mikka/official-files-conservation.json':
+                    return json.dumps({'before': digest, 'after': digest})
+                if path == '/opt/mikka/official-files-ready.json': return json.dumps(final)
+                if path == '/opt/mikka/fresh-conservation.json' and fresh_read is not None: return fresh_read
+                raise AssertionError('successful fresh command must not need another file transfer')
+            def run(self, command, **options):
+                calls.append(('run', command, options))
+                if raised is not None: raise raised
+                return result
+            def kill(self):
+                calls.append(('kill',))
+                if kill_error is not None: raise kill_error
+        factory_options = []
+        def factory(*_args, **options):
+            factory_options.append(options)
+            return Probe()
+        try:
+            value = bt.probe_conservation('candidate', 'fixture-key', 'claude', factory,
+                                          on_diagnostic=on_diagnostic)
+            return value, calls, factory_options
+        except BaseException as error:
+            error.test_calls = calls
+            error.test_factory_options = factory_options
+            raise
+
+    def test_completed_fresh_rpc_returns_the_receipt_without_a_second_file_transfer(self):
+        _, final = self.finalization()
+        with redirect_stderr(io.StringIO()):
+            value, calls, options = self.invoke(SimpleNamespace(exit_code=0, stdout=json.dumps(final) + '\n'))
+        self.assertEqual(value['finalization'], final)
+        self.assertEqual(value['preloadFinalization'], final)
+        self.assertEqual([row[0] for row in calls], ['read', 'read', 'run', 'kill'])
+        self.assertEqual(calls[2][2], {'user': 'root', 'timeout': 300, 'request_timeout': 310})
+        self.assertEqual(options[0]['timeout'], 600)
+        self.assertEqual([row[2] for row in calls[:2]], [{'user': 'root', 'request_timeout': 30}] * 2)
+
+    def test_invalid_or_oversized_stdout_never_falls_back_to_an_existing_receipt(self):
+        _, final = self.finalization()
+        private = 'DO-NOT-LOG-STDOUT-OR-URL-https://fixture.invalid/private'
+        payloads = [None, b'{}', '', ' \n', '{', '[]', 'null', '{}{}', '\ud800',
+                    json.dumps(final) + '\n' + private, json.dumps({'private': private}),
+                    'x' * (1024 * 1024 + 1), '界' * (1024 * 1024 // 3 + 1)]
+        for payload in payloads:
+            with self.subTest(type=type(payload).__name__, characters=len(payload) if payload is not None else None):
+                output, diagnostics = io.StringIO(), []
+                with redirect_stderr(output), self.assertRaisesRegex(ValueError, '^official_conservation_invalid$') as raised:
+                    self.invoke(SimpleNamespace(exit_code=0, stdout=payload), fresh_read=json.dumps(final),
+                                on_diagnostic=diagnostics.append)
+                self.assertEqual([row[0] for row in raised.exception.test_calls], ['read', 'read', 'run', 'kill'])
+                self.assertEqual(diagnostics, [{'kind': 'claude', 'stage': 'fresh_receipt', 'code': 'official_conservation_invalid'}]
+                                 if payload not in ['[]', 'null', json.dumps({'private': private})] else
+                                 [{'kind': 'claude', 'stage': 'fresh_validation', 'code': 'official_conservation_invalid'}])
+                if diagnostics[0]['stage'] == 'fresh_receipt':
+                    self.assertIsInstance(raised.exception.__cause__, (ValueError, TypeError, UnicodeError, RecursionError))
+                    if isinstance(raised.exception.__cause__, json.JSONDecodeError):
+                        self.assertEqual(raised.exception.__cause__.doc, payload)
+                self.assertNotIn(private, output.getvalue())
+
+    def test_stdout_proof_is_still_bound_to_preload_baseline_template_and_policy(self):
+        _, valid = self.finalization()
+        invalid = []
+        for key, value in [('kind', 'codex'), ('policySha256', '0' * 64),
+                           ('originalBefore', {'entries': 5, 'sha256': 'a' * 64}),
+                           ('after', {'entries': 5, 'sha256': 'e' * 64}),
+                           ('providerChanges', [{'path': '/unregistered-fixture', 'kind': 'file',
+                                                 'before': {'mode': 420}, 'after': {'mode': 511}}])]:
+            invalid.append({**valid, key: value})
+        for final in invalid:
+            diagnostics = []
+            with self.subTest(fields=final), redirect_stderr(io.StringIO()), self.assertRaisesRegex(ValueError, '^official_conservation_invalid$') as raised:
+                self.invoke(SimpleNamespace(exit_code=0, stdout=json.dumps(final)), fresh_read=json.dumps(valid),
+                            on_diagnostic=diagnostics.append)
+            self.assertEqual(diagnostics, [{'kind': 'claude', 'stage': 'fresh_validation', 'code': 'official_conservation_invalid'}])
+            self.assertEqual([row[0] for row in raised.exception.test_calls], ['read', 'read', 'run', 'kill'])
+
+    def test_failed_fresh_command_keeps_failure_and_cleanup_even_with_valid_stdout(self):
+        _, final = self.finalization()
+        failure = RuntimeError('DO-NOT-LOG-COMMAND-CAUSE')
+        failure.exit_code = 23
+        failure.stdout = json.dumps(final)
+        failure.stderr = 'mikka-conservation-check-failed official_files 23\n'
+        for exception in (None, failure):
+            diagnostics, output = [], io.StringIO()
+            with self.subTest(sdk_error=exception is not None), redirect_stderr(output), self.assertRaises(RuntimeError) as raised:
+                self.invoke(SimpleNamespace(exit_code=23, stdout=json.dumps(final)), raised=exception,
+                            fresh_read=json.dumps(final), on_diagnostic=diagnostics.append)
+            if exception is not None:
+                self.assertIs(raised.exception, failure)
+                self.assertEqual(diagnostics, [{'kind': 'claude', 'stage': 'fresh_scan', 'code': 'conservation_failed',
+                                               'exitCode': 23, 'check': 'official_files'}])
+            else:
+                self.assertEqual(str(raised.exception), 'official_conservation_missing')
+            self.assertEqual([row[0] for row in raised.exception.test_calls], ['read', 'read', 'run', 'kill'])
+            self.assertNotIn('DO-NOT-LOG-COMMAND-CAUSE', output.getvalue())
+
+    def test_cleanup_failure_keeps_the_primary_failure_and_never_turns_success_into_pass(self):
+        _, final = self.finalization()
+        failure = RuntimeError('DO-NOT-LOG-PRIMARY-CAUSE')
+        failure.exit_code = 23
+        failure.stderr = 'mikka-conservation-check-failed official_files 23\n'
+        failure.__cause__ = ValueError('DO-NOT-LOG-ORIGINAL-CAUSE')
+        cleanup_error = RuntimeError('DO-NOT-LOG-CLEANUP-CAUSE')
+        output, diagnostics = io.StringIO(), []
+        with redirect_stderr(output), self.assertRaises(RuntimeError) as raised:
+            self.invoke(SimpleNamespace(exit_code=0, stdout=json.dumps(final)), raised=failure,
+                        kill_error=cleanup_error, on_diagnostic=diagnostics.append)
+        self.assertIs(raised.exception, failure)
+        self.assertEqual(str(raised.exception.__cause__), 'DO-NOT-LOG-ORIGINAL-CAUSE')
+        self.assertEqual(raised.exception.__notes__, ['conservation_probe_cleanup_failed'])
+        self.assertEqual(raised.exception.test_calls[-1], ('kill',))
+        self.assertEqual(diagnostics, [{'kind': 'claude', 'stage': 'fresh_scan', 'code': 'conservation_failed',
+                                       'exitCode': 23, 'check': 'official_files'}])
+        for marker in ['DO-NOT-LOG-PRIMARY-CAUSE', 'DO-NOT-LOG-ORIGINAL-CAUSE', 'DO-NOT-LOG-CLEANUP-CAUSE']:
+            self.assertNotIn(marker, output.getvalue())
+        output = io.StringIO()
+        with redirect_stderr(output), self.assertRaises(RuntimeError) as raised:
+            self.invoke(SimpleNamespace(exit_code=0, stdout=json.dumps(final)), kill_error=cleanup_error,
+                        fresh_read=json.dumps(final))
+        self.assertIs(raised.exception, cleanup_error)
+        self.assertEqual(raised.exception.test_calls[-1], ('kill',))
+        self.assertNotIn('DO-NOT-LOG-CLEANUP-CAUSE', output.getvalue())
+
+    def test_real_verifier_stdout_matches_closed_receipt_and_cannot_reuse_an_old_file(self):
+        guard = bt.official_files_guard()
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            protected, manifest_path, receipt_path = [directory / value for value in ('protected', 'manifest.json', 'fresh.json')]
+            protected.write_text('fixture content\n')
+            manifest = {'version': 1, 'entries': [guard.entry(protected)]}
+            manifest_path.write_text(json.dumps(manifest))
+            checks = tuple((phase, 'test -f ' + shlex.quote(str(protected))) for phase, _ in bt.ANONYMOUS_WORKER_CHECKS)
+            with patch.object(bt, 'ANONYMOUS_WORKER_CHECKS', checks):
+                command = bt.fresh_conservation_command('claude')
+            for old, replacement in [('/opt/mikka/official-files.py', Path(__file__).with_name('official-files.py')),
+                                     ('/opt/mikka/official-files-before.json', manifest_path),
+                                     ('/opt/mikka/fresh-conservation.json', receipt_path)]:
+                command = command.replace(old, shlex.quote(str(replacement)))
+            result = subprocess.run(['bash', '-c', command], capture_output=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            receipt = receipt_path.read_bytes()
+            self.assertEqual(result.stdout, receipt)
+            digest = guard.receipt(manifest['entries'])
+            guard.validate_receipt({'before': digest, 'after': digest, 'finalization': json.loads(result.stdout)}, 'claude')
+            repeated = subprocess.run(['bash', '-c', command], capture_output=True, timeout=5)
+            self.assertNotEqual(repeated.returncode, 0)
+            self.assertEqual(repeated.stdout, b'')
+            self.assertEqual(receipt_path.read_bytes(), receipt)
+            self.assertIn(b'mikka-conservation-check-failed official_files 1\n', repeated.stderr)
+            receipt_path.unlink()
+            protected.write_text('changed protected fixture\n')
+            rejected = subprocess.run(['bash', '-c', command], capture_output=True, timeout=5)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertEqual(rejected.stdout, b'')
+            self.assertFalse(receipt_path.exists())
+            self.assertIn(b'official_files_changed', rejected.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

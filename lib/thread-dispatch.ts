@@ -7,6 +7,7 @@ import { db, pool } from '@/lib/db'
 import { readRunChain } from '@/lib/run-chain'
 import { sendOwnedRunMessage } from '@/lib/run-control'
 import { continuationNote } from '@/lib/thread-continuation'
+import { taskThreadRunPredicate } from './task-thread-run'
 export { continuationNote } from '@/lib/thread-continuation'
 
 // One task, one thread (decision 2026-11-01-1330-one-thread-per-task, R-81).
@@ -53,8 +54,7 @@ export async function latestTaskRun(query: Query, userId: string, issueId: strin
     FROM agent_runs r JOIN agents a ON a.id=r."agentId"
     LEFT JOIN device_repos d ON d.id=r."deviceRepoId"
     LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
-    WHERE r."userId"=$1 AND r."issueId"=$2 AND r.kind<>'group_chat'
-      AND NOT EXISTS (SELECT 1 FROM factory_attempts fa WHERE fa."runId"=r.id AND fa.stage IN ('review','verify','monitor'))
+    WHERE r."userId"=$1 AND r."issueId"=$2 AND ${taskThreadRunPredicate('r')}
     ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1`, [userId, issueId])
   if (!run) return null
   const { cloudWorkspaceId, cloudBotId, ...rest } = run

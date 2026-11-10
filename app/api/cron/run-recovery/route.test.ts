@@ -23,6 +23,10 @@ let retried = 0
 mock.module(new URL('../../../../lib/cloud-computer/workspace-teardown.ts', import.meta.url).href, { namedExports: {
   retrySandboxKills: async () => { retried++; return { killed: 1, pending: 1 } },
 } })
+let reviewSweeps = 0, reviewUnavailable = false
+mock.module(new URL('../../../../lib/coding-workspace/review-sessions.ts', import.meta.url).href, { namedExports: {
+  expireReviewSessions: async () => { reviewSweeps++; if (reviewUnavailable) throw new Error('private-review-error'); return { closed: 2, pending: 1 } },
+} })
 mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
 let swept: number[] = []
 let taskSweeps = 0
@@ -39,7 +43,11 @@ const later: (() => unknown)[] = []
 mock.module('next/server', { namedExports: { after: (work: () => unknown) => { later.push(work) } } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
-beforeEach(() => { process.env.CRON_SECRET = secret; calls = 0; fail = false; nextDue = null; armed = 0 })
+beforeEach(() => {
+  process.env.CRON_SECRET = secret; calls = 0; fail = false; nextDue = null; armed = 0
+  reconciled = 0; judged = 0; ended = 0; retried = 0; reviewSweeps = 0; reviewUnavailable = false; taskSweeps = 0
+  later.length = 0; swept = []
+})
 const call = (token: string | null = secret) => GET(new Request('http://127.0.0.1/mikka/api/cron/run-recovery', {
   headers: token ? { authorization: `Bearer ${token}` } : {},
 }))
@@ -50,6 +58,7 @@ test('independent recovery requires the existing cron bearer before scanning own
   assert.equal((await call()).status, 503)
   assert.equal(calls, 0)
   assert.equal(taskSweeps, 0)
+  assert.equal(reviewSweeps, 0)
 })
 
 test('recovery returns bounded counts and no private database error or cached result', async () => {
@@ -57,12 +66,13 @@ test('recovery returns bounded counts and no private database error or cached re
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
   // Stale Bot computers are reconciled, ended runs judged (R-52), closed tasks' sandboxes ended and deleted workspaces' unfinished kills retried, in the same pass.
-  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, taskMachines: { reconciled: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } })
+  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, reviewSessions: { closed: 2, pending: 1 }, taskMachines: { reconciled: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } })
   assert.equal(taskSweeps, 1)
   assert.equal(reconciled, 1)
   assert.equal(judged, 1)
   assert.equal(ended, 1)
   assert.equal(retried, 1)
+  assert.equal(reviewSweeps, 1)
   // Queued group turns are resumed after the answer, within the route's 300 s.
   assert.equal(later.length, 1)
   await later.pop()!()
@@ -73,6 +83,19 @@ test('recovery returns bounded counts and no private database error or cached re
   const failed = await call()
   assert.equal(failed.status, 502)
   assert.doesNotMatch(await failed.text(), /private-database-error/)
+})
+
+test('an unavailable review sweep preserves other recovery work and its next due retry', async () => {
+  reviewUnavailable = true
+  nextDue = Date.now() + 15_000
+  const response = await call()
+  assert.equal(response.status, 200)
+  const result = await response.json()
+  assert.equal(result.reviewSessions, null)
+  assert.equal(result.taskMachines.reconciled, 5)
+  assert.equal(reviewSweeps, 1)
+  assert.equal(armed, 1)
+  assert.doesNotMatch(JSON.stringify(result), /private-review-error/)
 })
 
 test('lost runs are reclaimed by this sweep only, not by the task-run poll or each heartbeat', async () => {

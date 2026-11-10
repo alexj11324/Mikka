@@ -39,7 +39,9 @@ export type ThreadLifecycleRow = {
   /** PostgreSQL text preserves the microseconds lost by pg's Date decoder. */
   lifecycleAtVersion: string | null
   lifecycle: ThreadLifecycleMetadata; status: string; stopRequestedAt: Instant
-  pauseReason?: string | null; safeExit?: boolean
+  pauseReason?: string | null; safeExit?: boolean; stopReason?: string | null
+  /** Human review is a separate absolute lease; it never renews execution. */
+  reviewExpiresAt?: Instant
   issueId: string | null; taskClosed: boolean; checkpointReady: boolean
 }
 type Dependencies = {
@@ -93,6 +95,14 @@ export function threadMachineLifecycleDecision(row: ThreadLifecycleRow, provider
   // A quota completion deliberately leaves status=paused with no run lease.
   // It is waiting for account recovery, not a crashed/abandoned execution.
   const quotaWait = row.status === 'paused' && row.pauseReason === 'quota_exhausted'
+  const reviewing = live(row.reviewExpiresAt ?? null, now) && !row.stopRequestedAt && !row.taskClosed
+    && row.stopReason !== 'device_lost' && row.safeExit
+    && (['succeeded', 'failed'].includes(row.status) || quotaWait)
+    && threadMachineExecutionDeadline(row, now) > now
+  if (reviewing && row.lifecycle.phase === 'review_resume_requested')
+    return { action: 'wait', at: at(row.reviewExpiresAt!), reason: 'human_review_resume' }
+  if (reviewing && provider?.state === 'running') return { action: 'keep',
+    at: Math.min(at(row.reviewExpiresAt!), threadMachineExecutionDeadline(row, now)), reason: 'human_review' }
   if (quotaWait && !row.taskClosed && provider?.state === 'running') return row.safeExit
     ? { action: 'pause', at: now, reason: 'quota_wait' }
     : { action: 'wait', at: provider.endAt && provider.endAt > now ? provider.endAt : null, reason: 'quota_safe_point_unverified' }
@@ -154,11 +164,12 @@ async function requestLifecycleStop(pool: Pool, actor: Actor, row: ThreadLifecyc
           ELSE false END
       RETURNING r."deviceId"`, [row.runId, actor.userId, actor.workspaceId, row.epoch, row.sandboxId, claimId, cause, now, THREAD_MACHINE_BUDGET_MS])
     if (!stopped.rowCount) { await client.query('COMMIT'); return false }
-    const [{ runChanged }, { runListChanged }, { notifyDeviceWork }] = await Promise.all([
+    const [{ runChanged }, { runListChanged }, { notifyDeviceWork, runControlChanged }] = await Promise.all([
       import('@/lib/live/panels'), import('@/lib/live/lists'), import('@/lib/device-gateway-notify'),
     ])
     await runChanged(client, row.runId)
     await runListChanged(client, row.runId)
+    runControlChanged(client, { runIds: [row.runId] })
     await client.query('COMMIT')
     notifyDeviceWork(stopped.rows[0].deviceId)
     return true
@@ -178,7 +189,11 @@ const runtime: Dependencies = {
  * timer. Every I/O attempt has a committed claim/deadline before it starts. */
 export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: string, overrides: Partial<Dependencies> = {}): Promise<false | number> {
   const deps = { ...runtime, ...overrides }, now = deps.now()
-  const row = (await pool.query<ThreadLifecycleRow>(`SELECT m.*,m."lifecycleAt"::text AS "lifecycleAtVersion",r.status,r."stopRequestedAt",r."leaseExpiresAt",r."pauseReason",
+  const row = (await pool.query<ThreadLifecycleRow>(`SELECT m.*,m."lifecycleAt"::text AS "lifecycleAtVersion",r.status,r."stopRequestedAt",r."stopReason",r."leaseExpiresAt",r."pauseReason",
+      (SELECT max(s."expiresAt") FROM coding_review_sessions s WHERE s."runId"=m."runId" AND s."ownerId"=m."ownerId"
+        AND s."workspaceId"=m."workspaceId" AND s."sandboxId"=m."sandboxId" AND s."machineEpoch"=m.epoch
+        AND s."machineOperationId"=m."operationId" AND s."deviceId"=m."deviceId" AND s."taskId"=m."issueId"
+        AND s."revokedAt" IS NULL AND s."expiresAt">clock_timestamp()) AS "reviewExpiresAt",
       COALESCE(r.report->'safePoint'->>'session'='exited',false) AS "safeExit",
       (m."issueId" IS NOT NULL AND (i.id IS NULL OR i.status IN ('done','canceled','duplicate')
         OR i.content->'attrs'->'mikka'->>'deletedAt' IS NOT NULL)) AS "taskClosed",
@@ -236,16 +251,28 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
-      await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])
+      const run = (await client.query('SELECT status,"stopRequestedAt","stopReason" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
       const current = (await client.query(`SELECT state,epoch,"sandboxId",lifecycle FROM thread_machines
         WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
       if (!current || current.epoch !== row.epoch || current.sandboxId !== row.sandboxId || current.lifecycle.reconcileId !== token || ['paused', 'ended'].includes(current.state)) {
         await client.query('COMMIT')
         return now + 1
       }
+      if (reason === 'human_review') {
+        const valid = await client.query(`SELECT 1 FROM coding_review_sessions s
+          WHERE s."runId"=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."sandboxId"=$4
+            AND s."machineEpoch"=$5 AND s."revokedAt" IS NULL AND s."expiresAt">clock_timestamp() LIMIT 1`,
+        [runId, actor.userId, actor.workspaceId, row.sandboxId, row.epoch])
+        if (!valid.rowCount || run?.stopRequestedAt || run?.stopReason === 'device_lost'
+          || !['succeeded', 'failed', 'paused'].includes(run?.status)) {
+          const next = await finish({ phase: 'needs_reconciliation', reason: 'review_authority_changed' }, now, client)
+          await client.query('COMMIT')
+          return next
+        }
+      }
       await deps.provider.keepAlive(row.sandboxId!, actor.userId, THREAD_MACHINE_PROVIDER_MS)
       providerOutcome = 'timeout_renewed'
-      const next = await finish({ phase: reason === 'provisioning' ? 'provisioning' : 'active', reason, failures: 0, providerDeadline: deps.now() + THREAD_MACHINE_PROVIDER_MS,
+      const next = await finish({ phase: reason === 'human_review' ? 'review_resumed' : reason === 'provisioning' ? 'provisioning' : 'active', reason, failures: 0, providerDeadline: deps.now() + THREAD_MACHINE_PROVIDER_MS,
         executionDeadline: threadMachineExecutionDeadline(row, now) }, due, client)
       await client.query('COMMIT')
       committedTransition?.()
@@ -255,6 +282,11 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
   }
 
   try {
+    // A concurrent SDK resume owns this short intent. Do not observe/pause the
+    // VM or replace its phase before its lease-fenced completion CAS returns.
+    // Stop/closure/revocation clears the lease and takes the normal path.
+    if (threadMachineLifecycleDecision(row, null, now).reason === 'human_review_resume')
+      return await finish({ phase: 'review_resume_requested', reason: 'human_review_resume', failures: 0 }, at(row.reviewExpiresAt!))
     if (row.status === 'queued' && row.stopRequestedAt && await deps.acknowledgeStop(pool, actor, runId)) {
       // True is returned only after provider kill acknowledgement and the
       // atomic retired write. Pending creation/failed kills retain their due row.
@@ -347,7 +379,9 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
     }
     if (decision.action === 'pause') {
       phase = 'pause_failed'
-      await deps.park(pool, actor, runId, { ...fenceOf(row), ...(decision.reason === 'stop_unacknowledged' ? { suspendAfterStop: true } : {}) })
+      const parked = await deps.park(pool, actor, runId, { ...fenceOf(row), ...(decision.reason === 'stop_unacknowledged' ? { suspendAfterStop: true } : {}) })
+      if (parked && typeof parked === 'object' && 'reviewHeldUntil' in parked)
+        return await finish({ phase: 'review_resumed', reason: 'human_review', failures: 0 }, Number(parked.reviewHeldUntil))
       providerOutcome = 'pause_ack'
       if (TERMINAL.has(row.status)) await pool.query(`UPDATE suggestion_executions SET status=$2,"endedAt"=COALESCE("endedAt",now()) WHERE "runId"=$1`,
         [runId, row.status === 'succeeded' ? 'done' : row.status === 'cancelled' ? 'stopped' : row.status])

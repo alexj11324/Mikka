@@ -24,6 +24,8 @@ const run = { id: 123, run_attempt: 2, workflow_id: workflow.id, name: RELEASE_N
   repository: { id: 789, full_name: REPOSITORY }, head_repository: { id: 789, full_name: REPOSITORY } }
 const expected = { sourceCommit: SHA, runId: run.id, runAttempt: run.run_attempt, workflowId: workflow.id, event: run.event }
 const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY,
+  TASK_SECRETS_JOB_STARTED_AT: new Date().toISOString(),
+  TASK_SECRETS_JOB_ID: '991', TASK_SECRETS_JOB_START_SOURCE: 'github_actions_job.started_at',
   GITHUB_REF: 'refs/heads/main', GITHUB_SHA: SHA, GITHUB_RUN_ID: '990', GITHUB_RUN_ATTEMPT: '1', GITHUB_TOKEN: TOKEN,
   APPLICATION_SHA: SHA, EXPECTED_SOURCE_SHA: SHA, EXPECTED_UPSTREAM_RUN_ID: '123', EXPECTED_UPSTREAM_RUN_ATTEMPT: '2',
   EXPECTED_WORKER_SHA: WORKER, EXPECTED_WORKER_SOURCE_SHA: SHA, EXPECTED_CLAUDE_TEMPLATE: 'candidate-claude', EXPECTED_CODEX_TEMPLATE: 'candidate-codex' })
@@ -244,12 +246,17 @@ test('every OIDC read is directly preceded by source/attempt/public-build attest
   assert.doesNotMatch(workflowText, /actions: write|contents: write|pull-requests: write|issues: write|workflow_dispatch:\s+workflows/)
   const steps = workflowText.slice(workflowText.indexOf('  acceptance:')).split('\n  factory:')[0].split('      - name:')
   const credentials = steps.map((step, index) => ({ step, index })).filter(({ step }) => step.includes('Infisical/secrets-action'))
-  assert.equal(credentials.length, 3)
+  assert.equal(credentials.length, 4)
   for (const { step, index } of credentials) {
     assert.match(steps[index - 1], /Recheck main, upstream attempt and public build immediately before/)
     assert.match(step, /identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac/)
     assert.match(step, /recursive: false/); assert.match(step, /include-imports: false/)
   }
+  const database = credentials.find(({ step }) => step.includes('secret-name: MIKKA_DATABASE_URL'))
+  assert.ok(database)
+  assert.match(database.step, /if: env.ACCEPTANCE_MODE == 'execute' && env.PRODUCTION_CANARY == 'true'/)
+  assert.match(steps[database.index - 1], /if: env.ACCEPTANCE_MODE == 'execute' && env.PRODUCTION_CANARY == 'true'/)
+  assert.match(workflowText, /PRODUCTION_CANARY: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.production_canary && 'true' \|\| 'false' \}\}/)
   assert.match(workflowText, /group: production-smoke-owner-acceptance/)
   assert.ok(!JSON.stringify(safeCIFailure(Error('PRIVATE_SECRET_URL'))).includes('PRIVATE'))
 })
@@ -281,6 +288,11 @@ test('Factory uses only the original ACME credentials and real execute path, wit
   assert.match(factory, /production-run-observability-report\/report\.json/)
   assert.match(factory, /task-secrets-ci\.mjs prepare/)
   assert.match(factory, /factory-scope\.json/)
+  const jobStart = factory.indexOf("readSecretJobStart(process.env, { expectedJob: 'factory' })")
+  assert.ok(jobStart >= 0 && jobStart < factory.indexOf('Install exact source-only Factory guard dependencies'))
+  assert.ok(jobStart < factory.indexOf('Recheck Factory scope, main, upstream attempt and public build immediately before account email'))
+  for (const assignment of ['TASK_SECRETS_JOB_ID=${job.id}', 'TASK_SECRETS_JOB_STARTED_AT=${job.startedAt}',
+    'TASK_SECRETS_JOB_START_SOURCE=${job.source}']) assert.ok(factory.includes(assignment))
   assert.doesNotMatch(factory, /--prepare|--browser-submit|--runner-browser|MIKKA_ACCEPTANCE_PROGRESS_TOKEN|SMOKE_OWNER|E2B_API_KEY|issues: write|actions: write|contents: write/)
   assert.doesNotMatch(native, /ACME_DEMO/)
   const steps = factory.split('      - name:')

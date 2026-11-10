@@ -68,6 +68,8 @@ test('background Factory transactions use persisted tenants before the APP pool 
   const agentId = await seedAgent(controls, owner)
   const { pool } = await import('../lib/db')
   const { withTaskWorkspace, borrowTaskWorkspaceMembership } = await import('../lib/task-workspace')
+  const { withProjectResourceLease } = await import('../lib/project-resources/store')
+  const { workspacePool } = await import('../lib/workspace-db')
   const { actAs } = await import('../lib/acting-user')
   const { tokenWorkspace } = await import('../lib/tokens/principal')
   const { factoryForBot, factoryStore } = await import('../lib/factory/server')
@@ -165,6 +167,15 @@ test('background Factory transactions use persisted tenants before the APP pool 
       const tx = await pool.connect()
       try {
         await beginFactoryTransaction(tx)
+        await assert.rejects(runtime.store.route(owner, a.input, tx), error => code(error) === 'projectEnvironmentUnavailable')
+      } finally { await rollbackFactoryTransaction(tx); forgetFactoryTransaction(tx); tx.release() }
+    })
+    assert.deepEqual(await state(), before, 'an existing APP transaction cannot repair a missing resource lease')
+    let expired: ReturnType<typeof borrowTaskWorkspaceMembership>
+    await withProjectResourceLease(owner, alpha, async () => {
+      const tx = await pool.connect()
+      try {
+        await beginFactoryTransaction(tx)
         const same = await runtime.store.route(owner, a.input, tx)
         assert.equal(same.task.id, a.task.id)
         registerFactoryProfile(tx, { ownerId: owner, workspaceId: alpha })
@@ -172,10 +183,53 @@ test('background Factory transactions use persisted tenants before the APP pool 
       } catch (error) { await rollbackFactoryTransaction(tx); throw error }
       finally { forgetFactoryTransaction(tx); tx.release() }
       const borrowed = borrowTaskWorkspaceMembership(owner, alpha)
-      assert.ok(borrowed); await borrowed.check(); await borrowed.close()
+      assert.ok(borrowed); await borrowed.check()
+      const heldPid = (await workspacePool.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+      assert.equal((await borrowed.workspaceClient.query('SELECT pg_backend_pid() AS pid')).rows[0].pid, heldPid,
+        'borrowed policy reads use the sole held Workspace backend')
+      expired = borrowTaskWorkspaceMembership(owner, alpha)
+      await borrowed.close()
+      await assert.rejects(async () => borrowed.workspaceClient.query('SELECT 1'), error => code(error) === 'workspaceAccessDenied')
+      await assert.rejects(borrowed.check(), error => code(error) === 'workspaceAccessDenied')
       await assert.rejects(factoryRuntimeForBot(betaBot).store.read(owner, b.task.id), error => code(error) === 'factoryNotFound')
     })
+    assert.ok(expired!)
+    await assert.rejects(async () => expired!.workspaceClient.query('SELECT 1'), error => code(error) === 'workspaceAccessDenied')
+    await assert.rejects(expired!.check(), error => code(error) === 'workspaceAccessDenied')
     assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+  })
+
+  await t.test('an existing Factory APP transaction rechecks current Enterprise policy without another checkout', async () => {
+    const organizationId = randomUUID(), sessionId = randomUUID()
+    const { enterprisePrincipal } = await import('../lib/enterprise/principal')
+    const reader = { id: owner, [tokenWorkspace]: alpha, [enterprisePrincipal]: { kind: 'session' as const, sessionId } }
+    await controls.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'Background borrow fixture\',$2)', [organizationId, owner])
+    await controls.query('INSERT INTO mikka_organization_workspaces("organizationId","workspaceId") VALUES($1,$2)', [organizationId, alpha])
+    await controls.query('INSERT INTO enterprise_org_policy("organizationId","enforceSso","allowMachineCredentials") VALUES($1,false,false)', [organizationId])
+    await controls.query('INSERT INTO session(id,token,"userId","expiresAt","createdAt","updatedAt") VALUES($1,$2,$3,now()+interval \'1 hour\',now(),now())', [sessionId, randomUUID(), owner])
+    const before = await state()
+    try {
+      await actAs(reader, () => withProjectResourceLease(reader, alpha, async () => {
+        const tx = await pool.connect()
+        try {
+          await beginFactoryTransaction(tx)
+          assert.equal((await runtime.store.route(owner, a.input, tx)).task.id, a.task.id)
+          await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+          await assert.rejects(runtime.store.route(owner, a.input, tx), error => code(error) === 'factoryNotFound')
+          registerFactoryProfile(tx, { ownerId: owner, workspaceId: alpha })
+          await assert.rejects(commitFactoryTransaction(tx), error => code(error) === 'agentProfileScopeNotFound'
+            && !!error && typeof error === 'object' && 'cause' in error && code(error.cause) === 'workspaceAccessDenied')
+        } finally { await rollbackFactoryTransaction(tx); forgetFactoryTransaction(tx); tx.release() }
+      }))
+      assert.deepEqual(await state(), before, 'denied continuation and COMMIT leave no Factory effects')
+      assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+      assert.equal(app.waitingCount, 0)
+    } finally {
+      await controls.query('DELETE FROM session WHERE id=$1', [sessionId])
+      await controls.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
+      await controls.query('DELETE FROM mikka_organization_workspaces WHERE "organizationId"=$1', [organizationId])
+      await controls.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
+    }
   })
 
   await t.test('membership suspension waits for a background write commit and later operations have no side effects', async () => {
@@ -325,11 +379,11 @@ test('background Factory transactions use persisted tenants before the APP pool 
     await controls.query('DELETE FROM "user" WHERE id=$1', [retired])
     assert.deepEqual(await history(), before, 'passed and blocked results remain historical facts')
 
-    const [{ sweepFactoryMonitor }, { createFactoryMonitor }, { sweepFactoryWatchdog }, { factoryAuthorize }, { factoryMonitorWorkspaceKey }] = await Promise.all([
+    const [{ sweepFactoryMonitor }, { createFactoryMonitor }, { sweepFactoryWatchdog }, { factoryMonitorWorkspaceKey }] = await Promise.all([
       import('../lib/factory/monitor-sweep'), import('../lib/factory/monitor'), import('../lib/factory/watchdog'),
-      import('../lib/factory/runtime'), import('../lib/factory/server'),
+      import('../lib/factory/server'),
     ])
-    let monitorScopes = 0, admissions = 0, runtimeReads = 0, dispatches = 0, watchdogWakes = 0
+    let monitorScopes = 0, admissions = 0, authorizations = 0, runtimeReads = 0, dispatches = 0, watchdogWakes = 0
     assert.deepEqual(await sweepFactoryMonitor(pool, () => {
       monitorScopes++
       return { reconcile: async () => ({ observed: 0 }) }
@@ -338,7 +392,10 @@ test('background Factory transactions use persisted tenants before the APP pool 
       admissions++
       return factoryTaskWorkspaceBoundary(pool, null)(userId, taskId, work, existing)
     }
-    const monitor = createFactoryMonitor(pool, factoryRuntimeForBot(null).store, factoryAuthorize, factoryMonitorWorkspaceKey, undefined, [], null, boundary)
+    const monitor = createFactoryMonitor(pool, factoryRuntimeForBot(null).store, async () => {
+      authorizations++
+      throw new Error('Deleted authors must be excluded before execution authorization')
+    }, factoryMonitorWorkspaceKey, undefined, [], null, boundary)
     assert.deepEqual(await monitor.reconcile(retired), { observed: 0 })
     assert.deepEqual(await sweepFactoryWatchdog(pool, {
       runtime: botId => { runtimeReads++; return factoryRuntimeForBot(botId) },
@@ -346,8 +403,8 @@ test('background Factory transactions use persisted tenants before the APP pool 
       wake: async () => { watchdogWakes++ },
     }, new Date(), Date.now() + 5000, { userId: retired, runId: retained[1].runId }),
     { scanned: 0, recovered: 0, blocked: 0, deferred: 0, failed: 0 })
-    assert.deepEqual({ monitorScopes, admissions, runtimeReads, dispatches, watchdogWakes },
-      { monitorScopes: 0, admissions: 0, runtimeReads: 0, dispatches: 0, watchdogWakes: 0 })
+    assert.deepEqual({ monitorScopes, admissions, authorizations, runtimeReads, dispatches, watchdogWakes },
+      { monitorScopes: 0, admissions: 0, authorizations: 0, runtimeReads: 0, dispatches: 0, watchdogWakes: 0 })
     await wakes.flush()
     assert.deepEqual(wakes.calls, priorWakes, 'historical reads schedule no Coordinator wake')
     assert.deepEqual(await history(), before, 'background scans do not rewrite completed or blocked history')

@@ -11,6 +11,7 @@ const run = { id: 'run', userId: 'owner', botId: 'bot' }
 const originalReport = { ...emptyRunReport(), execution: {} } as ReturnType<typeof emptyRunReport>
 const sanitized = { ...emptyRunReport(), summary: 'Validated evidence' }
 let mountError: Error | null = null, monitorError: Error | null = null, questionError: Error | null = null
+let reviewError: Error | null = null
 const authorizeEvaluation = async () => true
 const validateExecution = async () => {}
 const mount = mock.fn(async (..._args: unknown[]) => { trace.push('mount'); if (mountError) throw mountError; return sanitized })
@@ -25,6 +26,7 @@ const runtime = mock.fn((_botId: string | null) => ({ questions: scopedQuestions
 const dbRows: { botId: string | null }[] = []
 const dbPool = { query: mock.fn(async (_q: string, _p?: unknown[]) => ({ rows: dbRows })) }
 const sweepWatchdog = mock.fn(async (..._args: unknown[]) => {})
+const reconcileReview = mock.fn(async (..._args: unknown[]) => { if (reviewError) throw reviewError; return { closed: 0, pending: 0 } })
 const activityChanged = mock.fn((_executor: object, _runId: string) => {})
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 stub('./self-improvement/registry.ts', { lockSkillScope: async () => {} })
@@ -36,12 +38,13 @@ stub('./factory/runtime.ts', { factoryRuntimeForBot: runtime })
 stub('./factory/watchdog.ts', { sweepFactoryWatchdog: sweepWatchdog })
 stub('./factory/activity-live.ts', { taskActivityChanged: activityChanged })
 stub('./db/index.ts', { pool: dbPool })
+stub('./coding-workspace/review-sessions.ts', { reconcileReviewSessions: reconcileReview })
 let effects: typeof import('./run-completion-effects')
 const environment = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
 before(async () => { effects = await import('./run-completion-effects') })
 beforeEach(() => {
-  trace.length = 0; mountError = null; monitorError = null; questionError = null
-  for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query, sweepWatchdog, activityChanged]) fn.mock.resetCalls()
+  trace.length = 0; mountError = null; monitorError = null; questionError = null; reviewError = null
+  for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query, sweepWatchdog, reconcileReview, activityChanged]) fn.mock.resetCalls()
   process.env.MIKKA_FACTORY_ROUTING_ENABLED='0'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED='0'
 })
 after(() => {
@@ -115,12 +118,20 @@ test('a failed completion effect never schedules task activity', async () => {
   assert.equal(activityChanged.mock.callCount(), 0)
 })
 
-test('afterRunEnded: flags off touches no pool; on, reconciles only the run per owning bot via reconcile.run', async () => {
+test('the Factory-only helper does no SQL or unrelated review work when its flags are off', async () => {
+  assert.equal(await effects.reconcileFactoryAfterCompletion(dbPool, 'owner', 'run-1'), 0)
+  assert.equal(dbPool.query.mock.callCount(), 0)
+  assert.equal(reconcileReview.mock.callCount(), 0)
+})
+
+test('afterRunEnded always reconciles review authority; Factory progression remains flag-gated', async () => {
   dbRows.length = 0; dbRows.push({ botId: 'bot-a' }, { botId: null })
   assert.equal(await effects.afterRunEnded('owner', 'run-1'), 0)
   assert.equal(dbPool.query.mock.callCount(), 0)
+  assert.deepEqual(reconcileReview.mock.calls[0].arguments, [dbPool, { runIds: ['run-1'] }])
   process.env.MIKKA_FACTORY_ROUTING_ENABLED = '1'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
   assert.equal(await effects.afterRunEnded('owner', 'run-1'), 2)
+  assert.equal(reconcileReview.mock.callCount(), 2)
   assert.deepEqual(dbPool.query.mock.calls[0].arguments[1], ['run-1', 'owner'])
   assert.deepEqual(runtime.mock.calls.map((c) => c.arguments[0]), ['bot-a', null])
   assert.deepEqual(reconcileRun.mock.calls.map((c) => c.arguments), [['owner', 'run-1'], ['owner', 'run-1']])
@@ -129,6 +140,21 @@ test('afterRunEnded: flags off touches no pool; on, reconciles only the run per 
     assert.equal(call.arguments[0], dbPool)
     assert.deepEqual(call.arguments[4], { userId: 'owner', runId: 'run-1' })
   }
+})
+
+test('a review close failure remains retryable without preventing Factory completion', async () => {
+  process.env.MIKKA_FACTORY_ROUTING_ENABLED = '1'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
+  dbRows.length = 0; dbRows.push({ botId: 'bot-a' })
+  reviewError = new Error('private-review-transport-error')
+  const warn = mock.method(console, 'warn', () => {})
+  try {
+    assert.equal(await effects.afterRunEnded('owner', 'run-3'), 1)
+    assert.equal(reconcileReview.mock.callCount(), 1)
+    assert.deepEqual(reconcileRun.mock.calls[0].arguments, ['owner', 'run-3'])
+    const logged = JSON.stringify(warn.mock.calls.map(call => call.arguments))
+    assert.match(logged, /review_close_unacknowledged/)
+    assert.doesNotMatch(logged, /private-review-transport-error/)
+  } finally { warn.mock.restore() }
 })
 
 test('afterRunEnded never throws: a reconcile failure is logged by class/code only and deferred', async () => {

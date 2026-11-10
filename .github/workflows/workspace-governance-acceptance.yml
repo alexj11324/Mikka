@@ -73,7 +73,7 @@ jobs:
           import { appendFileSync } from 'node:fs'
           import { randomBytes } from 'node:crypto'
           import { assertDevLocal } from './scripts/dev-local/guard.mjs'
-          
+
           assert.equal(process.platform, 'linux')
           assert.equal(Number(process.versions.node.split('.')[0]), 24)
           assert.equal(process.env.CI, 'true')
@@ -127,7 +127,7 @@ jobs:
           import { loadEnvironment } from './scripts/test-accounts/environment.mjs'
           import { acquireTestAccounts, recordAuthenticationSecrets, auditEvidence } from './scripts/test-accounts/session.mjs'
           import { verifyWorkspaceGovernance } from './scripts/dev-local/workspace-governance-acceptance.mjs'
-          
+
           assert.equal(process.env.LOCAL_LOOP_ITEMS, '11')
           const root = process.cwd(), privateDirectory = resolve('.cache/wg-ci')
           await mkdir(privateDirectory, { recursive: true, mode: 0o700 })

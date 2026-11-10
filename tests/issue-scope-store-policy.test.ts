@@ -7,7 +7,7 @@ const issueId='53100000-0000-4000-8000-000000000005'
 function reset(extra = {}) {
   const probe={
     workspace:{id:workspaceId,kind:'team',ownerId:'owner'},activeMembers:new Set(['owner','other']),locks:[] as string[],
-    issue:{id:issueId,userId:'owner',workspaceId,ownershipState:'bound',revision:1,scope:'workspace',scopeVersion:1,linearSyncPolicy:'explicit',linearSyncBlocked:false,content:{type:'doc'}},
+    issue:{id:issueId,userId:'owner',workspaceId,ownershipState:'bound',revision:1,scope:'workspace',scopeVersion:1,status:'todo',linearSyncPolicy:'explicit',linearSyncBlocked:false,content:{type:'doc'}},
     link:false,outgoing:false,publication:false,writes:0,versions:0,...extra,
   }
   ;(globalThis as typeof globalThis & {scopeStoreProbe:typeof probe}).scopeStoreProbe=probe

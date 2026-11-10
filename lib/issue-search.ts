@@ -3,7 +3,6 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { issueMembers, issues } from '@/lib/db/schema'
 import { ActionFailureError } from '@/lib/action-error'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import type { TaskPrefixInput } from '@/lib/task-identifier-server'
 
 /** Backend relation-picker search. Authorization is applied before the SQL limit,
  * with owner-only personal tasks, active workspace membership and no 100-row cap.
@@ -23,6 +22,7 @@ const CJK = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han
 export type SearchQuery =
   | { kind: 'recent' }
   | { kind: 'number'; number: number }
+  | { kind: 'identifier'; identifier: string }
   | { kind: 'title'; text: string }
 
 export class SearchInputError extends Error {
@@ -34,8 +34,9 @@ export function parseSearchQuery(raw: string | null | undefined): SearchQuery {
   const text = (raw ?? '').trim()
   if (!text) return { kind: 'recent' }
   if (text.length > 200) throw new SearchInputError('searchQueryTooLong')
-  const number = /^(?:(?:ORV|MIK)-)?([1-9]\d{0,8})$/i.exec(text)
+  const number = /^([1-9]\d{0,8})$/.exec(text)
   if (number) return { kind: 'number', number: Number(number[1]) }
+  if (/^[a-z][a-z0-9_]{0,63}-[1-9]\d{0,15}$/i.test(text)) return { kind: 'identifier', identifier: text.toUpperCase() }
   if ([...text].length === 1 && !CJK.test(text)) throw new SearchInputError('searchQueryTooShort')
   return { kind: 'title', text }
 }
@@ -159,23 +160,25 @@ export function escapeLike(text: string) {
 export function searchCondition(query: SearchQuery): SQL | undefined {
   // Number and substring lookups have dedicated expression / pg_trgm indexes.
   if (query.kind === 'number') return sql`(${meta}->>'number') = ${String(query.number)}`
+  if (query.kind === 'identifier') return sql`(${issues.issuedIdentifier}=${query.identifier} OR EXISTS (
+    SELECT 1 FROM task_identifier_aliases a WHERE a."issueId"=${issues.id} AND a."workspaceId"=${issues.workspaceId} AND a.identifier=${query.identifier}
+  ))`
   if (query.kind === 'title') return sql`${issues.title} ilike ${'%' + escapeLike(query.text) + '%'}`
   return undefined
 }
 
-export type SearchRow = { id: string; ownerId: string; ownerName: string | null; scope: 'personal' | 'workspace'; title: string; status: string; priority: string; revision: number; updatedAt: Date; cursorKey: string; metadata: Metadata; prefixInput?: TaskPrefixInput | null }
+export type SearchRow = { id: string; ownerId: string; ownerName: string | null; scope: 'personal' | 'workspace'; title: string; status: string; priority: string; revision: number; updatedAt: Date; cursorKey: string; metadata: Metadata; issuedIdentifier: string | null }
 
-type SearchTransportRow = [string, string, string | null, 'personal' | 'workspace', string, string, string, number, string, Metadata | null]
+type SearchTransportRow = [string, string, string | null, 'personal' | 'workspace', string, string, string, number, string, Metadata | null, string | null]
 
 /** One page of already-authorized rows; visibility is part of SQL before LIMIT. */
 export async function fetchCandidates(db: Db, input: { userId: string; visibility: SQL; excludedIds: string[]; query: SearchQuery; cursor: { updatedAt: string; id: string } | null; limit: number; visibilityExcludesDeleted?: boolean }) {
-  const { taskPrefixInput } = await import('@/lib/task-identifier-server')
   // A single transport row avoids repeating the row/column protocol overhead.
   // Authorization and the full-precision ordering still happen before LIMIT.
   // The UTC microsecond cursor also carries the public timestamp; send it once.
   // A scalar name lookup keeps this page projection on the single issues table.
   const page = db.select({
-    v: sql<SearchTransportRow>`jsonb_build_array(id,"userId",(select name from "user" where "user".id=issues."userId"),scope,title,status,priority,revision,${cursorKey},${meta})`.as('v'),
+    v: sql<SearchTransportRow>`jsonb_build_array(id,"userId",(select name from "user" where "user".id=issues."userId"),scope,title,status,priority,revision,${cursorKey},${meta},"issuedIdentifier")`.as('v'),
   }).from(issues)
     .where(and(
       input.visibility,
@@ -185,17 +188,14 @@ export async function fetchCandidates(db: Db, input: { userId: string; visibilit
       input.cursor ? sql`(${issues.updatedAt}, ${issues.id}) < (${input.cursor.updatedAt}::timestamptz, ${input.cursor.id}::uuid)` : undefined,
     ))
     .orderBy(sql`"updatedAt" desc, id desc`).limit(input.limit).as('q')
-  // Both aggregate arguments refer only to this page. A filtered minimum is
-  // the reader's owner id, or null, so empty/foreign-only pages fetch no prefix.
+  // Keep the already-issued identifier in this authorized page. Team changes
+  // and owner prefix settings are neither naming nor authorization sources.
   const [packed] = await db.select({
-    data: sql<[SearchTransportRow[] | null, TaskPrefixInput | null]>`jsonb_build_array(jsonb_agg(q.v order by (q.v->>8)::timestamptz desc,(q.v->>0)::uuid desc),${taskPrefixInput(sql`min(q.v->>1) filter(where q.v->>1=${input.userId})`)})`,
+    data: sql<SearchTransportRow[] | null>`jsonb_agg(q.v order by (q.v->>8)::timestamptz desc,(q.v->>0)::uuid desc)`,
   }).from(page)
-  const [rows, prefixInput] = packed.data
-  // Unlinked tasks can only be visible to their owner. A linked foreign task
-  // receives no owner input; its name still comes from the complete team read.
-  return (rows ?? []).map(([id, ownerId, ownerName, scope, title, status, priority, revision, cursorKey, metadata]): SearchRow => ({
+  return (packed.data ?? []).map(([id, ownerId, ownerName, scope, title, status, priority, revision, cursorKey, metadata, issuedIdentifier]): SearchRow => ({
     id, ownerId, ownerName, scope, title, status, priority, revision, updatedAt: new Date(cursorKey), cursorKey,
-    metadata: metadata ?? {}, prefixInput: ownerId === input.userId ? prefixInput : null,
+    metadata: metadata ?? {}, issuedIdentifier,
   }))
 }
 
@@ -219,6 +219,20 @@ export async function searchIssues(db: Db, input: { userId: string; params: Sear
   const anchors = [...new Set([params.issueId, params.excludeId].filter((id): id is string => !!id))]
   const anchorRows = anchors.length ? await db.select().from(issues).where(and(idIn(issues.id, anchors), predicate)) : []
   if (anchorRows.length !== anchors.length) throw new ActionFailureError('issueNotFound')
+  let candidatePredicate = predicate
+  let query = params.query
+  if (query.kind === 'identifier') {
+    const { resolveTaskIdentifierAlias } = await import('@/lib/task-identity-store')
+    const resolved = await resolveTaskIdentifierAlias({ workspaceId: input.workspaceId, identifier: query.identifier }, db)
+    if (resolved.kind === 'found') {
+      candidatePredicate = and(predicate, eq(issues.id, resolved.issueId))!
+      query = { kind: 'recent' }
+    } else if (resolved.kind === 'missing' && /^(ORV|MIK)-[1-9]\d{0,8}$/.test(query.identifier)) {
+      // The pre-prefix UI accepted ORV/MIK plus the owner's numeric counter.
+      // Retain that search only when there is no real identifier to resolve.
+      query = { kind: 'number', number: Number(query.identifier.split('-')[1]) }
+    } else return { items: [] as SearchResultItem[], nextCursor: null, truncated: false }
+  }
   const currentRow = anchorRows.find(row => row.id === params.issueId)
   const current = currentRow ? { id: currentRow.id, ownerId: currentRow.userId, metadata: readIssueMetadata(currentRow.content) } : null
   const excluded = new Set<string>()
@@ -234,9 +248,9 @@ export async function searchIssues(db: Db, input: { userId: string; params: Sear
     }
   }
   const members = current && current.ownerId !== userId ? await memberIssueIds(db, current.ownerId, userId) : []
-  const rows = await fetchCandidates(db, { userId, visibility: predicate, excludedIds: [...excluded], query: params.query, cursor: params.cursor, limit: params.limit + 1, visibilityExcludesDeleted: true })
+  const rows = await fetchCandidates(db, { userId, visibility: candidatePredicate, excludedIds: [...excluded], query, cursor: params.cursor, limit: params.limit + 1, visibilityExcludesDeleted: true })
   const page = rows.slice(0, params.limit)
-  const identifiers = await taskIdentifiers(page.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: row.metadata.number, prefixInput: row.prefixInput })))
+  const identifiers = await taskIdentifiers(page.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: row.metadata.number, issuedIdentifier: row.issuedIdentifier })))
   return {
     items: page.map((row): SearchResultItem => ({
       id: row.id, identifier: identifiers.get(row.id) ?? null,

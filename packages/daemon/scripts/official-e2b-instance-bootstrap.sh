@@ -14,6 +14,8 @@ mikka_sha=${2:?worker digest required}
 mikka_kind=${3:?official template kind required}
 mikka_mode=${4:-install}
 mikka_previous_sha=${5:-}
+mikka_prebuild=0
+if [[ "$mikka_mode" = prebuild ]]; then mikka_mode=install; mikka_prebuild=1; fi
 [[ "$mikka_mode" = install || "$mikka_mode" = stage ]] || exit 2
 [[ "$mikka_commit" =~ ^[a-f0-9]{40}$ && "$mikka_sha" =~ ^[a-f0-9]{40}$ ]] || exit 2
 [[ "$mikka_kind" = desktop || "$mikka_kind" = claude || "$mikka_kind" = codex ]] || exit 2
@@ -24,6 +26,7 @@ if [[ "$mikka_mode" = stage ]]; then
   [[ -x /opt/mikka/runtime/node/bin/node && -L /opt/mikka/worker ]] || exit 3
 elif [[ -f /opt/mikka/worker-source-sha ]]; then
   [[ "$(cat /opt/mikka/worker-source-sha)" = "$mikka_sha" ]] || exit 3
+  if [[ "$mikka_prebuild" = 0 ]]; then python3 /opt/mikka/runtime/ingress-v1/guard.py verify >/dev/null; fi
   exit 0
 fi
 # Refuse an unknown installation. Retained/legacy instances are never erased
@@ -97,6 +100,20 @@ mikka_install="$mikka_release/worker-install"
   env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
 )
 python3 packages/daemon/scripts/prepare-worker-install.py "$mikka_release/source" "$mikka_install" --link
+# Every official kind can serve an authenticated run preview. Keep this pinned
+# Python dependency in Mikka's own versioned directory: no apt/system package
+# changes and no dependency installation when a person opens the preview.
+mikka_preview_deps=/opt/mikka/runtime/preview-python-3.14.0
+if [[ ! -e "$mikka_preview_deps" ]]; then
+  mikka_preview_stage=$(mktemp -d /opt/mikka/runtime/.preview-python-3.14.0-XXXXXXXX)
+  env HOME=/opt/mikka/runtime/bootstrap-home PIP_CACHE_DIR=/opt/mikka/runtime/pip-cache python3 -m pip install --disable-pip-version-check --target "$mikka_preview_stage" 'aiohttp==3.14.0'
+  env PYTHONPATH="$mikka_preview_stage" python3 -c 'import aiohttp; assert aiohttp.__version__ == "3.14.0"'
+  chmod -R go-w "$mikka_preview_stage"
+  mv -T --no-clobber "$mikka_preview_stage" "$mikka_preview_deps"
+  [[ ! -e "$mikka_preview_stage" ]] || exit 3
+fi
+[[ -d "$mikka_preview_deps" && ! -L "$mikka_preview_deps" && "$(stat -c %u "$mikka_preview_deps")" = 0 ]] || exit 3
+env PYTHONPATH="$mikka_preview_deps" python3 -c 'import aiohttp; assert aiohttp.__version__ == "3.14.0"'
 mikka_phase_done dependencies
 MIKKA_CLOUD_WORKER_BUILD_SHA="$mikka_sha" node packages/daemon/scripts/build-cloud-worker.mjs
 mikka_phase_done build
@@ -184,6 +201,15 @@ if [[ "$mikka_kind" = desktop ]]; then
 fi
 mikka_phase_done desktop
 install -d -m 710 -o root -g user /run/mikka-viewer
+python3 packages/daemon/scripts/workspace-control-install.py
+# The final prebuilt start owns its kernel/boot receipt. An official-instance
+# fallback prepares the same policy now, before returning to any credential
+# publication or worker launch. Staging exits above and cannot mint this proof.
+mikka_ingress=/opt/mikka/runtime/ingress-v1
+[[ ! -e "$mikka_ingress" && ! -L "$mikka_ingress" ]] || exit 3
+install -d -m 755 -o root -g root "$mikka_ingress"
+install -m 444 -o root -g root packages/daemon/scripts/workspace-ingress.py "$mikka_ingress/guard.py"
+if [[ "$mikka_prebuild" = 0 ]]; then python3 "$mikka_ingress/guard.py" prepare; fi
 chmod -R go-w "$mikka_release"
 printf '%s\n' "$mikka_sha" > /opt/mikka/worker-source-sha
 chmod 0444 /opt/mikka/worker-source-sha

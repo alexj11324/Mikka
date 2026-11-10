@@ -180,7 +180,7 @@
     "env": {}
   },
   "core-38": {
-    "command": "pnpm --filter @mikka/protocol exec vitest run src/run.test.ts\npnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts\n",
+    "command": "pnpm --filter @mikka/protocol exec vitest run src/run.test.ts\npnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts test/project-environment.test.ts src/permissions.test.ts\n",
     "kind": "core",
     "env": {}
   },
@@ -426,14 +426,19 @@
     "kind": "core",
     "env": {}
   },
-  "core-governance": {
-    "command": "pnpm test:governance",
+  "core-coding-review": {
+    "command": "pnpm test:coding-review-unit",
     "kind": "core",
     "env": {}
   },
   "integration-factory-activity": {
     "command": "pnpm test:factory-activity",
     "kind": "integration",
+    "env": {}
+  },
+  "core-governance": {
+    "command": "pnpm test:governance",
+    "kind": "core",
     "env": {}
   }
 }

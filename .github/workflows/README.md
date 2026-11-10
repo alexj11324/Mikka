@@ -119,6 +119,52 @@ documentation-only push can still rebuild and revalidate the unpublished worker.
 and task-owner E2B billing apply. See
 [Alex's preservation clarification](../../docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md).
 
+## Product terminal and preview acceptance
+
+After the application serves its approved main commit and the official runtime
+release has published, use the manual `workspace-review` mode in
+`task-secret-acceptance.yml`. It runs
+[`coding-workspace.mjs`](../../scripts/acceptance/coding-workspace.mjs) through
+the existing shared-account concurrency group. This mode uses only
+`SMOKE_OWNER_EMAIL` and `SMOKE_OWNER_PASSWORD`; it does not read an E2B key,
+database credential or ACME account, or invoke the separate Secret/ACME drivers.
+Automatic release-triggered acceptance keeps its existing behavior.
+
+Set the following manual inputs from the approved deployment and exact
+successful official release evidence:
+
+| Input | Value |
+| --- | --- |
+| `mode` | `workspace-review` |
+| `application_sha` | Exact current main commit served by `/mikka/api/version` |
+| `worker_sha`, `worker_source_sha` | Exact published worker digest and source commit |
+| `claude_template`, `codex_template` | The two template IDs from that same release |
+| `workspace_review_release_run_id`, `workspace_review_release_run_attempt` | Exact completed publication run and attempt |
+| `model_case` | `all` |
+| `factory_acceptance`, `production_canary` | `false`; leave `canary_window` empty |
+
+Before each account credential read, the guard checks main/served source and the
+release's workflow, complete jobs, immutable artifact digest, templates and both
+official subscription receipts. The task then uses its original shared
+subscription: Claude Haiku 5.5 with Vite, and GPT-6 Luna with Next. Existing active
+Profiles block admission; the driver never changes model order or another
+Profile. Each case creates a normal repository Task in the selected stored
+workspace, dispatches through the Coordinator and waits for a verified Factory
+candidate. It does not create a VM through a provider SDK or merge the task PR.
+
+The checkpoint artifact is `production-coding-workspace-report/report.json`.
+It contains exact self-created IDs, source pins and closed request/response
+evidence; it contains no credential, capability URL, cookie, input transcript or
+native output. The `always()` recovery step only uses that invocation's recorded
+IDs. A lost creation response remains uncertain, and incomplete first-case
+cleanup prevents the second case. Keep unconfirmed PR/branch and Task IDs for
+exact recovery rather than rerunning a model. Completed fixtures have their own
+PR closed, branch deleted, machines ended, Task deleted and Profile archived;
+owned idle Bots remain recorded because there is no Bot deletion API.
+
+See [terminal and preview acceptance boundaries](../../docs/acceptance/terminal-1723.md#normal-product-task-driver)
+for retained-run requirements, the five-minute lease and evidence limits.
+
 ## GitHub branch protection (separate repository setting)
 
 Keep required status checks enabled. Disable **Require branches to be up to

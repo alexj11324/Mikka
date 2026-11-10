@@ -111,7 +111,7 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
       assert.deepEqual(personalList.map(item => item.id), [id])
       const sharedList = await actAs(other, () => listWorkspaceIssues(shared.id))
       assert.deepEqual(sharedList.map(item => item.id), [sharedId])
-      assert.match(sharedList[0].identifier ?? '', /^MINE-[1-9][0-9]*$/, 'a shared task keeps its creator\'s stable number and prefix')
+      assert.match(sharedList[0].identifier ?? '', /^W[0-9A-F]{12,32}-[1-9][0-9]*$/, 'a new shared task receives its Workspace identifier independently of its creator')
       assert.notEqual(sharedList[0].metadata.number, row.metadata.number, 'number allocation stays unique across the owner\'s workspaces')
     })
     await t.test('the counter owner lock remains compatible with FK KEY SHARE', async () => {

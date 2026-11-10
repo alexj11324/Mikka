@@ -2,7 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
-import { createDesktopRpc, desktopBearerHeaders, humanSessionHeaders } from './handler'
+import { createDesktopRpc, desktopBearerHeaders, dispatchRpc, humanSessionHeaders } from './handler'
+import { workspaceSelection } from '../workspace-selection'
+import { createSessionClient } from '../../scripts/acceptance/cloud-startup.mjs'
+import { CASES, createDomainIssue } from '../../scripts/acceptance/work-domain-production.mjs'
+import { codingFixture, createWorkspaceReviewIssue } from '../../scripts/acceptance/coding-workspace.mjs'
 import { desktopActionSchemas } from './schemas'
 import { currentDesktopSession, withDesktopSession, safeDesktopSession } from './session'
 import { decode, encode, UPDATE_REQUIRED } from './wire'
@@ -180,6 +184,29 @@ test('explicit schemas and function map have exactly matching action names', () 
   }
 })
 
+test('Task presentation batch rejects forged authority and oversized input before invoking its reader', async () => {
+  const action = 'task-domain.getTaskPresentations'
+  let calls = 0
+  const handle = createDesktopRpc({
+    authenticate: async () => sessions.get(tokenA)!,
+    scope: withDesktopSession,
+    actions: { [action]: { args: desktopActionSchemas[action], invoke: async () => { calls++; return { version: 1, workspaceId: owner, items: {} } } } },
+  })
+  for (const args of [
+    [{ workspaceId: owner, issueIds: [peer], userId: peer }],
+    [{ workspaceId: owner, issueIds: [peer], includeDeleted: true }],
+    [{ workspaceId: owner, issueIds: [peer] }, { role: 'admin' }],
+    [{ workspaceId: 'invalid', issueIds: [] }],
+    [{ workspaceId: owner, issueIds: ['invalid'] }],
+    [{ workspaceId: owner, issueIds: Array.from({ length: 201 }, () => peer) }],
+  ]) assert.equal((await handle(request(action, args))).status, 400)
+  assert.equal(calls, 0)
+  for (const issueIds of [[], Array.from({ length: 200 }, () => peer)]) {
+    assert.equal((await handle(request(action, [{ workspaceId: owner, issueIds }]))).status, 200)
+  }
+  assert.equal(calls, 2, 'empty and bounded inputs still enter the reader and its membership checks')
+})
+
 test('Coordinator submission accepts an optional captured workspace without widening its authority tuple', () => {
   const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
   const legacy = ['hello', null, null, owner, undefined, undefined, undefined, undefined, undefined]
@@ -248,3 +275,85 @@ test('cached detail and bootstrap accept identity-free selectors while preservin
   for (const args of [[], [undefined], [owner]]) assert.equal(desktopActionSchemas['desktop.bootstrap'].safeParse(args).success, true)
   for (const args of [[null], ['invalid'], [{ workspaceId: owner, role: 'admin' }], [owner, peer]]) assert.equal(desktopActionSchemas['desktop.bootstrap'].safeParse(args).success, false)
 })
+
+
+test('domain production Task creation uses the actual strict saveIssue schema and fixed normal-session Workspace header', async () => {
+  const workspaceId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+  const issueId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+  const document = { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Synthetic domain acceptance work' }] }] } }
+  const session = { user: { id: owner } }
+  let invoked = 0, selected: string | null = null
+  const options = {
+    actions: { 'issues.saveIssue': { args: desktopActionSchemas['issues.saveIssue'], invoke: async (args: unknown[]) => {
+      invoked++
+      assert.equal(selected, workspaceId)
+      const input = args[0] as { title: string; content: unknown; status: string; priority: string }
+      assert.deepEqual(Object.keys(input).sort(), ['content', 'priority', 'status', 'title'])
+      assert.equal(input.title, CASES[0].title); assert.deepEqual(input.content, document.content)
+      assert.equal(input.status, 'todo'); assert.equal(input.priority, 'normal')
+      return { issue: { ...input, id: issueId, userId: owner, workspaceId: selected, revision: 1 } }
+    } } },
+    scope: async (_session: typeof session, work: () => Promise<Response>, req: Request) => {
+      assert.equal(req.headers.get('x-mikka-rpc'), '1')
+      const choice = workspaceSelection(req.headers)
+      assert.equal(choice.present, true); assert.equal(choice.workspaceId, workspaceId)
+      selected = choice.workspaceId
+      return work()
+    },
+  }
+  const legacy = new Request('https://app.example/mikka/api/rpc', { method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-mikka-rpc': '1', 'x-mikka-workspace-id': workspaceId },
+    body: JSON.stringify({ version: 1, action: 'issues.saveIssue', args: [{ workspaceId, title: CASES[0].title,
+      content: document.content, status: 'todo', priority: 'normal' }] }) })
+  const refused = await dispatchRpc(options, legacy, session, 'Cookie')
+  assert.equal(refused.status, 400)
+  assert.equal((await refused.json()).error.code, 'desktop_rpc_request_invalid')
+  assert.equal(invoked, 0)
+  const client = createSessionClient('https://app.example', (url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+    dispatchRpc(options, new Request(url, init), session, 'Cookie'))
+  const result = await createDomainIssue(client, { workspaceId }, CASES[0], document)
+  assert.equal(invoked, 1)
+  assert.equal(result.issue.id, issueId); assert.equal(result.issue.workspaceId, workspaceId); assert.equal(result.issue.userId, owner)
+})
+
+for (const harness of ['claude_code', 'codex']) {
+  test(`Coding Workspace ${harness} creates its normal Task through the strict RPC with a fixed Workspace header`, async () => {
+    const workspaceId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const issueId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    const record = { caseId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', harness }
+    const fixture = codingFixture(record.caseId, harness)
+    const expected = { title: `测试 Coding Workspace ${record.caseId} ${harness}`,
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: fixture.instructions }] }] },
+      status: 'todo', priority: 'low' }
+    const session = { user: { id: owner } }
+    let invoked = 0, selected: string | null = null
+    const options = {
+      actions: { 'issues.saveIssue': { args: desktopActionSchemas['issues.saveIssue'], invoke: async (args: unknown[]) => {
+        invoked++
+        assert.equal(selected, workspaceId)
+        assert.deepEqual(args, [expected])
+        return { issue: { ...expected, id: issueId, userId: owner, workspaceId: selected, revision: 1 } }
+      } } },
+      scope: async (_session: typeof session, work: () => Promise<Response>, req: Request) => {
+        assert.equal(req.headers.get('x-mikka-rpc'), '1')
+        const choice = workspaceSelection(req.headers)
+        assert.equal(choice.present, true); assert.equal(choice.workspaceId, workspaceId)
+        selected = choice.workspaceId
+        return work()
+      },
+    }
+    const legacy = new Request('https://app.example/mikka/api/rpc', { method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-mikka-rpc': '1' },
+      body: JSON.stringify({ version: 1, action: 'issues.saveIssue', args: [{ workspaceId, ...expected }] }) })
+    const refused = await dispatchRpc(options, legacy, session, 'Cookie')
+    assert.equal(refused.status, 400)
+    assert.equal((await refused.json()).error.code, 'desktop_rpc_request_invalid')
+    assert.equal(invoked, 0)
+    const client = createSessionClient('https://app.example', (url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+      dispatchRpc(options, new Request(url, init), session, 'Cookie'))
+    const result = await createWorkspaceReviewIssue(client, { workspaceId }, record, fixture)
+    assert.equal(invoked, 1)
+    assert.equal(result.issue.id, issueId); assert.equal(result.issue.workspaceId, workspaceId); assert.equal(result.issue.userId, owner)
+    assert.deepEqual(result.issue.content, expected.content)
+  })
+}

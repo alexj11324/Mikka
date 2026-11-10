@@ -12,5 +12,7 @@ app.whenReady().then(async () => {
     #edge{position:fixed;right:0;bottom:0;width:2px;height:2px;background:rgb(0,0,255)}
     #edge:after{content:"";position:absolute;right:0;bottom:0;width:1px;height:1px;background:rgb(255,0,0)}
     button{position:fixed;right:10px;bottom:10px;width:100px;height:40px}
-    </style><div id="edge"></div><button onclick="document.title='clicked'">Edge click</button>`))
+    #workspace{left:10px;top:10px;right:auto;bottom:auto}
+    </style><div id="edge"></div><button onclick="document.title='clicked'">Edge click</button>
+    <button id="workspace" role="menuitem" onclick="document.documentElement.dataset.switchRequested='true'">Switch workspace</button>`))
 })

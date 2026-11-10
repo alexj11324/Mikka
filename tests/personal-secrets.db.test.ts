@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('personal secrets', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
@@ -170,5 +170,72 @@ test('personal secrets', { skip: !dbUrl }, async t => {
     assert.deepEqual(await stopped(fifth), { stopped: true, expired: true })
     assert.equal((await stopped(foreign)).stopped, false)
     assert.equal((await stopped(queued)).stopped, false)
+  })
+
+  await t.test('production canary reads the full owner ledger and verifies real rotation revocation in read-only PostgreSQL transactions', async () => {
+    const { createOwnerIdleVerifier } = await import('../scripts/acceptance/task-secrets-production-canary.mjs')
+    const owner = await seedUser(pool, 'canary-idle-owner'), other = await seedUser(pool, 'canary-idle-other')
+    const first = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const second = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const firstBot = await seedBot(pool, first.id, owner), secondBot = await seedBot(pool, second.id, owner)
+    const agentId = await seedAgent(pool, owner), otherAgent = await seedAgent(pool, other)
+    const deviceId = randomUUID(), otherDevice = randomUUID(), oldRunId = randomUUID(), otherRunId = randomUUID()
+    await pool.query('insert into devices (id,"ownerId",name,kind) values ($1,$2,\'canary-idle\',\'local\'),($3,$4,\'canary-other\',\'local\')',
+      [deviceId, owner, otherDevice, other])
+    await pool.query(`insert into agent_runs (id,"userId","agentId","botId",status)
+      select fixture.id,$2,$3,$4,'stopped' from unnest($1::uuid[]) as fixture(id)`,
+    [Array.from({ length: 201 }, () => randomUUID()), owner, agentId, firstBot])
+    await pool.query(`insert into agent_runs (id,"userId","agentId","botId","deviceId",status,"createdAt","leaseExpiresAt")
+      values ($1,$2,$3,$4,$5,'paused',now()-interval '60 days',now()+interval '10 minutes')`,
+    [oldRunId, owner, agentId, secondBot, deviceId])
+    await pool.query(`insert into agent_runs (id,"userId","agentId","deviceId",status,"leaseExpiresAt")
+      values ($1,$2,$3,$4,'running',now()+interval '10 minutes')`, [otherRunId, other, otherAgent, otherDevice])
+    const window = { comment: 'https://github.com/alexj11324/Mikka/issues/1752#issuecomment-123',
+      expiresAt: new Date(Date.now() + 20 * 60_000).toISOString() }
+    const verifier = await createOwnerIdleVerifier({ connectionString: dbUrl, ownerId: owner, email: `${owner}@example.invalid`,
+      window, sourceCommit: 'a'.repeat(40), fixtureId: randomUUID() })
+    const control = () => ({ signal: AbortSignal.timeout(5000), timeoutMs: 5000 })
+    try {
+      // A recent 200-row projection would miss this task in the other
+      // workspace. The exact production driver must still refuse a write.
+      for (const status of ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']) {
+        await pool.query('update agent_runs set status=$2 where id=$1', [oldRunId, status])
+        await assert.rejects(verifier.assertIdle([], control()), /canary_idle_unverified/)
+      }
+      const occupied = await verifier.assertIdle([oldRunId], control())
+      assert.equal(occupied.unfinishedCount, 1)
+      assert.equal(occupied.ownedActiveCount, 1)
+      assert.equal(occupied.ownedStopRequestedCount, 0)
+      assert.equal(occupied.readOnly, true)
+      assert.equal(occupied.atomicWithMutation, false)
+      await pool.query('update agent_runs set status=\'stopped\' where id=$1', [oldRunId])
+      assert.equal((await verifier.assertIdle([], control())).unfinishedCount, 0, 'another owner does not block this owner window')
+
+      const row = await personal.createUserSecret(owner, { name: 'CANARY_IDLE_ROTATION', kind: 'secret', value: VALUE }, {})
+      const activeRunId = randomUUID()
+      await pool.query(`insert into agent_runs (id,"userId","agentId","botId","deviceId",status,"leaseExpiresAt")
+        values ($1,$2,$3,$4,$5,'running',now()+interval '10 minutes')`, [activeRunId, owner, agentId, firstBot, deviceId])
+      const requestedAt = new Date().toISOString()
+      await assert.rejects(verifier.assertRevoked(activeRunId, requestedAt, control()), /canary_revocation/)
+      await personal.replaceUserSecret(owner, { id: row.id, value: VALUE + '-rotated' })
+      assert.equal((await verifier.assertIdle([activeRunId], control())).ownedStopRequestedCount, 1)
+      await assert.rejects(verifier.assertRevoked(activeRunId, requestedAt, control()), /canary_revocation/,
+        'an expired lease without terminal acknowledgement is incomplete evidence')
+      // The actual store has set stopRequestedAt and expired the lease. This
+      // isolated fixture supplies the daemon terminal acknowledgement only.
+      await pool.query('update agent_runs set status=\'stopped\' where id=$1', [activeRunId])
+      const revoked = await verifier.assertRevoked(activeRunId, requestedAt, control())
+      assert.equal(revoked.status, 'stopped'); assert.equal(revoked.leaseExpired, true)
+      assert.equal((await verifier.assertIdle([], control())).unfinishedCount, 0)
+      assert.equal((await pool.query('select "stopRequestedAt" from agent_runs where id=$1', [otherRunId])).rows[0].stopRequestedAt, null)
+      await personal.deleteUserSecret(owner, { id: row.id })
+      assert.equal((await personal.listUserSecrets(owner)).some(secret => secret.id === row.id), false)
+      assert.doesNotMatch(JSON.stringify({ occupied, revoked }), new RegExp(owner))
+    } finally { await verifier.close() }
+
+    const mismatched = await createOwnerIdleVerifier({ connectionString: dbUrl, ownerId: owner, email: 'wrong-owner@example.invalid',
+      window, sourceCommit: 'a'.repeat(40), fixtureId: randomUUID() })
+    try { await assert.rejects(mismatched.assertIdle([], control()), /canary_idle_unverified/) }
+    finally { await mismatched.close() }
   })
 })

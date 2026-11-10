@@ -18,7 +18,7 @@ test('all real team dependencies and auth export/session metadata load before th
   const report=result.stdout.split('\n').find(line=>line.startsWith('{"teamImportContract":true'))
   assert.ok(report);t.diagnostic(report)
   assert.match(result.stdout,/"teamImportContract":true/)
-  assert.match(result.stdout,/"scenarios":22/)
+  assert.match(result.stdout,/"scenarios":24/)
   assert.match(result.stdout,/"nativeTransportAttempts":0,"nativeSqlSubmissions":0/)
   assert.doesNotMatch(result.stdout+result.stderr,/does not provide an export|reading 'builtins'/)
 })

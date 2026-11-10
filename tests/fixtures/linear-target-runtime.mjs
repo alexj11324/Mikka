@@ -1,7 +1,13 @@
 // Source-only publication tests use in-memory transaction results. No DB connection.
 import { registerHooks } from 'node:module'
 const dbSource='export const db={transaction:async fn=>fn(globalThis.linearTargetProbe.tx)};export const pool={options:{}}'
-const workspaceSource='export const workspaceDb={select:(...args)=>globalThis.linearTargetProbe.workspace.select(...args)}'
+const workspaceSource=`
+  export const workspaceDb={select:(...args)=>globalThis.linearTargetProbe.workspace.select(...args)};
+  export const workspacePool={
+    query(){throw new Error('Unexpected raw workspace query in Linear target fixture')},
+    connect(){throw new Error('Unexpected workspace transaction in Linear target fixture')},
+  };
+`
 registerHooks({
   resolve(specifier,context,next) {
     if(specifier==='server-only') return {url:'linear-target-fixture:empty',shortCircuit:true}

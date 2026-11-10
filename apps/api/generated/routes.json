@@ -939,7 +939,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "6c84f889ccb33e59c75cac7fc6b324e55010b6df67178aa9e7b6dfac40af0eac"
+      "sourceHash": "57ebcd52bb3b71b75a8b4fa49ec677c31557cd3080cd73a153e6d463c238116e"
     },
     {
       "path": "/mikka/api/factory/tasks/route",
@@ -1283,7 +1283,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "2d7a9689d2950876251582474f08a57b1a605fc61cb71d1e4a60ab7fa823cdfa"
+      "sourceHash": "fe52357a984946c4578c0d56c653e01f15be49bae10c07386ea628afd0b3cbbc"
     },
     {
       "path": "/mikka/api/mobile/artifacts/[id]",
@@ -1447,13 +1447,22 @@
       "sourceHash": "a416e1d3d409737b8d74347b4877ef2d003f12f5072e1b80b649989f60cbbc59"
     },
     {
+      "path": "/mikka/api/mobile/task-presentations",
+      "template": "/api/mobile/task-presentations",
+      "source": "app/api/mobile/task-presentations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "523320ae8a8aac677c1d76b16e5a6980ff2358f7291441c1b427ada14354d5ca"
+    },
+    {
       "path": "/mikka/api/mobile/tasks",
       "template": "/api/mobile/tasks",
       "source": "app/api/mobile/tasks/route.ts",
       "methods": [
         "GET"
       ],
-      "sourceHash": "f5503cef4f7685ce91b1faa0ef50b522386f175594c85db5ed651c4f3deddb2c"
+      "sourceHash": "1d5a95c94061e4e36bd26073494a71c1c9708b246bc178ecfc9174d9631d7be9"
     },
     {
       "path": "/mikka/api/mobile/tasks/[id]",
@@ -1877,6 +1886,45 @@
       "sourceHash": "4bbd05f3ec67d39a691094ce7e2bc2b8558d37d1fa5c9ecb80237c33f728814a"
     },
     {
+      "path": "/mikka/api/tasks/[id]/review/preview",
+      "template": "/api/tasks/[id]/review/preview",
+      "source": "app/api/tasks/[id]/review/preview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "aaaa0e686e510c357df1b3eb0cebd32285a4a5ecf38d2e38319d55c279d36a38"
+    },
+    {
+      "path": "/mikka/api/tasks/[id]/review/terminal",
+      "template": "/api/tasks/[id]/review/terminal",
+      "source": "app/api/tasks/[id]/review/terminal/route.ts",
+      "methods": [
+        "DELETE",
+        "GET"
+      ],
+      "maxDuration": 300,
+      "sourceHash": "b53e06f662f648dbdcc0ae5704a7cb8325de48bc2f2054bf89496b078812af8b"
+    },
+    {
+      "path": "/mikka/api/tasks/[id]/review/terminal/input",
+      "template": "/api/tasks/[id]/review/terminal/input",
+      "source": "app/api/tasks/[id]/review/terminal/input/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "9bc4ab80a786609a3f2f6c7ec237b91ff96e4aa2f24bf8a830fd9a24cbc1eed8"
+    },
+    {
+      "path": "/mikka/api/tasks/[id]/review/terminal/resize",
+      "template": "/api/tasks/[id]/review/terminal/resize",
+      "source": "app/api/tasks/[id]/review/terminal/resize/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "56bf42f57efcc10898e2965288731e13babecfc4162afbb7d7e2ffd2b5aede90"
+    },
+    {
       "path": "/mikka/api/teams/directory",
       "template": "/api/teams/directory",
       "source": "app/api/teams/directory/route.ts",
@@ -2272,7 +2320,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "ed0e980b5748c6345e9c9feeedcfa0346e46bd86c5938848fb2c756faefe59fe"
+      "sourceHash": "67027eaff496a1ed2e659924b13e8eef0253186646b1a2c36ba508de987769c5"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",

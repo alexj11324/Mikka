@@ -103,7 +103,8 @@ const defaultReconcileFor: FactoryReconcileFor = botId => async (userId, runId) 
  * task/issue/run locks). It is idempotent: each transition is keyed by
  * factoryEventId("run-completion", runId), so replays and the preparePrompt
  * fallback (workflows/coordinator/steps.ts) never advance a task twice.
- * Default-off: returns before any SQL unless both Factory flags are on.
+ * Factory SQL runs only with both flags on. The shared run-end hook below
+ * reconciles review authority independently of these Factory flags.
  * Best effort: a failure is logged without payload and left to the fallback. */
 export async function reconcileFactoryAfterCompletion(db: Queryable, userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
   if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
@@ -144,15 +145,24 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
   return reconciled
 }
 
-/** Shared after-commit hook for every path that ends a run outside the daemon
- * completion transaction (claim rejection, lease loss/retry, stop request).
- * Call only after the ending write committed. Default-off and never throws. */
+/** Shared after-commit hook for daemon completion and every other path that
+ * ends a run (claim rejection, lease loss/retry, stop request).
+ * Call only after the ending write committed. Review closes are always on;
+ * only Factory progression is flag-gated. Never throws. */
 export async function afterRunEnded(userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
   // An ended run is due for its outcome, and its task machine for parking, now (#1212).
   armDueTimerSoon('run-recovery')
-  if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
   try {
     const { pool } = await import('./db')
+    // Normal native completion retains a review lease; stop/lost scope must
+    // close it even when Factory is disabled. A failed close stays due.
+    try {
+      const { reconcileReviewSessions } = await import('./coding-workspace/review-sessions')
+      await reconcileReviewSessions(pool, { runIds: [runId] })
+    } catch {
+      armDueTimerSoon('run-recovery')
+      console.warn('Run review close deferred', { code: 'review_close_unacknowledged' })
+    }
     return await reconcileFactoryAfterCompletion(pool, userId, runId, reconcileFor)
   } catch (error) {
     console.warn('factory run-end reconcile deferred to Coordinator fallback', { runId, error: error instanceof Error ? error.constructor.name : typeof error })

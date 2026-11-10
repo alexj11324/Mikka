@@ -1,11 +1,11 @@
 """Local-only filesystem/process regression for private runtime refresh."""
-import contextlib, importlib.util, io, json, os, pathlib, socket, subprocess, tempfile, threading, unittest
+import contextlib, fcntl, importlib.util, io, json, os, pathlib, socket, subprocess, tempfile, threading, unittest
 spec=importlib.util.spec_from_file_location('refresh',pathlib.Path(__file__).with_name('refresh-cloud-worker.py'))
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 class RefreshTest(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name)
-        m.RUNTIME=self.root/'opt';m.HOME=self.root/'home';m.ROOT_UID=os.getuid();m.USER_UID=os.getuid()
+        m.RUNTIME=self.root/'opt';m.HOME=self.root/'home';m.CONTROL=self.root/'control';m.ROOT_UID=os.getuid();m.USER_UID=os.getuid()
         self.old=m.RUNTIME/'releases'/('a'*40)/'source';(self.old/'packages/daemon').mkdir(parents=True)
         stage=self.root/'stage';stage.mkdir()
         for args in [['init','-q'],['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-qm','fixture']]:subprocess.run(['git','-C',str(stage),*args],check=True)
@@ -64,6 +64,7 @@ class RefreshTest(unittest.TestCase):
         # Run the real entry point against this disposable installation only.
         source=pathlib.Path(__file__).with_name('refresh-cloud-worker.py').read_text()
         source=source.replace("RUNTIME=pathlib.Path('/opt/mikka')",'RUNTIME=pathlib.Path('+repr(str(m.RUNTIME))+')').replace("HOME=pathlib.Path('/home/user/.mikka')",'HOME=pathlib.Path('+repr(str(m.HOME))+')')
+        source=source.replace("CONTROL=pathlib.Path('/run/mikka-review-control')",'CONTROL=pathlib.Path('+repr(str(m.CONTROL))+')')
         source=source.replace('ROOT_UID=0','ROOT_UID='+str(os.getuid())).replace('USER_UID=None','USER_UID='+str(os.getuid())).replace('if os.geteuid()!=0:','if os.geteuid()!=ROOT_UID:')
         runner=self.root/'refresh-cli.py';runner.write_text(source)
         return subprocess.run(['python3',str(runner),mode,*self.args],capture_output=True,text=True)
@@ -100,6 +101,19 @@ class RefreshTest(unittest.TestCase):
         journal.write_text('{"runs":{}}');(m.HOME/'worker/device.json').write_text('{}')
         self.assertEqual(json.loads(self.cli('switch').stderr)['code'],'runtime_identity_mismatch')
         self.assertIsNone(old.poll());self.assertEqual((m.RUNTIME/'worker').resolve(),self.old)
+    def test_human_terminal_execution_fence_refuses_refresh_before_stopping_worker(self):
+        old=self.process(self.old)
+        m.CONTROL.mkdir(mode=0o710)
+        descriptor=os.open(m.CONTROL/'machine.lock',os.O_RDWR|os.O_CREAT,0o660)
+        try:
+            fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            result=self.cli('switch')
+            self.assertEqual(result.returncode,1)
+            self.assertEqual(json.loads(result.stderr)['code'],'runtime_native_busy')
+            self.assertIsNone(old.poll())
+            self.assertEqual((m.RUNTIME/'worker').resolve(),self.old)
+            self.assertFalse((m.RUNTIME/'runtime-refresh'/self.args[-1]).exists())
+        finally:os.close(descriptor)
     def test_switch_verifies_new_process_and_rollback_preserves_user_and_official_files(self):
         old=self.process(self.old);self.assertEqual(self.call('switch')['status'],'switched');self.assertIsNotNone(old.poll())
         self.assertEqual((m.RUNTIME/'worker').resolve(),self.new)
@@ -137,13 +151,23 @@ class StageTest(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name);self.runtime=self.root/'runtime'
         self.bin=self.root/'bin';self.bin.mkdir();self.repo=self.root/'repository';self.repo.mkdir()
         (self.repo/'scripts/e2b').mkdir(parents=True);(self.repo/'scripts/e2b/build-template.py').write_text("print('c'*40)\n")
+        # Stage runs the real CLI conservation check as well as the build. Give
+        # it disposable original CLIs and the actual checker, without reading
+        # host installations or replacing the check with a successful stub.
+        checker=pathlib.Path(__file__).parents[3]/'scripts/e2b/official-files.py'
+        (self.repo/'scripts/e2b/official-files.py').write_text(checker.read_text().replace("PRIVATE = Path('/opt/mikka')",'PRIVATE = Path('+repr(str(self.runtime))+')').replace('before.st_uid != 0','before.st_uid != '+str(os.getuid())))
+        for name in ['claude','codex']:self.executable(self.bin/name,'#!/bin/sh\nexit 0\n')
         subprocess.run(['git','init','-q',str(self.repo)],check=True)
         subprocess.run(['git','-C',str(self.repo),'add','.'],check=True)
         subprocess.run(['git','-C',str(self.repo),'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture'],check=True)
         self.source=subprocess.check_output(['git','-C',str(self.repo),'rev-parse','HEAD'],text=True).strip()
         self.destination=self.runtime/'releases'/self.source
         self.node=self.runtime/'runtime/node/bin';self.node.mkdir(parents=True)
-        self.executable(self.node/'node','#!/bin/sh\nexit 0\n')
+        self.executable(self.node/'node','#!/bin/sh\nif test "$1" = --input-type=module; then printf "{}\\n"; fi\n')
+        # The package/build commands below are local fixtures. In particular,
+        # staging must never try to download preview dependencies in this test.
+        preview=self.runtime/'runtime/preview-python-3.14.0/aiohttp';preview.mkdir(parents=True)
+        (preview/'__init__.py').write_text("__version__='3.14.0'\n")
         self.executable(self.bin/'corepack','#!/bin/sh\ntest ! -e "$STAGE_FAIL_INSTALL"\n')
         self.executable(self.bin/'git',"""#!/usr/bin/env python3
 import os,sys

@@ -52,7 +52,13 @@ export const auth = betterAuth({
       create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId) } }) },
       // Native hooks run after the deletion transaction commits. The durable
       // trigger already stopped fan-out; transport retries must not hold auth.
-      delete: { after: async session => { (await import('@/lib/enterprise/live-authority')).scheduleSessionLiveRevocation(session.userId) } },
+      delete: { after: async session => {
+        (await import('@/lib/enterprise/live-authority')).scheduleSessionLiveRevocation(session.userId)
+        // The SQL delete has also fenced this real review-session credential.
+        // Await its close; an unavailable provider remains durably due for retry.
+        const { revokeReviewSessions } = await import('./coding-workspace/review-sessions')
+        await revokeReviewSessions(pool, { credentialKind: 'session', credentialId: session.id }, 'credential_revoked')
+      } },
     },
     // A new account without a picture gets a default avatar now; older accounts are left as they are.
     user: { create: {

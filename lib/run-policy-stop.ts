@@ -4,6 +4,7 @@ import { PgDialect } from 'drizzle-orm/pg-core'
 import { afterDatabaseCommit } from './db/commit-effects'
 import { notifyDeviceWork } from './device-gateway-notify'
 import { armDueTimerAfterCommit } from './due-timer'
+import { reviewSessionsRevoked } from './coding-workspace/review-sessions'
 
 export type RunPolicyStopScope =
   | { kind: 'worker'; ownerId: string; agentId: string }
@@ -47,15 +48,18 @@ export function runPolicyStopSQL(scope: RunPolicyStopScope): SQL {
 /** The statement returned the devices, including legacy runners that still
  * consume a control hint. No follow-up database lookup is needed. */
 export function notifyStoppedPolicyRuns(executor: object, rows: readonly StoppedPolicyRun[]) {
+  if (rows.length) reviewSessionsRevoked(executor, { runIds: rows.map(row => row.id) }, 'run_control')
   for (const deviceId of new Set(rows.map(row => row.deviceId))) {
     afterDatabaseCommit(executor, `policy-stop:${deviceId}`, () => notifyDeviceWork(deviceId))
   }
   if (rows.some(row => row.stopped)) armDueTimerAfterCommit(executor, 'run-recovery')
 }
 
-export async function stopRunsForPolicyChange(executor: Pick<PoolClient, 'query'>, scope: RunPolicyStopScope) {
+/** A cross-database scope writer passes its outer commit executor so neither
+ * review close nor daemon wake runs while its Workspace locks are held. */
+export async function stopRunsForPolicyChange(executor: Pick<PoolClient, 'query'>, scope: RunPolicyStopScope, notificationExecutor: object = executor) {
   const compiled = new PgDialect().sqlToQuery(runPolicyStopSQL(scope))
   const { rows } = await executor.query<StoppedPolicyRun>(compiled.sql, compiled.params)
-  notifyStoppedPolicyRuns(executor, rows)
+  notifyStoppedPolicyRuns(notificationExecutor, rows)
   return rows.filter(row => row.stopped).length
 }

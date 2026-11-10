@@ -69,6 +69,59 @@ test('a terminal open task is parked; its workspace is not destroyed when its ru
     assert.equal(threadMachineLifecycleDecision(row({ status }), running, now).action, 'pause', status)
 })
 
+test('a bounded human review lease keeps a safely ended VM until its absolute deadline', () => {
+  for (const status of ['succeeded', 'failed']) {
+    const reviewed = row({ status, safeExit: true, reviewExpiresAt: now + 40_000 })
+    assert.deepEqual(threadMachineLifecycleDecision(reviewed, running, now),
+      { action: 'keep', at: now + 40_000, reason: 'human_review' })
+    assert.deepEqual(threadMachineLifecycleDecision(reviewed, running, now + 40_000),
+      { action: 'pause', at: now + 40_000, reason: 'run_ended' })
+  }
+})
+
+test('review cannot defeat stop, cancellation, closure, lost execution or an unproved native exit', () => {
+  const reviewed = row({ status: 'succeeded', safeExit: true, reviewExpiresAt: now + 60_000 })
+  for (const patch of [{ stopRequestedAt: now }, { status: 'stopped' }, { status: 'cancelled' },
+    { taskClosed: true }, { stopReason: 'device_lost' }, { safeExit: false },
+    { computeSeconds: THREAD_MACHINE_BUDGET_MS / 1_000 }]) {
+    assert.equal(threadMachineLifecycleDecision({ ...reviewed, ...patch }, running, now).action, 'pause', JSON.stringify(patch))
+  }
+  assert.equal(threadMachineLifecycleDecision({ ...reviewed, status: 'running', leaseExpiresAt: now - 1 }, running, now).reason,
+    'execution_lease_lost')
+})
+
+test('review resume intent preserves the exact phase until completion, expiry or stop', async () => {
+  const pending = row({ status: 'succeeded', safeExit: true, state: 'paused', runningSince: null,
+    reviewExpiresAt: now + 60_000, lifecycle: { phase: 'review_resume_requested' } })
+  assert.deepEqual(threadMachineLifecycleDecision(pending, paused, now),
+    { action: 'wait', at: now + 60_000, reason: 'human_review_resume' })
+  assert.equal(threadMachineLifecycleDecision({ ...pending, stopRequestedAt: now }, running, now).action, 'pause')
+  const f = fixture(pending)
+  await reconcileThreadMachine(f.pool, actor, 'run', f.deps)
+  assert.equal(f.machine.lifecycle.phase, 'review_resume_requested')
+  assert.equal(f.machine.lifecycleAt, now + 60_000)
+  assert.equal(f.counts().pauseCalls, 0)
+})
+
+test('a kept review retains parked provenance and does not renew an Agent lease', async () => {
+  const f = fixture(row({ status: 'succeeded', safeExit: true, reviewExpiresAt: now + 60_000, lifecycle: { phase: 'review_resumed' } }))
+  await reconcileThreadMachine(f.pool, actor, 'run', f.deps)
+  assert.equal(f.machine.lifecycle.phase, 'review_resumed')
+  assert.equal(f.machine.lifecycleAt, now + 60_000)
+  assert.equal(f.machine.leaseExpiresAt, null)
+  assert.equal(f.counts().pauseCalls, 0)
+})
+
+test('a review opened after the lifecycle snapshot cannot be recorded as parked', async () => {
+  const f = fixture(row({ status: 'succeeded', safeExit: true }))
+  await reconcileThreadMachine(f.pool, actor, 'run', { ...f.deps,
+    park: async () => ({ reviewHeldUntil: now + 30_000 }) })
+  assert.equal(f.machine.state, 'running')
+  assert.equal(f.machine.lifecycle.phase, 'review_resumed')
+  assert.equal(f.machine.lifecycleAt, now + 30_000)
+  assert.equal(f.counts().pauseCalls, 0)
+})
+
 test('stage handoff keeps the same VM for the admitted successor for 45 seconds, then parks', () => {
   const handoff = row({ status: 'succeeded', lifecycle: { phase: 'handoff', handoffRunId: 'next-run', handoffUntil: now + 45_000 } })
   assert.deepEqual(threadMachineLifecycleDecision(handoff, running, now), { action: 'wait', at: now + 45_000, reason: 'stage_handoff' })
@@ -160,6 +213,9 @@ function fixture(initial: ThreadLifecycleRow) {
     }
     if (sql.startsWith('SELECT state,epoch')) return result([structuredClone(machine)])
     if (sql.startsWith('SELECT id FROM agent_runs')) return result([{ id: machine.runId }])
+    if (sql.startsWith('SELECT status,"stopRequestedAt","stopReason"')) return result([structuredClone(machine)])
+    if (sql.startsWith('SELECT 1 FROM coding_review_sessions'))
+      return result(machine.reviewExpiresAt && new Date(machine.reviewExpiresAt).getTime() > clock ? [{ found: 1 }] : [])
     if (sql.includes('SET state=$5') || sql.includes("SET state='error'")) {
       if (machine.epoch !== values[1] || machine.sandboxId !== values[2] || machine.lifecycle.reconcileId !== values[3]) return result()
       machine.state = sql.includes('SET state=$5') ? String(values[4]) : 'error'

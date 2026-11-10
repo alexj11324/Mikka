@@ -47,7 +47,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
         <PropertyRow label={t('priorityLabel')}><IssuePropertyMenu variant="row" label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></PropertyRow>
         <PropertyRow label={t('scope.label')}><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} teamChoice={teamChoice} /></PropertyRow>
         {/* R-60: the assignee is a person; a Bot the task is handed to sits on its own line under it. */}
-        <PropertyRow label={tMetadata('assignee')}><IssueMetadataControls {...control} task={{ ...task, metadata: { ...task.metadata, assignee: task.metadata.assignee?.kind === 'member' ? task.metadata.assignee : null } }} section="assignee" /><DelegateLine issueId={task.id} assignee={task.metadata.assignee} /></PropertyRow>
+        <PropertyRow label={tMetadata('assignee')}><IssueMetadataControls {...control} task={{ ...task, metadata: { ...task.metadata, assignee: task.metadata.assignee?.kind === 'member' ? task.metadata.assignee : null } }} section="assignee" /><DelegateLine issueId={task.id} delegate={task.metadata.delegate} /></PropertyRow>
         <PropertyRow label={tMetadata('labels')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="labels" /></div></PropertyRow>
         <PropertyRow label={tMetadata('project')}><IssueMetadataControls {...control} section="project" /></PropertyRow>
         {task.metadata.estimate !== null && <PropertyRow label={tMetadata('estimate')}><Button variant="ghost" size="sm" className={ROW_VALUE} disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{tMetadata('estimatePoints', { count: task.metadata.estimate })}</Button></PropertyRow>}
@@ -82,12 +82,11 @@ export function overdue(dueDate: string, status: string, now: Date) {
  * a Bot the task was assigned to, else the Bot of its newest thread, as the board card shows it (R-25).
  * Drawn in the Bot's own look (R-36); the Coordinator's own threads add no line.
  */
-function DelegateLine({ issueId, assignee }: { issueId: string; assignee: IssueMetadata['assignee'] }) {
+function DelegateLine({ issueId, delegate }: { issueId: string; delegate: IssueMetadata['delegate'] }) {
   const t = useTranslations('Metadata.assignee')
   const { data: threads } = useIssueThreads(issueId)
-  const agent = assignee?.kind === 'agent' ? assignee : null
-  const thread = (agent ? threads?.find(item => item.detail?.agentName === agent.name) : threads?.find(item => item.detail?.bot))?.detail
-  const name = agent?.name ?? thread?.agentName
+  const thread = (delegate ? threads?.find(item => item.detail?.agentName === delegate.name) : threads?.find(item => item.detail?.bot))?.detail
+  const name = delegate?.name ?? thread?.agentName
   if (!name) return null
   return <p className="flex h-7 min-w-0 items-center gap-2 text-xs">
     <span className="sr-only">{t('delegatedTo', { name })}</span>

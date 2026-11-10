@@ -3,20 +3,16 @@ import { lstat, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
-
-export async function selectWorkspaceMenuItem(page, item) {
-  // A switch assigns the locale home URL after its action finishes. The old URL
-  // and ready DOM are not proof that the new document has loaded. An already
-  // selected item is a product no-op and only closes its menu.
-  const moved = await item.getAttribute('aria-current') === 'true' ? undefined : page.waitForEvent('domcontentloaded')
-  void moved?.catch(() => {})
-  await item.click()
-  await moved
-}
+import { selectWorkspaceMenuItem } from './native-document.mjs'
+export { selectWorkspaceMenuItem } from './native-document.mjs'
 
 export async function selectParityWorkspace(page, { menuName, workspaceName, basePath }) {
   await page.getByRole('button', { name: menuName, exact: true }).first().click()
-  await selectWorkspaceMenuItem(page, page.getByRole('menuitem', { name: workspaceName, exact: false }))
+  const item = page.getByRole('menuitem', { name: workspaceName, exact: false })
+  // A switch assigns the same /en URL after its action finishes. The old URL
+  // and ready DOM are not proof that the new document has loaded. An already
+  // selected item is a product no-op and only closes its menu.
+  await selectWorkspaceMenuItem(page, item)
   await page.waitForURL(url => url.pathname === `${basePath}/en` || url.pathname === `${basePath}/en/`)
   await page.getByRole('button', { name: menuName, exact: true }).first().waitFor()
 }
@@ -108,14 +104,14 @@ export function pageReadRequirements(name) {
   return []
 }
 
-export async function pageReady(page, name, fixture, messages, observed = {}) {
+export async function pageReady(page, name, fixture, messages, _observed = {}) {
   const text = value => page.getByText(value, { exact: true }).first().waitFor()
   const threadRows = async root => {
     const resolved = root.getByRole('button', { name: messages.Shell.threads.group.resolved.replace('{count}', '1'), exact: true })
     await expect(resolved).toHaveAttribute('aria-expanded', /^(?:true|false)$/, { timeout: 45_000 })
     if (await resolved.getAttribute('aria-expanded') === 'false') await resolved.click()
     await expect(resolved).toHaveAttribute('aria-expanded', 'true')
-    // A thread row is named by its task: the team number the database gave it, then its title.
+    // A thread row is named by its task: the immutable identifier issued by APP, then its title.
     await root.getByRole('button', { name: `${fixture.issueIdentifier} ${fixture.issueTitle}`, exact: true }).waitFor()
     await root.getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: false }).waitFor()
   }

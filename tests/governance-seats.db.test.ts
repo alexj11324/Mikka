@@ -33,6 +33,8 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
     await pool.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL,name varchar(120) NOT NULL,slug varchar(64) UNIQUE,icon text,kind text NOT NULL DEFAULT 'team',"createdAt" timestamptz NOT NULL DEFAULT now());
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid NOT NULL,"userId" text NOT NULL,name text NOT NULL,email text NOT NULL,role text NOT NULL,status text NOT NULL DEFAULT 'active',"createdAt" timestamptz NOT NULL DEFAULT now(),PRIMARY KEY("workspaceId","userId"));
       CREATE TABLE mikka_workspace_invitations (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL,"userId" text NOT NULL,email text NOT NULL,role text NOT NULL,"tokenHash" text NOT NULL UNIQUE,status text NOT NULL DEFAULT 'pending',"expiresAt" timestamptz NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now(),UNIQUE("workspaceId",email));`)
+    // Account deletion planning also reads Project retention when the fixture has no Projects.
+    await pool.query('CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid REFERENCES mikka_workspaces(id))')
     const { planWorkspaces } = await import('../lib/account/delete')
     const legacyPersonal = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,'legacy-owner','Legacy','personal');`, [legacyPersonal])

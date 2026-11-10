@@ -25,6 +25,24 @@ export function orderMigrations(names) {
 
 // Earlier branch and deployment names are aliases only for identical SQL.
 export const MIGRATION_EQUIVALENTS = {
+  // P0 is already main; the batch keeps one immutable SQL body per identity.
+  // Exact earlier candidate receipts skip replay without rewriting the ledger.
+  '20261109035000_task_workspace_ownership.sql': ['20261108120200_task_workspace_ownership.sql'],
+  '20261109035001_linear_workspace_policy.sql': ['20261108120201_linear_workspace_policy.sql'],
+  '20261109035002_phone_push_session.sql': ['20261108120202_phone_push_session.sql'],
+  '20261109035003_account_task_history.sql': ['20261108120203_account_task_history.sql'],
+  '20261109143000_project_v2.sql': ['20261108120300_project_v2.sql'],
+  '20261109143001_task_identity.sql': ['20261108120301_task_identity.sql'],
+  '20261109143002_task_identity_aliases.sql': ['20261108120302_task_identity_aliases.sql'],
+  '20261109143003_team_lifecycle.sql': ['20261108120303_team_lifecycle.sql'],
+  '20261109143004_project_resources.sql': ['20261108120304_project_resources.sql'],
+  '20261109143005_project_lifecycle.sql': ['20261108120305_project_lifecycle.sql'],
+  '20261109143006_project_history_retention.sql': ['20261108120306_project_history_retention.sql'],
+  '20261109143007_task_alias_tenant.sql': ['20261108120307_task_alias_tenant.sql'],
+  '20261109143008_project_writer_fence.sql': ['20261108120308_project_writer_fence.sql'],
+  '20261109143100_coding_review_sessions.sql': ['20261108230400_coding_review_sessions.sql'],
+  '20261109143101_coding_review_task_workspace.sql': ['20261108230500_coding_review_task_workspace.sql'],
+  '20261109143102_coding_review_task_thread.sql': ['20261108230600_coding_review_task_thread.sql'],
   '20261031000251_issue_owner_number_unique.sql': ['20261030213401_issue_owner_number_unique.sql', '20261030203401_issue_owner_number_unique.sql'],
   '20261031000250_issue_number_counter_expand.sql': ['20261030213400_issue_number_counter_expand.sql', '20261030203400_issue_number_counter_expand.sql'],
   ...INTEGRATION_MIGRATION_EQUIVALENTS,
@@ -68,6 +86,22 @@ export const MIGRATION_EQUIVALENTS = {
   '20261027164515_workspace_computer_policy.sql': ['20261027040514_workspace_computer_policy.sql', '20261027000700_workspace_computer_policy.sql'],
 }
 const EQUIVALENT_SQL_SHA256 = {
+  '20261109035000_task_workspace_ownership.sql': '466922d49f83020e42b40006813d81189744629de9e9cd34c974ee1099c3be94',
+  '20261109035001_linear_workspace_policy.sql': 'fbaf6b5828f186e06641c4846ce72faaf205d441b2aa0b59a1ebcb266bb6a501',
+  '20261109035002_phone_push_session.sql': '4ce66c68319d9c3c2b5e1b16d0d95675c01dc829c2acdee7b184cdde61cd8412',
+  '20261109035003_account_task_history.sql': 'f9ce8d8e619bc04929de85c3ebf374b8f9b2fdf7266d3a1beee0ea4d96007e20',
+  '20261109143000_project_v2.sql': 'beb0e0da6c9f082ada7cd0ead646ed438556f2a15322146cd133532646d2ba6a',
+  '20261109143001_task_identity.sql': '2f679e4b75c0a2f07917a745e982d4c3a2f0823abec1e634b7776d74b4d2d19c',
+  '20261109143002_task_identity_aliases.sql': 'd0b382f9996d36b87f37ce1688d5bc92da3e20ef1ab75ffcb3d23e72d7e8b1b7',
+  '20261109143003_team_lifecycle.sql': '847b661a47c931ed90106edbae478f82d25178d301b33ca841285916360145f2',
+  '20261109143004_project_resources.sql': 'cd6bdc40d8bc96f9ad7b402149176dc12cefc7647fca1695139b4127c7cb947b',
+  '20261109143005_project_lifecycle.sql': 'd6b5f12ee454bce3bb2dc426349cc6cc51624919f7ea0f811d11643515107f91',
+  '20261109143006_project_history_retention.sql': '9c60c4b09daf9e83b01879dd8bdb62570f9f5742543d2fee4298a1b1c4c2fce5',
+  '20261109143007_task_alias_tenant.sql': 'fc1b531efd430f271afda9a8ce64cc3a590d91824f7333dca35511eb92f2f576',
+  '20261109143008_project_writer_fence.sql': '4f3574e40224b742a494bca015dd2b1972374d6081b50856bf9ad8c2286fd358',
+  '20261109143100_coding_review_sessions.sql': '6245019af41d4a7252044ddb0b3d65985713cc35d596228b9211a17683f1d5ea',
+  '20261109143101_coding_review_task_workspace.sql': '2a6f57fd3a6921851127460f81f4c3736b81ddaa6c2c751d76c50210eba8a196',
+  '20261109143102_coding_review_task_thread.sql': '1692ff238bbb1f783afe42bf07590445dd5ddd597588a6d982041837c93558d8',
   '20261031000251_issue_owner_number_unique.sql': '940f564d977aaf7d0c7b17d27ac185052d81b2880ad696e8d47a2fb5a4700d11',
   '20261031000250_issue_number_counter_expand.sql': 'dcebd6c3d9fd4ec923958f4c19dcfa87c2422f3a83317b79d052768041e8db03',
   '20261029024124_run_publications.sql': '2808e1fca5e5e0a7b6979bbdfe4a20b1e8abb15ffe0a9e1d76082e1ea0452a41',

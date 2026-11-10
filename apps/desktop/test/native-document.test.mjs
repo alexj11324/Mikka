@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 import vm from 'node:vm'
-import { nativeLifecycleFailure, observeNativeNavigation, selectBundledServer, waitForBundledDocument } from './native-document.mjs'
+import { nativeLifecycleFailure, observeNativeNavigation, selectBundledServer, selectWorkspaceMenuItem, waitForBundledDocument } from './native-document.mjs'
 
 // Exercise the installed SDK's actual URL matcher and Frame.waitForURL branch,
 // without launching a browser. Only navigation/load/IPC delivery is controlled.
@@ -157,6 +157,65 @@ test('failure evidence retains a closed error class and owned source locations o
   assert.equal(JSON.stringify(result).includes('private'), false)
   assert.equal(JSON.stringify(result).includes('secret'), false)
   assert.deepEqual(nativeLifecycleFailure({ name: 'private-token', message: 'private-user' }), { kind: 'other', code: 'other', locations: [] })
+})
+
+function workspaceChoice({ current = false, clickFailure } = {}) {
+  const loaded = Promise.withResolvers(), calls = []
+  const page = {
+    _page: { context: () => ({ _options: {} }) },
+    url: () => 'mikka://app/mikka/en', waitForURL,
+    async waitForLoadState(state) { assert.equal(state, 'domcontentloaded'); calls.push('old-document-ready') },
+    waitForEvent(event, options) {
+      assert.equal(event, 'domcontentloaded')
+      assert.equal(options, undefined, 'inherit the existing page deadline instead of extending it')
+      calls.push('new-document-armed')
+      return loaded.promise
+    },
+  }
+  const item = {
+    async getAttribute(name) { assert.equal(name, 'aria-current'); return current ? 'true' : null },
+    async click() { calls.push('click'); if (clickFailure) throw clickFailure },
+  }
+  return { page, item, calls, loaded }
+}
+
+test('same-URL workspace selection cannot finish on the old document before the asynchronous reload', async () => {
+  const state = workspaceChoice()
+  let finished = false
+  const selection = selectWorkspaceMenuItem(state.page, state.item).then(() => { finished = true })
+  await new Promise(setImmediate)
+  assert.deepEqual(state.calls, ['old-document-ready', 'new-document-armed', 'click'])
+  // The installed Playwright method used by the old parity selector returns
+  // on this already-loaded same URL, before the product RPC/cache cleanup ends.
+  await state.page.waitForURL(state.page.url(), { waitUntil: 'domcontentloaded', timeout: 137 })
+  assert.equal(finished, false)
+  state.loaded.resolve()
+  await selection
+  assert.equal(finished, true)
+})
+
+test('selecting the already-current workspace does not wait for a nonexistent navigation', async () => {
+  const state = workspaceChoice({ current: true })
+  await selectWorkspaceMenuItem(state.page, state.item)
+  assert.deepEqual(state.calls, ['old-document-ready', 'click'])
+})
+
+test('a refused workspace switch retains the navigation failure and never clicks again', async () => {
+  const state = workspaceChoice(), failure = new Error('navigation deadline')
+  const selection = selectWorkspaceMenuItem(state.page, state.item)
+  const rejected = assert.rejects(selection, error => error === failure)
+  await new Promise(setImmediate)
+  state.loaded.reject(failure)
+  await rejected
+  assert.deepEqual(state.calls, ['old-document-ready', 'new-document-armed', 'click'])
+})
+
+test('a failed workspace click propagates without retrying or requiring a new document', async () => {
+  const failure = new Error('click failed'), state = workspaceChoice({ clickFailure: failure })
+  await assert.rejects(selectWorkspaceMenuItem(state.page, state.item), error => error === failure)
+  state.loaded.reject(new Error('page closed during cleanup'))
+  await new Promise(setImmediate)
+  assert.deepEqual(state.calls, ['old-document-ready', 'new-document-armed', 'click'])
 })
 
 const lifecycleSource = await readFile(new URL('./lifecycle.mjs', import.meta.url), 'utf8')

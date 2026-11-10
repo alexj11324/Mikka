@@ -223,6 +223,11 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
       // Team issues of the shared workspace keep their owner column; they stay on purpose.
       if (['issues', 'issue_documents', 'mikka_team_issues', 'mikka_teams', 'mikka_workspaces'].includes(table)) continue
       if (['bots', 'agent_runs', 'agents', 'run_messages', 'artifacts'].includes(table)) continue
+      if (['task_identifier_aliases', 'mikka_task_identifier_aliases'].includes(table)) {
+        const aliases = (await pool.query(`select distinct "issueId" from "${table}" where "ownerId"=$1`, [alice])).rows
+        assert.deepEqual(aliases, [{ issueId: teamIssue }], `${table} retains the shared Task's historical author without retaining the deleted personal Task`)
+        continue
+      }
       const { rowCount } = await pool.query(`select 1 from "${table}" where "${column}" = $1 limit 1`, [alice])
       if (rowCount) left.push(`${table}.${column}`)
     }
@@ -303,7 +308,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from workspace_deletions where id = $1', [shared])).rowCount, 0)
     assert.equal((await pool.query('select 1 from bots where id = $1', [formerBot])).rowCount, 0)
     // The shared workspace keeps its own rows, and her team bot stays there without an owner (「待接管」).
-    assert.deepEqual(await keyedBy(shared), ['agent_runs', 'artifacts', 'bots', 'conversations', 'hosted_allowances', 'issues', 'workspace_e2b_keys', 'workspace_secrets', 'workspace_settings'])
+    assert.deepEqual(await keyedBy(shared), ['agent_runs', 'artifacts', 'bots', 'conversations', 'hosted_allowances', 'issues', 'mikka_task_identifier_aliases', 'task_identifier_aliases', 'workspace_e2b_keys', 'workspace_secrets', 'workspace_settings', 'workspace_task_identifier_counters'])
     // Bob's own things are untouched.
     assert.equal((await pool.query('select 1 from issues where id = $1', [bobIssue])).rowCount, 1)
     assert.equal((await pool.query('select 1 from "user" where id = $1', [bob])).rowCount, 1)
