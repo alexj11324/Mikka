@@ -285,9 +285,9 @@ t.after(()=>daemon.stop())
 await daemon.syncWithServer()
 process.env.MIKKA_CUA_DRIVER=binary
 const originalListen=ComputerBroker.prototype.listen
-let started:ComputerBroker|null=null
+const started:{broker?:ComputerBroker}={}
 ComputerBroker.prototype.listen=async function(){
- started=this
+ started.broker=this
  await new Promise(r=>setTimeout(r,500))
  return originalListen.call(this)
 }
@@ -300,8 +300,8 @@ await daemon.stop()
 // is what this test observes, not the client's response.
 void pending
 client.close()
-assert.ok(started,'the late setup reached listen')
-const url=new URL(started.socketPath)
+assert.ok(started.broker,'the late setup reached listen')
+const url=new URL(started.broker.socketPath)
 const refused=await new Promise<NodeJS.ErrnoException>((resolve,reject)=>{
  const socket=connect({host:url.hostname,port:Number(url.port)})
  socket.once('error',resolve)
