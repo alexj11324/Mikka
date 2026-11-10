@@ -10,6 +10,9 @@ export const runOriginSchema = z.enum(RUN_ORIGINS)
  * or account data (lib/run-origin-writes.test.ts keeps them evidence-only). */
 const opaqueId = z.string().trim().min(1).max(256)
 
+/** Entry ids are external identities. `api.workspaceId` is part of the
+ * contract but M0 never writes it: the workspace is always derived from the
+ * task/run and rechecked, never trusted from a ref. */
 export const runOriginRefSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('slack'), teamId: opaqueId, channelId: opaqueId, threadTs: opaqueId }).strict(),
   z.object({ kind: z.literal('telegram'), chatId: opaqueId, messageId: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }).strict(),

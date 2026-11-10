@@ -36,6 +36,17 @@ test('every production agent_runs insert writes origin and originRef', () => {
   eachNear('factory/questions/queue-continuation.ts', 'INSERT INTO agent_runs', /origin,"originRef"[\s\S]*entry\.origin, entry\.originRef \? JSON\.stringify\(entry\.originRef\) : null/)
 })
 
+test('entry refs carry only external identities, never the workspace', () => {
+  // MCP names itself by kind only; the workspace stays derived from the task
+  // or run and is rechecked at read time.
+  assert.match(source('mcp/actions.ts'), /origin: 'api', originRef: \{ kind: 'api' \}/)
+  assert.doesNotMatch(source('mcp/actions.ts'), /originRef: \{[^}]*workspaceId/)
+  // The Slack event helper builds a closed object from its own fields.
+  const slack = /export function slackRunOriginRef[\s\S]*?\n\}/.exec(source('run-origin.ts'))
+  assert.ok(slack)
+  assert.doesNotMatch(slack[0], /workspaceId/)
+})
+
 test('the entry provenance never enters a dispatch digest', () => {
   const queueLocal = source('factory/queue-local.ts')
   const selection = /selection: \[([\s\S]*?)\],\n/.exec(queueLocal)
