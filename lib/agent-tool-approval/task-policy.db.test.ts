@@ -320,9 +320,11 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     assert.equal(applied.policy.permissions.install_dependency, 'deny')
     assert.equal(applied.policy.permissions.write_outside_repo, 'deny')
     assert.equal(applied.policy.permissions.git_push, 'deny')
-    // read_only is a ceiling: a later explicit workspace allow cannot widen it back.
+    // read_only is a ceiling: a later explicit workspace allow cannot widen it back. Each field gets its own widest
+    // legal value — write_outside_repo offers ask|deny only (CONFIGURABLE_PERMISSIONS, ADR 0009 Stage 1: writing
+    // outside the worktree cannot be allowed wholesale), so `ask` is the widest it can ask for.
     const relaxed = await setCliPolicy(pool, owner, subject.run, 'workspace', applied.revision,
-      { permissions: { install_dependency: 'allow', write_outside_repo: 'allow', git_push: 'allow' } })
+      { permissions: { install_dependency: 'allow', write_outside_repo: 'ask', git_push: 'allow' } })
     assert.equal(relaxed.policy.readOnly, true)
     assert.equal(relaxed.policy.permissions.install_dependency, 'deny')
     assert.equal(relaxed.policy.permissions.write_outside_repo, 'deny')
