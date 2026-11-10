@@ -1,3 +1,4 @@
+import { DE, diagRecord } from '@/lib/diagnostics/issue1512-native-reads.mjs'
 import { carryReadDispatch } from '@/lib/swr/read-observer'
 import { MAX_READ_BATCH, READ_BATCH_ACTION, type BatchReadAction, type ReadBatchItem } from '@/lib/desktop-rpc/read-batch-contract'
 import type { Locale } from './location'
@@ -19,8 +20,8 @@ export class DesktopTransportError extends Error {
   }
 }
 
-type ReadContext = { locale: Locale; workspace: string | null; currentWorkspace: () => string | null; isCurrent?: () => boolean; onDispatch?: () => void }
-type Send = (action: string, args: unknown[], context: { locale: Locale; isCurrent: () => boolean; onDispatch?: () => void }) => Promise<unknown>
+type ReadContext = { locale: Locale; workspace: string | null; currentWorkspace: () => string | null; isCurrent?: () => boolean; onDispatch?: () => void; diagnosticAction?: number }
+type Send = (action: string, args: unknown[], context: { locale: Locale; isCurrent: () => boolean; onDispatch?: () => void; diagnosticActions?: readonly number[] }) => Promise<unknown>
 type Pending = ReadContext & {
   action: BatchReadAction; args: unknown[]; generation: number; send: Send
   resolve: (result: unknown) => void; reject: (error: unknown) => void
@@ -38,6 +39,7 @@ const reject = (item: Pending, cause: unknown) => item.reject(current(item) ? ca
  * App invalidation calls this before old reads can use a new main-process scope. */
 export function resetReadBatchScope() {
   generation++
+  diagRecord(DE.scopeReset, generation, pending.length)
   const retired = pending
   pending = []
   for (const item of retired) item.reject(changed())
@@ -46,6 +48,7 @@ export function resetReadBatchScope() {
 async function single(item: Pending) {
   try {
     const result = await item.send(item.action, item.args, { locale: item.locale, isCurrent: () => current(item),
+      diagnosticActions: [item.diagnosticAction ?? 0],
       ...(item.onDispatch ? { onDispatch: item.onDispatch } : {}),
     })
     if (!current(item)) throw changed()
@@ -68,6 +71,7 @@ async function batch(items: Pending[]) {
     // and its decoded item results must not pass through the codec again.
     const result = await items[0].send(READ_BATCH_ACTION, [items.map(({ action, args }) => ({ action, args }))], {
       locale: items[0].locale, isCurrent: () => items.every(current),
+      diagnosticActions: items.map(item => item.diagnosticAction ?? 0),
       ...(items.some(item => item.onDispatch) ? { onDispatch: () => { for (const item of items) item.onDispatch?.() } } : {}),
     })
     if (!validItems(result, items.length)) throw new DesktopTransportError('desktop_rpc_response_invalid', { status: 200 })

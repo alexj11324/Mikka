@@ -140,10 +140,10 @@ def source_guard():
     run = api("/actions/runs/" + str(source["run"]))
     require(run.get("head_sha") == source["head"] and run.get("run_attempt") == 1, "SOURCE_RUN")
     require(run.get("repository", {}).get("id") == MANIFEST["repositoryId"], "SOURCE_RUN_REPOSITORY")
+    require(source["checkout"] == source["head"], "SOURCE_DIRECT_CHECKOUT")
     head = api("/git/commits/" + source["head"])
-    checkout = api("/git/commits/" + source["checkout"])
-    require(head["tree"]["sha"] == source["tree"] == checkout["tree"]["sha"], "SOURCE_TREES")
-    require([p["sha"] for p in checkout["parents"]] == [source["base"], source["head"]], "SOURCE_CHECKOUT_PARENTS")
+    require(head["tree"]["sha"] == source["tree"], "SOURCE_TREES")
+    require([p["sha"] for p in head["parents"]] == [source["base"]], "SOURCE_CHECKOUT_PARENTS")
     RECEIPT["sourceJobMetadataBlob"] = freeze(original)
     RECEIPT["sourcePrivacy"] = {
         "nativeAudit": "passed: known credentials/cookies scanned; traces and recordings forbidden",

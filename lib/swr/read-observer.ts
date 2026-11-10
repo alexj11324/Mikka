@@ -1,3 +1,5 @@
+import { DE, diagRecord, diagObject, diagKey, diagWithRead } from '../diagnostics/issue1512-native-reads.mjs'
+
 type Cache = { get(key: string): { data?: unknown; error?: unknown } | undefined }
 type Outcome = { status: 'committed' | 'discarded' } | { status: 'failed'; error: unknown }
 type Read = {
@@ -41,20 +43,24 @@ export function capturePendingReadDispatch(): (() => void) | undefined {
     read.dispatchAmbiguous = true
     read.pendingDispatchAt = undefined
     read.revokePending?.()
+    diagRecord(DE.pendingRevoke, diagObject(read), 1)
     return
   }
   read.dispatchCaptured = true
   read.pendingRevoked = new Promise(resolve => { read.revokePending = resolve })
+  diagRecord(DE.pendingCapture, diagObject(read))
   return () => {
     if (!observation.current() || read.received || read.superseded) return
     if (read.dispatchNotified || read.dispatchAmbiguous) {
       read.dispatchAmbiguous = true
       read.pendingDispatchAt = undefined
       read.revokePending?.()
+      diagRecord(DE.pendingRevoke, diagObject(read), 2)
       return
     }
     read.dispatchNotified = true
     read.pendingDispatchAt = readBoundary()
+    diagRecord(DE.pendingNotify, diagObject(read), read.pendingDispatchAt)
   }
 }
 
@@ -73,10 +79,12 @@ const dispatched = new WeakMap<object, number>()
  * bound on transport dispatch, not the instant bytes reached the server. */
 export function captureReadDispatch() {
   const began = readBoundary()
-  return <T>(value: T): T => {
+  const prove = <T>(value: T): T => {
     if (value !== null && typeof value === 'object') dispatched.set(value, began)
     return value
   }
+  diagRecord(DE.proof, diagObject(prove), began)
+  return prove
 }
 
 /** Preserve one result's proof through a shallow wrapper or batch projection.
@@ -93,7 +101,7 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: (withDispa
   const reads = latest.get(cache) ?? new Map<string, Read>()
   latest.set(cache, reads)
   const previous = reads.get(key)
-  if (previous) { previous.superseded = true; previous.revokePending?.() }
+  if (previous) { previous.superseded = true; previous.revokePending?.(); diagRecord(DE.pendingRevoke, diagObject(previous), 3) }
   let finish!: (outcome: Outcome) => void
   const read: Read = {
     began: readBoundary(), settled: new Promise(resolve => { finish = resolve }),
@@ -110,6 +118,8 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: (withDispa
     },
   }
   reads.set(key, read)
+  const diagnosticRead = diagObject(read)
+  diagRecord(DE.readBegin, diagnosticRead, diagObject(cache), diagKey(key), read.began)
   // Return this exact promise to SWR. Its continuation runs onSuccess and then
   // commits the cache synchronously; the following microtask checks both.
   const withDispatch = <Result>(run: () => Result): Result => {
@@ -117,18 +127,20 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: (withDispa
     synchronousRead = { read, current: () => reads.get(key) === read && !read.superseded }
     try { return run() } finally { synchronousRead = previous }
   }
-  const promise = (async () => fetcher(withDispatch))()
+  const promise = (async () => diagWithRead(diagnosticRead, () => fetcher(withDispatch)))()
   const complete = (outcome: Outcome) => {
     if (outcome.status === 'committed' && read.value !== null && typeof read.value === 'object') {
       read.committedValue = new WeakRef(read.value)
       read.value = undefined
     } else if (reads.get(key) === read) reads.delete(key)
+    diagRecord(DE.readSettle, diagnosticRead, outcome.status === 'committed' ? 1 : outcome.status === 'discarded' ? 2 : 3, read.began, Number(read.accepted), Number(read.superseded))
     finish(outcome)
   }
   void promise.then(value => {
     read.received = true; read.value = value
     const sent = value !== null && typeof value === 'object' ? dispatched.get(value) : undefined
     if (sent !== undefined && sent > read.began) read.began = sent
+    diagRecord(DE.readReceive, diagnosticRead, sent ?? 0, read.began)
     queueMicrotask(() => {
       // Only this read's original callback failure belongs to it. A retained
       // cache.error can instead be from an older, unrelated request.
@@ -142,7 +154,7 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: (withDispa
 /** SWR does not call onSuccess for results discarded by a later read/mutation. */
 export function acceptSWRRead(cache: Cache, key: string, value: unknown) {
   const read = latest.get(cache)?.get(key)
-  if (read?.received && Object.is(read.value, value)) read.accepted = true
+  if (read?.received && Object.is(read.value, value)) { read.accepted = true; diagRecord(DE.readAccept, diagObject(read)) }
 }
 
 /** Preserve an original onSuccess exception without turning it into a retry. */
@@ -157,25 +169,34 @@ export function failSWRRead(cache: Cache, key: string, value: unknown, error: un
 export async function readFresh(cache: Cache, key: string, after: number, revalidate: () => Promise<unknown>, accepts: (data: unknown) => boolean, current: () => boolean): Promise<unknown> {
   while (current()) {
     const read = latest.get(cache)?.get(key)
-    if (!read || read.began <= after && (read.pendingDispatchAt ?? 0) <= after) return revalidate()
+    if (!read || read.began <= after && (read.pendingDispatchAt ?? 0) <= after) {
+      diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, read ? diagObject(read) : 0,
+        !read ? 1 : read.dispatchCaptured && !read.dispatchNotified && !read.received ? 2 : 3,
+        read?.began ?? 0, read?.pendingDispatchAt ?? 0)
+      return revalidate()
+    }
+    diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), read.began > after ? 4 : 5, read.began, read.pendingDispatchAt ?? 0)
     const outcome = await (read.began > after ? read.settled : Promise.race([
       read.settled,
       read.pendingRevoked!.then(() => ({ status: 'revoked' as const })),
     ]))
-    if (!current()) return
+    if (!current()) { diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), 6); return }
     if (outcome.status === 'revoked') {
       const next = latest.get(cache)?.get(key)
-      if (next && next !== read) continue
+      if (next && next !== read) { diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), 7, diagObject(next)); continue }
+      diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), 8)
       return revalidate()
     }
-    if (outcome.status === 'failed') throw outcome.error
+    if (outcome.status === 'failed') { diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), 9); throw outcome.error }
     if (outcome.status === 'committed' && read.began > after && read.applied()) {
       const data = cache.get(key)?.data
-      if (accepts(data)) return data
+      if (accepts(data)) { diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), 10, read.began); return data }
+      diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), 11, read.began)
     }
     // A later read can itself cover this obligation; never return the old
     // result or let its completion erase the newer read's observation.
     const next = latest.get(cache)?.get(key)
-    if (!next || next === read) return revalidate()
+    if (!next || next === read) { diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), 12, read.began); return revalidate() }
+    diagRecord(DE.fresh, diagObject(cache), diagKey(key), after, diagObject(read), 13, diagObject(next))
   }
 }

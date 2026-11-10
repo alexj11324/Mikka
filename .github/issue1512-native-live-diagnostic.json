@@ -1,0 +1,272 @@
+{
+  "version": 1,
+  "enabled": true,
+  "repository": "alexj11324/Mikka",
+  "branch": "ops/1512-native-live-diagnostic-20261110",
+  "requestId": "6e1a5e12-269f-44be-9ef5-a05d6f5088c1",
+  "message": "ci: admit issue1512 native read diagnostic 6e1a5e12-269f-44be-9ef5-a05d6f5088c1",
+  "baseSha": "5f3598029033b83ee72c88ea6c49955205eecab2",
+  "baseTree": "b2559ddd822059f1b69fa711d037f654a790fd2a",
+  "productionCases": 0,
+  "formalBudgetAcceptance": false,
+  "modelCallsAllowed": false,
+  "additionalBusinessQueriesAllowed": false,
+  "runner": "macos-26",
+  "acceptanceCommand": "node apps/desktop/test/environment.mjs -- node apps/desktop/test/run-acceptance.mjs bundled-smoke parity lifecycle",
+  "diagnosticTestCommand": "node --test apps/desktop/test/native-read-diagnostic.test.mjs",
+  "entryEnvironment": {
+    "MIKKA_1512_LIFECYCLE_READ_DIAGNOSTIC": "1"
+  },
+  "files": [
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.mjs",
+      "base": null,
+      "sha": "6a9eed46a4062eeebc1b0f9984f0d6fe25d8dca7",
+      "bytes": 7916,
+      "sha256": "e748c66a85eb09bd2630b9a661ce9d0234b68fe9b6574e107dec114612faedf0",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-native-reads.d.mts",
+      "base": null,
+      "sha": "c7e36b323dd04a52d9df4948a9ad503af4ae028f",
+      "bytes": 1823,
+      "sha256": "127df8c7aa7f99de75fe88ad420b67412d8d8420647a3d493dabe85d2ee1b16c",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "base": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "sha": "39d63bd92fbc9ed4c0b568694b67df28a49c6e65",
+      "bytes": 10363,
+      "sha256": "a89b07dcb399681dd434d8bd4307a99feb6786a597213e0be489b903da6f2949",
+      "mode": "100644"
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "base": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "sha": "1bdf18021a9c614549bd165f41555ccd0b527479",
+      "bytes": 4727,
+      "sha256": "4561c0908805628eadda2eb6f23247a6789ec243d3dc4dd63b4bd3d2d8724f29",
+      "mode": "100644"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "base": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "sha": "8fd8ad5fc8324caa0e1734887ea77eea60765b93",
+      "bytes": 10062,
+      "sha256": "d4668f3832459160aa25b045080f622919afd4cf6041faf5b18c7a5d0542231d",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/coordinator/chat-read-client.ts",
+      "base": "c5588e067ff295cc81b5c3e35ea5307fbd94bf57",
+      "sha": "668f6c2be742d2cccd25e416a73998d2baf2ed08",
+      "bytes": 4534,
+      "sha256": "7acee170698db55bd8a9b8658d1bc1b2a8a0ed1c4ac2fe439cb0e2c996f3235a",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "base": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "sha": "5f43ea9f39d9354955fe60e390aa76665ce83f99",
+      "bytes": 25440,
+      "sha256": "613d75da047a4059b822cf070f8a330c323e836a4d108fff5dc43f9ef0c77e97",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "base": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "sha": "ecd547d17c1a32cd360090621d22bc3e4e41d732",
+      "bytes": 5493,
+      "sha256": "94966e43cc8b0cb20c2a28e9a2dedd2cf41cc9abdb114e57a43dd2bd9711270e",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "base": "e7f6972a23519ae45e059038cd0c404789d44a98",
+      "sha": "64038a0aaae11888d1b32ff0f21498612013dfeb",
+      "bytes": 6628,
+      "sha256": "ac75d6ececb7a7ccd0acf6a15b69ea7db196390f8213bc29f7cfea4b5a861f9a",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-read-collector.mjs",
+      "base": null,
+      "sha": "5d50d75c0ebef2eef6051a5a39a835877c6f8fa7",
+      "bytes": 5499,
+      "sha256": "fc6cb1f596bbb8f0bd511fd6c8ac501e4e6c83b08316deb2f92da01942c03ad0",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/diagnostics/issue1512-read-collector.d.mts",
+      "base": null,
+      "sha": "1a19642f991012cf2b9c9b23354e32bc5833a800",
+      "bytes": 949,
+      "sha256": "d362863a1eb03b3bc6a027e67131524764c9c55b570cfb1d1ce9d63ed713c15c",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/main/index.ts",
+      "base": "61da70923e2109761919f8b4968c0cb701917ff3",
+      "sha": "59b8685db01b9dfaf870e2cf21cba0ab2ff7bb13",
+      "bytes": 29940,
+      "sha256": "543ffe0a81ce6632107b2a6338297f8285aee9aebc5a66662b61706849781773",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/preload/index.ts",
+      "base": "1e62cd5e98e17554733e75915d2d9f03e99f7826",
+      "sha": "70fce399664dd440aa4a96cfa36b502f1e0957e4",
+      "bytes": 7585,
+      "sha256": "3af88f827a8d7e3a1e64066a971a6f17224e1cc0704ae560e87eec0547690bad",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/test/native-read-diagnostic.mjs",
+      "base": null,
+      "sha": "a164a94125835b901f8ce47e9d8746f71c653cfe",
+      "bytes": 1910,
+      "sha256": "827daeebd8e92ad6d99ea16776950dc8bee2efca0e54a7ad9aad8ae276e8ca37",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "base": "8251fc9aa56103614d1ddff944668930d1da937c",
+      "sha": "bb4b1a3e28514d6cfaf811568fb6b041a3191715",
+      "bytes": 33042,
+      "sha256": "1169b6e4e5cfa0ad3818c8b4857d38df3e128e9bdebc6a9806e69668b388ffe9",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/test/native-read-diagnostic.test.mjs",
+      "base": null,
+      "sha": "fa8636f058c1f61412d39a0f8d0d493fddd2a33a",
+      "bytes": 15640,
+      "sha256": "0d2e5ba4596adada313f96ba078cd6cef888233aaaaf2ace79e1945de787bb1e",
+      "mode": "100644"
+    },
+    {
+      "path": ".github/workflows/issue1512-native-live-diagnostic.yml",
+      "base": null,
+      "sha": "5b7ea8c83aabc154f51a7f205fae0deb4eacd326",
+      "bytes": 8302,
+      "sha256": "88cea4d9b4f96fc9c3bffdf950746283d6de25d62c94391c96a5d764523f2ce9",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/ops/issue1512-native-live-diagnostic-guard.mjs",
+      "base": null,
+      "sha": "dbb678d6d95ad2f1f025840b2ded2bd78bde803b",
+      "bytes": 7792,
+      "sha256": "78e041eb9c619f2a8b48b7267922962091d825bc799d2373f37d1365bd12baae",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/ops/issue1512-native-live-diagnostic-guard.test.mjs",
+      "base": null,
+      "sha": "ce2dbd3787e976e382e28fde6f19709dca54f06e",
+      "bytes": 5750,
+      "sha256": "0545243b44f817f581f528707bb820330b4cc1490670b60d5640f80eaa3997f3",
+      "mode": "100644"
+    }
+  ],
+  "invariants": [
+    {
+      "path": ".github/workflows/desktop.yml",
+      "sha": "1cfd9d8be85015b639809faedc8a68fb83609399"
+    },
+    {
+      "path": "package.json",
+      "sha": "4b0b4d88bfa19cc2fe9a792a415d89a247a27e56"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "sha": "733aba8cb0bfd26f2c7c7302ad02bb9a92bb0e0f"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha": "171de02abdaf1b9c414aa19aeb07690ef692bafe"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "sha": "a9aff193192f224a7b457af8b82a52cfa86c9a48"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6"
+    },
+    {
+      "path": "apps/desktop/test/run-acceptance.mjs",
+      "sha": "c28c6348d1efcd359ca1440267189d40341aae30"
+    },
+    {
+      "path": "apps/desktop/test/environment.mjs",
+      "sha": "cf1dcee34ea2edeb9e0ed32110966726049246e5"
+    },
+    {
+      "path": "apps/desktop/test/native-startup.mjs",
+      "sha": "785a9fbd1adad8ba49d4ed79e1b3d009512594d6"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "sha": "39e1facecdf28a661511f72e14580fdb4b1ae967"
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "sha": "b36f8db3a1d34233a697a676ab9bb86aadd9cfa3"
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "sha": "93fc0510b98e9a3812e6b4452a929ac5900fe458"
+    },
+    {
+      "path": "apps/desktop/test/db-query-operations.cjs",
+      "sha": "9011b6edb7296c8872d3e311074529a49987b575"
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "sha": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+    },
+    {
+      "path": "apps/desktop/test/parity.mjs",
+      "sha": "71157e93057ca19159a054fd4d41c9c0e0650fca"
+    },
+    {
+      "path": "apps/desktop/test/bundled-smoke.mjs",
+      "sha": "2df81511184d89d773b86f7d34ae0c069a49e295"
+    },
+    {
+      "path": "apps/desktop/test/native-crypto.mjs",
+      "sha": "86926e6807f0b693680dfc1b363e7d104699a260"
+    },
+    {
+      "path": "apps/desktop/test/electron-launch.mjs",
+      "sha": "8c853e461279fc4afb7f9fed2ef08c199643eb66"
+    },
+    {
+      "path": "apps/desktop/scripts/package-dev.mjs",
+      "sha": "9ddbffbad566e5416206baa827bf4a737c61b493"
+    },
+    {
+      "path": "apps/desktop/scripts/native-evidence.mjs",
+      "sha": "9eaf48c43ba5b3013b5ccb82d58c9dd968ed888e"
+    },
+    {
+      "path": "scripts/test-accounts/cli.mjs",
+      "sha": "8bfb15d5a6411ddf73a5ba039070b30662bc7d2f"
+    }
+  ],
+  "evidence": {
+    "overlayManifest": "2bb50b7cc74c03c5e3898d956ddf43bd5155e141",
+    "protocolVerification": "e0e6ec4fc8ce3bb821e20d53a0e078a1bd491e8c",
+    "protocolCleanup": "f66529b503b46c74284b98e411b6cd954a290d05",
+    "unchangedAdmissionVerification": "c6496ee92dbd757e083e0724d1ef362a4bcaf026",
+    "controlStaticReview": "d7e523e6cd7da31469d48a578d1010b54664e3b0",
+    "coreStaticReview": "cd9df0e4a42b7525381df4aa9befba378937a8c9",
+    "pinnedElectronReview": "6217d45b712dd529aeabbef6f461fafe815b0324",
+    "supersededUnpublishedCandidate": "0df2e2740defd140200a161249203319ae45c280",
+    "collectorFinalReview": "14642bffcb3c0428025865fe21eeb446d0bc5c65"
+  },
+  "scope": "One diagnostic run only. Does not satisfy formal Native SQL or production acceptance. No main or PR head mutation."
+}
