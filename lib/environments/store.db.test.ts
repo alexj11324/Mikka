@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Pool } from 'pg'
-import { dbUrl, seedPersonalWorkspace, seedProject, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedIssue, seedPersonalWorkspace, seedProject, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import type { EnvironmentSaveInput } from './contract'
 import {
   archiveEnvironment, defaultEnvironmentForRun, listEnvironmentRows, readEnvironmentRow, saveEnvironment,
@@ -25,6 +25,8 @@ test('run environments are versioned by revision and one default per scope', { s
   const owner = await seedUser(pool, 'env-store-owner')
   const workspaceId = await seedPersonalWorkspace(pool, owner)
   const projectId = await seedProject(pool, owner, [])
+  const issueId = await seedIssue(pool, owner, workspaceId)
+  await pool.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [projectId, JSON.stringify([issueId])])
   const actor = { userId: owner, workspaceId }
 
   const first = await saveEnvironment(pool, actor, environment({ projectId }))
@@ -38,18 +40,18 @@ test('run environments are versioned by revision and one default per scope', { s
   const workspaceDefault = await saveEnvironment(pool, actor, environment({ projectId: null, config: { name: 'Any', workdir: '', setupScript: '' } }))
   assert.equal(workspaceDefault.isDefault, true)
 
-  const renamed = await saveEnvironment(pool, actor, environment({ id: second.id, revision: 1, projectId, config: { name: 'Python 2', workdir: '', setupScript: '' } }))
+  const renamed = await saveEnvironment(pool, actor, environment({ id: second.id, revision: 1, projectId, config: { name: 'Python 2', workdir: '', setupScript: '', repositories: ['v2/github.com/acme/only'] } }))
   assert.equal(renamed.revision, 2)
   await assert.rejects(saveEnvironment(pool, actor, environment({ id: second.id, revision: 1, projectId, config: { name: 'Stale', workdir: '', setupScript: '' } })), { code: 'environmentConflict' })
-  const updated = await saveEnvironment(pool, actor, environment({ id: second.id, revision: 2, projectId, config: { name: 'Python 3', workdir: 'py', setupScript: 'pip install -r requirements.txt' } }))
+  const updated = await saveEnvironment(pool, actor, environment({ id: second.id, revision: 2, projectId, config: { name: 'Python 3', workdir: 'py', setupScript: 'pip install -r requirements.txt', repositories: ['v2/github.com/acme/only'] } }))
   assert.equal(updated.revision, 3)
   assert.equal((await pool.query('SELECT revision FROM project_environment_revisions WHERE "environmentId"=$1 ORDER BY revision', [second.id])).rows.map(row => row.revision).join(','), '1,2,3')
 
   await assert.rejects(saveEnvironment(pool, actor, environment({ projectId, config: { name: 'python 3', workdir: '', setupScript: '' } })), { code: 'environmentNameTaken' })
 
-  const chosen = await defaultEnvironmentForRun(pool, { workspaceId, issueId: null, repositoryKey: 'v2/github.com/acme/other' })
+  const chosen = await defaultEnvironmentForRun(pool, { workspaceId, issueId, repositoryKey: 'v2/github.com/acme/other' })
   assert.equal(chosen?.id, workspaceDefault.id, 'a project default that forbids this repository is skipped')
-  const allowed = await defaultEnvironmentForRun(pool, { workspaceId, issueId: null, repositoryKey: 'v2/github.com/acme/only' })
+  const allowed = await defaultEnvironmentForRun(pool, { workspaceId, issueId, repositoryKey: 'v2/github.com/acme/only' })
   assert.equal(allowed?.id, second.id, 'the project default wins when its allow-list admits the repository')
 
   await assert.rejects(archiveEnvironment(pool, actor, { id: second.id, revision: 2 }), { code: 'environmentConflict' })
