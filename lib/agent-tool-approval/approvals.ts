@@ -170,12 +170,16 @@ export class RunToolApprovalStore {
     }, actor.deviceId)
   }
 
-  /** The owner's approval surface: requests for one run, newest first. */
+  /** The owner's approval surface: requests for one run, newest first. An
+   * Ask request is run-bound and one-shot, so a run that ended or stopped
+   * keeps no waiting cards; its approvals disappear with its authority. */
   async list(userId: string, runId: string): Promise<ToolApprovalView[]> {
     const { rows } = await this.query<ApprovalRow & { runId: string }>(
-      `SELECT id,"runId",status,method,tool,input,digest,"inputDigest","policyRevision","expiresAt","createdAt"
-       FROM agent_tool_approvals WHERE "runId"=$1 AND "userId"=$2 AND status IN ('pending','approved','denied')
-       ORDER BY "createdAt" DESC LIMIT 50`, [runId, userId])
+      `SELECT a.id,a."runId",a.status,a.method,a.tool,a.input,a.digest,a."inputDigest",a."policyRevision",a."expiresAt",a."createdAt"
+       FROM agent_tool_approvals a JOIN agent_runs r ON r.id=a."runId" AND r."userId"=a."userId"
+       WHERE a."runId"=$1 AND a."userId"=$2 AND a.status IN ('pending','approved','denied')
+         AND r.status=ANY($3::text[]) AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
+       ORDER BY a."createdAt" DESC LIMIT 50`, [runId, userId, [...LIVE_STATUSES]])
     return rows.map(row => ({
       approvalId: row.id, runId: row.runId, status: toolApprovalEffectiveStatus(row.status as ToolApprovalStatus, row.expiresAt.getTime()),
       method: row.method as ToolApprovalMethod, tool: row.tool ?? row.method,

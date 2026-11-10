@@ -168,3 +168,18 @@ test('a policy revision change fences a pending approval', async () => {
   await pool.query(`UPDATE agent_kit_heads SET cli_run_policy='{"permissions":{"network":"deny"}}'::jsonb,cli_run_policy_version=cli_run_policy_version+1 WHERE owner_id=$1 AND bot_key='coordinator'`, [owner])
   await assert.rejects(store.decide(owner, run, created.approvalId, 'approve'), error => error instanceof ApprovalUnavailable && error.revokeReason === 'policy_changed')
 })
+
+test('an approval disappears from the list and cannot be decided once its run ended', async () => {
+  const run = await askRun()
+  const store = new RunToolApprovalStore(pool)
+  const actor = { userId: owner, deviceId }
+  const revision = (await readCliRunPolicy(pool, run, owner)).revision
+  const created = await store.request(actor, run, { policyRevision: revision, requestId: `turn:${randomUUID()}`, harness: 'codex', method: 'tool', tool: 'Bash', input: { command: 'npm test' } })
+  assert.deepEqual((await store.list(owner, run)).map(item => item.approvalId), [created.approvalId])
+  // The run ended: its Ask request is no longer a live card, and the
+  // decision path refuses before touching the row.
+  await pool.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=now(),"finishedAt"=now() WHERE id=$1`, [run])
+  assert.deepEqual(await store.list(owner, run), [])
+  await assert.rejects(store.decide(owner, run, created.approvalId, 'approve'), error => error instanceof ApprovalUnavailable)
+  assert.deepEqual((await pool.query(`SELECT status FROM agent_tool_approvals WHERE id=$1`, [created.approvalId])).rows, [{ status: 'pending' }])
+})
