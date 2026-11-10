@@ -387,8 +387,6 @@ export class CodexAdapter implements AgentAdapter {
       Partial<Pick<StartOptions, "prompt" | "continueSession">>,
   ): Promise<AgentSession> {
     const approval = requireRunToolApproval(options.runId, options.toolApproval)
-    // Read-only is the policy's own fact, not a mode the adapter must guess.
-    const readOnlyPolicy = runPolicy(options.policy).readOnly === true
     if (!await approval.checkLive()) { approval.revoke(); throw new Error('Run tool approval unavailable') }
     const log = options.log.child({ harness: "codex" })
     const mailboxCatalogue = options.mailbox ? codexMailboxCatalogue(options.mailbox) : undefined
@@ -976,20 +974,19 @@ export class CodexAdapter implements AgentAdapter {
       }
       // Two independent facts decide this, and neither is a thread mode:
       //
-      // - A read-only policy uses Codex's native read-only sandbox and never
-      //   asks: the run cannot change anything, so there is nothing to ask.
-      // - A run whose policy resolves an action to `ask` starts untrusted, so
-      //   its native command and file-change approvals reach the run-bound
-      //   gate: a denied write is asked for, never silently applied, and an
-      //   approval grants that one exact action.
-      //   A policy with no such action keeps the historical config: nothing is
-      //   asked and the sandbox is off (decision 2026-11-01-2335).
+      // A run whose policy resolves an action to `ask` starts untrusted, so
+      // its native command and file-change approvals reach the run-bound gate:
+      // a denied write is asked for, never silently applied, and an approval
+      // grants that one exact action. A policy with no such action keeps the
+      // historical config: nothing is asked and Codex's own sandbox is off
+      // (decision 2026-11-01-2335). A read-only run is not a sandbox decision
+      // here — the run policy and the host tool paths already deny the writes.
       const asksAny = approval.asksAny
       const thread: Omit<ThreadResumeParams, 'threadId'> = {
         cwd: ctx.worktree,
         ...(adopted ? { config: adopted.threadConfig } : {}),
         approvalPolicy: asksAny ? "untrusted" : "never",
-        sandbox: readOnlyPolicy || asksAny ? "read-only" : "danger-full-access",
+        sandbox: asksAny ? "read-only" : "danger-full-access",
         developerInstructions: ctx.instructions(),
         ...(options.model ? { model: options.model } : {}),
       }

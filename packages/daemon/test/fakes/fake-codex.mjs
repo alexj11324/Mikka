@@ -267,8 +267,14 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
     case "thread/start":
     case "thread/resume": {
       fixtureTrace({ method, dynamicToolsPresent: Object.hasOwn(params, 'dynamicTools') })
-      // Runs ask nothing and use no Codex sandbox (decision 2026-11-01-2335).
-      if (!params.cwd || params.sandbox !== "danger-full-access" || params.approvalPolicy !== "never")
+      // A run that asks nothing uses no Codex sandbox (decision 2026-11-01-2335).
+      // A run whose policy resolved a gate-expressible action to `ask` starts
+      // untrusted in the read-only sandbox and reaches the run-bound gate.
+      const sandbox = params.sandbox
+      const approval = params.approvalPolicy
+      const plainThread = sandbox === "danger-full-access" && approval === "never"
+      const askingThread = sandbox === "read-only" && approval === "untrusted"
+      if (!params.cwd || !(plainThread || askingThread))
         return send({ id, error: { code: -1, message: "bad thread params" } })
       if (params.model) model = params.model
       if (method === "thread/resume") {

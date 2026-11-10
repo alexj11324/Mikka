@@ -32,7 +32,7 @@ describe('run live gate', () => {
   })
 })
 
-describe('thread mode approvals (#1730)', () => {
+describe('policy-driven tool approvals', () => {
   const request = { requestId: 'turn-1', method: 'tool' as const, tool: 'Bash', input: { command: 'npm test' } }
 
   it('a policy that asks nothing keeps the old live-run behavior', async () => {
@@ -65,12 +65,12 @@ describe('thread mode approvals (#1730)', () => {
     expect(await approved.requestApproval(request, undefined, 'install_dependency')).toBe(false)
   })
 
-  it('Ask never treats a transport error or an aborted turn as approval', async () => {
+  it('an asking run never treats a transport error or an aborted turn as approval', async () => {
     const failing = new ToolApprovalGate('run-1', { isLive: () => true, requestApproval: async () => { throw new Error('offline') } }, 'legacy', ['install_dependency'])
-    expect(await failing.requestApproval(request)).toBe(false)
+    expect(await failing.requestApproval(request, undefined, 'install_dependency')).toBe(false)
     const hanging = new ToolApprovalGate('run-1', { isLive: () => true, requestApproval: () => new Promise(() => {}) }, 'legacy', ['install_dependency'])
     const abort = new AbortController()
-    const pending = hanging.requestApproval(request, abort.signal)
+    const pending = hanging.requestApproval(request, abort.signal, 'install_dependency')
     abort.abort()
     expect(await pending).toBe(false)
   })
