@@ -251,9 +251,15 @@
     "closingCommit": "c925615d7bbb7a135f89e8f4421a82d7f5206d95",
     "closingRunId": 42730247567,
     "closingRunConclusion": "skipped",
-    "closingJobs": 0,
+    "closingJobs": 1,
+    "closingSkippedJobId": 129546195115,
+    "archiveRunId": 42730334983,
+    "archiveConclusion": "skipped",
+    "archiveSkippedJobId": 129546430620,
+    "allSkippedJobsHaveNoSteps": true,
+    "allSkippedJobRunnerIdentities": null,
     "allocatedRunners": 0,
-    "proofBlob": "84f9e3cda40a6bed4061618c84b754679fcee06f"
+    "proofBlob": "31a1d7e1b182bb4bd330a35926cb208b2c31ce01"
   },
   "evidence": [
     {
@@ -362,7 +368,7 @@
     },
     {
       "path": "closure-proof.json",
-      "sha": "84f9e3cda40a6bed4061618c84b754679fcee06f"
+      "sha": "31a1d7e1b182bb4bd330a35926cb208b2c31ce01"
     }
   ],
   "scope": "This validates the exact task-runs reader change and retained authorization behavior. Native budget and deployed production acceptance remain separate pending gates; no feature/main publication was performed by this runner.",
