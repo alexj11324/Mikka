@@ -57,9 +57,9 @@ test('answering starts a continuation run: the task moved on, so the sentence go
 })
 
 test('a run judged done, idle or blocked is not waiting', () => {
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'done' }) }), new Set()), [])
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'idle' }) }), new Set()), [])
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'blocked' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'done', issue: 'i1' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'idle', issue: 'i1' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'blocked', issue: 'i1' }) }), new Set()), [])
 })
 
 test('the judge can hand a succeeded run back as needs_input; the inbox waits on that too', () => {
@@ -131,8 +131,8 @@ test('a task waiting for review or with an open pull request is not owed an answ
 })
 
 test('quota and failed runs are not questions the person owes an answer to', () => {
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'paused', outcome: 'needs_input' }) }), new Set()), [])
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'failed' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { status: 'paused', outcome: 'needs_input', issue: 'i1' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'failed', issue: 'i1' }) }), new Set()), [])
 })
 
 test('a live waiting_input still shows on a merged task, as the thread badge does', () => {
@@ -143,8 +143,8 @@ test('a live waiting_input still shows on a merged task, as the thread badge doe
 })
 
 test('a judged outcome wins over asked_human: the run moved on', () => {
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'done', stopReason: 'asked_human' }) }), new Set()), [])
-  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'blocked', stopReason: 'asked_human' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'done', stopReason: 'asked_human', issue: 'i1' }) }), new Set()), [])
+  assert.deepEqual(waitingQuestionRuns([{ position: 1, line: question('r1') }], sources({ r1: run('r1', { outcome: 'blocked', stopReason: 'asked_human', issue: 'i1' }) }), new Set()), [])
 })
 
 test('a thread with no task shows only its live wait, which can end', () => {

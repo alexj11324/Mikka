@@ -21,8 +21,8 @@ const CLOSED_ISSUE = new Set(['done', 'canceled', 'duplicate'])
  * `needsReply` in `localTaskState`'s order (hooks/use-bot-tasks.ts): a closed
  * task, a newer active attempt, quota, a merged pull request, a failed run, or
  * a task waiting for review is not an answer the person owes. `asked_human`
- * sits where `needs_input` does: it is recorded when the run completes, before
- * the outcome judge answers. The inbox's factory-approval branch has no field
+ * stands in only until the outcome judge answers: it is recorded when the run
+ * completes. The inbox's factory-approval branch has no field
  * in `RunSource`, so it is not mirrored here.
  */
 function needsReply(issue: { status?: string } | undefined, run: { status: string; outcome: string | null; stopReason?: string | null }, pullRequests: readonly { state: string }[]): boolean {
