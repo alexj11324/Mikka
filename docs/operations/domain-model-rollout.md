@@ -26,6 +26,7 @@ MIGRATE=1 pnpm migrate
 1. `backfillTaskWorkspaces`：先用可信关系绑定 P0 Task 归属，同时补有证明的 Run / Factory / artifact 归属。没有充分证明的 Task 保持 `ownershipState='pending'`、`workspaceId IS NULL`。
 2. `backfillTaskIdentifiers`：先分批补齐已绑定 Task 的空租户别名，并导入有同 Task、同 Workspace、Run 执行者匹配证明的历史 publication（包括协作者执行的 Run）。这一步也处理已经发号的 Task。随后只给尚无 `issuedIdentifier` 的已绑定 Task 发放稳定编号，并复制匹配 Task、Workspace、历史创建者的 Team 别名。首发优先采用最早的可信 publication；已有稳定编号和已发布 Run 的编号不重写。
 3. `backfillProjectV2`：在可信 Task 归属基础上推导 Project 的唯一 Workspace，建立 `workspace_project_tasks` 和成员关系，并写完成回执。
+4. `resource-acl-backfill.mjs`（治理层 #1851）：在 `backfillProjectV2` 之后运行。脚本检测到 `workspace_projects."workspaceId"` 与 `workspace_project_tasks` 时，只使用 canonical 归属和 canonical 关系；`workspaceId IS NULL` 的 Project 注册为 quarantined，不按 Team 链接、创建者或名称猜测。只有 Project v2 列/关系尚未部署时才回退到旧 Team-link/owner 推断，避免同一次发布出现第二套 Project 身份。未注册 ACL 的 Project 对普通读取不可见，因此必须在开放读取前完成。
 
 日志对应以下结果：
 

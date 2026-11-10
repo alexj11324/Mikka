@@ -32,6 +32,12 @@ private ACLs. Personal workspaces admit only their owner and reject Team
 creation. Private teams would require a separate explicit policy and are
 outside this change.
 
+Content access is additionally filtered by the application resource ACL from
+the workspace governance layer (#1851): a Project or Task must pass
+`canReadContent` after the active Workspace/Enterprise check. That ACL is the
+content-sharing authority. Project or Team membership still does not grant it,
+and a private resource is represented by its ACL policy, not by a private Team.
+
 ## Project relationships
 
 Projects have nullable `leadUserId`, real Project member user IDs, optional
