@@ -1,6 +1,6 @@
 {
   "schema": "issue1512-native-pending-pg17-v1",
-  "enabled": true,
+  "enabled": false,
   "repository": "alexj11324/Mikka",
   "opsBranch": "ops/1512-task-runs-pg-20261110",
   "admissionMessage": "issue1512 Native pending workspace PG admit 20261110",
@@ -185,5 +185,10 @@
     "workflowBlob": "e5c0c2537598720eb732225f9726cf97f2177a72"
   },
   "sourceStatus": "unreferenced immutable commits; controller/workflow are draft artifacts until root review and explicit publication",
-  "resourcesStartedAtPreparation": 0
+  "resourcesStartedAtPreparation": 0,
+  "closedReason": "Admission is disabled after the single permitted verification. Its actual outcome is preserved separately; no retry or new runner is authorized by evidence-only pushes.",
+  "admittedRunId": 42745526739,
+  "admittedJobId": 129596578091,
+  "admittedOpsSha": "e29dec5a9cae90fa8f48b5b612ac2cf8c08ad4cc",
+  "controllerStaticReviewBlob": "d85b6bc8b2a430482477e4054e37e104cd53ad56"
 }
