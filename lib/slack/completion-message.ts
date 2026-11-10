@@ -116,8 +116,8 @@ export function slackCompletionDeepLink({ issue, thread, origin, basePath }: Sla
   let parsed: URL
   try {
     parsed = new URL(origin)
-  } catch {
-    throw new TypeError('origin must be an http(s) origin')
+  } catch (error) {
+    throw new TypeError('origin must be an http(s) origin', { cause: error })
   }
   if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || parsed.pathname !== '/' || parsed.search || parsed.hash) {
     throw new TypeError('origin must be an http(s) origin')
