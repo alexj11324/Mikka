@@ -5834,6 +5834,7 @@
   "HostedTasks": {
     "open": "打开任务",
     "status": "状态",
+    "factoryStage": "Factory 阶段",
     "tasks": "任务",
     "steps": "步骤",
     "happened": "最近的进展",

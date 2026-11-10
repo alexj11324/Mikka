@@ -5834,6 +5834,7 @@
   "HostedTasks": {
     "open": "Open task",
     "status": "Status",
+    "factoryStage": "Factory stage",
     "tasks": "Tasks",
     "steps": "Steps",
     "happened": "Latest",

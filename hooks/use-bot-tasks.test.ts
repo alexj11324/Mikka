@@ -25,6 +25,11 @@ test('a task is one row, grouped by its newest thread; threads without a listed 
   ])
 })
 
+test('an In Review task with an open PR whose newest run succeeded without an outcome waits for review (F1503-18)', () => {
+  const task = issue('a', 'review', [{ url: 'https://github.com/o/r/pull/17', state: 'open' }])
+  assert.deepEqual(localTaskState(task, { status: 'succeeded', outcome: null }), { state: 'waiting', reason: 'review' })
+})
+
 test('a closed task is done whatever its thread is doing', () => {
   const groups = tasksOf([thread('r1', 'a', 'running', '2026-11-07T10:00:00Z')], [issue('a', 'canceled')])
   assert.equal(groups.done[0]?.issue.id, 'a')
