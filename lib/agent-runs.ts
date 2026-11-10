@@ -223,7 +223,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
     const result = await queueAdmittedRun(userId, {
       ...input, issueId: current.issueId!, repo: repo.remoteUrl,
       requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
-      readOnly: current.agentDefinition.readOnly, mode: current.mode,
+      readOnly: current.agentDefinition.readOnly, carriedMode: current.mode,
     }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId, current.source,
     // The wrapper authorizes the failed source above. All target policy,
     // credential, task-destination and publication checks still run normally.

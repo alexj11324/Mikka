@@ -17,7 +17,7 @@ import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source
 import { cloudTaskTarget } from './cloud-task-target'
 import { runListChanged } from '@/lib/live/lists'
 import { runChanged } from '@/lib/live/panels'
-import { freezeThreadMode, readThreadMode, ThreadModeConflict } from '@/lib/thread-mode/store'
+import { carryThreadMode, freezeThreadMode, readThreadMode, ThreadModeConflict } from '@/lib/thread-mode/store'
 import type { ThreadMode } from '@mikka/protocol/thread-mode'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
@@ -50,8 +50,10 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   subscriptionBindingId?: string
   /** An investigation that changes nothing: read-only policy and no task branch. */
   readOnly?: boolean
-  /** An explicit thread-mode transition (#1730); absent inherits the thread. */
+  /** A person's explicit thread-mode transition (#1730); absent inherits the thread. */
   mode?: ThreadMode
+  /** The source run's frozen mode, carried by an automatic continuation (provider fallback, quota retry). It names this run only and never rewrites the thread. */
+  carriedMode?: ThreadMode
   /** Internal host placement grant, never a model/tool argument. The current owner source can only narrow it. */
   allowLocalRecovery?: true
   sourceEventId?: string

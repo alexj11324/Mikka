@@ -19,7 +19,7 @@ import { taskIdentifiers, taskPrefixInput } from './task-identifier-server'
 import { publicationBranch } from './run-publication-policy'
 import { admitRepositoryTask, matchesRepositoryAdmission } from './repository-admission'
 import { lockCliAgentPolicy, lockCliTaskScope } from './agent-tool-approval/policy-store'
-import { freezeThreadMode, readThreadMode, ThreadModeConflict } from './thread-mode/store'
+import { carryThreadMode, freezeThreadMode, readThreadMode, ThreadModeConflict } from './thread-mode/store'
 import type { ThreadMode } from '@mikka/protocol/thread-mode'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 import { dispatchFingerprint, type DispatchCredential, type DispatchInput } from './run-dispatch'
@@ -35,6 +35,8 @@ export async function acceptLocalRun(input: {
   source?: 'mcp' | null; botId: string | null; prompt: string; /** Code-point task range; initial briefs start at zero. */ promptTaskStart?: number | null; promptTaskLength?: number | null; definition: WorkerDefinitionSnapshot; requestEventId?: string
   /** An explicit thread-mode transition; absent inherits the thread's choice. */
   mode?: ThreadMode
+  /** The source run's frozen mode, carried by an automatic continuation (a provider fallback or a quota retry). It names this run only and never rewrites the thread. */
+  carriedMode?: ThreadMode
   dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string; profileSourceRunId?: string
   factoryContext?: { sourceEventId: string; attemptId: string }
 }, existing?: PoolClient): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
@@ -50,7 +52,7 @@ export async function acceptLocalRun(input: {
     // the explicit choice, else the thread's current one. The actual freeze
     // happens after every replay return, so an old replay cannot revert a
     // newer mode choice.
-    const expectedMode: ThreadMode = input.mode ?? (await readThreadMode(client, input.userId, input.issueId)).mode
+    const expectedMode: ThreadMode = input.carriedMode ?? input.mode ?? (await readThreadMode(client, input.userId, input.issueId)).mode
     const expectedReadOnly = input.definition.readOnly === true || expectedMode === 'plan'
     // The setters acquire these locks before reading runs or updating workers.
     // Internal hosts prelock the same policy before taking their domain locks.
@@ -127,7 +129,11 @@ export async function acceptLocalRun(input: {
     // and no mode inherits the thread's current choice.
     let mode: ThreadMode
     try {
-      mode = await freezeThreadMode(client, { userId: input.userId, issueId: input.issueId, workspaceId: taskScope.workspaceId!, requested: input.mode })
+      // A carried mode belongs to this run alone; only a person's explicit
+      // choice is a thread transition (see carryThreadMode).
+      mode = input.carriedMode !== undefined
+        ? await carryThreadMode(client, input.userId, input.issueId, input.carriedMode)
+        : await freezeThreadMode(client, { userId: input.userId, issueId: input.issueId, workspaceId: taskScope.workspaceId!, requested: input.mode })
     } catch (error) {
       if (error instanceof ThreadModeConflict) throw invalid(error.reason)
       throw error

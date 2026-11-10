@@ -256,7 +256,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
           const queued = await queueCloudRun(pool, { userId: source.userId, workspaceId: target.workspaceId }, {
             ...selection, botId: target.botId, issueId: source.issueId, agentId: target.agentId, deviceRepoId: target.deviceRepoId,
             title: issue.title, body: tiptapToText(issue.content), readOnly: source.agentDefinition.readOnly,
-            mode: source.mode,
+            carriedMode: source.mode,
             withoutBot: source.botId === null, idempotencyKey: `provider:${source.id}`,
             allowLocalRecovery: source.agentDefinition.allowLocalRecovery,
             sourceEventId: source.agentDefinition.repositoryAdmission?.requestEventId,

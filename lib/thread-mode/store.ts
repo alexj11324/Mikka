@@ -30,6 +30,19 @@ export async function readThreadMode(query: Pick<Pool | PoolClient, 'query'>, us
   return row ? { mode: resolveThreadMode(row.mode), version: row.version } : { mode: 'execute', version: 0 }
 }
 
+/**
+ * The mode an automatic continuation freezes. A provider fallback or a quota
+ * continuation carries the source run's mode into the **new run** and nothing
+ * else: the thread keeps whatever the person has chosen now. That matters
+ * because the source run is usually already `failed`, which `unfinishedRun`
+ * never blocks, so treating the carry as a transition would revert a switch the
+ * person made in the meantime, invalidate the version their picker holds and
+ * record `thread.mode_changed` as if they had acted.
+ */
+export async function carryThreadMode(query: Pick<Pool | PoolClient, 'query'>, userId: string, issueId: string, carried?: ThreadMode): Promise<ThreadMode> {
+  return carried ?? (await readThreadMode(query, userId, issueId)).mode
+}
+
 async function unfinishedRun(client: Pick<Pool | PoolClient, 'query'>, userId: string, issueId: string) {
   const { rowCount } = await client.query(`SELECT 1 FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2 AND status=ANY($3::text[]) LIMIT 1`, [userId, issueId, [...UNFINISHED_RUN_STATUSES]])
   return (rowCount ?? 0) > 0
@@ -72,18 +85,20 @@ export async function freezeThreadMode(client: PoolClient, input: {
 
 /**
  * The API's explicit transition. `expectedVersion` is the version the person
- * saw; a stale value changes nothing. Only the run's owner may call it, and
- * an unfinished run keeps the mode it froze.
+ * saw; a stale value changes nothing. The caller has already proven two things
+ * — the run is their own (`threadModeTarget`) and they are a current member of
+ * its workspace (`requireTaskWorkspace`) — so this locks the task's row only to
+ * bind the write to that workspace, never to require that they created the
+ * task. The row it writes is their own `(userId, issueId)` choice.
  */
 export async function setThreadMode(pool: Pick<Pool, 'connect'>, input: {
   userId: string; issueId: string; workspaceId: string; mode: ThreadMode; expectedVersion: number; actorName?: string
 }): Promise<ThreadModeState> {
   const mode = threadModeSchema.parse(input.mode)
   return writeTransaction(pool, async tx => {
-    // Lock the issue first: the caller has already authorized the run that
-    // names it; rechecking ownership here keeps a stale run id from writing
-    // another person's thread.
-    const { rows: [issue] } = await tx.query<{ workspaceId: string | null }>(`SELECT "workspaceId" FROM issues WHERE id=$1 AND "userId"=$2 FOR SHARE`, [input.issueId, input.userId])
+    // Lock the issue first, so a stale run id cannot write another tenant's
+    // thread: the tenant is compared, not who created the task.
+    const { rows: [issue] } = await tx.query<{ workspaceId: string | null }>(`SELECT "workspaceId" FROM issues WHERE id=$1 FOR SHARE`, [input.issueId])
     if (!issue || issue.workspaceId !== input.workspaceId) throw new ThreadModeConflict('threadModeChanged')
     const current = await lockThreadMode(tx, input.userId, input.issueId)
     if (current.version !== input.expectedVersion) throw new ThreadModeConflict('threadModeChanged')
