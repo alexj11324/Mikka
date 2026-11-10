@@ -7,6 +7,7 @@ import { mkdir, mkdtemp, open, readFile, realpath, rm, symlink, writeFile } from
 import { dirname, join, resolve } from 'node:path'
 import { SshInstaller, runProcess, quote, type SshInstallState } from '../../apps/desktop/src/main/ssh-install'
 import { InstallProcessError, nodeDiscoveryScript, redactInstallLog } from '../../apps/desktop/src/main/local-install'
+import { prepareLaunchctlDiagnostic } from './local-installer-launchctl-diagnostic.mjs'
 
 assert.equal(process.platform, 'darwin')
 assert.equal(process.arch, 'arm64')
@@ -15,6 +16,15 @@ assert.ok(major === 18 || major === 22)
 // macOS TMPDIR is a long /var/folders path. A normal daemon Unix socket under
 // that synthetic HOME exceeds macOS's 103-byte IPC path limit.
 const home = await mkdtemp('/tmp/mikka-i-')
+// Private exact-path handoff to the always-run diagnostic controller. Never uploaded.
+const fixtureControl = resolve('.cache/launchctl-fixture-control')
+try {
+  await mkdir(fixtureControl, { recursive: true, mode: 0o700 })
+  await writeFile(join(fixtureControl, 'owned-home'), home + '\n', { mode: 0o600, flag: 'wx' })
+} catch (error) {
+  await rm(home, { recursive: true, force: true })
+  throw error
+}
 const dataDir = join(home, 'Library/Application Support/Mikka')
 const socketPathBytes = Buffer.byteLength(join(dataDir, 'local-computer.sock'))
 assert.ok(socketPathBytes <= 103)
@@ -56,6 +66,7 @@ let done = new Promise<void>(resolve => { finish = resolve })
 const tarball = process.env.MIKKA_DAEMON_TARBALL ? resolve(process.env.MIKKA_DAEMON_TARBALL) : ''
 let npmStarted = false
 let lastStatus = ''
+let launchctlDiagnostic: Awaited<ReturnType<typeof prepareLaunchctlDiagnostic>> | undefined
 const sanitized = (value: string) => redactInstallLog(value).replaceAll(home, '[fixture-home]').replaceAll(deviceId, '[fixture-device]').replaceAll(workspaceId, '[fixture-workspace]')
 const evidence = () => ({ platform: process.platform, arch: process.arch, node: process.versions.node,
   npmStarted, registrations, heartbeats, enrollments, socketPathBytes,
@@ -88,6 +99,8 @@ try {
     await mkdir(nvm, { recursive: true })
     await symlink(process.execPath, join(nvm, 'node'))
     await symlink(join(selectedBin, 'npm'), join(nvm, 'npm'))
+    // Wrap launchctl in the already-selected nvm bin; the original Finder PATH remains unchanged.
+    launchctlDiagnostic = await prepareLaunchctlDiagnostic(home, process.execPath)
     process.env.PATH = '/usr/bin:/bin:/usr/sbin:/sbin'
     assert.ok(tarball)
   } else {
@@ -106,6 +119,7 @@ try {
       if (script.includes('mikka daemon status')) lastStatus = sanitized(result)
       return result
     } catch (error) {
+      if (script.includes('mikka daemon service install')) launchctlDiagnostic?.probeAfterFailure()
       if (script.includes('mikka daemon status')) lastStatus = sanitized(error instanceof InstallProcessError ? error.stderr : error instanceof Error ? error.message : String(error))
       throw error
     }
@@ -134,12 +148,13 @@ try {
     const manifest = JSON.parse(await readFile(join(home, '.mikka/npm/lib/node_modules/@aspectlylabs/mikka/package.json'), 'utf8'))
     assert.equal(manifest.engines.node, '>=22')
     done = new Promise<void>(resolve => { finish = resolve })
+    await launchctlDiagnostic?.reconnect()
     await installer.restartLocal('fixture-owner')
     await done
     assert.equal(installer.state()?.status, 'online')
     assert.equal(enrollments, 1, 'reconnect must not re-enroll')
   }
-  const result = { ...evidence(), result: major === 18 ? 'check/node_required' : 'installed/launchagent/online/reconnect' }
+  const result = { ...evidence(), result: major === 18 ? 'check/node_required' : 'installed/launchagent/online/reconnect', launchctl: launchctlDiagnostic?.snapshot() }
   await mkdir('artifacts/local-installer', { recursive: true })
   await writeFile(`artifacts/local-installer/node-${major}.json`, JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result))
@@ -150,16 +165,32 @@ try {
     ['service', join(home, 'Library/Logs/mikka-daemon.log')],
     ['daemon', join(dataDir, 'logs/daemon.log')],
   ].map(async ([name, path]) => [name, sanitized(await readFile(path, 'utf8').catch(() => 'unavailable'))])))
-  const result = { ...evidence(), result: 'failed', lastStatus, logs, installer: await installerDiagnostic() }
+  const result = { ...evidence(), result: 'failed', lastStatus, logs, installer: await installerDiagnostic(), launchctl: launchctlDiagnostic?.snapshot() }
   await mkdir('artifacts/local-installer', { recursive: true })
   await writeFile(`artifacts/local-installer/node-${major}.json`, JSON.stringify(result, null, 2) + '\n')
   process.stderr.write(JSON.stringify(result, null, 2) + '\n')
   throw error
 } finally {
-  if (major === 22) await runProcess('launchctl', ['bootout', `gui/${process.getuid!()}/com.aspectlylabs.mikka.daemon`]).catch(() => undefined)
+  let bootout: { attempted: boolean; exitCode: number | null; error: boolean } = { attempted: false, exitCode: null, error: false }
+  if (major === 22) {
+    bootout.attempted = true
+    try {
+      await runProcess('launchctl', ['bootout', `gui/${process.getuid!()}/com.aspectlylabs.mikka.daemon`])
+      bootout.exitCode = 0
+    } catch (error) {
+      bootout.error = true
+      bootout.exitCode = error instanceof InstallProcessError ? error.exitCode : null
+    }
+  }
   server.closeAllConnections()
   await new Promise<void>(resolve => server.close(() => resolve()))
   process.env.HOME = originalHome
   process.env.PATH = originalPath
   await rm(home, { recursive: true, force: true })
+  await mkdir('artifacts/local-installer', { recursive: true })
+  await writeFile('artifacts/local-installer/fixture-cleanup.json', JSON.stringify({
+    schema: 'issue1512.macos-fixture-cleanup.v1', finishedAt: new Date().toISOString(),
+    bootout, fixtureServerClosed: true, environmentRestored: true, fixtureHomeRemoved: true,
+    limitation: 'A nonzero bootout does not establish service absence. Process absence is not independently probed here.',
+  }, null, 2) + '\n')
 }

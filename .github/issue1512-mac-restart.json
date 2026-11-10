@@ -1,0 +1,53 @@
+{
+  "schema": "issue1512.macos-restart-diagnostic-request.v1",
+  "enabled": true,
+  "requestId": "20261110-5852-a1",
+  "sourceCommit": "5852aa8832c07fdeef43665dd5e156ce5516e3ea",
+  "sourceTree": "42d33eb7faf77d7049607523599de9374e065660",
+  "priorFailure": {
+    "runId": 42731843507,
+    "attempt": 1,
+    "jobId": 129551876738,
+    "rawGitBlob": "989174f5612eaffa364b517728571cefb88d9763",
+    "sourceReviewGitBlob": "6732c9769bafbdda81d0e081bdc7f5c9f5366711"
+  },
+  "overlays": [
+    {
+      "path": "scripts/acceptance/local-installer-launchctl-diagnostic.mjs",
+      "beforeGitBlob": null,
+      "beforeSha256": null,
+      "gitBlob": "486227c042e6f40778bee40f06540f3e5b9c76ed",
+      "bytes": 8802,
+      "sha256": "ce20d2774596d0f5837936ecbef05ba5021fd3e2ee561780b9918aacc34901f1"
+    },
+    {
+      "path": "scripts/acceptance/local-installer-macos.ts",
+      "beforeGitBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+      "beforeSha256": "eb6b97e018e194d5fadbbe2ef14810952f7421bbf77fa87982ef1d3e6ec4a680",
+      "gitBlob": "e270807d4b726cb25d34d6e8e027ebfbf28eb98e",
+      "bytes": 11490,
+      "sha256": "73df05e2beb4688853b161b5683df256c777ef1c5a58b342a4a5c68431e43377"
+    }
+  ],
+  "controller": {
+    "path": "scripts/ops/issue1512-macos-restart-controller.mjs",
+    "gitBlob": "8028b287e990f40d316a22d1fc5394be24be5cac",
+    "bytes": 9203,
+    "sha256": "cfb6288cd7d50b3f55ef812e593f62c3272d960a039a2439bf2875e35dfeb91a"
+  },
+  "limits": {
+    "originalFixtureRuns": 1,
+    "runAttempts": 1,
+    "productionCredentials": false,
+    "readOnlyGithubToken": true,
+    "primaryCommandRetries": 0,
+    "probeTimeoutMs": 1000,
+    "wrapperJournalMaxBytes": 8192,
+    "wrapperJournalMaxRecords": 16,
+    "failureProbeCommands": 2,
+    "controllerCleanupCommands": 2,
+    "controllerCleanupCommandTimeoutMs": 10000
+  },
+  "interpretation": "This temporary overlay adds time between bootout and bootstrap. Non-reproduction does not establish a product fix; no diagnostic outcome replaces the formal Node22 acceptance.",
+  "closure": "After this single workflow reaches a terminal state, publish a normal closing commit that disables the job guards and sets enabled false; preserve receipts before closing the entry."
+}
