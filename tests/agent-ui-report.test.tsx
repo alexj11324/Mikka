@@ -212,7 +212,7 @@ test('A task chip is boxed with its state icon and code; a thread is its title i
   assert.ok(taskClass.includes('text-object-chip-foreground'), 'task chip is in the accent')
   assert.ok(!taskClass.some(name => /^h-\d/.test(name)), 'task chip takes the text\'s own height')
   const runClass = classes(runChip)
-  assert.ok(runClass.includes('text-primary') && runClass.includes('bg-transparent'), 'a thread is in the link colour with no fill')
+  assert.ok(runClass.includes('text-object-chip-foreground') && runClass.includes('bg-transparent'), 'a thread is in the citation link colour with no fill')
   assert.doesNotMatch(runChip, /<svg/, 'a thread has no icon')
   const text = (chip: string) => chip.replace(/<[^>]+>/g, '')
   assert.match(text(taskChip), /^MIK-43/)
@@ -224,6 +224,41 @@ test('A task chip is boxed with its state icon and code; a thread is its title i
   assert.match(sourceChip, /data-variant="source"/)
   assert.ok(sourceClass.split(' ').includes('underline'), 'source chip keeps its underline')
   assert.ok(!sourceClass.split(' ').includes('bg-object-chip'), 'source chip has no box')
+})
+
+test('saved OpenUI, citation markers and oldest bare UUID references all use the current compact task and thread renderers', () => {
+  const task = '00000000-0000-4000-8000-000000000045'
+  const run = '00000000-0000-4000-8000-000000000046'
+  const title = '修复登录后的工作区前缀和查询参数丢失问题'
+  const sources = {
+    [task]: { kind: 'issue', id: task, number: 45, identifier: 'ALEX-45', title, status: 'doing', priority: 'normal', run: { status: 'waiting_input', outcome: null } },
+    [run]: { kind: 'run', id: run, agentName: 'Worker', harness: 'codex', status: 'waiting_input', issue: { id: task, number: 45, identifier: 'ALEX-45', title }, name: title, summary: null, steps: 1, createdAt: '2026-11-01T00:00:00Z', finishedAt: null },
+  } as const
+  // These are the saved producer grammars, with synthetic IDs; no model text or stored record is rewritten.
+  const saved = [
+    `root = InlineText(["旧消息 ", TaskChip("${task}"), " / ", RunChip("${run}"), "：已开始运行，等待回答。"] )`,
+    `旧消息 [[issue:${task}]] / [[run:${run}]]：已开始运行，等待回答。`,
+    `旧消息 ${task} / ${run}：已开始运行，等待回答。`,
+  ]
+  for (const response of saved) {
+    const html = renderToStaticMarkup(<NextIntlClientProvider locale="zh-CN" messages={chineseMessages}><AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: () => {}, carded: new Set([run]) }}>
+      <AgentGenerativeUI response={response} isStreaming={false} onAction={() => {}} />
+    </AgentCitationsContext></NextIntlClientProvider>)
+    const starts = [...html.matchAll(/<span[^>]*data-slot="inline-citation-trigger"/g)].map(match => match.index)
+    assert.equal(starts.length, 2, response)
+    const taskChip = html.slice(starts[0], starts[1])
+    const runLink = html.slice(starts[1])
+    const visible = (value: string) => value.replace(/<[^>]+>/g, '')
+    assert.match(visible(taskChip), /^ALEX-45/)
+    assert.ok(!visible(taskChip).includes(title), 'the old long title is absent from the task chip')
+    assert.match(taskChip, /data-task-chip="waiting"/)
+    assert.match(runLink, /data-thread-link=""/)
+    assert.match(runLink, /text-object-chip-foreground/)
+    assert.match(runLink, /bg-transparent/)
+    assert.doesNotMatch(runLink, /<svg|data-citation-carded/)
+    assert.ok(visible(runLink).startsWith(title))
+    assert.ok(visible(html).includes('已开始运行，等待回答。'), 'historical model prose stays verbatim')
+  }
 })
 
 test('Text inside an OpenUI card is part of the card, not a chat bubble', () => {

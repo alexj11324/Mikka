@@ -375,18 +375,19 @@ test('a task and its thread in one reply: the task is its state icon and code, t
   } finally { await view.unmount() }
 })
 
-test('a thread whose card sits under the same reply is named in the words without a chip (R-66)', async () => {
+test('a thread keeps its current text-link renderer when a dispatch card sits under the same saved reply', async () => {
   const view = await mount()
   try {
     const citations = { ...base, sources: { ...known, [THREAD]: thread } }
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} carded={THREAD} />)
-    assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 0)
-    assert.equal(view.container.querySelector('[data-citation-carded]')?.textContent, 'Fix sign-in redirect')
+    assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1)
+    assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Fix sign-in redirect')
+    assert.equal(view.container.querySelector('[data-citation-carded]'), null)
     // A thread of a task is named by the task's title, without its code.
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={{ ...citations, sources: { ...known, [THREAD]: { ...thread, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: 'Release checklist' } } } }} carded={THREAD} />)
-    assert.equal(view.container.querySelector('[data-citation-carded]')?.textContent, 'Release checklist')
+    assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Release checklist')
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} />)
-    assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 1, 'without its card here, it is a chip')
+    assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1, 'with or without a card it is the same thread link')
   } finally { await view.unmount() }
 })
 

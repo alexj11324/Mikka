@@ -14,7 +14,7 @@ const ignoreAction = () => {}
  * title pill already says who this is). A message frame that draws reply text
  * plain (the hosted thread) sets ReplyBubbles off around it, and that wins:
  * otherwise Markdown and OpenUI text in one reply would disagree.
- * Cited issues, runs and web pages show as source chips in the text; a task whose thread it also cites is its title.
+ * Cited tasks use compact state/code chips and threads use title links, including saved replies and carded runs.
  * Web pages it cites are listed under it on hover (R-15). A citation it cannot show stays as written.
  * While it streams, a citation still arriving is left out until its chip can show.
  * Memoised: a token for the reply that is streaming does not redraw the replies already finished.
@@ -24,7 +24,7 @@ export const CoordinatorReply = memo(function CoordinatorReply({ text, citations
   carded?: string }) {
   const bubbles = use(ReplyBubbles) ?? true
   const shown = isStreaming ? withoutPartialCitation(text) : text
-  // A task whose thread this reply also cites is its title, not a second chip (R-15).
+  // Preserve reply metadata for existing callers; the shared citation renderer determines current presentation.
   const value = useMemo(() => ({ ...citations, covered: coveredIssues(shown, citations.sources), carded: new Set(carded ? carded.split(',') : []) }), [citations, shown, carded])
   return <AgentCitationsContext value={value}>
     <div data-quote-source="" className="flex w-full min-w-0 flex-col gap-2 break-words">

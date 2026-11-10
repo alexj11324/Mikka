@@ -37,7 +37,7 @@ export interface AgentCitations {
    * its own compact chip (state icon and code) and the thread its title, so neither repeats the other.
    */
   covered?: ReadonlySet<string>
-  /** Threads whose card sits under this same reply: the card is the object, so the words name it without a second chip (R-66). */
+  /** Legacy reply metadata; references use the same compact task chip / thread link even beside a dispatch card. */
   carded?: ReadonlySet<string>
 }
 
@@ -91,7 +91,6 @@ export function CitationAnchor({ href, children, className: _className, ...props
     const source = citations.sources[id]
     if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
-    if (source.kind === 'run' && citations.carded?.has(id)) return <span data-citation-carded="">{runTitle(source)}</span>
     return <CitationChip id={id} kind={source.kind} />
   }
   if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />
