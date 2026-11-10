@@ -10,7 +10,8 @@
 - Replaces: the per-Bot write-policy surface in decision 2026-10-31 (R-77) as
   the place a person configures app access. The per-Bot storage is kept only as
   historical rows and is no longer read for enforcement; existing rows are
-  migrated into the workspace policy.
+  migrated into the workspace policy. The owner-scoped legacy Coordinator head
+  survives only as the no-workspace ceiling described below.
 
 What follows:
 
@@ -44,6 +45,13 @@ What follows:
 - The run policy on the same page is the workspace layer
   (`workspace_computer_policies.cli_run_policy`); per-Bot and per-worker layers
   are retired, while team and project scopes still narrow a task.
+- A run that names no workspace has no workspace policy to read: it uses the
+  owner-scoped legacy `agent_kit_heads` row (`bot_key='coordinator'`) as an
+  explicit ceiling, never as a wider allow. That row is not a per-Bot layer —
+  no Bot read or write creates or reads one — and it stops applying once the
+  personal-workspace backfill gives the run its workspace. The retired per-Bot
+  heads (one per Bot id) are historical rows only; nothing reads their policy
+  columns.
 - Capy's comparable model — permissions on the MCP server plus a per-device
   access prompt — also authorizes a connection, not each agent. This decision
   matches that shape and removes the per-Bot enforcement layers.
