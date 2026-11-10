@@ -1,6 +1,6 @@
 {
   "schema": "issue1512-native-live-routing-validation/v1",
-  "enabled": true,
+  "enabled": false,
   "draft": false,
   "opsBranch": "ops/1512-task-runs-pg-20261110",
   "admissionMessage": "ops: issue1512 live routing GREEN validation 58275b1d-3520-445d-b6c5-23dba8a01bd6",
@@ -60,7 +60,7 @@
   },
   "driverSha256": "fd47b3ab2f5abef1b2fbb368135f7d0c42bbf69ad6b80c8c82072adfe739bc81",
   "driverBlob": "39f80294ee396b8b0ceb369bf41e8da25d1efffc",
-  "workflowBlob": "ea0877277da2b470be1b52fa7411ca84f48e3d0c",
+  "workflowBlob": "4961e05d943593c68d184b330ff402f3599b09bf",
   "closedWorkflowBlob": "4961e05d943593c68d184b330ff402f3599b09bf",
   "controlPaths": [
     ".github/ops/issue1512-native-live-routing-validation/driver.mjs",
@@ -217,7 +217,7 @@
       "testToken": "apps/desktop/src/renderer/workspace-live.test.ts"
     }
   ],
-  "status": "BOUND FOR ONE ISOLATED FIXED-SOURCE VALIDATION. No test success claimed; ordinary formal Native and production acceptance remain pending.",
+  "status": "ENTRY CLOSED AFTER EXACT-SOURCE PREPARE SUCCEEDED; the sole admitted run continues using its immutable active commit.",
   "beforeEvidence": {
     "kind": "actual instrumented Native diagnostic; no manufactured missing-export RED",
     "source": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
@@ -270,5 +270,13 @@
     "sqlAndBytes": "Source contains no extra statement for the hint. Additional kind/owner projected bytes are not zero cost; original full-window SQL/bytes acceptance still required.",
     "unitCounts": "Exact source-derived 100/54/126 counts are mandatory at admission and per complete group. Static count proof is not an execution result; real full TAP with all-pass and no skip/todo/cancel/fail remains required."
   },
-  "expectedUnitTestsProofBlob": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e"
+  "expectedUnitTestsProofBlob": "31c10e77de69dcdd80c0208a6e5c15e4d9cd151e",
+  "admittedRun": {
+    "id": 42766089161,
+    "attempt": 1,
+    "jobId": 129662811912,
+    "commit": "063cf037560c750d87aa93818bd5b58bdfc78d69",
+    "manifest": "74ed0ab00b09aa345120360373725f93edd6d2d3",
+    "source": "ff385bfd91edcd40c3b3ee398b4b93098e5becbb"
+  }
 }

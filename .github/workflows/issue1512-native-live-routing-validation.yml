@@ -30,12 +30,9 @@ env:
 jobs:
   fixed-green:
     name: One fixed candidate - Live routing units, PG17, types and changed-source lint
-    # One reviewed admission only; the immutable controller also verifies source, tree, parents, expiry and attempt.
+    # Draft closed entry. Root binds the complete candidate and reviews before activation.
     if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/ops/1512-task-runs-pg-20261110' &&
-      github.run_attempt == 1 &&
-      github.event.head_commit.message == 'ops: issue1512 live routing GREEN validation 58275b1d-3520-445d-b6c5-23dba8a01bd6'
+      false
     runs-on: ubuntu-22.04
     timeout-minutes: 55
     steps:
