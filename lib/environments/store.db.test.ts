@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Pool } from 'pg'
-import { dbUrl, seedPersonalWorkspace, seedProject, seedUser } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedPersonalWorkspace, seedProject, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import type { EnvironmentSaveInput } from './contract'
 import {
   archiveEnvironment, defaultEnvironmentForRun, listEnvironmentRows, readEnvironmentRow, saveEnvironment,
@@ -38,10 +38,12 @@ test('run environments are versioned by revision and one default per scope', { s
   const workspaceDefault = await saveEnvironment(pool, actor, environment({ projectId: null, config: { name: 'Any', workdir: '', setupScript: '' } }))
   assert.equal(workspaceDefault.isDefault, true)
 
+  const renamed = await saveEnvironment(pool, actor, environment({ id: second.id, revision: 1, projectId, config: { name: 'Python 2', workdir: '', setupScript: '' } }))
+  assert.equal(renamed.revision, 2)
   await assert.rejects(saveEnvironment(pool, actor, environment({ id: second.id, revision: 1, projectId, config: { name: 'Stale', workdir: '', setupScript: '' } })), { code: 'environmentConflict' })
   const updated = await saveEnvironment(pool, actor, environment({ id: second.id, revision: 2, projectId, config: { name: 'Python 3', workdir: 'py', setupScript: 'pip install -r requirements.txt' } }))
   assert.equal(updated.revision, 3)
-  assert.equal((await pool.query('SELECT revision FROM project_environment_revisions WHERE "environmentId"=$1 ORDER BY revision', [second.id])).rows.map(row => row.revision).join(','), '1,3')
+  assert.equal((await pool.query('SELECT revision FROM project_environment_revisions WHERE "environmentId"=$1 ORDER BY revision', [second.id])).rows.map(row => row.revision).join(','), '1,2,3')
 
   await assert.rejects(saveEnvironment(pool, actor, environment({ projectId, config: { name: 'python 3', workdir: '', setupScript: '' } })), { code: 'environmentNameTaken' })
 
@@ -60,8 +62,6 @@ test('a member cannot change an environment even when the client calls storage d
   const pool = new Pool({ connectionString: dbUrl, max: 2 })
   t.after(() => pool.end())
   const owner = await seedUser(pool, 'env-store-admin'), member = await seedUser(pool, 'env-store-member')
-  const workspaceId = await seedPersonalWorkspace(pool, owner)
-  await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`,
-    [workspaceId, member, `${member}@example.invalid`])
+  const { id: workspaceId } = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   await assert.rejects(saveEnvironment(pool, { userId: member, workspaceId }, environment()), { code: 'environmentPermissionDenied' })
 })
