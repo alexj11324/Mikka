@@ -470,6 +470,14 @@ export async function githubMcp(userId: string, input: import('@/lib/github/mcp'
 // A GitHub write has no idempotency key; never replay an uncertain call.
 githubMcp.maxRetries = 0
 
+/** Whether this workspace lets the Bot call GitHub tools. A step because the
+ * policy module reaches the server-only graph, which a tool's execute may not import. */
+export async function githubCallAllowed(userId: string, botId: string | null) {
+  'use step'
+  const { githubCallAllowed: allowed } = await import('@/lib/operations/github-call-policy')
+  return allowed(userId, botId)
+}
+
 /** Apps connected from the 插件 store, through the tools Composio lists for them (lib/app-tools.ts). */
 export async function appTools(userId: string, botId: string, operation: 'list' | 'call', input: unknown, scope?: NativeToolScope) {
   'use step'
