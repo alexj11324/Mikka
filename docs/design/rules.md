@@ -12,8 +12,12 @@ source wins in a conflict is in [`README.md`](README.md).
 
 ## Bots, chats and threads
 
-- **R-01** The left column is the bot list (bots and group chats). The right
-  column is 概览 with its tabs, including 任务, or 全部任务 (R-50). There is no "conversation list".
+- **R-01** The left column is the bot list (bots and group chats). In the
+  hosted shell each Bot can expand its dispatched tasks and Agent work beneath
+  its own row, like Capy's Captains; tasks are named for the work and use their
+  own state icon. Bots and groups retain their own avatars. This is not a
+  separate global Agent list ([2026-11-10](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
+  The right column is 概览 with its tabs, including 任务, or 全部任务 (R-50).
 - **R-02** The right panel's 概览 header shows the bot selected on the left:
   the same bloub avatar and the same name as its left row, then the tabs
   详情 / 任务 / PR / 电脑 (R-50). Task titles belong in their rows and
@@ -381,6 +385,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     task. The conversation joins runs oldest first, opens a selected stretch
     at its first run and otherwise starts at the newest message. Its header
     is the task title and current Agent; its composer addresses the newest run.
+    The hosted work-area task view starts with one large editable title,
+    its code and time, then compact properties, description, subtasks and
+    activity. The tab names the task; no second inner title bar repeats it.
+    Save, more and expand stay available
+    ([Capy layout](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
   - 全部任务 opens from the window bar on every page, with the hand and the
     count of 等你处理 tasks. A bot's 任务 tab lists its dispatched tasks.
     Search hits in a task conversation resolve to the task. Legacy run IDs

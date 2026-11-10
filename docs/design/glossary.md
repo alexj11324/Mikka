@@ -39,13 +39,17 @@ Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspac
 
 ## Rules for designs
 
-- The left column is the **bot list**: bots and group chats only. The right
-  column is the **task list** (since 2026-11-07: no list shows threads; a
-  thread opens only from inside its task,
-  [decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)). There is no "conversation list".
-- The bot list holds bots and group chats only. A thread name ("#66 …",
-  "MIK-11 …") is never a left-column row. A bot row's preview line may quote
-  the latest message, which may mention a thread, but the row is the bot.
+- The left column is the **bot list**. In the hosted shell a Bot expands
+  its dispatched tasks and Agent work below its own row, like Capy's Captains
+  ([2026-11-10](decisions/2026-11-10-1317-capy-sidebar-and-task-layout.md)).
+  Bot and group rows keep their own avatars. A child is named for its work;
+  a task carries its own state, and the Agent's mark identifies its executor.
+  This navigation does not change the distinction between dispatching Bot,
+  task and executing Agent.
+- Task lists continue to show one row per task, with its threads inside
+  ([2026-11-07](decisions/2026-11-07-2045-tasks-only-threads-inside.md)).
+  A standalone Agent run already visible to its dispatching Bot can be a
+  child of that Bot in the hosted sidebar; it is not a global thread list.
 - The right panel's 概览 header is the selected bot (the same avatar and
   name as its left row), followed by the tabs 详情 / 任务 / PR / 电脑. A
   task's title appears in its task row and detail, never as that

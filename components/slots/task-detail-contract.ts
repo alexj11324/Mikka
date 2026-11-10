@@ -163,7 +163,8 @@ export type TaskDetailFrameProps = {
 
 /**
  * The task view in a chat's work area (decision 2026-11-10): a narrow tab, whose own × closes it, so the layer leaves
- * out the way back, the pager and ✕, stacks the details card above the body, and offers expand: the task's full page.
+ * out the way back, the pager and ✕, places the title before compact properties and the body, and offers expand:
+ * the task's full page (2026-11-10 Capy layout decision).
  * Absent (null) on the task page itself.
  */
 export type TaskDetailPlacement = { onExpand: () => void; expandLabel: string }
