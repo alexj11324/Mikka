@@ -307,7 +307,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     for (const item of [...items].reverse()) {
       const line = item.line
       if (!line || line.kind !== 'runQuestion' || staleEvents.has(item.position)) continue
-      const run = line.runId ? sources?.[line.runId] : undefined
+      const run = line.runId ? data?.sources?.[line.runId] : undefined
       const key = line.runId ?? `position-${item.position}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -318,7 +318,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       } else if (line.title) rows.push({ runId: line.runId ?? null, title: line.title })
     }
     return rows
-  }, [items, sources, staleEvents])
+  }, [items, data, staleEvents])
   /** The thread cards under `item`: those whose first reply it is; a live reply only threads no stored reply has carded. */
   const cardsOf = (item: Chat['items'][number], live: boolean) => item.threads.filter(id => (live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position) && sources?.[id]?.kind === 'run')
   // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
