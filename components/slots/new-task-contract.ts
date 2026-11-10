@@ -18,7 +18,8 @@ export type NewTaskMachine = {
 export type NewTaskBot = { id: string | null; name: string; avatar: ReactNode }
 
 /** An Agent 配置 the task can use; `auto` is 自动. */
-export type NewTaskProfile = { value: string; label: string; detail?: string; disabled?: boolean }
+/** An Agent 配置 choice; `icon` is its ProfileMark as Mikka draws it, absent for 自动. */
+export type NewTaskProfile = { value: string; label: string; detail?: string; disabled?: boolean; icon?: ReactNode }
 
 export type NewTaskProps = {
   onClose: () => void
@@ -47,6 +48,8 @@ export type NewTaskProps = {
     value: string
     /** The picked profile's name, 自动 when none. */
     label: string
+    /** The picked profile's mark; absent for 自动. */
+    icon?: ReactNode
     onChange: (value: string) => void
     /** 管理: opens Settings in a new tab; absent without a workspace. */
     onManage?: () => void

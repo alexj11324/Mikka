@@ -218,7 +218,7 @@ test('rejection diagnostics expose only an eligible exact ID and a finite 0..1 c
 
 test('Profile HTTP guards owner scope, same origin, strict bodies, and optimistic version errors', async () => {
   const workspaceId = randomUUID(), id = randomUUID(), calls: string[] = []
-  const stored = { ...profile(), id, version: 1, digest: 'a'.repeat(64), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), archivedAt: null }
+  const stored = { ...profile(), icon: 'chevrons' as const, color: 'teal' as const, id, version: 1, digest: 'a'.repeat(64), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), archivedAt: null }
   const handler = createAgentProfileHandler({
     authenticate: async () => ({ ownerId: 'authenticated-owner', workspaceId }),
     management: async scope => { assert.equal(scope.ownerId, 'authenticated-owner'); calls.push('list'); return { profiles: [stored] } },
@@ -255,4 +255,67 @@ test('Profile availability preview accepts only an explicit allowed location and
   assert.equal((await handler(new Request(`${url}&location=unknown`))).status, 400)
   assert.equal((await handler(new Request(`${url}&deviceId=foreign-text`))).status, 400)
   assert.equal(previews.length, 1)
+})
+
+test('a Profile mark is derived from its roles, then name and description, and stays steady', async () => {
+  const { deriveProfileMark, resolveProfileMark, PROFILE_GLYPHS, PROFILE_COLORS, DEFAULT_PROFILE_MARK } = await import('./agent-profile-mark')
+  assert.equal(deriveProfileMark({ name: 'Anything', roles: ['Review'] }).icon, 'lens')
+  assert.equal(deriveProfileMark({ name: '实现', roles: [] }).icon, 'chevrons')
+  assert.equal(deriveProfileMark({ name: 'Writer', roles: ['文档'] }).icon, 'lines')
+  assert.equal(deriveProfileMark({ name: 'QA', roles: ['testing', 'review'] }).icon, 'check', 'the first matching role decides')
+  assert.equal(deriveProfileMark({ name: 'Mixed', roles: ['review and test'] }).icon, 'lens', 'the earliest word in a role decides')
+  assert.equal(deriveProfileMark({ name: 'Nova', description: 'Plans the work and writes specs' }).icon, 'stairs')
+  assert.equal(deriveProfileMark({ name: '前端', roles: ['Frontend'] }).icon, 'diamond')
+  assert.equal(deriveProfileMark({ name: 'Release', roles: ['deploy'] }).icon, 'arrow')
+  // Words inside other words do not match ("prefix" is not "fix", "docker" is not "doc").
+  assert.notEqual(deriveProfileMark({ name: 'prefix docker' }).icon, 'lines')
+  const unnamed = deriveProfileMark({ name: 'Zephyr' })
+  assert.deepEqual(deriveProfileMark({ name: ' zephyr ' }), unnamed, 'same name, same mark')
+  assert.notEqual(unnamed.icon, 'square', 'the Default glyph is never derived for a custom Profile')
+  for (const name of ['a', 'b', 'Backend', 'Ops', '审查', 'x'.repeat(80)]) {
+    const mark = deriveProfileMark({ name })
+    assert.ok(PROFILE_GLYPHS.includes(mark.icon)); assert.ok(PROFILE_COLORS.includes(mark.color)); assert.notEqual(mark.color, 'ink')
+  }
+  assert.deepEqual(resolveProfileMark({ name: 'Review' }, { icon: 'diamond', color: 'pink' }), { icon: 'diamond', color: 'pink' })
+  assert.deepEqual(resolveProfileMark({ name: 'Review' }, null), deriveProfileMark({ name: 'Review' }))
+  assert.deepEqual(resolveProfileMark({ name: 'Review' }, { icon: 'skull', color: 'red' }), deriveProfileMark({ name: 'Review' }), 'unknown ids fall back')
+  assert.deepEqual(resolveProfileMark({ name: 'Review' }, { icon: 'arrow', color: null }), { icon: 'arrow', color: deriveProfileMark({ name: 'Review' }).color })
+  assert.deepEqual(DEFAULT_PROFILE_MARK, { icon: 'square', color: 'ink' })
+})
+
+test('a Profile mark is a closed set beside the definition and never enters its digest', async () => {
+  const { profileMarkInputSchema } = await import('./agent-profile-mark')
+  assert.deepEqual(profileMarkInputSchema.parse({ icon: 'lens', color: 'teal' }), { icon: 'lens', color: 'teal' })
+  assert.deepEqual(profileMarkInputSchema.parse({ icon: null }), { icon: null })
+  for (const bad of [{ icon: 'skull' }, { color: 'red' }, { color: 'amber' }, { color: 'violet' }, { icon: 'lens', svg: '<svg/>' }, { icon: '' }]) assert.equal(profileMarkInputSchema.safeParse(bad).success, false)
+  assert.throws(() => parseAgentProfile({ ...profile(), icon: 'lens' }), 'the mark is not a definition field')
+  const workspaceId = randomUUID(), id = randomUUID()
+  const seen: unknown[] = []
+  const stored = { ...profile(), icon: 'lens' as const, color: 'teal' as const, id, version: 1, digest: 'a'.repeat(64), createdAt: '', updatedAt: '', archivedAt: null }
+  const handler = createAgentProfileHandler({
+    authenticate: async () => ({ ownerId: 'owner', workspaceId }), management: async () => ({ profiles: [] }),
+    store: {
+      get: async () => stored, history: async () => [], archive: async () => stored,
+      create: async (_scope, _profile, _requestId, mark) => { seen.push(['create', mark]); return stored },
+      update: async (_scope, _id, _version, _profile, mark) => { seen.push(['update', mark]); return stored },
+    },
+  })
+  const url = `https://mikka.example/api/factory/agent-profiles?workspaceId=${workspaceId}`
+  const send = (method: string, body: unknown, profileId?: string) => handler(new Request(url, { method, headers: { origin: 'https://mikka.example', 'content-type': 'application/json' }, body: JSON.stringify(body) }), profileId)
+  assert.equal((await send('POST', { profile: profile(), mark: { icon: 'lens', color: 'teal' } })).status, 201)
+  assert.equal((await send('POST', { profile: profile(), mark: { icon: 'skull' } })).status, 400)
+  assert.equal((await send('POST', { profile: profile(), mark: { color: 'red' } })).status, 400)
+  assert.equal((await send('PATCH', { profile: profile(), version: 1 }, id)).status, 200)
+  assert.equal((await send('PATCH', { profile: profile(), version: 1, mark: { icon: null } }, id)).status, 200)
+  assert.deepEqual(seen, [['create', { icon: 'lens', color: 'teal' }], ['update', undefined], ['update', { icon: null }]])
+  assert.equal(agentProfileDigest(profile(), []), agentProfileDigest(parseAgentProfile(profile()), []), 'the digest is over the definition alone')
+})
+
+test('a thread reads a custom Profile with its mark; Default and malformed values read as none', async () => {
+  const { threadProfile } = await import('@/lib/issue-threads')
+  const id = randomUUID()
+  assert.deepEqual(threadProfile({ profileId: id, name: 'Reviewer', roles: ['review'], description: '', icon: null, color: null }), { id, name: 'Reviewer', icon: 'lens', color: (await import('./agent-profile-mark')).deriveProfileMark({ name: 'Reviewer', roles: ['review'] }).color })
+  assert.deepEqual(threadProfile({ profileId: id, name: 'Reviewer', roles: ['review'], icon: 'arrow', color: 'pink' }), { id, name: 'Reviewer', icon: 'arrow', color: 'pink' })
+  assert.equal(threadProfile({ profileId: 'default', name: 'Default Agent' }), null)
+  for (const bad of [null, undefined, 'x', { name: 'No id' }, { profileId: id }]) assert.equal(threadProfile(bad), null)
 })

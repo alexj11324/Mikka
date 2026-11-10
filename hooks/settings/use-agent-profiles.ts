@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
+import { deriveProfileMark, resolveProfileMark, type ProfileMarkValue } from '@/lib/factory/agent-profile-mark'
 import { profileDefinition, profileModelKey, profileRequest, ProfileRequestError, useAgentProfiles, type AgentProfilesView } from '@/components/settings/factory-profiles-data'
 
 export type ProfileEditor = { profile?: AgentProfile; duplicate?: boolean }
@@ -68,32 +69,42 @@ export function useAgentProfileEditor({ workspaceId, editor, catalog, onSaved }:
   const [modelKey, setModelKey] = useState(draft.model.mode === 'fixed' ? profileModelKey(draft.model) : '')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<ProfileFailure | null>(null)
+  // Only what the person picked is sent; the rest stays stored (edit) or is derived from the roles (add).
+  const [chosenMark, setChosenMark] = useState<Partial<ProfileMarkValue>>({})
   const requestId = useRef<string | null>(null)
-  const attempt = useRef<AgentProfileDefinition | null>(null)
+  const attempt = useRef<{ profile: AgentProfileDefinition; mark?: Partial<ProfileMarkValue> } | null>(null)
   const models = catalog.models.filter(model => draft.harness === 'auto' || model.harness === draft.harness)
   const selectedModel = models.find(model => profileModelKey(model) === modelKey)
   const frozen = error === 'saveUnconfirmed'
   function change(patch: Partial<AgentProfileDefinition>) { setDraft(current => ({ ...current, ...patch })); setError(null) }
+  const roleList = () => [...new Set(roles.split(/[,，\n]/).map(role => role.trim()).filter(Boolean))]
+  const derived = deriveProfileMark({ name: draft.name, roles: roleList(), description: draft.description })
+  const stored = original ? resolveProfileMark(original, original) : derived
+  const mark: ProfileMarkValue = { icon: chosenMark.icon ?? stored.icon, color: chosenMark.color ?? stored.color }
+  function changeMark(patch: Partial<ProfileMarkValue>) { setChosenMark(current => ({ ...current, ...patch })); setError(null) }
 
   async function save() {
     if (pending) return
-    const roleList = [...new Set(roles.split(/[,，\n]/).map(role => role.trim()).filter(Boolean))]
-    if (!draft.name.trim() || roleList.length > 12 || roleList.some(role => role.length > 48) || (modelMode === 'fixed' && !selectedModel)) { setError('invalid'); return }
-    const profile: AgentProfileDefinition = frozen && attempt.current ? attempt.current : {
-      ...draft, name: draft.name.trim(), description: draft.description.trim(), roles: roleList,
-      model: modelMode === 'fixed' && selectedModel ? { mode: 'fixed', harness: selectedModel.harness, model: selectedModel.model, source: selectedModel.source } : { mode: 'inherit' },
+    const roleNames = roleList()
+    if (!draft.name.trim() || roleNames.length > 12 || roleNames.some(role => role.length > 48) || (modelMode === 'fixed' && !selectedModel)) { setError('invalid'); return }
+    const sent = frozen && attempt.current ? attempt.current : {
+      profile: {
+        ...draft, name: draft.name.trim(), description: draft.description.trim(), roles: roleNames,
+        model: modelMode === 'fixed' && selectedModel ? { mode: 'fixed', harness: selectedModel.harness, model: selectedModel.model, source: selectedModel.source } : { mode: 'inherit' },
+      } satisfies AgentProfileDefinition,
+      ...(chosenMark.icon || chosenMark.color ? { mark: { ...chosenMark } } : {}),
     }
-    attempt.current = profile
+    attempt.current = sent
     requestId.current ??= crypto.randomUUID()
     setPending(true); setError(null)
     try {
       await profileRequest<{ profile: AgentProfile }>(workspaceId, original ? 'PATCH' : 'POST', original?.id,
-        { profile, ...(original ? { version: original.version } : { requestId: requestId.current }) })
+        { ...sent, ...(original ? { version: original.version } : { requestId: requestId.current }) })
       toast.success(t('saved'))
       onSaved()
     } catch (failure) { setError(profileFailure(failure)) }
     finally { setPending(false) }
   }
 
-  return { original, draft, change, roles, setRoles, modelMode, setModelMode, modelKey, setModelKey, models, selectedModel, frozen, pending, error, setError, save }
+  return { original, draft, change, mark, changeMark, roles, setRoles, modelMode, setModelMode, modelKey, setModelKey, models, selectedModel, frozen, pending, error, setError, save }
 }

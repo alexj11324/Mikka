@@ -77,7 +77,7 @@ before(async () => {
 beforeEach(() => {
   submitted.length = 0; refreshes = 0; readError = undefined
   data = { profiles: [{
-    id: customId, name: 'Fixture role', description: '', roles: ['review'], enabled: true, harness: 'claude_code',
+    id: customId, name: 'Fixture role', description: '', roles: ['review'], icon: 'lens', color: 'pink', enabled: true, harness: 'claude_code',
     model: { mode: 'inherit' }, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64),
     createdAt: '2026-11-05T00:00:00Z', updatedAt: '2026-11-05T00:00:00Z', archivedAt: null,
   }], catalog: { models: [], skills: [] }, availability: { [customId]: { available: true } }, defaultAvailability: { available: true } }

@@ -3014,7 +3014,27 @@
         "independent-review": "Review the frozen candidate and record reproducible findings.",
         "systematic-debugging": "Reproduce the failure, identify its cause and verify the fix."
       },
-      "numberedSource": "{source} {number}"
+      "numberedSource": "{source} {number}",
+      "mark": {
+        "icon": "Icon",
+        "color": "Colour",
+        "icons": {
+          "square": "Square",
+          "chevrons": "Brackets",
+          "lens": "Lens",
+          "lines": "Lines",
+          "check": "Check",
+          "stairs": "Steps",
+          "diamond": "Diamond",
+          "arrow": "Arrow"
+        },
+        "colors": {
+          "ink": "Ink",
+          "graphite": "Graphite",
+          "teal": "Teal",
+          "pink": "Pink"
+        }
+      }
     },
     "cloud": {
       "title": "Mikka Cloud",
