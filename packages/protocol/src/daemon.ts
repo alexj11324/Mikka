@@ -16,6 +16,7 @@
 import { z } from "zod"
 import { sanitizeTraceContext } from './trace-context'
 
+import { computerDoctorSchema } from "./computer"
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotReportSchema, quotaSnapshotSchema } from "./quota"
 import {
@@ -213,6 +214,19 @@ export const daemonRpc = {
     params: z.object({ runId: z.string() }),
     result: runSummarySchema,
   },
+  /**
+   * Local computer use on this computer: the pinned driver's identity, the
+   * three TCC states and one real screenshot probe. Read-only; never prompts.
+   * An older daemon answers with an unknown-method error, which the desktop
+   * treats as "this build cannot show the section".
+   */
+  "computer.permissions": { params: empty, result: computerDoctorSchema },
+  /**
+   * The person clicked 启用本机电脑操作. Requests the grants under CuaDriver's
+   * app identity (macOS dialogs) and answers with a fresh report. It must
+   * only ever be sent from that click in the GUI session.
+   */
+  "computer.permissions.grant": { params: empty, result: computerDoctorSchema },
   /**
    * Dev only (`mikka daemon --dev --server memory`): queue and start a mock
    * run on an allow-listed repo without a server. Refused otherwise.

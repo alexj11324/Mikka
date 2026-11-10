@@ -46,6 +46,8 @@ next-env.d.ts
 /playwright-report-smoke/
 /performance-results/
 /blob-report/
+# scripted acceptance evidence (screenshots, JSON); never committed
+/artifacts/
 
 # Workflow SDK local world
 /.workflow-data/
