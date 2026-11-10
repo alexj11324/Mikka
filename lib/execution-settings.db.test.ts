@@ -216,17 +216,39 @@ test(
         prioritySupport:{'provider-model':false,'second-provider-model':true},
       });
       assert.equal((await settings.connectedSubscriptions('alice',true)).includes(connection),false);
-      // A legacy current-epoch catalogue refreshes once through the existing
-      // menu path. Unknown capability is recorded without repeatedly probing.
+      // A valid legacy catalogue remains sufficient for ordinary dispatch.
+      // Only the chat menu explicitly requests the optional Fast capability.
       await pool.query(`UPDATE byos_connections SET "modelCatalog"="modelCatalog"-'priorityVersion'-'prioritySupport' WHERE id=$1`,[connection]);
-      assert.equal((await settings.connectedSubscriptions('alice',true)).includes(connection),true);
+      const legacyCatalogue = {revision:'1',models:['provider-model','second-provider-model']};
+      assert.equal((await settings.connectedSubscriptions('alice',true)).includes(connection),false);
+      assert.equal((await settings.connectedSubscriptions('alice',true,{codexPriority:true})).includes(connection),true);
       let catalogueReads=0;
       const unknownCapability = async () => { catalogueReads++; return [{id:'provider-model'},{id:'second-provider-model'}] };
       await settings.ensureCatalogues(alice,8000,unknownCapability);
-      await settings.ensureCatalogues(alice,8000,unknownCapability);
-      assert.equal(catalogueReads,1);
-      assert.equal((await settings.connectedSubscriptions('alice',true)).includes(connection),false);
+      assert.equal(catalogueReads,0,'ordinary availability does not discover an optional chat capability');
+      assert.deepEqual((await pool.query('SELECT "modelCatalog" FROM byos_connections WHERE id=$1',[connection])).rows[0].modelCatalog,legacyCatalogue);
+      let failedReads=0;
+      const failedDiscovery = async () => { failedReads++; throw new Error('synthetic catalogue failure') };
+      const warnings: string[]=[];
+      const warning=mock.method(console,'warn',(line: unknown) => { warnings.push(String(line)) });
+      try { await settings.ensureCatalogues(alice,8000,failedDiscovery,{codexPriority:true}); }
+      finally { warning.mock.restore(); }
+      assert.equal(failedReads,1); assert.equal(warnings.length,1);
+      assert.equal(JSON.parse(warnings[0]).msg,'subscription_catalogue_failed');
+      assert.deepEqual((await pool.query('SELECT "modelCatalog" FROM byos_connections WHERE id=$1',[connection])).rows[0].modelCatalog,legacyCatalogue,'a failed upgrade does not mark capability as read');
+      await settings.ensureCatalogues(alice,8000,failedDiscovery);
+      assert.equal(failedReads,1,'ordinary dispatch does not retry a failed optional upgrade');
+      await settings.ensureCatalogues(alice,8000,unknownCapability,{codexPriority:true});
+      await settings.ensureCatalogues(alice,8000,unknownCapability,{codexPriority:true});
+      assert.equal(catalogueReads,1,'successful unknown capability is read once, not probed on every menu read');
+      assert.equal((await settings.connectedSubscriptions('alice',true,{codexPriority:true})).includes(connection),false);
       assert.deepEqual((await pool.query('SELECT "modelCatalog" FROM byos_connections WHERE id=$1',[connection])).rows[0].modelCatalog.prioritySupport,{});
+      await pool.query(`UPDATE byos_connections SET "modelCatalog"=jsonb_set("modelCatalog",'{revision}','"0"') WHERE id=$1`,[connection]);
+      await settings.ensureCatalogues(alice,8000,unknownCapability);
+      assert.equal(catalogueReads,2,'ordinary dispatch still refreshes a stale credential epoch catalogue');
+      await pool.query('UPDATE byos_connections SET "modelCatalog"=NULL WHERE id=$1',[connection]);
+      await settings.ensureCatalogues(alice,8000,unknownCapability);
+      assert.equal(catalogueReads,3,'ordinary dispatch still discovers genuinely missing models');
 
       await assert.rejects(settings.refreshBotModels(bob, connection, async () => { throw new Error('must not discover foreign account') }), { code: 'executionAccountUnavailable' });
       // A subscription belongs to the account: its owner refreshes it from any workspace (decision 2026-10-31-2130).

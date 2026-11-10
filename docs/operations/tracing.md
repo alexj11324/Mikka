@@ -716,6 +716,12 @@ provider field.
 
 The catalogue and request gates are described in the
 [subscription worker guide](../../packages/subscription-worker/README.md#model-catalogue-and-codex-priority).
+Only authenticated `getBotModelMenu` requests the optional upgrade of an
+otherwise current catalogue for priority metadata. Default `ensureCatalogues`,
+`getModelOrder`, and dispatch do not request that upgrade. Missing catalogues
+and epoch mismatches retain the existing refresh; manual refresh also collects
+capability within the same owner and shared-subscription boundaries.
+
 Unknown or unsupported capability omits priority on the original request
 without retry. Fast can increase subscription allowance or credit use; consult
 the official [pricing guide](https://learn.chatgpt.com/docs/pricing).

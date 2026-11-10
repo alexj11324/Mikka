@@ -15,6 +15,8 @@ export interface ExecutionSettingsScope {
   workspaceId: string;
 }
 /** Callers obtain scope from the session and current workspace, never from input. */
+type CatalogueRequirements = { codexPriority?: true };
+
 export class ExecutionSettings {
   constructor(readonly pool: Pool) {}
   /** The owner's connected subscriptions, from any workspace: a subscription belongs to the account,
@@ -147,21 +149,21 @@ export class ExecutionSettings {
       },
     );
   }
-  /** The owner's connected subscriptions (any workspace); `missingOnly`: those with no catalogue for their current revision yet. */
-  async connectedSubscriptions(ownerId: string, missingOnly = false): Promise<string[]> {
+  /** Missing models are refreshed for every consumer; optional Codex Fast metadata is requested only by the chat menu. */
+  async connectedSubscriptions(ownerId: string, missingOnly = false, requirements: CatalogueRequirements = {}): Promise<string[]> {
     return (await this.pool.query<{ id: string }>(
       `SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false AND "removedAt" IS NULL
        AND ($2::boolean=false OR "modelCatalog" IS NULL OR "modelCatalog"->>'revision'<>epoch::text
-         OR (provider='codex' AND "modelCatalog"->>'priorityVersion' IS DISTINCT FROM '1')) ORDER BY id`,
-      [ownerId, missingOnly])).rows.map((row) => row.id);
+         OR ($3::boolean AND provider='codex' AND "modelCatalog"->>'priorityVersion' IS DISTINCT FROM '1')) ORDER BY id`,
+      [ownerId, missingOnly, requirements.codexPriority === true])).rows.map((row) => row.id);
   }
   /**
    * A subscription's models reach the menu, 优先使用的模型 and dispatch only through its catalogue.
    * Each connected subscription with none for its current revision asks its account once; one that
    * does not answer in time is asked again on the next read. Never throws.
    */
-  async ensureCatalogues(scope: ExecutionSettingsScope, timeoutMs = 8000, discover?: (ownerId: string, connectionId: string) => Promise<SubscriptionCatalogueModel[]>) {
-    const missing = await this.connectedSubscriptions(scope.ownerId, true);
+  async ensureCatalogues(scope: ExecutionSettingsScope, timeoutMs = 8000, discover?: (ownerId: string, connectionId: string) => Promise<SubscriptionCatalogueModel[]>, requirements: CatalogueRequirements = {}) {
+    const missing = await this.connectedSubscriptions(scope.ownerId, true, requirements);
     await Promise.allSettled(missing.map((connectionId) => Promise.race([
       // The reason only (a refusal code or error name), never what the provider answered.
       this.refreshBotModels(scope, connectionId, discover).catch((error: unknown) => {

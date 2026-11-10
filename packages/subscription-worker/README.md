@@ -91,11 +91,19 @@ leaves support unknown and omits the field. Display metadata is ignored;
 `additional_speed_tiers` is not evidence. Claude omits this field. The existing
 ID/name validation, response limits, and epoch/state check after the read remain.
 
-The existing `ensureCatalogues` path upgrades a Codex catalogue without
-`priorityVersion: 1` after a successful account read. It saves the boolean
-`prioritySupport` map in the existing `modelCatalog` transaction, fenced to the
-same connection epoch. Requests use that catalogue through the existing fresh
-access read; priority selection adds no per-turn `GET /models` or SQL query.
+Only the authenticated `getBotModelMenu` path opts `ensureCatalogues` into
+upgrading an otherwise current Codex catalogue that lacks `priorityVersion: 1`.
+Default `ensureCatalogues`, `getModelOrder`, and dispatch keep using that
+catalogue; missing priority metadata alone does not trigger provider discovery.
+Missing catalogues and epoch mismatches still use the original refresh, and
+manual refresh also collects capability. Discovery stays within the
+authenticated owner's connections; subscription sharing does not expand that
+scope.
+
+After a successful account read, the existing `modelCatalog` transaction saves
+`priorityVersion: 1` and the boolean `prioritySupport` map, fenced to the same
+connection epoch. Requests use that catalogue through the existing fresh access
+read; priority selection adds no per-turn `GET /models` or SQL query.
 
 Non-scheduled hosted chats handled by `coordinatorTurn`, including the built-in
 Coordinator and named Bots, receive the internal priority policy on the Codex
