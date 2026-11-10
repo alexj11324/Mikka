@@ -167,4 +167,32 @@ test('Stripe purchased points ledger', { skip: !dbUrl }, async t => {
     await applyStripeEvent(event('checkout.session.completed', session()), options)
     assert.equal((await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId"=$1 and "deliveredAt" is not null', [foreignEvent])).rows[0].n, 1)
   })
+
+  await t.test('a foreign failing refund receipt cannot fail this webhook', async () => {
+    const foreign = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const paymentIntent = id('pi'), sourceEvent = id('evt'), receipt = id('re')
+    await pool.query(`insert into stripe_webhook_events (id,type) values ($1,'refund.updated')`, [sourceEvent])
+    await pool.query(`insert into workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId","paymentAllocations","amountCents",currency,"stripeInvoiceId")
+      values ($1,$2,'plan',1000,'subscription',$3,$4::jsonb,1000,'usd',$5)`,
+      [randomUUID(), foreign.id, 'plan:' + sourceEvent, JSON.stringify({ [paymentIntent]: { paidCents: 1000, totalCents: 1000 } }), id('in')])
+    await pool.query(`insert into billing_refund_receipts (id,"paymentIntentId","chargeId","amountCents",currency,"sourceEventId") values ($1,$2,$3,100,'usd',$4)`,
+      [receipt, paymentIntent, id('ch'), sourceEvent])
+    const trigger = `synthetic_refund_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`create function ${trigger}() returns trigger language plpgsql as $$ begin if NEW."workspaceId"='${foreign.id}'::uuid and NEW.reason='refund' then raise exception 'synthetic_refund_outage'; end if; return NEW; end $$;
+      create trigger ${trigger} before insert on workspace_credit_grants for each row execute function ${trigger}()`)
+    try {
+      // A different tenant's webhook succeeds and leaves the receipt for its own retry.
+      const purchase = session()
+      assert.equal(await applyStripeEvent(event('checkout.session.completed', purchase), options), true)
+      assert.equal((await pool.query('select "reconciledAt" from billing_refund_receipts where id=$1', [receipt])).rows[0].reconciledAt, null)
+      // The receipt's own event is the one allowed to fail its webhook.
+      await assert.rejects(applyStripeEvent({ id: sourceEvent, type: 'refund.updated', data: { object: {} } }, options),
+        (error: Error & { cause?: Error }) => /synthetic_refund_outage/.test(`${error.message} ${error.cause?.message ?? ''}`))
+    } finally {
+      await pool.query(`drop trigger if exists ${trigger} on workspace_credit_grants; drop function if exists ${trigger}()`)
+    }
+    // Its durable receipt still reconciles from a later webhook after recovery.
+    await applyStripeEvent(event('checkout.session.completed', session()), options)
+    assert.ok((await pool.query('select "reconciledAt" from billing_refund_receipts where id=$1', [receipt])).rows[0].reconciledAt)
+  })
 })
