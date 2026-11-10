@@ -179,6 +179,10 @@ export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewAc
           JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$3 AND r."issueId"=$4
           WHERE a.id=$1 AND a."taskId"=$2 AND r.status='queued' AND r."agentDefinition"->'workspaceReview'->>'batchId'=$5`,
         [repaired.task.attemptId, repaired.task.id, actor.userId, fresh.taskId, current.id])
+        if (process.env.MIKKA_REVIEW_DEBUG === '1') console.error(JSON.stringify({ event: 'factory_repair_debug',
+          queued: queued?.runId ?? null, wake: Boolean(wake),
+          task: { id: repaired.task.id, stage: repaired.task.stage, status: repaired.task.status,
+            attemptId: repaired.task.attemptId, candidateId: repaired.task.candidateId } }))
         if (!queued || !wake) throw new WorkspaceReviewError('workspace_review_unavailable')
         delivery = { kind: 'factory_repair', id: repaired.task.attemptId, runId: queued.runId,
           ...(snapshot.revision.headSha ? { headSha: snapshot.revision.headSha } : {}) }
@@ -209,6 +213,12 @@ export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewAc
       } })
   } catch (error) {
     const reason = refusal(error)
+    if (process.env.MIKKA_REVIEW_DEBUG === '1') {
+      const detail = error as { code?: string; message?: string; cause?: { code?: string; message?: string } }
+      console.error(JSON.stringify({ event: 'review_refusal_debug', reason,
+        name: error instanceof Error ? error.name : typeof error, code: detail.code, message: detail.message,
+        causeCode: detail.cause?.code, causeMessage: detail.cause?.message }))
+    }
     if (reason && !requestSignal.aborted) return reject(deps, actor, row, reason, requestSignal)
     throw new WorkspaceReviewError('workspace_review_delivery_uncertain', { cause: error })
   }
