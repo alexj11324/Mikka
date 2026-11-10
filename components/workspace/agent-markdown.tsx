@@ -60,9 +60,11 @@ function MarkdownPre({ children }: { children?: ReactNode }) {
  * paragraph, chip and code block on each streamed token, replaying their enter animations (the chat flashed).
  */
 const components: NonNullable<ComponentProps<typeof Markdown>['components']> = {
-  h1: ({ node: _node, ...props }) => <h1 {...props} className="mt-3 text-2xl font-semibold leading-snug" />,
-  h2: ({ node: _node, ...props }) => <h2 {...props} className="mt-3 text-xl font-semibold leading-snug" />,
-  h3: ({ node: _node, ...props }) => <h3 {...props} className="mt-2 text-lg font-semibold leading-snug" />,
+  // Chat type (R-32): a reply is 13/21 (14 in the hosted thread), so its headings stay close to it, Comma's quiet way –
+  // the top two one step up (text-md 15/24), the rest the body size in SemiBold. Document sizes (24, 20, 18) shouted here.
+  h1: ({ node: _node, ...props }) => <h1 {...props} className="mt-2 text-md font-semibold" />,
+  h2: ({ node: _node, ...props }) => <h2 {...props} className="mt-2 text-md font-semibold" />,
+  h3: ({ node: _node, ...props }) => <h3 {...props} className="mt-1 font-semibold" />,
   h4: ({ node: _node, ...props }) => <h4 {...props} className="font-semibold" />,
   h5: ({ node: _node, ...props }) => <h5 {...props} className="font-semibold" />,
   h6: ({ node: _node, ...props }) => <h6 {...props} className="font-semibold" />,
@@ -72,7 +74,7 @@ const components: NonNullable<ComponentProps<typeof Markdown>['components']> = {
   a: ({ node: _node, ...props }) => <CitationAnchor {...props} />,
   img: MarkdownImage,
   pre: MarkdownPre,
-  code: ({ node: _node, ...props }) => <code {...props} className="rounded bg-muted px-1 py-0.5 font-mono text-xs" />,
+  code: ({ node: _node, ...props }) => <code {...props} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]" />,
   table: MarkdownTable,
   thead: ({ node: _node, ...props }) => <TableHeader {...props} />,
   tbody: ({ node: _node, ...props }) => <TableBody {...props} />,
@@ -89,7 +91,7 @@ export function AgentMarkdownContent({ text, isStreaming = false, size = 'defaul
   const cites = Boolean(useAgentCitations())
   const plugins = useMemo(() => [...remarkPlugins, ...mathRemarkPlugins, ...(cites ? [remarkCitations] : [])], [mathRemarkPlugins, cites])
 
-  return <div data-agent-markdown className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-5.25 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex_.cjk_fallback]:font-sans', {
+  return <div data-agent-markdown data-size={size} className={cn('agent-markdown flex min-w-0 max-w-full flex-col gap-3 break-words text-sm leading-5.25 [&_.katex-display]:max-w-full [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex_.cjk_fallback]:font-sans', {
     'text-xs': size === 'small' || size === 'small-heavy',
     'text-base': size === 'large' || size === 'large-heavy',
     'font-semibold': size === 'small-heavy' || size === 'large-heavy',
