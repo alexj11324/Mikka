@@ -108,6 +108,7 @@ import type { RunAssignment } from "./server-link"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
 import { ComputerBroker } from "./computer/broker.mjs"
 import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
+import { doctorComputerDriver, grantComputerAccess } from "./computer/doctor.mjs"
 import { createHostedComputerExecutor, type CredentialExecutorAuthority } from "./computer/credential-executor"
 import { pollWebComputerReviews } from "./computer/web-review"
 import { DeviceWorkSignal, type PushedWait } from "./device-work-signal"
@@ -1840,6 +1841,10 @@ export class Daemon {
         const { runId } = daemonRpc["runs.cancel"].params.parse(raw)
         return this.supervisor.cancel(runId)
       },
+      // Local computer use. The doctor is read-only; the grant runs only when
+      // the person clicked in the GUI, and both are local-socket RPC.
+      "computer.permissions": () => doctorComputerDriver(),
+      "computer.permissions.grant": () => grantComputerAccess(),
       "dev.mockRun": async (raw) => {
         const params = daemonRpc["dev.mockRun"].params.parse(raw)
         const memory = this.options.memoryServer
