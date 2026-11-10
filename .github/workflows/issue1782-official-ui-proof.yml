@@ -45,7 +45,7 @@ jobs:
       BETTER_AUTH_URL: http://localhost:3000
       AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       NEXT_TELEMETRY_DISABLED: '1'
-      MIKKA_TEST_DEPLOYMENT_SHA: e3c0b0e050515986a8e42cc15ce0a3de15b8e88c
+      MIKKA_TEST_DEPLOYMENT_SHA: ce6ad923bbb449023783052d0848db22e4360f1d
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
       MIKKA_UI_OVERLAY_SHA: fe20f19bcf82e6541430b62c450920ba42c95fb0
     defaults:
@@ -63,7 +63,7 @@ jobs:
       - name: Check out the exact product source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: e3c0b0e050515986a8e42cc15ce0a3de15b8e88c
+          ref: ce6ad923bbb449023783052d0848db22e4360f1d
           path: app
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
@@ -164,7 +164,7 @@ jobs:
         if: always() && steps.evidence.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1782-official-ui-e3c0b0e0-fe20f19b
+          name: issue1782-official-ui-ce6ad923-fe20f19b
           path: ui-evidence
           if-no-files-found: error
           retention-days: 14
