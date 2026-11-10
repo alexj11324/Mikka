@@ -1,11 +1,11 @@
 import 'server-only'
 // 审计日志 read API (N6). Admin only, newest first, the last 90 days.
-import { and, desc, eq, gt, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, lte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaceAuditEvents } from '@/lib/db/audit-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { AUDIT_WINDOW_DAYS, auditPageInput, decodeAuditCursor, encodeAuditCursor } from './cursor'
+import { auditPageInput, auditWindow, decodeAuditCursor, encodeAuditCursor } from './cursor'
 import type { AuditActorType, AuditCategory } from './events'
 
 export interface AuditEventView {
@@ -31,13 +31,16 @@ async function requireAdmin(actorId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
 }
 
-/** One page. `filter: 'security'` is the 「安全」 segment. Errors: workspaceAccessDenied, validationGeneric. */
+/**
+ * One page. `filter: 'security'` is the 「安全」 segment; `categories`, `from`
+ * and `until` narrow it further (auditPageInput). Errors: workspaceAccessDenied, validationGeneric.
+ */
 export async function listWorkspaceAudit(actorId: string, workspaceId: string, input: unknown, now = new Date()): Promise<AuditPage> {
-  const { filter, cursor, limit } = auditPageInput.parse(input ?? {})
+  const { filter, categories, from, until: to, cursor, limit } = auditPageInput.parse(input ?? {})
   const position = cursor ? decodeAuditCursor(cursor) : null
   if (cursor && !position) throw new WorkspaceError('validationGeneric')
   await requireAdmin(actorId, workspaceId)
-  const since = new Date(now.getTime() - AUDIT_WINDOW_DAYS * 86_400_000)
+  const { since, until } = auditWindow({ from, until: to }, now)
   const rows = await db.select({
     id: workspaceAuditEvents.id, createdAt: workspaceAuditEvents.createdAt, micros,
     actorType: workspaceAuditEvents.actorType, actorName: workspaceAuditEvents.actorName, action: workspaceAuditEvents.action,
@@ -46,7 +49,10 @@ export async function listWorkspaceAudit(actorId: string, workspaceId: string, i
   }).from(workspaceAuditEvents).where(and(
     eq(workspaceAuditEvents.workspaceId, workspaceId),
     gt(workspaceAuditEvents.createdAt, since),
+    // The window's end only when one was asked for: an unbounded read also shows what lands while it pages.
+    to ? lte(workspaceAuditEvents.createdAt, until) : undefined,
     filter === 'security' ? eq(workspaceAuditEvents.category, 'security') : undefined,
+    categories ? inArray(workspaceAuditEvents.category, categories) : undefined,
     position ? sql`(${workspaceAuditEvents.createdAt}, ${workspaceAuditEvents.id}) < (timestamptz 'epoch' + ${position.micros}::bigint * interval '1 microsecond', ${position.id}::uuid)` : undefined,
   )).orderBy(desc(workspaceAuditEvents.createdAt), desc(workspaceAuditEvents.id)).limit(limit + 1)
   const page = rows.slice(0, limit)

@@ -48,6 +48,7 @@ import { firstThreadCards, staleEventPositions, visibleDivider } from '@/lib/coo
 import { ActivityExpansionContext, ReplyActivity, useActivityExpansion, useThreadToolRows } from './reply-activity'
 import { CHAT_SURFACE, ChatMessage, ChatWaiting } from '@ui-slot/chat-message'
 import * as threadSlot from '@ui-slot/thread'
+import { useConversationPanels } from '@/components/coordinator/conversation-panels'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { useFactoryQuestions } from '@/hooks/use-factory-questions'
 import { noteChipText } from '@/lib/browser/note'
@@ -473,7 +474,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const speaker: ChatSpeaker = bot ? { id: bot.id, name: bot.name, color: bot.color, shape: bot.shape } : { name, coordinator: true }
 
   // A layer that draws the conversation as one screen (slot `thread`) gets the same rows as data and nodes.
-  const Screen = !embedded && !compact ? threadSlot.ThreadScreen ?? null : null
+  // The board's chat column (compact) is a conversation too; only an artifact's chat (embedded) keeps its chips.
+  const Screen = !embedded ? threadSlot.ThreadScreen ?? null : null
+  // The Overview and the browser, when the frame's work area holds them (FRAME_OWNS_PANEL).
+  const panels = useConversationPanels()
   const toolRows = useThreadToolRows()
   const tMessage = useTranslations('AiElements.message')
   const tNavAll = useTranslations()
@@ -545,7 +549,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
       {/* The page's floating title pill sits over the top 56px on wide screens: the screen starts below it. */}
       <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 min-w-0 flex-1 flex-col md:pt-14">
-        <Screen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty}
+        <Screen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty} panels={compact ? undefined : panels}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
           composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending, onSubmit: () => { void send() },
