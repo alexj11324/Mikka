@@ -58,7 +58,7 @@ async function readTaskRuns() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   const context = await loadWorkspaceContext(undefined, session.user)
-  const visibility = await issueVisibility(session.user, false, context.workspace.id)
+  const visibility = await issueVisibility(session.user, false, context.workspace.id, db, { withTeamLinks: false })
   const observedAt = Date.now()
   const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['task_run_list'])
   // A run whose device went offline is retried (or lands in 等你) by the minute
