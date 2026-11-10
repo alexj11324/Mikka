@@ -1,6 +1,6 @@
 {
   "schema": "issue1512-native-original-extraction-admission-v1",
-  "enabled": true,
+  "enabled": false,
   "repository": "alexj11324/Mikka",
   "repositoryId": 1427517699,
   "opsBranch": "ops/1512-task-runs-pg-20261110",

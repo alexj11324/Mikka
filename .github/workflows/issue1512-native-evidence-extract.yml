@@ -6,7 +6,7 @@ on:
 
 permissions:
   actions: read
-  contents: write
+  contents: read
 
 concurrency:
   group: issue1512-native-evidence-extract
@@ -15,13 +15,8 @@ concurrency:
 jobs:
   extract:
     name: Freeze H Native ZIPs and exact five JSON members once
-    if: >-
-      github.repository == 'alexj11324/Mikka' &&
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/ops/1512-task-runs-pg-20261110' &&
-      github.event.before == '3e440c2ff6808dd7c18bdedbf274373801f8583c' &&
-      github.event.head_commit.message == 'issue1512 Native H original evidence extract admit 20261110' &&
-      github.run_attempt == 1
+    # Closed after the single admitted original-artifact retrieval.
+    if: false
     runs-on: ubuntu-22.04
     timeout-minutes: 12
     steps:
