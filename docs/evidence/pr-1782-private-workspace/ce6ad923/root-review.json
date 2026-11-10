@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "batch": 1782,
+  "issue": 1724,
+  "sourceCommit": "ce6ad923bbb449023783052d0848db22e4360f1d",
+  "sourceTree": "dffda64a4975b22cfc649908a8c5e19749ea8a96",
+  "workerSha": "638876d7e373115b084b8e56fe69cb437f342f47",
+  "originalRunId": 42761964307,
+  "originalRunAttempt": 1,
+  "originalJobId": 129649516421,
+  "originalLogSha256": "eb7689e6513fcdc2ebbfe05b5e897d0bfe37d99c59904024c8a22db8a43f88cb",
+  "readerCommit": "a63a155087ddb3220bfa2952bb8c261d3a7d96d7",
+  "readerRunId": 42766445683,
+  "readerJobId": 129663943979,
+  "readerLogSha256": "02d4194da66f2e52792ce149a54d839e37971012acb45c7af87542d5aac760b2",
+  "closedReportBytes": 8306,
+  "closedReportSha256": "12a92940c32aa71d901079d7e9a4476b861bdb0d1f0e83d679ff6fe8517ce978",
+  "independentRunnerChecks": {
+    "fixedArchiveDownloaded": true,
+    "archiveSha256AndBytes": true,
+    "allMemberCrc32AndSha256": true,
+    "strictJson": true,
+    "actualRunJobSteps": true,
+    "productSourcePins19": true,
+    "fullIngressGuardProjectionBeforeAfter": true,
+    "resourceJournalMatches": true
+  },
+  "rootChecks": {
+    "reviewedReaderSource": true,
+    "readBackActualRunAndJobMetadata": true,
+    "readBackClosedJsonBytes": true,
+    "recomputedClosedJsonSha256": true,
+    "replayedClosedAcceptanceProjection": true
+  },
+  "limitations": [
+    "Reader did not download or recompute seven original runner input files; the original artifact binds their digests.",
+    "Canonical worker hash was recomputed by original producer; independent reader verified product tree and 19 file pins.",
+    "Both runtime VMs were already absent at provider reconciliation; no extra kill ACK or independent scope proof was recorded.",
+    "Private candidates do not establish production Task authority, official subscription calls, browser iframe behavior or agent-root isolation."
+  ],
+  "passed": true
+}
