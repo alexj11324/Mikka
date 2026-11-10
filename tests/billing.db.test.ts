@@ -90,6 +90,9 @@ test('workspace and organization resource billing', { skip: !dbUrl }, async t =>
     const request = requests.find(row => row.url.endsWith('/checkout/sessions'))!, body = new URLSearchParams(request.body)
     assert.deepEqual([body.get('mode'), body.get('line_items[0][price]'), body.get('line_items[0][quantity]'), body.get('subscription_data[metadata][workspaceId]'), body.get('subscription_data[metadata][billingModel]')], ['subscription', 'price_resource', '1', ws.id, 'resource_v1'])
     assert.equal(body.get('managed_payments[enabled]'), 'true')
+    const audit = (await pool.query(`select metadata from workspace_audit_events where "workspaceId"=$1 and action='billing.checkout_started'`, [ws.id])).rows
+    assert.equal(audit.length, 1)
+    assert.deepEqual(audit[0].metadata, { amountCents: 2000, currency: 'USD' })
     price.active = false
     await rejects(billing.planCheckoutUrl(admin, ws.id, back, fake, env), 'billingResourcePlanUnavailable')
     price.active = true

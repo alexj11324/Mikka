@@ -108,7 +108,7 @@ export async function resourcePlanCheckout(actorId: string, workspaceId: string,
         priceId: price.id, params, createdAt: now, expiresAt }).returning()
       await recordAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: actorId },
         action: 'billing.checkout_started', target: { type: 'billing_checkout', id: requestId },
-        metadata: { amountCents: price.amountCents, currency: price.currency } })
+        metadata: { amountCents: price.amountCents, currency: price.currency.toUpperCase() } })
       return created
     })
     if (request.customerId !== customerId) throw new Error('billing_customer_scope_mismatch')
