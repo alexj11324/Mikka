@@ -29,6 +29,8 @@ export const KEEP_RECENT_TOKENS = 20_000
 const KEEP_TOOL_MESSAGES = 20
 
 export interface StoredMessage {
+  /** Authenticated submitter, independently of the structural Chat owner. */
+  actor?: { id: string; name: string } | null
   position: number
   message: ModelMessage
   /** coordinator_messages.id for persisted rows; absent for pending inbox items. */
@@ -351,6 +353,7 @@ export function jsonbText(value: unknown): string {
 }
 
 export interface ChatItem {
+  actor?: { id: string; name: string } | null
   /** coordinator_messages.id of the row this item starts at; absent while the message is still pending in the inbox. */
   id?: string
   position: number
@@ -424,7 +427,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
     items.push({ position: waiting.position, from: 'coordinator', text: '', tools: [], threads: [], createdAt: waiting.createdAt.toISOString(), artifacts: [...new Set(waiting.ids)] })
     waiting.ids = []
   }
-  for (const { id, position, message, createdAt, pending } of rows) {
+  for (const { id, position, message, createdAt, pending, actor } of rows) {
     if (message.role === 'user') {
       const source = message as SourcedMessage
       // Completion instructions are model context. Trust the host event marker,
@@ -467,7 +470,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         }
       }
       flush()
-      const base = { ...(id ? { id } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
+      const base = { ...(id ? { id } : {}), ...(actor ? { actor } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
       // The triage line is for the Coordinator, not the person.
       if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'),
         ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : { line: eventLine(source.mikkaEvent?.eventKind, raw, source.mikkaEvent?.observedState ?? null) }) })

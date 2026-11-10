@@ -1,4 +1,5 @@
 'use client'
+import { useResourceCreation } from '@/hooks/use-resource-creation'
 import { useTranslations } from 'next-intl'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -38,7 +39,8 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   const i18nText = useTranslations();
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
   const [teamId, setTeamId] = useState(initialTeamId)
-  const [visibility, setVisibility] = useState<'shared'|'private'>('shared')
+  const creation = useResourceCreation(undefined, open)
+  const { visibility, setVisibility } = creation
   const [title, setTitle] = useState(initialTitle)
   const seenAhead = useRef(initialTitle)
   const [content, setContent] = useState<JSONContent>(EMPTY)
@@ -59,7 +61,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   }, [])
   const submitting = useRef(false)
   const [defaults, setDefaults] = useState({ status: initialStatus, priority: 'normal' })
-  const dirty = !!title.trim() || JSON.stringify(content) !== JSON.stringify(EMPTY) || status !== defaults.status || priority !== defaults.priority || teamId !== initialTeamId || visibility !== 'shared'
+  const dirty = !!title.trim() || JSON.stringify(content) !== JSON.stringify(EMPTY) || status !== defaults.status || priority !== defaults.priority || teamId !== initialTeamId || creation.chosen
   const [expanded, setExpanded] = useState(false)
   const [discardOpen, setDiscardOpen] = useState(false)
 
@@ -104,6 +106,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
   }
 
   async function create() {
+    if (!creation.ready) return
     const currentTitle = titleRef.current?.value ?? title
     if (submitting.current || !currentTitle.trim()) return
     submitting.current = true
@@ -171,7 +174,8 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
             <IssuePropertyMenu pill label={i18nText("Issue.statusLabel")} value={status} options={ISSUE_STATUSES} icon={CircleDashed} disabled={pending} onChange={setStatus} />
             <IssuePropertyMenu pill label={i18nText("Issue.priorityLabel")} value={priority} options={ISSUE_PRIORITIES} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={setPriority} />
           </div>
-          <FieldGroup><Field><FieldLabel htmlFor="task-visibility">{i18nText('ResourceAccess.visibility')}</FieldLabel><NativeSelect id="task-visibility" value={visibility} disabled={pending} onChange={event=>setVisibility(event.target.value as 'shared'|'private')}><NativeSelectOption value="shared">{i18nText('ResourceAccess.shared')}</NativeSelectOption><NativeSelectOption value="private">{i18nText('ResourceAccess.private')}</NativeSelectOption></NativeSelect><p className="text-xs text-muted-foreground">{i18nText('ResourceAccess.creationHint')}</p></Field></FieldGroup>
+          {creation.error && <FieldError>{i18nText('ResourceAccess.loadFailed')}<Button type="button" variant="outline" onClick={()=>{void creation.mutate()}}>{i18nText('ResourceAccess.retry')}</Button></FieldError>}
+          <FieldGroup><Field><FieldLabel htmlFor="task-visibility">{i18nText('ResourceAccess.visibility')}</FieldLabel><NativeSelect id="task-visibility" value={visibility} disabled={pending || !creation.ready} onChange={event=>setVisibility(event.target.value as 'shared'|'private')}><NativeSelectOption value="shared" disabled={creation.data?.kind === 'personal'}>{i18nText('ResourceAccess.shared')}</NativeSelectOption><NativeSelectOption value="private">{i18nText('ResourceAccess.private')}</NativeSelectOption></NativeSelect><p className="text-xs text-muted-foreground">{i18nText('ResourceAccess.creationHint')}</p></Field></FieldGroup>
           <FieldGroup><Field><FieldLabel htmlFor="new-issue-team">{i18nText("FeatureCopy.c_53d4919c")}</FieldLabel><NativeSelect id="new-issue-team" value={teamId} disabled={pending || !!teamsError} onChange={event => setTeamId(event.target.value)}><NativeSelectOption value="">{i18nText("FeatureCopy.c_a0860f69")}</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect>{teamsError && <p className="text-xs text-muted-foreground">{i18nText("FeatureCopy.c_d7d814ec")}</p>}</Field></FieldGroup>
           {error && <FieldError className="text-xs">{error}</FieldError>}
           {notice && <p role="status" className="text-xs text-muted-foreground">{notice}</p>}
@@ -180,7 +184,7 @@ export function CreateIssueDialog({ open, onOpenChange, onCreated, author, initi
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShortcutKeys keys={['mod', 'Enter']} />{i18nText("Projects.form.createAction")}</span>
           <div className="flex items-center gap-3">
             <FieldGroup className="contents"><Field orientation="horizontal"><Switch id="create-more" size="sm" checked={createMore} onCheckedChange={setCreateMore} disabled={pending} /><FieldLabel htmlFor="create-more">{i18nText("Issue.create.createMore")}</FieldLabel></Field></FieldGroup>
-            <Button type="submit" size="sm" disabled={pending || !title.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? i18nText("Invite.creating") : i18nText("Issue.create.submit")}</Button>
+            <Button type="submit" size="sm" disabled={pending || !creation.ready || !title.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? i18nText("Invite.creating") : i18nText("Issue.create.submit")}</Button>
           </div>
         </footer>
       </form>

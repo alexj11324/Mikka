@@ -89,7 +89,7 @@ export async function configureOrganizationModels(organizationId: string, actorI
     await tx.insert(organizationResourcePolicies).values({ organizationId, modelPolicy: value, revision })
       .onConflictDoUpdate({ target: organizationResourcePolicies.organizationId, set: { modelPolicy: value, revision, updatedAt: new Date() } })
     await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.model_policy_changed', metadata: { revision } })
-    if (JSON.stringify(readModelPolicy(previous?.modelPolicy).models) !== JSON.stringify(value.models)) {
+    if (JSON.stringify(readModelPolicy(previous?.modelPolicy)) !== JSON.stringify(value)) {
       await tx.insert(organizationPolicyOutbox).values({ id: randomUUID(), organizationId, workspaceIds: await getOrganizationWorkspaceIds(tx, organizationId),
         changes: { modelCredentials: false, mcp: false, modelProviders: false, modelPolicy: true } })
       armDueTimerAfterCommit(tx, 'audit-retention')

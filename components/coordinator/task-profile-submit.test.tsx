@@ -30,10 +30,12 @@ const submitted: { text: string; context?: CoordinatorMessageContext }[] = []
 let refreshes = 0
 const mutate = async () => { refreshes++ }
 mock.module('swr', { defaultExport: (key: unknown) => {
+  if (Array.isArray(key) && key[0] === 'resource-creation-defaults') return {data:{workspaceId,kind:'team',visibility:'shared',personalPrivateByDefault:false,organization:null},mutate}
   if (Array.isArray(key) && key[0] === 'factory-agent-profiles') return { data, error: readError, mutate }
   if (Array.isArray(key) && key[0] === 'settings:model-order') return { data: { location: 'cloud', first: { kind: 'cloud' }, entries: [], readyDeviceIds: [] }, mutate }
   return { data: key === 'issue-creation-available' ? true : [], mutate }
 }, namedExports: { useSWRConfig: () => ({ mutate: async () => {} }) } })
+mock.module(new URL('../../app/actions/resource-access.ts', import.meta.url).href, { namedExports: { getResourceCreationDefaults: async () => ({workspaceId,kind:'team',visibility:'shared',personalPrivateByDefault:false,organization:null}) } })
 mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { namedExports: { listDevices: async () => [] } })
 mock.module(new URL('../../app/actions/bots.ts', import.meta.url).href, { namedExports: { listBots: async () => [] } })
 mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { issueCreationAvailable: async () => true } })

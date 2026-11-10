@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { ActionFailureError } from './action-error'
 import { lockResourcesAccess } from './resource-access/store'
+import { prepareNewThreadVisibility } from './resource-access/creation-defaults'
 import { resourcePersonalResourcesAllowed } from './run-private-resources'
 
 /** Queue owners hold the complete ACL chain through the Run INSERT. A
@@ -12,6 +13,7 @@ export async function lockRunContextAdmission(query: PoolClient, input: {
   ownerId: string; workspaceId: string; issueId: string; sourceRunId?: string;
 }): Promise<boolean> {
   const { ownerId, workspaceId, issueId, sourceRunId } = input
+  const initialVisibility = sourceRunId ? null : await prepareNewThreadVisibility(query, ownerId, workspaceId)
   await lockResourcesAccess(drizzle(query), ownerId, [
     { reference: { kind: 'task', id: issueId, workspaceId }, action: 'canSteer' },
     ...(sourceRunId ? [{ reference: { kind: 'thread' as const, id: sourceRunId, workspaceId }, action: 'canSteer' as const }] : []),
@@ -21,5 +23,6 @@ export async function lockRunContextAdmission(query: PoolClient, input: {
       [sourceRunId, ownerId, workspaceId, issueId])
     if (!source) throw new ActionFailureError('runInvalid', { reason: 'sourceRunMismatch' })
   }
+  if (!sourceRunId && initialVisibility === 'private') return true
   return resourcePersonalResourcesAllowed(query, sourceRunId ? 'thread' : 'task', sourceRunId ?? issueId, ownerId)
 }

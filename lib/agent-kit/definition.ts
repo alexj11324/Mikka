@@ -83,6 +83,8 @@ export interface DefinitionSnapshot {
   hostInstructionsDigest: string
   effectiveTools: string[]
   runtime: HostedRuntimeSnapshot
+  /** A host projection using only platform guidance and explicit Shared tools. */
+  contextIsolation?: 'shared_clean'
   /** Explicit personal installations frozen when this execution starts. No credentials. */
   personalPlugins?: PersonalPluginSnapshot
 }

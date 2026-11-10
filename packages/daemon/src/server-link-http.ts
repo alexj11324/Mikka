@@ -142,12 +142,22 @@ export class HttpServerLink implements ServerLink {
     for (const gate of this.runControls) gate.setControlMode(mode)
   }
   async downloadChatFile(assignment: RunAssignment, id: string, signal: AbortSignal) {
-    const transfer = await this.call('GET', `/v1/devices/${seg(assignment.deviceId)}/runs/${seg(assignment.runId)}/attachments/${seg(id)}`, { schema: chatFileTransferSchema, signal, timeoutMs: 60000 })
+    const path = `/v1/devices/${seg(assignment.deviceId)}/runs/${seg(assignment.runId)}/attachments/${seg(id)}`
+    const transfer = await this.call('GET', path, { schema: chatFileTransferSchema, signal, timeoutMs: 60000 })
     if ('data' in transfer) return transfer
     const url = new URL(transfer.downloadUrl)
-    if (url.protocol !== 'https:' || !url.hostname.endsWith('.r2.cloudflarestorage.com') || url.username || url.password || url.port) throw Error('Invalid attachment storage origin')
-    // The capability is sufficient: never forward the device session to storage.
-    const response = await this.taskFetch(assignment.runId, 'storage_transfer', url, { redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) })
+    const authenticated = serverUrl(this.baseUrl, `${path}?content=bytes`)
+    let response: Response
+    if (url.href === authenticated.href && !url.username && !url.password) {
+      // A new server rechecks the exact run, actual Actor and source ACL on
+      // every transfer. Never send this credential to a caller-selected path.
+      response = await this.send('GET', `${path}?content=bytes`, undefined, this.credential, { signal, timeoutMs: 60000 })
+    } else {
+      // Old servers can return an R2 capability. The compatibility read never
+      // forwards a device credential; new servers no longer mint these grants.
+      if (url.protocol !== 'https:' || !url.hostname.endsWith('.r2.cloudflarestorage.com') || url.username || url.password || url.port) throw Error('Invalid attachment storage origin')
+      response = await this.taskFetch(assignment.runId, 'storage_transfer', url, { redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) })
+    }
     if (!response.ok || !response.body) throw Error('Attachment storage unavailable')
     const reader = response.body.getReader(), chunks: Uint8Array[] = []
     let size = 0

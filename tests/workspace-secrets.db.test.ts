@@ -53,7 +53,8 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
       await rejects(store.deleteWorkspaceSecret(actor, tenant.id, { id: threadSecret.id }), 'secretNotFound')
       await rejects(store.createWorkspaceSecret(actor, tenant.id, { name: 'FORGED_SCOPE', kind: 'env', value: 'x', scope: { type: 'project', projectId: project } }), 'secretNotFound')
     }
-    await rejects(store.createWorkspaceSecret(administrator, other.id, { name: 'FOREIGN_SCOPE', kind: 'env', value: 'x', scope: { type: 'thread', threadId: runId } }), 'secretNotFound')
+    // A valid admin of the selected tenant still cannot attach a foreign scope.
+    await rejects(store.createWorkspaceSecret(admin, other.id, { name: 'FOREIGN_SCOPE', kind: 'env', value: 'x', scope: { type: 'thread', threadId: runId } }), 'secretNotFound')
     await pool.query('insert into resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities) values(\'project\',$1,\'account\',$2,$3)', [project, peer, ['canReadContent']])
     assert.deepEqual((await store.listWorkspaceSecrets(peer, tenant.id)).map(row => row.name).sort(), [privateName, threadName].sort())
     await rejects(store.replaceWorkspaceSecret(peer, tenant.id, { id: threadSecret.id, value: 'denied-change' }), 'secretNotFound')
@@ -176,7 +177,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const direct = await store.replaceWorkspaceSecret(admin, ws.id, { id: row.id, delivery: DIRECT }, async (_tx, event) => { events.push(event) }, now)
     assert.deepEqual(direct.delivery, { ...DIRECT, approvedBy: admin, approvedAt: now.toISOString() })
     assert.equal(await stored(row.id), SECRET, 'delivery-only changes do not need the plaintext to be re-entered')
-    assert.deepEqual(events[0].metadata, { role: 'admin', delivery: 'direct', previousDelivery: 'protected' })
+    assert.deepEqual(events[0].metadata, { role: 'admin', scope: 'workspace', delivery: 'direct', previousDelivery: 'protected' })
     assert.ok(!JSON.stringify(events).includes(SECRET))
     const rotated = await store.replaceWorkspaceSecret(admin, ws.id, { id: row.id, value: SECRET + 'rotated' })
     assert.deepEqual(rotated.delivery, direct.delivery)

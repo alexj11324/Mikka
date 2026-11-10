@@ -25,6 +25,10 @@ const recovery = createWakeRecovery(pool)
  * credential. Elsewhere, events still collect in the inbox and wait.
  */
 export async function coordinatorEnabled(ownerId?: string, botId: string | null = null): Promise<boolean> {
+  if (ownerId && botId) {
+    const { botChatOwnerExclusive, sharedBotHasAuthorizedReply } = await import('@/lib/collaboration/bot-chat')
+    if (!await botChatOwnerExclusive(pool, ownerId, botId)) return sharedBotHasAuthorizedReply(ownerId, botId)
+  }
   if (runTestFixture('mock') !== undefined || await defaultModelAvailable(ownerId)) return true
   return ownerId ? (await import('./model-ready')).botModelReady(ownerId, botId) : false
 }

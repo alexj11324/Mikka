@@ -38,7 +38,7 @@ before(async () => {
     transferWorkspaceOwnership: respond('transferWorkspaceOwnership', { owner: { userId: 'm-1', name: 'Mia', email: 'm@example.invalid' }, previousRole: 'member' }),
     deleteWorkspaceData: async (...args: unknown[]) => { calls.push(['deleteWorkspaceData', ...args]); if (failure) throw failure; return { deleted: { bots: 0, threads: 0, tasks: 0, projects: 0, teams: 0, invitations: 0, members: 1 }, nextWorkspaceId: args[2] === 'Last' ? null : '22222222-2222-4222-8222-222222222222' } },
   } })
-  mock.module('@/lib/workspace-admin/members', { namedExports: { removeMember: respond('removeMember', { removed: true, transferred: { bots: 2 }, label: 'Mia' }), transferOnSuspend: respond('transferOnSuspend', { bots: 0 }), releaseDepartingMember: respond('releaseDepartingMember', undefined), restoreReturningMember: respond('restoreReturningMember', undefined), archivedBots: respond('archivedBots', []), takeOverBot: respond('takeOverBot', { bots: 1 }) } })
+  mock.module('@/lib/workspace-admin/members', { namedExports: { removeMember: respond('removeMember', { removed: true, transferred: { bots: 2 }, label: 'Mia' }), transferOnSuspend: respond('transferOnSuspend', { bots: 0 }), releaseDepartingMember: respond('releaseDepartingMember', undefined), restoreReturningMember: respond('restoreReturningMember', undefined), archivedBots: respond('archivedBots', []), takeOverBot: respond('takeOverBot', { bots: 1 }), transferOwnedBot: respond('transferOwnedBot', { bots: 1 }) } })
   mock.module('@/lib/workspace-admin/teams', { namedExports: {
     teamDeletionImpact: respond('teamDeletionImpact', { teamId: 't', name: 'Platform', tasks: 42, projects: 5 }),
     deleteTeamData: respond('deleteTeamData', { deleted: { tasks: 42, projects: 5 } }),
@@ -171,4 +171,17 @@ test('transferWorkspace passes the shown workspace and audit context to its tran
   assert.deepEqual(relevant(), [['workspaceTransferTargets', actor.userId, other], ['transferWorkspaceOwnership', actor.userId, other, 'm-1', auditContext]])
   failure = new WorkspaceError('workspaceTransferTargetInvalid')
   assert.deepEqual(await actions.transferWorkspace('m-1', other), { error: 'workspaceTransferTargetInvalid', params: undefined })
+})
+
+test('transferMyBot delegates the current actor, shown tenant and explicit private-transfer revision unchanged', async () => {
+  reset()
+  const workspace = '33333333-3333-4333-8333-333333333333'
+  const consent = { expectedRevision: 7, confirmPrivateTransfer: true }
+  assert.deepEqual(await actions.transferMyBot('bot-7', 'recipient-2', consent, workspace), { bots: 1 })
+  assert.deepEqual(calls, [
+    ['currentWorkspaceActor', workspace],
+    ['transferOwnedBot', actor.userId, workspace, 'bot-7', 'recipient-2', consent],
+  ])
+  failure = new WorkspaceError('botNotFound')
+  assert.deepEqual(await actions.transferMyBot('bot-7', 'recipient-2', consent, workspace), { error: 'botNotFound', params: undefined })
 })

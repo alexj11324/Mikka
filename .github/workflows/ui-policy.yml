@@ -218,7 +218,9 @@ jobs:
         # Real namespace/process/file attacks. No skips, host-policy changes,
         # provider credentials, fabricated model success or sandbox fallback.
         timeout-minutes: 6
-        run: pnpm --filter @mikka/daemon test:native-isolation | tee "$RUNNER_TEMP/pr1849-native-isolation.txt"
+        run: |
+          set -o pipefail
+          pnpm --filter @mikka/daemon test:native-isolation | tee "$RUNNER_TEMP/pr1849-native-isolation.txt"
         env:
           MIKKA_NATIVE_ISOLATION_HARNESSES: ${{ runner.temp }}/mikka-native-isolation-harnesses
       - name: Existing mailbox CLI integration tests

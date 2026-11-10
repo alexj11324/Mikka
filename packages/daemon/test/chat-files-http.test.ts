@@ -87,3 +87,36 @@ it('a download capability cannot select a different origin or exceed its authori
   )
   expect(cancelled).toBe(true)
 })
+
+it('new servers reauthorize large bytes on the exact authenticated run route', async () => {
+  const bytes = Buffer.from('freshly authorized attachment')
+  const assignment = { runId: 'run', deviceId: 'device' } as RunAssignment
+  const id = '10000000-0000-4000-8000-000000000001'
+  const path = `/mikka/v1/devices/device/runs/run/attachments/${id}`
+  const file = { id, name: 'file.md', mediaType: 'text/markdown', size: bytes.length,
+    sha256: createHash('sha256').update(bytes).digest('hex'), text: null,
+    downloadUrl: `https://mikka.invalid${path}?content=bytes` }
+  let reads = 0, revoked = false
+  const fetcher = (async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    if (String(url).includes('/register')) return new Response(null, { status: 204 })
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer synthetic-device-session')
+    const parsed = new URL(String(url))
+    expect(parsed.pathname).toBe(path)
+    if (parsed.search === '?content=bytes') {
+      reads++
+      return revoked ? new Response(null, { status: 403 }) : new Response(bytes)
+    }
+    return Response.json(file)
+  }) as typeof fetch
+  const link = new HttpServerLink('https://mikka.invalid/mikka', fetcher)
+  await link.registerDevice('synthetic-device-session', { name: 'fixture', platform: 'linux', arch: 'x64', daemonVersion: '1', protocolVersion: 3, harnesses: [] }).catch(() => {})
+  expect(Buffer.from((await link.downloadChatFile(assignment, id, new AbortController().signal)).data, 'base64')).toEqual(bytes)
+  revoked = true
+  await expect(link.downloadChatFile(assignment, id, new AbortController().signal)).rejects.toThrow('unavailable')
+  expect(reads).toBe(2)
+  for (const suffix of ['/another-path', '?content=bytes&other=1']) {
+    file.downloadUrl = `https://mikka.invalid${path}${suffix}`
+    await expect(link.downloadChatFile(assignment, id, new AbortController().signal)).rejects.toThrow('origin')
+  }
+  expect(reads).toBe(2, 'a server response cannot redirect device credentials to another path or query')
+})

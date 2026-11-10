@@ -5,17 +5,19 @@ import { db, withDatabaseTransaction } from '@/lib/db'
 import type { IssueReader } from '@/lib/issue-visibility'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { lockResourceAccess, lockResourcesAccess, type ResourceExecutor } from './store'
+import { newResourceVisibility } from './creation-defaults'
 import type { ResourceReference } from './contract'
 
 /** Call from the existing Workspace Project creation transaction, after its
  * Workspace/member/source locks. An APP commit followed by a failed WS commit
  * can leave only an unreachable policy; never an unguarded content row. */
 export async function registerProjectAccess(reader: IssueReader, projectId: string, workspaceId: string, visibility?: 'shared' | 'private') {
-  return withTaskWorkspace(reader, workspaceId, workspace => db.transaction(tx => withDatabaseTransaction(tx, async () => {
+  return withTaskWorkspace(reader, workspaceId, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
     const ownerId = taskReaderScope(reader).userId
+    const initialVisibility = await newResourceVisibility(reader, workspaceId, visibility)
     await tx.execute(sql`select set_config('mikka.acl_actor',${ownerId},true),set_config('mikka.acl_source','project_created',true)`)
     await tx.execute(sql`insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
-      values('project',${projectId}::uuid,${workspaceId}::uuid,${ownerId},${workspace.kind === 'team' ? visibility ?? 'shared' : 'private'},'created')`)
+      values('project',${projectId}::uuid,${workspaceId}::uuid,${ownerId},${initialVisibility},'created')`)
   })))
 }
 

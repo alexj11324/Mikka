@@ -53,6 +53,7 @@ export type NewTaskProps = {
     disabled: boolean
   }
   /** Profile checks, 未开启任务创建 and Coordinator unavailable, as Mikka draws them; null when there are none. */
+  visibility?: {value:'private'|'shared';label:string;description:string;options:{value:'private'|'shared';label:string;disabled?:boolean}[];disabled:boolean;onChange:(value:'private'|'shared')=>void}
   notices: ReactNode
   sending: boolean
   /** Whether 创建任务 can send now (text, a usable profile, files done, creation available). */

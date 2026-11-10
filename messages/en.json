@@ -4715,10 +4715,10 @@
     "category": {
       "all": "All",
       "documents": "Documents",
-      "pages": "Web pages"
-    ,
+      "pages": "Web pages",
       "pullRequests": "Pull requests",
-      "media": "Screenshots and recordings"},
+      "media": "Screenshots and recordings"
+    },
     "columns": {
       "name": "Name",
       "source": "Source",
@@ -5272,7 +5272,11 @@
       "activePlan": "Active resource plan",
       "inactiveCreditShare": "Your earlier personal credit share is inactive while the Organization account pays. Turn it off to revoke that consent.",
       "capacity": "Concurrent platform runs",
-      "plans": { "free": "Free", "pro": "Pro", "enterprise": "Enterprise" },
+      "plans": {
+        "free": "Free",
+        "pro": "Pro",
+        "enterprise": "Enterprise"
+      },
       "removeLimitHelp": "Remove this scope’s spending cap. Existing usage and audit history remain.",
       "differentPayer": "Platform execution uses a different Organization payment account. This page shows this Workspace’s retained balance and history. Open the Organization scope to manage platform purchases."
     },
@@ -5536,7 +5540,9 @@
     "run_failed": {
       "default": "The task could not be completed. Check the error details or try again."
     },
-    "run_clean_isolation_required": {"default": "This shared thread requires a clean cloud environment with protected native credentials. Start a private thread or select a compatible clean cloud computer."},
+    "run_clean_isolation_required": {
+      "default": "This shared thread requires a clean cloud environment with protected native credentials. Start a private thread or select a compatible clean cloud computer."
+    },
     "governance_denied": {
       "plan_changed": "The plan changed. Review its current entitlements before applying this update.",
       "default": "The governance action could not be completed. Try again.",
@@ -6494,6 +6500,14 @@
     "grantUnavailable": "This execution authorization is no longer available. Choose comments only or another active authorization.",
     "threadMessage": "Message this thread",
     "readOnly": "You can read this conversation. Ask its owner for permission to contribute.",
-    "taskPrompt": "Describe the new task"
+    "taskPrompt": "Describe the new task",
+    "defaultsTitle": "Default visibility",
+    "defaultsDescription": "Applies to new projects, tasks and threads. Existing content keeps its current access. Private parent resources still restrict access.",
+    "personalDefault": "Create privately by default",
+    "personalDefaultDescription": "Start your new collaboration resources as Private. You can explicitly choose Shared when creating one.",
+    "organizationDefault": "Organization: private by default",
+    "organizationDefaultDescription": "Start new resources in this organization as Private unless the creator explicitly chooses Shared.",
+    "organizationDefaultReadOnly": "The organization controls this default. You can also keep your own resources Private.",
+    "defaultsLoading": "Loading the visibility settings…"
   }
 }

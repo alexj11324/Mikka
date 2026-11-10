@@ -3,8 +3,7 @@ import { captureRunFailure, readRunFailure, type RunFailure } from '@mikka/proto
 import { APP_BUILD } from '@/lib/app-build'
 import { sourcedEventMessage } from './message-safety'
 import { runCompletionObservations } from './run-completion-observation'
-import { visibleRuns } from '@/lib/agent-runs'
-import { threadNamePrompt } from '@/lib/run-bot-name'
+import { visibleRuns, visibleRunCitations } from '@/lib/agent-runs'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
 import { issuesForUser } from '@/lib/issues-for-user'
@@ -18,7 +17,7 @@ import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
 import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { wakeCoordinatorSoon } from './wake-after-commit'
 import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
-import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
@@ -43,9 +42,10 @@ import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 import { botChatChanged } from '../live/chats'
-import { activeTaskWorkspaces } from '@/lib/task-workspace'
+import { activeTaskWorkspaces, taskReaderScope } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
 import type { CoordinatorStartupReceipt, CoordinatorStartupSettingsCandidate, CoordinatorStartupSettings, CoordinatorStartupTake } from './startup-receipt'
+import { bindBotChatMessages, botChatIsOwnerExclusive, recordBotChatMessageInput, sharedBotInbox } from '@/lib/collaboration/bot-chat-provenance'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -65,13 +65,27 @@ const sessionOf = (userId: string, botId: string) => and(eq(coordinatorSessions.
 const messagesOf = (userId: string, botId: string) => and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId))
 const eventsOf = (userId: string, botId: string) => and(eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.botId, botId))
 
+// This is an additional provenance fence, after the viewer's resource ACL.
+// Filtering before pagination and hashes keeps private status/counts out too.
+const displayMessagesOf = (ownerId: string, botId: string, reader: IssueReader) => and(messagesOf(ownerId, botId),
+  taskReaderScope(reader).userId === ownerId ? undefined : sql`mikka_bot_chat_display_message_visible(${ownerId},${botId}::uuid,${coordinatorMessages.id},${taskReaderScope(reader).userId})`)
+const displayEventsOf = (ownerId: string, botId: string, reader: IssueReader) => and(eventsOf(ownerId, botId),
+  taskReaderScope(reader).userId === ownerId ? undefined : sql`mikka_bot_chat_event_visible(${ownerId},${botId}::uuid,${coordinatorEvents.id})`)
+const displaySessionOf = (ownerId: string, botId: string, reader: IssueReader) => and(sessionOf(ownerId, botId),
+  taskReaderScope(reader).userId === ownerId ? undefined : sql`mikka_bot_chat_execution_visible(${ownerId},${botId}::uuid,${coordinatorSessions.leaseHolder})`)
+const messageActor = sql<{ id: string; name: string } | null>`(select jsonb_build_object('id',a."actorId",'name',coalesce(u.name,''))
+  from bot_chat_submission_authorities a left join "user" u on u.id=a."actorId"
+  where a."eventId"::text=${coordinatorMessages.message}#>>'{mikkaUserEvent,id}' and ${coordinatorMessages.message}->>'role'='user')`
+const eventActor = sql<{ id: string; name: string } | null>`(select jsonb_build_object('id',a."actorId",'name',coalesce(u.name,''))
+  from bot_chat_submission_authorities a left join "user" u on u.id=a."actorId" where a."eventId"=${coordinatorEvents.id})`
+
 async function chatReader(userId: string, botId: string, viewer: IssueReader = userId): Promise<IssueReader> {
   const access = await (await import('@/lib/resource-access/chat')).authorizedBotChat(viewer, botId)
   if (access.ownerId !== userId) throw new ActionFailureError('botNotFound')
   return access.reader
 }
 
-async function nextPosition(executor: Executor, userId: string, botId: string): Promise<number> {
+export async function nextPosition(executor: Executor, userId: string, botId: string): Promise<number> {
   await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId}`},0))`)
   const [row] = await executor.select({ last: sql<number>`coalesce(max(${coordinatorMessages.position}), 0)` })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
@@ -252,7 +266,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
     await coordinatorSessionChanged(tx, userId, botId)
     // A receipt-only LEFT JOIN row has no event. It must never reach
     // payload/source handling; empty seed rows are filtered in SQL already.
-    const candidates = startupRows ? startupRows.flatMap(row => {
+    let candidates = startupRows ? startupRows.flatMap(row => {
       if (row.id === null) return []
       const { r: _receipt, ...event } = row
       return [{ ...event, id: row.id,
@@ -264,6 +278,11 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       }]
     }) : await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+    const collaborative = await sharedBotInbox(tx, { ownerId: userId, botId, candidates })
+    if (collaborative !== null) {
+      candidates = collaborative
+      if (!candidates.length) return finish({ held: true, ...NO_TAKE })
+    }
     // A schedule is a separate read-only turn. Hydrate its authority through
     // the stored event link, never from notification/model payload fields.
     const scheduledCandidate = candidates[0]?.payload.source === 'schedule_due' ? candidates[0] : undefined
@@ -300,7 +319,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       }
     }
     const isolatedTask = Boolean(taskEventId) || Boolean(scheduled)
-    const backgroundLimit = isolatedTask || due.some(event => event.kind === 'user_message') ? 0 : INBOX_BATCH - due.length
+    const backgroundLimit = collaborative !== null || isolatedTask || due.some(event => event.kind === 'user_message') ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
@@ -334,7 +353,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       ...(scheduledRead ? { scheduledRead } : {}),
       ...(attentionQuestions.length ? { attentionQuestions } : {}),
       // A verification code is told in the app chat only, never on Telegram.
-      telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
+      telegramTargets: collaborative !== null || handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
       handoffOnly: handoffs.length === events.length,
       pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier, runId: event.runId, issueId: event.issueId })),
@@ -386,6 +405,13 @@ export async function releaseLease(userId: string, holder: string, botId: string
  * back to original creation time. Trying a slow event advances the durable
  * cursor instead of repeatedly hiding all events after the oldest batch. */
 export async function untriagedEvents(userId: string, botId: string) {
+  // Shared automation is a readable notification, not a chargeable Owner
+  // trigger. Only an authenticated reply receipt can start its model turn.
+  if (!await botChatIsOwnerExclusive(db, userId, botId)) {
+    await db.update(coordinatorEvents).set({ deliveredAt: new Date(), tier: 'background' })
+      .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), ne(coordinatorEvents.kind, 'user_message')))
+    return []
+  }
   const reader = await chatReader(userId, botId)
   const retryBefore = new Date(Date.now() - TRIAGE_RETRY_COOLDOWN_MS)
   const events = await db.select().from(coordinatorEvents)
@@ -456,14 +482,18 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
     const first = await nextPosition(tx, userId, botId)
+    const collaborative = !await botChatIsOwnerExclusive(tx, userId, botId)
     if (messages.length) {
-      await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+      const stored = await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried,
+          mikkaUserEvent: _forgedHuman, mikkaEvent: _forgedEvent, mikkaChatAuthority: _forgedAuthority, ...plain } = message as unknown as Record<string, unknown>
         // 停止: the turn's last message carries the mark; the chat shows 已停止 under the reply.
         const stop = stopped && index === messages.length - 1 && message.role === 'assistant'
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
-          message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
-      }))
+          message: { ...plain, ...(!collaborative ? { mikkaUserEvent: _forgedHuman, mikkaEvent: _forgedEvent } : {}),
+            ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
+      })).returning({ id: coordinatorMessages.id })
+      await bindBotChatMessages(tx, { ownerId: userId, botId, executionKey: streamId, messageIds: stored.map(row => row.id) })
       await botChatChanged(tx, userId, botId)
     }
     const now = new Date()
@@ -533,11 +563,15 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     // returns above, so it cannot duplicate these messages or their effects.
     if (messages.length) {
       const first = await nextPosition(tx, userId, botId)
-      await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+      const collaborative = !await botChatIsOwnerExclusive(tx, userId, botId)
+      const stored = await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried,
+          mikkaUserEvent: _forgedHuman, mikkaEvent: _forgedEvent, mikkaChatAuthority: _forgedAuthority, ...plain } = message as unknown as Record<string, unknown>
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
-          message: { ...plain, ...(message.role === 'assistant' && completed?.streamId ? { mikkaStreamId: completed.streamId } : {}) } }
-      }))
+          message: { ...plain, ...(!collaborative ? { mikkaUserEvent: _forgedHuman, mikkaEvent: _forgedEvent } : {}),
+            ...(message.role === 'assistant' && completed?.streamId ? { mikkaStreamId: completed.streamId } : {}) } }
+      })).returning({ id: coordinatorMessages.id })
+      await bindBotChatMessages(tx, { ownerId: userId, botId, executionKey: completed?.streamId, messageIds: stored.map(row => row.id) })
     }
   })
 }
@@ -606,6 +640,21 @@ export async function loadConversationForPrompt(userId: string, botId: string): 
   }
 }
 
+/** A collaborative turn uses only individually proven transcript rows. An
+ * owner's earlier summary, private memory and preferences are never loaded. */
+export async function loadSharedConversationForPrompt(userId: string, botId: string, eventId: string): Promise<LoadedConversation> {
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message })
+    .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(200)
+  const visible: StoredMessage[] = []
+  for (const row of rows.reverse()) {
+    if (!await recordBotChatMessageInput(db, { ownerId: userId, botId, messageId: row.id, message: row.message, destinationEventId: eventId })) continue
+    if (row.message.mikkaRetried === true) continue
+    const { mikkaStreamId: _stream, mikkaStopped: _stop, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retry, ...message } = row.message
+    visible.push({ position: row.position, message: message as unknown as ModelMessage })
+  }
+  return { summary: null, memory: '', messages: visible }
+}
+
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
 export async function saveSummary(userId: string, summary: string, through: number, botId: string): Promise<void> {
   await db.update(coordinatorSessions).set({ summary, summaryThrough: through, updatedAt: new Date() })
@@ -660,7 +709,7 @@ export async function storedReasoning(userId: string, botId: string, positions: 
   await chatReader(userId, botId, viewer)
   if (!positions.length) return []
   const rows = await db.select({ message: coordinatorMessages.message }).from(coordinatorMessages)
-    .where(and(messagesOf(userId, botId), inArray(coordinatorMessages.position, [...positions]))).orderBy(asc(coordinatorMessages.position))
+    .where(and(displayMessagesOf(userId, botId, viewer), inArray(coordinatorMessages.position, [...positions]))).orderBy(asc(coordinatorMessages.position))
   return rows.flatMap(({ message }) => message.role === 'assistant' && Array.isArray(message.content)
     ? (message.content as { type?: unknown; text?: unknown }[]).flatMap(part => part.type === 'reasoning' && typeof part.text === 'string' && part.text.trim() ? [part.text] : [])
     : [])
@@ -681,21 +730,12 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
     .from(issues)
     .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
-  const runs = runIds.length ? await visibleRuns(reader, { runIds, limit: runIds.length, brief: true }) : []
-  // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
-  const ownIds = runs.filter(row => row.agentId).map(row => row.id)
+  const citations = runIds.length ? await visibleRunCitations(reader, runIds) : []
+  const runs = citations.map(row => row.run)
   const runIssueIds = [...new Set(runs.flatMap(row => row.issueId ? [row.issueId] : []))]
-  // The prompt and tool count belong to the same authorized owner runs. One
-  // bounded projection avoids opening a third APP connection beside tasks.
-  const [ownedRuns, tasks] = await Promise.all([
-    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt,
-      steps: sql<number>`(select count(*) from ${runChunks} c where c."runId" = agent_runs.id
-        and c.chunk->>'type' = 'tool-input-available')`.mapWith(Number),
-    }).from(agentRuns).where(and(inArray(agentRuns.id, ownIds), await (await import('@/lib/resource-access/thread')).threadReadAccess(reader))) : [],
-    issuesForUser(reader, runIssueIds, false, db, { projection: 'citation', withTeamLinks: false }),
-  ])
-  const prompts = new Map(ownedRuns.map(row => [row.id, row.prompt]))
-  const steps = new Map(ownedRuns.map(row => [row.id, row.steps]))
+  const tasks = await issuesForUser(reader, runIssueIds, false, db, { projection: 'citation', withTeamLinks: false })
+  const prompts = new Map(citations.map(({ run, prompt }) => [run.id, prompt]))
+  const steps = new Map(citations.map(({ run, steps }) => [run.id, steps]))
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
     ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
@@ -771,20 +811,20 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
 export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}, viewer: IssueReader = userId): Promise<{ chat: ChatView } & ChatReadObservation> {
   const reader = await chatReader(userId, botId, viewer)
   const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, lastFailure: coordinatorSessions.lastFailure })
-    .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
+    .from(coordinatorSessions).where(displaySessionOf(userId, botId, reader)).limit(1).as('chat_session')
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
-  const messagesRead = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage.as('message'), createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(and(messagesOf(userId, botId), window.after === undefined ? undefined : gt(coordinatorMessages.position, window.after), window.through === undefined ? undefined : sql`${coordinatorMessages.position} <= ${window.through}`))
+  const messagesRead = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage.as('message'), actor: messageActor.as('actor'), createdAt: coordinatorMessages.createdAt })
+    .from(coordinatorMessages).where(and(displayMessagesOf(userId, botId, reader), window.after === undefined ? undefined : gt(coordinatorMessages.position, window.after), window.through === undefined ? undefined : sql`${coordinatorMessages.position} <= ${window.through}`))
     .orderBy(desc(coordinatorMessages.position)).limit(limit + 1).as('chat_messages')
-  type MessageRow = { id: string; position: number; message: Record<string, unknown>; createdAt: string }
+  type MessageRow = { id: string; position: number; message: Record<string, unknown>; actor: { id: string; name: string } | null; createdAt: string }
   const storedRead = db.select({ rows: sql<MessageRow[]>`coalesce(jsonb_agg(to_jsonb(${sql.identifier('chat_messages')}) order by ${messagesRead.position} desc), '[]'::jsonb)`.as('rows') })
     .from(messagesRead).as('chat_stored')
   const waitingRead = db.select({ kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts,
     wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError, issueId: coordinatorEvents.issueId,
-    runId: coordinatorEvents.runId, payload: coordinatorEvents.payload, createdAt: coordinatorEvents.createdAt }).from(coordinatorEvents)
-    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), window.through === undefined ? undefined : sql`false`))
+    runId: coordinatorEvents.runId, payload: coordinatorEvents.payload, actor: eventActor.as('actor'), createdAt: coordinatorEvents.createdAt }).from(coordinatorEvents)
+    .where(and(displayEventsOf(userId, botId, reader), isNull(coordinatorEvents.deliveredAt), window.through === undefined ? undefined : sql`false`))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH).as('chat_waiting')
-  type WaitingRow = Pick<typeof coordinatorEvents.$inferSelect, 'kind' | 'tier' | 'wakeAttempts' | 'wakeLastError' | 'issueId' | 'runId' | 'payload'> & { wakeLeaseUntil: string | null; createdAt: string }
+  type WaitingRow = Pick<typeof coordinatorEvents.$inferSelect, 'kind' | 'tier' | 'wakeAttempts' | 'wakeLastError' | 'issueId' | 'runId' | 'payload'> & { actor: { id: string; name: string } | null; wakeLeaseUntil: string | null; createdAt: string }
   // Claiming an inbox atomically changes all three tables. A session read from
   // before that commit with messages/inbox from after it invents a failed turn.
   // One bounded statement keeps their snapshot together without a held lock.
@@ -801,7 +841,7 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}), createdAt: rows[0].createdAt }
   // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
   const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
-    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
+    position: last + index + 1, createdAt: event.createdAt, actor: event.actor, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
   }))
   const read = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   // An older page (history): a welcome failure there was answered by what came after it, so it is not shown.
@@ -819,16 +859,16 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
     sources: await citationSources(reader, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
       ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(reader, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
-    continuation: { after, prefix: await chatPrefix(userId, botId, after), cursor: last },
+    continuation: { after, prefix: await chatPrefix(userId, botId, after, reader), cursor: last },
     ...(hasMore && rows[0] ? { historyBefore: rows[0].position } : {}),
   }
   return { chat, ...chatReadObservation(session, waiting, now) }
 }
 
 /** Hash only the bounded prefix that preceded the last rendered item; no message body crosses the wire. */
-async function chatPrefix(userId: string, botId: string, through: number) {
+async function chatPrefix(userId: string, botId: string, through: number, viewer: IssueReader) {
   const rows = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message }).from(coordinatorMessages)
-    .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
+    .where(and(displayMessagesOf(userId, botId, viewer), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
   const [result] = await db.select({ hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))` }).from(rows)
   return chatProjectionHash(result.hash)
 }
@@ -836,9 +876,9 @@ async function chatPrefix(userId: string, botId: string, through: number) {
 /** Hash and metadata share one statement snapshot, so a concurrent prefix edit
  * cannot pair an old proof with new tool labels. Only these aggregates leave
  * PostgreSQL; the stored message is read there solely to prove the prefix. */
-async function chatPrefixMetadata(userId: string, botId: string, through: number, cursor: number) {
+async function chatPrefixMetadata(userId: string, botId: string, through: number, cursor: number, viewer: IssueReader) {
   const rows = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, parts: compactChatToolMetadata.as('parts') })
-    .from(coordinatorMessages).where(and(messagesOf(userId, botId), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
+    .from(coordinatorMessages).where(and(displayMessagesOf(userId, botId, viewer), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
   const [result] = await db.select({
     hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))`,
     rows: sql<ChatToolMetadataRow[]>`coalesce(jsonb_agg(jsonb_build_object('position', ${rows.position}, 'parts', ${rows.parts}) order by ${rows.position}) filter (where ${rows.position} >= ${Math.max(0, cursor - 199)} and jsonb_array_length(${rows.parts}) > 0), '[]'::jsonb)`,
@@ -854,8 +894,8 @@ export const CHAT_FIRST_PAGE = 50
 export async function chatUpdate(userId: string, botId: string, continuation?: NonNullable<ChatView['continuation']> & { restoreToolMetadata?: true }, viewer: IssueReader = userId) {
   await chatReader(userId, botId, viewer)
   const prefix = continuation && continuation.after <= continuation.cursor
-    ? continuation.restoreToolMetadata ? await chatPrefixMetadata(userId, botId, continuation.after, continuation.cursor)
-      : { hash: await chatPrefix(userId, botId, continuation.after), rows: undefined }
+    ? continuation.restoreToolMetadata ? await chatPrefixMetadata(userId, botId, continuation.after, continuation.cursor, viewer)
+      : { hash: await chatPrefix(userId, botId, continuation.after, viewer), rows: undefined }
     : undefined
   if (continuation && prefix && prefix.hash === continuation.prefix) {
     const latest = await chatVersion(userId, 200, botId, viewer)
@@ -899,9 +939,9 @@ export async function chatVersion(userId: string, limit = 200, botId: string, vi
 export async function chatVersionState(userId: string, limit = 200, botId: string, viewer: IssueReader = userId): Promise<ChatVersionState> {
   await chatReader(userId, botId, viewer)
   const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, failureVersion: sql<string>`md5(coalesce(${coordinatorSessions.lastFailure}::text, ''))`.as('failureVersion') })
-    .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
+    .from(coordinatorSessions).where(displaySessionOf(userId, botId, viewer)).limit(1).as('chat_session')
   const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
+    .from(coordinatorMessages).where(displayMessagesOf(userId, botId, viewer)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
   const storedRead = db.select({
     last: sql<number>`coalesce(max(${latest.position}), 0)::int`.as('last'),
     hash: sql<string>`md5(coalesce(string_agg(${latest.id}::text || ':' || md5(${latest.message}::text), ',' order by ${latest.position}), ''))`.as('hash'),
@@ -910,7 +950,7 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
     createdAt: sql<string | null>`(array_agg(${latest.createdAt} order by ${latest.position} desc))[1]`.as('createdAt'),
   }).from(latest).as('chat_stored')
   const waitingRead = db.select({ id: coordinatorEvents.id, payloadVersion: sql<string>`md5(${coordinatorEvents.payload}::text)`.as('payloadVersion'), kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError, createdAt: coordinatorEvents.createdAt }).from(coordinatorEvents)
-    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
+    .where(and(displayEventsOf(userId, botId, viewer), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH).as('chat_waiting')
   type WaitingRow = Pick<typeof coordinatorEvents.$inferSelect, 'id' | 'kind' | 'tier' | 'wakeAttempts' | 'wakeLastError'> & { payloadVersion: string; wakeLeaseUntil: string | null; createdAt: string }
   const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, failureVersion: sessionRead.failureVersion,
@@ -955,13 +995,16 @@ export async function botChatSnapshot(reader: IssueReader) {
   const botIds = readableBots.map(bot => bot.id)
   const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).innerJoin(bots,and(eq(bots.id,coordinatorMessages.botId),eq(bots.ownerId,coordinatorMessages.userId)))
-    .where(and(inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
+    .where(and(inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`,
+      sql`(${coordinatorMessages.userId}=${userId} OR mikka_bot_chat_display_message_visible(${coordinatorMessages.userId},${coordinatorMessages.botId},${coordinatorMessages.id},${userId}))`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
   const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).innerJoin(bots,and(eq(bots.id,coordinatorSessions.botId),eq(bots.ownerId,coordinatorSessions.userId)))
-    .where(inArray(coordinatorSessions.botId, botIds))
+    .where(and(inArray(coordinatorSessions.botId, botIds),
+      sql`(${coordinatorSessions.userId}=${userId} OR mikka_bot_chat_execution_visible(${coordinatorSessions.userId},${coordinatorSessions.botId},${coordinatorSessions.leaseHolder}))`))
   const waiting = await db.select({ botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError })
     .from(coordinatorEvents).innerJoin(bots,and(eq(bots.id,coordinatorEvents.botId),eq(bots.ownerId,coordinatorEvents.userId)))
-    .where(and(inArray(coordinatorEvents.botId, botIds), isNull(coordinatorEvents.deliveredAt)))
+    .where(and(inArray(coordinatorEvents.botId, botIds), isNull(coordinatorEvents.deliveredAt),
+      sql`(${coordinatorEvents.userId}=${userId} OR mikka_bot_chat_event_visible(${coordinatorEvents.userId},${coordinatorEvents.botId},${coordinatorEvents.id}))`))
   const now = new Date()
   const expiries = [
     ...sessions.flatMap(session => coordinatorLeaseActive(session, now) && session.leaseUntil ? [session.leaseUntil] : []),

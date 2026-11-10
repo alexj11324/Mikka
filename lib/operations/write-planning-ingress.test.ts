@@ -21,7 +21,7 @@ overrideDeploymentSwitch('factoryRouting',false)
 const stub = (path:string,namedExports:Record<string,unknown>) => mock.module(new URL(path,import.meta.url).href,{namedExports})
 stub('../abuse/resolve.ts',{resolveDefaultHostedModel:async(_scope:unknown,model:string)=>model})
 stub('../auth.ts',{auth:{api:{getSession:async()=>userId?{user:{id:userId},session:{id:'planner-fixture-session'}}:null}}})
-stub('../db/index.ts',{pool:null,withDatabaseClient:unavailable,db:{insert:()=>({values:(event:Event)=>({onConflictDoNothing:()=>({returning:async()=>{events.push(structuredClone(event));return [{id:event.id}]}})})})}})
+stub('../db/index.ts',{pool:null,withDatabaseClient:unavailable,withDatabaseTransaction:unavailable,db:{insert:()=>({values:(event:Event)=>({onConflictDoNothing:()=>({returning:async()=>{events.push(structuredClone(event));return [{id:event.id}]}})})})}})
 stub('../request-log.ts',{noteLogRpcAction:()=>{},noteLogUser:()=>undefined,withRequestLog:(_path:string,handler:unknown)=>handler})
 stub('../coordinator/store.ts',{loadConversationForPrompt:async()=>({...conversation,personalInstructions:''}),saveSummary:async()=>undefined,chatView:async()=>({})})
 stub('../agent-kit/service.ts',{agentScope:async(ownerId:string,botId:string|null)=>({ownerId,botId,workspaceId:null})})
@@ -58,7 +58,7 @@ test('authenticated HTTP submission reaches actual planner prompt through stored
   conversation.messages=[{position:1,message:sourcedEventMessage(event,eventPrompt(event))}]
   const prompt=await preparePrompt(userId,COORDINATOR_BOT)
   assert.deepEqual(files(prompt.messages[0].content).map(part=>[part.mediaType,part.data]),[['image/png',png]])
-  const runtime=runtimeForWritePlanning({harness:'ai_sdk',model:'original'},['send_slack_message'],true,false)
+  const runtime=runtimeForWritePlanning({harness:'ai_sdk',model:'original',actorId:'authenticated-owner'},['send_slack_message'],true,false)
   assert.equal(supportsWritePlanning(runtime),true)
   // Only callbacks are captured: no wake, model, provider or DB is executed.
   assert.ok(callbacks.length>0)
@@ -107,7 +107,7 @@ test('actual preparePrompt compacts original HTTP image using the frozen planner
     conversation.messages=[{position:1,message:sourcedEventMessage(imageEvent,eventPrompt(imageEvent))},
       ...Array.from({length:40},(_,i)=>({position:i+2,message:sourcedEventMessage({id:'notification-'+i,kind:'action_decided',runId:null,issueId:null,payload:{status:'pending'}},'Unverified report '.repeat(2500))})),
       {position:42,message:sourcedEventMessage({id:'followup',kind:'user_message',runId:null,issueId:null,payload:{}},'Continue with existing permissions')}]
-    const runtime=runtimeForWritePlanning({harness:'ai_sdk',model:'original'},['send_slack_message'],true,false)
+    const runtime=runtimeForWritePlanning({harness:'ai_sdk',model:'original',actorId:'authenticated-owner'},['send_slack_message'],true,false)
     const snapshot=makeSnapshot('10000000-0000-4000-8000-000000000001',1,DEFAULT_AGENT_DEFINITION,'host',runtime)
     allowCompaction=true
     const prompt=await preparePrompt(userId,COORDINATOR_BOT,snapshot)

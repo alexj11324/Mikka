@@ -43,7 +43,7 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
       content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: event.payload.text }] }] },
       status: 'todo',
       priority: 'normal',
-      visibility:creation?.visibility??(event.payload.taskDestination?'shared':'private'),
+      visibility:creation?.visibility??(event.payload.taskDestination?undefined:'private'),
       ...(creation?.projectId?{projectId:creation.projectId}:{}),
     }, systemActor('coordinator'), { workspaceId: source.workspaceId })
     if (!issue) throw new FactoryError('factoryInvalid')

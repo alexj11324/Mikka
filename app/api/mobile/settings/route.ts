@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { coordinatorSessions, linearConnections } from '@/lib/db/schema'
 import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit } from '@/lib/composio'
 import { listComposioPages } from '@/lib/composio-pagination'
+import { resourceCreationDefaults } from '@/lib/resource-access/creation-defaults'
 import { readPreferences } from '@/lib/preferences'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { listOrganizations } from '@/lib/governance/organizations'
@@ -54,6 +55,7 @@ async function handleGET(request: Request) {
     workspace: context.workspace,
     workspaces: context.choices,
     preferences,
+    resourceCreation: await resourceCreationDefaults(user, context.workspace.id),
     // The session's updatedAt moves with every turn, so the memory carries no 更新于 time.
     memory: session?.memory ?? '',
     apps,

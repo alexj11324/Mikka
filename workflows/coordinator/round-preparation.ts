@@ -3,10 +3,10 @@ import { beginPreparedAgentExecution } from './agent-kit-steps'
 import { prepareTurn } from './steps'
 
 /** One durable preparation for a hosted execution; its frozen snapshot owns the prompt and tools. */
-export async function prepareHostedAgentRound(userId: string, botId: string, holder: string, round: number, selected: Extract<CoordinatorRuntime, { harness: 'ai_sdk' }>, mailboxEnabled: boolean, scheduledRead: boolean, enabled: boolean) {
+export async function prepareHostedAgentRound(userId: string, botId: string, holder: string, round: number, selected: Extract<CoordinatorRuntime, { harness: 'ai_sdk' }>, mailboxEnabled: boolean, scheduledRead: boolean, enabled: boolean, sourceEventId?: string) {
   'use step'
   const started = Date.now()
-  const execution = await beginPreparedAgentExecution(userId, botId, holder, round, selected, enabled)
+  const execution = await beginPreparedAgentExecution(userId, botId, holder, round, selected, enabled, sourceEventId)
   // Without an execution snapshot, model selection keeps its own durable checkpoint.
   if (!execution) return { kind: 'disabled' as const }
   if (execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')

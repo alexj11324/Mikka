@@ -255,6 +255,8 @@ export interface TaskDetail {
 }
 
 export interface Preferences {
+  /** Absent on older servers. */
+  privateByDefault?: boolean
   proactive: boolean
   pushDecide: boolean
   pushReview: boolean
@@ -271,6 +273,7 @@ export interface Preferences {
 }
 
 export interface Settings {
+  resourceCreation?: {workspaceId:string;kind:'personal'|'team';visibility:'private'|'shared';personalPrivateByDefault:boolean;organization:{id:string;privateByDefault:boolean;revision:number;canManage:boolean}|null}
   /** Fresh finance entry scope; absent on older servers. */
   billingScope?: { kind: 'workspace' | 'organization'; id: string } | null
   user: Person

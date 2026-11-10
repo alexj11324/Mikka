@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { userSecrets, workspaceSecrets } from '@/lib/db/secrets-schema'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { withTaskWorkspace } from '@/lib/task-workspace'
+import { ActionFailureError } from '@/lib/action-error'
 import { sealSecret, userSecretAad, SecretsKeyMissingError } from './crypto'
 import { parseDotenv } from './dotenv'
 import { createUserSecretInput, deleteSecretInput, importUserSecretsInput, isReservedEnvName, replaceUserSecretInput, USER_SECRETS_LIMIT } from './format'
@@ -40,11 +41,17 @@ function seal(value: string, row: { userId: string; kind: string; name: string }
  */
 async function workspaceNames(userId: string, workspaceId: string | undefined, names: readonly string[]): Promise<Set<string>> {
   if (!workspaceId || !names.length) return new Set()
+  try {
   const rows = await withTaskWorkspace(userId, workspaceId, () => guardSecretsDb(() => db.selectDistinct({ name: workspaceSecrets.name }).from(workspaceSecrets)
     .where(and(eq(workspaceSecrets.workspaceId, workspaceId), inArray(workspaceSecrets.name, [...names]),
       sql`case when ${workspaceSecrets.scopeType}='project' then mikka_resource_acl_allowed('account',${userId},${workspaceId}::uuid,
         'project',${workspaceSecrets.scopeRef}::uuid,'canReadContent') else ${workspaceSecrets.scopeType}<>'thread' end`))))
   return new Set(rows.map(row => row.name))
+  } catch (error) {
+    if (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied')
+      throw Object.assign(new WorkspaceError('workspaceAccessDenied'), { cause: error })
+    throw error
+  }
 }
 
 export async function listUserSecrets(userId: string): Promise<UserSecretView[]> {

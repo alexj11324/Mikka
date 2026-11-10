@@ -34,6 +34,11 @@ mock.module(new URL('./issue-scope-authorization.ts', import.meta.url).href, { n
 mock.module(new URL('./issue-numbering.ts', import.meta.url).href, { namedExports: { allocateIssueNumbers: async () => { throw new Error('not reached') } } })
 mock.module(new URL('./task-workspace.ts', import.meta.url).href, { namedExports: { requireTaskWorkspace: async () => { throw new Error('not reached') } } })
 mock.module(new URL('./task-identifier-server.ts', import.meta.url).href, { namedExports: { issueView: () => { throw new Error('not reached') } } })
+mock.module(new URL('./resource-access/store.ts', import.meta.url).href, { namedExports: { lockResourceAccess: () => assert.fail('invalid content never acquires resource locks') } })
+mock.module(new URL('./resource-access/creation-defaults.ts', import.meta.url).href, { namedExports: {
+  newResourceVisibility: () => assert.fail('invalid content never reads creation defaults'),
+  applyNewTaskVisibility: () => assert.fail('invalid content never writes an ACL'),
+} })
 mock.module(new URL('./linear-sync/dispatch.ts', import.meta.url).href, { namedExports: { dispatchLinearIssueSync: () => {} } })
 const exchangeDocument: typeof import('../app/actions/collaboration').exchangeDocument = async input => (await import('../app/actions/collaboration')).exchangeDocument(input)
 

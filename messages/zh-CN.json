@@ -4715,10 +4715,10 @@
     "category": {
       "all": "全部",
       "documents": "文档",
-      "pages": "网页"
-    ,
+      "pages": "网页",
       "pullRequests": "PR",
-      "media": "截图与录屏"},
+      "media": "截图与录屏"
+    },
     "columns": {
       "name": "名称",
       "source": "来源",
@@ -5272,7 +5272,11 @@
       "activePlan": "生效中的资源套餐",
       "inactiveCreditShare": "组织账户付款期间，此前的个人点数共享不生效。关闭此项可撤销原授权。",
       "capacity": "平台并发执行数",
-      "plans": { "free": "免费版", "pro": "专业版", "enterprise": "企业版" },
+      "plans": {
+        "free": "免费版",
+        "pro": "专业版",
+        "enterprise": "企业版"
+      },
       "removeLimitHelp": "移除此范围的消费上限，保留既有用量与审计记录。",
       "differentPayer": "平台执行使用另一个组织付款账户。此页显示当前工作区保留的余额与历史，请切换组织范围管理平台购买。"
     },
@@ -5536,7 +5540,9 @@
     "run_failed": {
       "default": "任务未能完成，请查看错误详情或重试。"
     },
-    "run_clean_isolation_required": {"default": "此共享线程需要具备原生凭证保护能力的干净云环境。请新建私人线程，或选择兼容的干净云电脑。"},
+    "run_clean_isolation_required": {
+      "default": "此共享线程需要具备原生凭证保护能力的干净云环境。请新建私人线程，或选择兼容的干净云电脑。"
+    },
     "governance_denied": {
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
@@ -6494,6 +6500,14 @@
     "grantUnavailable": "此执行授权已不可用。请选择仅留言或其他有效授权。",
     "threadMessage": "给这个线程发消息",
     "readOnly": "你可以阅读此对话；如需参与，请联系 Owner 授权。",
-    "taskPrompt": "描述要创建的任务"
+    "taskPrompt": "描述要创建的任务",
+    "defaultsTitle": "默认可见范围",
+    "defaultsDescription": "用于新建项目、任务和线程。已有内容保留原权限，私人父级仍限制子资源的访问。",
+    "personalDefault": "默认创建为私人",
+    "personalDefaultDescription": "你新建的协作资源默认为私人，也可在创建时明确选择共享。",
+    "organizationDefault": "组织默认创建为私人",
+    "organizationDefaultDescription": "组织内新资源默认为私人，创建者可在创建时明确选择共享。",
+    "organizationDefaultReadOnly": "此默认值由组织管理，你也可以将自己的资源保留为私人。",
+    "defaultsLoading": "正在读取可见范围设置…"
   }
 }

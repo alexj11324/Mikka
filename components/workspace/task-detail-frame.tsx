@@ -28,6 +28,7 @@ import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
 import type { ActivityVersion } from '@/lib/issue-activity'
+import { ResourceAccessDialog } from './resource-access-dialog'
 import { PullRequestStatus } from './issue-pull-request-link'
 
 type Issue = IssueView
@@ -88,6 +89,8 @@ const REOPENED = 'todo'
  */
 export function FramedTask(props: FramedTaskProps) {
   const { Frame, task, preview, userId, onOpen, getCurrent, adopt } = props
+  const tAccess = useTranslations('ResourceAccess')
+  const [sharing, setSharing] = useState(false)
   const t = useTranslations('IssueDetail')
   const tFrame = useTranslations('IssueDetail.frame')
   const tDetail = useTranslations('Workspace.detail')
@@ -232,7 +235,7 @@ export function FramedTask(props: FramedTaskProps) {
       anchorRemoved: tActivity('anchorRemoved'), copyLink: tMenu('copyLink'), commentBy: name => tActivity('comment', { author: name }),
     }}
     favorite={menu.favorite}
-    menu={{ items: menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item), disabled: menu.disabled, onOpen: loadOptions }}
+    menu={{ items: [...(!preview && task.workspaceId ? [{id:'resource-access',label:tAccess('manage'),mark:{kind:'icon' as const,icon:'members' as const},onSelect:()=>setSharing(true)}] : []), ...menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item)], disabled: menu.disabled, onOpen: loadOptions }}
     titleField={props.titleField} saveError={props.saveError} syncNotice={props.syncNotice}
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
     acceptance={props.acceptance}
@@ -247,7 +250,7 @@ export function FramedTask(props: FramedTaskProps) {
     rowsError={metadata.error || team.failed}
     meta={[task.identifier, tFrame('created', { when: format.relativeTime(created, now) })].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
-    dialogs={<>{props.dialogs}{menu.dialogs}<IssueMetadataControls task={task} section="dialog" disabled={preview} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
+    dialogs={<>{task.workspaceId && <ResourceAccessDialog reference={{kind:'task',id:task.id,workspaceId:task.workspaceId}} open={sharing} onOpenChange={setSharing} />}{props.dialogs}{menu.dialogs}<IssueMetadataControls task={task} section="dialog" disabled={preview} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />
 }
 

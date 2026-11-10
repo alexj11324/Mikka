@@ -1,14 +1,21 @@
 import 'server-only'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import type { LanguageModel } from 'ai'
+import type { LanguageModel, ModelMessage } from 'ai'
 import { pool } from './db'
 import { openApiKeyForChat } from './model-api-keys'
 import type { HostedApiKeySnapshot } from './subscription-model-snapshot'
 import { observedModel } from './tracing/ai'
+import { estimateTokens } from './coordinator/context'
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 
 async function open(frozen: HostedApiKeySnapshot): Promise<V4Model> {
+  if (frozen.consumerId) {
+    const { botChatOwnerExclusive, liveBotChatAuthority } = await import('./collaboration/bot-chat')
+    if (frozen.collaborationEventId) {
+      await liveBotChatAuthority(pool, frozen.collaborationEventId, { ownerId: frozen.ownerId, botId: frozen.consumerId })
+    } else if (!await botChatOwnerExclusive(pool, frozen.ownerId, frozen.consumerId)) throw Error('shared_bot_execution_authority_required')
+  }
   const { apiKey, baseUrl } = await openApiKeyForChat(pool, frozen.ownerId, frozen.workspaceId, frozen.keyId, process.env,
     { actorId: frozen.actorId, model: frozen.modelId, credentialOwnerId: frozen.credentialOwnerId, credentialRevision: frozen.credentialRevision })
   const model = createOpenAICompatible({ name: 'mikka-api-key', baseURL: baseUrl, apiKey }).chatModel(frozen.modelId) as LanguageModel
@@ -28,6 +35,20 @@ export async function resolveApiKeyChatModel(frozen: HostedApiKeySnapshot): Prom
     const member = Reflect.get(target, property, target)
     if (property === 'doStream' || property === 'doGenerate') {
       return async (...args: unknown[]) => {
+        if (frozen.collaborationEventId) {
+          const input = args[0] as Parameters<V4Model['doStream']>[0]
+          // This is a conservative request-capacity bound, never a claim about
+          // provider usage or cost. Actual attempts also have a durable budget.
+          const size = estimateTokens([...input.prompt as ModelMessage[],
+            { role: 'user', content: JSON.stringify(input.tools ?? []) }])
+          if (size > 64_000) throw Error('shared_bot_input_capacity_exceeded')
+          const { reserveBotChatModelCall } = await import('./collaboration/bot-chat')
+          const { stepIdentity } = await import('./model-call-timing')
+          const budget = await reserveBotChatModelCall(frozen, await stepIdentity())
+          const deadline = AbortSignal.timeout(Math.max(1, budget.expiresAt - Date.now()))
+          args[0] = { ...input, maxOutputTokens: Math.min(input.maxOutputTokens ?? budget.maxOutputTokens, budget.maxOutputTokens),
+            abortSignal: input.abortSignal ? AbortSignal.any([input.abortSignal, deadline]) : deadline }
+        }
         const current = await open(frozen)
         return Reflect.apply(Reflect.get(current, property, current) as (...a: unknown[]) => unknown, current, args)
       }

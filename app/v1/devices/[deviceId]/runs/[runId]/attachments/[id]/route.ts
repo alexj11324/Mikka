@@ -1,14 +1,12 @@
 import { z } from 'zod'
+import { CHAT_FILE_CHUNK_BYTES } from '@mikka/protocol/chat-attachments'
 import { pool } from '@/lib/db'
 import { withDeviceRoute } from '@/lib/device-route'
 import { authenticateDevice } from '@/lib/device-link'
 import { isDeviceAuthorityError } from '@/lib/db/device-scope'
 import {
-  authorizeFileScope,
   chatFileBytes,
-  chatFileDownloadUrl,
-  fileScope,
-  readChatFile,
+  readChatFileForRun,
 } from '@/lib/chat-attachments/store'
 
 export const dynamic = 'force-dynamic'
@@ -26,27 +24,30 @@ async function handleGET(
     return Response.json({ error: 'Unavailable' }, { status: 404, headers })
   const { deviceId, runId, id } = parsed.data
   const run = (
-    await pool.query<{ prompt: string }>(
-      `SELECT r.prompt FROM agent_runs r
+    await pool.query<{ workspaceId: string; actorId: string }>(
+      `SELECT r."workspaceId",coalesce(r."agentDefinition"->'executionIdentity'->>'actor',r."userId") AS "actorId" FROM agent_runs r
     JOIN devices d ON d.id=r."deviceId"
     WHERE r.id=$1 AND r."userId"=$2 AND r."deviceId"=$3 AND d."ownerId"=$2 AND d.enabled=true AND d."removedAt" IS NULL
-      AND (r."deviceTokenId" IS NULL OR r."deviceTokenId"=$4) AND r.status IN ('preparing','running','waiting_input','paused')
-      AND (position($5 in r.prompt)>0 OR EXISTS(SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."userId"=$2 AND position($5 in m.text)>0))`,
-      [runId, actor.userId, deviceId, actor.tokenId, `[mikka-file:${id}:`],
+      AND (r."deviceTokenId" IS NULL OR r."deviceTokenId"=$4) AND r.status IN ('preparing','running','waiting_input','finishing')`,
+      [runId, actor.userId, deviceId, actor.tokenId],
     )
   ).rows[0]
   if (!run) return Response.json({ error: 'Unavailable' }, { status: 404, headers })
   try {
-    const workspace = await authorizeFileScope(actor.userId, { kind: 'thread', id: runId })
-    if (actor.scopeWorkspaceId && actor.scopeWorkspaceId !== workspace) throw Error('scope')
-    const file = await readChatFile(actor.userId, id)
-    if ((await authorizeFileScope(actor.userId, fileScope(file))) !== workspace) throw Error('scope')
-    if (!file.usedAt) return Response.json({ error: 'Unavailable' }, { status: 404, headers })
-    const downloadUrl = await chatFileDownloadUrl(file)
-    const transfer = downloadUrl
-      ? { downloadUrl }
-      : { data: Buffer.from(await chatFileBytes(file)).toString('base64') }
-    await readChatFile(actor.userId, id)
+    if (!run.workspaceId || actor.scopeWorkspaceId && actor.scopeWorkspaceId !== run.workspaceId) throw Error('scope')
+    const authority={runId,executionOwnerId:actor.userId,actorId:run.actorId,workspaceId:run.workspaceId}
+    const file = await readChatFileForRun(pool, authority, id)
+    const url=new URL(request.url)
+    if(url.searchParams.get('content')==='bytes') {
+      const bytes=new Uint8Array(await chatFileBytes(file))
+      await readChatFileForRun(pool,authority,id)
+      return new Response(new ReadableStream({start(controller){controller.enqueue(bytes);controller.close()}}),{
+        headers:{...headers,'Content-Type':'application/octet-stream','X-Content-Type-Options':'nosniff'},
+      })
+    }
+    url.search='';url.searchParams.set('content','bytes')
+    const transfer=file.size>CHAT_FILE_CHUNK_BYTES?{downloadUrl:url.href}:{data:Buffer.from(await chatFileBytes(file)).toString('base64')}
+    await readChatFileForRun(pool, authority, id)
     return Response.json(
       {
         id: file.id,

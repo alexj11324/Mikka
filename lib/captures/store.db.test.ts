@@ -7,8 +7,8 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
-// Run captures belong to one run and its owner: teammates, other devices and
-// other workspaces never read, share or make them. Uploads count only once
+// Captures follow the run's ACL; these task-free runs are private. Workspace
+// membership alone never grants their content. Uploads count only once
 // the bytes match what was announced; cloud recordings never outlive their
 // run. Database regressions execute only in CI against ephemeral Postgres 17.
 // Local pure runs skip them; REQUIRE_DB=1 makes a missing database fail.
@@ -184,6 +184,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
       await pool.query('DELETE FROM bots WHERE id=$1', [botId])
       await pool.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agentId, bobAgentId]])
       await pool.query('DELETE FROM devices WHERE id=ANY($1::uuid[])', [[cloudDevice, localDevice, bobDevice, threadDevice]])
+      await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspaceId])
       await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[alice, bob]])
     })
     await scope.close()
@@ -196,14 +197,17 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     const migration = await readFile(new URL('../../drizzle/20261029043636_run_captures.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
     for (const id of [alice, bob]) await pool.query(`INSERT INTO "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [id, `${id}@example.com`])
+    await seedFixtureWorkspace(pool, alice, 'team', workspaceId)
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status)
+      VALUES ($1,$2,$2,$3,'member','active')`, [workspaceId, bob, `${bob}@example.com`])
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'cloud','cloud'),($3,$2,'mac','local'),($4,$5,'bob','local')`, [cloudDevice, alice, localDevice, bobDevice, bob])
     await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,'synthetic',$3,$4,$5,now()+interval '5 minutes')`, [cloudToken, alice, `test-${cloudToken}`, cloudDevice, workspaceId])
     await pool.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,'codex',$3,$4),($5,$6,'codex',$7,$8)`, [agentId, alice, `Codex ${agentId}`, cloudDevice, bobAgentId, bob, `Codex ${bobAgentId}`, bobDevice])
     await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)`, [botId, workspaceId, alice, `Captures ${botId}`])
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES ($1,$2,$3,$4,true,'running',$5)`, [workspaceId, alice, `sandbox-${workspaceId}`, randomUUID(), cloudDevice])
     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display,control) VALUES ($1,$2,$3,3,'agent')`, [botId, workspaceId, alice])
-    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","botId","deviceId",status) VALUES ($1,$2,$3,$4,$5,'running'),($6,$2,$3,null,$7,'running'),($8,$9,$10,null,$11,'running')`,
-      [cloudRun, alice, agentId, botId, cloudDevice, localRun, localDevice, bobRun, bob, bobAgentId, bobDevice])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","botId","deviceId",status,"workspaceId") VALUES ($1,$2,$3,$4,$5,'running',$12),($6,$2,$3,null,$7,'running',$12),($8,$9,$10,null,$11,'running',$12)`,
+      [cloudRun, alice, agentId, botId, cloudDevice, localRun, localDevice, bobRun, bob, bobAgentId, bobDevice, workspaceId])
     await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [cloudRun])
     await pool.query(`INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [cloudRun, botId, workspaceId, alice])
     await pool.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId") VALUES ($1,$2,'markdown','Acceptance notes',$3)`, [artifactId, alice, cloudRun])
@@ -608,7 +612,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     gone = false
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'dedicated thread','cloud')`, [threadDevice, alice])
     await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,'synthetic thread',$3,$4,$5,now()+interval '5 minutes')`, [threadToken, alice, `test-${threadToken}`, threadDevice, workspaceId])
-    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","botId","deviceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$5,'running',now()+interval '5 minutes')`, [threadRun, alice, agentId, botId, threadDevice])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","botId","deviceId",status,"leaseExpiresAt","workspaceId") VALUES ($1,$2,$3,$4,$5,'running',now()+interval '5 minutes',$6)`, [threadRun, alice, agentId, botId, threadDevice, workspaceId])
     await pool.query(`INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [threadRun, botId, workspaceId, alice])
     await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,$3,$4,$5,'synthetic snapshot',$6,'running',$7)`, [threadRun, workspaceId, alice, botId, `sandbox-${threadRun}`, randomUUID(), threadDevice])
     await pool.query(`UPDATE bot_desktops SET control='user',"controlledBy"=$2,"controlUntil"=now()+interval '5 minutes' WHERE "botId"=$1`, [botId, alice])

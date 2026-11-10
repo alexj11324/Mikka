@@ -33,6 +33,11 @@ before(async () => {
   mock.module(new URL('../enterprise/live-authority.ts', import.meta.url).href, { namedExports: { workspaceLiveTicket: async (
     scope: { ownerId: string; workspaceId: string }, sessionId: string, config: Parameters<typeof liveTicket>[1],
   ) => ({ status: 'allowed', ticket: liveTicket(scope, config, Date.now(), sessionId) }) } })
+  mock.module(new URL('../resource-access/cache-proof.ts', import.meta.url).href, { namedExports: { readResourceAccessProof: async (userId: string, workspaceId: string) => {
+    assert.equal(userId, owner)
+    assert.ok(memberships.has(`${userId}:${workspaceId}`), 'no ACL digest is read before tenant authorization')
+    return { accessProof: 'a'.repeat(64), accessExpiresAt: null, accessExpiresAfterMs: null }
+  } } })
   mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, handler: (request: Request) => Promise<Response>) => handler } })
   route = await import('../../app/api/live/ticket/route')
 })
@@ -67,6 +72,8 @@ test('the route signs the session owner and exact authorized workspace, ignoring
   const response = await request()
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
   const ticket = await response.json()
+  assert.equal(ticket.accessProof, 'a'.repeat(64))
+  assert.equal(ticket.accessExpiresAt, null)
   const channel = liveChannelId({ ownerId: 'owner', workspaceId: workspace })
   assert.equal(deviceGatewayTicketValid(`live:${channel}`, ticket.protocol, secret), true)
   assert.equal(ticket.url, `wss://gateway.test/v1/live/${channel}/socket`)

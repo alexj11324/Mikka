@@ -28,6 +28,8 @@ export const hostedApiKeySnapshotSchema = z.strictObject({
   type: z.literal('api_key'), keyId: z.uuid(), ownerId: z.string().min(1),
   actorId: z.string().min(1).optional(),
   credentialOwnerId: z.string().min(1).optional(), credentialRevision: z.number().int().positive().optional(), organizationId: z.uuid().optional(),
+  /** Immutable authenticated Shared Bot contribution; checked at every call. */
+  collaborationEventId: z.uuid().optional(),
   consumerId: z.uuid().optional(), workspaceId: z.uuid(), modelId: z.string().min(1).max(128),
   /** 订阅额度用完后，自动改用 API Key: the subscription this turn would have used, out of quota, and the person's own key it runs on instead. */
   afterQuota: z.strictObject({

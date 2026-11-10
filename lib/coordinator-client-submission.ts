@@ -39,8 +39,8 @@ type Fetch = (input: string, init: RequestInit) => Promise<Response>
 type Unsettled = { submission: Submission; state: 'uncertain' | 'authRequired' | 'conflict' }
 
 /** The server-action transport keeps public errors without exposing exceptions. */
-export function readActionOutcome(result: { queued?: unknown; error?: unknown }): SubmitOutcome {
-  if (result.queued === true) return { kind: 'accepted', enabled: true, sourceEventId: null, replayed: false }
+export function readActionOutcome(result: { queued?: unknown; accepted?: unknown; error?: unknown }): SubmitOutcome {
+  if (result.queued === true || result.accepted === true) return { kind: 'accepted', enabled: true, sourceEventId: null, replayed: false }
   if (result.error === 'authRequired') return { kind: 'authRequired' }
   if (result.error === 'submissionConflict') return { kind: 'conflict' }
   return { kind: 'rejected', error: ACTION_ERROR_CODES.find(code => code === result.error) ?? 'generic' }
@@ -48,7 +48,7 @@ export function readActionOutcome(result: { queued?: unknown; error?: unknown })
 
 export async function readOutcome(response: Response): Promise<SubmitOutcome> {
   const body: Record<string, unknown> = await response.json().catch(() => ({}))
-  if (response.status === 202 && body.queued === true) return {
+  if (response.status === 202 && (body.queued === true || body.accepted === true)) return {
     kind: 'accepted',
     enabled: body.enabled !== false,
     sourceEventId: typeof body.sourceEventId === 'string' ? body.sourceEventId : null,

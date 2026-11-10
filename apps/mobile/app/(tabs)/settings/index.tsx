@@ -9,11 +9,13 @@ import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { PushRow } from '@/components/PushRow'
 import { PreferenceSaveNotice } from '@/components/PreferenceSaveNotice'
-import { Avatar, Row } from '@/components/settings'
+import { Avatar, Row, ToggleRow } from '@/components/settings'
 import { Symbol, type SymbolName } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
+import { api } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
 import { clearApiCache } from '@/lib/useApi'
 import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
@@ -38,9 +40,22 @@ const tileStyle = { width: 30, height: 30, borderRadius: 7, borderCurve: 'contin
 export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { data, error, reload } = useSettings()
+  const { data, error, reload, savePreferences, preferenceSave } = useSettings()
   const leaving = useRef(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [savingDefault, setSavingDefault] = useState(false)
+  const [defaultError, setDefaultError] = useState(false)
+  const organizationDefault = data?.resourceCreation?.organization
+  const saveOrganizationDefault = async (privateByDefault: boolean) => {
+    if (!organizationDefault?.canManage || savingDefault) return
+    const context = apiCache.context()
+    setSavingDefault(true); setDefaultError(false)
+    try {
+      await api('/api/resources/defaults', {method:'POST',body:{privateByDefault,expectedRevision:organizationDefault.revision}})
+      if(context===apiCache.context())await reload()
+    } catch { if(context===apiCache.context())setDefaultError(true) }
+    finally { if(context===apiCache.context())setSavingDefault(false) }
+  }
   const [signOutFailed, setSignOutFailed] = useState(false)
   const signOut = async () => {
     if (leaving.current) return
@@ -86,6 +101,11 @@ export default function SettingsScreen() {
             <Row icon={icon('book.fill', BookOpen, '#AF52DE')} label="记忆" onPress={() => router.push('/settings/memory')} />
             <Row icon={icon('puzzlepiece.extension.fill', Blocks, '#34C759')} label="已连接的 App" value={String(data.apps.filter(app => app.connected).length || '')} onPress={() => router.push('/settings/plugins')} />
           </Group>
+          <Group>
+            {organizationDefault && <ToggleRow label={messages.ResourceAccess.organizationDefault} value={organizationDefault.privateByDefault} disabled={savingDefault || !organizationDefault.canManage} onChange={value=>{void saveOrganizationDefault(value)}} />}
+            <ToggleRow label={messages.ResourceAccess.personalDefault} value={data.preferences.privateByDefault ?? false} disabled={preferenceSave.status !== 'idle'} onChange={privateByDefault => { void savePreferences({privateByDefault}) }} />
+          </Group>
+          {defaultError && <Text accessibilityRole="alert" style={{color:colors.danger}}>{messages.ResourceAccess.saveFailed}</Text>}
           <Group>
             <Row icon={icon('globe', Globe, '#5856D6')} label="语言" value="简体中文" trailing={Platform.OS === 'web' ? null : <Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
               onPress={Platform.OS === 'web' ? undefined : () => { void Linking.openSettings() }} />

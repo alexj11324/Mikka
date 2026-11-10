@@ -19,12 +19,16 @@ type Executor = Pick<typeof db, 'insert' | 'execute'>
 export async function recordCoordinatorEvent(executor: Executor, event: CoordinatorEventInput) {
   // Read through the same executor: inside a transaction this keeps to its one connection.
   await assertCredentialSafeChat(event.userId, event.payload, executor)
-  const inserted = await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
+  const { botChatEventInputVisible, botChatIsOwnerExclusive } = await import('./collaboration/bot-chat-provenance')
+  const visible = await botChatEventInputVisible(executor, event)
+  const mayWake = visible && (!event.botId || await botChatIsOwnerExclusive(executor, event.userId, event.botId))
+  const inserted = await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event,
+    ...(!mayWake ? { deliveredAt: new Date(), tier: 'background' as const } : {}) }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
   if (!inserted.length) return
   if (event.runId) await runChanged(executor, event.runId)
-  await botChatChanged(executor, event.userId, event.botId ?? null)
+  if (visible) await botChatChanged(executor, event.userId, event.botId ?? null)
   // A pending row starts its turn after COMMIT, whether or not the caller also wakes (#1212).
-  wakeCoordinatorAfterCommit(executor, event.userId)
+  if (mayWake) wakeCoordinatorAfterCommit(executor, event.userId)
   if (event.runId && ['run_finished', 'run_retried', 'run_credential_switched', 'run_quota_paused', 'run_question', 'run_blocked'].includes(event.kind)) {
     await runListChanged(executor, event.runId)
   }

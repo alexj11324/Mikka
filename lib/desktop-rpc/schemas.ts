@@ -87,6 +87,8 @@ const readBatch: z.ZodType = tuple(z.array(object({ action: z.enum(READ_BATCH_AC
 /** Explicit transport whitelist. Optional parameters and array lengths are
  * checked here before the original action performs its ownership checks. */
 export const desktopActionSchemas = {
+  'resource-access.getResourceCreationDefaults':tuple(uuid.optional()),
+  'resource-access.saveOrganizationCreationDefaults':tuple(uuid,z.object({privateByDefault:z.boolean(),expectedRevision:z.number().int().nonnegative()}).strict()),
   'resource-access.getResourceAccess':tuple(resourceReferenceInput),
   'resource-access.saveResourceAccess':tuple(resourceReferenceInput,resourceAccessChangeSchema),
   'resource-access.getThreadExecutionAccess':tuple(uuid,uuid),
@@ -153,13 +155,14 @@ export const desktopActionSchemas = {
   'collaboration.listMembers': oneId,
   'collaboration.inviteMember': tuple(uuid, z.email().max(254)),
   'collaboration.removeMember': tuple(uuid, id),
+  'coordinator.getBotChatContribution': tuple(bot.optional()),
   'coordinator.pollCoordinatorChat': coordinatorRead,
   'coordinator.syncCoordinatorChat': coordinatorRead,
   'coordinator.coordinatorHistory': tuple(bot, count, z.number().int().min(1).max(200).optional()),
   'coordinator.coordinatorCitationSources': tuple(z.array(uuid).min(1).max(50)),
   'coordinator.coordinatorReasoning': tuple(bot, z.array(positive).min(1).max(50)),
   'coordinator.pollBotChatSummaries': none,
-  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional(), workspace,taskCreationSchema.optional()),
+  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional(), workspace,taskCreationSchema.optional(),z.enum(['comment','reply']).optional()),
   'coordinator.welcomeCoordinator': tuple(bot.optional()),
   'coordinator.stopCoordinatorTurn': tuple(bot.optional()),
   'coordinator.retryCoordinatorTurn': tuple(bot.optional()),

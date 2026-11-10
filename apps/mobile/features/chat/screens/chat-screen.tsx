@@ -31,7 +31,7 @@ import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, sendFailureState, submissionBody, unsettled, type Outgoing } from '@/lib/outbox'
 import { apiCache } from '@/lib/api-cache'
 import { askForPush, usePushState } from '@/lib/push-state'
-import { runName, type BotPage, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
+import { runName, type BotPage, type Chat, type CitationSource, type PendingAction, type Settings } from '@/lib/types'
 import { ChatHeader } from '@/features/chat/components/chat-header'
 import { menuTasks } from '@/features/chat/model/chat-header-menu'
 import { useTasks } from '@/features/tasks/components/task-list'
@@ -47,7 +47,7 @@ import { nextQueueCheck, queuedItems } from '@/features/chat/model/chat-queue'
 import { FailedReply } from '@/components/FailedReply'
 import { eventText, questionCard } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
-import { useLiveApi, useRefresh } from '@/lib/useApi'
+import { useApi, useLiveApi, useRefresh } from '@/lib/useApi'
 import { listRef, UNRESOLVED_LIVE_ID } from '@/lib/live'
 import { pendingActionsDeadline } from '@/lib/live-client'
 import { useStop } from '@/lib/useStop'
@@ -70,7 +70,10 @@ import { Segmented } from '@/components/Segmented'
 export function ChatScreen({ botId, name, color, shape, draft, focus, compose, taskRequest, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean;taskRequest?:boolean; composerAccessory?: ReactNode | ((running: boolean) => ReactNode); composerNotice?: ReactNode }) {
   const [quote, setQuote] = useState<string | null>(null)
   const [creatingTask,setCreatingTask]=useState(Boolean(taskRequest))
-  const [taskVisibility,setTaskVisibility]=useState<'shared'|'private'>('shared')
+  const creationDefaults=useApi<NonNullable<Settings['resourceCreation']>>(creatingTask?'/api/resources/defaults':null)
+  const [taskChoice,setTaskChoice]=useState<{context:number;visibility:'shared'|'private'}|null>(null)
+  const taskVisibility=taskChoice?.context===apiCache.context()?taskChoice.visibility:creationDefaults.data?.visibility??'private'
+  const setTaskVisibility=(visibility:'shared'|'private')=>setTaskChoice({context:apiCache.context(),visibility})
   useEffect(()=>{if(taskRequest)setCreatingTask(true)},[taskRequest])
   const self = botId ?? 'coordinator'
   const router = useRouter()
@@ -205,7 +208,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, t
   }
 
   const send = async (typed: string, attachments: Attachment[] = []) => {
-    if (serviceUnavailable) return false
+    if (serviceUnavailable || creatingTask && (!creationDefaults.data || creationDefaults.error)) return false
     // While words are selected, what is typed answers them: it goes out quoting the selection.
     const words = selection && !quote && typed.trim() ? quotedMessage(selectionQuote(selection.selected, selection.text), typed) : typed
     setSelection(null)
@@ -358,10 +361,10 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, t
       </View>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer key={apiContext} value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={creatingTask?mobileMessages.ResourceAccess.taskPrompt:selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+      <Composer key={apiContext} value={text} sendDisabled={serviceUnavailable || creatingTask && (!creationDefaults.data || !!creationDefaults.error)} onChangeText={setText} placeholder={creatingTask?mobileMessages.ResourceAccess.taskPrompt:selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
           <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={data?.working ? () => void stopper.stop() : undefined} />
-          {creatingTask?<View style={styles.serviceNotice}><Text style={styles.serviceMessage}>{mobileMessages.ResourceAccess.visibility}</Text><Segmented value={taskVisibility} onChange={setTaskVisibility} options={[{value:'shared',label:mobileMessages.ResourceAccess.shared},{value:'private',label:mobileMessages.ResourceAccess.private}]} /><Text style={styles.serviceMessage}>{taskVisibility==='shared'?mobileMessages.ResourceAccess.sharedDescription:mobileMessages.ResourceAccess.privateDescription}</Text></View>:null}
+          {creatingTask?<View style={styles.serviceNotice}><ReadNotice error={creationDefaults.error} hasData={!!creationDefaults.data} label={mobileMessages.ResourceAccess.defaultsTitle} onRetry={creationDefaults.reload} />{!creationDefaults.data&&!creationDefaults.error?<Text style={styles.serviceMessage}>{mobileMessages.ResourceAccess.defaultsLoading}</Text>:null}<Text style={styles.serviceMessage}>{mobileMessages.ResourceAccess.visibility}</Text><Segmented value={taskVisibility} onChange={setTaskVisibility} options={creationDefaults.data?.kind==='personal'?[{value:'private',label:mobileMessages.ResourceAccess.private}]:[{value:'shared',label:mobileMessages.ResourceAccess.shared},{value:'private',label:mobileMessages.ResourceAccess.private}]} /><Text style={styles.serviceMessage}>{taskVisibility==='shared'?mobileMessages.ResourceAccess.sharedDescription:mobileMessages.ResourceAccess.privateDescription}</Text></View>:null}
           <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )

@@ -7,6 +7,8 @@ import { billingManagementRequest, BillingManagementError, billingManagementPath
 import type { BillingManagementOperation, BillingManagementView, BillingScope } from '@/lib/billing/management-contract'
 import type { BillingPlanState, CreditBalanceState } from './use-billing'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
+import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
+import { dropQueryKeys } from '@/components/workspace/workspace-navigation'
 
 export function useBillingManagement(initial: BillingScope) {
   const [selected, setSelected] = useState<BillingScope | null>(null)
@@ -23,19 +25,14 @@ export function useBillingManagement(initial: BillingScope) {
   useEffect(() => {
     const url = new URL(window.location.href)
     if (!url.searchParams.has('topup') && !url.searchParams.has('billing_return')) return
-    url.searchParams.delete('topup'); url.searchParams.delete('session_id'); url.searchParams.delete('billing_return')
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    dropQueryKeys('topup', 'session_id', 'billing_return')
     // The return parameter is not a payment receipt. Only a fresh ledger read is authoritative.
     void read.mutate()
   }, [read.mutate])
-  useEffect(() => {
-    const returned = () => {
-      const expected = externalReturn.current
-      if (expected && expected.kind === scope.kind && expected.id === scope.id) { externalReturn.current = null; void read.mutate() }
-    }
-    window.addEventListener('focus', returned)
-    return () => window.removeEventListener('focus', returned)
-  }, [scope.kind, scope.id, read.mutate])
+  const checkOnReturn = useCheckOnReturn(() => {
+    const expected = externalReturn.current
+    if (expected && expected.kind === scope.kind && expected.id === scope.id) { externalReturn.current = null; void read.mutate() }
+  })
   const denied = read.error instanceof BillingManagementError && [401, 403].includes(read.error.status)
   const data = denied ? undefined : read.data
   const selectScope = (next: BillingScope) => { if (writing.current) return; externalReturn.current = null; setSelected(next); setBudgetWorkspaceId(null); setError(null) }
@@ -49,7 +46,7 @@ export function useBillingManagement(initial: BillingScope) {
       if (!alive.current || currentScope.current.kind !== scope.kind || currentScope.current.id !== scope.id) return false
       if (result.url) {
         const bridge = bridgeFromWindow(window as MikkaWindow)
-        if (bridge) { externalReturn.current = scope; await bridge.app.openExternal(result.url) }
+        if (bridge) { externalReturn.current = scope; checkOnReturn(); await bridge.app.openExternal(result.url) }
         else window.location.assign(result.url)
       } else await read.mutate()
       return true

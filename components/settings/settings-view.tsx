@@ -20,6 +20,7 @@ import { PaymentDesignationSettings } from '@/components/settings/payment-design
 import { AccountSettings } from '@/components/settings/account-settings'
 import { CloudSettings } from '@/components/settings/cloud-settings'
 
+import { ResourceCreationDefaultsSettings } from './resource-creation-defaults'
 import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { SecretsPage } from '@/components/settings/secrets-page'
 import { DevicesSettings } from '@/components/devices/devices-settings'
@@ -131,7 +132,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'cloud': return userKey ? <CloudSettings userKey={userKey} workspaceId={workspaceId} /> : null
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
 
-    case 'privacy': return <PrivacySettings />
+    case 'privacy': return <><ResourceCreationDefaultsSettings workspaceId={workspaceId} /><PrivacySettings /></>
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
     case 'preferences': return <PreferencesSettings />

@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { nativeRunToolConfig, nativeToolConfigArgs, nativeToolEnvironment, nativeToolFilesystem } from '../src/agents/native-tool-isolation.mjs'
+import { nativeControllerCommand, nativeRunToolConfig, nativeToolConfigArgs, nativeToolEnvironment, nativeToolFilesystem } from '../src/agents/native-tool-isolation.mjs'
 import { claudeIsolatedTools, requireClaudeIsolatedTransport } from '../src/adapters/claude'
 import type { Query } from '@anthropic-ai/claude-agent-sdk'
 
@@ -12,6 +12,16 @@ function config() {
   const root = mkdtempSync(join(tmpdir(), 'mikka-native-tools-unit-')); roots.push(root)
   return nativeRunToolConfig({ binary: '/usr/bin/codex', worktree: join(root, 'work'), runDir: join(root, 'run'),
     privateRoots: [join(root, 'native-home')], taskEnv: { REGION: 'fixture', ANTHROPIC_API_KEY: 'must-not-be-a-tool-key', NODE_OPTIONS: '--require=/private/loader', HOME: '/private' } })
+}
+function controllerFixture() {
+  const value = config(), vendor = join(roots.at(-1)!, 'vendor')
+  mkdirSync(join(vendor, 'bin'), { recursive: true })
+  mkdirSync(join(vendor, 'codex-resources'))
+  value.binary = join(vendor, 'bin', 'codex')
+  for (const binary of [value.binary, join(vendor, 'codex-resources', 'bwrap')])
+    writeFileSync(binary, '#!/bin/sh\nexit 0\n', { mode: 0o700 })
+  mkdirSync(value.worktree)
+  return value
 }
 
 it('separates trusted native authentication and loader variables from explicitly admitted task variables', () => {
@@ -46,6 +56,27 @@ it('requires the official named profile, clean shell environment and disabled un
   expect(args).toContain('features.codex_hooks=false')
   expect(args).toContain(`projects.${JSON.stringify(value.worktree)}.trust_level="untrusted"`)
   expect(args.join('\n')).not.toContain('must-not-be-a-tool-key')
+})
+
+it('gives the native controller a lifetime namespace and hides project MCP config without rewriting it', () => {
+  const value = controllerFixture()
+  mkdirSync(join(value.worktree, '.codex'))
+  const projectConfig = join(value.worktree, '.codex', 'config.toml')
+  writeFileSync(projectConfig, 'untrusted-config-fixture')
+  const argv = nativeControllerCommand(value, [value.binary, 'app-server'], { hideProjectConfig: true })
+  for (const flag of ['--unshare-pid', '--die-with-parent', '--as-pid-1']) expect(argv).toContain(flag)
+  const masked = argv.indexOf(join(value.control, 'repository-config-disabled'))
+  expect(argv[masked - 1]).toBe('--ro-bind')
+  expect(argv[masked + 1]).toBe(join(value.worktree, '.codex'))
+  expect(argv.slice(-2)).toEqual([value.binary, 'app-server'])
+  expect(readFileSync(projectConfig, 'utf8')).toBe('untrusted-config-fixture')
+})
+
+it('does not follow a repository config symlink when mounting the controller view', () => {
+  const value = controllerFixture()
+  const other = join(roots.at(-1)!, 'private'); mkdirSync(other)
+  symlinkSync(other, join(value.worktree, '.codex'))
+  expect(() => nativeControllerCommand(value, [value.binary, 'app-server'], { hideProjectConfig: true })).toThrow('native_tool_project_config_unsafe')
 })
 
 it('Claude removes every builtin and independently rejects a forged native tool call', async () => {

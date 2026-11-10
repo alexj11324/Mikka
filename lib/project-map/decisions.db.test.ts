@@ -125,8 +125,10 @@ test('project decisions: real PostgreSQL authority, atomic appends, retries and 
   })
   await t.test('membership revocation takes effect on the next write; workspace changes never expose old reasons', async () => {
     const input = { ...base(), issueId: undefined, projectId: sharedProject, workspaceId: teamWorkspace.id }
-    await recordProjectDecision({ kind: 'human', user: owner, workspaceId: teamWorkspace.id }, input)
-    assert.deepEqual(await listProjectDecisions(await resolveProjectScope(member, sharedProject, teamWorkspace.id)), [])
+    const recorded = await recordProjectDecision({ kind: 'human', user: owner, workspaceId: teamWorkspace.id }, input)
+    const visible = await listProjectDecisions(await resolveProjectScope(member, sharedProject, teamWorkspace.id))
+    assert.deepEqual(visible.map(row => row.id), [recorded.decisionId], 'the shared project exposes its authorized decision, never the owner personal project history')
+    assert.equal(visible[0].reason, input.reason)
     await connection.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, member])
     await rejected(recordProjectDecision({ kind: 'human', user: member, workspaceId: teamWorkspace.id }, { ...input, idempotencyKey: randomUUID() }), 'PROJECT_NOT_FOUND')
   })

@@ -49,7 +49,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
     } })
     const { reclaimLostRuns, latestCheckpoint } = await import('../lib/run-leases')
 
-    async function fixture(destination?: 'cloud', automatic = true) {
+    async function fixture(destination?: 'cloud', automatic = true, visibility: 'private' | 'shared' = 'private') {
       const id = randomUUID(), userId = `cloud-handoff-${id}`, workspaceId = randomUUID(), botId = randomUUID(), issueId = randomUUID()
       const parentDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), keyId = randomUUID(), deviceB = randomUUID(), agentB = randomUUID()
       const remoteKey = `v2/github.com/mikka-ci/cloud-handoff-${id}`, remoteUrl = `https://github.com/mikka-ci/cloud-handoff-${id}.git`
@@ -71,6 +71,9 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       const key = sealSecret('synthetic-model-fixture', ['model_api_key', keyId, userId].join('\0'))
       await pool.query('INSERT INTO model_api_keys(id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) VALUES($1,$2,\'openai\',\'openai\',$3,$4,$5,\'test\',\'["gpt-5"]\')', [keyId, userId, key.ciphertext, key.iv, key.keyVersion])
       await pool.query('INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES($1,$2,$3,\'bound\',\'Cloud handoff task\',\'{"type":"doc","attrs":{"mikka":{"number":1}},"content":[]}\',\'todo\',\'normal\',\'workspace\')', [issueId, userId, workspaceId])
+      // These recovery cases use the Owner's model, Git and local computer.
+      // Make their private resource authority explicit; Shared cannot inherit it.
+      await pool.query('UPDATE resource_access_policies SET visibility=$2 WHERE kind=\'task\' AND id=$1', [issueId, visibility])
       const sourceEventId = randomUUID()
       await pool.query('INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,"deliveredAt") VALUES($1::uuid,$2,$3,$4,\'user_message\',$1::text,$5,now())', [sourceEventId, userId, botId, issueId,
         JSON.stringify({ text: 'Keep the current goal and receipts.', ...(destination ? { taskDestination: { kind: destination } } : {}) })])
@@ -89,6 +92,16 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       assert.notEqual(physical.deviceId, parentDevice)
       return { userId, workspaceId, botId, issueId, runId, deviceB, agentB, keyId, agentId, repoId, source, task, machine, now, token }
     }
+
+    await t.test('a Shared GitHub task cannot inherit personal Git authorization or start a cloud workflow', async () => {
+      const beforeWorkflows = cloudWorkflows
+      const beforeRuns = (await pool.query('SELECT count(*)::int AS n FROM agent_runs')).rows[0].n
+      const beforeMachines = (await pool.query('SELECT count(*)::int AS n FROM thread_machines')).rows[0].n
+      await assert.rejects(fixture(undefined, true, 'shared'), { message: 'personal_git_authorization_required' })
+      assert.equal(cloudWorkflows, beforeWorkflows)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs')).rows[0].n, beforeRuns)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM thread_machines')).rows[0].n, beforeMachines)
+    })
 
     await t.test('Cloud→B confirms one provider pause before exposing one fresh local receipt, then adopts the same current epoch', async () => {
       const f = await fixture()

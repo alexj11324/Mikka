@@ -98,6 +98,7 @@ export const organizationResourcePolicies = pgTable('mikka_organization_resource
   modelCredentialSharing: text('modelCredentialSharing').$type<SharingRule>().notNull().default('allow'),
   mcpSharing: text('mcpSharing').$type<SharingRule>().notNull().default('allow'),
   allowedModelProviders: jsonb('allowedModelProviders').$type<string[] | null>(),
+  privateByDefault: boolean('privateByDefault').notNull().default(false),
   modelPolicy: jsonb('modelPolicy').$type<import('@/lib/organization-model-policy').OrganizationModelPolicy | null>(),
   auditRetentionDays: integer('auditRetentionDays'),
   legalHold: boolean('legalHold').notNull().default(false),

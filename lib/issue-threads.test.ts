@@ -9,14 +9,21 @@ const make = (id: string, userId = 'teammate', issueId = 'issue') => ({
   createdAt: new Date('2026-01-01'), finishedAt: null, agentName: 'Mikka Backend', harness: 'codex', ownerName: userId === 'viewer' ? 'Me' : 'Lin',
 })
 
-test('a teammate thread shows whose it is, its status and time, never its content', () => {
-  const [team] = projectIssueThreads([make('team')], 'issue', 'viewer', new Set(['teammate', 'viewer']))
-  assert.equal(team.ownedByCurrentUser, false)
-  assert.equal(team.ownerName, 'Lin')
-  assert.equal(team.status, 'running')
-  assert.equal(team.detail, null)
-  assert.ok(!/Route|Mikka Backend|codex|Done/.test(JSON.stringify(team)))
+test('a private teammate thread exposes neither content nor a row, status or count', () => {
+  assert.deepEqual(projectIssueThreads([make('team')], 'issue', 'viewer', new Set(['teammate', 'viewer'])), [])
   assert.equal(canReadThread('teammate', 'viewer', new Set(['teammate', 'viewer'])), false)
+})
+
+test('a fresh resource grant exposes shared content while retaining the actual owner', () => {
+  const rows = [make('shared'), make('private')]
+  const members = new Set(['teammate', 'viewer'])
+  const [shared] = projectIssueThreads(rows, 'issue', 'viewer', members, new Set(['shared']))
+  assert.equal(shared.ownedByCurrentUser, false)
+  assert.equal(shared.ownerName, 'Lin')
+  assert.equal(shared.detail?.name, 'Route group replies')
+  assert.equal(shared.detail?.summary, 'Done')
+  assert.deepEqual(projectIssueThreads(rows, 'issue', 'viewer', members, new Set()), [], 'revoked grants never fall back to workspace membership')
+  assert.deepEqual(projectIssueThreads(rows, 'issue', 'removed', members, new Set(['shared'])), [])
 })
 
 test('the owner reads their own thread in full', () => {
@@ -31,19 +38,19 @@ test('the full owner detail identifies an error fallback without exposing privat
   const [own] = projectIssueThreads([row], 'issue', 'viewer', members)
   assert.equal(own.detail?.summary, 'Previous error')
   assert.equal(own.detail?.summarySource, 'error')
-  const [foreign] = projectIssueThreads([row], 'issue', 'teammate', members)
-  assert.equal(foreign.detail, null)
+  assert.deepEqual(projectIssueThreads([row], 'issue', 'teammate', members), [])
 })
 
 test('stopping is shared status metadata and disappears when the daemon acknowledges', () => {
   const row = { ...make('stopping'), stopRequestedAt: new Date('2026-01-01T00:00:01Z') }
   const members = new Set(['viewer', 'teammate'])
-  const [live] = projectIssueThreads([row], 'issue', 'viewer', members)
+  const [live] = projectIssueThreads([row], 'issue', 'viewer', members, new Set([row.id]))
   assert.equal(live.stopping, true)
-  assert.equal(live.detail, null)
+  assert.equal(live.detail?.name, 'Route group replies')
   assert.ok(!('stopRequestedAt' in live), 'the private timestamp stays out of teammate metadata')
-  const [ended] = projectIssueThreads([{ ...row, status: 'stopped' }], 'issue', 'viewer', members)
+  const [ended] = projectIssueThreads([{ ...row, status: 'stopped' }], 'issue', 'viewer', members, new Set([row.id]))
   assert.equal(ended.stopping, false)
+  assert.deepEqual(projectIssueThreads([row], 'issue', 'viewer', members), [], 'private stop status is absent')
 })
 
 test('a Bot display name or Bot identifier cannot replace the thread owner', () => {
@@ -51,9 +58,7 @@ test('a Bot display name or Bot identifier cannot replace the thread owner', () 
   const members = new Set(['owner', 'viewer'])
   const [mine] = projectIssueThreads([row], 'issue', 'owner', members)
   assert.equal(mine.detail?.agentName, 'My Bot')
-  const [foreign] = projectIssueThreads([row], 'issue', 'viewer', members)
-  assert.equal(foreign.ownedByCurrentUser, false)
-  assert.equal(foreign.detail, null)
+  assert.deepEqual(projectIssueThreads([row], 'issue', 'viewer', members), [])
   assert.equal(canReadThread(row.userId, row.botId, members), false)
 })
 
@@ -66,7 +71,7 @@ test('other issues, removed owners and removed viewers see nothing', () => {
 
 test('threads are latest first and bounded to twenty', () => {
   const rows = Array.from({ length: 30 }, (_, i) => ({ ...make(String(i)), createdAt: new Date(2026, 0, i + 1) }))
-  const result = projectIssueThreads(rows, 'issue', 'viewer', new Set(['viewer', 'teammate']))
+  const result = projectIssueThreads(rows, 'issue', 'viewer', new Set(['viewer', 'teammate']), new Set(rows.map(row => row.id)))
   assert.equal(result.length, 20); assert.equal(result[0].id, '29'); assert.equal(result[19].id, '10')
 })
 
@@ -191,9 +196,11 @@ test('thread lists expose only compact diagnostics, including the latest continu
   const failure: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
     providerMessage: 'private provider response', causes: [{ name: 'APIError' }], runId: 'root', appVersion: 'test', occurredAt: '2026-11-07T12:00:00.000Z' }
   const members = new Set(['viewer', 'teammate'])
-  const [foreign] = projectIssueThreads([{ ...make('root'), failureDetails: failure }], 'issue', 'viewer', members)
+  const foreignRows = [{ ...make('root'), failureDetails: failure }]
+  assert.deepEqual(projectIssueThreads(foreignRows, 'issue', 'viewer', members), [])
+  const [foreign] = projectIssueThreads(foreignRows, 'issue', 'viewer', members, new Set(['root']))
   assert.equal(foreign.failureDetails?.code, 'run_api_key_invalid')
-  assert.equal(foreign.detail, null)
+  assert.equal(foreign.detail?.name, 'Route group replies')
   assert.doesNotMatch(JSON.stringify(foreign), /private provider response|APIError/)
   const [own] = projectIssueThreads([{ ...make('root', 'viewer'), failureDetails: failure }], 'issue', 'viewer', members)
   const chain: RunChain = { rootRunId: 'root', latestRunId: 'next', attempts: [
