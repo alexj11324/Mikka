@@ -5,7 +5,7 @@ import { organizationBillingAccounts, organizationEntitlements, organizations, o
 import { workspaceEntitlements } from '@/lib/db/team-entitlements-schema'
 import { workspaces } from '@/lib/db/workspace-schema'
 import { workspaceDb } from '@/lib/workspace-db'
-import { requireWorkspace } from '@/lib/workspace-access'
+import { requireWorkspace, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { requireOrganizationAdmin } from '@/lib/governance/organizations'
 import { GovernanceError } from '@/lib/governance/errors'
 import { enqueueOrganizationAudit } from '@/lib/governance/audit'
@@ -13,8 +13,8 @@ import { enqueueOrganizationAudit } from '@/lib/governance/audit'
 export interface PlatformBillingAccount { organizationId: string | null; accountWorkspaceId: string }
 
 /** Resolves platform-only spending. BYO resources retain their own payer. Not an authorization check. */
-export async function resolvePlatformBillingAccount(workspaceId: string): Promise<PlatformBillingAccount> {
-  const [account] = await workspaceDb.select({ organizationId: organizationBillingAccounts.organizationId,
+export async function resolvePlatformBillingAccount(workspaceId: string, source: Pick<WorkspaceTransaction, 'select'> = workspaceDb): Promise<PlatformBillingAccount> {
+  const [account] = await source.select({ organizationId: organizationBillingAccounts.organizationId,
     accountWorkspaceId: organizationBillingAccounts.workspaceId }).from(organizationWorkspaces)
     .innerJoin(organizations, eq(organizations.id, organizationWorkspaces.organizationId))
     .innerJoin(organizationBillingAccounts, eq(organizationBillingAccounts.organizationId, organizationWorkspaces.organizationId))

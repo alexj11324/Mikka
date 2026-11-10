@@ -12,6 +12,7 @@ export type BillingManagementView = {
   platformAccountWorkspaceId: string | null
   canManageRecharge: boolean
   canManageBudget: boolean
+  capacity: { plan: 'free' | 'pro' | 'enterprise'; hostedMaxInFlight: number; activeHumanLimit: number | null }
   organizations: { id: string; name: string }[]
   organization: { id: string; name: string; role: 'owner' | 'admin'; accountWorkspaceId: string | null;
     canDesignate: boolean; accounts: { id: string; name: string; selectable: boolean }[] } | null

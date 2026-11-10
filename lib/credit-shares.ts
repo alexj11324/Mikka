@@ -8,6 +8,7 @@ import { resolvePlatformBillingAccount } from '@/lib/billing/organization-accoun
 import { hostedBillingScope } from '@/lib/abuse/context'
 import { recordAudit } from '@/lib/audit/write'
 import { sql } from 'drizzle-orm'
+import { lockWorkspaceEntitlements } from '@/lib/governance/entitlements'
 
 /**
  * 我的点数也可用于这个团队 (decision 2026-10-31-2300 item 4, orchestration.md
@@ -47,10 +48,15 @@ export async function creditShareView(actorId: string, workspaceId: string): Pro
 
 /** Turns the member's own share on or off. A team only; any active member. */
 export async function setOwnCreditShare(actorId: string, workspaceId: string, shared: boolean): Promise<CreditShareView> {
-  if (shared && (await resolvePlatformBillingAccount(workspaceId)).organizationId) throw new WorkspaceError('billingOrganizationAccountRequired')
   await workspaceDb.transaction(async ws => {
     const { workspace, membership } = await requireWorkspace(ws, workspaceId, actorId)
     if (workspace.kind !== 'team') throw new WorkspaceError('validationGeneric')
+    if (shared) {
+      // Serialize consent with account designation. Reuse this transaction so
+      // a single-connection Workspace pool never nests a second checkout.
+      await lockWorkspaceEntitlements(ws, workspaceId)
+      if ((await resolvePlatformBillingAccount(workspaceId, ws)).organizationId) throw new WorkspaceError('billingOrganizationAccountRequired')
+    }
     await db.transaction(async tx => {
       const changed = shared
         ? await tx.execute(sql`INSERT INTO workspace_credit_shares ("workspaceId","userId") VALUES (${workspaceId}::uuid,${actorId}) ON CONFLICT DO NOTHING RETURNING "userId"`)

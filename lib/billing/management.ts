@@ -4,7 +4,10 @@ import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
-import { organizationBillingAccounts, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
+import { organizationBillingAccounts, organizationEntitlements, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
+import { workspaceEntitlements } from '@/lib/db/team-entitlements-schema'
+import { resolveEntitlements } from '@/lib/governance/policy'
+import { deploymentMode } from '@/lib/governance/edition'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { requireOrganizationAdmin } from '@/lib/governance/organizations'
 import type { EnterprisePrincipal } from '@/lib/enterprise/principal'
@@ -75,6 +78,11 @@ export async function billingManagementView(actorId: string, target: BillingScop
       .where(and(eq(workspaceMembers.workspaceId, budgetWorkspaceId), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaceMembers.name)) : []
     const account = accountId ? [...available, ...linked].find(row => row.id === accountId) : null
     if (accountId && !account) throw new WorkspaceError('workspaceAccessDenied')
+    const [grantLink] = accountId ? await tx.select({ id: organizationWorkspaces.organizationId }).from(organizationWorkspaces).where(eq(organizationWorkspaces.workspaceId, accountId)).limit(1) : []
+    const entitlementOrganizationId = grantLink?.id ?? organizationId
+    const [localGrant] = accountId ? await tx.select().from(workspaceEntitlements).where(eq(workspaceEntitlements.workspaceId, accountId)).limit(1) : []
+    const [orgGrant] = entitlementOrganizationId ? await tx.select().from(organizationEntitlements).where(eq(organizationEntitlements.organizationId, entitlementOrganizationId)).limit(1) : []
+    const effective = resolveEntitlements({ mode: deploymentMode(), kind: account?.kind === 'personal' ? 'personal' : 'team', grants: [localGrant, orgGrant] })
     const [designation] = accountId ? await tx.select().from(organizationBillingAccounts).where(eq(organizationBillingAccounts.workspaceId, accountId)).limit(1) : []
     const canManageRecharge = Boolean(account && (designation ? organization?.id === designation.organizationId && organization.role === 'owner' : account.ownerId === actorId))
     const memberCount = target.kind === 'organization'
@@ -112,6 +120,7 @@ export async function billingManagementView(actorId: string, target: BillingScop
     return { scope: { ...target, name: scopeName! }, account: account ? { workspaceId: account.id, name: account.name } : null,
       billing, credits, organizations: organizationChoices, platformAccountWorkspaceId, canPurchasePlatform: accountId === platformAccountWorkspaceId, canManagePayments: Boolean(accountId && administrable.has(accountId)), canManageRecharge,
       canManageBudget: Boolean(budgetWorkspaceId && administrable.has(budgetWorkspaceId)), organization,
+      capacity: { plan: effective.plan, hostedMaxInFlight: effective.hostedMaxInFlight, activeHumanLimit: effective.activeHumanLimit },
       budgetWorkspaceId, workspaces: available.map(row => ({ id: row.id, name: row.name, canEdit: administrable.has(row.id) })), members,
       resourceTargets: resources, resourceTargetsAvailable: Boolean(policies.rows[0]?.available), budgets,
       usage: { month, costMicroUsd: totals.rows.reduce((sum, row) => sum + row.cost, 0), reservedMicroUsd: totals.rows.reduce((sum, row) => sum + row.held, 0),
@@ -153,7 +162,7 @@ export async function mutateBillingManagement(actorId: string, target: BillingSc
     const origin = resolveAppOrigin(process.env)
     if (!origin) throw new WorkspaceError('billingNotConfigured')
     const back = new URL(withBasePath('/settings'), origin)
-    back.searchParams.set('section', 'billing'); back.searchParams.set('workspace', accountId)
+    back.searchParams.set('section', 'billing'); back.searchParams.set('workspace', accountId); back.searchParams.set('billing_return', '1')
     return value.action === 'portal' ? billingPortalUrl(actorId, accountId, back.href)
       : planCheckoutUrl(actorId, accountId, back.href)
   }, { organizationId: target.kind === 'organization' ? target.id : undefined, ownPlatformAccount: value.action !== 'portal', principal })

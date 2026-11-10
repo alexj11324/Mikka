@@ -47,7 +47,7 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     await pool.query('delete from mikka_organization_billing_accounts where "organizationId"=$1', [organizationId])
     await pool.query('delete from agent_runs where "workspaceId"=any($1::uuid[])', [ids])
     await pool.query('delete from agents where "userId"=any($1::text[])', [[owner, member, admin, outsider]])
-    for (const table of ['hosted_usage', 'billing_resource_budgets', 'workspace_credit_grants', 'workspace_billing', 'personal_access_tokens'])
+    for (const table of ['hosted_usage', 'billing_resource_budgets', 'workspace_credit_grants', 'workspace_credit_shares', 'workspace_billing', 'personal_access_tokens'])
       await pool.query(`delete from ${table} where "workspaceId"=any($1::uuid[])`, [ids])
     await pool.query('delete from mikka_organizations where id=any($1::uuid[])', [[organizationId, otherOrganizationId]])
     await pool.query('delete from mikka_workspaces where id=any($1::uuid[])', [ids])
@@ -128,6 +128,26 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     await pool.query('update mikka_organization_members set status=\'suspended\' where "organizationId"=$1 and "userId"=$2', [organizationId, admin])
     assert.equal((await orgGet()).status, 403)
     await pool.query('update mikka_organization_members set status=\'active\' where "organizationId"=$1 and "userId"=$2', [organizationId, admin])
+  })
+
+  await t.test('active capacity includes existing grants without relabeling unpaid Stripe state', async () => {
+    actor = owner
+    await pool.query(`insert into mikka_workspace_entitlements("workspaceId",plan,source) values($1,'enterprise','cloud')
+      on conflict ("workspaceId") do update set plan='enterprise',source='cloud',"expiresAt"=null`, [first.id])
+    const view = await (await orgGet()).json() as BillingManagementView
+    assert.deepEqual(view.capacity, { plan: 'enterprise', hostedMaxInFlight: 128, activeHumanLimit: null })
+    assert.equal(view.billing?.entitlementPlan, 'free')
+    assert.equal(view.billing?.live, false)
+  })
+
+  await t.test('an inactive historical personal credit share remains revocable while the Organization pays', async () => {
+    const { creditShareView, setOwnCreditShare } = await import('../lib/credit-shares')
+    await pool.query('insert into workspace_credit_shares("workspaceId","userId") values($1,$2)', [first.id, member])
+    const existing = await creditShareView(member, first.id)
+    assert.deepEqual([existing.mine, existing.canShare], [true, false])
+    assert.equal((await setOwnCreditShare(member, first.id, false)).mine, false)
+    await assert.rejects(setOwnCreditShare(member, first.id, true), /billingOrganizationAccountRequired/)
+    assert.equal((await pool.query('select count(*)::int n from workspace_credit_shares where "workspaceId"=$1 and "userId"=$2', [first.id, member])).rows[0].n, 0)
   })
 
   await t.test('real scoped PATs cannot enumerate Organizations, cross tenants or survive expiry/revocation', async () => {
