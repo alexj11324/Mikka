@@ -3591,6 +3591,7 @@
       "runWaitingDevice": "等设备上线后开始",
       "runDeviceBack": "设备已上线，即将开始",
       "issueMoved": "改为{status}",
+      "issueSnapshot": "状态为{status}",
       "issueChanged": "状态有变化",
       "runReport": "汇报了进展",
       "runQuestion": "在等你回答",

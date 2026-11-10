@@ -3591,6 +3591,7 @@
       "runWaitingDevice": "starts when its computer is back online",
       "runDeviceBack": "starts now: its computer is back online",
       "issueMoved": "moved to {status}",
+      "issueSnapshot": "is {status}",
       "issueChanged": "changed status",
       "runReport": "reported progress",
       "runQuestion": "is waiting for your answer",

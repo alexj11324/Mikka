@@ -62,7 +62,7 @@ export interface ChatItem {
 
 /** lib/coordinator/event-line.ts on the server. */
 export interface EventLine {
-  kind: 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack' | 'issueStatus' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'other'
+  kind: 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack' | 'issueStatus' | 'issueSnapshot' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'scheduleRan' | 'scheduleDue' | 'other'
   runId: string | null
   issueId: string | null
   status: string | null

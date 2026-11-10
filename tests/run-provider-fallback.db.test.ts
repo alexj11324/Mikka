@@ -17,6 +17,7 @@ import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allow
 import type { DecisionAnswer } from '../lib/coordinator/decision'
 import { MODEL_ROUTING_TIERS, modelTier } from '../lib/model-routing'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
+import { threadPromptView } from '../lib/thread-prompt'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
   const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
@@ -499,6 +500,9 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(original.report.modelFallback.state, 'switched')
     assert.equal(original.report.modelFallback.retryRunId, continuation.id)
     assert.equal(continuation.status, 'queued')
+    assert.ok(original.promptTaskLength > 0)
+    assert.deepEqual(threadPromptView(continuation.prompt, continuation.promptTaskStart, continuation.promptTaskLength),
+      threadPromptView(original.prompt, original.promptTaskStart, original.promptTaskLength))
     for (const field of ['userId', 'botId', 'issueId', 'deviceId', 'deviceRepoId', 'attempt', 'kind', 'baseBranch'])
       assert.equal(continuation[field], original[field], field)
     assert.equal(continuation.agentDefinition.harness, 'codex')

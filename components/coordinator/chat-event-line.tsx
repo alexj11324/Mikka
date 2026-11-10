@@ -24,6 +24,7 @@ export function ChatEventLine({ line, citations }: { line: EventLine; citations:
   const issueStatus = line.status && tIssue.has(`status.${line.status}` as never) ? tIssue(`status.${line.status}` as never) : null
   const [subject, what] = line.kind === 'runFinished' ? [thread, line.status && RUN_ENDED.has(line.status) ? t(`runEnded.${line.status as 'succeeded'}`) : t('runEnded.other')]
     : line.kind === 'issueStatus' ? [task, issueStatus ? t('issueMoved', { status: issueStatus }) : t('issueChanged')]
+    : line.kind === 'issueSnapshot' ? [task, issueStatus ? t('issueSnapshot', { status: issueStatus }) : t('issueChanged')]
     : line.kind === 'scheduleRan' ? [schedule, line.status && SCHEDULE_ENDED.has(line.status) ? t(`scheduleEnded.${line.status as 'succeeded'}`) : t('scheduleEnded.other')]
     : line.kind === 'scheduleDue' ? [schedule, t('scheduleDue')]
     : line.kind === 'artifact' ? [null, line.title ? t('artifactTitled', { title: line.title }) : t('artifact')]
