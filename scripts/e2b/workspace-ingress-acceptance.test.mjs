@@ -449,3 +449,163 @@ test('prepare command and JSON failures keep their cause and cleanup without fab
     assert.equal(JSON.stringify(report).includes(privateText), false)
   }
 })
+
+async function localFrameworkStartup(t, { kind = 'next', status = 200,
+  body = `<main>mikka-preview-${kind}-v1</main>`, held = false, disconnect = false, killError } = {}) {
+  const { createServer } = await import('node:http')
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const execute = promisify(execFile), requested = Promise.withResolvers(), release = Promise.withResolvers()
+  const stopped = Promise.withResolvers(), calls = []
+  let requests = 0, kills = 0, headers, commandError
+  const server = createServer(async (request, response) => {
+    requests++; headers = request.headers
+    if (disconnect) { request.socket.destroy(); requested.resolve(); return }
+    response.writeHead(status, status === 302 ? { Location: '/must-not-follow' } : {})
+    response.write('<html>'); response.flushHeaders(); requested.resolve()
+    if (held) await release.promise
+    response.end(body + '</html>')
+  })
+  let port
+  do {
+    await new Promise(accept => server.listen(0, '127.0.0.1', accept))
+    port = server.address().port
+    if ([49983, 50005].includes(port)) await new Promise(accept => server.close(accept))
+  } while ([49983, 50005].includes(port))
+  const close = async () => {
+    release.resolve()
+    if (server.listening) {
+      server.closeAllConnections()
+      await new Promise(accept => server.close(accept))
+    }
+    stopped.resolve()
+  }
+  t.after(close)
+  const handle = { wait: () => stopped.promise, async kill() {
+    kills++
+    if (killError) throw killError
+    await close()
+  } }
+  const sandbox = { commands: { async run(command, options) {
+    calls.push({ command, options })
+    assert.equal(options.user, 'user')
+    if (options.background) {
+      assert.equal(options.timeoutMs, 0)
+      if (kind === 'next') assert.match(command, /dev --webpack --hostname 127\.0\.0\.1 --port \d+$/)
+      else assert.match(command, /--host 127\.0\.0\.1 --port \d+ --strictPort$/)
+      options.onStdout(kind === 'next' ? 'Ready in 1ms\n' : 'Local: http://127.0.0.1\n')
+      return handle
+    }
+    const match = /^python3 - <<'MIKKA_FRAMEWORK_HTTP_READY'\n([\s\S]*)\nMIKKA_FRAMEWORK_HTTP_READY$/.exec(command)
+    assert.ok(match)
+    assert.ok(Number.isInteger(options.timeoutMs) && options.timeoutMs > 0 && options.timeoutMs <= 90_000)
+    try {
+      const result = await execute('python3', ['-c', match[1]], { timeout: options.timeoutMs, maxBuffer: 32_768 })
+      return { exitCode: 0, stdout: result.stdout }
+    } catch (cause) { commandError = cause; throw cause }
+  } } }
+  return { sandbox, port, handle, calls, requested: requested.promise, release: () => release.resolve(),
+    stats: () => ({ requests, kills, listening: server.listening, headers, commandError }) }
+}
+
+test('framework startup waits for the complete real loopback document after the banner without a retry', async t => {
+  const { startFrameworkServer } = await import('./workspace-ingress-acceptance.mjs')
+  for (const kind of ['next', 'vite']) {
+    const f = await localFrameworkStartup(t, { kind, held: true })
+    let complete = false
+    const pending = startFrameworkServer(f.sandbox, kind, `/synthetic/${kind}`, '/synthetic', f.port)
+    void pending.then(() => { complete = true })
+    await f.requested
+    assert.equal(complete, false, 'a banner and response headers alone cannot complete startup')
+    assert.equal(f.stats().requests, 1)
+    f.release()
+    const result = await pending
+    assert.equal(result.handle, f.handle)
+    assert.equal(result.value, true)
+    assert.deepEqual([f.stats().requests, f.stats().kills, f.stats().listening], [1, 0, true])
+    assert.equal(f.stats().headers.host, `localhost:${f.port}`)
+    assert.equal(f.stats().headers['accept-encoding'], 'identity')
+    await result.handle.kill()
+    assert.equal(f.stats().listening, false)
+  }
+})
+
+test('startup refuses wrong or oversized documents and redirects, and cleanup cannot replace the failure', async t => {
+  const { startFrameworkServer } = await import('./workspace-ingress-acceptance.mjs')
+  for (const options of [{ status: 503 }, { status: 302 }, { body: '<main>mikka-preview-next-v10</main>' },
+    { body: 'x'.repeat(1_048_577) }, { body: 'wrong', killError: new Error('synthetic cleanup refusal') }]) {
+    const f = await localFrameworkStartup(t, options)
+    await assert.rejects(startFrameworkServer(f.sandbox, 'next', '/synthetic/next', '/synthetic', f.port),
+      cause => cause.receiptCode === 'ready')
+    assert.equal(f.stats().requests, 1)
+    assert.equal(f.stats().kills, 1)
+    assert.equal(f.stats().listening, Boolean(options.killError))
+  }
+})
+
+test('an actual loopback HTTP disconnect retains its command cause and stops the startup handle', async t => {
+  const { startFrameworkServer } = await import('./workspace-ingress-acceptance.mjs')
+  const f = await localFrameworkStartup(t, { disconnect: true })
+  await assert.rejects(startFrameworkServer(f.sandbox, 'next', '/synthetic/next', '/synthetic', f.port), cause => {
+    assert.equal(cause.receiptCode, 'process')
+    assert.equal(cause.cause, f.stats().commandError)
+    assert.ok(cause.cause)
+    return true
+  })
+  assert.deepEqual([f.stats().requests, f.stats().kills, f.stats().listening], [1, 1, false])
+})
+
+test('the original 90 second deadline includes SDK start and HTTP readiness and is never reset after the banner', async t => {
+  const { startFrameworkServer } = await import('./workspace-ingress-acceptance.mjs')
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1000 })
+  const started = Promise.withResolvers(), http = Promise.withResolvers(), exited = Promise.withResolvers()
+  const calls = []
+  let kills = 0
+  const handle = { wait: () => exited.promise, async kill() { kills++; exited.resolve() } }
+  const sandbox = { commands: { run(command, options) {
+    calls.push({ command, options })
+    return options.background ? started.promise : http.promise
+  } } }
+  const pending = startFrameworkServer(sandbox, 'next', '/synthetic/next', '/synthetic', 3199)
+  const refused = assert.rejects(pending, cause => cause.receiptCode === 'ready')
+  t.mock.timers.tick(70_000)
+  calls[0].options.onStdout('Ready in 70000ms\n'); started.resolve(handle)
+  for (let i = 0; i < 8; i++) await Promise.resolve()
+  assert.equal(calls.length, 2)
+  assert.equal(calls[1].options.timeoutMs, 20_000)
+  t.mock.timers.tick(20_000)
+  await refused
+  assert.equal(kills, 1)
+  http.resolve({ exitCode: 0, stdout: JSON.stringify({ status: 200, markerMatched: true }) })
+  for (let i = 0; i < 8; i++) await Promise.resolve()
+  assert.equal(kills, 1)
+})
+
+test('a process handle delivered after startup expires is killed and never starts an HTTP probe', async t => {
+  const { startFrameworkServer } = await import('./workspace-ingress-acceptance.mjs')
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1000 })
+  const started = Promise.withResolvers()
+  let calls = 0, kills = 0, waits = 0
+  const handle = { wait() { waits++; return new Promise(() => {}) }, async kill() { kills++ } }
+  const sandbox = { commands: { run() { calls++; return started.promise } } }
+  const pending = startFrameworkServer(sandbox, 'next', '/synthetic/next', '/synthetic', 3199)
+  const refused = assert.rejects(pending, cause => cause.receiptCode === 'ready')
+  t.mock.timers.tick(90_000)
+  await refused
+  assert.deepEqual([calls, kills, waits], [1, 0, 0])
+  started.resolve(handle)
+  for (let i = 0; i < 12; i++) await Promise.resolve()
+  assert.deepEqual([calls, kills, waits], [1, 1, 0])
+})
+
+test('startup preserves command failure causes and cleans a process that exits before its banner', async () => {
+  const { startFrameworkServer } = await import('./workspace-ingress-acceptance.mjs')
+  const original = new Error('synthetic SDK failure')
+  await assert.rejects(startFrameworkServer({ commands: { async run() { throw original } } },
+    'next', '/synthetic/next', '/synthetic', 3199), cause => cause === original)
+  let kills = 0, calls = 0
+  const handle = { async wait() {}, async kill() { kills++ } }
+  await assert.rejects(startFrameworkServer({ commands: { async run() { calls++; return handle } } },
+    'next', '/synthetic/next', '/synthetic', 3199), cause => cause.receiptCode === 'ready')
+  assert.deepEqual([calls, kills], [1, 1])
+})

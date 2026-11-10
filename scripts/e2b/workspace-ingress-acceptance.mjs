@@ -271,6 +271,55 @@ async function background(sandbox, command, options, ready, timeoutMs = 30_000) 
   return { handle, value: await bounded(pending.promise, timeoutMs, 'ready') }
 }
 
+export async function startFrameworkServer(sandbox, kind, directory, root, port) {
+  check(['next', 'vite'].includes(kind), 'configuration')
+  validPorts({ framework: port }, ['framework'])
+  const deadline = Date.now() + 90_000, banner = Promise.withResolvers()
+  void banner.promise.catch(() => {})
+  let handle, abandoned = false, settled = false, buffer = ''
+  const stop = async owned => { try { await bounded(owned.kill(), 5000, 'cleanup') } catch {} }
+  const remaining = () => {
+    const milliseconds = Math.min(90_000, Math.floor(deadline - Date.now()))
+    check(milliseconds > 0, 'ready')
+    return milliseconds
+  }
+  const binary = kind === 'next' ? `${root}/node_modules/next/dist/bin/next` : `${root}/node_modules/vite/bin/vite.js`
+  const args = kind === 'next' ? `dev --webpack --hostname 127.0.0.1 --port ${port}` : `--host 127.0.0.1 --port ${port} --strictPort`
+  const startup = (async () => {
+    handle = await sandbox.commands.run(`exec '${NODE}' '${binary}' ${args}`, {
+      user: 'user', cwd: directory, envs: { NEXT_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
+      background: true, timeoutMs: 0, onStderr: () => {}, onStdout: chunk => {
+        if (settled || abandoned) return
+        buffer += chunk
+        if (buffer.length > 65_536) { settled = true; banner.reject(error('ready')); return }
+        if (kind === 'next' ? buffer.includes('Ready in') : buffer.includes('Local:')) {
+          settled = true; banner.resolve()
+        }
+      },
+    })
+    // A timed-out SDK start can still deliver its exact process handle later.
+    if (abandoned) { await stop(handle); throw error('ready') }
+    void handle.wait().then(() => { if (!settled) banner.reject(error('ready')) },
+      cause => { if (!settled) banner.reject(error('ready', cause)) })
+    await banner.promise
+    check(!abandoned, 'ready')
+    const milliseconds = remaining()
+    // Next's banner precedes handler initialization. One local request and the
+    // banner share the original startup deadline; this grants no public lease.
+    const request = `import http.client,json\nc=http.client.HTTPConnection('127.0.0.1',${port},timeout=${milliseconds}/1000)\ntry:\n c.request('GET','/',headers={'Host':'localhost:${port}','Accept-Encoding':'identity','Connection':'close'})\n r=c.getresponse();b=r.read(1048577)\n print(json.dumps({'status':r.status,'markerMatched':len(b)<=1048576 and b'<main>mikka-preview-${kind}-v1</main>' in b}))\nfinally:c.close()`
+    const reply = await jsonCommand(sandbox, `python3 - <<'MIKKA_FRAMEWORK_HTTP_READY'\n${request}\nMIKKA_FRAMEWORK_HTTP_READY`, milliseconds, 'user')
+    check(!abandoned && remaining() > 0 && reply.status === 200 && reply.markerMatched === true, 'ready')
+    return { handle, value: true }
+  })()
+  void startup.catch(() => {})
+  try { return await bounded(startup, remaining(), 'ready') }
+  catch (cause) {
+    abandoned = true
+    if (handle) await stop(handle)
+    throw cause
+  }
+}
+
 async function rawChecks(sandbox, ports, fetchImpl) {
   const local = await jsonCommand(sandbox, `python3 - <<'MIKKA_LOCAL_POSITIVE'\nimport json,urllib.request\nports=${JSON.stringify(ports)}\nopener=urllib.request.build_opener(urllib.request.ProxyHandler({}))\nresult={}\nfor name in ${JSON.stringify(RAW_NAMES)}:\n host='[::1]' if name=='userLoopback6' else '127.0.0.1'\n result[name]=opener.open('http://'+host+':'+str(ports[name]),timeout=5).read()==${JSON.stringify(MARKER)}.encode()\nprint(json.dumps(result))\nMIKKA_LOCAL_POSITIVE`, 20_000, 'user')
   check(RAW_NAMES.every(name => local[name] === true), 'positive_control')
@@ -326,11 +375,7 @@ async function framework(sandbox, kind, root, identity, fetchImpl, Socket, runti
   await sandbox.files.write(`${directory}/package.json`, JSON.stringify({ name: `mikka-preview-${kind}`, private: true }), { user: 'user' })
   const port = await jsonCommand(sandbox, "python3 -c 'import socket,json;s=socket.socket();s.bind((\"127.0.0.1\",0));print(json.dumps(s.getsockname()[1]));s.close()'", 5000, 'user')
   validPorts({ framework: port }, ['framework'])
-  const binary = kind === 'next' ? `${root}/node_modules/next/dist/bin/next` : `${root}/node_modules/vite/bin/vite.js`
-  const args = kind === 'next' ? `dev --webpack --hostname 127.0.0.1 --port ${port}` : `--host 127.0.0.1 --port ${port} --strictPort`
-  const running = await background(sandbox, `exec '${NODE}' '${binary}' ${args}`, {
-    user: 'user', cwd: directory, envs: { NEXT_TELEMETRY_DISABLED: '1', NO_COLOR: '1' },
-  }, text => (kind === 'next' ? text.includes('Ready in') : text.includes('Local:')) ? true : undefined, 90_000)
+  const running = await startFrameworkServer(sandbox, kind, directory, root, port)
   const runId = randomUUID(), leaseId = randomUUID()
   const binding = { taskId: randomUUID(), runId, ownerId: identity.fixtureId, workspaceId: randomUUID(),
     deviceId: randomUUID(), repoId: randomUUID(), sandboxId: sandbox.sandboxId, epoch: 1,
