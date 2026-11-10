@@ -6,7 +6,7 @@ import { MailboxError } from './mailbox-error'
 export interface MailboxTransactionLease {
   workspaceClient?: Pick<PoolClient, 'query'>
   signal?: AbortSignal
-  check(): Promise<void>
+  check(appExecutor?: Pick<PoolClient, 'query'>): Promise<void>
   close(): Promise<void>
 }
 export interface MailboxTransactionGuard {

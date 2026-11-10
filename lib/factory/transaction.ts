@@ -65,7 +65,7 @@ export async function commitFactoryTransaction(tx: PoolClient) {
         scopes.set(JSON.stringify([scope.ownerId, scope.workspaceId]), scope);
       }
       for (const [, scope] of [...scopes.entries()].sort(([a], [b]) => a.localeCompare(b))) members.push(await acquireProfileMembership(scope));
-      for (const member of members) await member.check();
+      for (const member of members) await member.check(tx);
     }
     await tx.query('COMMIT');
     committed = true;

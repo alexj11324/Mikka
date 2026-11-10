@@ -325,6 +325,77 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 
+  await t.test('Profile COMMIT rechecks Enterprise policy on its sole owned APP client and rolls back the new version', async () => {
+    const organizationId = randomUUID(), profileId = randomUUID()
+    const { AgentProfileStore } = await import('../lib/factory/agent-profile-store')
+    await controls.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'Profile borrow fixture\',$2)', [organizationId, owner])
+    await controls.query('INSERT INTO mikka_organization_workspaces("organizationId","workspaceId") VALUES($1,$2)', [organizationId, alpha])
+    await controls.query('INSERT INTO enterprise_org_policy("organizationId","enforceSso","allowMachineCredentials") VALUES($1,false,false)', [organizationId])
+    const store = new AgentProfileStore(app, { validateModel: async () => {
+      // Inherit has no external model source to validate. This owned-fixture
+      // barrier changes real APP policy after admission, before the real COMMIT.
+      await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+    } })
+    try {
+      await assert.rejects(actAs(session.user, () => withFactoryMembership(owner, () => store.create({ ownerId: owner, workspaceId: alpha }, {
+        name: 'Rollback after Enterprise policy change', harness: 'auto', model: { mode: 'inherit' }, roles: [], skills: [], instructions: '',
+      }, profileId))), error => code(error) === 'agentProfileScopeNotFound'
+        && !!error && typeof error === 'object' && 'cause' in error && code(error.cause) === 'workspaceAccessDenied')
+      assert.equal((await controls.query('SELECT id FROM factory_agent_profiles WHERE id=$1', [profileId])).rowCount, 0)
+      assert.equal((await controls.query('SELECT "profileId" FROM factory_agent_profile_versions WHERE "profileId"=$1', [profileId])).rowCount, 0)
+      assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+      assert.equal(app.waitingCount, 0, 'fresh Enterprise checks must not queue a second APP checkout')
+    } finally {
+      await controls.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
+      await controls.query('DELETE FROM mikka_organization_workspaces WHERE "organizationId"=$1', [organizationId])
+      await controls.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
+    }
+  })
+
+  await t.test('raw CLI policy reads and both COMMIT fences reuse the single APP client and refuse a later Enterprise change', async () => {
+    const organizationId = randomUUID(), agentId = randomUUID(), taskRun = randomUUID(), coordinatorRun = randomUUID()
+    const { lockCliTaskScope, readCliRunPolicy, cliPolicyGuard, realCliMembershipGuard } = await import('../lib/agent-tool-approval/policy-store')
+    const { writeTransaction } = await import('../lib/operations/write-transaction')
+    await controls.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'CLI borrow fixture\',$2)', [organizationId, owner])
+    await controls.query('INSERT INTO mikka_organization_workspaces("organizationId","workspaceId") VALUES($1,$2)', [organizationId, alpha])
+    await controls.query('INSERT INTO enterprise_org_policy("organizationId","enforceSso","allowMachineCredentials") VALUES($1,false,false)', [organizationId])
+    await controls.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,\'CLI borrow fixture\',\'codex\')', [agentId, owner])
+    for (const [runId, issueId] of [[taskRun, a.issueId], [coordinatorRun, null]]) {
+      await controls.query('INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId",status,"finishedAt") VALUES($1,$2,$3,$4,$5,\'succeeded\',now())', [runId, owner, alpha, issueId, agentId])
+    }
+    const before = (await controls.query('SELECT title FROM issues WHERE id=$1', [a.issueId])).rows[0].title
+    try {
+      await actAs(session.user, async () => {
+        // This caller owns a raw APP transaction; no withDatabaseClient ALS
+        // supplies the executor implicitly, with or without an outer WS lease.
+        const readTask = () => writeTransaction(app, tx => lockCliTaskScope(tx, owner, a.issueId))
+        assert.equal((await readTask()).workspaceId, alpha)
+        await withTaskWorkspace(session.user, alpha, async () => {
+          assert.equal((await readTask()).workspaceId, alpha)
+          assert.equal((await readCliRunPolicy(app, taskRun, owner)).workspaceId, alpha)
+          assert.equal((await readCliRunPolicy(app, coordinatorRun, owner)).workspaceId, alpha)
+          await assert.rejects(writeTransaction(app, tx => lockCliTaskScope(tx, owner, a.issueId), {
+            guard: cliPolicyGuard(taskRun, owner, realCliMembershipGuard),
+            guardedWork: async (tx, scope) => {
+              await tx.query('UPDATE issues SET title=\'Uncommitted CLI borrow effect\' WHERE id=$1', [a.issueId])
+              await controls.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+              return scope
+            },
+          }), error => code(error) === 'workspaceAccessDenied')
+        })
+      })
+      assert.equal((await controls.query('SELECT title FROM issues WHERE id=$1', [a.issueId])).rows[0].title, before, 'the final Enterprise refusal rolls back the real APP effect')
+      assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+      assert.equal(app.waitingCount, 0, 'CLI policy and COMMIT checks must never queue a second APP checkout')
+    } finally {
+      await controls.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[taskRun, coordinatorRun]])
+      await controls.query('DELETE FROM agents WHERE id=$1', [agentId])
+      await controls.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
+      await controls.query('DELETE FROM mikka_organization_workspaces WHERE "organizationId"=$1', [organizationId])
+      await controls.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
+    }
+  })
+
   await t.test('Profile borrows are exact, cannot close their owner, and expire after nested rollback or return', async () => {
     let afterReturn: Awaited<ReturnType<typeof acquireProfileMembership>> | undefined
     await withTaskWorkspace(session.user, alpha, async () => {

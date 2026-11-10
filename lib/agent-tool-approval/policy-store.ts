@@ -49,17 +49,17 @@ export async function lockCliTaskScope(tx: PoolClient, userId: string, issueId: 
   const { rows: [task] } = await tx.query<CliTaskRow>(`SELECT "workspaceId","ownershipState","scopeVersion",
     CASE WHEN jsonb_typeof(content)='object' THEN jsonb_build_object('attrs',content->'attrs') ELSE content END AS content
     FROM issues WHERE id=$1`, [issueId])
-  return validateCliTaskScope(userId, issueId, task)
+  return validateCliTaskScope(userId, issueId, task, tx)
 }
 
-async function validateCliTaskScope(userId: string, issueId: string, task: CliTaskRow | undefined): Promise<CliTaskScope> {
+async function validateCliTaskScope(userId: string, issueId: string, task: CliTaskRow | undefined, appExecutor: Pick<PoolClient, 'query'>): Promise<CliTaskScope> {
   if (!task || task.ownershipState !== 'bound' || !task.workspaceId || readIssueMetadata(task.content).deletedAt) throw new Error('agentPolicyUnavailable')
-  await requirePolicyWorkspace(userId, task.workspaceId)
+  await requirePolicyWorkspace(userId, task.workspaceId, appExecutor)
   return { issueId, scopeVersion: task.scopeVersion, workspaceId: task.workspaceId }
 }
 
-async function requirePolicyWorkspace(userId: string, workspaceId: string) {
-  try { await requireTaskWorkspace(userId, workspaceId) }
+async function requirePolicyWorkspace(userId: string, workspaceId: string, appExecutor: Pick<PoolClient, 'query'>) {
+  try { await requireTaskWorkspace(userId, workspaceId, appExecutor) }
   catch (error) {
     if (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied') throw new Error('agentPolicyUnavailable', { cause: error })
     throw error
@@ -197,10 +197,10 @@ export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: st
     FROM agent_runs r LEFT JOIN issues i ON i.id=r."issueId" WHERE r.id=$1 AND r."userId"=$2`, [runId,userId])
   const run = result.rows[0]
   if (!run?.runWorkspaceId) throw new Error('agentPolicyUnavailable')
-  const task = run.issueId ? await validateCliTaskScope(userId,run.issueId,run) : undefined
+  const task = run.issueId ? await validateCliTaskScope(userId,run.issueId,run,tx) : undefined
   if (task && task.workspaceId !== run.runWorkspaceId) throw new Error('agentPolicyUnavailable')
   if (!task && run.hierarchy != null) throw new Error('agentPolicyUnavailable')
-  if (!task) await requirePolicyWorkspace(userId, run.runWorkspaceId)
+  if (!task) await requirePolicyWorkspace(userId, run.runWorkspaceId, tx)
   if (task) { const hierarchy = await cliHierarchy(task,run.hierarchy); if (hierarchy) task.hierarchy = hierarchy }
   const current = await lockCliAgentPolicy(tx,userId,run.agentId,run.botId,task,run.runWorkspaceId)
   if (options.freezeHierarchy !== false && task?.hierarchy && run.hierarchy == null) {
@@ -256,7 +256,7 @@ export async function policyMemberships(current: Awaited<ReturnType<typeof lockC
     return {
       workspaceClient: leases[current.workspaceIds.indexOf(current.workspaceId ?? '')]?.workspaceClient,
       signal: AbortSignal.any([signal, ...leases.flatMap(lease => lease.signal ? [lease.signal] : [])]),
-      async check() { for (const lease of leases) await lease.check() },
+      async check(appExecutor) { for (const lease of leases) await lease.check(appExecutor) },
       async close() { await Promise.all(leases.map(lease => lease.close())) },
     }
   } catch (error) { await Promise.all(leases.map(lease => lease.close())); throw error }

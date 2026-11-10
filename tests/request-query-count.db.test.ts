@@ -351,7 +351,8 @@ test('held Task Workspace linkage follows real Org writers, nested rollback and 
   const { setTimeout: delay } = await import('node:timers/promises')
   const { pool } = await import('../lib/db')
   const { workspaceDb, workspacePool } = await import('../lib/workspace-db')
-  const { activeTaskWorkspaces, withTaskWorkspace } = await import('../lib/task-workspace')
+  const { activeTaskWorkspaces, withTaskWorkspace, borrowTaskWorkspaceMembership } = await import('../lib/task-workspace')
+  const { actAs } = await import('../lib/acting-user')
   const { enterprisePrincipal } = await import('../lib/enterprise/principal')
   const org = await import('../lib/governance/organizations')
   const keys = ['MIKKA_EDITION', 'DEVICE_GATEWAY_URL', 'DEVICE_GATEWAY_PUSH_SECRET'] as const
@@ -518,6 +519,22 @@ test('held Task Workspace linkage follows real Org writers, nested rollback and 
       }
     })
 
+    await t.test('borrowed membership rechecks a policy change within the same live Workspace lease', async () => {
+      await policy(false)
+      try {
+        await withTaskWorkspace(plain, workspaceId, async () => {
+          const borrowed = borrowTaskWorkspaceMembership(owner.id, workspaceId)
+          assert.ok(borrowed)
+          await borrowed.check()
+          await policy(true)
+          await assert.rejects(borrowed.check(), { code: 'workspaceAccessDenied' }, 'holding membership cannot retain the old SSO policy')
+          await policy(false)
+          await borrowed.check()
+          await borrowed.close()
+        })
+      } finally { await policy(true) }
+    })
+
     await t.test('held linkage never freezes current policy, SCIM, provider verification or the exact session', async () => {
       // These are real persisted bindings. OIDC/SAML protocol validation has its separate HTTP/PG suite.
       await pool.query('insert into enterprise_sso_provider(id,"providerId","organizationScopeId","userId",issuer,domain,"domainVerified","oidcConfig","domainTokenHash") values($1,$2,$3,$4,$5,$6,true,$7,$8)', [randomUUID(), providerId, orgId, owner.id, 'https://held.example.invalid', providerId + '.example.invalid', '{}', hash])
@@ -526,24 +543,34 @@ test('held Task Workspace linkage follows real Org writers, nested rollback and 
       await pool.query('insert into enterprise_identity(id,"providerId",issuer,subject,"userId","directoryUserId") values($1,$2,$3,$4,$4,$5)', [identityId, providerId, 'https://held.example.invalid', owner.id, directoryId])
       await pool.query('update session set "enterpriseOrganizationId"=$2,"enterpriseProviderId"=$3,"enterpriseIdentityId"=$4 where id=$1', [assuredSession, orgId, providerId, identityId])
       await withTaskWorkspace(assured, workspaceId, async () => {
+        const borrowed = borrowTaskWorkspaceMembership(owner.id, workspaceId)
+        assert.ok(borrowed)
+        await borrowed.check()
         assert.deepEqual(await read(workspaceId, assured), visible(workspaceId))
         await policy(false)
         assert.deepEqual(await read(), visible(workspaceId))
         await policy(true)
         assert.deepEqual(await read(), [], 'a plain session does not acquire the held reader\'s SSO assurance')
+        await actAs(plain, () => assert.rejects(borrowed.check(), { code: 'workspaceAccessDenied' }, 'a current plain actor cannot borrow the holder\'s SSO assurance'))
+        await borrowed.check()
         assert.deepEqual(await read(workspaceId, assured), visible(workspaceId))
         await pool.query('update enterprise_scim_user set active=false where id=$1', [directoryId])
         assert.deepEqual(await read(workspaceId, assured), [], 'SCIM deactivation wins within the existing lease')
+        await assert.rejects(borrowed.check(), { code: 'workspaceAccessDenied' })
         await pool.query('update enterprise_scim_user set active=true where id=$1', [directoryId])
         assert.deepEqual(await read(workspaceId, assured), visible(workspaceId))
         await pool.query('update enterprise_sso_provider set "domainVerified"=false where "providerId"=$1', [providerId])
         assert.deepEqual(await read(workspaceId, assured), [], 'provider verification is checked on the next call')
+        await assert.rejects(borrowed.check(), { code: 'workspaceAccessDenied' })
         await pool.query('update enterprise_sso_provider set "domainVerified"=true where "providerId"=$1', [providerId])
         assert.deepEqual(await read(workspaceId, assured), visible(workspaceId))
         await pool.query('update session set "expiresAt"=now()-interval \'1 second\' where id=$1', [assuredSession])
         assert.deepEqual(await read(workspaceId, assured), [], 'a once-assured session must still be current')
+        await assert.rejects(borrowed.check(), { code: 'workspaceAccessDenied' })
         await pool.query('update session set "expiresAt"=now()+interval \'1 hour\' where id=$1', [assuredSession])
         assert.deepEqual(await read(workspaceId, assured), visible(workspaceId))
+        await borrowed.check()
+        await borrowed.close()
       })
     })
   } finally {

@@ -244,7 +244,7 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
       if (deps.transaction) (await import('./transaction')).registerFactoryProfile(client, scope, agentProfile)
       else {
         member = await membership(scope)
-        await member.check()
+        await member.check(client)
         await client.query('COMMIT')
       }
       return { target, ...(agentProfile ? { agentProfile } : {}), selectionMode }
