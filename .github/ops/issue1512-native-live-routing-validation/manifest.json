@@ -1,6 +1,6 @@
 {
   "schema": "issue1512-native-live-routing-validation/v1",
-  "enabled": true,
+  "enabled": false,
   "draft": false,
   "opsBranch": "ops/1512-task-runs-pg-20261110",
   "admissionMessage": "ops: issue1512 live routing corrected validation ca60e1f3-5d08-45e9-b8ef-8ea2a8e7ff38",
@@ -193,7 +193,7 @@
       "testToken": "apps/desktop/src/renderer/workspace-live.test.ts"
     }
   ],
-  "status": "BOUND FOR ONE CORRECTED FIXED-SOURCE VALIDATION; prior FAIL preserved; actual G2 tests not yet executed",
+  "status": "CLOSED after one fixed G2 admission; later pushes cannot run this entry",
   "beforeEvidence": {
     "kind": "actual instrumented Native diagnostic; no manufactured missing-export RED",
     "source": "2e2f75de15a01858ac0990bbcf4b50156832dbc7",
@@ -354,5 +354,10 @@
       "Full PG15 and fresh setup, three previously failed typechecks and both affected lints must actually pass.",
       "G as a whole remains FAIL; no Native or production acceptance success is implied."
     ]
+  },
+  "closedAdmission": {
+    "opsSha": "4c7270ebfdf828f368cac066ffc8589d8b522d5e",
+    "sourceSha": "0b3b0f69b901b46e9d25da7e619e04f2c09c4c9e",
+    "reason": "Prevent duplicate execution while the admitted run finishes and performs owned cleanup."
   }
 }
