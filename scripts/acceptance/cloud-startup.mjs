@@ -630,7 +630,11 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
   const watchedRunIds = new Set([record.runId])
   const extraScopes = new Set()
   let closed = false, reading = false, dirty = false, deadline = false, settle, refreshWork
-  const outcome = new Promise((resolve, reject) => { settle = { resolve, reject } })
+  let readsStarted = 0, readsCompleted = 0, lastCompletedAt = null, readInFlight = false, liveObserver, outcomeSettled = false
+  const outcome = new Promise((resolve, reject) => { settle = {
+    resolve: () => { outcomeSettled = true; resolve() },
+    reject: error => { outcomeSettled = true; reject(error) },
+  } })
   const abort = () => settle.reject(new Error('startup_observation_aborted'))
   if (hooks.signal?.aborted) abort()
   else hooks.signal?.addEventListener('abort', abort, { once: true })
@@ -663,21 +667,42 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
     url.searchParams.set('revisions', '1')
     const socket = new WebSocketImpl(url, ticket.protocol)
     sockets.set(workspaceId, socket)
-    socket.onclose = socket.onerror = () => { if (!closed) failLive('live_disconnected') }
+    const timeline = { openedAt: null, readyAt: null, lastNotificationAt: null }
     const failLive = code => reject(new Error(`startup_${code}`))
+    const disconnected = (event, close) => {
+      if (closed || outcomeSettled) return
+      // Freeze only the first observed transport fault. No event bodies, tickets
+      // or identifiers leave; later callbacks cannot rewrite the failure.
+      if (!liveObserver) {
+        const firstFailure = { event, at: iso(now()), scopeHash: sha(workspaceId).slice(0, 16),
+          readyState: Number.isInteger(socket.readyState) && socket.readyState >= 0 && socket.readyState <= 3 ? socket.readyState : null }
+        if (event === 'close') {
+          if (Number.isInteger(close?.code) && close.code >= 0 && close.code <= 65535) firstFailure.code = close.code
+          if (typeof close?.wasClean === 'boolean') firstFailure.wasClean = close.wasClean
+        }
+        liveObserver = record.liveObserver = { version: 1, firstFailure, ...timeline,
+          detailReads: { started: readsStarted, completed: readsCompleted, lastCompletedAt, inFlightAtFailure: readInFlight },
+          shutdownAt: null }
+      }
+      failLive('live_disconnected')
+    }
+    socket.onclose = event => disconnected('close', event)
+    socket.onerror = () => disconnected('error')
     socket.onmessage = message => {
       if (closed || message.data === 'pong' || typeof message.data !== 'string' || message.data.length > 2048) return
       let value
       try { value = JSON.parse(message.data) } catch { return }
       if (value.type === 'live_ready') {
         if (!Array.isArray(value.kinds) || !value.kinds.includes('thread') || !value.kinds.includes('run')) return failLive('live_capability_missing')
+        timeline.readyAt ??= iso(now())
         kick(); return
       }
       if ((['thread', 'run'].includes(value.kind) && watchedRunIds.has(value.id))
         || (value.kind === 'issue_threads' && value.id === record.issueId)
-        || hooks.matches?.(value)) kick()
+        || hooks.matches?.(value)) { timeline.lastNotificationAt = iso(now()); kick() }
     }
     socket.onopen = () => {
+      timeline.openedAt ??= iso(now())
       const heartbeat = () => { if (closed) return; if (socket.readyState === 1) socket.send('ping'); later(heartbeat, 30000) }
       later(heartbeat, 30000)
     }
@@ -689,7 +714,12 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
       do {
         dirty = false
         const finalRead = deadline
-        const detail = await client.rpc('agents.getIssueThread', [record.issueId, record.runId])
+        readsStarted++; readInFlight = true
+        let detail
+        try {
+          detail = await client.rpc('agents.getIssueThread', [record.issueId, record.runId])
+          readsCompleted++; lastCompletedAt = iso(now())
+        } finally { readInFlight = false }
         if (closed) return
         record.detailReads = (record.detailReads ?? 0) + 1
         record.runCreatedAt ??= detail.thread?.createdAt ?? null
@@ -711,6 +741,7 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
   try { await outcome }
   finally {
     closed = true
+    if (liveObserver) liveObserver.shutdownAt = iso(now())
     hooks.signal?.removeEventListener('abort', abort)
     for (const timer of timers) clearTimeout(timer)
     for (const socket of sockets.values()) { socket.onclose = socket.onerror = socket.onmessage = socket.onopen = null; socket.close() }
