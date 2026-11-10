@@ -174,7 +174,7 @@ export async function deleteAccount(userId: string, email: string, options: impo
   return { ok: false, pending: true, id: job.id, stage: job.stage }
 }
 
-export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<Plan | { soleAdminOf: string[] }> {
+export async function planWorkspaces(wtx: WorkspaceTx, userId: string, appTarget?: Pick<PoolClient, 'query'>): Promise<Plan | { soleAdminOf: string[] }> {
   const memberships = await wtx.select({ workspaceId: workspaceMembers.workspaceId, role: workspaceMembers.role, status: workspaceMembers.status })
     .from(workspaceMembers).where(eq(workspaceMembers.userId, userId))
   const owned = await wtx.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.userId, userId))
@@ -206,9 +206,9 @@ export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<
   const keptIssueIds: string[] = []
   // New shared Projects need no Team link. Retention follows their persisted
   // tenant, including a former membership, and never changes private ACLs.
-  const { pool } = await import('@/lib/db')
-  const policyProjects = await pool.query<{ id: string }>(`select id from resource_access_policies
-    where kind='project' and "ownerId"=$1 and "workspaceId" is not null and not ("workspaceId"=any($2::uuid[]))`, [userId, solo])
+  const app = appTarget ?? (await import('@/lib/db')).pool
+  const policyProjects = await localResourceAcl(app) ? await app.query<{ id: string }>(`select id from resource_access_policies
+    where kind='project' and "ownerId"=$1 and "workspaceId" is not null and not ("workspaceId"=any($2::uuid[]))`, [userId, solo]) : { rows: [] }
   const keptProjectIds = [...new Set([
     ...policyProjects.rows.map(row => row.id),
     ...shared.length ? (await wtx.select({ id: teamProjects.projectId }).from(teamProjects).where(inArray(teamProjects.workspaceId, shared))).map(row => row.id) : [],
@@ -222,11 +222,19 @@ export async function planWorkspaces(wtx: WorkspaceTx, userId: string): Promise<
  * Only a bound tenant explicitly in solo is deleted: a former membership,
  * provider scope or creator cannot turn a Shared/pending task into personal data.
  * A restore journal's prior keep decision is never silently discarded. */
+async function localResourceAcl(client: Pick<PoolClient, 'query'>): Promise<boolean> {
+  // A historical restore target may predate resource ACLs and deliberately
+  // use search_path=<isolated schema>,public. Never fall through into the
+  // live schema's authority or audit rows while replaying deletion there.
+  return (await client.query<{ present: boolean }>(`select exists(select 1 from information_schema.tables
+    where table_schema=current_schema() and table_name='resource_access_policies') as present`)).rows[0]?.present === true
+}
+
 export async function freezeTaskRetention(client: Pick<PoolClient, 'query'>, userId: string, plan: Plan): Promise<Plan> {
   // Match content writers: Workspace authority is already held, then ACL,
   // then Factory/Task rows. Revoking subject grants later cannot invert this
   // order against an in-flight edit of a retained shared Task.
-  await client.query(`select p.kind,p.id from resource_access_policies p where p."ownerId"=$1
+  if (await localResourceAcl(client)) await client.query(`select p.kind,p.id from resource_access_policies p where p."ownerId"=$1
     or exists(select 1 from resource_access_grants g where g."resourceKind"=p.kind and g."resourceId"=p.id and g."subjectKind"='account' and g."subjectId"=$1)
     or (p.kind='task' and (p.id=any($2::uuid[])
       or exists(select 1 from issue_documents d where d."issueId"=p.id and d."userId"=$1)
@@ -358,8 +366,10 @@ export async function deleteMainAccountData(client: PoolClient, userId: string, 
     where id=any($2::uuid[]) and "userId"=$1`, [userId, kept.events, kept.bots])
   // Subject grants end with the account; private retained source rows never
   // become shared or readable by an administrator through this cleanup.
-  await client.query('delete from resource_access_grants where "subjectKind"=\'account\' and "subjectId"=$1', [userId])
-  await client.query('delete from resource_access_policies where kind=\'project\' and "ownerId"=$1 and not (id=any($2::uuid[]))', [userId, plan.keptProjectIds])
+  if (await localResourceAcl(client)) {
+    await client.query('delete from resource_access_grants where "subjectKind"=\'account\' and "subjectId"=$1', [userId])
+    await client.query('delete from resource_access_policies where kind=\'project\' and "ownerId"=$1 and not (id=any($2::uuid[]))', [userId, plan.keptProjectIds])
+  }
   const statements = await deletionStatements(client, userId, plan, kept)
   // Complete child deletes before attempting their execution/task parents.
   // A guarded workspace also rejects the implicit UPDATE from SET NULL FKs

@@ -56,7 +56,7 @@ export async function lockResourceAccess(executor: ResourceExecutor, userId: str
  * in one deterministic order before any content row, including overlapping
  * private parents; locking each resource separately can deadlock. */
 export async function lockResourcesAccess(executor: ResourceExecutor, userId: string,
-  requests: readonly { reference: ResourceReference; action: ResourceAction }[], writePolicy = false): Promise<ResourcePolicy[]> {
+  requests: readonly { reference: ResourceReference; action: ResourceAction }[], writePolicy = false, returnPolicies = true): Promise<ResourcePolicy[]> {
   if (!requests.length) return []
   for (const { reference } of requests) referenceSchema.parse(reference)
   const roots = sql.join(requests.map(({ reference }) => sql`(${reference.kind}::text,${reference.id}::uuid)`), sql`, `)
@@ -67,28 +67,30 @@ export async function lockResourcesAccess(executor: ResourceExecutor, userId: st
       from ancestry a join resource_access_policies p on p.kind=a."parentKind" and p.id=a."parentId" where a.depth<32 and not a.cycle
   )`
   const strength = writePolicy ? sql`for update of p` : sql`for share of p`
-  const locked = await executor.execute<ResourcePolicy>(sql`${ancestry} select p.* from resource_access_policies p
+  const locked = await executor.execute<{ kind: ResourceKind; id: string }>(sql`${ancestry} select p.kind,p.id from resource_access_policies p
     where (p.kind,p.id) in (select kind,id from ancestry) order by p.kind,p.id ${strength}`)
-  const { rows: current } = await executor.execute<{ kind: ResourceKind; id: string }>(sql`${ancestry} select kind,id from ancestry`)
-  const keys = new Set(locked.rows.map(row => `${row.kind}:${row.id}`))
-  if (current.some(row => !keys.has(`${row.kind}:${row.id}`))) throw new ActionFailureError('issueNotFound')
-  const result: ResourcePolicy[] = []
-  for (const { reference, action } of requests) {
-    const policy = locked.rows.find(row => row.kind === reference.kind && row.id === reference.id)
-    if (!policy || !await resourceActionAllowed(executor, userId, reference, action)) throw new ActionFailureError('issueNotFound')
-    result.push(policy)
-  }
-  return result
+  // One post-wait statement rechecks both ancestry and every requested action.
+  // Content writers need the authorization result, not complete policy rows.
+  const values = requests.map(({ reference, action }, position) => ({ ...reference, action, position }))
+  const keys = locked.rows.map(row => `${row.kind}:${row.id}`)
+  const { rows } = await executor.execute<ResourcePolicy & { allowed: boolean }>(sql`${ancestry}
+    select ${returnPolicies ? sql`p.*,` : sql``}
+      mikka_resource_acl_allowed('account',${userId},r."workspaceId",r.kind,r.id,r.action)
+      and not exists(select 1 from ancestry a where not ((a.kind||':'||a.id::text)=any(${sql.param(keys)}::text[]))) as allowed
+    from jsonb_to_recordset(${JSON.stringify(values)}::jsonb) r(kind text,id uuid,"workspaceId" uuid,action text,position integer)
+    join resource_access_policies p on p.kind=r.kind and p.id=r.id order by r.position`)
+  if (rows.length !== requests.length || rows.some(row => !row.allowed)) throw new ActionFailureError('issueNotFound')
+  return returnPolicies ? rows.map(({ allowed: _allowed, ...policy }) => policy) : []
 }
 
 /** Canonical write lease: Workspace and membership first, then APP ACL rows,
  * then the caller's resource rows. Nested actions share this APP transaction. */
 export async function withResourceAccess<T>(reader: IssueReader, reference: ResourceReference, action: ResourceAction,
-  work: (policy: ResourcePolicy) => Promise<T>): Promise<T> {
+  work: (policy: ResourcePolicy, tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>): Promise<T> {
   referenceSchema.parse(reference)
   return withTaskWorkspace(reader, reference.workspaceId, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
     const policy = await lockResourceAccess(tx, taskReaderScope(reader).userId, reference, action)
-    return work(policy)
+    return work(policy, tx)
   })))
 }
 

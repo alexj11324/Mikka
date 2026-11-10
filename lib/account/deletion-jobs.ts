@@ -113,7 +113,7 @@ async function prepare(job: AccountDeletionJob, options: AccountDeletionOptions,
     // This canonical guard and the Organization owner check commit together.
     // A refused request removes its guard while still holding the Org row.
     await guard(client, job.subjectUserId, job.id, job.requestedAt)
-    let planned: Plan | PreparationRefusal = await planWorkspaces(drizzle(client), job.subjectUserId)
+    let planned: Plan | PreparationRefusal = await planWorkspaces(drizzle(client), job.subjectUserId, main)
     if (!('soleAdminOf' in planned)) {
       try { await lockAccountOrganizationOwnership(drizzle(client), job.subjectUserId) }
       catch (error) {
@@ -183,7 +183,7 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       assertHeld()
       const frozen = await transaction(workspace, async client => {
         assertHeld()
-        const plan = options.replayPlan ?? await planWorkspaces(drizzle(client), job.subjectUserId)
+        const plan = options.replayPlan ?? await planWorkspaces(drizzle(client), job.subjectUserId, main)
         await lockAccountOrganizationOwnership(drizzle(client), job.subjectUserId)
         if (!('soleAdminOf' in plan) && plan.solo.length) await client.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") SELECT unnest($1::uuid[]),$2 ON CONFLICT DO NOTHING', [plan.solo, id])
         assertHeld()
@@ -205,7 +205,7 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       assertHeld()
       await transaction(workspace, async workspaceClient => {
         assertHeld()
-        const checked = await planWorkspaces(drizzle(workspaceClient), job.subjectUserId)
+        const checked = await planWorkspaces(drizzle(workspaceClient), job.subjectUserId, main)
         if (!options.replayPlan && ('soleAdminOf' in checked || auditDigest(checked) !== auditDigest(frozen))) throw new Error('accountDeletionWorkspaceChanged')
         // Existing order is Workspace -> Organization -> APP. Keep the Org
         // ownership decision locked until the APP deletion has committed.

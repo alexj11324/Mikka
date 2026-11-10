@@ -26,15 +26,16 @@ export async function requireCurrentIssueWorkspace(reader: IssueReader, workspac
  * An existing task's authorization failure has the same unavailable response
  * as its entry ACL, including for the creator. New-task admission stays separate. */
 export async function withIssueWorkspace<T>(reader: IssueReader, workspaceId: string | null,
-  access: { issueId: string; action: ResourceAction; relatedIssueIds?: readonly string[] }, work: (workspace: TaskWorkspace) => Promise<T>): Promise<T> {
+  access: { issueId: string; action: ResourceAction; relatedIssueIds?: readonly string[] },
+  work: (workspace: TaskWorkspace, tx: Parameters<Parameters<typeof import('./db').db.transaction>[0]>[0]) => Promise<T>): Promise<T> {
   if (!workspaceId) throw new ActionFailureError('issueNotFound')
   const { withTaskWorkspace, taskReaderScope } = await import('./task-workspace')
   const { db, withDatabaseTransaction } = await import('./db')
   const { lockResourcesAccess } = await import('./resource-access/store')
   try { return await withTaskWorkspace(reader, workspaceId, workspace => db.transaction(tx => withDatabaseTransaction(tx, async () => {
     await lockResourcesAccess(tx, taskReaderScope(reader).userId,
-      [...new Set([access.issueId, ...access.relatedIssueIds ?? []])].map(id => ({ reference: { kind: 'task' as const, id, workspaceId }, action: access.action })))
-    return work(workspace)
+      [...new Set([access.issueId, ...access.relatedIssueIds ?? []])].map(id => ({ reference: { kind: 'task' as const, id, workspaceId }, action: access.action })), false, false)
+    return work(workspace, tx)
   }))) }
   catch (error) {
     if (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied') throw Object.assign(new ActionFailureError('issueNotFound'), { cause: error })

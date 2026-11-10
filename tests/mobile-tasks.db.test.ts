@@ -265,7 +265,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const unlinkedId = await workspaceTask()
     const { rows: [localTeam] } = await workspace.query('select identifier from mikka_teams where id=$1', [team.id])
     const removed = await changeTeam({ issueId: unlinkedId, teamId: null, expectedTeamId: team.id })
-    assert.equal(removed.ok, true)
+    assert.equal(removed.ok, true, JSON.stringify(removed))
     await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'MOBI', other, 'OTHR'])
     const { rows: [numbered] } = await pool.query('select content,scope,"workspaceId","ownershipState" from issues where id=$1', [unlinkedId])
     const identifier = 'MOBI-' + numbered.content.attrs.mikka.number

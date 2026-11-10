@@ -206,6 +206,25 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
         assert.equal(await allowed(owner, 'thread', id), true)
       }
     })
+
+    await t.test('account freeze refuses new authority while revocation and its immutable audit remain writable', async () => {
+      const subject = `deleting-${suffix}`, resource = randomUUID()
+      await app.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$1||\'@acl.example.invalid\',true,now(),now())', [subject])
+      await app.query('insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance) values(\'task\',$1,$2,$3,\'private\',\'created\')', [resource, alpha, subject])
+      await app.query('insert into resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities) values(\'task\',$1,\'account\',$2,ARRAY[\'canReadContent\'])', [resource, member])
+      await app.query('insert into account_deletion_guards("subjectId","jobId") values($1,$2)', [subject, randomUUID()])
+      await assert.rejects(app.query('update resource_access_policies set visibility=\'shared\' where kind=\'task\' and id=$1', [resource]), { code: '55000' })
+      await assert.rejects(app.query('insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance) values(\'task\',$1,$2,$3,\'private\',\'created\')', [randomUUID(), alpha, subject]), { code: '55000' })
+      await assert.rejects(app.query('insert into resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities) values(\'task\',$1,\'account\',$2,ARRAY[\'canReadContent\'])', [resource, manager]), { code: '55000' })
+      const revision = (await policy('task', resource)).revision
+      await app.query('delete from resource_access_grants where "resourceKind"=\'task\' and "resourceId"=$1', [resource])
+      assert.ok((await policy('task', resource)).revision > revision)
+      await app.query('delete from resource_access_policies where kind=\'task\' and id=$1', [resource])
+      const events = (await app.query('select action from resource_access_events where "resourceKind"=\'task\' and "resourceId"=$1', [resource])).rows
+      assert.ok(events.some(row => row.action === 'grant_delete'))
+      assert.ok(events.some(row => row.action === 'delete'))
+      await assert.rejects(app.query('delete from resource_access_events where "resourceId"=$1', [resource]), { code: '23514' })
+    })
   } finally {
     if (previous.app === undefined) delete process.env.MIKKA_DATABASE_URL; else process.env.MIKKA_DATABASE_URL = previous.app
     if (previous.ws === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = previous.ws
