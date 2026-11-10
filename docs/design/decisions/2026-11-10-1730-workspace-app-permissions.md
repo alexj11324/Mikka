@@ -3,13 +3,13 @@
 - Date: 2026-11-10
 - Source: Alex: authorizing each Bot separately is the wrong shape; an app is
   connected once and every Bot in the workspace should inherit that choice.
-- Rule: 设置 › 应用与运行权限 authorizes the current workspace. It shows one access level per connected app or MCP server — allow, read-only or disabled — and the provider's real tool catalogue. The workspace is the only authorization surface; a Bot has no permission layer of its own. A device is allowed or denied separately. Target contract: MCP-server access levels are not enforced yet.
+- Rule: 设置 › 应用与运行权限 authorizes the current workspace. It shows one access level per connected app or MCP server — allow, read-only or disabled — and the provider's real tool catalogue. The workspace is the only authorization surface; a Bot has no permission layer of its own. A device is allowed or denied separately. Target contract: MCP-server access levels, including read-only, are not enforced yet. Current: app access still uses `allow`, `ask` and `deny`, and the per-Bot rows are still read.
 - Replaces: every per-Bot write-policy surface and every per-Bot allow/ask/deny row, including decision 2026-10-31 (R-77). Target contract: the per-Bot layer will be removed and legacy rows migrated to the workspace rule or deleted; until that backend change lands, the current code still reads the per-Bot rows alongside the workspace rule.
 - Amended by: user ruling, 2026-11-10. The workspace is the only authorization surface.
 
 What follows:
 
-- The page no longer asks which Bot to authorize. It reads
+- In the target model, the page no longer asks which Bot to authorize. It reads
   `workspace_computer_policies.external_write_permissions` through
   `workspace_write_policy` and saves it through `set_workspace_write_policy`;
   only a workspace admin may save, any member may read. A personal workspace
