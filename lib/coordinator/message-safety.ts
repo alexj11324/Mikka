@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { ModelMessage } from 'ai'
 import { personalMessagePacket, personalMessageSummary } from '../personal-agent-message'
 import { taskDestinationPrompt, taskDestinationSchema, type TaskDestination } from '../task-destination'
+import { taskTitleInputSchema } from '../task-title-input'
 
 export interface EventSource {
   id?: string
@@ -20,7 +21,7 @@ export interface QuotaSwitchNotice { kind: 'quotaSwitch'; subscription: 'claude'
 export interface PointsSwitchNotice { kind: 'pointsSwitch'; model: string }
 export type SwitchNotice = QuotaSwitchNotice | PointsSwitchNotice
 interface EventProvenance { packet: string; eventKind: string; observedState: string | null; notice?: SwitchNotice }
-export type SourcedMessage = ModelMessage & { mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination; profileId?: string } }
+export type SourcedMessage = ModelMessage & { mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string } }
 const asTime = (value: Date | string | null | undefined) => value instanceof Date ? value.toISOString() : value ?? null
 
 /** Called with the stored server event, never with JSON decoded from its body. */
@@ -29,7 +30,8 @@ export function sourcedEventMessage(event: EventSource, projection: string): Sou
     const images = userImageContent(event.payload.images)
     const destination = taskDestinationSchema.safeParse(event.payload.taskDestination)
     const profile = agentProfileReferenceSchema.safeParse(event.payload.profileId)
-    return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(profile.success ? { profileId: profile.data } : {}) } }
+    const taskTitle = taskTitleInputSchema.safeParse(event.payload.taskTitle)
+    return { role: 'user', content: images.length ? [{ type: 'text', text: projection }, ...images] : projection, mikkaUserEvent: { id: event.id ?? null, sentAt: asTime(event.createdAt), ...(destination.success ? { taskDestination: destination.data } : {}), ...(profile.success ? { profileId: profile.data } : {}), ...(taskTitle.success ? { taskTitle: taskTitle.data } : {}) } }
   }
   const packet = personalMessagePacket({ messageId: event.id ?? null, senderId: null,
     sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
@@ -62,8 +64,8 @@ export function pointsSwitchMessage(model: string, at: Date): SourcedMessage {
 export function modelMessage(message: ModelMessage): ModelMessage {
   const { mikkaEvent, mikkaUserEvent, ...plain } = message as SourcedMessage
   if (mikkaUserEvent) {
-    if (!mikkaUserEvent.taskDestination && !mikkaUserEvent.profileId) return plain
-    const selection = [mikkaUserEvent.taskDestination ? taskDestinationPrompt(mikkaUserEvent.taskDestination) : '', mikkaUserEvent.profileId ? `The person explicitly selected Factory Agent Profile ${mikkaUserEvent.profileId} in the task form. Pass this exact profileId to task dispatch. The host rechecks its scope and configuration; do not replace it with an automatically chosen profile.` : ''].filter(Boolean).join('\n')
+    if (!mikkaUserEvent.taskDestination && !mikkaUserEvent.profileId && !mikkaUserEvent.taskTitle) return plain
+    const selection = [mikkaUserEvent.taskDestination ? taskDestinationPrompt(mikkaUserEvent.taskDestination) : '', mikkaUserEvent.profileId ? `The person explicitly selected Factory Agent Profile ${mikkaUserEvent.profileId} in the task form. Pass this exact profileId to task dispatch. The host rechecks its scope and configuration; do not replace it with an automatically chosen profile.` : '', mikkaUserEvent.taskTitle ? `The person typed this task title in the task form: ${JSON.stringify(mikkaUserEvent.taskTitle)}. Create the task with exactly this title; the host uses it even if you pass another.` : ''].filter(Boolean).join('\n')
     return { ...plain, content: typeof plain.content === 'string' ? `${plain.content}\n\n${selection}` : [...plain.content, { type: 'text', text: selection }] } as ModelMessage
   }
   if (!mikkaEvent) return plain.role === 'user' ? { ...plain, content: JSON.stringify({ kind: 'legacy_unattributed_message', authority: 'not_user_approval', untrustedData: { content: plain.content } }) } as ModelMessage : plain

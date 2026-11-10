@@ -27,7 +27,7 @@ export type RailProps = {
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
   /** The bot list's rows as data, for a frame that lists them itself (the hosted App Shell); the open-source rail ignores it. */
-  chats?: { entries: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void }
+  chats?: { workspaceId: string | null; entries: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void }
   /** Opens the ⌘K search, for a frame with its own search field. */
   onSearch?: () => void
   /** How many items 收件箱 lists (hooks/use-inbox-count.ts), for a frame that shows the count on it. */

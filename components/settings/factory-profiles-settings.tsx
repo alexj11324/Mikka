@@ -2,9 +2,11 @@
 
 import { useId, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, KeyRound, MoreHorizontal, Pencil, Plus, SlidersHorizontal, UserRound } from 'lucide-react'
+import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, KeyRound, MoreHorizontal, Pencil, Plus, UserRound } from 'lucide-react'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
 import { HarnessLabel, ModelLabel, harnessName } from '@/components/labels/entity-labels'
+import { ProfileMark, ProfileMarkPicker } from '@/components/labels/profile-mark'
+import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
@@ -48,7 +50,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
       {!data && !list.error ? <SettingsLoading bare rows={2} label={t('loading')} />
         : !data ? <div className="p-4"><SettingsSaveError message={t('loadFailed')} retryLabel={common('retry')} onRetry={() => { void list.mutate() }} /></div>
         : <>
-          <SettingRow title={t('defaultName')} icon={<SlidersHorizontal aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
+          <SettingRow title={t('defaultName')} icon={<ProfileMark {...DEFAULT_PROFILE_MARK} />}
             description={<span className="flex flex-col gap-1"><span>{t('inherit')}</span>
               {data.defaultAvailability && <ProfileState available={data.defaultAvailability.available} enabled label={data.defaultAvailability.available ? t('available') : t(`reasons.${profileAvailabilityKey(data.defaultAvailability.reason)}`)} />}</span>}>
             <span className="text-muted-foreground">{t('builtIn')}</span>
@@ -58,7 +60,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
             const state = data.availability[profile.id]
             const fixed = profile.model.mode === 'fixed' ? profile.model : null
             const source = fixed ? data.catalog.models.find(model => profileModelKey(model) === profileModelKey(fixed)) : undefined
-            return <SettingRow key={profile.id} title={profile.name} icon={<SlidersHorizontal aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
+            return <SettingRow key={profile.id} title={profile.name} icon={<ProfileMark {...resolveProfileMark(profile, profile)} />}
               description={<span className="flex min-w-0 flex-col gap-1">
                 {profile.description && <span className="wrap-break-word">{profile.description}</span>}
                 {profile.roles.length > 0 && <span className="wrap-break-word text-xs">{profile.roles.join(' · ')}</span>}
@@ -108,7 +110,7 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, o
   const t = useTranslations('Settings.agentProfiles')
   const common = useTranslations('Common')
   const id = useId()
-  const { original, draft, change, roles, setRoles, modelMode, setModelMode, modelKey, setModelKey, models, selectedModel, frozen, pending, error, setError, save } = useAgentProfileEditor({ workspaceId, editor, catalog, onSaved })
+  const { original, draft, change, mark, changeMark, roles, setRoles, modelMode, setModelMode, modelKey, setModelKey, models, selectedModel, frozen, pending, error, setError, save } = useAgentProfileEditor({ workspaceId, editor, catalog, onSaved })
   const sourceName = (model: AgentProfilesView['catalog']['models'][number]) => modelSourceName(model, t)
 
   return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
@@ -116,7 +118,12 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, o
       <DialogTitle className="pr-8">{original ? t('editTitle') : t('addTitle')}</DialogTitle>
       <form className="flex min-h-0 flex-col gap-4" onSubmit={event => { event.preventDefault(); void save() }}>
         <FieldGroup className="min-h-0 overflow-y-auto px-0.5 pb-1">
-          <Field><FieldLabel htmlFor={id + '-name'}>{t('name')}</FieldLabel><Input id={id + '-name'} value={draft.name} maxLength={80} required disabled={pending || frozen} onChange={event => change({ name: event.target.value })} /></Field>
+          <Field><FieldLabel htmlFor={id + '-name'}>{t('name')}</FieldLabel>
+            <div className="flex min-w-0 items-center gap-2"><ProfileMark {...mark} size="lg" /><Input id={id + '-name'} value={draft.name} maxLength={80} required disabled={pending || frozen} onChange={event => change({ name: event.target.value })} /></div>
+          </Field>
+          <FieldSet className="gap-3"><FieldLegend className="text-sm">{t('mark.icon')}</FieldLegend>
+            <ProfileMarkPicker value={mark} disabled={pending || frozen} onChange={changeMark} />
+          </FieldSet>
           <Field><FieldLabel htmlFor={id + '-description'}>{t('description')}</FieldLabel><Textarea id={id + '-description'} className="min-h-16 resize-y" value={draft.description} maxLength={600} disabled={pending || frozen} onChange={event => change({ description: event.target.value })} /></Field>
           <Field><FieldLabel htmlFor={id + '-roles'}>{t('roles')}</FieldLabel><Input id={id + '-roles'} value={roles} maxLength={600} placeholder={t('rolesPlaceholder')} disabled={pending || frozen} onChange={event => { setRoles(event.target.value); setError(null) }} /></Field>
           <div className="grid gap-4 sm:grid-cols-2">

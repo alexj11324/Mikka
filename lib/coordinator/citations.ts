@@ -21,6 +21,13 @@ export interface IssueSource {
   title: string
   status: string
   priority: string
+  /**
+   * The task's newest thread (run), as its task rows read it: with its board status and pull requests, the task's one
+   * state comes from localTaskState (R-52). Absent from older payloads; null when it has had no thread.
+   */
+  run?: { status: string; outcome: string | null } | null
+  /** Its pull requests, for the same state (a merged PR is done, an open one waits for review). */
+  pullRequests?: import('@/lib/issue-metadata').IssuePullRequest[]
 }
 
 export interface RunSource {
@@ -36,8 +43,10 @@ export interface RunSource {
   /**
    * `shortTitle`: the task's short title while it keeps the title it was written from (lib/short-title.ts).
    * `status`: the task's board status, so a card can name the task's state as its task rows do (localTaskState).
+   * `run`: the task's newest thread (run), which decides that state rather than the cited run (absent from older
+   * payloads; null when the reader sees none).
    */
-  issue: { id: string; number: number | null; identifier: string | null; title: string; shortTitle?: string | null; status?: string } | null
+  issue: { id: string; number: number | null; identifier: string | null; title: string; shortTitle?: string | null; status?: string; run?: { status: string; outcome: string | null } | null } | null
   /** The first line of what it was asked to do; its shown name is runThreadName. */
   name: string
   /** How it ended, once it has. */
@@ -57,6 +66,14 @@ export type CitationSource = IssueSource | RunSource
 /** A thread's own name, as its thread-list row shows it (glossary): its task, as 「MIK-12 标题」, else what it was asked. */
 export function runThreadName(run: Pick<RunSource, 'issue' | 'name'>) {
   return run.issue ? [run.issue.identifier, run.issue.title].filter(Boolean).join(' ') : run.name
+}
+
+/**
+ * A thread's title where it is named in a sentence (decision 2026-11-10): its task's title without the code, since the
+ * task is cited as its own chip that carries the code, else what it was asked.
+ */
+export function runTitle(run: Pick<RunSource, 'issue' | 'name'>) {
+  return run.issue?.title || run.name
 }
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'

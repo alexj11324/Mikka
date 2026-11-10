@@ -48,13 +48,14 @@ import { firstThreadCards, staleEventPositions, visibleDivider } from '@/lib/coo
 import { ActivityExpansionContext, ReplyActivity, useActivityExpansion, useThreadToolRows } from './reply-activity'
 import { CHAT_SURFACE, ChatMessage, ChatWaiting } from '@ui-slot/chat-message'
 import * as threadSlot from '@ui-slot/thread'
-import { useConversationPanels } from '@/components/coordinator/conversation-panels'
+import { useConversationPanels, useWorkTabs } from '@/components/coordinator/conversation-panels'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { useFactoryQuestions } from '@/hooks/use-factory-questions'
 import { noteChipText } from '@/lib/browser/note'
 import { PERSON_BUBBLE } from '@/components/slots/chat-message'
 import type { ChatSpeaker } from '@/components/slots/chat-message-contract'
 import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
+import { runThreadName } from '@/lib/coordinator/citations'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
@@ -87,7 +88,6 @@ import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { ChatEventLine } from './chat-event-line'
 import { RetryReplyButton } from './retry-reply-button'
 import { COMPOSER_NOTICE } from './composer-notice'
-import { FieldError } from '@/components/ui/field'
 
 /** A new message's enter: a short fade (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md). */
 const ENTER = 'animate-in fade-in-0 duration-200 motion-reduce:animate-none'
@@ -165,7 +165,9 @@ const showThread = ({ runId }: { runId: string }) => openThread(runId)
 /** Starting goals offered in an empty Coordinator chat (coordinator's choice, 2026-11-08). */
 const STARTERS = ['fixBug', 'reviewPullRequests', 'summarizeToday', 'dailyBriefing'] as const
 
-export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string }) {
+export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId, pill = true }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string
+  /** A floating title pill sits over the chat on wide screens (ConversationPill): the layer's screen starts below it. */
+  pill?: boolean }) {
   const t = useTranslations('Coordinator')
   const cloudErrors = useTranslations('RunErrors')
   const tNav = useTranslations('Nav')
@@ -384,7 +386,26 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const dividerAt = visibleDivider(unread.divider, items, staleEvents)
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
-  const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
+  // A layer that draws the conversation as one screen (slot `thread`) gets the same rows as data and nodes.
+  // The board's chat column (compact) is a conversation too; only an artifact's chat (embedded) keeps its chips.
+  const Screen = !embedded ? threadSlot.ThreadScreen ?? null : null
+  // The Overview and the browser, when the frame's work area holds them (FRAME_OWNS_PANEL).
+  const panels = useConversationPanels()
+  // Tasks and threads opened from this chat open as tabs of that work area (decision 2026-11-10), named by their code.
+  const work = useWorkTabs(Boolean(Screen && panels && !compact), {
+    task: id => {
+      const source = Object.values(sources ?? {}).find(item => item.kind === 'issue' ? item.id === id : item.issue?.id === id)
+      const issue = source?.kind === 'issue' ? source : source?.issue
+      return issue?.identifier ?? issue?.title ?? t('citation.issue')
+    },
+    thread: id => {
+      const run = sources?.[id]
+      if (run?.kind !== 'run') return { title: t('citation.run') }
+      return { title: run.issue?.identifier ? `${run.issue.identifier} › ${run.name || runThreadName(run)}` : runThreadName(run), issueId: run.issue?.id ?? null, name: runThreadName(run) }
+    },
+  }, name)
+  const openIssue = work.work ? work.openTask : onOpenIssue
+  const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue: openIssue }), [sources, previews, openIssue])
   // A live reply cites tasks and threads the stored chat may not know yet; they are looked up as it streams.
   const liveCitations = useLiveCitations(stream.replies.map(reply => reply.text), citations)
   // What the person said next after each reply, so a choice card shows its answer after a reload.
@@ -473,17 +494,18 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
 
   const speaker: ChatSpeaker = bot ? { id: bot.id, name: bot.name, color: bot.color, shape: bot.shape } : { name, coordinator: true }
 
-  // A layer that draws the conversation as one screen (slot `thread`) gets the same rows as data and nodes.
-  // The board's chat column (compact) is a conversation too; only an artifact's chat (embedded) keeps its chips.
-  const Screen = !embedded ? threadSlot.ThreadScreen ?? null : null
-  // The Overview and the browser, when the frame's work area holds them (FRAME_OWNS_PANEL).
-  const panels = useConversationPanels()
   const toolRows = useThreadToolRows()
   const tMessage = useTranslations('AiElements.message')
   const tNavAll = useTranslations()
   // The Coordinator's chat docks the person's pending Factory questions; a read follows the chat's own version.
   const factory = useFactoryQuestions(data?.version ?? data?.cursor ?? null, Boolean(Screen && !botId && data))
   if (Screen) {
+    // The live failure as the thread's error line: a plain failure says 回复失败 (or why the wake failed) once, on the
+    // line, with 重试 under it; a failure with its own reason (cloud, refusal, subscription, API balance) keeps its notice.
+    const plainFailure = Boolean(data?.error && !data.working && !cloudCode && !refusal && !declined && !apiBalance)
+    const liveFailurePart: ThreadEntryPart = plainFailure
+      ? { kind: 'error', text: wakeError ? t(`wakeErrors.${wakeError}`) : t('failedTitle'), actions: <>{retry}{liveRaw && <RunErrorDetails code={liveRaw} />}</> }
+      : { kind: 'error', text: t('failedTitle'), actions: failureNotice }
     const rows = [...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined as CoordinatorLiveReply | undefined, key: String(item.pending ? `pending-${item.position}` : item.streamId ?? item.position) })),
       ...stream.replies.map(reply => ({ item: streamedItem(reply, stopping), live: stopping && reply.committedThrough === undefined ? { ...reply, committedThrough: -1 } : reply, key: reply.id }))]
     const entries: ThreadEntry[] = []
@@ -492,7 +514,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       const streaming = Boolean(live && live.committedThrough === undefined)
       if (item.from === 'event') {
         const node = item.notice ? <QuotaSwitchLine notice={item.notice} botId={botId} /> : item.line ? <ChatEventLine line={item.line} citations={citations} /> : null
-        if (node) entries.push({ id: key, role: 'bot', at, parts: [{ kind: 'text', text: '', node }] })
+        if (node) entries.push({ id: key, role: 'bot', at, event: true, parts: [{ kind: 'text', text: '', node }] })
         continue
       }
       if (item.from === 'person') {
@@ -505,9 +527,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
         ]
         entries.push({ id: key, role: 'person', at, text, ...(attachments.length ? { attachments } : {}), status: item.pending ? 'sending' : 'sent',
           actions: item.text ? <MessageActions className={cn('items-start', REPLY_ACTIONS)}><CopyAction text={text} />{item.id && <MessageReactions reactions={reactions[item.id]} align="end" />}</MessageActions> : undefined })
-        if (item.failure) entries.push({ id: `${key}-failure`, role: 'bot', at, parts: [{ kind: 'error', text: t('failedTitle'), actions: item.position === failedAt
-          ? failureNotice
-          : <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /> }] })
+        if (item.failure) entries.push({ id: `${key}-failure`, role: 'bot', at, parts: [item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /> }] })
         continue
       }
       const parts: ThreadEntryPart[] = item.welcome ? [] : replyRows(item, live).map((segment, index): ThreadEntryPart => segment.kind === 'tools'
@@ -519,7 +539,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       }
       const artifacts = item.artifacts.flatMap(id => data?.artifacts[id] ? [{ id, name: data.artifacts[id].title }] : [])
       if (artifacts.length) parts.push({ kind: 'artifacts', items: artifacts, onOpen: openArtifact })
-      if (item.failure) parts.push({ kind: 'error', text: t('failedTitle'), actions: item.position === failedAt ? failureNotice : <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
+      if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
       entries.push({ id: key, role: 'bot', at, parts, streaming, ...(item.stopped ? { stopped: true } : {}),
         actions: item.text && !streaming ? <MessageActions className={cn('items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>
           <CopyAction text={replyCopyText(item.text)} />
@@ -531,25 +551,26 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     // Before the reply has anything to show: the Bot's turn, still empty, with its caret.
     if (data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && !stopping)
       entries.push({ id: 'waiting', role: 'bot', at: Date.now(), parts: [], streaming: true })
-    if (welcomeFailed && !items.length) entries.push({ id: 'welcome-failure', role: 'bot', at: Date.now(), parts: [{ kind: 'error', text: t('failedTitle'), actions: failureNotice }] })
+    if (welcomeFailed && !items.length) entries.push({ id: 'welcome-failure', role: 'bot', at: Date.now(), parts: [liveFailurePart] })
     const empty = data && !items.length && !stream.replies.length && !data.error ? (data.enabled
       ? <p role="status">{tNav('writingWelcome')}</p>
       : <div className="flex flex-col gap-3"><p>{t('empty', { name })}</p>
         {!bot && <div className="flex flex-wrap gap-2">{STARTERS.map(key => <Button key={key} variant="outline" size="sm" className="rounded-full font-normal" onClick={() => setDraft(t(`starters.${key}`))}>{t(`starters.${key}`)}</Button>)}</div>}</div>) : undefined
     const notices = <>
-      {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
+      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle></Alert>}
       {failedAt === null && !welcomeFailed && failureNotice}
       {!data?.error && <HostedUnavailableNotice botId={botId} />}
       {!refusal && (declined === 'quotaUsed' || !data?.error) && <QuotaNotice botId={botId} stopped={declined === 'quotaUsed'}
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
-      {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
+      {unanswered && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48">{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
     </>
     return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
-      {/* The page's floating title pill sits over the top 56px on wide screens: the screen starts below it. */}
-      <section ref={rootRef} aria-label={name} className="mikka-agent flex min-h-0 min-w-0 flex-1 flex-col md:pt-14">
-        <Screen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty} panels={compact ? undefined : panels}
+      {/* The page's floating title pill sits over the top 56px on wide screens: the screen starts below it. Without one (the
+          hosted shell owns the header and the thread names itself) no band is left. */}
+      <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col', pill && 'md:pt-14')}>
+        <Screen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty} panels={compact ? undefined : panels} work={work.work}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
           composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending, onSubmit: () => { void send() },
@@ -679,14 +700,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       </MessageScroller>
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
-      {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
+      {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle></Alert>}
       {failedAt === null && !welcomeFailed && failureNotice}
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
       {/* On Mikka 默认 with no points here: said before sending (decision 2026-11-02-1450). */}
       {!data?.error && <HostedUnavailableNotice botId={botId} />}
       {!refusal && (declined === 'quotaUsed' || !data?.error) && <QuotaNotice botId={botId} stopped={declined === 'quotaUsed'}
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
-      {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
+      {unanswered && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48">{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}

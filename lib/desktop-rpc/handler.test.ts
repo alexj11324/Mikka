@@ -192,6 +192,23 @@ test('Coordinator submission accepts an optional captured workspace without wide
   assert.equal(schema.safeParse([...legacy, peer, { admin: true }]).success, false)
 })
 
+test('Coordinator task titles cross the shared Web and desktop RPC boundary', () => {
+  const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
+  const args = ['Task description', null, null, owner, undefined, undefined, undefined, undefined, undefined]
+  for (const workspaceId of [undefined, peer]) {
+    const parsed = schema.safeParse([...args, workspaceId, '  修复登录后回跳  '])
+    assert.equal(parsed.success, true)
+    if (parsed.success) {
+      assert.ok(Array.isArray(parsed.data))
+      assert.equal(parsed.data[10], '修复登录后回跳')
+    }
+    for (const title of ['', ' ', 'x'.repeat(61), 'two\nlines', null, { admin: true }]) {
+      assert.equal(schema.safeParse([...args, workspaceId, title]).success, false)
+    }
+  }
+  assert.equal(schema.safeParse([...args, peer, 'Title', { admin: true }]).success, false)
+})
+
 test('billing re-export consumers accept only the existing workspace selector and purchase amounts', () => {
   const verification = desktopActionSchemas['billing.startCardVerification']
   for (const args of [[], [undefined], [owner]]) assert.equal(verification.safeParse(args).success, true)

@@ -44,7 +44,8 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
     const identity = { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId, notes: filler }
     for (const [index, id] of runs.entries()) {
       await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error,"agentDefinition","workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-        [id, owner, index === 3 ? null : issueId, agent, 'succeeded', prompts[index], reports[index] === null ? null : JSON.stringify(reports[index]), errors[index], JSON.stringify({ harness: 'codex', executionIdentity: identity }), workspaceId])
+        // The task's newest thread (index 2) waits on the person; the older ones it cites succeeded.
+        [id, owner, index === 3 ? null : issueId, agent, index === 2 ? 'waiting_input' : 'succeeded', prompts[index], reports[index] === null ? null : JSON.stringify(reports[index]), errors[index], JSON.stringify({ harness: 'codex', executionIdentity: identity }), workspaceId])
     }
     const full = new Map((await visibleRuns(owner, { runIds: runs, limit: runs.length })).map(run => [run.id, run]))
     const task = await issueForUser(owner, issueId)
@@ -60,11 +61,18 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
       const run = full.get(id)!
       assert.equal(source.name, threadName(prompts[index], run.agentName), `run ${index}: the same name as from its whole prompt`)
       assert.equal(source.summary, runSummaryText(run), `run ${index}: the same summary as from its whole report`)
-      assert.deepEqual(source.issue, index === 3 ? null : { id: issueId, title: task.title, number: 12, identifier: source.issue?.identifier ?? null, status: 'doing' })
+      // Every cited run's task carries the task's newest thread, so its card names the task's current state, not this run's.
+      assert.deepEqual(source.issue, index === 3 ? null : { id: issueId, title: task.title, number: 12, identifier: source.issue?.identifier ?? null, status: 'doing', run: { status: 'waiting_input', outcome: null } })
       assert.deepEqual(source.pullRequests, index === 3 ? [] : readIssueMetadata(task.content).pullRequests)
     }
     assert.equal((sources[runs[0]] as { name: string }).name, 'Fix the login bug that drops a session when the token refre…')
     assert.equal((sources[runs[0]] as { summary: string }).summary, 'Fixed the race.')
+
+    // A cited task carries its newest thread's status and outcome and its PRs, for its one state (localTaskState).
+    const cited = (await citationSources(owner, [`[[issue:${issueId}]]`]))[issueId]
+    assert.ok(cited?.kind === 'issue')
+    assert.deepEqual(cited.run, { status: 'waiting_input', outcome: null }, 'the newest of its threads')
+    assert.deepEqual(cited.pullRequests, readIssueMetadata(task.content).pullRequests)
 
     // The list projection: only the report's summary, no provenance.
     const brief = await visibleRuns(owner, { runIds: runs, limit: runs.length, brief: true })

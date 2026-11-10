@@ -219,3 +219,9 @@ test('agentStretches joins consecutive threads by one Agent, oldest first (2026-
   const checks = agentStretches([{ ...t('i', 1, 'claude_code'), kind: 'implement' }, { ...t('r', 2, 'codex'), kind: 'acceptance' }, { ...t('v', 3, 'claude_code'), kind: 'review' }])
   assert.deepEqual(checks.map(s => [s.agent, s.ids]), [['claude_code', ['i']]])
 })
+
+test('agentStretches also splits where the custom Agent 配置 changes (2026-11-10)', () => {
+  const t = (id: string, at: number, profile: string | null) => ({ id, createdAt: new Date(at), detail: { harness: 'codex', profile: profile ? { id: profile } : null } })
+  const out = agentStretches([t('a', 1, null), t('b', 2, 'review'), t('c', 3, 'review'), t('d', 4, 'docs'), t('e', 5, null)])
+  assert.deepEqual(out.map(s => [s.profile, s.ids]), [[null, ['a']], ['review', ['b', 'c']], ['docs', ['d']], [null, ['e']]])
+})

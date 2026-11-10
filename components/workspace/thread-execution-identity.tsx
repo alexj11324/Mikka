@@ -15,6 +15,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { EMPTY_LABELS, rolesByPerson } from '@/lib/execution-identity-label-view'
 import { currentThreadExecutionEvidence, readThreadExecutionEvidence, type ThreadExecutionEvidence } from '@/lib/thread-execution-identity-view'
 import { DECISION_REASONS, type DecisionReason } from '@/lib/factory/agent-profile-decision'
+import { ProfileAgentMark, ProfileMark } from '@/components/labels/profile-mark'
+import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
 
 export function ThreadExecutionIdentity({ runId }: { runId: string }) {
   // A different actual run closes the previous dialog and starts with no data.
@@ -132,7 +134,10 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       {routing.previousModel && <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-muted-foreground">{t('previousModel')}<span className="text-foreground" title={routing.previousModel}><ModelLabel model={routing.previousModel} /></span></p>}
     </section>}
     {profile && <dl className="flex flex-col gap-3"><ValueRow label={profileT('frozenProfile')}><Line>
+      {/* Who did the work: the Profile's mark first, the Agent that ran it smaller beside the name. */}
+      <ProfileMark {...(profile.profileId === 'default' ? DEFAULT_PROFILE_MARK : resolveProfileMark({ name: profile.name }, profile))} />
       {profile.source === 'default' && profile.profileId === 'default' ? profileT('defaultName') : profile.name}
+      {evidence.harness && <ProfileAgentMark harness={evidence.harness} />}
       <Quiet>· {profileT('version', { version: profile.version })} · {profileT(`selectionSources.${profile.source}`)}</Quiet>
       {/* A run frozen before reasons were codes holds an English sentence: the source already says how it was chosen. */}
       {profile.source === 'decision' && (DECISION_REASONS as readonly string[]).includes(profile.reason) && <Quiet>· {profileT(`selectionReasons.${profile.reason as DecisionReason}`)}</Quiet>}

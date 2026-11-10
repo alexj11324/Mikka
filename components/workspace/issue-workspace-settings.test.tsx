@@ -30,7 +30,7 @@ mock.module('@/i18n/navigation', { namedExports: { usePathname: () => browser.lo
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
 mock.module('swr', { defaultExport: (key: unknown) => ({ data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } } : [], mutate: refreshed }), namedExports: { SWRConfig: swr.SWRConfig, unstable_serialize: swr.unstable_serialize, useSWRConfig: swr.useSWRConfig } })
 mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
-mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}) } })
+mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { useSession: () => ({ data: null }) } } })
 mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed } })
 mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean) => ({ value: open, open, onOpenChangeComplete: nothing }) } })
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspace() }) } })
@@ -44,7 +44,7 @@ mock.module('@/hooks/use-live-lists', { namedExports: {
 for (const [file, names] of [
   ['../../app/actions/projects.ts', ['listProjects']], ['../../app/actions/teams.ts', ['listTeams']],
   ['../../app/actions/team-relations.ts', ['listProjectTeams']], ['../../app/actions/workspace-secrets.ts', ['saveE2BKey']],
-  ['../../app/actions/bots.ts', ['listBots']], ['../../app/actions/agents.ts', ['getThreadName']],
+  ['../../app/actions/bots.ts', ['listBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, async () => []])) })
 
 // Exercise the production lazy/Suspense boundary, with its chunk deliberately
