@@ -9,7 +9,7 @@ import { isAbsolute, join } from 'node:path'
 import { IPC, BUNDLED_IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
-import { grantLocalComputerPermissions, localComputerPermissions, localDeviceStatus, localQuota } from './daemon'
+import { localDeviceStatus, localQuota } from './daemon'
 import { connectForUpdate, updateLocalDaemon } from './daemon-update'
 import { readLocalDeviceAccount, readLocalDeviceOwner } from './local-setup'
 import { AppLoadState, offlineReason, offlineRetryDelay } from './offline'
@@ -629,8 +629,6 @@ async function start(): Promise<void> {
     prepareReturn,
     claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
-    computerPermissions: localComputerPermissions,
-    grantComputerPermissions: grantLocalComputerPermissions,
     pickRepo,
     localAccount: () => readLocalDeviceAccount((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     localOwner: () => readLocalDeviceOwner((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment?view=owner', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),

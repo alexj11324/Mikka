@@ -5,238 +5,28 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { createInterface } from "node:readline";
 const exec = promisify(execFile);
-// The pinned release; a Mac may also have an older driver on PATH.
-export const CUA_DRIVER_VERSION = "0.38.0";
-const CUA_DRIVER_VERSION_PATTERN = /^cua-driver\s+0\.38\.0\b/;
-const CUA_DRIVER_APP_PATH = "/Applications/CuaDriver.app/Contents/MacOS/cua-driver";
-const PERMISSION_TIMEOUT_MS = 5000;
-const GRANT_TIMEOUT_MS = 200000;
-const PROBE_TIMEOUT_MS = 10000;
-const DRIVER_ENV_KEYS = [
-  "PATH",
-  "HOME",
-  "USER",
-  "LANG",
-  "DISPLAY",
-  "WAYLAND_DISPLAY",
-  "XDG_RUNTIME_DIR",
-  "DBUS_SESSION_BUS_ADDRESS",
-];
-// The only environment a driver child gets: no shell, credentials or agent env.
-function driverEnvironment() {
-  return Object.fromEntries(
-    DRIVER_ENV_KEYS.flatMap((k) =>
-      process.env[k] === undefined ? [] : [[k, process.env[k]]],
-    ),
-  );
-}
-/**
- * Where a local driver may live. `MIKKA_CUA_DRIVER` pins exactly one path for
- * acceptance and tests, so a stale or fake override cannot silently fall
- * through to another install. Otherwise macOS checks the app bundle,
- * `~/.local/bin` and PATH in that order; other platforms keep PATH only.
- */
-export function computerDriverCandidates({ platform = process.platform, env = process.env, home = homedir() } = {}) {
-  const override = typeof env.MIKKA_CUA_DRIVER === "string" ? env.MIKKA_CUA_DRIVER.trim() : "";
-  if (override) return [override];
-  if (platform === "darwin") return [CUA_DRIVER_APP_PATH, join(home, ".local/bin/cua-driver"), "cua-driver"];
-  return ["cua-driver"];
-}
-async function resolveDriverCandidate(candidate) {
-  const located = candidate.includes("/")
-    ? candidate
-    : (await exec("which", [candidate], { timeout: 5000 })).stdout.trim().split("\n")[0];
-  if (!located) return null;
-  return await realpath(located);
-}
-/**
- * Looks for the pinned driver without running an action. `found` lists every
- * executable that answered, so a caller can tell "not installed" from
- * "another version is installed". A cloud caller passing an explicit path
- * checks only that path.
- */
-export async function inspectComputerDriver(binary, options = {}) {
-  const candidates = binary === undefined ? computerDriverCandidates(options) : [binary];
-  const found = [];
-  const seen = new Set();
-  for (const candidate of candidates) {
-    let path;
-    try { path = await resolveDriverCandidate(candidate); } catch { continue; }
-    if (!path || seen.has(path)) continue;
-    seen.add(path);
-    let version = null;
-    try {
-      version = (await exec(path, ["--version"], { timeout: 5000 })).stdout.trim().split("\n")[0].trim() || null;
-    } catch { /* Executable but not a usable driver. */ }
-    found.push({ path, version });
-    if (!version || !CUA_DRIVER_VERSION_PATTERN.test(version)) continue;
-    try {
-      return {
-        driver: {
-          installed: true,
-          version,
-          path,
-          fingerprint: createHash("sha256").update(await readFile(path)).digest("hex"),
-        },
-        found,
-      };
-    } catch { /* Unreadable binary never becomes an approved driver. */ }
-  }
-  return { driver: null, found };
-}
-export async function detectComputerDriver(binary, options) {
-  return (await inspectComputerDriver(binary, options)).driver;
-}
-const UNKNOWN_PERMISSIONS = Object.freeze({ accessibility: "unknown", screenRecording: "unknown", captureConsent: "unknown" });
-const permissionState = (value) => value === true ? "granted" : value === false ? "denied" : "unknown";
-/**
- * Normalizes `cua-driver permissions status --json` (0.38.0). The read-only
- * command answers through a running CuaDriver daemon; without one it reports
- * `status: "unknown"` and no booleans, which must never read as a denial.
- * `screen_recording_capturable` is null on read-only calls; a recorded direct
- * capture verification stands in for it.
- */
-export function parseComputerPermissionStatus(raw) {
-  let value;
-  try { value = JSON.parse(raw); } catch { return { ...UNKNOWN_PERMISSIONS }; }
-  if (!value || typeof value !== "object" || Array.isArray(value)) return { ...UNKNOWN_PERMISSIONS };
-  if (value.status === "unknown" || typeof value.accessibility !== "boolean" || typeof value.screen_recording !== "boolean")
-    return { ...UNKNOWN_PERMISSIONS };
-  const verified = value.direct_capture_verification;
-  const captureConsent =
-    typeof value.screen_recording_capturable === "boolean"
-      ? permissionState(value.screen_recording_capturable)
-      : value.direct_capture_status === "ready" || (verified && typeof verified === "object" && !Array.isArray(verified))
-        ? "granted"
-        : value.direct_capture_status === "unavailable" || value.direct_capture_status === "blocked_by_screen_recording"
-          ? "denied"
-          : "unknown";
-  return {
-    accessibility: permissionState(value.accessibility),
-    screenRecording: permissionState(value.screen_recording),
-    captureConsent,
-  };
-}
-/** Read-only TCC status; never prompts and never runs the capture probe. */
-export async function readComputerPermissions(driver, { platform = process.platform, run = exec } = {}) {
-  if (platform !== "darwin") return { ...UNKNOWN_PERMISSIONS };
+export async function detectComputerDriver(binary = "cua-driver") {
   try {
-    const { stdout } = await run(driver.path, ["permissions", "status", "--json"], { timeout: PERMISSION_TIMEOUT_MS });
-    return parseComputerPermissionStatus(stdout);
-  } catch {
-    return { ...UNKNOWN_PERMISSIONS };
-  }
-}
-/**
- * Requests Accessibility, Screen Recording and direct-capture consent under
- * CuaDriver's own app identity. The person approves the macOS dialogs; the
- * command itself waits up to 180 seconds. Only a person's click may reach it.
- */
-export async function grantComputerPermissions(driver, { platform = process.platform, run = exec } = {}) {
-  if (platform !== "darwin") throw new Error("Computer permission grants require macOS");
-  await run(driver.path, ["permissions", "grant"], { timeout: GRANT_TIMEOUT_MS });
-}
-function probeResult(result) {
-  const failed = { ok: false, width: null, height: null };
-  if (!result || typeof result !== "object" || result.isError === true) return failed;
-  const structured = result.structuredContent;
-  const width = Number.isInteger(structured?.screenshot_width) ? structured.screenshot_width : null;
-  const height = Number.isInteger(structured?.screenshot_height) ? structured.screenshot_height : null;
-  if (!width || !height || width <= 0 || height <= 0) return failed;
-  const image = Array.isArray(result.content)
-    ? result.content.find((part) => part?.type === "image" && typeof part.data === "string")
-    : undefined;
-  if (!image) return failed;
-  const data = image.data.replace(/\s+/g, "");
-  const bytes = Buffer.from(data, "base64");
-  if (bytes.length === 0 || bytes.toString("base64").replace(/=+$/, "") !== data.replace(/=+$/, "")) return failed;
-  return { ok: true, width, height };
-}
-/**
- * Health check: one real screenshot through `mcp --direct`, bounded to ten
- * seconds. It returns only whether capture worked and its pixel size; the
- * image never leaves the child and driver stderr is never read.
- */
-export function probeComputerDriver(driver, { timeoutMs = PROBE_TIMEOUT_MS } = {}) {
-  const failed = { ok: false, width: null, height: null };
-  return (async () => {
-    let fingerprint;
-    try {
-      fingerprint = createHash("sha256").update(await readFile(driver.path)).digest("hex");
-    } catch {
-      return failed;
-    }
-    if (fingerprint !== driver.fingerprint) return failed;
-    let child;
-    try {
-      child = spawn(driver.path, ["mcp", "--direct"], {
-        env: driverEnvironment(),
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-    } catch {
-      return failed;
-    }
-    return await new Promise((resolve) => {
-      let settled = false;
-      let bytes = 0;
-      let nextId = 0;
-      let lines;
-      const pending = new Map();
-      const finish = (result) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        try { lines?.close(); } catch { /* Already closed. */ }
-        try { child.stdin.end(); } catch { /* Exited. */ }
-        child.kill();
-        resolve(result);
-      };
-      const send = (message) => {
-        try { child.stdin.write(JSON.stringify(message) + "\n"); } catch { finish(failed); }
-      };
-      child.stderr.resume(); // Never forward driver or desktop output.
-      child.on("error", () => finish(failed));
-      child.stdin.on("error", () => finish(failed));
-      child.on("exit", () => finish(failed));
-      lines = createInterface({ input: child.stdout });
-      lines.on("line", (line) => {
-        if (settled) return;
-        bytes += Buffer.byteLength(line);
-        if (bytes > 24 * 1024 * 1024) return finish(failed);
-        let message;
-        try { message = JSON.parse(line); } catch { return finish(failed); }
-        const waiter = pending.get(message.id);
-        if (!waiter) return;
-        pending.delete(message.id);
-        if (message.error) return finish(failed);
-        if (waiter.kind === "initialize") {
-          send({ jsonrpc: "2.0", method: "notifications/initialized" });
-          const id = ++nextId;
-          pending.set(id, { kind: "capture" });
-          send({ jsonrpc: "2.0", id, method: "tools/call", params: { name: "get_desktop_state", arguments: {} } });
-          return;
-        }
-        finish(probeResult(message.result));
-      });
-      const timer = setTimeout(() => finish(failed), timeoutMs);
-      const id = ++nextId;
-      pending.set(id, { kind: "initialize" });
-      send({
-        jsonrpc: "2.0",
-        id,
-        method: "initialize",
-        params: {
-          protocolVersion: "2024-11-05",
-          capabilities: {},
-          clientInfo: { name: "mikka-computer-doctor", version: "1" },
-        },
-      });
+    const { stdout: located } = await exec("which", [binary], {
+      timeout: 5000,
     });
-  })();
+    const path = await realpath(located.trim());
+    const { stdout } = await exec(path, ["--version"], { timeout: 5000 });
+    const version = stdout.trim().split("\n")[0];
+    if (!/^cua-driver\s+0\.38\.0\b/.test(version)) return null;
+    return {
+      installed: true,
+      version,
+      path,
+      fingerprint: createHash("sha256")
+        .update(await readFile(path))
+        .digest("hex"),
+    };
+  } catch {
+    return null;
+  }
 }
 // What an action does, in the person's words. While a screen recording runs it
 // becomes a step on the recording's timeline (Figma 13), so it is never
@@ -419,7 +209,20 @@ export async function executeDriver(driver, input, display, leaseGuard, assertLi
   if (fingerprint !== driver.fingerprint)
     throw new Error("Driver changed; restart and approve a new request");
   const args = driverArguments(call);
-  const env = driverEnvironment();
+  const env = Object.fromEntries(
+    [
+      "PATH",
+      "HOME",
+      "USER",
+      "LANG",
+      "DISPLAY",
+      "WAYLAND_DISPLAY",
+      "XDG_RUNTIME_DIR",
+      "DBUS_SESSION_BUS_ADDRESS",
+    ].flatMap((k) =>
+      process.env[k] === undefined ? [] : [[k, process.env[k]]],
+    ),
+  );
   if (leaseGuard && (driver.path !== "/opt/mikka/computer/cua-driver" || display === undefined || typeof leaseGuard.botId !== "string" || typeof leaseGuard.ownerId !== "string" || !leaseGuard.botId || !leaseGuard.ownerId || !Number.isSafeInteger(leaseGuard.policyVersion) || leaseGuard.policyVersion < 0 || leaseGuard.policyVersion > 2147483647 || [leaseGuard.botId, leaseGuard.ownerId].some(value => value.length > 128 || value.includes("\0"))))
     throw new Error("Invalid desktop lease");
   const command = leaseGuard ? "flock" : driver.path;

@@ -4,7 +4,6 @@
 import { webContents, ipcMain, type IpcMainInvokeEvent } from 'electron'
 
 import type { LocalDevice, LocalDeviceAccount } from '@mikka/protocol/bridge'
-import type { ComputerDoctor } from '@mikka/protocol/computer'
 import { IPC } from '@mikka/protocol/ipc'
 import type { QuotaSnapshotReport } from '@mikka/protocol/quota'
 
@@ -27,10 +26,6 @@ export interface BridgeOptions {
   prepareReturn(state: string): Promise<string>
   claudeCallback(authorizationUrl: unknown): Promise<string | null>
   localDevice(): Promise<LocalDevice>
-  /** Local computer use on this Mac; null when no daemon answers. */
-  computerPermissions(): Promise<ComputerDoctor | null>
-  /** The person's click: requests macOS grants for the local driver, then reports. */
-  grantComputerPermissions(): Promise<ComputerDoctor | null>
   pickRepo?(): Promise<import('@mikka/protocol/bridge').PickRepoResult>
   localAccount(): Promise<LocalDeviceAccount>
   localOwner(): Promise<Pick<LocalDeviceAccount, 'ownerId'>>
@@ -95,8 +90,6 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
   handle(IPC.appRequireUpdate, () => options.requireUpdate())
   handle(IPC.deviceStatus, () => options.localDevice())
   handle(IPC.devicePickRepo, () => options.pickRepo?.() ?? { status: 'cancelled' })
-  handle(IPC.deviceComputerPermissions, () => options.computerPermissions())
-  handle(IPC.deviceComputerPermissionsGrant, () => options.grantComputerPermissions())
   handle(IPC.quotaGet, () => options.quota())
   handle(IPC.notificationsShow, notification => options.notifications.show(notification))
   handle(IPC.notificationsSetBadge, count => options.notifications.setBadge(count))

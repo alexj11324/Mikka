@@ -192,33 +192,6 @@ async function runTurn(text) {
     complete()
     return
   }
-  // Scripted macOS acceptance: the real proxy is the computer config the
-  // daemon injected; every call is a real MCP round trip, and image bytes are
-  // reported by size only so no screenshot enters the transcript.
-  if (text.startsWith('COMPUTER_ACTIONS_TEST ')) {
-    const calls = JSON.parse(text.slice('COMPUTER_ACTIONS_TEST '.length))
-    const results = []
-    for (const call of calls) {
-      const reply = await callMcpTool(computer, call.name, call.arguments ?? {})
-      const result = reply?.result ?? reply
-      const image = Array.isArray(result?.content)
-        ? result.content.find(part => part?.type === 'image' && typeof part.data === 'string')
-        : null
-      results.push({
-        name: call.name,
-        isError: result?.isError === true,
-        imageBytes: image ? Buffer.from(image.data, 'base64').length : 0,
-        width: result?.structuredContent?.screenshot_width ?? null,
-        height: result?.structuredContent?.screenshot_height ?? null,
-      })
-    }
-    const output = JSON.stringify({ computerResults: results })
-    item('started', { type: 'agentMessage', id: `m-${turn}`, text: '' })
-    notify('item/agentMessage/delta', { threadId, turnId: open, itemId: `m-${turn}`, delta: output })
-    item('completed', { type: 'agentMessage', id: `m-${turn}`, text: output })
-    complete()
-    return
-  }
   if (text.startsWith('MAILBOX_TEST ') || text.startsWith('MAILBOX_RESUME_TEST ')) {
     const resumeFixture = text.startsWith('MAILBOX_RESUME_TEST ')
     const results = []

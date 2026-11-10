@@ -4,56 +4,13 @@ export interface ComputerDriver {
   path: string;
   fingerprint: string;
 }
-export interface ComputerDriverFound {
-  path: string;
-  version: string | null;
-}
-export interface ComputerDriverInspection {
-  driver: ComputerDriver | null;
-  found: ComputerDriverFound[];
-}
-export type ComputerPermissionState = "granted" | "denied" | "unknown";
-export interface ComputerPermissions {
-  accessibility: ComputerPermissionState;
-  screenRecording: ComputerPermissionState;
-  captureConsent: ComputerPermissionState;
-}
-export interface ComputerProbe {
-  ok: boolean;
-  width: number | null;
-  height: number | null;
-}
-export const CUA_DRIVER_VERSION: string;
-export function computerDriverCandidates(options?: {
-  platform?: string;
-  env?: Record<string, string | undefined>;
-  home?: string;
-}): string[];
-export function inspectComputerDriver(
-  binary?: string,
-  options?: { platform?: string; env?: Record<string, string | undefined>; home?: string },
-): Promise<ComputerDriverInspection>;
-export function detectComputerDriver(
-  binary?: string,
-  options?: { platform?: string; env?: Record<string, string | undefined>; home?: string },
-): Promise<ComputerDriver | null>;
-export function parseComputerPermissionStatus(raw: string): ComputerPermissions;
-export function readComputerPermissions(
-  driver: ComputerDriver,
-  options?: { platform?: string },
-): Promise<ComputerPermissions>;
-export function grantComputerPermissions(
-  driver: ComputerDriver,
-  options?: { platform?: string },
-): Promise<void>;
-export function probeComputerDriver(
-  driver: ComputerDriver,
-  options?: { timeoutMs?: number },
-): Promise<ComputerProbe>;
 export interface ComputerCall {
   name: string;
   arguments: Record<string, unknown>;
 }
+export function detectComputerDriver(
+  binary?: string,
+): Promise<ComputerDriver | null>;
 export function normalizeCall(value: unknown): ComputerCall;
 export function actionStep(value: unknown): string | null;
 export function executeDriver(

@@ -8,7 +8,6 @@ import { listReadDeadline, listReadPresence, observeListRead, ownerListWorkspace
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { DevicesPage } from '@ui-slot/settings-devices'
 import { ConnectDeviceDialog } from './connect-device-dialog'
-import { LocalComputerUse } from './local-computer-use'
 import { SshAddDialog } from './ssh-add-dialog'
 import { LocalSetupStatus } from './local-setup-status'
 
@@ -58,7 +57,7 @@ export function DevicesSettings(_props: { workspaceId?: string }) {
   }
   return <>
     <DevicesPage devices={data?.devices} listError={Boolean(error)} onAdd={() => setAdding(true)} onChanged={changed} onReconnect={reconnect}
-      localSetup={desktopSsh ? <div className="flex flex-col gap-3"><LocalComputerUse /><LocalSetupStatus onOnline={changed} /></div> : null} />
+      localSetup={desktopSsh ? <LocalSetupStatus onOnline={changed} /> : null} />
     {desktopSsh
       ? <SshAddDialog open={adding} onOpenChange={setAdding} devices={devices} onAdded={changed} />
       : <ConnectDeviceDialog open={adding} onOpenChange={setAdding} hideTrigger />}

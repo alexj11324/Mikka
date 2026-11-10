@@ -848,39 +848,6 @@
     "emptyTitle": "No devices yet",
     "emptyDescription": "Install and start Mikka on a computer. It will appear here when it connects.",
     "footer": "A passing check means the latest availability check succeeded; it does not mean the tool is running. Wait for a new result after a check expires.",
-    "localComputerUse": {
-      "title": "Computer use on this Mac",
-      "description": "Let Mikka's runs take screenshots, click, type and scroll on this Mac. The driver stays with the daemon; a run only gets a request-only proxy.",
-      "driver": "CuaDriver",
-      "notInstalled": "0.38.0 not installed",
-      "checking": "Checking…",
-      "accessibility": "Accessibility",
-      "screenRecording": "Screen Recording",
-      "captureConsent": "Direct capture consent",
-      "statusLabel": "Status",
-      "state": {
-        "granted": "Granted",
-        "denied": "Denied",
-        "unknown": "Unknown"
-      },
-      "status": {
-        "ok": "Ready. This Mac's screen and input are available to approved runs.",
-        "missing": "CuaDriver 0.38.0 is not installed. Install it, then check again.",
-        "binary_version": "CuaDriver {version} is installed, but Mikka needs 0.38.0.",
-        "binaryVersionUnknown": "A different CuaDriver build is installed; Mikka needs 0.38.0.",
-        "accessibility_denied": "Accessibility is off. Click Enable and approve CuaDriver in System Settings › Privacy & Security › Accessibility.",
-        "screen_recording_denied": "Screen Recording is off. Click Enable and approve CuaDriver in System Settings › Privacy & Security › Screen & System Audio Recording.",
-        "capture_failed": "The driver could not capture this Mac's screen. Check Screen Recording, then click Enable and approve the direct-capture prompt."
-      },
-      "enable": "Enable computer use on this Mac",
-      "enabling": "Waiting for macOS…",
-      "recheck": "Check again",
-      "installHint": "Install the pinned CuaDriver 0.38.0 for macOS to continue.",
-      "grantingLabel": "macOS may ask for permission",
-      "grantingDescription": "Approve CuaDriver in the system dialogs. This can take up to three minutes.",
-      "errorTitle": "Status unavailable",
-      "error": "The daemon did not answer. Make sure it is running, then try again."
-    },
     "connect": {
       "trigger": "Connect device",
       "title": "Add device",

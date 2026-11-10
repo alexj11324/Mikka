@@ -5,7 +5,6 @@
 // the schemas below because the renderer is untrusted.
 import { z } from "zod"
 
-import type { ComputerDoctor } from "./computer"
 import type { QuotaSnapshotReport } from "./quota"
 import { authProvider, sessionUser, type AccessToken } from "./auth"
 
@@ -348,18 +347,6 @@ export interface MikkaBridge {
     link(workspaceId: string): Promise<LocalDevice>
     /** Native folder picker; main checks the folder is in a git repo. */
     pickRepo(): Promise<PickRepoResult>
-    /**
-     * Local computer use on this Mac: the daemon's fixed-shape doctor (driver
-     * identity, TCC states, one real screenshot probe). Null when the daemon
-     * is offline or too old. Absent on older desktop builds.
-     */
-    computerPermissions?(): Promise<ComputerDoctor | null>
-    /**
-     * Requests the macOS Accessibility, Screen Recording and capture grants
-     * under CuaDriver's app identity, then returns a fresh doctor. Only the
-     * person's click in 设备 sends this; absent on older desktop builds.
-     */
-    grantComputerPermissions?(): Promise<ComputerDoctor | null>
   }
   /** Subscription numbers from the local daemon. Never a vendor credential. */
   quota: {

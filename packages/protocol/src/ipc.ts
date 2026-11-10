@@ -42,9 +42,6 @@ export const IPC = {
   deviceStatus: "mikka:device:status",
   deviceLink: "mikka:device:link",
   devicePickRepo: "mikka:device:pick-repo",
-  /** Local computer use on this Mac: read-only doctor, and the person's grant click. */
-  deviceComputerPermissions: "mikka:device:computer-permissions",
-  deviceComputerPermissionsGrant: "mikka:device:computer-permissions-grant",
   /** main -> renderer push of AuthState. */
   authChanged: "mikka:auth:changed",
 } as const

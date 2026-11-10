@@ -848,39 +848,6 @@
     "emptyTitle": "还没有设备",
     "emptyDescription": "在电脑上安装并启动 Mikka，上线后它就会出现在这里。",
     "footer": "检查通过表示最近一次可用性检查成功，不代表工具正在运行。检查过期后需等待新的检查结果。",
-    "localComputerUse": {
-      "title": "本机电脑操作",
-      "description": "允许 Mikka 的运行在这台 Mac 上截图、点击、输入和滚动。驱动只由 daemon 持有，运行只会拿到只转发请求的 proxy。",
-      "driver": "CuaDriver",
-      "notInstalled": "未安装 0.38.0",
-      "checking": "检查中…",
-      "accessibility": "辅助功能",
-      "screenRecording": "屏幕录制",
-      "captureConsent": "直接截屏授权",
-      "statusLabel": "状态",
-      "state": {
-        "granted": "已授权",
-        "denied": "已拒绝",
-        "unknown": "未知"
-      },
-      "status": {
-        "ok": "已就绪，受批准的运行可以使用这台 Mac 的屏幕和输入。",
-        "missing": "没有安装 CuaDriver 0.38.0。装好后重新检查。",
-        "binary_version": "已安装 CuaDriver {version}，但 Mikka 需要 0.38.0。",
-        "binaryVersionUnknown": "安装的是其他版本的 CuaDriver，Mikka 需要 0.38.0。",
-        "accessibility_denied": "辅助功能未开启。点「启用」后在「系统设置 › 隐私与安全性 › 辅助功能」里允许 CuaDriver。",
-        "screen_recording_denied": "屏幕录制未开启。点「启用」后在「系统设置 › 隐私与安全性 › 屏幕与系统音频录制」里允许 CuaDriver。",
-        "capture_failed": "驱动无法截取这台 Mac 的屏幕。检查屏幕录制后点「启用」，并在系统弹窗里允许直接截屏。"
-      },
-      "enable": "启用本机电脑操作",
-      "enabling": "等待 macOS…",
-      "recheck": "重新检查",
-      "installHint": "先安装固定版本 CuaDriver 0.38.0 的 macOS 版。",
-      "grantingLabel": "macOS 可能会请求权限",
-      "grantingDescription": "请在系统弹窗里允许 CuaDriver，最多需要三分钟。",
-      "errorTitle": "无法获取状态",
-      "error": "daemon 没有响应。确认它正在运行后再试。"
-    },
     "connect": {
       "trigger": "连接设备",
       "title": "添加设备",

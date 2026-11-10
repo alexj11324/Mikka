@@ -72,38 +72,3 @@ export const computerSyncResponse = z.object({ decisions: z.array(localComputerD
 export type LocalComputerRequest = z.infer<typeof localComputerRequest>
 export type LocalComputerDecision = z.infer<typeof localComputerDecision>
 export const computerSyncPath = (deviceId: string) => `/v1/devices/${encodeURIComponent(deviceId)}/computer`
-
-/**
- * Local computer use on this Mac (desktop → daemon). The report is fixed
- * shape: permission states, the pinned driver identity and one capture
- * probe. It never carries screen content, window titles or driver stderr.
- */
-export const computerPermissionStateSchema = z.enum(['granted', 'denied', 'unknown'])
-export type ComputerPermissionState = z.infer<typeof computerPermissionStateSchema>
-export const computerDoctorStatusSchema = z.enum([
-  'ok',
-  'missing',
-  'binary_version',
-  'accessibility_denied',
-  'screen_recording_denied',
-  'capture_failed',
-])
-export type ComputerDoctorStatus = z.infer<typeof computerDoctorStatusSchema>
-export const computerDoctorSchema = z.object({
-  installed: z.boolean(),
-  /** The pinned driver's version, or the version found when it is not 0.38.0. */
-  version: z.string().nullable(),
-  binaryPath: z.string().nullable(),
-  accessibility: computerPermissionStateSchema,
-  screenRecording: computerPermissionStateSchema,
-  /** Tahoe's direct-capture consent; unknown on read-only status calls. */
-  captureConsent: computerPermissionStateSchema,
-  probe: z.object({
-    status: computerDoctorStatusSchema,
-    /** One real get_desktop_state returned a decodable image with a size. */
-    ok: z.boolean(),
-    width: z.number().int().nonnegative().nullable(),
-    height: z.number().int().nonnegative().nullable(),
-  }).strict(),
-}).strict()
-export type ComputerDoctor = z.infer<typeof computerDoctorSchema>
