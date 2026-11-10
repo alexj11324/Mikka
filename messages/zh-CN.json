@@ -4487,7 +4487,12 @@
       "modelUnavailable": "没有可运行的默认模型",
       "loadingPlacement": "正在检查运行设置…",
       "quotaUnchecked": "模型额度待检查",
-      "workspaceDefault": "按工作区设置"
+      "workspaceDefault": "按工作区设置",
+      "machineRow": "机器",
+      "botRow": "交给",
+      "details": "详情",
+      "expand": "放大窗口",
+      "collapse": "缩小窗口"
     },
     "board": {
       "toolbar": "看板工具栏",
