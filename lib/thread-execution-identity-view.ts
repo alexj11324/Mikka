@@ -18,8 +18,7 @@ export const modelRoutingEvidenceSchema = z.discriminatedUnion('version', [
   z.object({ version: z.literal(2), required: z.enum([...MODEL_ROUTING_TIERS, 'unknown']), ...frozenRouting }).strip(),
 ])
 
-const reference = z.string().min(1).max(200)
-const resource = z.object({
+const reference = z.string().min(1).max(200)const resource = z.object({
   kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'mcp']),
   id: reference, ownerId: reference, access: z.enum(['owner', 'workspace_share']),
   revision: z.string().max(200).optional(),
@@ -42,6 +41,14 @@ const evidence = z.object({ run: z.object({
   executionIdentity: identity.nullable(),
   labels: executionIdentityLabelsSchema.nullable().optional().catch(null),
   modelRouting: modelRoutingEvidenceSchema.nullable().optional().catch(null),
+  // What this run's prompt carried of its skills: the bodies it inlined, and
+  // the ones it only named because the section would not hold them whole.
+  skillPrompt: z.object({
+    budgetChars: z.number().int().nonnegative(),
+    usedChars: z.number().int().nonnegative(),
+    inlined: z.array(z.string().max(80)),
+    deferred: z.array(z.string().max(80)),
+  }).nullable().optional().catch(null),
   agentProfile: z.object({
     profileId: z.string().min(1).max(200), name: z.string().max(80), version: z.number().int().positive(), digest: z.string().max(200),
     source: z.enum(['explicit', 'decision', 'default']), reason: z.string().max(4000),

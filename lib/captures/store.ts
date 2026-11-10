@@ -14,6 +14,7 @@ import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignA
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
 import { modelRoutingEvidenceSchema } from '@/lib/thread-execution-identity-view'
+import { runSkillPrompt } from '@mikka/protocol/run'
 import { taskActivityChanged } from '@/lib/factory/activity-live'
 
 // Screenshots and screen recordings in Neon (whose, which run, share links)
@@ -298,6 +299,9 @@ export async function runEvidence(userId: string, runId: string) {
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
     modelRouting: sql<unknown>`${agentRuns.agentDefinition}->'modelDispatch'->'routing'`,
+    // What the prompt carried of the run's skills; a body it only deferred is
+    // shown beside the run so the person knows a skill waited on a file read.
+    skillPrompt: sql<unknown>`${agentRuns.report}->'skillPrompt'`,
     // The mark is presentation, not part of the frozen receipt: the Profile's current one, else derived from the frozen public summary.
     agentProfile: sql<RunAgentProfileMarkRow | null>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
       'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId','name',${agentRuns.agentDefinition}->'agentProfile'->'name',
@@ -314,6 +318,7 @@ export async function runEvidence(userId: string, runId: string) {
   // authorization check. Schema projection strips private/unknown fields.
   const identity = executionIdentitySchema.safeParse(run.executionIdentity)
   const routing = modelRoutingEvidenceSchema.safeParse(run.modelRouting)
+  const skills = runSkillPrompt.safeParse(run.skillPrompt)
   // Names for the identity's references, so the owner reads people and machines, not IDs.
   const labels = identity.success ? await (await import('@/lib/execution-identity-labels')).executionIdentityLabels(pool, (await import('@/lib/workspace-db')).workspacePool, userId, identity.data) : null
   const captures = await db.select().from(runCaptures)
@@ -322,7 +327,8 @@ export async function runEvidence(userId: string, runId: string) {
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
   return {
-    run: { ...run, agentProfile: profileWithMark(run.agentProfile), executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null },
+    run: { ...run, agentProfile: profileWithMark(run.agentProfile), executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null,
+      skillPrompt: skills.success ? skills.data : null },
     recording: recording.length > 0,
     captures: captures.map(captureView),
     artifacts: documents.map(document => ({ ...document, createdAt: document.createdAt.toISOString() })),

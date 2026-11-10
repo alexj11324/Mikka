@@ -48,8 +48,8 @@ import { runPaths } from "../agents/run-context"
 import { removeRunCredentials } from "../run-scratch"
 import { createRunMasker, type RunMasker } from "../secret-mask"
 import { stdSerializers } from 'pino'
-import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
-import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
+import { SKILLS_DIR, SKILL_BODY_FILE, skillPromptPlan, skillSlug } from "@mikka/protocol/skill"
+import { runQuestion, runSkillMount, runExecution, runRuntime, type RunSkillPrompt } from "@mikka/protocol/run"
 import { ProviderFailureError, providerFailureSchema, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import { CodedError } from "@mikka/protocol/coded-error"
 import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
@@ -1006,13 +1006,16 @@ export class RunSupervisor {
       entry.assignment.preserveQuestionWorktree = true
     const readOnlyTask = entry && (isReadOnlyTask(entry.assignment) || entry.assignment.factoryCheck?.reportOnly === true || entry.assignment.factoryExecuteKind === 'deliverable')
     // Never copy trusted evidence from an adapter/model report.
-    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, safePoint: _safePoint, ...content } = report
+    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, skillPrompt: _prompt, execution: _execution, runtime: _runtime, safePoint: _safePoint, ...content } = report
     report = {
       ...content,
       ...(active?.safePoint ? { safePoint: active.safePoint } : {}),
       ...(entry?.baseCommit && /^[a-f0-9]{40}$/.test(entry.baseCommit)
         ? { sourceCommit: entry.baseCommit } : {}),
       ...(entry?.assignment.factoryExecuteKind === 'deliverable' && entry.deliverableCommit ? { deliverableCommit: entry.deliverableCommit } : {}),
+      // What the prompt actually carried of the run's skills; a deferred body
+      // is a fact the person needs to see, not something to leave unsaid.
+      ...(entry && skillPromptOf(entry.assignment) ? { skillPrompt: skillPromptOf(entry.assignment) } : {}),
       ...(entry?.skillMount && entry.skillMount.sessionId === entry.sessionId &&
         entry.skillMount.receiptId === entry.assignment.skillReceipt?.id &&
         entry.skillMount.versionId === entry.assignment.skillReceipt?.artifact.versionId &&
@@ -2198,6 +2201,24 @@ function isReadOnlyTask(assignment: RunAssignment): boolean {
   // Investigations hand in a report. Acceptance checks and benchmarks still
   // run their host-owned verification against the fixed candidate.
   return runPolicy(assignment.policy).readOnly === true && assignment.kind !== "acceptance" && !assignment.benchmark
+}
+
+/**
+ * The skills section the agent was actually given, as the report states it.
+ * Only a run that carried skills has one; a deferred body is reported so the
+ * app can show it instead of leaving the person to guess why a skill did not
+ * take effect.
+ */
+function skillPromptOf(assignment: RunAssignment): RunSkillPrompt | undefined {
+  const skills = assignment.skills
+  if (!skills?.length) return undefined
+  const plan = skillPromptPlan(skills)
+  return {
+    budgetChars: plan.budgetChars,
+    usedChars: plan.usedChars,
+    inlined: plan.inlined.map(entry => entry.name),
+    deferred: plan.degraded.map(entry => entry.name),
+  }
 }
 
 /** Existing acceptance runs remain compatible; Factory checks are exact-SHA read-only runs. */
