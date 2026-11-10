@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 
-const SECTIONS = new Set(['members', 'preferences', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'audit', 'usage', 'billing'])
+const SECTIONS = new Set(['members', 'preferences', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'audit', 'usage', 'billing'])
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
 
 function sectionId(id) {
@@ -28,11 +28,18 @@ export function settingsReadRequirements(id, fixture) {
       { path: '/api/integrations/mcp' },
       { action: 'telegram.getTelegramIntegrationStatus' },
     ]
+    // Bot 权限 lists the same connected apps (Composio and Mikka's own), without MCP servers.
+    case 'bot-permissions': return [
+      { path: '/api/integrations/composio' },
+      { path: '/api/integrations/github' },
+      { path: '/api/integrations/linear/status' },
+      { action: 'telegram.getTelegramIntegrationStatus' },
+    ]
     default: return []
   }
 }
 
-/** Positive application DOM states for all eighteen existing Settings pages.
+/** Positive application DOM states for all nineteen existing Settings pages.
  * One shared deadline, no sleeps, click retries, private React probes or UI
  * mutation. A title and an absent skeleton are never the completion signal.
  * settingsReadRequirements must also settle for the no-DOM subreads above. */
@@ -100,6 +107,11 @@ export async function settingsReady(page, id, fixture, messages, observed = { li
       // when the account has no connections. The required reads also cover empty MCP.
       // The app list's card has no title, so it is not a labelled section: look in the page body.
       await either(text('Plugins.noConnections'), text('Plugins.state.paused'))
+      break
+    case 'bot-permissions':
+      // The rule's line shows once the connected apps are read; an account with none says so.
+      await visible(text('Settings.botPermissions.rule'))
+      await either(text('Settings.botPermissions.empty'), body.getByRole('listitem').first())
       break
     case 'models': {
       const subscriptions = section('subscriptions-heading')

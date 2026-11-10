@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { Bell, Blocks, Brain, Building2, ChartColumn, CircleCheck, CreditCard, FileText, Gauge, HardDrive, KeyRound, Lock, Monitor, Plus, Shield, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { Bell, Blocks, Brain, Building2, ChartColumn, CircleCheck, CreditCard, FileText, Gauge, HardDrive, KeyRound, Lock, Monitor, Plus, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type LucideIcon } from 'lucide-react'
 import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { SearchInput } from '@/components/ui/search-input'
@@ -16,7 +16,7 @@ import { ResizablePane } from '@/components/ui/resizable-pane'
 import type { SettingsSidebarProps } from '@/components/slots/settings-sidebar-contract'
 
 const icons: Record<SettingsSectionId, LucideIcon> = {
-  account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks,
+  account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks, 'bot-permissions': ShieldCheck,
   models: Gauge, logins: KeyRound, privacy: Lock, computers: Monitor, developer: SquareTerminal,
   general: Building2, members: Users, teams: SquareUserRound, permissions: CircleCheck, secrets: HardDrive,
   audit: FileText, usage: ChartColumn, billing: CreditCard, cloud: Blocks,

@@ -1,0 +1,88 @@
+# Runtime input deduplication: first release receipt
+
+This historical receipt records the first implementation release. The actual documentation-only main-push verification is recorded on [issue #1843](https://github.com/alexj11324/Mikka/issues/1843) against its then-current runtime inputs.
+
+```json
+{
+  "issue": 1843,
+  "implementationPullRequest": 1845,
+  "implementationMerge": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c",
+  "inputsSha256": "fa4b76d50dbee6d7ad8f61dc072623251414b6cb8d826d2d3fabb940b15cf4f4",
+  "workerSha": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+  "runtimeRunId": 42718055741,
+  "runAttempt": 1,
+  "runtimeConclusion": "failure",
+  "failedJob": "release / subscriptions",
+  "failedStep": "Require real Claude Code and Codex subscriptions on the private candidates",
+  "checkSeconds": 20,
+  "webRunId": 42718055501,
+  "webConclusion": "success",
+  "publicVersionVerification": {
+    "verifiedAt": "2026-11-09T23:39:00Z",
+    "build": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c",
+    "overlaySha": "b92b0e1d48f75c92d059ee071162b72455e6af90",
+    "webRunId": 42718055501,
+    "webConclusion": "success"
+  },
+  "failureMarker": {
+    "artifactId": 13721202790,
+    "zipBytes": 289,
+    "zipSha256": "e7d6f41b70a8bc882c361e99910e4bd00ac9fc0a551946033bc1da0ea41f0ee3",
+    "content": {
+      "digest": "fa4b76d50dbee6d7ad8f61dc072623251414b6cb8d826d2d3fabb940b15cf4f4",
+      "sourceCommit": "2ff5c07fa1358fb0218aad578ab1032ad3ad351c",
+      "runId": "42718055741",
+      "runAttempt": "1"
+    }
+  },
+  "cleanup": {
+    "jobId": 129520746423,
+    "artifactId": 13720842816,
+    "deletedPrivateTemplates": 3,
+    "sandboxes": 0,
+    "errors": 0,
+    "zipSha256": "090f949770aa46b8cba04489459d7c48c291f53c92c881eecadd8a82a4fbc037"
+  },
+  "diagnostics": [
+    {
+      "kind": "claude",
+      "stage": "receipt",
+      "code": "template_gate_bootstrap_proof_invalid",
+      "sampleStatus": "failed",
+      "sampleError": "startup_dispatch_refused",
+      "failurePhase": "coordinator_stream",
+      "failureCode": "startup_dispatch_refused",
+      "dispatchRefusalCode": "unknown",
+      "lastStatus": "unavailable",
+      "agentStart": false,
+      "providerChunk": false,
+      "cleanupErrorCount": 0
+    },
+    {
+      "kind": "codex",
+      "stage": "receipt",
+      "code": "template_gate_bootstrap_proof_invalid",
+      "sampleStatus": "failed",
+      "sampleError": "startup_dispatch_refused",
+      "failurePhase": "coordinator_stream",
+      "failureCode": "startup_dispatch_refused",
+      "dispatchRefusalCode": "unknown",
+      "lastStatus": "unavailable",
+      "agentStart": false,
+      "providerChunk": false,
+      "cleanupErrorCount": 0
+    }
+  ],
+  "automaticCoreRunId": 42722002836,
+  "automaticCoreConclusion": "success",
+  "automaticReadCacheRunId": 42722002963,
+  "automaticReadCacheConclusion": "success",
+  "phaseOneReleasedComment": 6754644564,
+  "scope": "Historical first implementation release. Runtime failure remains a failure.",
+  "liveVerification": {
+    "issue": "https://github.com/alexj11324/Mikka/issues/1843",
+    "method": "Merge one documentation-only commit on the then-current main and record its exact run/attempt, check duration, input digest, skip reason and resource jobs.",
+    "sourceBinding": "Use the eligible failed run matching that main's input digest. A matching published worker is a separate skip reason."
+  }
+}
+```

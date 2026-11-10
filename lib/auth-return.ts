@@ -54,7 +54,7 @@ export function safeAuthReturn(value?: string) {
     const idKeys = ['bot', 'group', 'session', 'team', 'project', 'issue', 'thread', 'artifact']
     const section = url.searchParams.get('section')
     const threads = url.searchParams.get('threads')
-    const sections = ['coordinator', 'agent', 'plugins', 'suggestions', 'artifacts', 'all-issues', 'projects', 'team-home', 'team-issues', 'team-projects']
+    const sections = ['coordinator', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'tasks', 'all-issues', 'projects', 'team-home', 'team-issues', 'team-projects']
     return hasOnlyQueryKeys(url, ['section', ...idKeys, 'threads']) &&
       idKeys.every(key => optionalUuid(url, key)) &&
       (section === null || sections.includes(section)) &&
