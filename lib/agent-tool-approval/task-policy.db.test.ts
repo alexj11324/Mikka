@@ -197,7 +197,14 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
   await t.test('cross-harness provider policy survives live settings, broker grants and signed HTTP renewal', async () => {
     const sourceAgent = randomUUID(), nextAgent = randomUUID()
     await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex','Provider source fixture',$3),($4,$2,'claude_code','Provider target fixture',$3)`, [sourceAgent, owner, device, nextAgent])
-    const source = await fixture(null), child = await fixture(null), unrelated = await fixture(null)
+    // These runs share one workspace, and the read_only setting below applies to the workspace, not to one worker
+    // (ADR 2026-11-10-1730 retired the worker layer). They therefore get workspaces of their own: on the shared
+    // personal workspace the setting would force install_dependency to deny for `personal.run` too, which the later
+    // 'Coordinator tasks inherit their own workspace ceiling' case reads. `unrelated` is in a third workspace because
+    // the `readOnly` / `computer_use` assertions below are about what the setting does NOT reach.
+    const isolationWorkspace = await seedFixtureWorkspace(pool, owner, 'team')
+    const unrelatedWorkspace = await seedFixtureWorkspace(pool, owner, 'team')
+    const source = await fixture(isolationWorkspace), child = await fixture(isolationWorkspace), unrelated = await fixture(unrelatedWorkspace)
     await pool.query('UPDATE agent_runs SET "agentId"=$2 WHERE id=$1', [source.run, sourceAgent])
     await pool.query('UPDATE agent_runs SET "agentId"=$2,"issueId"=$3 WHERE id=$1', [child.run, nextAgent, source.issue])
     await pool.query('UPDATE agent_runs SET "agentId"=$2 WHERE id=$1', [unrelated.run, nextAgent])
@@ -297,6 +304,32 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     assert.equal(next.policy.permissions.install_dependency, 'deny')
     assert.equal(next.revision, current.revision)
     assert.equal((await read(personal.run)).policy.permissions.install_dependency, 'allow')
+  })
+  await t.test('a workspace read_only setting forces the destructive permissions to deny', async () => {
+    // policy-store.ts:186-191 turns any workspace layer's approvalMode: 'read_only' into readOnly with
+    // install_dependency, write_outside_repo and git_push forced to deny. This asserts that derivation on its own
+    // workspace, so it stays covered independently of any other case's fixture state.
+    const readonlyWorkspace = await seedFixtureWorkspace(pool, owner, 'team')
+    const subject = await fixture(readonlyWorkspace)
+    const before = await read(subject.run)
+    // The protocol default this overrides, so the assertion below proves the forcing rather than a stored value.
+    assert.equal(before.policy.permissions.install_dependency, 'allow')
+    assert.equal(before.policy.readOnly, undefined)
+    const applied = await setCliPolicy(pool, owner, subject.run, 'workspace', before.revision, { approvalMode: 'read_only' })
+    assert.equal(applied.policy.readOnly, true)
+    assert.equal(applied.policy.permissions.install_dependency, 'deny')
+    assert.equal(applied.policy.permissions.write_outside_repo, 'deny')
+    assert.equal(applied.policy.permissions.git_push, 'deny')
+    // read_only is a ceiling: a later explicit workspace allow cannot widen it back.
+    const relaxed = await setCliPolicy(pool, owner, subject.run, 'workspace', applied.revision,
+      { permissions: { install_dependency: 'allow', write_outside_repo: 'allow', git_push: 'allow' } })
+    assert.equal(relaxed.policy.readOnly, true)
+    assert.equal(relaxed.policy.permissions.install_dependency, 'deny')
+    assert.equal(relaxed.policy.permissions.write_outside_repo, 'deny')
+    // Removing read_only lifts the forced values for another workspace, never retroactively for this one.
+    const cleared = await setCliPolicy(pool, owner, subject.run, 'workspace', relaxed.revision, { approvalMode: 'ask' })
+    assert.equal(cleared.policy.readOnly, undefined)
+    assert.equal(cleared.policy.permissions.install_dependency, 'allow')
   })
   await t.test('team and shared-project ceilings are derived, intersected and live-versioned', async () => {
     const initial = await read(a.run)
