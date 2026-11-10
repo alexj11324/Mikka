@@ -368,7 +368,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   // R-61: one line under the header, one before the properties or an open thread; the page scrolls, the right column stays.
   return <div ref={rootRef} tabIndex={-1} role="region" aria-busy={preview} aria-label={title || t('titleLabel')} className="flex min-w-0 flex-1 outline-none" onKeyDown={onKeyDown}>
     <div className="flex min-w-0 flex-1 flex-col">
-    <IssueDetailHeader origin={origin} identifier={saved.identifier} title={title} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving} pending={false} navigation={navigation} onClose={onClose} actions={{actions}} />
+    <IssueDetailHeader origin={origin} identifier={saved.identifier} title={title} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving} pending={false} navigation={navigation} onClose={onClose} actions={actions} />
     <div className="mx-auto flex w-full min-w-0 max-w-170 flex-1 flex-col gap-6 px-5 py-6 sm:px-8 lg:py-10">
       {!wide && <SectionBoundary onClose={onClose}>{properties}</SectionBoundary>}
       <div className="min-w-0">
