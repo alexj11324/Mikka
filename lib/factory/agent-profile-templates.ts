@@ -1,4 +1,4 @@
-import { parseAgentProfile, type AgentProfileDefinition } from './agent-profile-definition'
+import type { AgentProfileDefinition } from './agent-profile-definition'
 
 /**
  * The four reusable professional starting points. A template is only a copy:
@@ -69,13 +69,15 @@ export function agentProfileTemplate(id: AgentProfileTemplateId) {
 }
 
 /** A copy of the template as a normal editable definition. Name and public
- * description come from the reader's locale; the role contract is fixed text. */
+ * description come from the reader's locale; the role contract is fixed text.
+ * This module is imported by the settings client, so it must stay free of the
+ * server-only definition module at runtime (its digest imports node:crypto). */
 export function agentProfileTemplateDefinition(id: AgentProfileTemplateId, copy: { name: string; description: string }): AgentProfileDefinition {
   const template = agentProfileTemplate(id)
   if (!template) throw new Error('agentProfileTemplateUnknown')
-  return parseAgentProfile({
+  return {
     name: copy.name.slice(0, 80), description: copy.description.slice(0, 600),
     roles: [...template.roles], enabled: true, harness: 'auto', model: { mode: 'inherit' },
     instructions: template.instructions, skills: [...template.skills],
-  })
+  }
 }

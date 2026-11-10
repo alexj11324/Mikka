@@ -12,6 +12,9 @@ afterAll(cleanupTempDirs)
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex')
 
+/** One read-only entry the daemon writes; only the fields a test reads are typed. */
+type ManifestSkill = { id: string; instructions?: string; [key: string]: unknown }
+
 function repositorySkill(root: string, directory: string, body: string) {
   const dir = join(root, directory)
   mkdirSync(dir, { recursive: true })
@@ -65,17 +68,17 @@ describe('Profile Skills in a daemon run', () => {
       harness: 'codex', worktree, runDir: join(stateDir, 'runs', 'run-1'), privateDir: stateDir,
       repositorySkills: ['tdd', 'review', 'escape', 'missing'],
     })
-    const manifest = JSON.parse(readFileSync(join(ctx.profileSkillsDir, 'manifest.json'), 'utf8'))
-    const byId = new Map(manifest.skills.map((skill: { id: string }) => [skill.id, skill]))
+    const manifest = JSON.parse(readFileSync(join(ctx.profileSkillsDir, 'manifest.json'), 'utf8')) as { skills: ManifestSkill[] }
+    const byId = new Map(manifest.skills.map(skill => [skill.id, skill] as const))
     expect(byId.get('repository:tdd')).toMatchObject({ available: true, name: 'tdd', description: 'Test first.', source: 'repository' })
-    expect(byId.get('repository:tdd').instructions).toContain('Write the failing check first.')
+    expect(byId.get('repository:tdd')?.instructions).toContain('Write the failing check first.')
     expect(byId.get('repository:review')).toMatchObject({ available: true, name: 'review' })
     expect(byId.get('repository:escape')).toMatchObject({ available: false, reason: 'invalid' })
     expect(byId.get('repository:missing')).toMatchObject({ available: false, reason: 'not_found' })
     // The body is pinned at start: a later edit cannot change what load_skill serves.
     writeFileSync(join(worktree, '.claude/skills/tdd', 'SKILL.md'), 'Changed after start.\n')
-    const pinned = JSON.parse(readFileSync(join(ctx.profileSkillsDir, 'manifest.json'), 'utf8'))
-    expect(pinned.skills.find((skill: { id: string }) => skill.id === 'repository:tdd').instructions).toContain('Write the failing check first.')
+    const pinned = JSON.parse(readFileSync(join(ctx.profileSkillsDir, 'manifest.json'), 'utf8')) as { skills: ManifestSkill[] }
+    expect(pinned.skills.find(skill => skill.id === 'repository:tdd')?.instructions).toContain('Write the failing check first.')
   })
 
   it('creates the manifest during preparation so a prewarmed MCP child can resolve it, then pins the checkout', async () => {

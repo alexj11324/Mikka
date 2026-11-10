@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { agentProfileDigest, agentProfileInstructions, parseAgentProfile } from './agent-profile-definition'
+import { agentProfileDigest, parseAgentProfile } from './agent-profile-definition'
 import { agentProfileSkillSource, agentProfileSkillsCatalog, profileSkillRunAssignment, resolveAgentProfileSkills } from './agent-profile-skills'
 import { AGENT_PROFILE_TEMPLATES, agentProfileTemplateDefinition } from './agent-profile-templates'
 import { profileDecisionInput, type PublicAgentProfile } from './agent-profile-decision'
