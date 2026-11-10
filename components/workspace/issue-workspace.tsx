@@ -580,7 +580,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // + (its Tools), ⌘⇧B for the browser, or the phone's chat pill for the Overview.
   const panelsInFrame = FRAME_OWNS_PANEL && isConversation
   const conversationPanels = panelsInFrame ? { ...panelReveal, tabs: [
-    { id: 'overview' as const, title: i18nText('Shell.panel.overview'), content: <ContextPanel key="context-panel" sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => {}}
+    { id: 'overview' as const, title: i18nText('Shell.panel.overview'), content: <ContextPanel key="context-panel" sheet frameTab workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => {}}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: botChatSummaries && coordinatorBot ? botChatSummaries.items[coordinatorBot.id]?.at ?? undefined : undefined }} /> },
     { id: 'browser' as const, title: i18nText('Browser.label'), content: <BrowserPane inTab onClose={() => showBrowser(false)} /> },
   ] } : undefined
