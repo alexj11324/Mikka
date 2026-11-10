@@ -137,7 +137,8 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
     const read = await get(first.id, headers), data = await read.json() as BillingManagementView
     assert.equal(read.status, 200); assert.deepEqual(data.organizations, []); assert.equal(data.organization, null)
     assert.equal((await get(second.id, headers)).status, 403); assert.equal((await orgGet(organizationId, headers)).status, 403)
-    await pool.query('update personal_access_tokens set "expiresAt"=now()-interval \'1 second\' where id=$1', [token.id])
+    // Expired now, but still a valid lifecycle: creation precedes expiry.
+    await pool.query('update personal_access_tokens set "createdAt"=now()-interval \'2 seconds\',"expiresAt"=now()-interval \'1 second\' where id=$1', [token.id])
     assert.equal((await get(first.id, headers)).status, 401)
     await pool.query('update personal_access_tokens set "expiresAt"=null,"revokedAt"=now() where id=$1', [token.id])
     assert.equal((await get(first.id, headers)).status, 401)
