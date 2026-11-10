@@ -5,6 +5,8 @@ import { serverPostHog } from '@/lib/posthog-server'
 import { isSmokeAccountEmail } from '@/lib/smoke-account'
 import { parseFirstTouch } from '@/lib/first-touch.mjs'
 
+type FirstTouch = { source: string; acquired_at: number; landing_path: string; referrer_domain?: string | null; utm_source?: string | null; utm_medium?: string | null; utm_campaign?: string | null; utm_content?: string | null; utm_term?: string | null }
+
 /**
  * Only Better Auth's user.create.after hook calls this. Its database insert
  * is the unique registration boundary; logins and failed sign-ups never fire.
@@ -12,7 +14,7 @@ import { parseFirstTouch } from '@/lib/first-touch.mjs'
  * billing or other trusted business decisions.
  */
 export async function trackNewRegistration(user: { id: string; email?: string | null }) {
-  let firstTouch: ReturnType<typeof parseFirstTouch> = null
+  let firstTouch: FirstTouch | null = null
   try {
     // Read while the Better Auth request context is still alive. OAuth
     // callbacks also return through this same top-level App origin.
