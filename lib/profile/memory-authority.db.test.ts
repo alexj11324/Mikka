@@ -47,15 +47,18 @@ test('memory uses authoritative membership across two real PostgreSQL databases'
       { id: foreign, userId: peer, name: 'Foreign personal', kind: 'personal' },
     ])
     await workspaceDb.insert(wsSchema.workspaceMembers).values([
-      ...[a, b, personal, foreign].map(workspaceId => ({ workspaceId, userId: owner, name: owner, email: `${owner}@example.invalid`, role: 'admin' as const })),
+      ...[a, b, personal].map(workspaceId => ({ workspaceId, userId: owner, name: owner, email: `${owner}@example.invalid`, role: 'admin' as const })),
+      { workspaceId: foreign, userId: peer, name: peer, email: `${peer}@example.invalid`, role: 'admin' },
       { workspaceId: suspended, userId: owner, name: owner, email: `${owner}@example.invalid`, role: 'admin', status: 'suspended' },
       { workspaceId: a, userId: peer, name: peer, email: `${peer}@example.invalid`, role: 'member' },
     ])
+    await assert.rejects(workspace.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role) VALUES ($1,$2,$2,$3,'admin')`, [foreign, owner, `${owner}@example.invalid`]), { code: '23514' })
+    assert.equal((await workspace.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [foreign, owner])).rowCount, 0)
     // Deliberately disagreeing legacy app-side copies must never grant or deny admission.
     await app.query(`CREATE TABLE IF NOT EXISTS mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL,name text NOT NULL,kind text NOT NULL DEFAULT 'team',"createdAt" timestamptz NOT NULL DEFAULT now())`)
     await app.query(`CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid NOT NULL,"userId" text NOT NULL,name text NOT NULL,email text NOT NULL,role text NOT NULL,status text NOT NULL DEFAULT 'active',"createdAt" timestamptz NOT NULL DEFAULT now(),PRIMARY KEY("workspaceId","userId"))`)
-    await app.query(`INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$3,'Stale A'),($2,$3,'Stale suspended')`, [a, suspended, owner])
-    await app.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$3,'Synthetic','synthetic@example.invalid','admin','suspended'),($2,$3,'Synthetic','synthetic@example.invalid','admin','active')`, [a, suspended, owner])
+    await app.query(`INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$4,'Stale A'),($2,$4,'Stale suspended'),($3,$4,'Stale foreign')`, [a, suspended, foreign, owner])
+    await app.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$4,'Synthetic','synthetic@example.invalid','admin','suspended'),($2,$4,'Synthetic','synthetic@example.invalid','admin','active'),($3,$4,'Synthetic','synthetic@example.invalid','admin','active')`, [a, suspended, foreign, owner])
     await projectDb.insert(projects).values([ownProject, teamProject].map(id => ({ id, userId: owner, name: 'Synthetic project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 })))
     await projectDb.insert(teamProjects).values({ projectId: teamProject, teamId: randomUUID(), workspaceId: b, userId: owner })
     await db.insert(schema.bots).values([
@@ -109,7 +112,7 @@ test('memory uses authoritative membership across two real PostgreSQL databases'
         assert.deepEqual((await memory.readMemoryView(pinned, a)).facts.find(fact => fact.id === factId)?.source, { kind: sourceKind, id: null, url: null })
       }
     })
-    await t.test('suspended authority and a corrupt foreign personal membership cannot be rescued by app rows', async () => {
+    await t.test('suspended authority and a rejected foreign personal membership cannot be rescued by app rows', async () => {
       for (const workspaceId of [suspended, foreign]) {
         await assert.rejects(memory.readMemoryView(owner, workspaceId), { code: 'workspaceAccessDenied' })
         await assert.rejects(memory.addMemoryFact(owner, workspaceId, { requestId: randomUUID(), kind: 'preference', subject: 'Refused', scope: { kind: 'global', ids: [] } }), { code: 'workspaceAccessDenied' })
