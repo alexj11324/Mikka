@@ -2156,7 +2156,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "d644a7fb95572f2761d3f279b38283121766f4d891cdf621f035dab417e1662d"
+      "sourceHash": "8ad0715712c5dccae5c2391c99310e056a78ef0b4298c860619c4aeecf1a7f2f"
     },
     {
       "path": "/mikka/api/version",
