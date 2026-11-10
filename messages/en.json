@@ -400,6 +400,9 @@
       "selectExistingProject": "Choose an existing project. Create new projects on the projects page first.",
       "projectLinkFailed": "Could not link the project.",
       "projectLinkFailedRetry": "Could not link the project. Please try again.",
+      "accessChangeTitle": "Change who can see this task?",
+      "accessChangeBody": "This moves {tasks} task(s) and changes who can read them.",
+      "accessChangeConfirm": "Move anyway",
       "saveFailed": "The save failed. Please try again.",
       "saveFailedRetry": "The save failed. Please try again shortly.",
       "estimatePoints": "{count} point estimate"
@@ -1166,6 +1169,7 @@
     "issueOutdated": "This task was updated. Please refresh and try again.",
     "issueTargetUnavailable": "The related task is no longer available.",
     "issueAccessChanged": "Task access has changed.",
+    "accessChangeConfirmationRequired": "Changing this would change who can read the task. Confirm to continue.",
     "issueParentCycle": "Parent and subtask relations cannot form a cycle.",
     "issueDuplicateCycle": "Duplicate relations cannot form a cycle.",
     "issueBlockCycle": "Blocking relations cannot form a cycle.",
