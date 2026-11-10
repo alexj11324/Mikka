@@ -61,17 +61,22 @@ export function truncateCommentTitle(title: string, max = RUN_COMMENT_TITLE_MAX)
   return truncatePoints(oneLine(title), max)
 }
 
-/** Keep the identifier when the title must shrink; never invent a second line. */
-function boundedSubject(identifier: string, title: string, room: number, fallback: string): string {
-  if (room <= 0) return ''
+/** Keep the identifier when the title must shrink; the rendered length decides, never a count of code points. */
+function fitSubject(identifier: string, title: string, fallback: string, fits: (subject: string) => boolean): string {
   const whole = [identifier, title].filter(Boolean).join(' ') || fallback
-  if (Array.from(whole).length <= room) return whole
-  const idLength = Array.from(identifier).length
-  if (identifier && room > idLength + 1) {
-    const bounded = truncatePoints(title, room - idLength - 1)
-    return [identifier, bounded].filter(Boolean).join(' ')
+  if (fits(whole)) return whole
+  if (identifier) {
+    for (let take = Array.from(title).length; take > 0; take--) {
+      const candidate = [identifier, truncatePoints(title, take)].filter(Boolean).join(' ')
+      if (fits(candidate)) return candidate
+    }
+    if (fits(identifier)) return identifier
   }
-  return truncatePoints(whole, room)
+  for (let take = Array.from(whole).length - 1; take > 0; take--) {
+    const candidate = truncatePoints(whole, take)
+    if (fits(candidate)) return candidate
+  }
+  return ''
 }
 
 /**
@@ -88,9 +93,10 @@ export function linearRunCommentBody(input: LinearRunCommentInput): string {
   const deepLink = input.deepLink.trim()
   if (!HTTP_URL.test(deepLink)) throw new TypeError('deep link must be an http(s) URL without whitespace or a closing parenthesis')
   const linkLine = `[${LINK_LABEL}](${deepLink})`
-  const fixed = `${PREFIX}${SEPARATOR}${label}\n${linkLine}`
-  const subject = boundedSubject(oneLine(input.identifier), truncateCommentTitle(input.title), RUN_COMMENT_MAX - fixed.length, EMPTY_SUBJECT[locale])
-  return `${PREFIX}${subject ? `${subject}${SEPARATOR}` : ''}${label}\n${linkLine}`
+  const render = (subject: string) => `${PREFIX}${subject ? `${subject}${SEPARATOR}` : ''}${label}\n${linkLine}`
+  const subject = fitSubject(oneLine(input.identifier), truncateCommentTitle(input.title), EMPTY_SUBJECT[locale],
+    candidate => render(candidate).length <= RUN_COMMENT_MAX)
+  return render(subject)
 }
 
 export type LinearRunDeepLinkInput = {

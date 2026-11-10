@@ -152,6 +152,16 @@ test('a longer link shrinks the title first and keeps the identifier and the who
   assert.equal(link, `[Open in Mikka](${deepLink})`)
 })
 
+test('astral titles never split a surrogate pair or exceed the budget', () => {
+  const deepLink = `${ORIGIN}/mikka?issue=${'a'.repeat(280)}`
+  const body = linearRunCommentBody({ identifier: 'MIK-42', title: '😀'.repeat(200), status: 'succeeded', locale: 'en', deepLink })
+  const lines = body.split('\n')
+  assert.equal(lines.length, 2)
+  assert.ok(body.length <= RUN_COMMENT_MAX, `${body.length} characters`)
+  assert.equal(lines[1], `[Open in Mikka](${deepLink})`)
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(body), 'no lone surrogate')
+})
+
 test('a link that alone exceeds the budget stays whole and keeps the two-line structure', () => {
   const deepLink = `${ORIGIN}/mikka?issue=${'a'.repeat(500)}`
   const body = linearRunCommentBody({ identifier: 'MIK-42', title: 'Fix login redirect', status: 'succeeded', locale: 'en', deepLink })
