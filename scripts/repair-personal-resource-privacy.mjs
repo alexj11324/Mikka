@@ -67,7 +67,8 @@ export async function repairPersonalResourcePrivacy(application, workspace, opti
 
 function databaseTarget(value) {
   const url = new URL(value)
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hash || [...url.searchParams.keys()].some(key => !['sslmode', 'channel_binding'].includes(key)))
+  if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname || url.pathname.length < 2 || url.hash
+    || [...url.searchParams.keys()].some(key => !['sslmode', 'channel_binding'].includes(key)))
     throw new Error('Repair requires unambiguous PostgreSQL targets')
   return `${url.hostname}:${url.port || '5432'}/${decodeURIComponent(url.pathname.slice(1))}`
 }

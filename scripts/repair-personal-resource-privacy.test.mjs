@@ -16,6 +16,7 @@ test('apply rejects unbounded Workspaces and wrong/ambiguous database targets be
     assert.throws(() => repairCommand(args, env))
   }
   assert.throws(() => repairCommand(selection, { ...env, MIKKA_DATABASE_URL: env.MIKKA_DATABASE_URL + '?host=other.example.invalid' }))
+  assert.throws(() => repairCommand([], { ...env, MIKKA_DATABASE_URL: 'postgresql://db.example.invalid/' }))
   await assert.rejects(repairPersonalResourcePrivacy(null, null, { dryRun: false, actorId: 'operator' }))
   await assert.rejects(repairPersonalResourcePrivacy(null, null, { dryRun: false, workspaceIds: [workspace] }))
 })
