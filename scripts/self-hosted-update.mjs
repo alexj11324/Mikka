@@ -163,10 +163,11 @@ async function performUpgrade(release, opts) {
       return { status: 'updated', tag: release.tag, revision: release.revision, backup: backupDirectory }
     } catch {
       if (!activated || !assessment.migrationChanged) {
-        try {
-          restoreOldApp(originalEnvironment, original.image)
-          fail('SELF_HOSTED_UPDATE_REVERTED_TO_PREVIOUS_IMAGE')
-        } catch { fail('SELF_HOSTED_UPDATE_MANUAL_RECOVERY_REQUIRED') }
+        let restored = false
+        try { restoreOldApp(originalEnvironment, original.image); restored = true }
+        catch { /* Preserve backup for manual recovery. */ }
+        if (restored) fail('SELF_HOSTED_UPDATE_REVERTED_TO_PREVIOUS_IMAGE')
+        fail('SELF_HOSTED_UPDATE_MANUAL_RECOVERY_REQUIRED')
       }
       // New startup may have executed DDL. Never silently run old binaries
       // against a potentially advanced schema or restore a live database.
