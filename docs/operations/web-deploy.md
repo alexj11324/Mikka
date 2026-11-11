@@ -65,6 +65,23 @@ and copies the runtime resources. `.vercel/output/mikka-build.json` records
 the source SHA, function contracts and resource hashes. These build checks do
 not prove hosted queue delivery or production OAuth callbacks.
 
+Before copying runtime resources, `dedupe-functions.mjs` replaces identical
+HTTP function directories with relative `.func` aliases, as Nitro already does
+for routes without custom configuration. The full function configuration,
+file bytes, executable modes and internal dependency links must match. Functions
+with external or unresolved dependency links remain independent, as do all
+Workflow trigger functions. Route destinations, duration limits and cancellation
+settings are retained. The build manifest's `functionPackaging` records logical
+functions, retained implementations and aliases added. This avoids archiving
+one copy of the entire API and its resources for every duration-configured route.
+
+An Actions timeout does not prove the remote deployment was cancelled. For
+example, run `43061442162` timed out after uploading a 6.6GB archive; its remote
+deployment completed and promoted 22 seconds later. Before rerunning a failed
+upload or releasing a new source, inspect that exact deployment's state and
+verify the production alias, source and overlay. Preserve the Actions failure
+and the independently observed remote result as separate evidence.
+
 Keep **Automatically expose System Environment Variables** enabled in the
 existing project. Workflow uses the platform's runtime `VERCEL_DEPLOYMENT_ID`,
 project ID, OIDC and encryption configuration; the custom client deployment

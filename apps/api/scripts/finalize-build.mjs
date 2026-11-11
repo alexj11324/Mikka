@@ -9,6 +9,7 @@ import { POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST, POSTER_BINARY_MAX_BYTES,
 import { configuredDeploymentId } from '../../../lib/deployment-id.mjs'
 import { nodeRuntimePackages } from '../build-contract.mjs'
 import { cloudServiceRewrite } from '../cloud-service-rewrite.mjs'
+import { deduplicateVercelFunctions } from './dedupe-functions.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const compress = promisify(gzip)
@@ -123,6 +124,7 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     const deploymentId = configuredDeploymentId()
     if (process.env.VERCEL_ENV === 'production' && !deploymentId) throw new Error('API_PRODUCTION_DEPLOYMENT_ID_REQUIRED')
     if (deploymentId) config.deploymentId = deploymentId
+    evidence.functionPackaging = await deduplicateVercelFunctions(join(output, 'functions'))
     for (const directory of await functionDirectories(join(output, 'functions'))) {
       const contract = await wrapFunction(directory, tracing)
       await copyResources(directory)
