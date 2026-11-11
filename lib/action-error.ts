@@ -17,7 +17,11 @@ export async function runAction<T>(fn: () => Promise<T | ActionResult<T>>): Prom
   try {
     return await fn() as ActionResult<T>
   } catch (error) {
-    if (error instanceof ActionFailureError) return { error: error.code, params: error.params, confirmable: error.confirmable }
+    // `confirmable` is present only on a refusal the caller may replay, so an
+    // ordinary failure keeps exactly the shape its callers already compare.
+    if (error instanceof ActionFailureError) return error.confirmable
+      ? { error: error.code, params: error.params, confirmable: error.confirmable }
+      : { error: error.code, params: error.params }
     throw error
   }
 }

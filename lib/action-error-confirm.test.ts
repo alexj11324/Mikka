@@ -16,10 +16,12 @@ test('a refusal that only asks for confirmation survives as confirmable, with it
   assert.deepEqual(result, { error: 'accessChangeConfirmationRequired', params: { tasks: 2, readers: 3 }, confirmable: true })
 })
 
-test('an ordinary failure is not confirmable', async () => {
+test('an ordinary failure is not confirmable, and carries no flag at all', async () => {
   const result = await runAction(async () => { throw new ActionFailureError('issueOutdated') })
-  assert.deepEqual(result, { error: 'issueOutdated', params: undefined, confirmable: undefined })
-  assert.equal(result.confirmable, undefined)
+  // The key is absent rather than undefined: existing callers compare this
+  // object with deepEqual, so an extra property would fail them.
+  assert.deepEqual(result, { error: 'issueOutdated', params: undefined })
+  assert.equal('confirmable' in result, false)
 })
 
 test('the confirmation code answers 409 and other codes keep their status', () => {
