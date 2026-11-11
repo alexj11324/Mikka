@@ -1,11 +1,28 @@
 import { posix } from 'node:path'
-import { Bash, InMemoryFs, stdoutAsBytes, latin1FromBytes } from 'just-bash'
+import { Bash, InMemoryFs, stdoutAsBytes, latin1FromBytes, defineCommand } from 'just-bash'
 import type { SandboxConnection } from 'eve/sandbox/provider'
 
 type Entry={path:string;kind:'directory'|'file'|'symlink';mode:number;mtime:number;content?:string;target?:string}
 export type ScratchSnapshot={version:1;entries:Entry[];env:Record<string,string>}
 export type ScratchMutation=<T>(work:(snapshot:ScratchSnapshot)=>Promise<{snapshot:ScratchSnapshot;value:T}>)=>Promise<T>
 const maxBytes=64*1024*1024
+// Eve's native workspace boundary uses GNU realpath's -e -z protocol.
+// This command resolves only the virtual filesystem supplied by JustBash.
+const realpath=defineCommand('realpath',async(args,ctx)=>{
+  let zero=false,options=true,path:string|undefined
+  for(const arg of args) {
+    if(options&&arg==='--'){options=false;continue}
+    if(options&&arg==='-e')continue
+    if(options&&arg==='-z'){zero=true;continue}
+    if(path!==undefined||(options&&arg.startsWith('-')))return {stdout:'',stderr:'realpath: unsupported arguments\n',exitCode:2}
+    path=arg
+  }
+  if(path===undefined)return {stdout:'',stderr:'realpath: missing path\n',exitCode:2}
+  try {
+    const resolved=await ctx.fs.realpath(ctx.fs.resolvePath(ctx.cwd,path));await ctx.fs.stat(resolved)
+    return {stdout:resolved+(zero?'\0':'\n'),stderr:'',exitCode:0}
+  } catch {return {stdout:'',stderr:'realpath: path unavailable\n',exitCode:1}}
+},{trusted:false})
 
 export function emptyScratchSnapshot():ScratchSnapshot {
   return {version:1,entries:[],env:{HOME:'/home/eve',PATH:'/usr/bin:/bin',AI_AGENT:'eve'}}
@@ -21,7 +38,7 @@ async function restore(snapshot:ScratchSnapshot) {
   }
   for(const entry of snapshot.entries)if(entry.kind!=='symlink'){await fs.chmod(entry.path,entry.mode);await fs.utimes(entry.path,new Date(entry.mtime),new Date(entry.mtime))}
   await fs.mkdir('/workspace',{recursive:true});await fs.mkdir('/home/eve',{recursive:true})
-  return {fs,bash:new Bash({fs,cwd:'/workspace',env:{...snapshot.env},executionLimitProfile:'hardened',executionLimits:{maxExecutionTimeMs:10_000,maxOutputSize:1024*1024}})}
+  return {fs,bash:new Bash({fs,cwd:'/workspace',env:{...snapshot.env},customCommands:[realpath],executionLimitProfile:'hardened',executionLimits:{maxExecutionTimeMs:10_000,maxOutputSize:1024*1024}})}
 }
 async function capture(fs:InMemoryFs,bash:Bash):Promise<ScratchSnapshot> {
   const entries:Entry[]=[]
