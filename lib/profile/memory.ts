@@ -362,10 +362,11 @@ export async function purgeExpiredMemoryUndo() {
 
 /**
  * Only approved, in-scope facts are put in an actual Coordinator/Bot turn.
- * A project-only fact never leaks into an unbound chat. A fixed lease holder
- * yields the same idempotency id even if a workflow step retries.
+ * A project-only fact never leaks into an unbound chat. The signed host supplies
+ * the owned native turn; its retries share one usage receipt. Legacy callers
+ * retain their original lease identity, which never authorizes a native turn.
  */
-export async function memoryForBotPrompt(reader: MemoryReader, botId: string, enabled?: boolean): Promise<string> {
+export async function memoryForBotPrompt(reader: MemoryReader, botId: string, enabled?: boolean, nativeTurn?: { sessionId: string; turnId: string }): Promise<string> {
   const { userId } = taskReaderScope(reader)
   // Hosted preparation already read this owner's switch with the conversation.
   // Reuse that snapshot rather than issuing a second preference query in a turn.
@@ -374,17 +375,27 @@ export async function memoryForBotPrompt(reader: MemoryReader, botId: string, en
     .where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1)
   if (!bot) return ''
   return withTaskWorkspace(reader, bot.workspaceId, async () => {
+    if (nativeTurn) {
+      const owned = await db.execute(sql`SELECT 1 FROM eve_sessions s
+        JOIN eve_turn_sources t ON t.session_id=s.session_id
+        JOIN coordinator_events e ON e.id=t.source_event_id
+        WHERE s.session_id=${nativeTurn.sessionId} AND t.turn_id=${nativeTurn.turnId}
+          AND s.owner_id=${userId} AND s.bot_id=${botId}::uuid AND s.workspace_id=${bot.workspaceId}::uuid
+          AND s.surface='web' AND e."userId"=${userId} AND e."botId"=${botId}::uuid`)
+      if (!owned.rows.length) throw new WorkspaceError('workspaceAccessDenied')
+    }
     const facts = await db.select({ id: userFacts.id, subject: userFacts.subject, scopeKind: userFacts.scopeKind, scopeIds: userFacts.scopeIds })
       .from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'), eq(userFacts.reviewStatus, 'approved')))
       .orderBy(desc(userFacts.lastSeenAt)).limit(500)
     const shown = facts.filter(fact => applies(fact, bot.workspaceId, new Set())).slice(0, 20)
     if (!shown.length) return ''
-    // The bot's active lease identifies one actual prompt-producing turn.
-    // No lease = no claimed use (for example read-only preview preparation).
-    const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder }).from(coordinatorSessions)
+    // Compatibility status can contain a native session id across many turns.
+    // Only the persisted native tuple identifies a use in that path.
+    const [legacy] = nativeTurn ? [] : await db.select({ leaseHolder: coordinatorSessions.leaseHolder }).from(coordinatorSessions)
       .where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))).limit(1)
-    if (session?.leaseHolder) {
-      const hash = createHash('sha256').update(JSON.stringify([userId, botId, session.leaseHolder])).digest()
+    const identity = nativeTurn ? ['eve', nativeTurn.sessionId, nativeTurn.turnId] : legacy?.leaseHolder
+    if (identity) {
+      const hash = createHash('sha256').update(JSON.stringify([userId, botId, identity])).digest()
       hash[6] = (hash[6] & 15) | 64
       hash[8] = (hash[8] & 63) | 128
       const hex = hash.subarray(0, 16).toString('hex')

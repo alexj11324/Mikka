@@ -166,22 +166,22 @@ dbTest('personal instructions reach the next prompt for the Coordinator and Bots
   assert.equal(await personal.withPersonalInstructions(people.alex, 'BASE RULES'), 'BASE RULES')
 })
 
-dbTest('the Coordinator\'s and a Bot\'s turn prompt (preparePrompt) carry the saved instructions and drop them once cleared', async () => {
+dbTest('the Coordinator\'s and a Bot\'s turn prompt (prepareEveInstructions) carry the saved instructions and drop them once cleared', async () => {
   as(people.alex)
   const { preferences } = m
-  const { preparePrompt } = await import('@/workflows/coordinator/steps')
+  const { prepareEveInstructions } = await import('@/workflows/coordinator/steps')
   const botId = randomUUID()
   // The Coordinator is an ordinary bot row; its prompt keeps the Coordinator's rules.
   const coordinator = (await seedCoordinator(people.alex)).botId
   await preferences.updatePreferences({ personalInstructions: 'Sign every reply with 🐧.' })
   for (const bot of [coordinator, botId]) {
-    const { instructions } = await preparePrompt(people.alex, bot)
+    const instructions = await prepareEveInstructions(people.alex, bot)
     assert.match(instructions, /You are the Coordinator in Mikka/, 'the rules come first')
     assert.match(instructions, /<personal_instructions>\nSign every reply with 🐧\.\n<\/personal_instructions>/)
     assert.ok(instructions.indexOf('<personal_instructions>') > instructions.indexOf('You are the Coordinator in Mikka'))
   }
   await preferences.updatePreferences({ personalInstructions: '' })
-  for (const bot of [coordinator, botId]) assert.doesNotMatch((await preparePrompt(people.alex, bot)).instructions, /personal_instructions|Sign every reply/)
+  for (const bot of [coordinator, botId]) assert.doesNotMatch(await prepareEveInstructions(people.alex, bot), /personal_instructions|Sign every reply/)
 })
 
 dbTest('time zone: a picked zone survives browser and IP reports until 自动', async () => {

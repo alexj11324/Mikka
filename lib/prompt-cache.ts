@@ -33,7 +33,7 @@ export function cacheableInstructions(text: string, stable?: number, stableRules
   return [{ role: 'system', content: text.slice(0, stable) }, { role: 'system', content: text.slice(stable) }]
 }
 
-/** Boundaries become system messages, never options of WorkflowAgent itself. */
+/** Boundaries become system messages, never options of the model call itself. */
 export function promptOptions<T extends { instructions?: string; stable?: number; stableRules?: number }>({ instructions, stable, stableRules, ...rest }: T): Omit<T, 'instructions' | 'stable' | 'stableRules'> & { instructions?: string | SystemModelMessage[] } {
   return instructions === undefined ? rest : { ...rest, instructions: cacheableInstructions(instructions, stable, stableRules) }
 }

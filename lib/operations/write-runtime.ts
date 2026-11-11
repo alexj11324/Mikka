@@ -32,7 +32,7 @@ function callIntent(runId:string, callId:string) {
   const hex = bytes.toString('hex'); return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`
 }
 /** Trusted host entry: no owner, run, permission or account comes from tool input. */
-export async function personalWriteFromRun(ownerId:string, botId:string | null, runId:string, call:ModelWriteCall, nativeScope?:PersonalNativeScope) {
+export async function personalWriteFromRun(ownerId:string, botId:string | null, runId:string, call:ModelWriteCall, nativeScope?:PersonalNativeScope, nativeWriteReview?:import('./native-write-review').NativeWriteReview, signal?:AbortSignal) {
   if (!personalWritesEnabled() || !(WRITE_ACTIONS as readonly string[]).includes(call.action)) throw new Error('approvedWritesDisabled')
   const scope = await agentScope(ownerId,botId)
   const run = { ...scope, runId }
@@ -43,7 +43,7 @@ export async function personalWriteFromRun(ownerId:string, botId:string | null, 
     const member = await memberGuard?.(tx,signal)
     return { signal:member?.signal ?? signal, async check() { await fence(tx); await member?.check() }, async close() { await member?.close() } }
   } : memberGuard
-  const service = personalWriteRuntime().operations(call.action as WriteActionName,{ modelRun:run, guard, guardForRun, judgeWrite:serverWriteJudge(ownerId,botId) })
+  const service = personalWriteRuntime().operations(call.action as WriteActionName,{ modelRun:run, guard, guardForRun, judgeWrite:serverWriteJudge(ownerId,botId), nativeWriteReview, signal })
   return service.proposeFromRun(call.input,callIntent(runId,call.toolCallId))
 }
 

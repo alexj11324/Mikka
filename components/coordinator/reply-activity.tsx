@@ -242,7 +242,7 @@ function ToolGroup({ tools, live }: { tools: readonly ChatTool[]; live: boolean 
  */
 export const ReplyActivity = memo(function ReplyActivity({ tools, thinking, thought = false, reasoningAt, botId = null, live = false }: {
   tools: readonly ChatTool[]
-  thinking?: { active: boolean; seconds: number; text?: string }
+  thinking?: { active: boolean; seconds?: number; text?: string }
   thought?: boolean
   reasoningAt?: readonly number[]
   botId?: string | null
@@ -256,7 +256,7 @@ export const ReplyActivity = memo(function ReplyActivity({ tools, thinking, thou
     { revalidateOnFocus: false, revalidateIfStale: false, shouldRetryOnError: false })
   if (!tools.length && !thinking && !thought) return null
   const text = thinking?.text ?? (stored ? storedText ?? '' : undefined)
-  const title = thinking?.active ? t('thinking') : thinking ? t('thought', { seconds: thinking.seconds }) : t('thoughtStored')
+  const title = thinking?.active ? t('thinking') : thinking?.seconds ? t('thought', { seconds: thinking.seconds }) : t('thoughtStored')
   return <ActivityList data-reply-activity="">
     {(thinking || thought) && <ActivityThinking running={thinking?.active ?? false} title={title} {...(thinking ? { seconds: thinking.seconds } : {})} text={text} onOpen={() => setOpened(true)} />}
     {tools.length === 1 ? <ToolRow tool={tools[0]} live={live} /> : tools.length > 1 && <ToolGroup tools={tools} live={live} />}
@@ -276,10 +276,10 @@ export function ReplyWaiting() {
 export function useThreadToolRows() {
   const t = useTranslations('Coordinator.activity')
   const view = useToolView()
-  return (tools: readonly ChatTool[], { live, thinking, thought }: { live: boolean; thinking?: { active: boolean; seconds: number; text?: string } | false; thought?: boolean }): ThreadToolRow[] => [
+  return (tools: readonly ChatTool[], { live, thinking, thought }: { live: boolean; thinking?: { active: boolean; seconds?: number; text?: string } | false; thought?: boolean }): ThreadToolRow[] => [
     ...(thinking || thought ? [{
-      id: 'thinking', label: thinking && thinking.active ? t('thinking') : thinking ? t('thought', { seconds: thinking.seconds }) : t('thoughtStored'),
-      status: thinking && thinking.active ? 'running' as const : 'done' as const, ...(thinking && !thinking.active ? { ms: thinking.seconds * 1000 } : {}),
+      id: 'thinking', label: thinking && thinking.active ? t('thinking') : thinking && thinking.seconds ? t('thought', { seconds: thinking.seconds }) : t('thoughtStored'),
+      status: thinking && thinking.active ? 'running' as const : 'done' as const, ...(thinking && !thinking.active && thinking.seconds !== undefined ? { ms: thinking.seconds * 1000 } : {}),
       ...(thinking && thinking.text ? { detail: thinking.text } : {}),
     }] : []),
     ...tools.map(tool => {

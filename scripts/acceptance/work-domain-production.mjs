@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { observeEveSession } from './eve-session.mjs'
 /** Epic #1687. Ordinary shared-account APIs, only inside the existing OIDC job.
  * Preflight sends no model prompt. Active retains useful Tasks and reports.
  * No database/provider credentials, startup timing, settings preparation or UI.
@@ -359,14 +360,6 @@ function modelSource(state, scope, item) {
 }
 function modelReady(state, scope, item) { check(modelSource(state, scope, item).available === true, 'source_unavailable') }
 
-// The normal tool preview may end after 200 characters. Only a complete UUID
-// field from that exact tool call is a receipt; prose/Task-wide search is not.
-function previewId(text, key) {
-  if (typeof text !== 'string') return null
-  const match = new RegExp('"' + key + '"\\s*:\\s*"([0-9a-f-]{36})"', 'i').exec(text)
-  return uuid(match?.[1]) ? match[1] : null
-}
-
 async function dispatch(client, record, scope, item, timeoutMs) {
   const caseRef = '[1687:' + record.submissionId + ']'
   const input = { issueId: record.issueId, repo: scope.repositoryKey.slice('v2/github.com/'.length), target: 'cloud',
@@ -377,39 +370,27 @@ async function dispatch(client, record, scope, item, timeoutMs) {
   record.submitted = true
   await client.rpc('coordinator.sendCoordinatorMessage', [text, null, scope.botId, record.submissionId,
     { kind: 'cloud' }, null, [], { $mikka: 'undefined' }, record.profileId])
-  const response = await client.request('/api/coordinator/stream?botId=' + scope.botId + '&wait=1', {}, timeoutMs)
-  check(response.ok && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'stream_invalid')
-  const reader = response.body.getReader(), decoder = new TextDecoder()
-  let buffer = '', call, bytes = 0
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      bytes += value?.length ?? 0; check(bytes <= 4000000, 'stream_invalid')
-      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n'); buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        let event
-        try { event = JSON.parse(line) } catch { throw new DomainError('stream_invalid') }
-        if (event.type !== 'tool' || event.name !== 'dispatch_run') continue
-        if (event.state === 'running' && previewId(event.input, 'issueId') === record.issueId) {
-          const profileId = previewId(event.input, 'profileId'), requestKey = previewId(event.input, 'requestKey')
-          // quote preserves the dispatch note independently of the truncated
-          // input preview. An unrelated turn can use the same Task/Profile.
-          if (requestKey !== record.submissionId && !(typeof event.quote === 'string' && event.quote.startsWith(caseRef + ' '))) continue
-          check((!profileId || profileId === record.profileId) && (!requestKey || requestKey === record.submissionId), 'run_scope_mismatch')
-          check(!call || call === event.call, 'dispatch_multiple'); call = event.call
-        }
-        if (!call || event.call !== call || event.state === 'running') continue
-        if (event.state !== 'done') { record.dispatchSettled = true; const error = new DomainError('dispatch_refused'); error.serverCode = event.errorCode; throw error }
-        const runId = previewId(event.output, 'runId')
-        check(runId, 'dispatch_missing')
-        record.dispatchSettled = true; record.runId = runId; record.placement = { kind: 'cloud' }; record.harness = item.harness
-        return
+  let call, completed = false
+  await observeEveSession(client, scope.botId, { timeoutMs, fail: () => { throw new DomainError('stream_invalid') },
+    onEvent: event => {
+      if (event.type === 'call.requested' && event.data.capability?.name === 'dispatch_run') {
+        const input = event.data.input
+        if (input?.issueId !== record.issueId || input.requestKey !== record.submissionId && !input.note?.startsWith(caseRef + ' ')) return false
+        check(!input.requestKey || input.requestKey === record.submissionId, 'run_scope_mismatch')
+        check(input.profileId === record.profileId, 'run_scope_mismatch')
+        check(!call || call === event.data.callId, 'dispatch_multiple'); call = event.data.callId
       }
-      if (done) throw new DomainError('dispatch_missing')
-    }
-  } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
+      if (event.type !== 'call.settled' || !call || event.data.callId !== call) return false
+      const code = event.data.error?.code ?? event.data.output?.error ?? (event.data.output?.ok === false ? event.data.output.code : undefined)
+      if (event.data.outcome !== 'completed' || code) { record.dispatchSettled = true; const error = new DomainError('dispatch_refused'); error.serverCode = typeof code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(code) ? code : undefined; throw error }
+      const runId = event.data.output?.runId
+      check(uuid(runId), 'dispatch_missing')
+      record.dispatchSettled = true; record.runId = runId; record.placement = { kind: 'cloud' }; record.harness = item.harness
+      completed = true
+      return true
+    },
+  })
+  check(completed, 'dispatch_missing')
 }
 
 async function factoryState(client, record, shared) {

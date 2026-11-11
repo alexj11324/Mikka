@@ -280,6 +280,17 @@ export async function acquireTestAccounts({ database, environment, runId, worker
       const coordinator = await request('/api/conversations/coordinator/read')
       if (!coordinator.ok) { await coordinator.body?.cancel(); fail('ACCOUNT_INITIALIZATION_FAILED') }
       await coordinator.body?.cancel()
+      if (provision) {
+        // Native chat lazily creates its durable Coordinator session. Initialize
+        // it without a message before the one-time seal, so opening chat later
+        // preserves the immutable account footprint. Never reseal reused accounts.
+        const native = await request('/api/agents/eve/v1/session', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+        })
+        if (!native.ok) { await native.body?.cancel(); fail('ACCOUNT_INITIALIZATION_FAILED') }
+        const session = await native.json()
+        if (typeof session?.sessionId !== 'string' || !session.sessionId) fail('ACCOUNT_INITIALIZATION_FAILED')
+      }
       const landing = await request(environment.basePath)
       if (!landing.ok) { await landing.body?.cancel(); fail('ACCOUNT_INITIALIZATION_FAILED') }
       await landing.body?.cancel()

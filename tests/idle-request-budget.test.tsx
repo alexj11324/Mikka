@@ -158,10 +158,11 @@ async function measure(page: ReactNode) {
   const open = { opened: sockets.length, open: sockets.filter(socket => socket.readyState === 1).length }
   // Dialogs and sheets render in a portal on the body.
   const text = document.body.textContent ?? ''
+  const chatLoadFailure = Boolean(document.querySelector('[data-chat-failure=load]'))
   await act(async () => { view.unmount() }); container.remove()
   // Nothing a page left scheduled may fire into the next page's count.
   fakeClock(Date.now())
-  return { idle, missing: new Set(missing), sockets: open, text }
+  return { idle, missing: new Set(missing), sockets: open, text, chatLoadFailure }
 }
 
 const OWNER = '10000000-0000-4000-8000-000000000001'
@@ -223,6 +224,12 @@ Object.assign(fixtures, {
   'coordinator.pollBotChatSummaries': () => ({ items: { [BOT]: { at: AT, text: 'Done: the redirect is fixed.' } }, live }),
   'artifacts.getArtifactText': () => '# Release notes\n\nSign-in redirect fixed.',
 })
+// A bodyless native create prewarms the mapped session without starting a turn.
+// The public v27 protocol reports tail -1 until its first delivery; resume catches up and closes while idle.
+routes['/api/agents/eve/v1/session'] = () => ({ ok: true, sessionId: 'wrun_idle_fixture' })
+routes['/api/agents/eve/v1/session/wrun_idle_fixture/stream'] = () => new Response('', { headers: {
+  'content-type': 'application/x-ndjson', 'x-eve-stream-format': 'ndjson', 'x-eve-stream-version': '27', 'x-eve-stream-tail-index': '-1',
+} })
 routes['/api/auth/get-session'] = () => ({ user: { ...person, emailVerified: true, createdAt: AT, updatedAt: AT }, session: { id: 'session', userId: OWNER, token: 'fixture', expiresAt: '2026-12-05T00:00:00.000Z', createdAt: AT, updatedAt: AT } })
 routes['/api/workspace/switcher'] = () => ({ workspace: { id: WORKSPACE, name: 'Mikka' }, live, accounts: [{ id: OWNER, email: person.email, choices: [{ id: OWNER_HOME, name: 'Personal', kind: 'personal' }, { id: WORKSPACE, name: 'Mikka', kind: 'team' }] }] })
 routes['/api/pending-actions'] = () => new Response('[]', { headers: { 'content-type': 'application/json', 'x-mikka-viewer': OWNER, 'x-mikka-observed-at': AT } })
@@ -325,6 +332,7 @@ for (const [name, page] of Object.entries(pages)) test(`${name}: an idle, visibl
   const result = await measure(await page())
   measured[name] = Object.fromEntries([...result.idle].sort(([a], [b]) => a.localeCompare(b)))
   assert.deepEqual([...result.missing], [], 'every read the page makes has a fixture, so no failure retries are counted')
+  assert.equal(result.chatLoadFailure, false, 'the native chat session must be healthy before its idle budget is accepted')
   for (const words of shows[name]) assert.ok(result.text.includes(words), `${name} shows “${words}”`)
   assert.equal(result.sockets.open, result.sockets.opened, 'every live channel the page opened is still connected')
   const allowed = budgets.pages[name] ?? {}

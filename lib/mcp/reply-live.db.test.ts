@@ -108,7 +108,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
   const independent = new Pool({ connectionString: target, max: 4 })
   observePoolCommits(independent)
   const app = await import('../db/request-scope')
-  const store = await import('../coordinator/store')
+  const store = await import('@/tests/support/legacy-coordinator-store')
   const live = await import('./reply-live')
   const replyObservers: { botId: string; closed: number; lost: () => boolean }[] = []
   const replies = mock.module('./reply-live', { namedExports: {

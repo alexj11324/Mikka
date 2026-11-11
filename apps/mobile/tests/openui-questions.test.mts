@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, createElement, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+
+// TSX components load Lucide's require export; keep native SVG outside this DOM behavior fixture.
+const require = createRequire(import.meta.url)
 
 const view = ({ children }: { children?: ReactNode }) => createElement('div', null, children)
 const text = ({ children }: { children?: ReactNode }) => createElement('span', null, children)
@@ -17,7 +21,7 @@ mock.module('react-native', { namedExports: {
   },
   Image: () => null, Linking: { openURL: async () => {} },
 } })
-mock.module('lucide-react-native', { namedExports: { ArrowUpRight: () => null, Check: () => null } })
+mock.module(require.resolve('lucide-react-native'), { namedExports: { ArrowUpRight: () => null, Check: () => null } })
 mock.module(new URL('../components/Text.tsx', import.meta.url).href, { namedExports: { Text: text } })
 mock.module(new URL('../components/chat.tsx', import.meta.url).href, { namedExports: { BotBubble: view } })
 mock.module(new URL('../components/Markdown.tsx', import.meta.url).href, { namedExports: { Markdown: ({ text: words }: { text: string }) => createElement('p', null, words) } })

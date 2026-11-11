@@ -124,19 +124,19 @@ test('proxy strips credentials, cookies, redirects and remote policy; preserves 
   let calls = 0
   const serve = bundledProtocol(root, { request: async (path, init) => {
     calls++
-    assert.equal(path, '/api/coordinator/stream?after=1')
+    assert.equal(path, '/api/agents/eve/v1/session/wrun_native/stream?startIndex=1')
     const headers = new Headers(init?.headers)
     assert.equal(headers.get('authorization'), null)
     assert.equal(headers.get('cookie'), null)
-    assert.equal(headers.get('x-mikka-stream-key'), 'opaque-replay-cursor')
+    assert.equal(headers.get('x-mikka-stream-key'), null)
     const stream = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('data: first\n\n')); controller.close() } })
-    return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'set-cookie': `session_token=${secret}`, authorization: secret, 'x-mikka-session-token': secret, 'content-security-policy': "default-src * 'unsafe-eval'", 'x-mikka-stream-key': 'next-cursor' } })
+    return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'set-cookie': `session_token=${secret}`, authorization: secret, 'x-mikka-session-token': secret, 'content-security-policy': "default-src * 'unsafe-eval'", 'x-eve-stream-format': 'ndjson', 'x-eve-stream-version': '27', 'x-eve-stream-tail-index': '1' } })
   } })
-  const response = await serve(Object.assign(new Request(`${RENDERER_URL}/api/coordinator/stream?after=1`, { headers: { authorization: 'Bearer malicious', cookie: 'session_token=malicious', 'x-mikka-stream-key': 'opaque-replay-cursor' } }), { initiatorOrigin: 'mikka://app' }))
+  const response = await serve(Object.assign(new Request(`${RENDERER_URL}/api/agents/eve/v1/session/wrun_native/stream?startIndex=1`, { headers: { authorization: 'Bearer malicious', cookie: 'session_token=malicious', 'x-mikka-stream-key': 'opaque-replay-cursor' } }), { initiatorOrigin: 'mikka://app' }))
   assert.equal(response.headers.get('set-cookie'), null)
   assert.equal(response.headers.get('authorization'), null)
   assert.equal(response.headers.get('x-mikka-session-token'), null)
-  assert.equal(response.headers.get('x-mikka-stream-key'), 'next-cursor')
+  assert.equal(response.headers.get('x-eve-stream-version'), '27')
   assert.equal(response.headers.get('content-security-policy'), RENDERER_CSP)
   assert.match(await response.text(), /data: first/)
   for (const request of [new Request(`${RENDERER_URL}/api/auth/token`), new Request(`${RENDERER_URL}/api/desktop/rpc`, { method: 'POST', headers: { origin: 'https://evil.test' } }), new Request(`${RENDERER_URL}/api/desktop/rpc`, { method: 'POST', headers: { origin: 'null' } }), new Request(`${RENDERER_URL}/api/workspace`, { headers: { 'sec-fetch-site': 'cross-site' } })]) assert.equal((await serve(request)).status, 403)
@@ -447,4 +447,50 @@ test('main binary viewer hides credentials, scopes ownership/workspace, and boun
   assert.equal(closed, 1)
   assert.equal(events.at(-1)?.type, 'close')
   broker.closeAll()
+})
+
+
+test('eve permits native session operations and streams, with no operator or arbitrary agent routes', () => {
+  assert.equal(allowedApiPath('/api/agents/eve/v1/session', 'POST'), true)
+  assert.equal(allowedApiPath('/api/agents/eve/v1/session', 'GET'), false)
+  assert.equal(allowedApiPath('/api/agents/eve/v1/session/wrun_bot', 'POST'), true)
+  for (const operation of ['cancel', 'clear', 'compact', 'end', 'reset']) {
+    assert.equal(allowedApiPath(`/api/agents/eve/v1/session/wrun_bot/${operation}`, 'POST'), true)
+    assert.equal(allowedApiPath(`/api/agents/eve/v1/session/wrun_bot/${operation}`, 'GET'), false)
+  }
+  for (const operation of ['stream', 'descendants/stream']) {
+    assert.equal(allowedApiPath(`/api/agents/eve/v1/session/wrun_bot/${operation}`, 'GET'), true)
+    assert.equal(allowedApiPath(`/api/agents/eve/v1/session/wrun_bot/${operation}`, 'POST'), false)
+  }
+  for (const path of ['/api/agents/eve/v1/info', '/api/agents/eve/v1/cron/token', '/api/agents/eve/v1/dev/runtime-artifacts', '/api/agents/arbitrary', '/api/agents/eve/v1/session/wrun_bot/unknown']) assert.equal(allowedApiPath(path, 'POST'), false)
+})
+
+test('desktop forwards eve protocol headers and fences NDJSON bytes at account/workspace changes', async t => {
+  const root = await fixture(t)
+  let scope = 'owner-a:workspace-a', cancelled = false
+  let source!: ReadableStreamDefaultController<Uint8Array>
+  const stream = new ReadableStream<Uint8Array>({ start(controller) { source = controller }, cancel() { cancelled = true } })
+  const serve = bundledProtocol(root, { scope: () => scope, request: async (path, init) => {
+    assert.equal(path, '/api/agents/eve/v1/session/wrun_bot/stream?botId=bot-a&startIndex=5')
+    const headers = new Headers(init?.headers)
+    assert.equal(headers.get('x-mikka-submission-id'), 'logical-operation')
+    assert.equal(headers.get('cookie'), null)
+    assert.equal(headers.get('authorization'), null)
+    return new Response(stream, { headers: {
+      'content-type': 'application/x-ndjson', 'x-eve-stream-format': 'ndjson', 'x-eve-stream-version': '27',
+      'x-eve-stream-tail-index': '6', 'x-eve-session-id': 'wrun_bot', 'x-eve-observation-key': '["local","wrun_bot"]',
+      'set-cookie': `session_token=${secret}`, 'x-mikka-session-token': secret,
+    } })
+  } })
+  const response = await serve(new Request(`${RENDERER_URL}/api/agents/eve/v1/session/wrun_bot/stream?botId=bot-a&startIndex=5`, { headers: { 'x-mikka-submission-id': 'logical-operation', authorization: 'Bearer attacker', cookie: 'attacker' } }))
+  for (const [header, expected] of Object.entries({ 'x-eve-stream-format': 'ndjson', 'x-eve-stream-version': '27', 'x-eve-stream-tail-index': '6', 'x-eve-session-id': 'wrun_bot', 'x-eve-observation-key': '["local","wrun_bot"]' })) assert.equal(response.headers.get(header), expected)
+  assert.equal(response.headers.get('set-cookie'), null)
+  assert.equal(response.headers.get('x-mikka-session-token'), null)
+  const reader = response.body!.getReader()
+  source.enqueue(new TextEncoder().encode('{"first":true}\n'))
+  assert.equal(new TextDecoder().decode((await reader.read()).value), '{"first":true}\n')
+  scope = 'owner-b:workspace-b'
+  source.enqueue(new TextEncoder().encode('{"previousOwner":true}\n'))
+  assert.equal((await reader.read()).done, true)
+  assert.equal(cancelled, true)
 })

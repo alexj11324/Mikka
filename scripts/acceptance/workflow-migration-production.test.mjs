@@ -842,13 +842,18 @@ test('missing admin and unreadable or mismatched candidate keep cleanup and targ
   }
 })
 
-test('managed evidence accepts actual locked compiler identifiers and rejects source-file aliases', async () => {
+test('historical managed evidence accepts locked compiler identifiers and rejects source-file aliases', async () => {
   const workflowRequire = createRequire(import.meta.resolve('workflow/nitro'))
   const nitroRequire = createRequire(workflowRequire.resolve('@workflow/nitro'))
   const builders = pathToFileURL(nitroRequire.resolve('@workflow/builders'))
   const { applySwcTransform } = await import(new URL('./apply-swc-transform.js', builders).href)
   const { fileURLToPath } = await import('node:url')
   const root = fileURLToPath(new URL('../../', import.meta.url))
+  // Retain the old report codec after the Coordinator moved to native Eve.
+  const historicalCoordinator = `export async function coordinatorTurn() {
+    'use workflow'
+    return null
+  }`
   const ids = []
   for (const [file, mode, name] of [
     ['workflows/coordinator/workflow.ts', 'workflow', 'coordinatorTurn'],
@@ -856,7 +861,8 @@ test('managed evidence accepts actual locked compiler identifiers and rejects so
     ['workflows/due-timer/steps.ts', 'step', 'runDue'],
   ]) {
     const filename = fileURLToPath(new URL('../../' + file, import.meta.url))
-    const transformed = await applySwcTransform(file, await readFile(filename, 'utf8'), mode, filename, root, root)
+    const source = file === 'workflows/coordinator/workflow.ts' ? historicalCoordinator : await readFile(filename, 'utf8')
+    const transformed = await applySwcTransform(file, source, mode, filename, root, root)
     const entry = transformed.workflowManifest[mode === 'workflow' ? 'workflows' : 'steps'][file][name]
     ids.push(entry[mode === 'workflow' ? 'workflowId' : 'stepId'])
   }

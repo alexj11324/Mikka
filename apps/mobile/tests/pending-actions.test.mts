@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, createElement, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+
+// TSX components load Lucide's require export; keep native SVG outside this DOM behavior fixture.
+const require = createRequire(import.meta.url)
 import type { PendingAction } from '../lib/types.ts'
 
 type Decision = { status: 'done' | 'failed' | 'declined'; reason: string | null }
@@ -27,7 +31,7 @@ mock.module('react-native', { namedExports: {
     return createElement('button', { disabled, onClick: onPress }, children)
   },
 } })
-mock.module('lucide-react-native', { namedExports: { CalendarClock: () => null, Mail: () => null } })
+mock.module(require.resolve('lucide-react-native'), { namedExports: { CalendarClock: () => null, Mail: () => null } })
 mock.module(new URL('../components/Symbol.tsx', import.meta.url).href, { namedExports: { Symbol: () => null } })
 mock.module(new URL('../components/Text.tsx', import.meta.url).href, { namedExports: { Text: text } })
 mock.module(new URL('../components/icons.tsx', import.meta.url).href, { namedExports: { Spinner: () => null } })

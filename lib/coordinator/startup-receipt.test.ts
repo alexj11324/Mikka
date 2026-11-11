@@ -4,7 +4,7 @@ import { AgentKitError } from '../agent-kit/store'
 import {
   decodeStoredStartupReceipt, encodeStoredStartupReceipt, readStartupReceipt,
   type CoordinatorStartupReceipt, type CoordinatorStartupSettings,
-} from './startup-receipt'
+} from '@/tests/support/legacy-coordinator-startup'
 
 // Exercise the real codec and schemas. No database, transport, model or module
 // mocks are needed; all identifiers and text below are synthetic metadata.
