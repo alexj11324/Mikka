@@ -48,13 +48,16 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
   return <aside id="issue-properties" aria-label={t('properties')} className="order-1 w-full min-w-0 lg:sticky lg:top-20 lg:order-2 lg:self-start">
     <Button variant="ghost" className="min-h-11 w-full justify-between lg:hidden" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(value => !value)}><SlidersHorizontal data-icon="inline-start" /><span className="flex-1 text-left">{tDetail('propertiesRelations')}</span><ChevronDown data-icon="inline-end" className={cn(expanded && 'rotate-180')} /></Button>
     <div id={contentId} className={cn('flex-col gap-6 lg:flex lg:py-0', expanded ? 'flex py-4' : 'hidden')}>
-    <section className="flex flex-col gap-3 [&_button]:min-h-11 lg:[&_button]:min-h-0"><h2 className="hidden text-xs font-medium text-muted-foreground lg:block">{tDetail('propertiesHeading')}</h2>
+    {/* No descendant min-height utility on this group: it forced every nested button (chips, the property menus'
+        triggers) to 44px and broke the 28px row rhythm. Button and SelectTrigger already grow to a 44px hit area on a
+        coarse pointer through lib/touch-target.ts, which moves nothing. */}
+    <section className="flex flex-col gap-3"><h2 className="hidden text-xs font-medium text-muted-foreground lg:block">{tDetail('propertiesHeading')}</h2>
       <FieldGroup className="gap-1">
         <PropertyRow label={t('statusLabel')}><IssuePropertyMenu variant="row" label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} displayValue={stateLabel(own.state, own.reason)} valueIcon={<TaskStateIcon state={own.state} />} onChange={onStatus} /></PropertyRow>
         <PropertyRow label={t('priorityLabel')}><IssuePropertyMenu variant="row" label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></PropertyRow>
         <PropertyRow label={t('scope.label')}><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} teamChoice={teamChoice} /></PropertyRow>
         {/* R-60: the assignee is a person; a Bot the task is handed to sits on its own line under it. */}
-        <PropertyRow label={tMetadata('assignee')}><IssueMetadataControls {...control} task={{ ...task, metadata: { ...task.metadata, assignee: task.metadata.assignee?.kind === 'member' ? task.metadata.assignee : null } }} section="assignee" /><DelegateLine issueId={task.id} assignee={task.metadata.assignee} /></PropertyRow>
+        <PropertyRow label={tMetadata('assignee')}><IssueMetadataControls {...control} task={{ ...task, metadata: { ...task.metadata, assignee: task.metadata.assignee?.kind === 'member' ? task.metadata.assignee : null } }} section="assignee" /><DelegateLine issueId={task.id} delegate={task.metadata.delegate} /></PropertyRow>
         <PropertyRow label={tMetadata('labels')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="labels" /></div></PropertyRow>
         <PropertyRow label={tMetadata('project')}><IssueMetadataControls {...control} section="project" /></PropertyRow>
         {task.metadata.estimate !== null && <PropertyRow label={tMetadata('estimate')}><Button variant="ghost" size="sm" className={ROW_VALUE} disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{tMetadata('estimatePoints', { count: task.metadata.estimate })}</Button></PropertyRow>}
@@ -64,7 +67,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
       </FieldGroup>
     </section>
     {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}
-    <div className="flex min-w-0 flex-col gap-6">{relations}</div>
+    <div data-slot="issue-relations" className="flex min-w-0 flex-col gap-6">{relations}</div>
     </div>
   </aside>
 }
@@ -89,12 +92,11 @@ export function overdue(dueDate: string, status: string, now: Date) {
  * a Bot the task was assigned to, else the Bot of its newest thread, as the board card shows it (R-25).
  * Drawn in the Bot's own look (R-36); the Coordinator's own threads add no line.
  */
-function DelegateLine({ issueId, assignee }: { issueId: string; assignee: IssueMetadata['assignee'] }) {
+function DelegateLine({ issueId, delegate }: { issueId: string; delegate: IssueMetadata['delegate'] }) {
   const t = useTranslations('Metadata.assignee')
   const { data: threads } = useIssueThreads(issueId)
-  const agent = assignee?.kind === 'agent' ? assignee : null
-  const thread = (agent ? threads?.find(item => item.detail?.agentName === agent.name) : threads?.find(item => item.detail?.bot))?.detail
-  const name = agent?.name ?? thread?.agentName
+  const thread = (delegate ? threads?.find(item => item.detail?.agentName === delegate.name) : threads?.find(item => item.detail?.bot))?.detail
+  const name = delegate?.name ?? thread?.agentName
   if (!name) return null
   return <p className="flex h-7 min-w-0 items-center gap-2 text-xs">
     <span className="sr-only">{t('delegatedTo', { name })}</span>

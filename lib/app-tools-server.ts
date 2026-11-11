@@ -32,9 +32,15 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
     getTool: slug => client.tools.getRawComposioToolBySlug(slug) as Promise<AppTool>,
     execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId),
     setting: async (tool, toolkit) => {
-      // Unreadable settings name nothing; the Decisions judge then decides, not a fixed ask.
+      // A layer that cannot be read names nothing: the call goes to the
+      // Decisions judge exactly as an unset key does, and the failure is logged
+      // by name (decision 2026-11-01-1330). Deliberately not a refusal — this
+      // contradicts the P1 note that would fail closed here; the ruling wins.
       // The lookup covers the tool's slug, its app key and its legacy write action (send_slack_message).
-      try { return appCallSetting(await readWriteSettingLayers(db, userId, botId), tool, toolkit) } catch { return null }
+      try { return appCallSetting(await readWriteSettingLayers(db, userId, botId), tool, toolkit) } catch (failure) {
+        console.error('Workspace app setting unreadable: judged without it', { toolkit, tool, cause: failure instanceof Error ? failure.name : 'unknown' })
+        return null
+      }
     },
     judge: serverWriteJudge(userId, botId),
     recordStart: async (call, accountId) => {

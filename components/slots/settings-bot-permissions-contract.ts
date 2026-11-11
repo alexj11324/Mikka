@@ -20,14 +20,10 @@ export type BotPermissionAction = {
   name: string
   /** What the workspace stores. */
   value: PermissionValue
-  /** What runs now, where a stricter layer narrows `value`; null otherwise. */
-  effective: PermissionChoice | null
   /** The choices this action takes (git_push: allow / deny; write_outside_repo: ask / deny). */
   choices: PermissionValue[]
   /** False where no route saves it (computer_use is set on the computer, not here) or the person may not. */
   editable: boolean
-  /** The app an action acts in, for its mark. */
-  app?: string
 }
 
 /** One real tool from the provider's catalogue. */
@@ -54,21 +50,15 @@ export type BotPermissionApp = {
 export type SettingsBotPermissionsProps = {
   /** `workspace`: this page authorizes the whole workspace, not one Bot. */
   scope: 'workspace'
-  /** The Bots in this workspace, for a layer that still names the anchor; the default page does not show a picker. */
-  bots?: { id: string | null; name: string }[]
-  botId?: string | null
-  onBot?: (id: string | null) => void
   /** Null while the first read is out. */
   apps: BotPermissionApp[] | null
   /** The workspace's run permissions; null when there is no worker to read them through yet. */
   run: BotPermissionAction[] | null
-  /** Kept for contract compatibility; the workspace choice is already on each app. */
-  workspace: BotPermissionAction[] | null
   /** The workspace's approval mode; null when it cannot be read. */
   approvalMode: { value: 'ask' | 'read_only'; editable: boolean } | null
   onApprovalMode: (mode: 'ask' | 'read_only') => void
-  /** Saves one or more actions of one kind to the same value. `write` and `workspace` both save the workspace policy. */
-  onAction: (kind: 'write' | 'run' | 'workspace', ids: string[], value: PermissionValue) => void
+  /** Saves one or more actions of one kind to the same value; both kinds save the workspace policy. */
+  onAction: (kind: 'write' | 'run', ids: string[], value: PermissionValue) => void
   /** Reads one app's real tool catalogue on demand. */
   onLoadTools?: (app: string) => void
   saving: boolean

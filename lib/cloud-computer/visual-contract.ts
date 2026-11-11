@@ -47,8 +47,8 @@ const scopedDecisions = z.record(z.string(), z.enum(['allow','ask','deny']))
  * computer deny, or an explicit deny for this effect, still blocks it. "ask" is
  * not a browser option: settings reject it and the 2026-11-01 migration turned
  * stored ones into allow; one that slipped through reads as allow. */
-export function browserPermission(effect: BrowserEffect, computer: 'allow'|'deny', agent: unknown, workspace: unknown): 'allow'|'deny' {
+export function browserPermission(effect: BrowserEffect, computer: 'allow'|'deny', workspace: unknown): 'allow'|'deny' {
   const action = `browser_${effect}`
-  const layers = [scopedDecisions.parse(agent), scopedDecisions.parse(workspace)]
-  return computer === 'deny' || layers.some(layer => layer[action] === 'deny') ? 'deny' : 'allow'
+  const layer = scopedDecisions.parse(workspace)
+  return computer === 'deny' || layer[action] === 'deny' ? 'deny' : 'allow'
 }

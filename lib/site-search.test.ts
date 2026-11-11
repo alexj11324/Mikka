@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test, { before } from 'node:test'
 import { basePath } from './base-path-config.mjs'
 
-// Runs with next.config's real basePath, as the browser bundle does. Every fetch
+// Runs with the app's real basePath, as the browser bundle does. Every fetch
 // below is a mock standing in for #310's route: these tests cover the client's
 // handling of that contract, not the deployed endpoint.
 process.env.MIKKA_BASE_PATH = basePath

@@ -33,9 +33,11 @@ test('workspace app permissions', { skip: !dbUrl }, async t => {
   const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
   const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
   const bot = await seedBot(pool, ws.id, admin), memberBot = await seedBot(pool, ws.id, member), otherBot = await seedBot(pool, other.id, admin)
-  // The GitHub gate joins the workspace policy through this Bot's AgentKit head.
-  await pool.query('insert into agent_kit_heads(owner_id,bot_key,workspace_id) values($1,$2,$3),($4,$5,$6),($7,$8,$9)',
-    [admin, bot, ws.id, member, memberBot, ws.id, admin, otherBot, other.id])
+  // A head that names a workspace must name its Bot too (agent_kit_heads_check1);
+  // only the owner-scoped legacy 'coordinator' row may carry neither. These rows
+  // exist so the gate below can prove it ignores them.
+  await pool.query('insert into agent_kit_heads(owner_id,bot_key,bot_id,workspace_id) values($1,$2::text,$2::uuid,$3),($4,$5::text,$5::uuid,$3),($1,$6::text,$6::uuid,$7)',
+    [admin, bot, ws.id, member, memberBot, otherBot, other.id])
   const workspaceScope = { ownerId: admin, botId: bot, workspaceId: ws.id }
   const memberScope = { ownerId: member, botId: bot, workspaceId: ws.id }
   const otherScope = { ownerId: admin, botId: otherBot, workspaceId: other.id }
@@ -61,16 +63,16 @@ test('workspace app permissions', { skip: !dbUrl }, async t => {
     assert.equal(appPermissionValue((await settings.readWorkspace(workspaceScope)).permissions, 'slack'), 'deny')
   })
 
-  await t.test('the GitHub gate follows the stored workspace and Bot layers', async () => {
+  await t.test('the GitHub gate follows the stored workspace layer only', async () => {
     assert.equal(await githubCallAllowed(admin, bot), true)
     await settings.setWorkspace(workspaceScope, { ...(await settings.readWorkspace(workspaceScope)).permissions, github: 'deny' }, '1')
     assert.equal(await githubCallAllowed(admin, bot), false)
     // Another workspace's policy does not govern this Bot.
     assert.equal(await githubCallAllowed(admin, otherBot), true)
-    // A Bot layer can still narrow, and an explicit deny can never become an allow.
+    // A Bot head deny cannot narrow a workspace allow.
     await pool.query('update agent_kit_heads set external_write_permissions=$3 where owner_id=$1 and bot_key=$2', [admin, bot, { github: 'deny' }])
     await settings.setWorkspace(workspaceScope, { github: 'allow' }, '2')
-    assert.equal(await githubCallAllowed(admin, bot), false)
+    assert.equal(await githubCallAllowed(admin, bot), true)
   })
 
   await t.test('the definition route rejects a member save and accepts an admin save', async () => {
@@ -91,18 +93,20 @@ test('workspace app permissions', { skip: !dbUrl }, async t => {
       body: JSON.stringify({ action: 'set_workspace_write_policy', permissions, expectedVersion }),
     })
     const version = (await settings.readWorkspace(workspaceScope)).version
-    const denied = await handler(command(member, memberBot, { slack: 'allow' }, version), memberBot)
+    // Establish this case's own precondition: the earlier GitHub case replaced the
+    // whole layer with `{ github: 'allow' }`, so a stored `slack` cannot be assumed.
+    await settings.setWorkspace(workspaceScope, { ...(await settings.readWorkspace(workspaceScope)).permissions, slack: 'deny' }, version)
+    const before = (await settings.readWorkspace(workspaceScope)).version
+    const denied = await handler(command(member, memberBot, { slack: 'allow' }, before), memberBot)
     assert.equal(denied.status, 403)
     assert.deepEqual(await denied.json(), { error: 'workspaceAccessDenied' })
     assert.equal(appPermissionValue((await settings.readWorkspace(workspaceScope)).permissions, 'slack'), 'deny')
-    const saved = await handler(command(admin, bot, { slack: 'ask' }, version), bot)
+    const saved = await handler(command(admin, bot, { slack: 'ask' }, before), bot)
     assert.equal(saved.status, 200)
     assert.equal(appPermissionValue((await settings.readWorkspace(workspaceScope)).permissions, 'slack'), 'ask')
   })
 
-  await t.test('a malformed stored layer fails closed', async () => {
-    // Clear the Bot layer so only the malformed workspace layer can decide the call.
-    await pool.query('update agent_kit_heads set external_write_permissions=$3 where owner_id=$1 and bot_key=$2', [admin, bot, {}])
+  await t.test('a malformed workspace layer fails closed', async () => {
     await pool.query('update workspace_computer_policies set external_write_permissions=$2 where "workspaceId"=$1', [ws.id, { github: 'maybe' }])
     assert.equal(await githubCallDecision(admin, bot), 'unavailable')
     assert.equal(await githubCallAllowed(admin, bot), false)

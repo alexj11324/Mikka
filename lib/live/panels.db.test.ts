@@ -6,6 +6,7 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits, databaseCommitScope, captureDatabaseQuery } from '../db/commit-effects'
 import { documentLiveTargets, runLiveTargets, runChanged, threadLiveReferences } from './panels'
@@ -93,7 +94,10 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       const id = randomUUID()
       const workspaceId = workspace ?? (owner === 'foreign' ? foreignPersonal : personal)
       await databasePool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES ($1,$2,$3,'bound','Fixture','{"type":"doc","content":[]}','todo','normal',$4)`, [id, owner, workspaceId, workspace ? 'workspace' : 'personal'])
-      if (workspace) await databasePool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [id, randomUUID(), workspace, owner])
+      if (workspace) {
+        const grouping = await seedTeam(databasePool, workspace, owner)
+        await databasePool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [id, grouping.id, workspace, owner])
+      }
       return id
     }
     async function run(issueId: string | null, owner = 'owner', botId: string | null = null) {

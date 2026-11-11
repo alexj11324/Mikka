@@ -10,10 +10,9 @@ const settings = z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), decision)
  * without a judgment gets ask. */
 export type WriteFallback = 'allow' | 'ask'
 
-/** Resolve only host-owned permission configuration. Absence from every layer
- * means the tool's fallback; a layer that does not name the action does not
- * inject one. Invalid data is unavailable, never allow. Restrictive wins:
- * deny > ask > allow, the same rule as the app tool path
+/** The workspace entry is the decision. There is no agent/Bot choice to narrow:
+ * absence falls back, a malformed layer is unavailable (never allow), and deny
+ * beats ask beats allow inside the workspace layer
  * (lib/operations/permission-precedence.ts). */
 export function resolveWritePermission(action: string, layers: readonly unknown[], fallback: WriteFallback = 'ask'): 'allow' | 'ask' | 'deny' {
   if (!/^[a-z][a-z0-9_]{0,63}$/.test(action) || !layers.length) throw new OperationError('writePolicyUnavailable')
@@ -24,12 +23,4 @@ export function resolveWritePermission(action: string, layers: readonly unknown[
     if (Object.hasOwn(parsed.data, action)) choices.push(parsed.data[action])
   }
   return permissionDecision(choices) ?? fallback
-}
-
-/** The workspace's layer. A workspace deny or ask applies to every Bot; there is
- * no Bot layer to narrow it. */
-export function resolveScopedWritePermission(action: string, agent: unknown, workspace: unknown, fallback: WriteFallback = 'ask'): 'allow' | 'ask' | 'deny' {
-  const parsed = settings.safeParse(workspace)
-  if (!parsed.success) throw new OperationError('writePolicyUnavailable')
-  return resolveWritePermission(action, [agent, parsed.data], fallback)
 }

@@ -44,6 +44,7 @@
     "forget",
     "stop_run",
     "load_skill",
+    "read_personal_skill",
     "list_factory_requests",
     "create_issue_from_request",
     "route_factory_task",

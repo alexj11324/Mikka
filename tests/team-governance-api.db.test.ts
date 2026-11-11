@@ -103,8 +103,26 @@ test('Team governance HTTP handlers enforce actual entitlements and workspace bo
     const response = await report('?from=2026-11-07&to=2026-11-07')
     assert.equal(response.status, 200)
     const data = await response.json()
-    assert.deepEqual(data.hosted, [{ day: '2026-11-07', model: '=literal-model', requests: 1, inputTokens: '50', outputTokens: '70', costMicroUsd: '123', freeMicroUsd: '23', purchasedMicroUsd: '100' }])
+    // This row shape changed when the report gained per-dimension fields, so the
+    // literal below gained them too. Each addition states a fact the fixture
+    // proves rather than a number moved to match output:
+    //   memberId/repository - the default report is not subdivided, so both are
+    //     null; a caller asks for one with groupBy.
+    //   unknownRequests - none of these settled rows lacked a provider cost.
+    //   cacheReadTokens/cacheWriteTokens - the fixture inserted no cache figures,
+    //     so they are null, NOT "0": absent means uncollected. cacheCollectedRequests
+    //     reports 0, which is how a reader tells this apart from a real zero.
+    assert.deepEqual(data.hosted, [{
+      day: '2026-11-07', model: '=literal-model', memberId: null, repository: null, requests: 1, unknownRequests: 0,
+      inputTokens: '50', outputTokens: '70', cacheReadTokens: null, cacheWriteTokens: null, cacheCollectedRequests: 0,
+      costMicroUsd: '123', freeMicroUsd: '23', purchasedMicroUsd: '100',
+    }])
     assert.deepEqual(data.runs, [{ status: 'succeeded', count: 1 }])
+    // A new client learns the available dimensions from the response itself, so a
+    // dimension added here is discoverable without reading this source.
+    assert.deepEqual(data.availableGroupBy, ['day', 'model', 'member', 'repository'])
+    assert.equal(data.groupBy, null, 'an omitted groupBy keeps the unsubdivided shape')
+    assert.equal((await report('?from=2026-11-07&to=2026-11-07&groupBy=bogus')).status, 400, 'an unknown dimension is refused, never guessed')
     const csvResponse = await report('?from=2026-11-07&to=2026-11-07&format=csv')
     assert.equal(csvResponse.status, 200)
     assert.equal(csvResponse.headers.get('cache-control'), 'private, no-store')
@@ -117,6 +135,60 @@ test('Team governance HTTP handlers enforce actual entitlements and workspace bo
     assert.equal((await report('?from=2025-01-01&to=2026-11-07')).status, 400)
     await pool.query('delete from agent_runs where id=$1', [runId])
     await pool.query('delete from agents where id=$1', [agentId])
+  })
+
+  await t.test('cache figures distinguish not-collected from zero, and the subdivisions split the same ledger', async () => {
+    principal = { id: owner }
+    // One settled call that reported cache, one that reported none, and one whose
+    // repository attribution never completed. All three are real spend.
+    await pool.query(`insert into hosted_usage (id,"workspaceId",model,state,"costMicroUsd","freeMicroUsd","purchasedMicroUsd","inputTokens","outputTokens","cacheReadTokens","cacheWriteTokens","actorId","createdAt") values
+      ($1,$2,'cached','settled',100,0,100,1000,10,800,50,'alice','2026-11-08T12:00:00Z'),
+      ($3,$2,'uncached','settled',50,0,50,400,10,null,null,'bob','2026-11-08T12:00:00Z'),
+      ($4,$2,'plain','settled',25,0,25,100,10,0,0,'alice','2026-11-08T12:00:00Z')`,
+      [randomUUID(), first.id, randomUUID(), randomUUID()])
+    const read = async (query: string) => (await report(`?from=2026-11-08&to=2026-11-08${query}`)).json()
+    const byModel = new Map(((await read('')).hosted as Array<Record<string, unknown>>).map(row => [row.model as string, row]))
+
+    // Collected zero and never collected are different facts and must stay different.
+    assert.equal(byModel.get('cached')!.cacheReadTokens, '800')
+    assert.equal(byModel.get('cached')!.cacheCollectedRequests, 1)
+    assert.equal(byModel.get('uncached')!.cacheReadTokens, null, 'an uncollected breakdown is null, never 0')
+    assert.equal(byModel.get('uncached')!.cacheCollectedRequests, 0)
+    assert.equal(byModel.get('plain')!.cacheReadTokens, '0', 'a provider-reported zero stays zero')
+    assert.equal(byModel.get('plain')!.cacheCollectedRequests, 1)
+    // The breakdown is inside the input total, never on top of it.
+    for (const row of byModel.values()) {
+      assert.ok(Number(row.cacheReadTokens ?? 0) + Number(row.cacheWriteTokens ?? 0) <= Number(row.inputTokens),
+        'cache tokens are a breakdown of inputTokens, so they cannot exceed it')
+    }
+    // Summing across models keeps the same distinction: one model uncollected is not a zero total.
+    const total = ((await read('')).hosted as Array<Record<string, unknown>>).reduce((sum, row) => sum + Number(row.cacheReadTokens ?? 0), 0)
+    assert.equal(total, 800, 'only collected figures contribute to a total')
+
+    const members = (await read('&groupBy=member')).hosted as Array<Record<string, unknown>>
+    // A row stays one dated model point, so a member with two models has two rows:
+    // the subdivision splits each point, it does not collapse the model dimension.
+    // Group in the assertion rather than expecting one row per member.
+    const perMember = new Map<string, number>()
+    for (const row of members) perMember.set(row.memberId as string, (perMember.get(row.memberId as string) ?? 0) + Number(row.requests))
+    assert.deepEqual([...perMember.entries()].sort(), [['alice', 2], ['bob', 1]], 'a member subdivision splits the same ledger by actorId')
+    // The split re-adds to the unsubdivided total: no row is lost or double counted.
+    assert.equal(members.reduce((sum, row) => sum + Number(row.costMicroUsd), 0), 175)
+
+    const repos = (await read('&groupBy=repository')).hosted as Array<Record<string, unknown>>
+    // Rows stay per dated model point, so the three models produce three rows; what
+    // matters is that a call with no completed repository attribution groups under a
+    // null repository instead of being dropped by the join.
+    assert.ok(repos.length > 0)
+    assert.ok(repos.every(row => row.repository === null), 'unattributed calls group under a null repository rather than vanishing')
+    assert.equal(repos.reduce((sum, row) => sum + Number(row.requests), 0), 3, 'every call is still counted')
+
+    const csv = await (await report('?from=2026-11-08&to=2026-11-08&groupBy=member&format=csv')).text()
+    assert.ok(csv.includes('memberId'), 'a requested subdivision is a CSV column')
+    const plainCsv = await (await report('?from=2026-11-08&to=2026-11-08&format=csv')).text()
+    assert.ok(!plainCsv.includes('memberId'),
+      'an unrequested subdivision stays out of the CSV instead of becoming a column of nulls')
+    await pool.query('delete from hosted_usage where "workspaceId"=$1 and "createdAt">=\'2026-11-08\'', [first.id])
   })
 
   await t.test('usage and template HTTP requests do not invert a real task writer with one connection per pool', async () => {

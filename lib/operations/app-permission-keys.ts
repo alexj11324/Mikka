@@ -1,22 +1,36 @@
 import { WRITE_TOOL_APPS } from '@/lib/app-policy/apps'
 
-// One app-level permission key, with the legacy first-class write tool that
-// acts in the same app. A settings page writes both so the app-level choice
-// governs generic app tools and the older write path together. The map is the
-// app policy's own (`WRITE_TOOL_APPS`), so a new first-class write action
-// cannot leave the workspace page silently unable to govern it.
-export const LEGACY_WRITE_ACTIONS: Readonly<Record<string, string>> = WRITE_TOOL_APPS
+/**
+ * The first-class mail and calendar writes (lib/composio-actions APPROVAL_ACTIONS), and the app each one writes to.
+ * ALE-8: without these entries `send_email`, `create_calendar_event` and `update_calendar_event` were governed by no
+ * app key, so a workspace that set Gmail to 不允许 still let the Coordinator send.
+ */
+export const APPROVAL_WRITE_ACTIONS: Readonly<Record<string, string>> = {
+  send_email: 'gmail',
+  create_calendar_event: 'googlecalendar',
+  update_calendar_event: 'googlecalendar',
+}
 
+// One app-level permission key, with every first-class write tool that acts in
+// the same app. A settings page writes them all so the app-level choice governs
+// generic app tools and the first-class write paths together. The team-permission
+// map is the app policy's own (`WRITE_TOOL_APPS`), extended with the mail and
+// calendar writes, so a new first-class write action cannot leave the workspace
+// page silently unable to govern it.
+export const LEGACY_WRITE_ACTIONS: Readonly<Record<string, string>> = { ...WRITE_TOOL_APPS, ...APPROVAL_WRITE_ACTIONS }
+
+/** One write action per app ('googlecalendar' → its last one), so a page can ask "does this app have a first-class
+ * write?" without listing every key. An app can carry several actions, so this is not the list an app is saved on and
+ * not the list a call consults: `appPermissionKeys` and `appCallSettingKeys` are. */
 export const LEGACY_APP_ACTIONS: Readonly<Record<string, string>> = Object.fromEntries(
   Object.entries(LEGACY_WRITE_ACTIONS).map(([action, app]) => [app, action]),
 )
 
 export type AppPermissionValue = 'allow' | 'ask' | 'deny'
 
-/** The keys that carry one app's choice: the app itself, then its legacy tool. */
+/** The keys that carry one app's choice: the app itself, then every first-class write tool in it. */
 export function appPermissionKeys(app: string): string[] {
-  const legacy = LEGACY_APP_ACTIONS[app]
-  return legacy ? [app, legacy] : [app]
+  return [...new Set([app, ...Object.entries(LEGACY_WRITE_ACTIONS).filter(([, value]) => value === app).map(([action]) => action)])]
 }
 
 const VALUES = new Set<string>(['allow', 'ask', 'deny'])
@@ -39,7 +53,7 @@ export function appCallAllowed(value: AppPermissionValue | null | undefined): bo
   return value !== 'deny'
 }
 
-/** The app's stored choice, set on both keys, or removed from both. */
+/** The app's stored choice, set on every key it carries, or removed from all of them. */
 export function withAppPermission(
   permissions: Record<string, AppPermissionValue>,
   app: string,
@@ -58,7 +72,7 @@ export function appCallSettingKeys(toolSlug: string, toolkit: string): string[] 
   return [...new Set([toolSlug, ...appPermissionKeys(toolkit)])]
 }
 
-/** One save applies the same choice to every selected app, each on both keys. */
+/** One save applies the same choice to every selected app, each on all of its keys. */
 export function withAppPermissions(
   permissions: Record<string, AppPermissionValue>,
   apps: readonly string[],

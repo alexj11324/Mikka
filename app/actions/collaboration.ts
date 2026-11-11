@@ -21,6 +21,7 @@ import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspa
 import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
 import { issueListChanged } from '@/lib/live/lists'
 import { issueMembersChanged } from '@/lib/live/issue-detail'
+import { mayGrantOwnerRole, mayManageMembers, mayMuteMember, maySetSubscription, type MembershipCaller } from '@/lib/issue-member-role'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
 const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional(), known: z.string().regex(/^[0-9a-f]{32}$/).optional() })
@@ -87,7 +88,7 @@ export async function listMembers(id: string) {
   const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
-  const members = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image, createdAt: issueMembers.createdAt }).from(issueMembers)
+  const members = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image, role: issueMembers.role, subscribed: issueMembers.subscribed, invitedBy: issueMembers.invitedBy, createdAt: issueMembers.createdAt }).from(issueMembers)
     .innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId))).orderBy(issueMembers.createdAt, users.id)
   const [owner] = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(issues)
     .innerJoin(users, eq(users.id, issues.userId)).where(and(eq(issues.id, id), eq(issues.userId, issue.userId))).limit(1)
@@ -97,24 +98,82 @@ export async function listMembers(id: string) {
   // The channel its `issue_members` key arrives on; null reads once a minute.
   return { ...result, live: { workspaceId: await documentLiveWorkspace(pool, workspacePool, issue.id, user.id) } }
 }
-export async function inviteMember(id: string, email: string): Promise<ActionResult<{ success: true; member: { id: string; name: string; email: string; image: string | null; createdAt: Date } }>> {
+export async function inviteMember(id: string, email: string): Promise<ActionResult<{ success: true; member: { id: string; name: string; email: string; image: string | null; role: 'owner' | 'member'; subscribed: boolean; invitedBy: string | null; createdAt: Date } }>> {
   return runAction(async () => {
     const { issue, user } = await requireIssueAccess(id)
-    if (issue.userId !== user.id) return { error: 'memberOwnerOnly' }
     const parsed = z.email().max(254).safeParse(email.trim().toLowerCase())
     if (!parsed.success) return { error: 'memberInvalidEmail' }
     return withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canManageAccess' }, () => db.transaction(async tx => {
+      // The task's owner always may invite; a member with the owner role may too (ALE-29).
       const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+      if (!mayManageMembers(await callerFor(tx, id, user.id, issue.userId))) return { error: 'memberOwnerOnly' }
       const [member] = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(users).where(eq(users.email, parsed.data)).limit(1)
       if (!member || member.id === user.id) return { error: 'memberNotRegistered' }
-      const [added] = await tx.insert(issueMembers).values({ issueId: id, userId: user.id, memberId: member.id }).onConflictDoNothing().returning({ createdAt: issueMembers.createdAt })
+      const [added] = await tx.insert(issueMembers).values({ issueId: id, userId: user.id, memberId: member.id, invitedBy: user.id }).onConflictDoNothing()
+        .returning({ createdAt: issueMembers.createdAt, role: issueMembers.role, subscribed: issueMembers.subscribed, invitedBy: issueMembers.invitedBy })
       if (!added) return { error: 'memberAlreadyAdded' }
       await issueMembersChanged(tx, id)
-      return { success: true, member: { ...member, createdAt: added.createdAt } }
+      return { success: true, member: { ...member, ...added } }
     }))
   })
 }
+/** The rules in lib/issue-member-role.ts, given the caller's row for this task. */
+async function callerFor(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], issueId: string, accountId: string, ownerId: string): Promise<MembershipCaller> {
+  if (accountId === ownerId) return { accountId, ownerId, role: null }
+  const [member] = await tx.select({ role: issueMembers.role }).from(issueMembers)
+    .where(and(eq(issueMembers.issueId, issueId), eq(issueMembers.memberId, accountId))).limit(1)
+  return { accountId, ownerId, role: member?.role ?? null }
+}
+
+/** Grants or revokes a member's owner role, so they can invite in their turn. */
+export async function setMemberRole(id: string, memberId: string, role: 'owner' | 'member'): Promise<ActionResult<{ success: true }>> {
+  return runAction(async () => {
+    const parsed = z.object({ memberId: z.string().min(1).max(128), role: z.enum(['owner', 'member']) }).safeParse({ memberId, role })
+    if (!parsed.success) return { error: 'validationGeneric' }
+    const { issue, user } = await requireIssueAccess(id)
+    // Only the task's own owner hands out the role that can invite; a delegated
+    // owner cannot create more owners.
+    if (!mayGrantOwnerRole({ accountId: user.id, ownerId: issue.userId, role: null })) return { error: 'memberOwnerOnly' }
+    if (parsed.data.memberId === issue.userId) return { error: 'validationGeneric' }
+    return withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canManageAccess' }, () => db.transaction(async tx => {
+      const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
+      requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+      const [updated] = await tx.update(issueMembers).set({ role: parsed.data.role })
+        .where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, parsed.data.memberId)))
+        .returning({ memberId: issueMembers.memberId })
+      if (!updated) return { error: 'memberNotFound' }
+      await issueMembersChanged(tx, id)
+      return { success: true as const }
+    }))
+  })
+}
+
+/**
+ * Mutes or unmutes a member's notifications for this task. A member changes
+ * their own; only the task's owner mutes somebody else (ALE-29).
+ */
+export async function setMemberSubscribed(id: string, memberId: string, subscribed: boolean): Promise<ActionResult<{ success: true }>> {
+  return runAction(async () => {
+    const parsed = z.object({ memberId: z.string().min(1).max(128), subscribed: z.boolean() }).safeParse({ memberId, subscribed })
+    if (!parsed.success) return { error: 'validationGeneric' }
+    const { issue, user } = await requireIssueAccess(id)
+    // Anyone may read for themselves through the task; only its owner changes another member.
+    if (!maySetSubscription({ accountId: user.id, ownerId: issue.userId, role: null }, parsed.data.memberId)) return { error: 'memberOwnerOnly' }
+    if (!mayMuteMember(parsed.data.memberId, issue.userId)) return { error: 'validationGeneric' }
+    return withIssueWorkspace(user, issue.workspaceId, { issueId: issue.id, action: 'canReadContent' }, () => db.transaction(async tx => {
+      const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(and(eq(issues.id, id), eq(issues.userId, user.id))).for('update')
+      requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
+      const [updated] = await tx.update(issueMembers).set({ subscribed: parsed.data.subscribed })
+        .where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, parsed.data.memberId)))
+        .returning({ memberId: issueMembers.memberId })
+      if (!updated) return { error: 'memberNotFound' }
+      await issueMembersChanged(tx, id)
+      return { success: true as const }
+    }))
+  })
+}
+
 export async function removeMember(id: string, memberId: string): Promise<ActionResult<{ success: true }>> {
   return runAction(async () => {
     const { issue, user } = await requireIssueAccess(id)

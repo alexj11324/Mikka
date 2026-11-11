@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { WRITE_ACTIONS } from './write-schema'
-import { WRITE_TOOL_APPS } from '@/lib/app-policy/apps'
-import { appCallAllowed, appCallSettingKeys, appPermissionKeys, appPermissionValue, withAppPermission, withAppPermissions } from './app-permission-keys'
+import { APPROVAL_WRITE_ACTIONS, LEGACY_WRITE_ACTIONS, appCallAllowed, appCallSettingKeys, appPermissionKeys, appPermissionValue, withAppPermission, withAppPermissions } from './app-permission-keys'
 
 test('only an explicit deny withholds an app call; ask stays callable where no card exists', () => {
   assert.equal(appCallAllowed('allow'), true)
@@ -39,11 +38,15 @@ test('a tool call consults its own slug and its app keys, with no duplicates', (
 })
 
 test('every first-class write action is governed by its app key', () => {
-  // A future action added to WRITE_ACTIONS must also be reachable from the workspace page.
-  for (const action of WRITE_ACTIONS) {
-    const app = WRITE_TOOL_APPS[action]
+  // A future action added to WRITE_ACTIONS must also be reachable from the workspace page. An app can carry more
+  // than one action (googlecalendar has cancel_calendar_event and the two APPROVAL_WRITE_ACTIONS), so the app's keys
+  // are the app plus all of them, and a save writes every one.
+  const writes = [...WRITE_ACTIONS, ...Object.keys(APPROVAL_WRITE_ACTIONS)]
+  for (const action of writes) {
+    const app = LEGACY_WRITE_ACTIONS[action]
     assert.equal(typeof app, 'string', action)
-    assert.deepEqual(appPermissionKeys(app), [app, action], action)
-    assert.deepEqual(withAppPermissions({}, [app], 'deny'), { [app]: 'deny', [action]: 'deny' }, action)
+    assert.deepEqual(appPermissionKeys(app), [app, ...writes.filter(other => LEGACY_WRITE_ACTIONS[other] === app)], action)
+    assert.deepEqual(withAppPermissions({}, [app], 'deny'),
+      Object.fromEntries([app, ...writes.filter(other => LEGACY_WRITE_ACTIONS[other] === app)].map(key => [key, 'deny'])), action)
   }
 })

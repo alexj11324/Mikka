@@ -4,6 +4,8 @@ import { and, desc, eq, gt } from 'drizzle-orm'
 import { appToolCallSchema, APP_TOOL_ACTION, type AppToolCall } from '@/lib/app-tools'
 import { COMPOSIO_ACTIONS, isApprovalAction, parseActionInput } from '@/lib/composio-actions'
 import { serverWriteJudge, type WriteJudge } from '@/lib/operations/write-judgment'
+import { accountWriteSetting } from '@/lib/operations/account-write-setting'
+import { accountWriteError, accountWriteOutcome } from '@/lib/operations/account-write-gate'
 import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
 import { pendingActions } from '@/lib/db/schema'
@@ -13,22 +15,31 @@ import { actionOutcome, calendarEventSummary, PENDING_ACTION_TTL_MS, type Pendin
 const MAX_PENDING = 20
 
 /**
- * Sends mail or writes the calendar in the person's connected account, with
- * no card (decision 2026-10-31): the connection's grant is the permission and
- * only a destructive call asks. The Decisions API judges this exact call, with
- * the tool's MCP annotations as input; a destructive, unjudged or refused call
- * goes to `proposeAction` instead. The row is written before dispatch and kept
- * as the record; like other writes the policy allows, it has no `decidedAt`
- * and never shows as a card.
+ * Sends mail or writes the calendar in the person's connected account.
+ *
+ * The workspace's setting is the permission (ADR 2026-11-10-1730): a deny
+ * withholds the call, an ask makes the card, an allow runs at once without the
+ * Decisions judge. Only a workspace that names no key for the app reaches the
+ * judge, which asks for a destructive call and otherwise runs it
+ * (lib/operations/write-judgment.ts). The gate runs before every dispatch, so
+ * nothing is sent for a withheld or carded call.
+ *
+ * The row is written before dispatch and kept as the record; like other writes
+ * the policy allows, it has no `decidedAt` and never shows as a card.
  */
 export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId)) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
+  // Read once, before the account and tool version are resolved: the setting is
+  // the workspace's, and reading it inside the gate would read it per attempt.
+  const setting = await accountWriteSetting(db, userId, botId, action)
   const id = crypto.randomUUID()
   let recorded = false as boolean
   const result = await runComposioAction(userId, action, parsed, selectedAccountId, async (accountId, tool) => {
-    if (await judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }) === 'ask') return { error: 'integrationApprovalRequired' }
+    const outcome = await accountWriteOutcome(setting, () => judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }))
+    const stopped = accountWriteError(outcome)
+    if (stopped) return stopped
     await db.insert(pendingActions).values({ id, userId, botId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
     recorded = true
     return null

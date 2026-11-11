@@ -6,6 +6,7 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import type { LiveInvalidation } from './events'
@@ -71,7 +72,8 @@ test('the PR status key reaches each delivered task\'s audience, after the real 
     await database.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,'owner','Coder','codex')`, [agent])
     // A personal task and a team task the PR was delivered on; a third task names the PR but has no delivery.
     await database.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope,"workspaceId") VALUES ($1,'owner','Personal',$4,'review','normal','personal',$5),($2,'owner','Team',$4,'review','normal','workspace',$6),($3,'owner','Unrelated',$4,'todo','normal','personal',$5)`, [personalTask, teamTask, unrelated, content, home, team])
-    await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [teamTask, randomUUID(), team])
+    const grouping = await seedTeam(database, team, 'owner')
+    await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [teamTask, grouping.id, team])
     for (const issueId of [personalTask, teamTask]) {
       const run = randomUUID()
       await database.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt) VALUES ($1,'owner',$2,$3,'succeeded','Fix it')`, [run, issueId, agent])

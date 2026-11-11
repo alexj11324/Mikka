@@ -29,7 +29,6 @@ const fingerprint = async () => {
       'drizzle',
       'package.json',
       'pnpm-lock.yaml',
-      'next.config.mjs',
     ],
     { encoding: 'utf8' },
   )

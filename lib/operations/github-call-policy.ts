@@ -4,7 +4,7 @@ import { explicitSetting } from '@/lib/app-tools'
 import { appCallAllowed } from './app-permission-keys'
 import { readWriteSettingLayers } from './write-setting-layers'
 
-type SettingLayers = { agent: unknown; workspace: unknown } | null
+type SettingLayers = { workspace: unknown } | null
 
 /** The layers are injectable so a database error and malformed stored settings are testable. */
 export type GitHubCallPolicyDeps = {

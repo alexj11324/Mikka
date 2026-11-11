@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 
-// The registry path: github_call asks a durable step for the workspace/Bot policy
+// The registry path: github_call asks a durable step for the workspace app policy
 // before it reaches GitHub. The step is stubbed so this stays source-only.
 type Policy = 'allow' | 'deny' | 'unavailable'
 const state = { policy: 'allow' as Policy, mcpCalls: 0, gateCalls: [] as string[] }

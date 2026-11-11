@@ -11,13 +11,13 @@ import { OWN_APP_STATES_KEY, fetchOwnAppStates } from '@/components/plugins/plug
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { withBasePath } from '@/lib/base-path'
 import { CONFIGURABLE_ACTIONS, CONFIGURABLE_PERMISSIONS, type PermissionDecision } from '@mikka/protocol/agent-policy'
-import { LEGACY_APP_ACTIONS, appPermissionValue, withAppPermissions } from '@/lib/operations/app-permission-keys'
+import { LEGACY_APP_ACTIONS, LEGACY_WRITE_ACTIONS, appPermissionValue, withAppPermissions } from '@/lib/operations/app-permission-keys'
 import { OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import type { BotPermissionAction, BotPermissionApp, BotPermissionAppTools, PermissionChoice, PermissionValue, SettingsBotPermissionsProps } from '@/components/slots/settings-bot-permissions-contract'
 
 type WritePolicy = { permissions: Record<string, PermissionChoice>; version: string }
 type PolicyLayer = { permissions?: Record<string, PermissionDecision>; networkAllow?: string[]; approvalMode?: 'ask' | 'read_only'; defaults?: unknown }
-type AgentPolicy = { policy: { permissions: Record<string, PermissionDecision>; readOnly?: boolean }; revision: string; layers: { agent?: PolicyLayer; workspace?: PolicyLayer } }
+type AgentPolicy = { revision: string; layers: { workspace?: PolicyLayer } }
 
 class PermissionsReadError extends Error {
   constructor(readonly code: string) { super(code); this.name = 'PermissionsReadError' }
@@ -39,10 +39,20 @@ async function agentPolicy<T>(body: unknown): Promise<T> {
   return value
 }
 
+/** The page's own error: a failed read, or a workspace with no Bot to anchor
+ * its policy. Without a Bot the save and catalogue routes have no target, so
+ * the page says why instead of failing silently. `bots` is undefined until the
+ * list loads, so an empty array means loaded-and-empty, not still-reading. */
+export function botPermissionsErrorKey(input: { bots: unknown[] | undefined; workspaceId?: string; readFailed: boolean }): 'readFailed' | 'noBotInWorkspace' | null {
+  if (input.readFailed) return 'readFailed'
+  if (input.workspaceId && input.bots?.length === 0) return 'noBotInWorkspace'
+  return null
+}
+
 /**
  * The current workspace's permissions: one access level per connected app, the provider's real tool catalogue, and the
- * workspace's run policy. This is not per Bot: every Bot in the workspace inherits these choices; no Bot layer
- * narrows them. Admins save; any member reads. Saves go through the same routes.
+ * workspace's run policy. This is not per Bot: every Bot in the workspace inherits these choices, and the workspace
+ * value is the decision. Admins save; any member reads. Saves go through the same routes.
  */
 export function useBotPermissions({ admin = false, workspaceId }: { admin?: boolean; workspaceId?: string } = {}): SettingsBotPermissionsProps {
   const t = useTranslations('Settings.botPermissions')
@@ -51,8 +61,8 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   const apps = useConnectedApps()
   // Mikka's own apps are connected apps too; only GitHub has a real per-app tool path.
   const own = useSWR(OWN_APP_STATES_KEY, () => fetchOwnAppStates())
-  // The Bot list is scoped to the workspace the page shows (`?workspace=`), not the session's active one: the
-  // workspace routes resolve their workspace through this Bot.
+  // The Bot list is scoped to the workspace the page shows (`?workspace=`). The Coordinator is a Bot too; its id is
+  // an execution identity, not a policy key. The workspace id keys the policy.
   const { data: bots, error: botsError } = useSWR(workspaceId ? ['bots', 'workspace', workspaceId] : 'bots', () => workspaceId ? listBotsForWorkspace(workspaceId) : listBots())
   const { data: agents } = useSWR('agents', () => listAgents())
   const [saving, setSaving] = useState(false)
@@ -60,12 +70,21 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   // Catalogue reads are lazy: GitHub plus the legacy write apps load with the page, every other app on open.
   const [catalogues, setCatalogues] = useState<Record<string, BotPermissionAppTools | 'loading'>>({})
   const started = useRef(new Set<string>())
-  // The workspace-scoped routes resolve their workspace through a Bot the person owns in it. The page has no Bot
-  // picker: any Bot in the workspace names the same workspace.
+  // The workspace-scoped routes resolve their workspace through a Bot the person owns in it, so the page reads and
+  // saves through one anchor. `listOwnerBots` orders the person's Coordinator first, so the anchor is that row when it
+  // exists; the page has no Bot picker because any Bot in the workspace names the same workspace. A workspace the
+  // person owns no Bot in has no anchor, and the page says so instead of silently doing nothing (ALE-8).
   const anchor = bots?.[0] ?? null
   const botId = anchor?.id ?? null
-  // The worker the run policy is read through: the person's first agent (the workspace layer is the same for each).
+  // The worker the run policy is read through: the person's first agent. The workspace's run policy is the same for
+  // every Bot.
   const agentId = agents?.[0]?.id ?? null
+  // A save or catalogue read with no anchor cannot reach the workspace routes. Throwing keeps that visible: the
+  // `save` wrapper turns it into the page's own error line rather than a control that quietly does nothing.
+  function requireAnchor(): string {
+    if (!botId) throw new PermissionsReadError('noBotInWorkspace')
+    return botId
+  }
 
   // The workspace's policy is the page's only source of truth; no Bot layer is read or applied.
   const workspace = useSWR(botId && workspaceId ? ['workspace-write-policy', workspaceId, botId] : null, () => botId ? definition<WritePolicy>(botId, { view: 'workspace_write_policy' }) : null, { revalidateOnFocus: false })
@@ -78,6 +97,7 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
     const legacy = LEGACY_APP_ACTIONS[id] !== undefined
     // GitHub calls its hosted MCP directly; an app-level deny is the only choice that withholds it.
     const enforceable = id === 'github' || legacy || !OWN_INTEGRATIONS.has(id)
+    // The workspace's value is the value; there is no second layer to compare.
     const saved = appPermissionValue(stored, id)
     // GitHub has no ask card: its default is direct allow, and deny is the only restriction.
     const value: PermissionValue = id === 'github' ? (saved === 'deny' ? 'deny' : 'allow') : saved ?? 'default'
@@ -87,7 +107,6 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
       id,
       name: count ? t('allToolsCount', { count }) : t('allTools'),
       value,
-      effective: null,
       choices: id === 'github' ? ['allow', 'deny'] : enforceable ? ['default', 'allow', 'ask', 'deny'] : ['default'],
       editable: writable && enforceable,
     }
@@ -96,8 +115,10 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   const connected = apps.connectedToolkits().filter(id => appState(apps.accountsFor(id)).on)
   const ownConnected = OWN_APPS.filter(id => id === 'github' && own.data?.states[id] === 'connected')
   const known = new Set([...ownConnected, ...connected])
-  // A legacy write key names the same app's choice, so an app stored only under the old key still appears.
-  const withSettings = [...new Set(Object.keys(stored).map(key => LEGACY_APP_ACTIONS[key] ?? key))].filter(id => known.has(id))
+  // A legacy write key names the same app's choice, so an app stored only under the old key still appears. The map is
+  // action -> app (`LEGACY_WRITE_ACTIONS`, not `LEGACY_APP_ACTIONS`, which runs the other way): reading it backwards
+  // left a disconnected app whose only stored key was `send_slack_message` out of the page entirely.
+  const withSettings = [...new Set(Object.keys(stored).map(key => LEGACY_WRITE_ACTIONS[key] ?? key))].filter(id => known.has(id))
   const appList: BotPermissionApp[] | null = apps.loading || (!own.data && !own.error) || !bots || workspace.isLoading || !workspaceId ? null : [...new Set([...ownConnected, ...connected, ...withSettings])].map(id => {
     const account = apps.accountsFor(id).find(item => item.enabled)
     const catalogue = catalogues[id]
@@ -108,14 +129,13 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
     }
   })
 
-  const agentLayer = run.data?.layers.workspace ?? {}
+  const workspaceLayer = run.data?.layers.workspace ?? {}
   const runActions: BotPermissionAction[] | null = !run.data ? null : CONFIGURABLE_ACTIONS.map(action => {
-    const value = agentLayer.permissions?.[action] ?? 'default'
-    const effective = run.data!.policy.permissions[action]
+    const value = workspaceLayer.permissions?.[action] ?? 'default'
     return {
-      id: action, name: t(`run.${action}`), value, effective: effective !== value ? effective : null,
+      id: action, name: t(`run.${action}`), value,
       choices: ['default', ...CONFIGURABLE_PERMISSIONS[action]],
-      // The workspace layer stores no computer_use (lib/agent-tool-approval/policy-store.ts): it is set on the computer.
+      // The workspace layer stores no computer_use; computer use is set on the computer.
       editable: admin && action !== 'computer_use',
     }
   })
@@ -124,11 +144,12 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
     // `coordinator` is not an app-tools Bot id; without a real Bot in this workspace there is nothing to read through.
     if (!botId || started.current.has(id)) return
     started.current.add(id)
+    const anchorId = botId
     setCatalogues(previous => ({ ...previous, [id]: 'loading' }))
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 12_000)
     // The route already bounds the catalogue (`private, max-age=60`), so the browser cache serves a reopen.
-    fetch(withBasePath(`/api/bots/${botId}/app-tools?app=${encodeURIComponent(id)}`), { credentials: 'same-origin', signal: controller.signal })
+    fetch(withBasePath(`/api/bots/${anchorId}/app-tools?app=${encodeURIComponent(id)}`), { credentials: 'same-origin', signal: controller.signal })
       .then(async response => {
         const body = await response.json().catch(() => null) as (BotPermissionAppTools & { error?: string }) | null
         if (!response.ok || !body || typeof body.count !== 'number') throw new Error('catalogueUnavailable')
@@ -163,36 +184,37 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
 
   return {
     scope: 'workspace',
-    // Kept for a layer that still names an anchor; the page itself does not pick a Bot.
-    bots: bots?.map(bot => ({ id: bot.id, name: bot.name })) ?? [],
-    botId, onBot: () => {},
     apps: appList,
     run: runActions,
-    workspace: null,
-    approvalMode: run.data ? { value: agentLayer.approvalMode ?? 'ask', editable: admin } : null,
+    approvalMode: run.data ? { value: workspaceLayer.approvalMode ?? 'ask', editable: admin } : null,
     onApprovalMode: mode => { void save(async () => {
       if (!admin || !run.data || !agentId) return
-      await agentPolicy({ operation: 'setAgent', agentId, botId, target: 'workspace', expectedRevision: run.data.revision, policy: { ...agentLayer, approvalMode: mode } })
+      await agentPolicy({ operation: 'setAgent', agentId, botId, target: 'workspace', expectedRevision: run.data.revision, policy: { ...workspaceLayer, approvalMode: mode } })
       await run.mutate()
     }) },
     onAction: (kind, ids, value) => { void save(async () => {
       if (kind === 'run') {
         if (!admin || !run.data || !agentId) return
-        const permissions = { ...agentLayer.permissions }
+        const permissions = { ...workspaceLayer.permissions }
         for (const id of ids) { if (value === 'default') delete permissions[id]; else permissions[id] = value }
-        await agentPolicy({ operation: 'setAgent', agentId, botId, target: 'workspace', expectedRevision: run.data.revision, policy: { ...agentLayer, permissions } })
+        await agentPolicy({ operation: 'setAgent', agentId, botId, target: 'workspace', expectedRevision: run.data.revision, policy: { ...workspaceLayer, permissions } })
         await run.mutate()
         return
       }
-      // `write` is the overlay's name for an app rule; both save the workspace's one policy.
-      if (!writable || !workspace.data || !botId) return
+      // Both kinds save the workspace's one policy. A page that loaded no policy cannot save one; an anchor that is
+      // missing is reported, not swallowed.
+      if (!admin || !workspace.data) return
+      const anchorId = requireAnchor()
       const permissions = withAppPermissions(workspace.data.permissions, ids, value === 'default' ? null : value)
-      await definition(botId, { body: { action: 'set_workspace_write_policy', permissions, expectedVersion: workspace.data.version } })
+      await definition(anchorId, { body: { action: 'set_workspace_write_policy', permissions, expectedVersion: workspace.data.version } })
       await workspace.mutate()
     }) },
     onLoadTools: loadTools,
     saving,
-    error: error ?? (workspace.error || run.error || botsError ? tError('readFailed') : null),
+    error: error ?? (() => {
+      const key = botPermissionsErrorKey({ bots, workspaceId, readFailed: Boolean(workspace.error || run.error || botsError) })
+      return key ? tError(key as never) : null
+    })(),
   }
 }
 
@@ -227,7 +249,7 @@ export function BotPermissionsView({ scope, apps, run, approvalMode, onLoadTools
         </li>)}
       </ul>}
     {run && <ul className="flex flex-col divide-y rounded-xl border">
-      {run.map(action => <li key={action.id} className="flex justify-between gap-3 px-4 py-2 text-sm"><span>{action.name}</span><span className="text-muted-foreground">{action.effective ? `${runLevel(action.value)} · ${level(action.effective)}` : runLevel(action.value)}</span></li>)}
+      {run.map(action => <li key={action.id} className="flex justify-between gap-3 px-4 py-2 text-sm"><span>{action.name}</span><span className="text-muted-foreground">{runLevel(action.value)}</span></li>)}
     </ul>}
   </div>
 }

@@ -27,13 +27,32 @@ What follows:
   three-item hand-written list was a policy subset, not the app's tool
   surface. The :botId only anchors the legacy route; the catalogue read is
   workspace-scoped and authorizes no Bot separately.
-- The workspace deny covers every GitHub call in the workspace, including a
-  dispatched Agent that uses the person's own GitHub credential; no personal
-  credential bypasses the workspace choice. Target contract: until the
-  backend makes this deny absolute, a dispatched Agent can still use the
-  person's own credential.
-- The run policy on the same page is the workspace layer (workspace_computer_policies.cli_run_policy). The workspace layer is the base; per-Bot and per-worker policy columns are retired, and team and project scopes still narrow a task.
-- Capy's model — allow, disable or read-only on the MCP server, and allow on a device — authorizes a connection or a device, never an individual agent. This decision adopts that shape: the workspace's app rule and the device are the only app-authorization surfaces, and no Bot-level layer remains.
+- GitHub is direct allow by default and can be denied as an app. There is no
+  approval card on `github_call`; `githubActionDenied` tells the model the
+  workspace blocked it, and `githubPolicyUnavailable` says the policy could
+  not be read. `github_tools` still lists names. Current: the deny gates
+  Mikka's direct calls only — `find_repository`, `github_tools` discovery and a
+  dispatched Agent still use the person's own GitHub credential, so the page's
+  line says "direct" rather than "never". Target contract: the workspace deny
+  covers every GitHub call in the workspace, including a dispatched Agent that
+  uses the person's own credential; no personal credential bypasses the
+  workspace choice. The copy stays "direct" until the backend makes that deny
+  absolute.
+- The run policy on the same page is the workspace layer
+  (`workspace_computer_policies.cli_run_policy`); the workspace layer is the
+  base, per-Bot and per-worker policy columns are retired, and team and project
+  scopes still narrow a task.
+- A run that names no workspace has no workspace policy to read: it uses the
+  owner-scoped legacy `agent_kit_heads` row (`bot_key='coordinator'`) as an
+  explicit ceiling, never as a wider allow. That row is not a per-Bot layer —
+  no Bot read or write creates or reads one — and it stops applying once the
+  personal-workspace backfill gives the run its workspace. The retired per-Bot
+  heads (one per Bot id) are historical rows only; nothing reads their policy
+  columns.
+- Capy's model — allow, disable or read-only on the MCP server, and allow on a
+  device — authorizes a connection or a device, never an individual agent. This
+  decision adopts that shape: the workspace's app rule and the device are the
+  only app-authorization surfaces, and no Bot-level layer remains.
 
 Cost if wrong: a team that needs per-Bot access has no surface; per-Bot access is intentionally unsupported because Capy has no such concept. Removing the Bot layer can only widen access where a Bot row was stricter; migrate those rows to the workspace rule before deleting them and record the diff.
 

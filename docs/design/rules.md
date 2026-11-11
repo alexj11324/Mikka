@@ -446,8 +446,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   words: its row names the reason. Raw input and output sit last, under
   「原始数据」, folded. 全部展开 / 全部收起, always shown beside every
   group, opens or closes every group in the chat. Under a reply, 复制 and 「N 个来源」 (web pages
-  only; tasks and threads are already chips) share one line that shows while the
-  reply is hovered, focused or tapped; the latest reply keeps it on a touch screen.
+  only; tasks and threads are already chips) share one line that is always there; the
+  icons stay muted until hovered or focused ([decision](decisions/2026-11-10-2002-chat-reply-actions-and-waiting.md)).
 
 ## Settings
 

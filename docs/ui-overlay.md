@@ -22,7 +22,7 @@ and don't add a slot only to make a fix possible. The build without
 
 `lib/ui-overlay.mjs` decides this once. The shared Vite plugin
 (`apps/frontend/scripts/application-plugin.mjs`) applies it to both Web and
-desktop renderer builds. `next.config.mjs` retains aliases for compatibility.
+desktop renderer builds; it is the only place the mapping is applied.
 Production uses the [shared frontend/API runtime](operations/web-runtime.md).
 `tsconfig.json` maps `@ui-slot/*` to the defaults, so typecheck, lint and tests
 in this repository always see the build without `mikka-hosted-ui`. The layer must sit inside

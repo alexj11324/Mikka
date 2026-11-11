@@ -40,7 +40,7 @@ the sheet behind the header's sidebar button, with the rail items at its foot.
 The section list is `SETTINGS_SECTIONS` in `lib/settings-sections.ts`; the
 sidebar, URL parsing and page body all read it.
 
-- **Personal:** Account, Security, Preferences, Notifications, Memory (记忆), Connections, Models, Logins and keys, Data and privacy, Activity, Computers (我的电脑), Developer.
+- **Personal (account):** Account, Security, Preferences, Notifications, Memory, Connections, 模型与订阅 (subscriptions, API keys, 运行位置 and 优先使用的模型; it replaced API 与订阅 and Bot 与 Agents), Secrets and logins, Data and privacy, Devices. The same in every workspace. Personal access tokens are built but hidden (`unbuilt`).
 - **Workspace:** General, App & run permissions, Members, Teams, Team permissions (admins), Secrets and environment, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators).
 
 App & run permissions holds the workspace's app access (allow / ask / deny today; read-only and disabled are target) and run policy. Team permissions holds computer use (allow / deny), device access and 允许使用的应用. Neither holds per-Bot settings. Target contract: MCP-server access levels are not enforced yet.
