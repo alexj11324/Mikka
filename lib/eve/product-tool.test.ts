@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import type { ApprovalConfiguration } from 'eve/tools/approval'
+import { createProductTool } from './product-tool'
+import type { productRpc, ProductOperation } from './product-rpc'
+import { scopeAuth } from './scope'
+
+const scope = {ownerId:'owner',botId:'10000000-0000-4000-8000-000000000001',workspaceId:'10000000-0000-4000-8000-000000000002',surface:'web' as const}
+const binding = {sessionId:'wrun_fixture',turnId:'turn_0',executionId:'10000000-0000-4000-8000-000000000003'}
+const input = {recipient:'fixture@example.invalid',body:'Proposed message'}
+const definition = {name:'send_email',description:'Send mail',inputSchema:{type:'object'}}
+
+test('native product tool pauses through Eve with exact durable call/input binding',async()=>{
+  const requests:ProductOperation[]=[]
+  const rpc:typeof productRpc = async <T>(_scope,request)=>{assert.deepEqual(_scope,scope);requests.push(request);return {status:'user-approval'} as T}
+  const tool=createProductTool(scope,binding,definition,rpc)
+  const approval=tool.approval as ApprovalConfiguration<unknown>
+  const context={session:{id:binding.sessionId,turn:{id:binding.turnId},auth:{current:scopeAuth(scope)}},callId:'call_1',toolInput:input,abortSignal:new AbortController().signal}
+  assert.equal(await approval.request(context as never),'user-approval')
+  assert.deepEqual(requests,[{...binding,operation:'approval',name:definition.name,input,callId:'call_1'}])
+  assert.equal(await approval.request({...context,session:{...context.session,id:'wrun_other'}} as never),'denied')
+  assert.equal(await approval.request({...context,session:{...context.session,auth:{current:scopeAuth({...scope,ownerId:'other'})}}} as never),'denied')
+  assert.equal(requests.length,1)
+})
+
+test('native approval accepts only original scoped owner and copies no token capability',async()=>{
+  const requests:ProductOperation[]=[]
+  const rpc:typeof productRpc = async <T>(_scope,request)=>{requests.push(request);return {output:'sent'} as T}
+  const tool=createProductTool(scope,binding,definition,rpc)
+  const approval=tool.approval as ApprovalConfiguration<unknown>
+  const owner=scopeAuth(scope)
+  const context={session:{id:binding.sessionId,turn:{id:binding.turnId}},request:{principal:owner},response:{principal:owner,decision:'approve'}}
+  assert.deepEqual(await approval.response!(context as never),{status:'allowed'})
+  for(const foreign of [scopeAuth({...scope,ownerId:'other'}),scopeAuth({...scope,botId:'other'}),scopeAuth({...scope,workspaceId:'other'}),scopeAuth({...scope,surface:'slack'}),{...owner,authenticator:'unknown'},null]) {
+    assert.equal((await approval.response!({...context,response:{...context.response,principal:foreign}} as never)).status,'rejected')
+    assert.equal((await approval.response!({...context,request:{principal:foreign}} as never)).status,'rejected')
+  }
+  const responder={...owner,getToken:()=>{throw new Error('must not access token')},attributes:{...owner.attributes,sourceEventId:'private-original-source'}}
+  assert.equal(await tool.execute!(input as never,{callId:'call_1',abortSignal:new AbortController().signal,approval:{responder}} as never),'sent')
+  assert.deepEqual(requests,[{...binding,operation:'execute',name:definition.name,input,callId:'call_1',approvalResponder:owner}])
+  assert.equal(await tool.execute!(input as never,{callId:'call_2',abortSignal:new AbortController().signal} as never),'sent')
+  assert.equal(Object.hasOwn(requests[1],'approvalResponder'),false)
+})
