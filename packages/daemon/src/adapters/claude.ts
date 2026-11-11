@@ -63,6 +63,7 @@ import {
 } from "../agents/run-context"
 import { requireRunToolApproval } from "../agents/tool-approval"
 import { nativeMcpProcess, type RunApps } from "../agents/run-apps"
+import { taskMcpSecretValues } from '@mikka/protocol'
 import type { AgentSandbox } from "../agents/sandbox"
 import { carryHistory, ownDir, wipeRunCredentials } from "../agents/harness-home"
 import { claudeCredentialEnv, credentialDomain } from "../agents/run-credential"
@@ -662,7 +663,7 @@ export class ClaudeAdapter implements AgentAdapter {
       return child
     }
     const credentialSecrets = [nativeToken, options.credential?.key].filter((value): value is string => Boolean(value && value !== NATIVE_AUTH_PLACEHOLDER))
-    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.apps?.token ?? ""]
+    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.apps?.token ?? "", ...taskMcpSecretValues(options.apps?.servers)]
     const capture = (error: unknown) => captureClaudeRunFailure(error, { runId: options.runId, appVersion: DAEMON_VERSION, provider: "claude", credential: options.credential ? "api_key" : "subscription", sensitiveText: [...sensitiveText, ...credentialSecrets] })
     const refreshOptions = externalAuth?.automaticRefresh ? {
       getOAuthToken: async ({ signal }: { signal: AbortSignal }): Promise<string | null> => {
