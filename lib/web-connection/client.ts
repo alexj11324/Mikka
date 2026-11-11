@@ -14,6 +14,7 @@ const b64 = (value: Uint8Array) => btoa(String.fromCharCode(...value)).replace(/
 const safeSession = (credential: Credential): WebServerAccount => ({ server: credential.server,
   user: { id: credential.user.id, name: credential.user.name, email: credential.user.email, image: typeof credential.user.image === 'string' ? credential.user.image : null, emailVerified: credential.user.emailVerified },
   session: { id: credential.session.id } })
+const validSessionToken = (value: unknown): value is string => typeof value === 'string' && tokenPattern.test(value) && !/^(?:mkp_|mka_|mkr_)/.test(value)
 const validText = (value: unknown, max = 200): value is string => typeof value === 'string' && value.length > 0 && value.length <= max
 const workspaceActions = new Set(['workspace.switchWorkspace', 'workspace.createWorkspace', 'workspace.acceptWorkspaceInvitation'])
 async function selectsWorkspace(request: Request, path: string) {
@@ -36,6 +37,7 @@ export class WebServerDirectory {
   private probed = new Map<string, number>()
   private pending = new Map<string, Pending>()
   private activeId: string | null = null
+  private expiredServer: string | null = null
   private generation = 0
   private workspaceGeneration = 0
   private workspaceIntent = 0
@@ -43,7 +45,7 @@ export class WebServerDirectory {
   private responseVersions = new WeakMap<Response, { account: number; workspace: number }>()
   private requests = new AbortController()
   private listeners = new Set<() => void>()
-  private snapshot: { version: number; account: WebServerAccount | null } = { version: 0, account: null }
+  private snapshot: { version: number; account: WebServerAccount | null; expiredServer: string | null } = { version: 0, account: null, expiredServer: null }
   readonly app: URL
 
   constructor(private options: { appUrl: string; fetch: WebFetch; storage?: StorageLike; sessionStorage?: StorageLike; now?: () => number; onChange?: () => Promise<void> | void }) {
@@ -69,27 +71,27 @@ export class WebServerDirectory {
         this.credentials.set(this.key(credential.server, credential.user.id), credential)
       }
       if (typeof sessions?.active === 'string' && this.credentials.has(sessions.active)) this.activeId = sessions.active
+      else if (sessions?.version === 1 && this.servers.has(sessions.expiredServer)) this.expiredServer = sessions.expiredServer
     } catch { /* A malformed directory cannot select an origin or invent authority. */ }
   }
   private persist() {
     try { this.options.storage?.setItem(directoryKey, JSON.stringify({ version: 1, servers: [...this.servers.values()], cloudUsers: [...this.cloudUsers] })) } catch { /* Memory remains usable when storage is unavailable. */ }
     try {
-      if (this.credentials.size) this.options.sessionStorage?.setItem(sessionKey, JSON.stringify({ version: 1, credentials: [...this.credentials.values()], active: this.activeId }))
+      if (this.credentials.size || this.expiredServer) this.options.sessionStorage?.setItem(sessionKey, JSON.stringify({ version: 1, credentials: [...this.credentials.values()], active: this.activeId, expiredServer: this.expiredServer }))
       else this.options.sessionStorage?.removeItem(sessionKey)
     } catch { /* Credentials never fall back to persistent directory storage. */ }
   }
   private validCredential(value: unknown, pendingServer?: string): value is Credential {
     if (!value || typeof value !== 'object') return false
     const item = value as Credential
-    return (this.servers.has(item.server) || pendingServer !== undefined && item.server === pendingServer) && typeof item.token === 'string' && tokenPattern.test(item.token)
-      && !/^(?:mkp_|mka_|mkr_)/.test(item.token) && validText(item.user?.id) && typeof item.user.name === 'string'
+    return (this.servers.has(item.server) || pendingServer !== undefined && item.server === pendingServer) && validSessionToken(item.token) && validText(item.user?.id) && typeof item.user.name === 'string'
       && typeof item.user.email === 'string' && typeof item.user.emailVerified === 'boolean' && validText(item.session?.id)
       && (item.workspaceId === undefined || selectedWorkspaceId(item.workspaceId) === item.workspaceId)
   }
   private conflicts(server: string, userId: string) {
     return this.cloudUsers.has(userId) || [...this.credentials.values()].some(item => item.user.id === userId && item.server !== server)
   }
-  private updateSnapshot() { const active = this.active(); this.snapshot = { version: this.generation, account: active ? safeSession(active) : null } }
+  private updateSnapshot() { const active = this.active(); this.snapshot = { version: this.generation, account: active ? safeSession(active) : null, expiredServer: this.expiredServer } }
   private async changed() {
     this.generation++
     this.workspaceGeneration++
@@ -108,7 +110,7 @@ export class WebServerDirectory {
   getSnapshot = () => this.snapshot
   subscribe = (changed: () => void) => { this.listeners.add(changed); return () => { this.listeners.delete(changed) } }
   getServers(): WebServerEntry[] {
-    return [...this.servers.values()].map(server => ({ ...server, signIn: { ...server.signIn }, active: this.active()?.server === server.url,
+    return [...this.servers.values()].map(server => ({ ...server, signIn: { ...server.signIn }, active: (this.active()?.server ?? this.expiredServer) === server.url,
       accounts: [...this.credentials.values()].filter(account => account.server === server.url).map(safeSession) }))
   }
   getActiveAccount(): WebServerAccount | null { return this.snapshot.account }
@@ -123,7 +125,7 @@ export class WebServerDirectory {
     if (!active) return null
     const response = await this.fetch(`${active.server}/api/desktop/rpc`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-mikka-desktop-protocol': '1' },
       body: JSON.stringify({ version: 1, action: 'desktop.session', args: [] }) })
-    if (response.status === 401) return null
+    if (response.status === 401) return this.active() === active ? safeSession(active) : null
     if (!response.ok) throw new WebConnectionError('web_connection_session_unavailable')
     const value = await response.json() as { ok?: boolean; result?: DesktopSession }
     if (!value.ok || value.result?.user.id !== active.user.id || value.result?.session.id !== active.session.id) throw new WebConnectionError('web_connection_session_invalid')
@@ -133,7 +135,15 @@ export class WebServerDirectory {
   async rememberCloudAccounts(userIds: readonly string[]) {
     for (const id of userIds) if (validText(id)) this.cloudUsers.add(id)
     let collision = false
-    for (const [key, account] of this.credentials) if (this.cloudUsers.has(account.user.id)) { this.credentials.delete(key); if (this.activeId === key) this.activeId = null; collision = true }
+    for (const [key, account] of this.credentials) {
+      if (!this.cloudUsers.has(account.user.id)) continue
+      this.credentials.delete(key)
+      if (this.activeId === key) {
+        this.activeId = null
+        this.expiredServer = account.server
+      }
+      collision = true
+    }
     if (collision) await this.changed(); else this.persist()
   }
   async addServer(input: unknown): Promise<WebServerProbe> {
@@ -183,6 +193,7 @@ export class WebServerDirectory {
     }
     this.credentials.set(this.key(account.server, account.user.id), account)
     this.activeId = this.key(account.server, account.user.id)
+    this.expiredServer = null
     await this.changed()
     return safeSession(account)
   }
@@ -193,6 +204,7 @@ export class WebServerDirectory {
       if (!account) throw new WebConnectionError('web_connection_sign_in_required')
       this.activeId = this.key(account.server, account.user.id)
     }
+    this.expiredServer = null
     await this.changed()
   }
   private async revoke(account: Credential) {
@@ -201,6 +213,7 @@ export class WebServerDirectory {
   }
   async signOut() {
     const account = this.active()
+    this.expiredServer = null
     if (!account) { await this.changed(); return }
     this.credentials.delete(this.activeId!); this.activeId = null
     await this.changed()
@@ -211,6 +224,7 @@ export class WebServerDirectory {
     for (const account of accounts) this.credentials.delete(this.key(account.server, account.user.id))
     for (const [state, pending] of this.pending) if (pending.server.url === serverUrl) this.pending.delete(state)
     if (this.activeId && !this.credentials.has(this.activeId)) this.activeId = null
+    if (this.expiredServer === serverUrl) this.expiredServer = null
     this.servers.delete(serverUrl); this.probed.delete(serverUrl)
     await this.changed()
     const results = await Promise.allSettled(accounts.map(account => this.revoke(account)))
@@ -234,6 +248,7 @@ export class WebServerDirectory {
     }
     if (!account) {
       if (!localApi || url.pathname.startsWith(`${localBase}/api/auth/`)) return this.options.fetch(input, init)
+      if (this.expiredServer) return Response.json({ error: 'web_auth_session_expired' }, { status: 401, headers: { 'cache-control': 'no-store' } })
       const source = new Request(input instanceof Request ? input : url, init), version = this.generation, workspace = this.workspaceGeneration
       const response = await this.options.fetch(new Request(source, { signal: AbortSignal.any([source.signal, this.requests.signal]) }))
       if (version !== this.generation) { await response.body?.cancel(); throw new WebConnectionError('web_connection_session_changed') }
@@ -258,7 +273,8 @@ export class WebServerDirectory {
     if (remote.origin !== this.app.origin) {
       for (const name of ['x-posthog-session-id', 'x-posthog-window-id', 'x-posthog-distinct-id']) headers.delete(name)
     }
-    headers.set('authorization', `Bearer ${account.token}`)
+    const requestToken = account.token
+    headers.set('authorization', `Bearer ${requestToken}`)
     if (account.workspaceId) headers.set(WORKSPACE_SELECTION_HEADER, account.workspaceId)
     if (path === '/api/desktop/rpc') headers.set('x-mikka-desktop-protocol', '1')
     const version = this.generation, workspace = this.workspaceGeneration, sequence = ++this.requestSequence
@@ -268,7 +284,17 @@ export class WebServerDirectory {
     const intent = selecting ? sequence : undefined
     if (intent !== undefined && intent !== this.workspaceIntent) throw new WebConnectionError('web_connection_session_changed')
     const signal = AbortSignal.any([source.signal, this.requests.signal])
-    let response = await this.options.fetch(new Request(new Request(target, source), { headers, credentials: 'omit', redirect: 'error', cache: 'no-store', signal }))
+    // A Request exposes its body as a stream. Forwarding that stream directly
+    // makes Chromium require HTTP/2 even for a small JSON POST. Preserve the
+    // original reusable body where possible and serialize prebuilt requests
+    // and multipart data with the boundary from the normalized source.
+    const supplied = init?.body
+    const body = !source.body ? undefined
+      : supplied != null && !(supplied instanceof ReadableStream) && !(supplied instanceof FormData)
+        ? supplied : await source.blob()
+    let response = await this.options.fetch(target, {
+      method: source.method, headers, body, signal, credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer',
+    })
     const current = () => version === this.generation && workspace === this.workspaceGeneration && (intent === undefined || intent === this.workspaceIntent)
     if (!current()) { await response.body?.cancel(); throw new WebConnectionError('web_connection_session_changed') }
     if (selecting && response.ok && response.headers.has(WORKSPACE_SELECTION_HEADER)) {
@@ -296,9 +322,18 @@ export class WebServerDirectory {
         }
       }
     }
-    const rotated = response.headers.get('x-mikka-session-token')
-    if (rotated && tokenPattern.test(rotated)) { account.token = rotated; this.persist() }
-    if (response.status === 401) { this.credentials.delete(this.activeId!); this.activeId = null; await this.changed() }
+    if (account.token === requestToken) {
+      const rotated = response.headers.get('x-mikka-session-token')
+      if (response.status === 401) {
+        this.credentials.delete(this.activeId!)
+        this.activeId = null
+        this.expiredServer = account.server
+        await this.changed()
+      } else if (response.ok && validSessionToken(rotated) && rotated !== requestToken) {
+        account.token = rotated
+        this.persist()
+      }
+    }
     this.responseVersions.set(response, { account: version, workspace: this.workspaceGeneration })
     return response
   }
