@@ -2,6 +2,7 @@ import 'server-only'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, asc, eq, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
+import type { PoolClient } from 'pg'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
@@ -53,7 +54,7 @@ export function invalidateTaskWorkspaceOrganization(workspaceId: string): void {
   currentOrganizationChanges()?.add(workspaceId)
 }
 
-export type BorrowedTaskWorkspaceMembership = { check(): Promise<void>; close(): Promise<void> }
+export type BorrowedTaskWorkspaceMembership = { workspaceClient: Pick<PoolClient, 'query'>; check(): Promise<void>; close(): Promise<void> }
 
 /** A borrow cannot release the owner transaction or authorize another tenant.
  * Its fresh read uses the held WS executor; no second pool checkout occurs. */
@@ -63,7 +64,11 @@ export function borrowTaskWorkspaceMembership(userId: string, workspaceId: strin
   if (lease.userId !== userId || lease.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   let closed = false
   const assertActive = () => { if (closed || !leaseActive(lease)) throw new ActionFailureError('workspaceAccessDenied') }
+  // Capture the current WS executor while its owning transaction is active.
+  // The wrapper refuses use after close or after that transaction completes.
+  const query = workspaceDatabase.workspacePool.query
   return {
+    workspaceClient: { query: ((...args: unknown[]) => { assertActive(); return Reflect.apply(query, workspaceDatabase.workspacePool, args) }) as PoolClient['query'] },
     async check() {
       assertActive()
       const [current] = await lease.tx.select({ id: workspaces.id }).from(workspaces)

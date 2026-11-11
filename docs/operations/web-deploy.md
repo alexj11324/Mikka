@@ -266,10 +266,10 @@ alone: their recorded overlay SHAs may differ.
   filenames, source or error messages. The fixed `migrate: starting` marker
   observes entry into a requested migration command before its guards; it does
   not prove any SQL ran. An explicit `MIGRATE=0` skip does not emit that marker.
-- The live Web builder is Vite + Nitro, both with `sourcemap: false`;
-  `next.config.mjs` is a legacy path, not the production compiler. Before
-  upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI
-  source, `.map`, inline source-map directives and `sourcesContent`.
+- The live Web builder is Vite + Nitro, both with `sourcemap: false`; there is
+  no Next compiler in the build path. Before upload, `hosted-ui.mjs audit`
+  checks Vercel's public static tree for raw UI source, `.map`, inline
+  source-map directives and `sourcesContent`.
 - The desktop production renderer and main/preload emit no source maps.
   Installers include their bundled `dist/` and package metadata, explicitly
   excluding hoisted workspace `node_modules/` and its development source/maps.

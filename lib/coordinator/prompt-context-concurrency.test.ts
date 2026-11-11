@@ -13,7 +13,7 @@ const snapshot = makeSnapshot('10000000-0000-4000-8000-000000000002', 1, DEFAULT
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = {
   summary: null, memory: 'Synthetic saved memory', messages: [{ position: 1, message: { role: 'user', content: 'Synthetic request' } }],
 }
-type Reader = 'execution' | 'personal' | 'github'
+type Reader = 'execution' | 'personal' | 'github' | 'repositories' | 'profile'
 function deferred() {
   let resolve!: () => void
   const promise = new Promise<void>(done => { resolve = done })
@@ -38,7 +38,10 @@ stub('./personal-instructions.ts', { withPersonalInstructionText: async (...args
   if (denied) throw denied
   return instructionsWithPersonal(args[1] as string, args[2] as string)
 } })
-stub('./github-context.ts', { githubPromptContext: async (...args: unknown[]) => { await enter('github', args); return github } })
+stub('./github-context.ts', { githubPromptContext: async (...args: unknown[]) => { await enter('github', args); return github },
+  // The turn asks which repositories this chat works in before reading the person's facts.
+  usedRepositoriesForBot: async (...args: unknown[]) => { await enter('repositories', args); return ['synthetic/repository'] } })
+stub('../profile/store.ts', { profilePromptSection: async (...args: unknown[]) => { await enter('profile', args); return '' } })
 stub('./execution-context.ts', { executionContextParts: async (...args: unknown[]) => { await enter('execution', args); return facts } })
 stub('./summary-model.ts', { summarizeConversation: forbidden })
 stub('../personal-mailbox-config.ts', { personalMailboxEnabled: () => false })
@@ -85,7 +88,9 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
   await firstStarted.promise
   try {
     // The old serial code starts only execution here. No sleeps or timing threshold.
-    assert.deepEqual(calls.map(call => call.reader), ['execution', 'personal', 'github'])
+    // The profile read runs after these three, from the repositories this chat works in,
+    // so only the parallel set is asserted here against the gates.
+    assert.deepEqual(calls.map(call => call.reader).filter(reader => reader !== 'repositories' && reader !== 'profile'), ['execution', 'personal', 'github'])
     assert.deepEqual(calls.find(call => call.reader === 'execution')?.args, [owner, bot])
     assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, undefined, undefined, undefined, bot])
     assert.deepEqual(calls.find(call => call.reader === 'personal')?.args, [owner, withCoordinatorPresentation(executionInstructions(snapshot)), personal, { servers: [], skills: [] }])
@@ -95,7 +100,9 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
     await pending
   }
   assert.deepEqual(await pending, expectedPrompt())
-  assert.equal(calls.length, 3)
+  // Exactly five reads and no more: the three parallel context parts, then the
+  // repositories this chat works in, then what Mikka has learnt about the person.
+  assert.equal(calls.length, 5)
 })
 
 test('a later turn reads current context again without caching or changing the frozen host', async () => {
@@ -107,6 +114,9 @@ test('a later turn reads current context again without caching or changing the f
   assert.deepEqual(second, expectedPrompt())
   assert.notEqual(second.instructions, first.instructions)
   for (const reader of ['execution', 'personal', 'github'] as const) assert.equal(calls.filter(call => call.reader === reader).length, 2)
+  // What Mikka learnt about the person is re-read every turn too, never carried over.
+  assert.equal(calls.filter(call => call.reader === 'profile').length, 2)
+  assert.equal(calls.filter(call => call.reader === 'repositories').length, 2)
 })
 
 test('an instruction read refusal is propagated unchanged without retry or a partial prompt', async () => {
@@ -118,10 +128,11 @@ test('an instruction read refusal is propagated unchanged without retry or a par
 test('prepareTurn returns only fixed numeric context timings beside the unchanged model prompt', async () => {
   const prepared = await prepareTurn(owner, bot, 'synthetic-holder', { snapshot, mailboxEnabled: false, runtime: null })
   assert.deepEqual(prepared.prompt, expectedPrompt())
-  assert.deepEqual(Object.keys(prepared.contextMs).sort(), ['execution', 'github', 'personal'])
+  assert.deepEqual(Object.keys(prepared.contextMs).sort(), ['execution', 'github', 'personal', 'profile'])
   assert.ok(Object.values(prepared.contextMs).every(value => Number.isFinite(value) && value >= 0))
   assert.deepEqual(prepared.mailboxTools, [])
-  assert.deepEqual(calls.map(call => call.reader), ['execution', 'personal', 'github'])
+  assert.deepEqual(calls.map(call => call.reader), ['execution', 'personal', 'github', 'repositories', 'profile'],
+    'the three parallel reads, then the repositories this chat works in, then the person\'s facts')
   assert.doesNotMatch(JSON.stringify(prepared.contextMs), /Synthetic|owner|request|instruction|repositories/)
   assert.ok(!('contextMs' in prepared.prompt) && !('phaseMs' in prepared.prompt), 'diagnostics never become model options or cached text')
 })

@@ -20,6 +20,16 @@ test('directives count only in the header (leading comment / blank lines)', () =
   assert.deepEqual(headerLines('-- a\n\n-- b\nselect 1;\n-- c\n'), ['-- a', '', '-- b'])
 })
 
+test('Project rolling-upgrade fence is an atomic Workspace migration', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const name = '20261111030008_project_writer_fence.sql'
+  const source = await readFile(new URL(`../drizzle/${name}`, import.meta.url), 'utf8')
+  const migration = planMigration(name, source)
+  assert.equal(migration.target, 'DATABASE_URL')
+  assert.equal(migration.noTransaction, false)
+  assert.equal(migration.sql, source)
+})
+
 test('no-transaction: exactly one statement, trailing semicolon optional, comments ignored', () => {
   const sql = `-- Trigram index.\n${NOTX}-- built without blocking writes, see MIK-16\ncreate index concurrently if not exists issues_title_trgm_idx\n  on issues using gin (title gin_trgm_ops); -- trailing note\n`
   assert.deepEqual(plan(sql), { target: 'MIKKA_DATABASE_URL', noTransaction: true, sql, concurrentIndex: 'issues_title_trgm_idx', concurrentIndexTable: { schema: null, table: 'issues' } })

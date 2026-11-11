@@ -40,7 +40,12 @@ export function MemorySettings() {
         {editing?.id === fact.id
           ? <Input autoFocus aria-label={t('correct')} value={editing.subject} maxLength={200} onChange={event => setEditing({ id: fact.id, subject: event.target.value })} onBlur={save} onKeyDown={event => { if (event.key === 'Enter') void save(); if (event.key === 'Escape') setEditing(null) }} />
           : <>
-              <span className="min-w-0 flex-1">{fact.subject}</span>
+              <span className="min-w-0 flex-1">
+                {fact.subject}
+                {/* A fact Mikka only believes inside one repository says so, so it is never
+                    mistaken for one that holds wherever the person works (ALE-68). */}
+                {fact.repository && <span className="ms-2 text-muted-foreground">{t('scopedTo', { repository: fact.repository })}</span>}
+              </span>
               <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within/fact:opacity-100 group-hover/fact:opacity-100 pointer-coarse:opacity-100">
                 <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('correct')} onClick={() => setEditing({ id: fact.id, subject: fact.subject })}><Pencil data-icon="inline-start" /></Button>
                 <Button variant="ghost" size="icon-sm" className="text-muted-foreground" aria-label={t('delete')} onClick={() => { void remove(fact.id) }}><Trash2 data-icon="inline-start" /></Button>

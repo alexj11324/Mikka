@@ -30,6 +30,7 @@ import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCap
 import {
   CLIENT_VERSION_HEADER,
   REPO_ORIGIN_HEADER,
+  PROJECT_ENVIRONMENT_HEADER,
   RECOVERY_WORKTREE_HEADER,
   MODEL_CREDENTIAL_HEADER,
   RUN_CREDENTIALS_HEADER,
@@ -300,6 +301,7 @@ export class HttpServerLink implements ServerLink {
           [SKILL_ARTIFACT_HEADER]: '1',
           [TEAM_SKILL_HEADER]: '1',
           [REPO_ORIGIN_HEADER]: '1',
+          [PROJECT_ENVIRONMENT_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
           [TASK_SECRETS_HEADER]: TASK_SECRETS_VERSION,

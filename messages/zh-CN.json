@@ -400,6 +400,9 @@
       "selectExistingProject": "请选择一个现有项目。新项目请先在项目页面创建。",
       "projectLinkFailed": "项目关联失败。",
       "projectLinkFailedRetry": "项目关联失败，请重试。",
+      "accessChangeTitle": "要改变谁能看到这个任务吗？",
+      "accessChangeBody": "这会移动 {tasks} 个任务，并改变谁能读取它们。",
+      "accessChangeConfirm": "仍然移动",
       "saveFailed": "保存失败，请重试。",
       "saveFailedRetry": "保存失败，请稍后重试。",
       "estimatePoints": "{count} 点估算"
@@ -1036,6 +1039,8 @@
       "changedTitle": "任务重命名为{title}",
       "assigned": "指派给{name}",
       "unassigned": "取消了负责人",
+      "delegated": "交给{name}执行",
+      "undelegated": "取消了执行委派",
       "addedSubtask": "添加了子任务 {title}",
       "addedLabel": "添加了标签 {name}",
       "removedLabel": "移除了标签 {name}",
@@ -1107,6 +1112,15 @@
     "allStatuses": "全部状态"
   },
   "Errors": {
+    "projectRepositoryDenied": "此仓库或目标分支不在工作区或项目允许的范围内。",
+    "projectEnvironmentUnavailable": "所选环境或其所需资源无法用于本次运行。",
+    "projectResourceConflict": "资源配置已被更新，请刷新后重试。",
+    "teamArchived": "此团队已归档，请恢复后再分配新工作。",
+    "teamPersonalWorkspace": "只有共享工作区支持创建团队。",
+    "teamDeleteReferenced": "此团队仍关联任务、项目或运行历史。请归档或移除分组以保留这些工作。",
+    "teamLifecycleConflict": "团队已发生变化，请刷新并重新查看影响范围。",
+    "projectArchived": "此项目已归档，请恢复后再开始新工作。",
+    "projectDeleteNotEmpty": "此项目仍有任务、关联或历史记录。请使用归档保留这些工作。",
     "botNotFound": "这个 Bot 不在当前工作区。",
     "executionPlaceInvalid": "请选择可用设备或云端。",
     "executionHarnessUnavailable": "所选设备上没有这个 Agent。",
@@ -1166,6 +1180,7 @@
     "issueOutdated": "任务已更新，请刷新后重试。",
     "issueTargetUnavailable": "关联任务已不可用。",
     "issueAccessChanged": "任务访问权限已变更。",
+    "accessChangeConfirmationRequired": "此操作会改变哪些人能看到该任务。确认后继续。",
     "issueParentCycle": "父子任务不能形成循环。",
     "issueDuplicateCycle": "重复任务不能形成循环引用。",
     "issueBlockCycle": "阻塞关系不能形成循环依赖。",
@@ -1490,6 +1505,18 @@
     "removeFailedTitle": "移除失败",
     "removing": "正在移除…",
     "confirmRemove": "确认移除",
+    "memberRoleOwner": "可邀请",
+    "mute": "静音",
+    "unmute": "接收通知",
+    "memberRoleMember": "协作者",
+    "subscribedOn": "接收通知",
+    "subscribedOff": "已静音",
+    "roleChanged": "{name} 现在可以邀请成员。",
+    "roleChangeFailed": "角色未能修改。",
+    "subscriptionChanged": "该任务的通知已{state}。",
+    "subscriptionChangeFailed": "通知设置未能修改。",
+    "mutedState": "静音",
+    "followedState": "恢复",
     "title": "成员",
     "breadcrumbSettings": "设置",
     "navLabel": "工作区设置导航",
@@ -1672,6 +1699,8 @@
       "readingActivity": "正在读取活动…"
     },
     "activity": {
+      "archived": "归档了项目",
+      "restored": "恢复了项目",
       "created": "创建了项目",
       "updatedOverview": "更新了项目属性与概览",
       "updatedFields": "更新了{fields}",
@@ -1881,6 +1910,7 @@
       "empty": "暂无记忆",
       "correct": "更正",
       "delete": "删除",
+      "scopedTo": "仅在 {repository}",
       "kinds": {
         "interest": "兴趣",
         "routine": "习惯",
@@ -3011,17 +3041,28 @@
         "keyRefused": "API Key 已被拒绝",
         "balance": "API 余额不足",
         "providerUnavailable": "模型服务暂不可用",
-        "unavailable": "当前模型来源或运行位置不可用"
+        "unavailable": "当前模型来源或运行位置不可用",
+        "skillMissing": "所选技能已不在本机安装",
+        "skillDisabled": "所选技能已停用",
+        "skillForbidden": "共享技能已无授权"
       },
       "skillNames": {
         "implementation-evidence": "实现与验证证据",
         "independent-review": "独立审阅",
-        "systematic-debugging": "系统排障"
+        "systematic-debugging": "系统排障",
+        "test-driven-development": "测试驱动开发",
+        "verification-before-completion": "完成前验证",
+        "performance-investigation": "性能调查",
+        "security-review": "安全审阅"
       },
       "skillDescriptions": {
         "implementation-evidence": "按验收标准记录改动、验证结果和未验证项。",
         "independent-review": "检查冻结的候选改动，并记录可复现的问题。",
-        "systematic-debugging": "复现故障、定位根因，再验证修复。"
+        "systematic-debugging": "复现故障、定位根因，再验证修复。",
+        "test-driven-development": "先写失败检查，再做最小实现使其通过。",
+        "verification-before-completion": "报告前把已观察结果和未验证项分开。",
+        "performance-investigation": "先测量性能问题，再改动主要成本并复测。",
+        "security-review": "检查信任边界、授权、注入与密钥处理。"
       },
       "numberedSource": "{source} {number}",
       "mark": {
@@ -3043,7 +3084,48 @@
           "teal": "青绿",
           "pink": "粉"
         }
-      }
+      },
+      "blankProfile": "空白配置",
+      "templates": {
+        "investigator": {
+          "name": "调查员",
+          "description": "复现问题并报告证据与根因。"
+        },
+        "planner": {
+          "name": "方案规划",
+          "description": "把复杂需求整理成方案和验收标准。"
+        },
+        "implementer": {
+          "name": "实现",
+          "description": "在任务仓库中实现、测试并验证改动。"
+        },
+        "reviewer": {
+          "name": "审阅",
+          "description": "独立审阅冻结的候选改动。"
+        }
+      },
+      "skillSources": {
+        "official": "官方",
+        "personal": "个人",
+        "workspace": "工作区",
+        "repository": "仓库"
+      },
+      "skillStates": {
+        "disabled": "已停用",
+        "missing": "未安装",
+        "forbidden": "未共享",
+        "invalid": "来源不可用"
+      },
+      "repositorySkills": "仓库技能",
+      "repositorySkillName": "技能名称",
+      "repositorySkillPlaceholder": "test-driven-development",
+      "addRepositorySkill": "添加",
+      "repositorySkillHint": "运行开始时从当前检出加载。",
+      "shareSkill": "共享",
+      "unshareSkill": "取消共享",
+      "skillLoaded": "已加载",
+      "skillNotLoaded": "未加载",
+      "skillsNone": "无技能"
     },
     "cloud": {
       "title": "Mikka 云服务",
@@ -3159,6 +3241,9 @@
     "linkCopied": "邀请链接已复制。",
     "copyManually": "自动复制不可用，请选中链接后手动复制。",
     "refreshFailed": "邀请已创建，但列表刷新失败。请关闭弹窗后刷新页面，不要重复创建。",
+    "skippedTitle": "{count} 个邮箱未受邀",
+    "skippedAlreadyMember": "已是成员",
+    "skippedDuplicate": "重复填写",
     "imported": "已导入 {count} 个有效邮箱；共 {total} 位待邀请。",
     "importedDuplicates": "已导入 {count} 个有效邮箱，已去重 {duplicates} 个；共 {total} 位待邀请。",
     "errors": {
@@ -3407,6 +3492,7 @@
     "unknownClient": "一个未命名的应用"
   },
   "Coordinator": {
+    "waitingQuestions": "{count, plural, other {# 个任务在等你回答}}",
     "stop": "停止",
     "stopped": "已停止",
     "label": "Coordinator",
@@ -3530,6 +3616,14 @@
     "sendUncertain": "未确认送达",
     "sendOffline": "没有网络，未发送",
     "lengthCount": "{count} / {max}",
+    "context": "上下文",
+    "contextUsage": "上下文：下一轮约 {used} token，达 {compactAt} 时折叠",
+    "contextHeld": "下一轮携带的估算 token",
+    "contextCompactAt": "折叠阈值",
+    "contextKeepRecent": "折叠后保留的近文",
+    "contextNearFold": "下一轮会先折叠旧对话",
+    "contextEstimated": "按存储文本估算，非模型实际 token 计数",
+    "contextNoWindow": "Mikka 不存储模型上下文窗口，因此不显示占窗口比例",
     "modelPicker": {
       "label": "模型：{name}",
       "labelUnavailable": "模型：{name}，不可用",
@@ -4118,6 +4212,22 @@
       "paidBy": "{owner} 的 {plan}",
       "movedTo": "已换到 {machine} 继续"
     },
+    "context": "上下文",
+    "contextUsage": "上下文，提纲已用 {used}，上限 {budget}",
+    "contextBrief": "提纲",
+    "contextHeld": "全部持有",
+    "contextEstimated": "估算值，非计费口径",
+    "contextUnmeasured": "未计入：{segments}",
+    "contextListSeparator": "、",
+    "contextSegments": {
+      "system": "系统",
+      "tools": "工具",
+      "rules": "指令",
+      "skills": "技能",
+      "mcp": "MCP",
+      "environment": "环境",
+      "conversation": "对话"
+    },
     "back": "返回",
     "executionIdentity": {
       "you": "你",
@@ -4151,6 +4261,11 @@
       "copyDiagnostics": "复制诊断信息",
       "diagnosticsCopied": "诊断信息已复制",
       "diagnosticsCopyFailed": "诊断信息复制失败",
+      "skills": "技能",
+      "skillsInlined": "已进提示词",
+      "skillsDeferred": "仅描述",
+      "skillsDeferredList": "{count, plural, =1 {1 个技能} other {# 个技能}}只给了描述，正文需读技能文件",
+      "skillsBudget": "提示词内技能正文 {used} / {budget} 字符",
       "title": "执行身份与费用归属",
       "loading": "正在读取执行记录",
       "unavailable": "执行记录不可读取",
@@ -4479,6 +4594,12 @@
         },
         "reason": {
           "needsReply": "等你回复",
+          "needs_input": "等你回复",
+          "approval": "等你确认",
+          "pr_review": "待审阅",
+          "offline": "离线",
+          "blocked_by": "等其他任务",
+          "flagged": "已标记",
           "running": "运行中",
           "confirm": "等你确认",
           "review": "待审阅",
@@ -4743,10 +4864,10 @@
     "category": {
       "all": "全部",
       "documents": "文档",
-      "pages": "网页"
-    ,
+      "pages": "网页",
       "pullRequests": "PR",
-      "media": "截图与录屏"},
+      "media": "截图与录屏"
+    },
     "columns": {
       "name": "名称",
       "source": "来源",
@@ -5300,7 +5421,11 @@
       "activePlan": "生效中的资源套餐",
       "inactiveCreditShare": "组织账户付款期间，此前的个人点数共享不生效。关闭此项可撤销原授权。",
       "capacity": "平台并发执行数",
-      "plans": { "free": "免费版", "pro": "专业版", "enterprise": "企业版" },
+      "plans": {
+        "free": "免费版",
+        "pro": "专业版",
+        "enterprise": "企业版"
+      },
       "removeLimitHelp": "移除此范围的消费上限，保留既有用量与审计记录。",
       "differentPayer": "平台执行使用另一个组织付款账户。此页显示当前工作区保留的余额与历史，请切换组织范围管理平台购买。"
     },
@@ -5516,23 +5641,57 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
-    "workspace_not_found": { "default": "当前账号无法访问此代码工作区。" },
-    "workspace_snapshot_unavailable": { "default": "此版本没有可用的审阅快照。" },
-    "workspace_snapshot_outdated": { "default": "源码版本已变化，请刷新差异后再提交反馈。" },
-    "workspace_review_conflict": { "default": "审阅记录已变化，请刷新后再修改。" },
-    "workspace_review_anchor_invalid": { "default": "所选代码行不属于当前差异版本。" },
-    "workspace_review_unavailable": { "default": "当前任务或账号无法提交审阅反馈。" },
-    "workspace_review_delivery_uncertain": { "default": "反馈送达尚未确认，请先查看已有回执，勿另建一次提交。" },
-    "workspace_review_github_unavailable": { "default": "GitHub 审阅暂不可用，本地评论已保留。" },
-    "workspace_review_github_forbidden": { "default": "你的 GitHub 连接无权审阅此 PR，评论已保存在本地。" },
-    "workspace_machine_unavailable": { "default": "运行机器不可用，请恢复机器或查看已保存的历史记录。" },
-    "workspace_checkout_unavailable": { "default": "此运行的仓库工作树不可用。" },
-    "workspace_path_unavailable": { "default": "文件不可用或受保护。" },
-    "workspace_version_conflict": { "default": "源码已变化，请重新加载并选择引用。" },
-    "workspace_limit_exceeded": { "default": "请求超出限制，请减少文件数量或缩小行范围。" },
-    "workspace_request_expired": { "default": "文件引用已过期，请重新选择源码。" },
-    "workspace_unsupported": { "default": "当前文件或平台不支持此操作。" },
-    "workspace_invalid_request": { "default": "代码工作区请求无效。" },
+    "workspace_not_found": {
+      "default": "当前账号无法访问此代码工作区。"
+    },
+    "workspace_snapshot_unavailable": {
+      "default": "此版本没有可用的审阅快照。"
+    },
+    "workspace_snapshot_outdated": {
+      "default": "源码版本已变化，请刷新差异后再提交反馈。"
+    },
+    "workspace_review_conflict": {
+      "default": "审阅记录已变化，请刷新后再修改。"
+    },
+    "workspace_review_anchor_invalid": {
+      "default": "所选代码行不属于当前差异版本。"
+    },
+    "workspace_review_unavailable": {
+      "default": "当前任务或账号无法提交审阅反馈。"
+    },
+    "workspace_review_delivery_uncertain": {
+      "default": "反馈送达尚未确认，请先查看已有回执，勿另建一次提交。"
+    },
+    "workspace_review_github_unavailable": {
+      "default": "GitHub 审阅暂不可用，本地评论已保留。"
+    },
+    "workspace_review_github_forbidden": {
+      "default": "你的 GitHub 连接无权审阅此 PR，评论已保存在本地。"
+    },
+    "workspace_machine_unavailable": {
+      "default": "运行机器不可用，请恢复机器或查看已保存的历史记录。"
+    },
+    "workspace_checkout_unavailable": {
+      "default": "此运行的仓库工作树不可用。"
+    },
+    "workspace_path_unavailable": {
+      "default": "文件不可用或受保护。"
+    },
+    "workspace_version_conflict": {
+      "default": "源码已变化，请重新加载并选择引用。"
+    },
+    "workspace_limit_exceeded": {
+      "default": "请求超出限制，请减少文件数量或缩小行范围。"
+    },
+    "workspace_request_expired": {
+      "default": "文件引用已过期，请重新选择源码。"
+    },
+    "workspace_unsupported": {
+      "default": "当前文件或平台不支持此操作。"
+    },
+    "workspace_invalid_request": {
+      "default": "代码工作区请求无效。"
+    },
     "task_secret_unavailable": {
       "default": "任务密钥不可用。请检查使用方式后重试任务。",
       "invalid_capability": "任务密钥的授权无效，请重试任务以重新授权。",
@@ -5545,18 +5704,42 @@
       "limit_exceeded": "密钥请求超出支持的数据大小或授权数量。",
       "configuration": "请配置该密钥的受保护 HTTP 规则，或明确允许 Agent 直接读取此密钥。"
     },
-    "run_subscription_expired": { "default": "模型订阅需要重新连接。" },
-    "run_api_key_invalid": { "default": "服务商拒绝了 API 密钥，请在模型设置中检查密钥。" },
-    "run_quota_exceeded": { "default": "服务商用量额度或余额已用尽，请查看用量。" },
-    "run_rate_limited": { "default": "服务商正在限制请求频率，请稍后重试。" },
-    "run_invalid_request": { "default": "服务商无法接受这次请求，请查看错误详情。" },
-    "run_access_denied": { "default": "服务商拒绝访问，请检查账号权限。" },
-    "run_model_unavailable": { "default": "此模型当前不可用或已退役，请选择其他模型。" },
-    "run_context_length_exceeded": { "default": "请求超出了模型的上下文长度限制，请缩短输入或选择其他模型。" },
-    "run_timeout": { "default": "服务商响应超时，请重试。" },
-    "run_network_error": { "default": "无法连接模型服务商，请检查连接后重试。" },
-    "run_provider_error": { "default": "模型服务商未能完成这次请求，请重试。" },
-    "run_failed": { "default": "任务未能完成，请查看错误详情或重试。" },
+    "run_subscription_expired": {
+      "default": "模型订阅需要重新连接。"
+    },
+    "run_api_key_invalid": {
+      "default": "服务商拒绝了 API 密钥，请在模型设置中检查密钥。"
+    },
+    "run_quota_exceeded": {
+      "default": "服务商用量额度或余额已用尽，请查看用量。"
+    },
+    "run_rate_limited": {
+      "default": "服务商正在限制请求频率，请稍后重试。"
+    },
+    "run_invalid_request": {
+      "default": "服务商无法接受这次请求，请查看错误详情。"
+    },
+    "run_access_denied": {
+      "default": "服务商拒绝访问，请检查账号权限。"
+    },
+    "run_model_unavailable": {
+      "default": "此模型当前不可用或已退役，请选择其他模型。"
+    },
+    "run_context_length_exceeded": {
+      "default": "请求超出了模型的上下文长度限制，请缩短输入或选择其他模型。"
+    },
+    "run_timeout": {
+      "default": "服务商响应超时，请重试。"
+    },
+    "run_network_error": {
+      "default": "无法连接模型服务商，请检查连接后重试。"
+    },
+    "run_provider_error": {
+      "default": "模型服务商未能完成这次请求，请重试。"
+    },
+    "run_failed": {
+      "default": "任务未能完成，请查看错误详情或重试。"
+    },
     "governance_denied": {
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
@@ -5571,33 +5754,87 @@
       "template_limit": "审批模板数量已达到当前套餐上限。",
       "not_found": "此组织、工作区或模板不可用。"
     },
-    "web_auth_invalid_request": { "default": "登录请求无效，请重新连接。" },
-    "web_auth_forbidden": { "default": "服务器拒绝了这个登录来源。" },
-    "web_auth_state_unavailable": { "default": "这个登录请求已被使用，请重新连接。" },
-    "web_auth_exchange_rejected": { "default": "登录交接被拒绝或已过期，请重新连接。" },
-    "web_auth_session_expired": { "default": "登录会话已失效，请重新登录服务器。" },
-    "web_connection_account_conflict": { "default": "这个账号 ID 已属于另一个服务器，请使用独立账号。" },
-    "web_connection_app_invalid": { "default": "官方应用地址无效。" },
-    "web_connection_auth_unavailable": { "default": "服务器暂时无法验证登录，请重试。" },
-    "web_connection_cloud_selected": { "default": "请切换回云端账号。" },
-    "web_connection_disabled": { "default": "管理员已关闭官方网页连接。" },
-    "web_connection_download_failed": { "default": "无法读取服务器文件，请重试。" },
-    "web_connection_handoff_expired": { "default": "登录交接已过期，请重新连接。" },
-    "web_connection_handoff_rejected": { "default": "服务器拒绝了登录交接，请重新连接。" },
-    "web_connection_https_required": { "default": "连接服务器需要 HTTPS 地址。" },
-    "web_connection_method_refused": { "default": "服务器不允许这种请求方式。" },
-    "web_connection_origin_refused": { "default": "请求地址不属于当前服务器。" },
-    "web_connection_popup_blocked": { "default": "请允许登录弹窗后重试。" },
-    "web_connection_preflight_refused": { "default": "服务器拒绝了跨域请求，请检查应用版本。" },
-    "web_connection_probe_required": { "default": "请先重新检查服务器地址。" },
-    "web_connection_revoke_unconfirmed": { "default": "浏览器已清除凭据，但无法确认服务器撤销。请在该服务器的会话设置中检查。" },
-    "web_connection_route_refused": { "default": "当前连接不允许访问这个接口。" },
-    "web_connection_server_limit": { "default": "已保存 20 个服务器，请先断开一个。" },
-    "web_connection_session_changed": { "default": "服务器或账号已切换，请重试。" },
-    "web_connection_session_expired": { "default": "服务器登录已失效，请重新登录。" },
-    "web_connection_session_invalid": { "default": "服务器返回的账号信息无效，请重新连接。" },
-    "web_connection_session_unavailable": { "default": "无法读取服务器会话，请重试。" },
-    "web_connection_sign_in_required": { "default": "请先登录这个服务器。" },
+    "web_auth_invalid_request": {
+      "default": "登录请求无效，请重新连接。"
+    },
+    "web_auth_forbidden": {
+      "default": "服务器拒绝了这个登录来源。"
+    },
+    "web_auth_state_unavailable": {
+      "default": "这个登录请求已被使用，请重新连接。"
+    },
+    "web_auth_exchange_rejected": {
+      "default": "登录交接被拒绝或已过期，请重新连接。"
+    },
+    "web_auth_session_expired": {
+      "default": "登录会话已失效，请重新登录服务器。"
+    },
+    "web_connection_account_conflict": {
+      "default": "这个账号 ID 已属于另一个服务器，请使用独立账号。"
+    },
+    "web_connection_app_invalid": {
+      "default": "官方应用地址无效。"
+    },
+    "web_connection_auth_unavailable": {
+      "default": "服务器暂时无法验证登录，请重试。"
+    },
+    "web_connection_cloud_selected": {
+      "default": "请切换回云端账号。"
+    },
+    "web_connection_disabled": {
+      "default": "管理员已关闭官方网页连接。"
+    },
+    "web_connection_download_failed": {
+      "default": "无法读取服务器文件，请重试。"
+    },
+    "web_connection_handoff_expired": {
+      "default": "登录交接已过期，请重新连接。"
+    },
+    "web_connection_handoff_rejected": {
+      "default": "服务器拒绝了登录交接，请重新连接。"
+    },
+    "web_connection_https_required": {
+      "default": "连接服务器需要 HTTPS 地址。"
+    },
+    "web_connection_method_refused": {
+      "default": "服务器不允许这种请求方式。"
+    },
+    "web_connection_origin_refused": {
+      "default": "请求地址不属于当前服务器。"
+    },
+    "web_connection_popup_blocked": {
+      "default": "请允许登录弹窗后重试。"
+    },
+    "web_connection_preflight_refused": {
+      "default": "服务器拒绝了跨域请求，请检查应用版本。"
+    },
+    "web_connection_probe_required": {
+      "default": "请先重新检查服务器地址。"
+    },
+    "web_connection_revoke_unconfirmed": {
+      "default": "浏览器已清除凭据，但无法确认服务器撤销。请在该服务器的会话设置中检查。"
+    },
+    "web_connection_route_refused": {
+      "default": "当前连接不允许访问这个接口。"
+    },
+    "web_connection_server_limit": {
+      "default": "已保存 20 个服务器，请先断开一个。"
+    },
+    "web_connection_session_changed": {
+      "default": "服务器或账号已切换，请重试。"
+    },
+    "web_connection_session_expired": {
+      "default": "服务器登录已失效，请重新登录。"
+    },
+    "web_connection_session_invalid": {
+      "default": "服务器返回的账号信息无效，请重新连接。"
+    },
+    "web_connection_session_unavailable": {
+      "default": "无法读取服务器会话，请重试。"
+    },
+    "web_connection_sign_in_required": {
+      "default": "请先登录这个服务器。"
+    },
     "installer_failed": {
       "default": "Mikka 未能安装，请查看本机安装日志。",
       "node_required": "请安装 Node.js 22 或更新版本，然后重试。",

@@ -234,7 +234,7 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
  * and duration. Durations and counts only. Each model call logs its own line
  * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
  */
-export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; storeTimingOrigin?: 'startup_checkpoint' | 'inbox_checkpoint'; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { startup?: number; settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; storeTimingOrigin?: 'startup_checkpoint' | 'inbox_checkpoint'; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { startup?: number; settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number; profile?: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
   'use step'
   try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
@@ -343,7 +343,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubPromptContext } = await import('@/lib/coordinator/github-context')
   const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const contextMs = { execution: 0, personal: 0, github: 0 }
+  const contextMs = { execution: 0, personal: 0, github: 0, profile: 0 }
   const timed = async <T>(part: keyof typeof contextMs, work: () => Promise<T>): Promise<T> => {
     const started = Date.now()
     try { return await work() } finally { contextMs[part] = Math.max(0, Date.now() - started) }
@@ -353,10 +353,22 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
     timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
   ])
+  // What Mikka has learnt about the person (R-73). It reaches only the chat's own
+  // repositories' facts, so one project's habits never surface in another's
+  // conversation. A profile read that fails leaves the section out; it never
+  // fails the turn. The `memory` switch governs it exactly as it governs the
+  // person's own notes: with 记忆 off, conversationWithMemory already emptied
+  // `memory`, and nothing learnt is stated either.
+  const profile = memory ? await timed('profile', async () => {
+    const [{ profilePromptSection }, { usedRepositoriesForBot }] = await Promise.all([
+      import('@/lib/profile/store'), import('@/lib/coordinator/github-context'),
+    ])
+    return profilePromptSection(userId, await usedRepositoriesForBot(userId, botId))
+  }).catch(() => '') : ''
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
   // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
-  // Memory and live model availability remain in the later prompt parts.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
+  // The person's memory and what Mikka knows about them ride together just after it, then live model availability.
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
   return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
 }
 

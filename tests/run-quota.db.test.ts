@@ -14,6 +14,7 @@ import { emptyRunReport } from '@mikka/protocol/run'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
 import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
+import { seedRunProjectResources } from './helpers/run-project-resources'
 import { threadPromptView } from '../lib/thread-prompt'
 
 test('quota exhausted mid-run: continue on the person\'s key, else pause with the reset; resume and retry actions', { skip: !dbUrl }, async t => {
@@ -111,8 +112,8 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     return { connection, binding }
   }
   /** A run dispatched the ordinary way, then running on the device with a session, as a claim leaves it. */
-  const running = async (p: Person, harness: 'claude_code' | 'codex', model?: string) => {
-    const { runId } = await queueRun(p.id, { issueId: await task(p.id, p.workspaceId), agentId: p.agents[harness], repo: p.remote, model: model ?? (harness === 'claude_code' ? 'subscription-model' : 'gpt-fixture') }, p.botId)
+  const running = async (p: Person, harness: 'claude_code' | 'codex', model?: string, issueId?: string) => {
+    const { runId } = await queueRun(p.id, { issueId: issueId ?? await task(p.id, p.workspaceId), agentId: p.agents[harness], repo: p.remote, model: model ?? (harness === 'claude_code' ? 'subscription-model' : 'gpt-fixture') }, p.botId)
     await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"worktreePath"='/tmp/wt',"startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId, `session-${runId}`])
     return runId
   }
@@ -126,6 +127,61 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
   const failsWith = async (work: Promise<unknown>, code: string) => assert.rejects(work, (error: { code?: string }) => error.code === code)
   const resetsAt = new Date(Date.now() + 3 * 3_600_000).toISOString()
+
+  for (const mutation of ['repository', 'environment-revision', 'environment-archive', 'project-archive', 'branch'] as const)
+    for (const automatic of [true, false]) await t.test(`${automatic ? 'automatic quota completion' : 'manual quota retry'} refuses ${mutation} before a child or extra parent mutation`, async () => {
+      const p = await person(`quota-resource-${mutation}-${automatic}`)
+      await subscribe(p)
+      const issueId = await task(p.id, p.workspaceId)
+      const resources = await seedRunProjectResources(pool, { ownerId: p.id, workspaceId: p.workspaceId, issueId,
+        repositoryKey: normalizeRepository(p.remote).key, runtime: 'local', harness: 'claude_code' })
+      const runId = await running(p, 'claude_code', undefined, issueId)
+      const frozen = (await row(runId)).agentDefinition
+      assert.equal(frozen.projectExecution.environment.id, resources.environment!.id)
+      if (!automatic) await quotaEnd(p, runId, resetsAt)
+      else await addKey(p.id, 'anthropic', ['subscription-model'])
+      await resources.refuse(mutation)
+      const before = await row(runId), beforeEvents = await events(runId)
+      const expected = mutation === 'repository' || mutation === 'branch' ? 'projectRepositoryDenied'
+        : mutation === 'project-archive' ? 'projectArchived' : 'projectEnvironmentUnavailable'
+      if (automatic) {
+        await quotaEnd(p, runId, resetsAt)
+        const stopped = await row(runId)
+        assert.equal(stopped.status, 'paused'); assert.equal(stopped.stopReason, 'quota_exhausted')
+        assert.deepEqual(stopped.agentDefinition, frozen)
+        assert.equal(stopped.finishedAt, null); assert.equal(stopped.leaseExpiresAt, null)
+        const recorded = await events(runId)
+        assert.equal(recorded.length, 1); assert.equal(recorded[0].kind, 'run_blocked')
+        assert.equal(recorded[0].payload.reasonCode, expected)
+        await quotaEnd(p, runId, null)
+        assert.deepEqual(await row(runId), stopped, 'the legitimate completion is idempotent after refusal')
+        assert.deepEqual(await events(runId), recorded)
+      } else {
+        await failsWith(quota.retryQuotaPausedRun(p.id, runId), expected)
+        assert.deepEqual(await row(runId), before)
+        assert.deepEqual(await events(runId), beforeEvents)
+      }
+      assert.deepEqual(await continuations(runId), [])
+    })
+
+  for (const environment of [false, true]) await t.test(`legacy quota source cannot acquire ${environment ? 'a new Environment' : 'a changed branch'}`, async () => {
+    const p = await person(`quota-legacy-resource-${environment}`)
+    await subscribe(p)
+    const runId = await running(p, 'claude_code')
+    await quotaEnd(p, runId, resetsAt)
+    const legacy = await row(runId)
+    delete legacy.agentDefinition.projectExecution
+    const { workerDefinitionDigest } = await import('../lib/agent-kit/worker-digest')
+    legacy.agentDefinition.definitionDigest = workerDefinitionDigest(legacy.agentDefinition)
+    await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [runId, JSON.stringify(legacy.agentDefinition)])
+    const resources = await seedRunProjectResources(pool, { ownerId: p.id, workspaceId: p.workspaceId, issueId: legacy.issueId,
+      repositoryKey: normalizeRepository(p.remote).key, runtime: 'local', harness: 'claude_code', environment })
+    if (!environment) await resources.refuse('branch')
+    const before = await row(runId), history = await events(runId)
+    await failsWith(quota.retryQuotaPausedRun(p.id, runId), environment ? 'projectEnvironmentUnavailable' : 'projectRepositoryDenied')
+    assert.deepEqual(await row(runId), before); assert.deepEqual(await events(runId), history)
+    assert.deepEqual(await continuations(runId), [])
+  })
 
   await t.test('(a) setting on and a key: the run ends quota_exhausted and goes on frozen on the key, in its worktree and session', async () => {
     const p = await person('quota-switch')

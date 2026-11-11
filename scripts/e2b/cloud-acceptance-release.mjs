@@ -6,7 +6,7 @@ import { assertDevLocal } from '../dev-local/guard.mjs'
 // Match the local acceptance source plus the committed worker install inputs.
 // Ignore generated caches and dependencies, but include untracked runtime code.
 const sourcePaths = ['app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'patches',
-  'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'next.config.mjs', 'tsconfig.json']
+  'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json']
 
 /** Official instances install a fixed public source commit, then verify the
  * existing worker digest. This does not build or change an E2B template. */

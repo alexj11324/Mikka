@@ -63,9 +63,21 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.ok('id' in legacy)
     const assigned = await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent))
     assert.ok('id' in assigned, 'the pre-existing MCP agent assignment remains accepted')
-    assert.equal(assigned.assignee, 'Legacy fixture')
+    assert.equal(assigned.assignee, null)
+    assert.equal(assigned.delegate?.name, 'Legacy fixture')
     assert.ok('id' in await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: null }, actor), 'the pre-existing MCP agent field remains accepted')
-    assert.deepEqual(await createIssue(stranger, { title: 'Ambiguous', assigneeAgentId: null, assigneeUserId: stranger }, actor), { error: 'validationGeneric' })
+    const mixedContract = { title: 'Mixed API contracts', assigneeAgentId: null, assigneeUserId: stranger }
+    const legacyState = async () => ({
+      issues: (await pool.query('SELECT id,revision,content FROM issues WHERE "userId"=$1 ORDER BY id', [stranger])).rows,
+      versions: (await pool.query('SELECT id FROM issue_versions WHERE "userId"=$1 ORDER BY id', [stranger])).rows,
+      receipts: (await pool.query('SELECT "toolCallId" FROM issue_tool_calls WHERE "userId"=$1 ORDER BY "toolCallId"', [stranger])).rows,
+      number: (await pool.query('SELECT "lastIssueNumber" FROM "user" WHERE id=$1', [stranger])).rows,
+    })
+    const beforeInvalidContract = await legacyState()
+    // The legacy MCP path has no human-assignee field or durable call receipt.
+    // Its gate must run before attempting any multi-action mutation.
+    assert.deepEqual(await createIssue(stranger, mixedContract, actor), { error: 'issueToolsDisabled' })
+    assert.deepEqual(await legacyState(), beforeInvalidContract)
     assert.deepEqual(await createIssue(stranger, { title: 'Queued step after shutdown' }, actor, `disabled-${randomUUID()}`), { error: 'issueToolsDisabled' })
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM issue_tool_calls WHERE "userId"=$1', [stranger])).rows[0].n, 0, 'disabled rollout preserves legacy MCP behavior without a receipt dependency')
     for (let retry = 0; retry < 2; retry++) {
@@ -75,6 +87,10 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
       assert.equal(await count('issue_tool_calls'), 0)
     }
     overrideDeploymentSwitch('issueTools', true)
+    // The enabled, durable Coordinator path does validate its strict input;
+    // it rejects legacy MCP fields without writing a task, receipt or number.
+    assert.deepEqual(await createIssue(stranger, mixedContract, actor, `mixed-contract-${randomUUID()}`), { error: 'validationGeneric' })
+    assert.deepEqual(await legacyState(), beforeInvalidContract)
     // The actual registered Workflow tool invokes its scoped step and shared
     // actions. No test-only issue writer stands in for the Coordinator.
     const tools = createCoordinatorRegistry(owner, coordinator, undefined, { coordinator: true })

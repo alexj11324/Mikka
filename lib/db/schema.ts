@@ -22,6 +22,12 @@ export const userOnboarding = pgTable('user_onboarding', {
 
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
+  /** Who may invite members and change the task's visibility; see issueMemberRole. */
+  role: text('role').$type<'owner' | 'member'>().notNull().default('member'),
+  /** Whether this member hears about the task; false mutes it without leaving. */
+  subscribed: boolean('subscribed').notNull().default(true),
+  /** The account that added this member; null when no inviter was recorded. */
+  invitedBy: text('invitedBy'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.issueId, table.memberId] }), index('issue_members_member_idx').on(table.memberId, table.issueId)])
 export const issueDocuments = pgTable('issue_documents', {
@@ -30,6 +36,8 @@ export const issueDocuments = pgTable('issue_documents', {
 })
 
 export const issues = pgTable('issues', {
+  /** Immutable issued identity; legacy aliases and publication receipts remain separate. */
+  issuedIdentifier: text('issuedIdentifier'),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   /** Immutable tenant. NULL is reserved for quarantined historical records. */
   workspaceId: uuid('workspaceId'),
@@ -727,10 +735,18 @@ export interface UserFactEvidence { source: string; suggestionId?: string; exter
  * One fact in one person's profile (lib/profile), drawn from what reaches them
  * and merged nightly. Facts belong to the person, never to a workspace, and
  * only they see them in 记忆. A fact the person corrected (`userEdited`) is
- * never overwritten by the model. Same fact = same (userId, kind, subjectKey).
+ * never overwritten by the model. Same fact = same
+ * (userId, repository, kind, subjectKey).
  */
 export const userFacts = pgTable('user_facts', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /**
+   * The work context the fact is true of, as the folded `remoteKey` Mikka
+   * already scopes repository settings and secrets by (drizzle/20261111010000).
+   * Null is a fact about the person themselves, true wherever they are; a
+   * repository fact reaches only a chat whose workspace works in it.
+   */
+  repository: text('repository'),
   kind: text('kind').$type<UserFactKind>().notNull(),
   /** One line, e.g. 川菜, or Verizon 套餐. */
   subject: text('subject').notNull(),
@@ -747,7 +763,7 @@ export const userFacts = pgTable('user_facts', {
   userEdited: boolean('userEdited').notNull().default(false),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
+}, table => [unique('user_facts_repository_subject_key').on(table.userId, table.repository, table.kind, table.subjectKey).nullsNotDistinct(), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind), index('user_facts_repository_idx').on(table.userId, table.repository, table.state)])
 
 /** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person (lib/profile/store.ts). The 记忆 switch is userPreferences.memoryEnabled. */
 export const userFactConsolidations = pgTable('user_fact_consolidations', {
@@ -1350,3 +1366,100 @@ export const liveRevisions = pgTable('live_revisions', {
 export { projectDecisions, projectDecisionSources } from './project-map-schema.ts'
 
 export { factoryAgentProfiles, factoryAgentProfileVersions } from './agent-profile-schema.ts'
+
+/**
+ * Drive: a person's or a project's file tree, addressed by content
+ * (drizzle/20261111000100_drive_volume.sql, lib/drive/store.ts).
+ *
+ * `driveScope` is deliberately not `workspace`: workspace already means the
+ * tenant, and a volume's scope is a layer of Drive, not a tenant.
+ */
+export const DRIVE_SCOPES = ['user', 'project', 'project-user'] as const
+export type DriveScope = (typeof DRIVE_SCOPES)[number]
+
+export const driveVolumes = pgTable('drive_volumes', {
+  id: text('id').primaryKey(),
+  driveScope: text('driveScope').$type<DriveScope>().notNull(),
+  scopeId: text('scopeId').notNull(),
+  /** The person inside a `project-user` volume; null for every other scope. */
+  scopeUserId: text('scopeUserId'),
+  ownerId: text('ownerId').notNull(),
+  workspaceId: uuid('workspaceId'),
+  name: text('name').notNull(),
+  /** The two head pointers, moved together so a digest always names its version. */
+  headVersionId: text('headVersionId').notNull(),
+  headDigest: text('headDigest').notNull(),
+  entryCount: integer('entryCount').notNull().default(0),
+  totalBytes: bigint('totalBytes', { mode: 'number' }).notNull().default(0),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  uniqueIndex('drive_volumes_scope_name_key').on(table.driveScope, table.scopeId, sql`coalesce(${table.scopeUserId}, '')`, table.name),
+  index('drive_volumes_owner_idx').on(table.ownerId, table.updatedAt.desc()),
+  index('drive_volumes_scope_idx').on(table.driveScope, table.scopeId, table.updatedAt.desc()),
+])
+
+/** Content by digest, deduplicated within one owner and never across owners (lib/drive/blobs.ts). */
+export const driveBlobs = pgTable('drive_blobs', {
+  ownerId: text('ownerId').notNull(),
+  sha256: text('sha256').notNull(),
+  sizeBytes: integer('sizeBytes').notNull(),
+  /** Object key in the bucket, or the bytes themselves where none is configured. */
+  storageKey: text('storageKey'),
+  inlineContent: bytea('inlineContent'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.ownerId, table.sha256] }),
+  uniqueIndex('drive_blobs_storage_key').on(table.storageKey).where(sql`"storageKey" IS NOT NULL`),
+])
+
+/** The head tree, one row per path, for a manifest read that needs no jsonb decode. */
+export const driveVolumeEntries = pgTable('drive_volume_entries', {
+  volumeId: text('volumeId').notNull().references(() => driveVolumes.id, { onDelete: 'cascade' }),
+  /** Repeated from the volume, so a put can prove the blob is this owner's. */
+  ownerId: text('ownerId').notNull(),
+  path: text('path').notNull(),
+  /** 420 = 0o644, 493 = 0o755. */
+  mode: integer('mode').notNull(),
+  sizeBytes: integer('sizeBytes').notNull(),
+  sha256: text('sha256').notNull(),
+}, table => [
+  primaryKey({ columns: [table.volumeId, table.path] }),
+  index('drive_volume_entries_blob_idx').on(table.sha256),
+])
+
+/** An immutable version, with the `threadId` and `authorName` a history reads. */
+export const driveVolumeVersions = pgTable('drive_volume_versions', {
+  id: text('id').primaryKey(),
+  volumeId: text('volumeId').notNull().references(() => driveVolumes.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull(),
+  seq: integer('seq').notNull(),
+  kind: text('kind').$type<'autosave' | 'checkpoint' | 'restore'>().notNull(),
+  fileCount: integer('fileCount').notNull(),
+  totalBytes: bigint('totalBytes', { mode: 'number' }).notNull(),
+  digest: text('digest').notNull(),
+  manifest: jsonb('manifest').$type<import('../drive/contract').DriveManifestEntry[]>().notNull(),
+  threadId: text('threadId'),
+  threadTitle: text('threadTitle'),
+  authorName: text('authorName').notNull(),
+  restoredFromVersionId: text('restoredFromVersionId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  uniqueIndex('drive_volume_versions_seq_key').on(table.volumeId, table.seq),
+  index('drive_volume_versions_volume_created_idx').on(table.volumeId, table.createdAt.desc(), table.id.desc()),
+  index('drive_volume_versions_owner_idx').on(table.ownerId, table.createdAt.desc()),
+])
+
+/** One receipt per applied mutation, so a retry lands once (lib/drive/store.ts). */
+export const driveMutations = pgTable('drive_mutations', {
+  volumeId: text('volumeId').notNull().references(() => driveVolumes.id, { onDelete: 'cascade' }),
+  mutationId: text('mutationId').notNull(),
+  requestDigest: text('requestDigest').notNull(),
+  versionId: text('versionId').notNull(),
+  expectedDigest: text('expectedDigest'),
+  resultDigest: text('resultDigest').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.volumeId, table.mutationId] }),
+  index('drive_mutations_version_idx').on(table.versionId),
+])
