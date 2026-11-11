@@ -25,8 +25,7 @@ import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useIssueScope } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
 import { useIssueThreads, type useAgentActivity } from './issue-threads'
-import { newestThreadRun } from './task-state-icon'
-import { localTaskState } from '@/hooks/use-bot-tasks'
+import { useSelectedTaskPresentation } from '@/hooks/use-selected-task-presentation'
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
@@ -120,6 +119,7 @@ export function FramedTask(props: FramedTaskProps) {
   const [teamChoice, setTeamChoice] = useState<ExplicitTeamChoice | null>(null)
   const scope = useIssueScope({ task, disabled: locked, onSaved: adopt, teamChoice })
   const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked, onChosen: (issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null) })
+  const presentation = useSelectedTaskPresentation(userId, task.workspaceId, preview ? undefined : task.id)
   const { data: threads } = useIssueThreads(task.id, !preview)
   const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
 
@@ -155,7 +155,18 @@ export function FramedTask(props: FramedTaskProps) {
   ]
 
   const rows: TaskDetailRow[] = [
-    { id: 'status', label: tIssue('statusLabel'), disabled: locked, value: { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } }, state: localTaskState({ status: props.status, metadata: meta }, newestThreadRun(threads)), menu: ISSUE_STATUSES.map(item => ({ id: item.value, label: statusLabel(item.value), mark: { kind: 'status', value: item.value }, checked: item.value === props.status, onSelect: () => props.onStatus(item.value) })) },
+    {
+      id: 'status', label: tIssue('statusLabel'), disabled: locked,
+      value: { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } },
+      state: presentation.data ?? undefined,
+      menu: [
+        ...presentation.error ? [{ id: 'reload', label: tAssignee('reload'), onSelect: presentation.retry }] : [],
+        ...ISSUE_STATUSES.map(item => ({
+          id: item.value, label: statusLabel(item.value), mark: { kind: 'status' as const, value: item.value },
+          checked: item.value === props.status, onSelect: () => props.onStatus(item.value),
+        })),
+      ],
+    },
     { id: 'priority', label: tIssue('priorityLabel'), disabled: locked, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
     { id: 'scope', label: scope.judgedByAgent.label, disabled: locked || scope.pending, value: { text: scope.current, mark: { kind: 'icon', icon: task.scope === 'workspace' ? 'workspace' : 'personal' } }, note: scope.judgedByAgent.shown ? scope.judgedByAgent.text : undefined, menu: scope.options.map(option => ({ id: option.value, label: option.label, mark: { kind: 'icon', icon: option.value === 'workspace' ? 'workspace' : 'personal' }, checked: option.value === task.scope, onSelect: () => { void scope.change(option.value) } })) },
     { id: 'assignee', label: tProperty('assignee'), disabled: busy, onOpen: loadOptions, value: member ? { text: member.name, mark: { kind: 'person', name: member.name }, aria: tAssignee('aria', { name: member.name }) } : { text: tAssignee('unassignedLabel'), mark: { kind: 'icon', icon: 'person' }, muted: true, aria: tAssignee('aria', { name: tAssignee('unassigned') }) }, menu: assigneeItems },
@@ -246,6 +257,7 @@ export function FramedTask(props: FramedTaskProps) {
     taskId={preview ? undefined : task.id}
     attachments={preview ? undefined : trigger => <TaskAttachments key={task.id} taskId={task.id} trigger={trigger} />}
     workspaceId={preview ? undefined : task.workspaceId}
+    factoryTaskId={presentation.data?.factoryTaskId}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}
@@ -269,7 +281,7 @@ export function FramedTask(props: FramedTaskProps) {
       drafts, subscribed: menu.subscribed, onSubscribe: menu.toggleSubscribed, subscribeLabel: menu.subscribed ? tFrame('unsubscribe') : tFrame('subscribe'),
     }}
     rows={rows}
-    rowsError={metadata.error || team.failed}
+    rowsError={metadata.error || team.failed || (presentation.error ? actionError() : '')}
     meta={[task.identifier, tFrame('created', { when: format.relativeTime(created, now) })].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
     dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
