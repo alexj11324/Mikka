@@ -39,6 +39,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
       # A literal install step keeps this job auditable under the credential
       # boundary in tests/mvp/pinned-pnpm.test.mjs, which requires exactly one
       # `pnpm install --frozen-lockfile` carrying the read-only token. setup-node's
@@ -88,6 +94,12 @@ jobs:
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
       - name: Install dependencies
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -207,6 +219,12 @@ jobs:
           name: desktop-icon
           path: ${{ runner.temp }}/icon
           retention-days: 7
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
       - name: Install dependencies
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
