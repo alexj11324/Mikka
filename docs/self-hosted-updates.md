@@ -82,7 +82,7 @@ The new app runs its existing migration ledger and session-level advisory
 lock at startup. The updater never rolls the database backward. If an upgrade
 with possible DDL fails, it retains the snapshots and reports that **manual
 recovery is required**. For migration-free failed upgrades it attempts to
-restart the previous image, retaining the same volumes. An application
+restart the previous image, retaining the same volumes. If a migration may have run or previous-image recovery fails, the trusted drain hook stays **enabled** until an administrator has repaired the installation and explicitly reopens traffic. An application
 rollback is **not** a database rollback. Do not delete backup directories
 until the installation has been checked and a separate restore is proven.
 
@@ -114,7 +114,7 @@ For policy `auto`, configure **both** executable hooks below:
 
 The controller calls these hooks again **on each upgrade**, before it stops
 the existing app. It never interrupts a running task merely because a new
-release was published. Even with hooks, migrations are not unattended.
+release was published. Even with hooks, migrations are not unattended. Unattended delivery requires one prior successful manual stable upgrade to establish a trusted baseline; older or replayed releases are refused. Host backups require at least 512 MiB free space before starting, and the real backup size may require substantially more.
 
 ```sh
 # Generate and store a private 32+ byte random webhook secret outside the repo.
