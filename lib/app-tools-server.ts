@@ -13,6 +13,7 @@ import { proposeAppToolCall } from '@/lib/pending-action-store'
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { composioToolkitLister, isNoAuthToolkit } from '@/lib/plugins/catalog'
 import { MAX_RUN_APP_TOOLS, runAppTool, type RunAppScope } from '@/lib/run-app-mcp'
+import type { NativeWriteReview } from './operations/native-write-review'
 
 type Client = NonNullable<ReturnType<typeof getComposio>>
 
@@ -55,11 +56,11 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
   }
 }
 
-export async function runAppTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown) {
+export async function runAppTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, review?: NativeWriteReview) {
   const client = getComposio()
   if (!client) return { error: 'composioNotConfigured' }
   const deps = appToolDeps(userId, botId, client)
-  return operation === 'list' ? listAppTools(deps, input) : callAppTool(deps, input)
+  return operation === 'list' ? listAppTools(deps, input) : callAppTool(deps, input, review ? { ownerId: userId, botId, review } : undefined)
 }
 
 /** The apps a device run may reach (one MCP entry each): connected by the owner, not one of Mikka's own integrations, and allowed for the Bot. */
