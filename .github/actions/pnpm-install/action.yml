@@ -50,20 +50,37 @@ runs:
         key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
           pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-
+    # Exactly one literal install step. The credential boundary in
+    # tests/mvp/pinned-pnpm.test.mjs requires that the step carrying
+    # FFMPEG_GITHUB_TOKEN be an auditable `pnpm install --frozen-lockfile`, and
+    # that there be exactly one of them, so the desktop profile is selected
+    # through pnpm's own workspace filter rather than a second command:
+    # NPM_CONFIG_FILTER scopes the same root install to the 6 of 7 workspaces
+    # that exclude the independent mobile app (verified: `Scope: 6 of 7`).
+    # Profile and Electron settings reach the install through the job
+    # environment: the credential boundary keeps the install step's own env to
+    # the single FFMPEG_GITHUB_TOKEN key, so they cannot ride on that step.
+    - name: Apply the dependency installation profile
+      id: profile
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        INSTALL_PROFILE: ${{ inputs.profile }}
+        SKIP_ELECTRON: ${{ inputs.skip-electron }}
+      run: |
+        case "$INSTALL_PROFILE" in
+          full) echo 'NPM_CONFIG_FILTER=' >> "$GITHUB_ENV" ;;
+          desktop) echo 'NPM_CONFIG_FILTER=!@mikka/mobile' >> "$GITHUB_ENV" ;;
+          *) echo '::error::Unknown dependency installation profile'; exit 1 ;;
+        esac
+        if [ "$SKIP_ELECTRON" = 'true' ]; then echo 'ELECTRON_SKIP_BINARY_DOWNLOAD=1' >> "$GITHUB_ENV"; fi
     - name: Install dependencies on a cache miss
       id: install
       if: steps.modules.outputs.cache-hit != 'true'
       shell: bash
       env:
-        INSTALL_PROFILE: ${{ inputs.profile }}
-        ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || env.ELECTRON_SKIP_BINARY_DOWNLOAD || '' }}
         FFMPEG_GITHUB_TOKEN: ${{ inputs.ffmpeg-github-token }}
-      run: |
-        case "$INSTALL_PROFILE" in
-          full) pnpm install --frozen-lockfile ;;
-          desktop) pnpm --filter '!@mikka/mobile' install --frozen-lockfile ;;
-          *) echo '::error::Unknown dependency installation profile'; exit 1 ;;
-        esac
+      run: pnpm install --frozen-lockfile
     # Save immediately after installation, before tests/builds/credentials can
     # mutate node_modules. No fuzzy module restore and no PR cache writers.
     - name: Save exact installed dependencies (main only)
