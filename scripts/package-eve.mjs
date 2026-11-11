@@ -1,5 +1,5 @@
-import { cp, lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'node:path'
+import { cp, lstat, mkdir, readFile, readdir, realpath, stat, symlink, writeFile } from 'node:fs/promises'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const publicPrefix = '/mikka/api/agents'
@@ -51,22 +51,29 @@ export async function packageEve({ root = process.cwd(), preset = process.env.NI
     if (eve.version !== 3 || config.version !== 3 || !Array.isArray(config.routes)) throw new Error('EVE_VERCEL_OUTPUT_INVALID')
     if (config.routes.some(route => route.dest?.startsWith(`/${functionPrefix}/`))) throw new Error('EVE_VERCEL_OUTPUT_ALREADY_PACKAGED')
     resourceRoot = join(output, app.functions[0].path)
-    const functions = []
+    const functions = [], aliases = []
+    const sourceFunctions = join(source, 'functions')
+    const sourceFunctionsReal = await realpath(sourceFunctions)
     const visit = async directory => {
       for (const item of await readdir(directory, { withFileTypes: true })) {
         const path = join(directory, item.name)
         if (item.name.endsWith('.func')) {
-          if (!(await lstat(path)).isDirectory()) throw new Error('EVE_FUNCTION_DIRECTORY_INVALID')
-          functions.push(path)
+          const entry = await lstat(path)
+          if (entry.isSymbolicLink()) {
+            const target = await realpath(path), location = relative(sourceFunctionsReal, target)
+            if (isAbsolute(location) || location === '..' || location.startsWith('../') || !(await stat(target)).isDirectory()) throw new Error('EVE_FUNCTION_ALIAS_INVALID')
+            aliases.push({ path, target })
+          } else if (entry.isDirectory()) functions.push(path)
+          else throw new Error('EVE_FUNCTION_DIRECTORY_INVALID')
         } else if (item.isDirectory()) await visit(path)
       }
     }
-    const sourceFunctions = join(source, 'functions')
     await visit(sourceFunctions)
+    const targets = new Map()
     for (const path of functions) {
       const target = join(output, 'functions', functionPrefix, relative(sourceFunctions, path))
       await mkdir(dirname(target), { recursive: true })
-      await cp(path, target, { recursive: true })
+      await cp(path, target, { recursive: true, verbatimSymlinks: true })
       const functionConfigPath = join(target, '.vc-config.json')
       const functionConfig = JSON.parse(await readFile(functionConfigPath, 'utf8'))
       if (functionConfig.runtime !== 'nodejs24.x') throw new Error('EVE_FUNCTION_RUNTIME_INVALID')
@@ -80,6 +87,18 @@ export async function packageEve({ root = process.cwd(), preset = process.env.NI
         await cp(join(resourceRoot, resource.path), destination)
       }
       app.functions.push({ path: relative(output, target), ...contract })
+      targets.set(await realpath(path), { path: target, contract })
+    }
+    // Nitro aliases HTTP routes to shared function directories. Wrap each real
+    // target once, then retain aliases within the namespaced output; traversing
+    // an alias while wrapping would make the entry import itself.
+    for (const alias of aliases) {
+      const destination = targets.get(alias.target)
+      if (!destination) throw new Error('EVE_FUNCTION_ALIAS_INVALID')
+      const target = join(output, 'functions', functionPrefix, relative(sourceFunctions, alias.path))
+      await mkdir(dirname(target), { recursive: true })
+      await symlink(relative(dirname(target), destination.path), target, 'dir')
+      app.functions.push({ path: relative(output, target), ...destination.contract })
     }
     config.routes.unshift(...eveVercelRoutes())
     // Queue routes are invoked by the preserved trigger, not by the app's
