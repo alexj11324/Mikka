@@ -85,3 +85,6 @@ next-env.d.ts
 
 # Temporary standalone typecheck inputs and compiler artifacts.
 /.cache/typecheck/
+
+# Native Eve session data for the default self-hosted service.
+/.cache/eve-workflow/
