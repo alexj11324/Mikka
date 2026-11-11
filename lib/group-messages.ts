@@ -168,3 +168,9 @@ export async function leaveGroupConversation(id: string, userId: string, fetcher
   } catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
   if (!response.ok) throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable', response.status)
 }
+
+/** SWR can pass either an array key or an encoded infinite-page key. Revoke both, not just the visible list. */
+export function revokedGroupCacheKey(key: unknown, id: string): boolean {
+  if (Array.isArray(key)) return (key[0] === 'group-members' || key[0] === 'group-messages') && key[1] === id
+  return typeof key === 'string' && key.includes(id) && (key.includes('group-members') || key.includes('group-messages'))
+}

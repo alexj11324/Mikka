@@ -72,6 +72,7 @@ import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
 import { GroupChatView, type GroupChatRequest } from './group-chat-view'
+import { revokedGroupCacheKey } from '@/lib/group-messages'
 import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { InlineLoadError } from '@/components/load-error'
 import { PluginsPage as DefaultPluginsPage } from '@/components/plugins/plugins-view'
@@ -535,7 +536,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const { entries: chatNav, reloadGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id, threads, issues: tasks })
   const onGroupLeft = async (id: string) => {
     // Clear member-only transcript pages before moving; browser Back must not flash revoked history.
-    await clearCache(key => typeof key === 'string' && key.includes(id) && (key.includes('group-messages') || key.includes('group-members')), undefined, { revalidate: false })
+    await clearCache(key => revokedGroupCacheKey(key, id), undefined, { revalidate: false })
     setPanelSheet(false)
     void reloadGroups().catch(() => {})
     openChat({ kind: 'coordinator' })

@@ -120,3 +120,11 @@ test('member departure is available only to the non-owner and writes their own I
     )
   }
 })
+
+test('revocation clears group list, transcript and infinite-page caches without touching another group', () => {
+  assert.equal(group.revokedGroupCacheKey(['group-members', ID], ID), true)
+  assert.equal(group.revokedGroupCacheKey(['group-messages', ID, null], ID), true)
+  assert.equal(group.revokedGroupCacheKey('$inf$@"group-messages","' + ID + '",null', ID), true)
+  assert.equal(group.revokedGroupCacheKey(['group-members', 'another-group'], ID), false)
+  assert.equal(group.revokedGroupCacheKey(['workspace', ID], ID), false)
+})
