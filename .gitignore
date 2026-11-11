@@ -77,3 +77,8 @@ next-env.d.ts
 
 # Nx Core local graph/task state
 .nx/
+
+# eve compiler, durable local storage and standalone service output.
+/apps/eve/.eve/
+/apps/eve/.output/
+/apps/eve/.vercel/
