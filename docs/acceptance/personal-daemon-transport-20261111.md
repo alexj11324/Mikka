@@ -4,8 +4,9 @@
 
 ## 版本与环境
 
-- 最终复跑源码：`e5714cf61abb46c619655f511fd15a530d4804f7`；其后仅更新验收文档。
-- 隐私依赖：`ce3f6bbc76d797db8bfda20ec45af87a13b589e3`；main 基线：`5c1e0522483d504f64de07066bcd35f603c44248`，实际执行当前全部 321 项生产迁移。
+- 27 项 HTTP 验收源码：`e5714cf61abb46c619655f511fd15a530d4804f7`；当时隐私依赖 `ce3f6bbc76d797db8bfda20ec45af87a13b589e3`。
+- 最新父分支集成：`8520e5abb7ce9ab54ec4765f4288832b33971792`，合入隐私 `bdd4918dcda2664f330ae9442031dcde9b234169`；变动及最小复验见下文。
+- main 验收基线：`5c1e0522483d504f64de07066bcd35f603c44248`，实际执行当时全部 321 项生产迁移。
 - 云端 Linux，Node 24.19.0、PostgreSQL 17.11，本任务的 loopback 服务端口为 55432。
 - 每个场景创建、迁移并清理自己的随机 `*_e2e` 数据库、Git 仓库及工作树。APP 与 Workspace 两个连接目标指向该场景的同一个隔离库；这不是分库部署验收。
 - 阶段一仅部署兼容两种 SQL 默认值的生产登记接口；本验收只执行当前 `drizzle/` 迁移，没有应用 `tests/fixtures/task-acl-private-default.sql`。事务内在登记前读取真实策略，确认当前 SQL 仍将原始 Task 根注册为 shared；随后两种 Workspace 都调用正式登记接口，个人变为 private，Team 保持 shared。
@@ -55,7 +56,14 @@ node --experimental-test-module-mocks --import ./scripts/server-test.mjs \
 | 日志 | SHA-256 |
 | --- | --- |
 | `personal-daemon-phase1-main321-27.log` | `3d77cb25bd4afa593d2ee726f2c9022c65fc198e5308cc9c20182a48dea2dbb0` |
+| `personal-daemon-parent-close5.log` | `a617281e10a34fe80048a7ae4dd7f57fcb29ef26772e593577478085413706f9` |
 | `personal-daemon-team-registration-red.log` | `2fa440578cc0085e48250b49a0b1d3925b9fdb4841b407e77480bb6759b70fe8` |
+
+## 父分支观测修正与证据复用
+
+最新父分支只增加 dispatch 测试的真实 Client end 事件观测与验收说明。相对已测 `e5714cf61`，生产 `lib/`、`app/`、`packages/`、生产迁移、package 及本套 HTTP 夹具字节全部相同，因此复用上面的 27 项绑定证据，没有宣称新头重跑了 27 项。
+
+在集成源码 `8520e5abb` 上，使用现有 main5c-cloud 隔离 PostgreSQL 环境最小复验受影响的 dispatch 文件，**5/5、零跳过**；根类型检查、相关 lint、政策及 DB runner **26/26** 再次通过。新夹具在原 zero-session 断言前等待其临时数据库的真实连接 end 事件，没有 sleep、轮询或强制终止 backend；本 PR 自己的 226 条原共享断言没有变化。之后只更新本文档。
 
 ## 未验证的执行层
 
