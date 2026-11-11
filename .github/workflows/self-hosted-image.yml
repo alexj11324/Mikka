@@ -37,6 +37,8 @@ jobs:
           node-version: 24
       - name: Verify disposable acceptance target guards and model fixture
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
+      - name: Verify stable release webhook and safe self-hosted update policy
+        run: node --test scripts/self-hosted-update.test.mjs
       - name: Build the public standalone application
         run: |
           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
@@ -177,3 +179,45 @@ jobs:
       - name: Stop disposable services
         if: always()
         run: docker compose down --volumes --remove-orphans
+
+  stable-release:
+    name: Publish tested self-hosted stable release
+    needs: image
+    if: ${{ github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Publish stable release only after the tested image exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "SELF_HOSTED_UPDATE_RELEASE_NOT_STABLE"
+            exit 1
+          fi
+          git fetch origin main --no-tags
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "SELF_HOSTED_UPDATE_RELEASE_NOT_ON_MAIN"
+            exit 1
+          fi
+          fingerprint="$(node scripts/self-hosted-update-policy.mjs migrations-hash)"
+          marker="<!-- mikka-self-hosted-release-v1 sha=$GITHUB_SHA migrations=$fingerprint protocol=0-1 -->"
+          printf '%s\n\n%s\n' "$marker" "Image: ghcr.io/alexj11324/mikka:$GITHUB_REF_NAME. This release passed the self-hosted image acceptance suite; operators must follow the database migration and backup policy in docs/self-hosted-updates.md." > "$RUNNER_TEMP/self-hosted-release-notes.md"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            actual="$(gh release view "$GITHUB_REF_NAME" --json body --jq '.body')"
+            if ! grep -Fq "$marker" <<< "$actual"; then
+              echo "SELF_HOSTED_UPDATE_RELEASE_ALREADY_PUBLISHED_DIFFERENT"
+              exit 1
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Mikka self-hosted $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/self-hosted-release-notes.md"
+          fi
