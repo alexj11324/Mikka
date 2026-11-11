@@ -16,6 +16,11 @@ const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a
 const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
 /** Route families are enumerated; there is deliberately no generic /api/* forwarding. */
 const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
+  [/^\/api\/agents\/eve\/v1\/session$/, ['POST']],
+  [new RegExp(`^/api/agents/eve/v1/session/${ID}$`), ['GET', 'POST']],
+  [new RegExp(`^/api/agents/eve/v1/session/${ID}/(?:cancel|compact|clear|end|reset)$`), ['POST']],
+  [new RegExp(`^/api/agents/eve/v1/session/${ID}/(?:stream|stubs|descendants/stream)$`), ['GET']],
+  [new RegExp(`^/api/agents/eve/v1/session/${ID}/subagents/${ID}/${ID}/stream$`), ['GET']],
   [/^\/api\/desktop\/config$/, ['GET']], [/^\/api\/desktop\/rpc$/, ['POST']],
   [/^\/api\/version$/, ['GET']], [/^\/api\/auth\/device$/, ['GET']],
   [/^\/api\/auth\/device\/(approve|deny)$/, ['POST']],

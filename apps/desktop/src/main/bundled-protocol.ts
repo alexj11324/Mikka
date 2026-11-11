@@ -9,10 +9,10 @@ const TYPES: Record<string, string> = {
   '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.gif': 'image/gif', '.ico': 'image/x-icon',
   '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.webm': 'video/webm',
 }
-const REQUEST_HEADERS = new Set(['accept', 'content-type', 'range', 'if-none-match', 'if-modified-since', 'x-mikka-stream-key'])
+const REQUEST_HEADERS = new Set(['accept', 'content-type', 'range', 'if-none-match', 'if-modified-since', 'x-mikka-stream-key', 'x-mikka-submission-id'])
 // Approval reads use these public headers to bind the result to the current
 // viewer and conservatively anchor expiry. Session/cache credentials stay private.
-const RESPONSE_HEADERS = new Set(['content-type', 'content-disposition', 'content-range', 'accept-ranges', 'etag', 'last-modified', 'x-mikka-stream-key', 'x-mikka-viewer', 'x-mikka-observed-at', 'retry-after'])
+const RESPONSE_HEADERS = new Set(['content-type', 'content-disposition', 'content-range', 'accept-ranges', 'etag', 'last-modified', 'x-mikka-stream-key', 'x-mikka-viewer', 'x-mikka-observed-at', 'retry-after', 'x-eve-session-id', 'x-eve-stream-format', 'x-eve-stream-version', 'x-eve-stream-tail-index', 'x-eve-observation-key'])
 const MAX_UPLOAD = 32 * 1024 * 1024
 
 function localHeaders(type?: string): Headers {
@@ -78,7 +78,7 @@ export function bundledProtocol(root: string, auth: Pick<BundledAuth, 'request'>
           output.set('content-security-policy', "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob: https:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors mikka://app")
         }
         let stream = response.body
-        if (stream && auth.scope && response.headers.get('content-type')?.includes('text/event-stream')) {
+        if (stream && auth.scope && (response.headers.get('content-type')?.includes('text/event-stream') || response.headers.get('content-type')?.includes('application/x-ndjson'))) {
           const scope = auth.scope()
           const reader = stream.getReader()
           stream = new ReadableStream({
