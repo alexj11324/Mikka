@@ -100,7 +100,6 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
     },
   } })
   const registration = (workflowId: string) => Object.assign(async () => { throw new Error('This fixture must not execute another Workflow') }, { workflowId })
-  mock.module(new URL('../../workflows/coordinator/workflow.ts', import.meta.url).href, { cache: true, namedExports: { coordinatorTurn: registration(names.coordinator) } })
   mock.module(new URL('../../workflows/due-timer/workflow.ts', import.meta.url).href, { cache: true, namedExports: { dueTimer: registration(names.recovery) } })
   mock.module(new URL('../../workflows/factory-stage/workflow.ts', import.meta.url).href, { cache: true, namedExports: { factoryCloudStageHandoff: registration(names.factory) } })
   mock.module(new URL('../../workflows/thread-machine/workflow.ts', import.meta.url).href, { cache: true, namedExports: { threadMachineLifecycle: registration(names.thread) } })
@@ -392,22 +391,11 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
     assert.equal((await native(readA, options)).status, 401)
   })
 
-  await t.test('Coordinator runtime registration and its current durable Bot lease bind user and Workspace', async () => {
+  await t.test('retired Coordinator leases no longer grant execution authority', async () => {
     const holder = 'wrun_' + randomUUID()
     await control.query(`INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil") VALUES($1,$2,$3,now()+interval '1 minute')
       ON CONFLICT("userId","botId") DO UPDATE SET "leaseHolder"=excluded."leaseHolder","leaseUntil"=excluded."leaseUntil"`, [userId, alphaBot, holder])
-    const invoke = <T>(work: () => Promise<T>, run = holder, name = names.coordinator) => step(name, run, () => actAs(userId, work))
-    assert.equal((await invoke(readA)).task.id, a.task.id)
-    await assert.rejects(invoke(readB), denied)
-    await assert.rejects(invoke(readA, 'wrun_other'), denied)
-    await assert.rejects(invoke(readA, holder, names.coordinator + '/lookalike'), denied)
-    await assert.rejects(step(names.coordinator, holder, () => actAs({ id: userId, [enterprisePrincipal]: { kind: 'session', sessionId: plain.id } }, readA)), denied)
-    await control.query('UPDATE coordinator_sessions SET "leaseUntil"=now()-interval \'1 second\' WHERE "userId"=$1 AND "botId"=$2', [userId, alphaBot])
-    await assert.rejects(invoke(readA), denied)
-    await control.query('UPDATE coordinator_sessions SET "leaseUntil"=now()+interval \'1 minute\' WHERE "userId"=$1 AND "botId"=$2', [userId, alphaBot])
-    await control.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [alpha, userId])
-    try { await assert.rejects(invoke(readA), denied) }
-    finally { await control.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [alpha, userId]) }
+    await assert.rejects(step(names.coordinator, holder, () => actAs(userId, readA)), denied)
   })
 
   await t.test('cron credentials are rechecked and callback authority expires instead of becoming ambient user privilege', async () => {

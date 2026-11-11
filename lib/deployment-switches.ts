@@ -67,6 +67,14 @@ export const DEPLOYMENT_SWITCHES = {
   factoryLifecycle: { flag: 'mikka-factory-lifecycle-off', kind: 'kill', legacy: exact('MIKKA_FACTORY_LIFECYCLE_ENABLED'), fallback: true },
   /** The personal mailbox tools. */
   personalMailbox: { flag: 'mikka-personal-mailbox-off', kind: 'kill', fallback: true },
+  /** Skills on demand: the Coordinator's prompt lists a skill's name and
+   * description and reads its body only when the model calls
+   * `read_personal_skill` (ALE-75). A kill flag because the failure it guards
+   * against is silent: a model that never calls the tool looks exactly like a
+   * chat with no skills, so turning this off must be one flag away, not a
+   * deploy. Off means the pre-ALE-75 behaviour, bodies inline under ALE-72's
+   * budget. */
+  personalSkillOnDemand: { flag: 'mikka-personal-skill-on-demand-off', kind: 'kill', fallback: true },
   /** Writes to the person's connected apps. */
   personalWrites: { flag: 'mikka-personal-writes-off', kind: 'kill', fallback: true },
   /** Model-judged Skill evaluations; spends model calls. */
@@ -99,7 +107,7 @@ export type DeploymentSwitch = keyof typeof DEPLOYMENT_SWITCHES
  * The cloud deployment keeps its existing remote/legacy rollout behavior. */
 export const PRODUCTION_SWITCH_DEFAULTS: Readonly<Record<DeploymentSwitch, boolean>> = {
   credentialVault: true, agentKit: true, agentKitLiveEval: false, cloudComputerTasks: true,
-  issueTools: true, factoryRouting: true, factoryLifecycle: true, personalMailbox: true, personalWrites: true,
+  issueTools: true, factoryRouting: true, factoryLifecycle: true, personalMailbox: true, personalWrites: true, personalSkillOnDemand: true,
   skillModelEvaluation: false, proactiveProfile: false, groupContribution: true,
   byos: true, byosClaudeOAuth: true, byosCodexOAuth: true, byosEnrollment: true,
   factoryVercelPublication: false, factoryVercelProduction: false, deviceUnitFence: true, dbEgressSample: true,

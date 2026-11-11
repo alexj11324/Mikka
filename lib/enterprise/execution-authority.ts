@@ -9,6 +9,7 @@ type Query = Pick<PoolClient, 'query'>
 type Runtime = { workflowRunId: string; workflowName: string; stepId: string }
 type Authority =
   | { source: 'cron'; secret: string }
+  | { source: 'eve'; authorization: string; sessionId: string; turnId: string; executionId?: string | null }
   | { source: 'recovery'; runtime: Runtime }
   | { source: 'thread'; runtime: Runtime; userId: string; workspaceId: string; runId: string }
 type HeldAuthority = Authority & { active: boolean; expiresAt: number }
@@ -28,10 +29,8 @@ async function workflowRuntime(): Promise<Runtime | undefined> {
     return undefined
   }
 }
-async function registeredRuntime(runtime: Runtime, kind: 'coordinator' | 'recovery' | 'thread'): Promise<boolean> {
-  const workflows = kind === 'coordinator'
-    ? [(await import('@/workflows/coordinator/workflow')).coordinatorTurn]
-    : kind === 'recovery' ? [(await import('@/workflows/due-timer/workflow')).dueTimer]
+async function registeredRuntime(runtime: Runtime, kind: 'recovery' | 'thread'): Promise<boolean> {
+  const workflows = kind === 'recovery' ? [(await import('@/workflows/due-timer/workflow')).dueTimer]
       : [(await import('@/workflows/factory-stage/workflow')).factoryCloudStageHandoff,
         (await import('@/workflows/thread-machine/workflow')).threadMachineLifecycle]
   // workflowId is the SDK's public generated start metadata, also checked by
@@ -51,6 +50,18 @@ async function runWithAuthority<T>(value: Authority, work: () => Promise<T>): Pr
   const held = { ...value, active: true, expiresAt: Date.now() + MAX_AUTHORITY_MS } as HeldAuthority
   try { return await authority.run(held, work) }
   finally { held.active = false }
+}
+
+/** Only the internal product gateway supplies this signed service credential.
+ * Session/turn labels alone never construct Enterprise execution authority. */
+export async function withEveProductAuthority<T>(
+  authorization: string | null,
+  input: { sessionId: string; turnId: string; executionId?: string | null },
+  work: () => Promise<T>,
+): Promise<T> {
+  const { internalEveScope } = await import('@/lib/eve/auth')
+  if (!authorization || !internalEveScope(authorization)) throw new WorkspaceError('workspaceAccessDenied')
+  return runWithAuthority({ source: 'eve', authorization, ...input }, work)
 }
 
 /** Only the two authenticated recovery routes call this. Recheck the actual
@@ -109,6 +120,19 @@ export async function currentExecutionAuthority(userId: string, workspaceId: str
   if (held) {
     if (!held.active || held.expiresAt <= Date.now()) return false
     if (held.source === 'cron') return held.secret === process.env.CRON_SECRET
+    if (held.source === 'eve') {
+      const [{ internalEveScope }, { agentKitEnabled }] = await Promise.all([import('@/lib/eve/auth'), import('@/lib/agent-kit/config')])
+      const scope = internalEveScope(held.authorization)
+      if (!scope || scope.ownerId !== userId || scope.workspaceId !== workspaceId) return false
+      if (!held.executionId && agentKitEnabled()) return false
+      const { rows } = await query.query(`SELECT 1 FROM eve_sessions s
+        JOIN bots b ON b.id=s.bot_id AND b."ownerId"=s.owner_id AND b."workspaceId"=s.workspace_id AND b."archivedAt" IS NULL
+        WHERE s.session_id=$1 AND s.owner_id=$2 AND s.workspace_id=$3 AND s.bot_id=$4 AND s.surface=$5
+          AND ($6::uuid IS NULL OR EXISTS (SELECT 1 FROM agent_kit_executions e
+            WHERE e.id=$6 AND e.owner_id=$2 AND e.bot_key=$4 AND e.execution_key=$7 AND e.status='running'))`,
+      [held.sessionId, userId, workspaceId, scope.botId, scope.surface, held.executionId ?? null, `${held.sessionId}:${held.turnId}:0`])
+      return rows.length > 0
+    }
     const runtime = await workflowRuntime()
     if (!sameRuntime(held.runtime, runtime)) return false
     if (held.source === 'recovery') return recoveryReceipt(held.runtime)
@@ -137,13 +161,5 @@ export async function currentExecutionAuthority(userId: string, workspaceId: str
           AND bot."workspaceId"=$3 AND bot."archivedAt" IS NULL))`, [held.runId, userId, workspaceId])
     return rows.length > 0
   }
-  const runtime = await workflowRuntime()
-  if (!runtime || !await registeredRuntime(runtime, 'coordinator')) return undefined
-  // The actual owner workflow must hold this exact Bot's live durable lease.
-  // Tool call/occurrence checks remain at the original Coordinator step owner.
-  const { rows } = await query.query(`SELECT 1 FROM coordinator_sessions s
-    JOIN bots b ON b.id=s."botId" AND b."ownerId"=s."userId"
-    WHERE s."userId"=$1 AND s."leaseHolder"=$3 AND s."leaseUntil">clock_timestamp()
-      AND b."workspaceId"=$2 AND b."archivedAt" IS NULL`, [userId, workspaceId, runtime.workflowRunId])
-  return rows.length > 0
+  return undefined
 }

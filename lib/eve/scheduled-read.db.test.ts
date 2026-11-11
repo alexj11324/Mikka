@@ -44,6 +44,30 @@ test('eve scheduled turns retain the persisted read-only authority and original 
       await assert.rejects(loadScheduledRead(scope, eventId), /scheduleWorkspaceAccessDenied/)
       await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspaceId, ownerId])
     })
+    await t.test('delegated Eve turns inherit read scope without settling the original occurrence', async () => {
+      const { readFile } = await import('node:fs/promises')
+      await pool.query(await readFile(new URL('../../drizzle/20261111070100_eve_sessions.sql', import.meta.url), 'utf8'))
+      const { default: hook } = await import('../../apps/eve/agent/hooks/product')
+      const { emptySessionView } = await import('eve/events')
+      const { scopeAuth, registerSession } = await import('./scope')
+      const nativeScope = { ...scope, surface: 'web' as const }
+      const rootId = 'wrun_schedule_' + randomUUID(), childId = 'wrun_child_' + randomUUID()
+      await registerSession(nativeScope, rootId)
+      await registerSession(nativeScope, childId)
+      const rootContext = { session: { id: rootId, auth: { current: { ...scopeAuth(nativeScope), attributes: { ...scopeAuth(nativeScope).attributes, sourceEventId: eventId } } } } }
+      await hook.events['turn.started']!({ data: { turnId: 'root-turn' } } as never, rootContext as never)
+      const childContext = { session: { id: childId, parent: { sessionId: rootId, turn: { id: 'root-turn' } }, auth: { current: scopeAuth(nativeScope) } }, view: emptySessionView() }
+      await hook.events['turn.started']!({ data: { turnId: 'child-turn' } } as never, childContext as never)
+      assert.equal((await pool.query('SELECT source_event_id FROM eve_turn_sources WHERE session_id=$1 AND turn_id=$2', [childId, 'child-turn'])).rows[0].source_event_id, eventId)
+      assert.deepEqual(await loadScheduledRead(scope, eventId), expected)
+      for (const outcome of ['completed', 'failed']) {
+        await hook.events['turn.settled']!({ data: { turnId: 'child-turn', outcome } } as never, childContext as never)
+        assert.equal((await pool.query('SELECT status FROM schedule_occurrences WHERE id=$1', [occurrenceId])).rows[0].status, 'running')
+      }
+      assert.equal((await pool.query('SELECT 1 FROM coordinator_messages WHERE "userId"=$1', [ownerId])).rowCount, 0)
+      assert.equal((await pool.query('SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND "leaseHolder" IS NOT NULL', [ownerId])).rowCount, 0)
+      assert.deepEqual(await loadScheduledRead(scope, eventId), expected)
+    })
     await t.test('publishes the fenced result once in the original chat', async () => {
       await completeScheduledRead(scope, expected, 'There are three tasks.', 'eve-test-turn')
       await assert.rejects(completeScheduledRead(scope, expected, 'Duplicate'), /scheduleReadAuthorityLost/)

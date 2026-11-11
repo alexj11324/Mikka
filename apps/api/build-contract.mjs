@@ -52,7 +52,7 @@ export async function routeFunctionRules(root) {
     // rou3 treats `*` as a catch-all and rejects more than one per route.
     // Named parameters retain each dynamic segment's original one-part bound.
     const pattern = route.path.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, '**').replace(/\[([^\]]+)\]/g, ':$1')
-    const supportsCancellation = route.template === '/api/coordinator/stream' || route.template === '/api/mcp' || route.template === '/api/agents/[...path]'
+    const supportsCancellation = route.template === '/api/coordinator/stream' || route.template === '/api/mcp' || route.template === '/api/agents/[...path]' || route.template === '/api/internal/eve/tools'
     rules[pattern] = { maxDuration: route.maxDuration, ...(supportsCancellation ? { supportsCancellation: true } : {}) }
   }
   return rules

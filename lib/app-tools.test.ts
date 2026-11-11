@@ -30,6 +30,16 @@ function deps(overrides: Partial<AppToolDeps> = {}) {
 }
 const call = (tool: string, toolkit = 'hubspot') => ({ toolkit, tool, arguments: { email: 'a@acme.dev' } })
 
+test('a native approval capability satisfies only Ask and cannot override a workspace Deny', async () => {
+  const asked = deps({ setting: async () => 'ask' })
+  const native = { ownerId: 'owner', botId: null, review: async () => 'allow' as const }
+  assert.equal((await callAppTool(asked.deps, call('SLACK_SEND_MESSAGE', 'slack'), native) as {status:string}).status, 'done')
+  assert.equal(asked.calls.some(value => value.startsWith('card:')), false)
+  const denied = deps({ setting: async () => 'deny' })
+  assert.deepEqual(await callAppTool(denied.deps, call('SLACK_SEND_MESSAGE', 'slack'), native), {error:'integrationActionDenied'})
+  assert.deepEqual(denied.calls, [])
+})
+
 test('a read-only tool goes to the Decisions judge too; allowed, it runs with the pinned version and no record', async () => {
   const judged: unknown[] = []
   const { deps: d, calls } = deps({ judge: async call => { judged.push(call); return 'allow' } })
