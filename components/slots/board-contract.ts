@@ -83,7 +83,7 @@ export type BoardScreenCard = {
 }
 
 /**
- * 看板 drawn whole by a UI layer (optional export `BoardScreen`): the toolbar, the columns and the list. Mikka keeps the
+ * The official BoardScreen renders the toolbar, columns and list. Mikka keeps the
  * filters, 显示 options, scope and view in BoardPage and every save in useIssueBoardSaves; the layer shows them and
  * calls back. The Coordinator sidebar stays beside it.
  */

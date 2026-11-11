@@ -7,6 +7,7 @@ import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE } from '../lib/bot-shapes'
 import { issueWithMetadata } from '../lib/issue-metadata'
+import type { BoardScreenProps } from '../components/slots/board-contract'
 
 // Idle request budget (#1212): each main page's real client component, real SWR with the app's defaults
 // (components/swr-defaults.tsx) and a healthy live channel, over one idle, visible minute on fake timers.
@@ -115,6 +116,13 @@ before(async () => {
     if (value !== undefined) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: typeof value === 'function' && !/^[A-Z]/.test(key) ? (value as (...args: unknown[]) => unknown).bind(browser) : value })
   }
   for (const [key, value] of Object.entries({ window: browser, requestAnimationFrame: timers.requestAnimationFrame, cancelAnimationFrame: timers.cancelAnimationFrame, WebSocket: FakeSocket, IS_REACT_ACT_ENVIRONMENT: true })) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
+  // The official board supplies the layout. Mount the real toolbar, card menus
+  // and their subscriptions while the public-only fixture renders their props.
+  const board = await import('../components/slots/board')
+  mock.module('@ui-slot/board', { namedExports: { ...board,
+    BoardScreen: ({ cards, tools, wrapCard }: BoardScreenProps) => <>{tools}<ul>{cards.map(card =>
+      <li key={card.id}>{wrapCard(card.id, <button>{card.title}</button>)}</li>)}</ul></>,
+  } })
   // happy-dom has no Web Animations; Base UI asks for running animations before it unmounts a popup.
   const elementPrototype = browser.Element.prototype as unknown as { getAnimations?: () => unknown[] }
   elementPrototype.getAnimations ??= () => []
