@@ -18,12 +18,6 @@ docker run --rm --network none --user "$(id -u):$(id -g)" \
   --env MIKKA_BUILD_REVISION --env MIKKA_UI_OVERLAY_SHA --env MIKKA_DEPLOYMENT_ID \
   --env MIKKA_EDITION --env MIKKA_BUILD_BYOS_WORKER --env MIKKA_DEPLOYMENT_ENVIRONMENT \
   --env NEXT_PUBLIC_MIKKA_BUILD --env NEXT_PUBLIC_POSTHOG_KEY --env NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY \
+  --env MIKKA_DEPLOYMENT_STAGE --env NEXT_PUBLIC_TURNSTILE_SITE_KEY \
   --env NEXT_PUBLIC_COMPUTER_ENABLED "${overlay[@]}" \
-  "$base_image" bash -eu -o pipefail -c '
-    node --experimental-strip-types scripts/generate-agent-ui-prompt.mjs
-    node scripts/build-eve.mjs
-    node apps/frontend/scripts/build.mjs web
-    node apps/api/scripts/build.mjs
-    node scripts/package-eve.mjs
-    node scripts/package-cf-eve-host.mjs
-  '
+  "$base_image" bash scripts/compile-cloudflare-eve-host.sh
