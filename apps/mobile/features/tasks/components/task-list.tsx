@@ -11,6 +11,9 @@ import { underBar } from '@/components/NavBar'
 import { displayTitle } from '@/lib/display-title'
 import { shortWhen } from '@/lib/clock'
 import type { Task, TaskGroup } from '@/lib/types'
+import { ApiError } from '@/lib/api'
+import { useTaskContinuation } from '../../../../../lib/hooks/use-task-continuation'
+import type { TaskListPageInput } from '../../../../../lib/task-list-page'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { tasksLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
@@ -23,8 +26,19 @@ import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } f
 /** The person's tasks (GET /api/mobile/tasks), read again when a task or one of its threads changes (the live channel). */
 export function useTasks(enabled = true) {
   const home = useHome().data
-  return useLiveApi<{ tasks: Task[]; workspaceId: string }>(enabled ? '/api/mobile/tasks' : null,
+  const list = useLiveApi<{ tasks: Task[]; workspaceId: string; next?: TaskListPageInput['after'] | null }>(enabled ? '/api/mobile/tasks' : null,
     list => tasksLive(home?.live?.workspaceId, list?.workspaceId ?? home?.workspace.id, list?.tasks.map(task => task.id)), readPresentedTasks)
+  const paging = useTaskContinuation(list.data?.tasks ?? [], list.data, list.data?.next ?? null, async after => {
+    const workspaceId = list.data!.workspaceId
+    const params = new URLSearchParams({ workspaceId, after: after.id, updatedAt: after.updatedAt })
+    const page = await readPresentedTasks('/api/mobile/tasks?' + params).catch(async error => {
+      if (error instanceof ApiError && error.status === 409) await list.reload()
+      throw error
+    })
+    if (page.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
+    return { items: page.tasks, next: page.next ?? null }
+  })
+  return { ...list, paging }
 }
 
 /**
@@ -34,10 +48,10 @@ export function useTasks(enabled = true) {
  */
 export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFilter; bot?: string; bottom?: number }) {
   const insets = useSafeAreaInsets()
-  const { data, error, loading, reload } = useTasks()
+  const { data, error, loading, reload, paging } = useTasks()
   const refresh = useRefresh(reload)
   const [toggled, setToggled] = useState<ReadonlySet<TaskGroup>>(new Set())
-  const tasks = bot ? (data?.tasks ?? []).filter(task => task.bot?.id === bot) : data?.tasks ?? []
+  const tasks = bot ? paging.items.filter(task => task.bot?.id === bot) : [...paging.items]
   const rows = taskListRows(tasks, toggled, filter)
   const toggle = (id: TaskGroup) => setToggled(current => {
     const next = new Set(current)
@@ -53,6 +67,10 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
       refreshControl={<RefreshControl {...refresh} />}
       contentContainerStyle={{ paddingBottom: insets.bottom + bottom }}
       ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />}
+      ListFooterComponent={paging.hasMore ? <Pressable accessibilityRole="button" disabled={paging.loading}
+        onPress={() => void paging.loadMore()} style={styles.center}>
+        <Text>{paging.failed ? mobileMessages.Common.retry : mobileMessages.HostedTasks.loadMore}</Text>
+      </Pressable> : undefined}
       ListEmptyComponent={loading && !data ? <View style={styles.center}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>{mobileMessages.MobileCore.noTasks}</Text>}
       renderItem={({ item }) => item.kind === 'section'
         ? <TaskGroupBar id={item.id} count={item.count} folded={item.folded} onToggle={() => toggle(item.id)} />

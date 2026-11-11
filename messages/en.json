@@ -6745,6 +6745,7 @@
     "moreMany": "{first}, {second} and {count, number} more"
   },
   "HostedTasks": {
+    "loadMore": "Load more tasks",
     "open": "Open task",
     "status": "Status",
     "factoryStage": "Factory stage",

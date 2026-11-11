@@ -1,4 +1,5 @@
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { taskListPageInput } from '@/lib/task-list-page'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
 import { z } from 'zod'
 import { projectInput, projectPatch } from '@/lib/project-input'
@@ -201,6 +202,7 @@ export const desktopActionSchemas = {
   'issues.pollIssues': tuple(version.optional(), listPositions(100).optional()),
   'issues.syncIssueList': tuple(version.optional(), listPositions(100).optional()),
   'issues.listWorkspaceIssues': oneId,
+  'issues.listWorkspaceTaskPage': tuple(taskListPageInput),
   'issues.getIssue': oneId,
   'issues.pollIssue': tuple(uuid, version.optional()),
   'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),

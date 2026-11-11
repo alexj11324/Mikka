@@ -47,3 +47,35 @@ test('mounted review/citation cards batch and deduplicate IDs including a task o
     } finally { await act(async () => root.unmount()) }
   }
 })
+
+test('continuations are user-driven, deduplicate overlaps and cannot restore another workspace page', async () => {
+  const { useTaskContinuation } = await import('../lib/hooks/use-task-continuation')
+  const host = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(host)
+  const cursor = { id: 'legacy-anchor', updatedAt: '2026-11-11T00:00:00.000Z' }
+  let release!: () => void, reads = 0, load!: () => Promise<void>
+  const read = async () => {
+    reads++
+    await new Promise<void>(resolve => { release = resolve })
+    return { items: [{ id: 'a-first' }, {id: 'a-second'}], next: null }
+  }
+  function Probe({ owner }: { owner: string }) {
+    const paging = useTaskContinuation([{ id: owner+'-first' }], owner, cursor, read)
+    load = paging.loadMore
+    return <span>{paging.items.map(row => row.id).join(',')}</span>
+  }
+  try {
+    await act(async () => { root.render(<Probe owner="a" />) })
+    assert.equal(reads, 0)
+    let first!: Promise<void>
+    await act(async () => { first = load(); void load() })
+    assert.equal(reads, 1)
+    await act(async () => { release(); await first })
+    assert.equal(host.textContent, 'a-first,a-second')
+    await act(async () => { root.render(<Probe owner="b" />) })
+    assert.equal(host.textContent, 'b-first')
+    await act(async () => { first = load() })
+    await act(async () => { root.render(<Probe owner="c" />) })
+    await act(async () => { release(); await first })
+    assert.equal(host.textContent, 'c-first')
+  } finally { await act(async () => root.unmount()) }
+})
