@@ -9,7 +9,7 @@ export default defineDynamic(async ctx => {
   return Object.fromEntries(await Promise.all(snapshot.servers.map(async server => {
     const connection = await personalPlugins.mcpConnection(scope.ownerId, server.id, server.revision, snapshot.mcpAuthority)
     if (connection.transport === 'stdio') return null
-    return ['mcp_' + server.id.replaceAll('-', '_'), defineMcpClientConnection({
+    return ['mcp-' + server.id, defineMcpClientConnection({
       url: connection.url, description: connection.name,
       instanceKey: JSON.stringify([server.id,server.revision,scope.workspaceId]),
       headers: async () => (await personalPlugins.mcpConnection(scope.ownerId, server.id, server.revision, snapshot.mcpAuthority)).headers,
