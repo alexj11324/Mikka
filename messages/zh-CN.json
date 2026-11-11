@@ -4171,6 +4171,22 @@
       "paidBy": "{owner} 的 {plan}",
       "movedTo": "已换到 {machine} 继续"
     },
+    "context": "上下文",
+    "contextUsage": "上下文，提纲已用 {used}，上限 {budget}",
+    "contextBrief": "提纲",
+    "contextHeld": "全部持有",
+    "contextEstimated": "估算值，非计费口径",
+    "contextUnmeasured": "未计入：{segments}",
+    "contextListSeparator": "、",
+    "contextSegments": {
+      "system": "系统",
+      "tools": "工具",
+      "rules": "指令",
+      "skills": "技能",
+      "mcp": "MCP",
+      "environment": "环境",
+      "conversation": "对话"
+    },
     "back": "返回",
     "executionIdentity": {
       "you": "你",

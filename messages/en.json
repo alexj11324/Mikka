@@ -4171,6 +4171,22 @@
       "paidBy": "{owner}'s {plan}",
       "movedTo": "Moved to {machine} to continue"
     },
+    "context": "Context",
+    "contextUsage": "Context, {used} of {budget} for the brief",
+    "contextBrief": "Brief",
+    "contextHeld": "Held",
+    "contextEstimated": "Estimated, not billed tokens",
+    "contextUnmeasured": "Not counted: {segments}",
+    "contextListSeparator": ", ",
+    "contextSegments": {
+      "system": "System",
+      "tools": "Tools",
+      "rules": "Instructions",
+      "skills": "Skills",
+      "mcp": "MCP",
+      "environment": "Environment",
+      "conversation": "Conversation"
+    },
     "back": "Back",
     "executionIdentity": {
       "you": "You",
