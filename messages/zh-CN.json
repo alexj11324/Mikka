@@ -400,6 +400,9 @@
       "selectExistingProject": "请选择一个现有项目。新项目请先在项目页面创建。",
       "projectLinkFailed": "项目关联失败。",
       "projectLinkFailedRetry": "项目关联失败，请重试。",
+      "accessChangeTitle": "要改变谁能看到这个任务吗？",
+      "accessChangeBody": "这会移动 {tasks} 个任务，并改变谁能读取它们。",
+      "accessChangeConfirm": "仍然移动",
       "saveFailed": "保存失败，请重试。",
       "saveFailedRetry": "保存失败，请稍后重试。",
       "estimatePoints": "{count} 点估算"
@@ -1166,6 +1169,7 @@
     "issueOutdated": "任务已更新，请刷新后重试。",
     "issueTargetUnavailable": "关联任务已不可用。",
     "issueAccessChanged": "任务访问权限已变更。",
+    "accessChangeConfirmationRequired": "此操作会改变哪些人能看到该任务。确认后继续。",
     "issueParentCycle": "父子任务不能形成循环。",
     "issueDuplicateCycle": "重复任务不能形成循环引用。",
     "issueBlockCycle": "阻塞关系不能形成循环依赖。",
