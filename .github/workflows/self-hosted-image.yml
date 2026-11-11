@@ -139,7 +139,33 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: Execute declared self-hosted compatibility tests in community mode
-        run: node scripts/ci/self-hosted-requirements.mjs --run-tests
+        env:
+          MIKKA_EDITION: community
+        run: |
+          set -euo pipefail
+          needs_db=$(node scripts/ci/self-hosted-requirements.mjs --needs-db)
+          case "$needs_db" in
+            true)
+              # This runner-owned service has its own cluster and volume. The
+              # running installation and its application database stay separate.
+              trap 'docker compose --profile dependency-tests rm --stop --force --volumes dependency-postgres' EXIT
+              docker compose --profile dependency-tests up --detach --no-deps --wait --wait-timeout 90 dependency-postgres
+              endpoint=$(docker compose --profile dependency-tests port dependency-postgres 5432)
+              [[ "$endpoint" =~ ^127\.0\.0\.1:([0-9]+)$ ]] || { echo 'Expected a loopback PG17 fixture port' >&2; exit 1; }
+              export MIKKA_TEST_DB_PORT="${BASH_REMATCH[1]}"
+              export E2E_DATABASE_URL="postgresql://e2e:${POSTGRES_PASSWORD}@${endpoint}/self_hosted_e2e"
+              # Some suites create separate app and workspace databases and
+              # change both URLs. Their migrations must follow those targets.
+              unset MIKKA_DATABASE_URL_UNPOOLED DATABASE_URL_UNPOOLED ORVILO_DATABASE_URL
+              export MIKKA_DATABASE_URL="$E2E_DATABASE_URL" DATABASE_URL="$E2E_DATABASE_URL"
+              export BETTER_AUTH_SECRET="$SELF_HOSTED_FIXTURE_KEY" BETTER_AUTH_URL=http://localhost:3100
+              export MIKKA_TEST_DEPLOYMENT_SHA="$GITHUB_SHA" REQUIRE_DB=1
+              pnpm test:e2e:setup
+              ;;
+            false) ;;
+            *) echo 'Invalid declared database-test selection' >&2; exit 1 ;;
+          esac
+          node scripts/ci/self-hosted-requirements.mjs --run-tests
       - name: Exercise the real daemon against the registered community user
         timeout-minutes: 6
         run: |
@@ -237,4 +263,4 @@ jobs:
         run: docker compose logs --no-color --tail=150
       - name: Stop disposable services
         if: always()
-        run: docker compose down --volumes --remove-orphans
+        run: docker compose --profile dependency-tests down --volumes --remove-orphans

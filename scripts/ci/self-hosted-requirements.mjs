@@ -38,24 +38,49 @@ export function verifyChange(path, before, after, declarations, isTest) {
   return errors
 }
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
-// A declaration points to an executable check, not an unreferenced fixture.
-// Plain Node tests run directly; other suites name their repository test script.
+const databaseTest = file => /\.db\.test\./.test(file)
+// Keep each file's package-defined loaders and flags. Large aggregate scripts
+// can contain multiple Node invocations with different runner settings.
 export function dependencyTestCommand(spec, scripts) {
-  if (!spec.suite && /\.test\.[cm]?js$/.test(spec.test)) return [process.execPath, '--test', spec.test]
+  if (!spec.suite && /\.test\.[cm]?js$/.test(spec.test)) {
+    return [process.execPath, ...(databaseTest(spec.test) ? ['--test-force-exit'] : []), '--test', spec.test]
+  }
   const command = Object.hasOwn(scripts, spec.suite) && scripts[spec.suite]
   if (typeof command !== 'string' || !/^test:[a-z0-9:-]+$/.test(spec.suite) || !command.includes(spec.test)) {
     throw new Error(spec.test + ': name the package test suite that executes this file')
   }
+  const parts = command.split(/\s+&&\s+/)
+  // Preserve build, install, fixture and cleanup steps in custom suites.
+  const onlyTests = parts.every(part => /(?:^|\s)node\s+.*--test(?:\s|$)/.test(part) ||
+    /^pnpm (?:run )?test:[a-z0-9:-]+$/.test(part) ||
+    /^pnpm --filter [@\w/-]+ exec vitest run [\w./ -]+$/.test(part))
+  for (const part of onlyTests ? parts : []) {
+    const args = part.trim().split(/\s+/)
+    const node = args.indexOf('node')
+    const test = args.indexOf('--test')
+    if (node < 0 || test <= node || !args.slice(test + 1).includes(spec.test)) continue
+    const prefix = args.slice(0, node)
+    const flags = args.slice(node + 1, test)
+    // Fall back to the original suite for shell expansions, wrappers, globs
+    // and post-option flags. Never reinterpret a shell expression as an argv.
+    if (!prefix.every(arg => /^[A-Z][A-Z0-9_]*=[\w./-]+$/.test(arg)) ||
+        !flags.every(arg => /^[\w./=-]+$/.test(arg)) ||
+        !args.slice(test + 1).every(arg => /^[\w./-]+\.[cm]?[jt]sx?$/.test(arg))) continue
+    // A database test can share pool teardown with other files in its normal
+    // suite. Exit after the isolated file has reported all its test results.
+    if (databaseTest(spec.test) && !flags.includes('--test-force-exit')) flags.push('--test-force-exit')
+    return [...(prefix.length ? ['env', ...prefix] : []), process.execPath, ...flags, '--test', spec.test]
+  }
   return ['pnpm', 'run', spec.suite]
 }
-export function main(runTests = false) {
+export function main(runTests = false, reportDatabase = false) {
   const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : {}
   const base = event.pull_request?.base?.sha || event.merge_group?.base_sha ||
     (typeof event.before === 'string' && !/^0+$/.test(event.before) && event.before) || 'HEAD^1'
   git('rev-parse', '--verify', base + '^{commit}')
   const declarations = JSON.parse(readFileSync(requirements, 'utf8'))
-  const isTest = file => /^(?:scripts|tests|apps|packages|lib|app)\/[\w./-]+$/.test(file) &&
-    !file.includes('..') && /(?:\.test\.[cm]?[jt]s$|\/acceptance\/)/.test(file) &&
+  const isTest = file => /^(?:scripts|tests|apps|packages|lib|app|hooks|cloudflare|services|components)\/[\w./-]+$/.test(file) &&
+    !file.includes('..') && /(?:\.test\.[cm]?[jt]sx?$|\/acceptance\/)/.test(file) &&
     existsSync(file) && statSync(file).isFile()
   const paths = git('diff', '--name-only', '--no-renames', '--diff-filter=AM', '-z', base, 'HEAD').split('\0').filter(Boolean)
   const errors = []
@@ -65,17 +90,25 @@ export function main(runTests = false) {
   }
   const full = paths.includes(requirements) || paths.includes('config/self-hosted-stable-version') || process.env.GITHUB_REF_TYPE === 'tag'
   const commands = new Map()
+  let needsDatabase = false
   const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts
   for (const [file, spec] of Object.entries(declarations)) {
     if (!full && !paths.includes(file) && !paths.includes(spec?.test)) continue
     if (typeof spec?.test !== 'string' || !isTest(spec.test)) throw new Error(file + ': missing declared acceptance test')
     const command = dependencyTestCommand(spec, scripts)
     commands.set(JSON.stringify(command), command)
+    if (databaseTest(spec.test)) needsDatabase = true
   }
   if (errors.length) throw new Error(errors.join('\n'))
+  if (reportDatabase) {
+    console.log(needsDatabase)
+    return
+  }
   if (runTests) {
     for (const [bin, ...args] of commands.values()) execFileSync(bin, args, { stdio: 'inherit', env: { ...process.env, MIKKA_EDITION: 'community' } })
   }
   console.log('Self-hosted dependency declarations verified against ' + base)
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main(process.argv[2] === '--run-tests')
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main(process.argv[2] === '--run-tests', process.argv[2] === '--needs-db')
+}

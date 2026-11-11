@@ -37,7 +37,18 @@ test('Nx and the declaration checker share the backend and migration path classi
 test('every selected declaration maps to an executable Node test or matching repository suite', () => {
   assert.deepEqual(dependencyTestCommand({ test: 'scripts/example.test.mjs' }, {}), [process.execPath, '--test', 'scripts/example.test.mjs'])
   const spec = { test: 'lib/demo.test.ts', suite: 'test:demo' }
-  assert.deepEqual(dependencyTestCommand(spec, { 'test:demo': 'node --import tsx --test lib/demo.test.ts' }), ['pnpm', 'run', 'test:demo'])
+  assert.deepEqual(dependencyTestCommand(spec, { 'test:demo': 'node --import tsx --test lib/demo.test.ts lib/other.test.ts' }),
+    [process.execPath, '--import', 'tsx', '--test', 'lib/demo.test.ts'])
+  const mobile = 'node --test lib/a.test.mjs && TSX_TSCONFIG_PATH=apps/mobile/tsconfig.json node --import tsx --test lib/demo.test.ts'
+  assert.deepEqual(dependencyTestCommand(spec, { 'test:demo': mobile }),
+    ['env', 'TSX_TSCONFIG_PATH=apps/mobile/tsconfig.json', process.execPath, '--import', 'tsx', '--test', 'lib/demo.test.ts'])
+  assert.deepEqual(dependencyTestCommand(spec, { 'test:demo': 'node scripts/custom-runner.mjs lib/demo.test.ts' }),
+    ['pnpm', 'run', 'test:demo'])
+  assert.deepEqual(dependencyTestCommand(spec, { 'test:demo': 'npm run build && node --test lib/demo.test.ts' }),
+    ['pnpm', 'run', 'test:demo'])
+  const database = { ...spec, test: 'lib/demo.db.test.ts' }
+  assert.deepEqual(dependencyTestCommand(database, { 'test:demo': 'node --import tsx --test lib/demo.db.test.ts' }),
+    [process.execPath, '--import', 'tsx', '--test-force-exit', '--test', database.test])
   assert.throws(() => dependencyTestCommand(spec, { 'test:demo': 'node other.ts' }))
   assert.throws(() => dependencyTestCommand({ ...spec, suite: 'postinstall' }, { postinstall: spec.test }))
 })
