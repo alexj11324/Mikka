@@ -77,7 +77,7 @@ Use your own Google or GitHub OAuth clients. Register callbacks on your exact or
 
 ## Connect an official app
 
-Use a release with server selection and enter your server address from `GET /mikka/api/server`. The backend and shared connection contract are delivered independently from the official connection UI.
+Use a client with server selection. Enter the address shown on the server status page or returned by `GET /mikka/api/server`. The client checks protocol and minimum version compatibility before sign-in.
 
 | Client | Entry and address requirement |
 | --- | --- |

@@ -74,7 +74,7 @@ For definitions of bots, agents, tasks, threads and runs, see the [glossary](doc
 
 Mikka has one official UI across its web, macOS and iOS clients. Those clients can connect to Mikka Cloud or a self-hosted server.
 
-This public repository includes the server, daemon, native mobile source and much of the web UI code. **Official web and desktop builds also use private UI components** that are not distributed here. A build from the public source alone is therefore **not the complete official web or desktop UI**. A legacy built-in workspace UI remains available behind an opt-in flag, but is not a second supported product design.
+This public repository includes the server, daemon, native mobile source and much of the web UI code. **Official web and desktop builds also use private UI components** that are not distributed here. A build from the public source alone is therefore **not the complete official web or desktop UI**. The self-hosted image serves installation status, sign-in and authorization pages. Open the official client, choose **Change** under the server name, and enter the HTTPS address shown by your installation.
 
 Read [UI source boundaries](docs/ui-overlay.md) and [self-hosting](docs/self-hosting.md) for what can be built, deployed and connected. Source implementation and production availability are verified separately under the [acceptance policy](docs/acceptance.md).
 
