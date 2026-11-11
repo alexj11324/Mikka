@@ -7,6 +7,7 @@ import type { JSONContent } from '@tiptap/core'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { measured, readMetrics } from './helpers/read-metrics'
 import { mergeList } from '../lib/list-poll'
+import { desktopActionSchemas } from '../lib/desktop-rpc/schemas'
 
 // Only a disposable loopback *_e2e database is admissible; required in CI.
 const required = process.env.REQUIRE_DB === '1'
@@ -123,12 +124,21 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     assert.equal(promotion.error, 'teamIssueAccessDenied', 'team promotion cannot move a task to another workspace')
     assert.equal((await pool.query('select "workspaceId" from issues where id=$1', [ids[1]])).rows[0].workspaceId, personalWorkspace)
     assert.equal((await pool.query('select count(*)::int n from team_issue_promotion_receipts where "requestId"=$1', [requestId])).rows[0].n, 0)
-    const createdShared = await withActivitySession(owner, () => saveIssue({ title: 'Shared list task', content: content(30), status: 'todo', priority: 'normal' }), workspaceId)
+    const wire = desktopActionSchemas['issues.saveIssue']
+    const payload = { workspaceId, title: 'Shared list task', content: content(30), status: 'todo', priority: 'normal' }
+    assert.equal(wire.safeParse([{ ...payload, workspaceId: 'invalid' }]).success, false)
+    assert.equal(wire.safeParse([{ ...payload, userId: owner }]).success, false)
+    const [authorizedInput] = wire.parse([payload])
+    const createdShared = await withActivitySession(owner, () => saveIssue(authorizedInput), workspaceId)
     assert.ok('issue' in createdShared && createdShared.issue)
+    assert.equal(createdShared.issue.workspaceId, workspaceId)
     const shared = await withActivitySession(peer, () => actAs(peer, () => pollIssues()), workspaceId)
     assert.deepEqual(shared.items?.map(row => row.id), [createdShared.issue.id])
     assert.equal(shared.items?.length, 1)
     await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, peer, 'suspended'])
+    const [revokedInput] = wire.parse([{ ...payload, title: 'Revoked writer task' }])
+    await assert.rejects(() => withActivitySession(peer, () => saveIssue(revokedInput), workspaceId), { message: 'workspaceAccessDenied' })
+    assert.equal((await pool.query('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [peer, revokedInput.title])).rowCount, 0)
     const revoked = await withActivitySession(peer, () => actAs(peer, () => pollIssues(shared.version, shared.positions)), workspaceId)
     assert.deepEqual(revoked.items, [], 'revocation clears the formerly shared row')
     assert.deepEqual(mergeList(shared.items!, revoked), [], 'the authoritative manifest removes the revoked cached task')
