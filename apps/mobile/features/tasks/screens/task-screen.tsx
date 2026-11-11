@@ -13,7 +13,7 @@ import { Text } from '@/components/Text'
 import { GlassButton } from '@/components/GlassButton'
 import { HARNESS } from '@/lib/harness'
 import { useHome } from '@/lib/home'
-import { tasksLive } from '@/lib/live-keys'
+import { taskDetailLive } from '@/lib/live-keys'
 import type { TaskActivity, TaskDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
@@ -21,7 +21,7 @@ import { shortWhen } from '@/lib/clock'
 import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
-import { activityEntries, type ActivityEntry } from '../model/task-conversation'
+import { activityEntries, activityEntryId, nativeActivityLabel, type ActivityEntry } from '../model/task-conversation'
 import { AgentName } from '../components/agent-name'
 import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
 import { reviewHref } from '@/features/review/model/routes'
@@ -42,12 +42,12 @@ export function TaskScreen() {
   const insets = useSafeAreaInsets()
   const bar = useScrolledUnderBar()
   const home = useHome().data
-  const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
+  const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`, data => taskDetailLive(id, data?.live?.workspaceId, home?.live?.workspaceId, home?.workspace.id))
   const task = data?.task
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null
   // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
-  const activity = data ? activityEntries(data.activity) : []
+  const activity = data ? activityEntries(data.activity, data.timeline) : []
 
   // A push opens the task, then the attempt it was about, once.
   const opened = useRef(false)
@@ -81,7 +81,7 @@ export function TaskScreen() {
             </View>
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
-            {activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} first={index === 0} last={index === activity.length - 1}
+            {activity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === activity.length - 1}
 
               onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId)) : undefined} />)}
           </>
@@ -128,10 +128,10 @@ function ActivityRow({ item, first, last, onOpen }: { item: ActivityEntry; first
       </View>
       <View style={styles.activityText}>
         {item.kind === 'agent' ? <AgentName harness={item.run.harness} style={styles.activityTitle} /> : <Text style={styles.activityTitle} numberOfLines={1}>
-          {item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
+          {'at' in item ? nativeActivityLabel(item) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
         </Text>}
         <Text style={styles.activityMeta} numberOfLines={2}>
-          {result && latest ? [ATTEMPT_WORD[result], result === 'done' && pullRequest ? mobileMessages.MobileCore.openedPullRequest.replace('{number}', String(pullRequest.number)) : null, shortWhen(latest.createdAt)].filter(Boolean).join(' · ') : item.kind === 'agent' ? null : shortWhen(item.createdAt)}
+          {result && latest ? [ATTEMPT_WORD[result], result === 'done' && pullRequest ? mobileMessages.MobileCore.openedPullRequest.replace('{number}', String(pullRequest.number)) : null, shortWhen(latest.createdAt)].filter(Boolean).join(' · ') : item.kind === 'agent' ? null : shortWhen('at' in item ? item.at : item.createdAt)}
         </Text>
       </View>
       {onOpen ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}

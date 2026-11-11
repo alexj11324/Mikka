@@ -3,9 +3,9 @@ import { withTaskDevicePresence } from './task-state-presence'
 import { taskStateOf } from './task-state'
 import { taskStateRunColumns } from './task-state-query'
 import { readCompactRunFailure } from './run-failure-projection'
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { agents, agentRuns, bots, devices, issues, issueVersions, users, runPublications } from '@/lib/db/schema'
+import { agents, agentRuns, bots, devices, issues, issueDocuments, users, runPublications } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { tokenWorkspace } from '@/lib/tokens/principal'
@@ -17,6 +17,9 @@ import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { runBotId } from '@/lib/run-bot-name'
 import { taskSchedule, taskScheduleLabels, taskScheduleView } from '@/lib/task-block-runs'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
+import { taskActivityVersions } from './task-activity-versions'
+import { taskActivityFacts } from './task-activity-timeline'
+import { deriveIssueActivity } from './issue-activity'
 import { latestConversationRun } from '@/lib/issue-threads'
 import { mobileTaskActivity } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
@@ -42,7 +45,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
   const metadata = readIssueMetadata(issue.content)
   const blockerIds = metadata.blockedByIds ?? []
   const visibleBlockers = blockerIds.length ? await issueVisibility(user, false, workspaceId, db, { onlyIssueIds: blockerIds }) : null
-  const [identifiers, runs, [decoration], versions, labels, blockers] = await Promise.all([
+  const [identifiers, runs, [decoration], versions, [document], labels, blockers] = await Promise.all([
     taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number, issuedIdentifier: issue.issuedIdentifier }]),
     db.select({ ...taskStateRunColumns, pullRequest: runPublications.pullRequest,
       kind: agentRuns.kind, createdAt: agentRuns.createdAt,
@@ -60,15 +63,21 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     db.select({ schedule: taskSchedule(issues.id, user.id, workspaceId), owner: users.name, codingReview: taskReviewSourceHint }).from(issues)
       .leftJoin(users, eq(users.id, issues.userId))
       .where(and(eq(issues.id, id), eq(issues.workspaceId, workspaceId), eq(issues.ownershipState, 'bound'))),
-    db.select({ actorType: issueVersions.actorType, actorId: issueVersions.actorId }).from(issueVersions)
-      .where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, issue.userId)))
-      .orderBy(asc(issueVersions.revision)).limit(1),
+    db.select().from(taskActivityVersions(db, id, issue.userId)),
+    db.select({ state: issueDocuments.state }).from(issueDocuments)
+      .where(and(eq(issueDocuments.issueId, id), eq(issueDocuments.userId, issue.userId))),
     taskScheduleLabels(),
     visibleBlockers ? db.select({ id: issues.id, status: issues.status, userId: issues.userId, scope: issues.scope, content: issues.content, issuedIdentifier: issues.issuedIdentifier }).from(issues)
       .where(and(inArray(issues.id, blockerIds), visibleBlockers.predicate)) : [],
   ])
   const reviews = await taskReviewSummaries(user, decoration?.codingReview ? [id] : [], workspaceId)
-  const [creation] = await enrichActivityActors(versions, issue.userId)
+  const history = deriveIssueActivity(await enrichActivityActors(versions, issue.userId), [], Infinity)
+  const creation = history.find(event => event.kind === 'created')
+  const { loadIssueDocument, readIssueThreads } = await import('./linear-sync/document')
+  const doc = document ? loadIssueDocument(document.state, issue.content) : null
+  let timeline
+  try { timeline = taskActivityFacts(history, doc ? readIssueThreads(doc) : []) }
+  finally { doc?.destroy() }
   const task = { ...issue, metadata }
   const attempts = (await withTaskDevicePresence(runs)).map(run => ({ ...run, failureDetails: readCompactRunFailure(run.failureDetails) }))
   const newest = attempts[0]
@@ -91,6 +100,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
       agent: newest ? { harness: newest.harness, model: newest.model } : null, place, schedule,
       review: reviews.get(id) ?? null,
     },
+    timeline,
     activity: mobileTaskActivity(task, attempts, { by: creation?.actor ? creation.actor.name : decoration?.owner ?? null, createdAt: issue.createdAt }),
     live: { workspaceId },
   }

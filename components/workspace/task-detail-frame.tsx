@@ -29,6 +29,7 @@ import { localTaskState } from '@/hooks/use-bot-tasks'
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
+import { chronologicalActivity, taskDiscussionEvents } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
 import { PullRequestStatus } from './issue-pull-request-link'
 
@@ -211,15 +212,28 @@ export function FramedTask(props: FramedTaskProps) {
 
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
-  const events = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows)
+  const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows)
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id, body => discussions.current?.onComment(body), (id, body) => discussions.current?.onReply(id, body))
   const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-  const activityItems = (current: IssueDiscussions): TaskActivityItem[] => [
-    ...events.map((item): TaskActivityItem => ({ kind: 'event', id: item.id, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
-    ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
-    ...current.threads.map((thread): TaskActivityItem => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, excerpt: thread.id.startsWith('discussion-') ? null : current.anchors.find(anchor => anchor.id === thread.id)?.excerpt ?? tActivity('anchorRemoved'), time })),
-  ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+  const activityItems = (current: IssueDiscussions, expandReplies = false): TaskActivityItem[] => {
+    const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
+    const byId = new Map(current.threads.map(thread => [thread.id, thread]))
+    const excerpt = (id: string) => id.startsWith('discussion-') ? null : anchors.get(id) ?? tActivity('anchorRemoved')
+    const comments: TaskActivityItem[] = expandReplies
+      ? taskDiscussionEvents(current.threads).map(fact => {
+        const thread = byId.get(fact.threadId)!
+        return { kind: 'comment', id: fact.id, at: fact.at, thread, time, excerpt: excerpt(thread.id),
+          message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
+      })
+      : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
+    const history = eventsFor([...props.agentActivity.items, ...comments])
+    return chronologicalActivity<TaskActivityItem>([
+      ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
+      ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
+      ...comments,
+    ])
+  }
 
   const created = new Date(task.createdAt)
   return <Frame
@@ -242,7 +256,7 @@ export function FramedTask(props: FramedTaskProps) {
     copyLink={menu.copyLink}
     subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: createChild, disabled: connections.pending, failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
-      items: activityItems,
+      items: activityItems, timeline: current => activityItems(current, true),
       failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : []],
       drafts, subscribed: menu.subscribed, onSubscribe: menu.toggleSubscribed, subscribeLabel: menu.subscribed ? tFrame('unsubscribe') : tFrame('subscribe'),
     }}

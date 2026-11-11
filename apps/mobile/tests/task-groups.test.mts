@@ -3,7 +3,7 @@ import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { attemptState, groupOf, groupOfThread, rowState, taskListRows } from '../features/tasks/model/task-groups.ts'
-import { activityEntries, boundary, conversationReplyRun, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
+import { activityEntries, activityEntryId, boundary, conversationReplyRun, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
 
 test('a task\'s current thread decides its group, by R-52\'s judgement', () => {
   assert.equal(groupOfThread('waiting'), 'pending')
@@ -189,4 +189,15 @@ test('an Agent brand mark is the package\'s own markup, sized by its caller, wit
   assert.match(file('codex-color.svg'), /fill="#fff"/)
   assert.doesNotMatch(agentMark(file('codex-color.svg')), /fill="#fff"/)
   assert.match(agentMark(file('cursor.svg')), /currentColor/)
+})
+
+test('native task activity interleaves discussion and history facts with runs, once and oldest first', () => {
+  const at = '2026-11-01T09:00:00Z'
+  const later = '2026-11-01T09:01:00Z'
+  const run = { kind: 'attempt' as const, runId: 'a', n: 1, group: 'running' as const, harness: 'Codex', createdAt: later, failed: false }
+  const discussion = { kind: 'reply' as const, id: 'discussion:t:m2', threadId: 't', messageId: 'm2', at, author: 'Alex', authorId: 'u', body: 'Ack', resolved: false }
+  const history = { kind: 'history' as const, id: 'history:created-v1', at, event: { id: 'created-v1', at, kind: 'created' as const } }
+  const activity = [run, { kind: 'created' as const, by: 'Alex', createdAt: at }]
+  assert.deepEqual(activityEntries(activity, [history, discussion]).map(activityEntryId), ['discussion:t:m2', 'history:created-v1', 'run:a'])
+  assert.deepEqual(activityEntries(activity).map(activityEntryId), ['created', 'run:a'])
 })

@@ -1,3 +1,5 @@
+import type { IssueActivityEvent } from './task-activity-timeline'
+export type { IssueActivityEvent } from './task-activity-timeline'
 import type { ActivityActorView } from './activity-actor-view'
 import type { JSONContent } from '@tiptap/core'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -20,23 +22,6 @@ export type ActivityChild = {
   id: string
   title: string
   createdAt: Date | string
-}
-
-export type IssueActivityEvent = {
-  id: string
-  at: string
-  kind: 'created' | 'status' | 'priority' | 'title' | 'assigned' | 'unassigned' | 'subtask' | 'labelAdded' | 'labelRemoved'
-  status?: string
-  priority?: string
-  title?: string
-  assigneeName?: string
-  /** Absent means the human assignee. Keep the existing event kinds for old
-   * consumers, but never describe clearing a Delegate as clearing the person. */
-  assignmentTarget?: 'delegate'
-  /** `type:id` of whoever made the change; null for rows from before MIK-17 and for subtasks. */
-  actorKey?: string | null
-  /** Who made the change, as the server resolved it (R-63 names them in front of the row). */
-  actor?: ActivityActorView | null
 }
 
 function actorKeyOf(version: ActivityVersion) {
@@ -70,7 +55,7 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
   const ordered = [...versions].sort((a, b) => a.revision - b.revision)
   const events: IssueActivityEvent[] = []
   const created = ordered.find(version => version.revision === 1)
-  if (created) events.push({ id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created), actor: created.actor ?? null })
+  if (created) events.push({ source: { kind: 'revision', id: created.id, revision: 1 }, id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created), actor: created.actor ?? null })
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1]
     const current = ordered[index]
@@ -80,35 +65,36 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     const at = timestamp(current.createdAt)
     const actorKey = actorKeyOf(current)
     const actor = current.actor ?? null
-    if (current.status !== previous.status) events.push({ id: `status-${current.id}`, at, actorKey, actor, kind: 'status', status: current.status })
-    if (current.priority !== previous.priority) events.push({ id: `priority-${current.id}`, at, actorKey, actor, kind: 'priority', priority: current.priority })
-    if (current.title !== previous.title) events.push({ id: `title-${current.id}`, at, actorKey, actor, kind: 'title', title: current.title })
+    const add = (event: IssueActivityEvent) => events.push({ ...event, source: { kind: 'revision', id: current.id, revision: current.revision } })
+    if (current.status !== previous.status) add({ id: `status-${current.id}`, at, actorKey, actor, kind: 'status', status: current.status })
+    if (current.priority !== previous.priority) add({ id: `priority-${current.id}`, at, actorKey, actor, kind: 'priority', priority: current.priority })
+    if (current.title !== previous.title) add({ id: `title-${current.id}`, at, actorKey, actor, kind: 'title', title: current.title })
     const beforeMetadata = readIssueMetadata(previous.content)
     const afterMetadata = readIssueMetadata(current.content)
     const before = beforeMetadata.assignee
     const after = afterMetadata.assignee
     if ((before?.id ?? null) !== (after?.id ?? null)) {
-      if (after) events.push({ id: `assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assigneeName: after.name })
-      else events.push({ id: `unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned' })
+      if (after) add({ id: `assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assigneeName: after.name })
+      else add({ id: `unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned' })
     }
     if (!sameDelegate(beforeMetadata.delegate, afterMetadata.delegate, previous.content, current.content)) {
-      if (afterMetadata.delegate) events.push({ id: `delegate-assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assignmentTarget: 'delegate', assigneeName: afterMetadata.delegate.name })
-      else events.push({ id: `delegate-unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned', assignmentTarget: 'delegate', assigneeName: beforeMetadata.delegate?.name })
+      if (afterMetadata.delegate) add({ id: `delegate-assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assignmentTarget: 'delegate', assigneeName: afterMetadata.delegate.name })
+      else add({ id: `delegate-unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned', assignmentTarget: 'delegate', assigneeName: beforeMetadata.delegate?.name })
     }
     const beforeLabels = new Set(labelNames(previous.content))
     const afterLabels = new Set(labelNames(current.content))
     for (const name of afterLabels) {
-      if (!beforeLabels.has(name)) events.push({ id: `label-add-${current.id}-${name}`, at, actorKey, actor, kind: 'labelAdded', title: name })
+      if (!beforeLabels.has(name)) add({ id: `label-add-${current.id}-${name}`, at, actorKey, actor, kind: 'labelAdded', title: name })
     }
     for (const name of beforeLabels) {
-      if (!afterLabels.has(name)) events.push({ id: `label-remove-${current.id}-${name}`, at, actorKey, actor, kind: 'labelRemoved', title: name })
+      if (!afterLabels.has(name)) add({ id: `label-remove-${current.id}-${name}`, at, actorKey, actor, kind: 'labelRemoved', title: name })
     }
   }
   const createdAt = created ? Date.parse(timestamp(created.createdAt)) : Number.NEGATIVE_INFINITY
   for (const child of children) {
     const at = timestamp(child.createdAt)
     if (Date.parse(at) + 2000 < createdAt) continue
-    events.push({ id: `subtask-${child.id}`, at, kind: 'subtask', title: child.title })
+    events.push({ source: { kind: 'subtask', id: child.id }, id: `subtask-${child.id}`, at, kind: 'subtask', title: child.title })
   }
   const createdEvent = events.find(event => event.kind === 'created')
   const rest = events.filter(event => event.kind !== 'created').sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id)).slice(0, limit)

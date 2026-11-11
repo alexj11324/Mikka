@@ -234,6 +234,8 @@ export interface TaskDetail {
     /** A factory task's flow: its stage, what it needs from the person, 审阅's verdict (2026-11-04-2200). Not sent yet. */
     flow?: import('../features/tasks/model/task-flow').TaskFlow | null
   }
+  /** Canonical, oldest-first history and discussions. Absent on older servers. */
+  timeline?: import('../../../lib/task-activity-timeline').TaskActivityFact[]
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */
   live?: { workspaceId: string }
