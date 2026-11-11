@@ -36,8 +36,8 @@ jobs:
       MIKKA_EVE_WORKFLOW_WORLD: cloudflare
       NODE_OPTIONS: --max-old-space-size=6144
       MIKKA_BUILD_REVISION: ${{ github.sha }}
-      # The public validation image uses the bundled UI at the same commit.
-      MIKKA_UI_OVERLAY_SHA: ${{ github.sha }}
+      # A public checkout builds its server authentication and status resources.
+      # Only the private release supplies both an official UI checkout and its SHA.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:

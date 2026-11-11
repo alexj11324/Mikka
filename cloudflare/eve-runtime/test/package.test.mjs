@@ -26,7 +26,7 @@ test('a private runtime image contains only the verified artifact, launcher and 
   const options = await fixture(t)
   const result = await packageCloudflareEveHost(options)
   assert.deepEqual(JSON.parse(await readFile(join(result.output, 'eve-host.json'), 'utf8')), {
-    version: 1, sourceSha, uiSha, releaseId: 'fixture-1',
+    version: 1, sourceSha, uiSha, releaseId: 'fixture-1', uiSource: 'official',
   })
   assert.equal(await readFile(join(result.output, 'eve/server/index.mjs'), 'utf8'), 'export default {}')
   assert.match(await readFile(join(result.output, 'runtime/start.mjs'), 'utf8'), /startEveService/)
@@ -61,4 +61,12 @@ test('an artifact that still depends on the build checkout is refused before ima
   const options = await fixture(t)
   await symlink(options.root, join(options.root, '.output/eve/build-checkout'), 'dir')
   await assert.rejects(packageCloudflareEveHost(options), /CF_EVE_IMAGE_EXTERNAL_LINK_REFUSED/)
+})
+
+test('server-only qualification resources are pinned to the public source', async t => {
+  const options = await fixture(t)
+  await assert.rejects(packageCloudflareEveHost({ ...options, uiSource: 'public-server' }), /CF_EVE_UI_SOURCE_MISMATCH/)
+  const { host } = await packageCloudflareEveHost({ ...options, uiSha: sourceSha, uiSource: 'public-server' })
+  assert.equal(host.uiSource, 'public-server')
+  assert.equal(host.uiSha, sourceSha)
 })
