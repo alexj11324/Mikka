@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { coordinatorStreamReply, readCoordinatorStream, visibleCoordinatorReplies, type CoordinatorLiveReply } from './coordinator-stream-client'
+import { coordinatorStreamReply, readCoordinatorStream, visibleCoordinatorReplies, type CoordinatorLiveReply } from '@/tests/support/legacy-coordinator-stream'
 import type { CoordinatorStreamEvent } from './coordinator/stream'
 
 test('JSONL decoding preserves split UTF-8, split records, and an unterminated final line', async () => {

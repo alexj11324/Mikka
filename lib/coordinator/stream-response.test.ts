@@ -9,7 +9,7 @@ import { fingerprint } from '@/lib/credentials/fingerprint'
 import { QUIET_REPLY } from '@/lib/attention/handoff'
 import { coordinatorTextStream, type CoordinatorStreamTiming } from './stream-response'
 import { ScopedCoordinatorWritable } from './scoped-stream'
-import { coordinatorStreamReply, type CoordinatorLiveReply } from '../coordinator-stream-client'
+import { coordinatorStreamReply, type CoordinatorLiveReply } from '@/tests/support/legacy-coordinator-stream'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 
 const start = (id = 'run:0', quietEligible = false): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-turn-start', id, quietEligible })
