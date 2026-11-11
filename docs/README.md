@@ -17,6 +17,8 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 - [Dependency-aware CI](ci/incremental.md) explains affected checks, fallback
   coverage and required gates.
 - [Workflow reference](../.github/workflows/README.md) maps CI and release jobs.
+- [Test ownership and CI cost](ci/test-ownership.md) explains regression
+  ownership, consolidation evidence and CI performance measurements.
 
 ## Understand the product and design
 

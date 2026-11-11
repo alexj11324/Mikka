@@ -13,7 +13,7 @@ import {
   validateInvitationEmails,
 } from "@/lib/invitation-csv";
 import { useActionError } from "@/lib/use-action-error";
-import { publicAppOrigin } from "@/lib/platform/public-origin";
+import { publicServiceLink } from "@/lib/platform/public-origin";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -41,7 +41,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { withBasePath } from "@/lib/base-path";
 
 /**
  * The message for each skip reason. Written out rather than built from the
@@ -205,7 +204,7 @@ export function InviteMembersDialog({
       setLinks(
         result.data.map((link) => ({
           email: link.email,
-          url: new URL(withBasePath(link.path), publicAppOrigin()).href,
+          url: publicServiceLink(link.path),
         })),
       );
       // Every address gets an answer (ALE-28): these ones were skipped, and the

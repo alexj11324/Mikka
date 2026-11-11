@@ -37,12 +37,37 @@ jobs:
           node-version: 24
       - name: Verify disposable acceptance target guards and model fixture
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
-      - name: Build the public standalone application
+      - name: Verify managed PostgreSQL Compose contract (offline)
+        run: node --test scripts/acceptance/self-hosted-neon-compose.test.mjs
+      # Reuse the expensive subscription-worker and app build stages across
+      # fresh hosted runners. Only the trusted default branch may publish a
+      # cache; PRs and tags read it and still build/test their exact source.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Resolve exact image inputs
+        id: image-inputs
         run: |
           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
-          docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --build-arg MIKKA_BUILD_WORKER_SHA="$mikka_image_worker_sha" --tag mikka-self-hosted:check .
+          echo "worker-sha=$mikka_image_worker_sha" >> "$GITHUB_OUTPUT"
+      - name: Build the public standalone application
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          push: false
+          tags: mikka-self-hosted:check
+          build-args: |
+            MIKKA_BUILD_REVISION=${{ github.sha }}
+            MIKKA_BUILD_WORKER_SHA=${{ steps.image-inputs.outputs.worker-sha }}
+          # A fork PR cannot borrow the owner's cache through its own ref.
+          # Missing/expired cache never replaces an actual build.
+          cache-from: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'type=gha,scope=mikka-selfhost-public' || '' }}
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=mikka-selfhost-public,mode=max' || '' }}
       - name: Verify packaged subscription binaries without network or credentials
         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
+      - name: Verify startup migration locks bypass transaction pooling
+        run: docker run --rm --network none --entrypoint node mikka-self-hosted:check --test scripts/self-hosted-start.test.mjs
       - name: Start with an empty database and no Mikka credentials
         run: |
           node --input-type=module <<'JS'
@@ -54,6 +79,8 @@ jobs:
           }
           appendFileSync(process.env.GITHUB_ENV, 'MIKKA_IMAGE=mikka-self-hosted:check\n')
           JS
+      - name: Start an independent external Compose installation against isolated PG17
+        run: bash scripts/acceptance/self-hosted-external-postgres.sh
       - name: Build the pinned upstream MinIO fixture
         run: docker compose build minio
       - name: Apply migrations and wait for health

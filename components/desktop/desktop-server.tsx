@@ -50,6 +50,8 @@ export function ServerName({ server }: { server: BundledServer }) {
   </span>
 }
 
+type SavedChoice = { id: string; label: string }
+
 function probeError(t: (key: string, values?: Record<string, string>) => string, probe: BundledServerProbe): string | null {
   switch (probe.status) {
     case 'ok': return null
@@ -73,25 +75,41 @@ export function ServerDialog({ open, onOpenChange, current, onSelected }: {
   current: BundledServer | null
   onSelected: (state: BundledServerState) => void
 }) {
+  const api = desktopServers()
+  if (!api) return null
+  return <ServerChooser open={open} onOpenChange={onOpenChange} current={current}
+    probeServer={address => api.probe(address)} select={async url => onSelected(await api.select(url))} />
+}
+
+export function ServerChooser({ open, onOpenChange, current, saved = [], activeChoice, probeServer, select, errorText }: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  current: Pick<BundledServer, 'cloud' | 'url'> | null
+  saved?: SavedChoice[]
+  activeChoice?: string
+  probeServer: (address: string) => Promise<BundledServerProbe>
+  select: (url: string | null, savedChoice?: string) => Promise<void>
+  errorText?: (error: unknown) => string
+}) {
   const t = useTranslations('DesktopServer')
-  const [choice, setChoice] = useState<'cloud' | 'self'>(current && !current.cloud ? 'self' : 'cloud')
+  const [choice, setChoice] = useState(activeChoice ?? (current && !current.cloud ? 'self' : 'cloud'))
   const [address, setAddress] = useState(current && !current.cloud ? current.url : '')
   const [probe, setProbe] = useState<BundledServerProbe | null>(null)
   const [pending, setPending] = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [failure, setFailure] = useState('')
   const found = choice === 'self' && probe?.status === 'ok' ? probe.server : null
   const error = choice === 'self' && probe ? probeError(t as (key: string, values?: Record<string, string>) => string, probe) : null
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const api = desktopServers()
-    if (!api || pending) return
-    setPending(true); setFailed(false)
+    if (pending) return
+    setPending(true); setFailure('')
     try {
-      if (choice === 'cloud') onSelected(await api.select(null))
-      else if (found) onSelected(await api.select(found.url))
-      else setProbe(await api.probe(address))
-    } catch { setFailed(true) }
+      if (choice === 'cloud') await select(null)
+      else if (choice !== 'self') await select(null, choice)
+      else if (found) await select(found.url)
+      else setProbe(await probeServer(address))
+    } catch (error) { setFailure(errorText?.(error) ?? t('errors.failed')) }
     finally { setPending(false) }
   }
 
@@ -101,18 +119,18 @@ export function ServerDialog({ open, onOpenChange, current, onSelected }: {
       <form onSubmit={event => { void submit(event) }}>
         <FieldGroup>
           <Field>
-            <RadioGroup aria-label={t('title')} value={choice} onValueChange={next => { if (next === 'cloud' || next === 'self') { setChoice(next); setFailed(false) } }}
+            <RadioGroup aria-label={t('title')} value={choice} disabled={pending} onValueChange={next => { setChoice(next); setFailure('') }}
               className="w-full min-w-0 gap-0 overflow-hidden rounded-xl border">
-              {(['cloud', 'self'] as const).map(value => <Label key={value} className="flex w-full min-w-0 items-center gap-3 px-3 py-2 font-normal hover:bg-muted has-data-checked:bg-muted">
-                <RadioGroupItem value={value} />
-                <span>{value === 'cloud' ? t('cloud') : t('selfHosted')}</span>
+              {[{ id: 'cloud', label: t('cloud') }, ...saved, { id: 'self', label: t('selfHosted') }].map(option => <Label key={option.id} className="flex w-full min-w-0 items-center gap-3 px-3 py-2 font-normal hover:bg-muted has-data-checked:bg-muted">
+                <RadioGroupItem value={option.id} />
+                <span>{option.label}</span>
               </Label>)}
             </RadioGroup>
           </Field>
           {choice === 'self' && <Field data-invalid={error ? true : undefined}>
             <FieldLabel htmlFor="desktop-server-address">{t('address')}</FieldLabel>
-            <Input id="desktop-server-address" value={address} autoFocus inputMode="url" autoComplete="url" spellCheck={false} maxLength={2048} placeholder="https://mikka.example.com"
-              aria-invalid={error ? true : undefined} onChange={event => { setAddress(event.target.value); setProbe(null); setFailed(false) }} />
+            <Input id="desktop-server-address" disabled={pending} value={address} autoFocus inputMode="url" autoComplete="url" spellCheck={false} maxLength={2048} placeholder="https://mikka.example.com"
+              aria-invalid={error ? true : undefined} onChange={event => { setAddress(event.target.value); setProbe(null); setFailure('') }} />
             {error && <FieldError>{error}</FieldError>}
           </Field>}
           {found && <Item variant="muted" size="sm" role="status">
@@ -122,7 +140,7 @@ export function ServerDialog({ open, onOpenChange, current, onSelected }: {
               <ItemDescription>{t('version', { version: found.version ?? '' })}</ItemDescription>
             </ItemContent>
           </Item>}
-          {failed && <FieldError>{t('errors.failed')}</FieldError>}
+          {failure && <FieldError>{failure}</FieldError>}
         </FieldGroup>
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>{t('cancel')}</Button>
