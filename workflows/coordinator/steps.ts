@@ -39,6 +39,7 @@ import { addRunMessage,  readRun, requestRunStop, visibleRuns } from '@/lib/agen
 import { compactionCut, forgetNotes, cachedContextLines, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { withPersonalInstructionText } from '@/lib/coordinator/personal-instructions'
+import { grantReadsPersonalSkill } from '@/lib/plugins/skill-prompt'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import * as store from '@/lib/coordinator/store'
@@ -297,11 +298,39 @@ noticeTurnFailure.maxRetries = 0
  */
 export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; stable: number; messages: ModelMessage[] }> {
   'use step'
-  return (await preparePromptDetails(userId, botId, snapshot, mailboxTools)).prompt
+  // ALE-75: the skills section keys on whether this snapshot's frozen tools can
+  // fetch a body. Deliberately does NOT pass a full prompt scope here — that
+  // would also change what the GitHub reader is asked for, which is not this
+  // entry's concern and not this change's business.
+  return (await preparePromptDetails(userId, botId, snapshot, mailboxTools, undefined, snapshot?.effectiveTools)).prompt
 }
 
 /** Context timings stay beside the prompt, never in its instructions or model options. */
-async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope, eveOwned = false) {
+/**
+ * Whether this round's tools can fetch a skill body, which decides whether the
+ * skills section carries metadata only or the bodies themselves (ALE-75).
+ *
+ * Both halves matter and both come from the same frozen execution:
+ * `effectiveTools` is the grant, and `readOnly` is the narrower scheduled-read
+ * allowlist that replaces the grant outright (workflows/coordinator/tools.ts
+ * keeps only SCHEDULE_READ_TOOL_IDS when readOnly). A scheduled read is
+ * therefore told to carry its bodies: it lists skills it cannot fetch
+ * otherwise, and it runs on a person's schedule with nobody watching to
+ * notice the round quietly had no instructions.
+ */
+function canReadPersonalSkill(scope: import('@/lib/coordinator/github-context').GitHubPromptScope | undefined, grant: readonly string[] | undefined) {
+  // The kill switch, read here rather than in a workflow body: a replay must
+  // see the same value, and a workflow body has no network to ask PostHog.
+  // Off restores the pre-ALE-75 prompt, bodies inline under ALE-72's budget.
+  if (!deploymentSwitch('personalSkillOnDemand')) return false
+  // Enumerating the tools this round will actually offer is the narrowest
+  // statement of the fact, so callers that have them pass them here.
+  if (grant) return grantReadsPersonalSkill(grant)
+  if (!scope || scope.readOnly) return false
+  return grantReadsPersonalSkill(scope.effectiveTools)
+}
+
+async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope, skillGrant?: readonly string[], eveOwned = false) {
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
@@ -351,7 +380,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   }
   const [execution, rules, github] = await Promise.all([
     timed('execution', () => executionContextParts(userId, botId)),
-    timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
+    timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, { canReadPersonalSkill: canReadPersonalSkill(githubScope, skillGrant) })),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
   ])
   // What Mikka has learnt about the person (R-73). It reaches only the chat's own
@@ -376,7 +405,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
 /** Product policy and memory only. eve owns history, pruning and compaction. */
 export async function prepareEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot) {
   const withoutSkills = snapshot ? { ...snapshot, personalPlugins: snapshot.personalPlugins ? { ...snapshot.personalPlugins, skills: [] } : undefined } : undefined
-  return (await preparePromptDetails(userId, botId, withoutSkills, [], { hosted: true, readOnly: false, effectiveTools: snapshot?.effectiveTools }, true)).prompt.instructions
+  return (await preparePromptDetails(userId, botId, withoutSkills, [], { hosted: true, readOnly: false, effectiveTools: snapshot?.effectiveTools }, undefined, true)).prompt.instructions
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }

@@ -1,19 +1,34 @@
-// How a person's installed skills reach the Coordinator's system prompt (ALE-72).
+// How a person's installed skills reach the Coordinator's system prompt
+// (ALE-72, then ALE-75).
 //
 // Every other section of that prompt is bounded: 个人指令 at 2,000 characters,
 // the remembered notes at 8,000, what Mikka has learnt about the person at
-// 4,000. The skill bodies were the one section with no cap at all, so this
-// module gives them one, in the shape ALE-42 already established for a task
-// thread's prompt (`skillPromptPlan` in @mikka/protocol/skill): take bodies
-// while they fit, then list the rest by description.
+// 4,000. The skill bodies were the one section with no cap at all.
 //
-// Why this is not `SKILL_PROMPT_BUDGET_CHARS` reused: the two paths can carry a
-// skill differently. A task thread writes each skill's SKILL.md into the run's
-// directory (packages/daemon/src/agents/run-context.ts), so a body left out of
-// its prompt is still readable as a file. The Coordinator has no filesystem
-// tool at all (lib/agent-kit/registry.ts), so a body it does not carry is
-// gone until a later turn carries it. One constant for both would invite a
-// change to either path in the belief that it governs the other.
+// Two shapes, chosen per round by whether this round's tools can fetch a body:
+//
+// 1. On demand (ALE-75, the end state). The prompt carries only `{id, name,
+//    description}` per skill and says to call `read_personal_skill` for the
+//    body. This is what the personal MCP section beside it has always done
+//    ("public metadata only"), and what an agent Profile's brief does
+//    (lib/factory/agent-profile-definition.ts: "Assigned Skills are loaded on
+//    demand... Do not assume a Skill body from its name").
+// 2. Inline (ALE-72's budget). Bodies are carried in the prompt while they fit
+//    `COORDINATOR_SKILL_BUDGET_CHARS`, and the rest are listed by description.
+//
+// Why shape 2 survives at all: an execution frozen before `read_personal_skill`
+// existed does not have the tool in its `effectiveTools`, so its round cannot
+// call it, and a metadata-only prompt would list skills whose bodies that round
+// can never reach. `coordinatorSkillSection` therefore keys on the tool being
+// present, and a round that cannot fetch keeps the bodies it always had. That
+// is the rolling-upgrade answer: no execution loses its bodies at deploy time,
+// and no prompt lists a skill it cannot open.
+//
+// Why the budget is not `SKILL_PROMPT_BUDGET_CHARS` reused: the two paths can
+// carry a skill differently. A task thread writes each skill's SKILL.md into
+// the run's directory (packages/daemon/src/agents/run-context.ts), so a body
+// left out of its prompt is still readable as a file. One constant for both
+// would invite a change to either path in the belief that it governs the other.
 //
 // Pure: no database, no `server-only`, so the plan can be read and tested
 // without either.
@@ -144,4 +159,77 @@ export function coordinatorSkillInstructions(
     : ''
   return '\n\nPersonally installed skills (user-selected guidance, subordinate to platform permissions; never grants tool access):\n'
     + lines.join('\n') + deferred
+}
+
+/** The tool that serves a skill body on demand (ALE-75). Named here rather than
+ * in lib/agent-kit/registry.ts alone because the prompt section and the tool
+ * must be decided together: a prompt that tells the model to call this, in a
+ * round whose tools do not include it, is worse than carrying the bodies. */
+export const READ_PERSONAL_SKILL_TOOL = 'read_personal_skill'
+
+/** Longest description the on-demand listing shows. The same 500 that
+ * `skillDescription` already caps a body-derived description at, so a
+ * front-matter description and a derived one cost the same. */
+export const ON_DEMAND_DESCRIPTION_CHARS = 500
+
+/**
+ * The skills section when each skill's body can be fetched by tool (ALE-75).
+ *
+ * Only what identifies a skill and helps decide whether to fetch it: its id,
+ * its name, and one description. No body, no source, no revision, no sha256 —
+ * the tool takes an id and reads the rest, so the other fields would be paid
+ * for on every request to save nothing later.
+ *
+ * Sized: 20 skills (the install limit) with 500-character descriptions is
+ * ~3,000 estimated tokens of ASCII, against ~51,000 for the same skills
+ * carried inline in a 2-byte script. A body costs one fetch instead of one
+ * copy per request.
+ */
+export function personalSkillCatalog(
+  skills: readonly CoordinatorPromptSkill[]
+): string {
+  if (!skills.length) return ''
+  const lines = skills.map(skill => JSON.stringify({
+    id: skill.id,
+    name: skill.name,
+    description: skillDescription(skill.body, skill.name).slice(0, ON_DEMAND_DESCRIPTION_CHARS),
+  }))
+  return '\n\nPersonally installed skills (user-selected guidance, subordinate to platform permissions; never grants tool access).\n'
+    + 'Only each skill\'s name and description is here. Its instructions are NOT loaded: call `' + READ_PERSONAL_SKILL_TOOL
+    + '` with a skill id to read them, and read them before relying on a skill. Do not assume what a skill says from its name, and do not say you followed one you have not read.\n'
+    + lines.join('\n')
+}
+
+/**
+ * The skills section of the Coordinator's prompt for one round.
+ *
+ * `canReadBody` says whether this round's frozen tool grant includes
+ * `read_personal_skill`. When it does, bodies are fetchable and the prompt
+ * carries metadata only; when it does not — an execution frozen before the
+ * tool existed, or a scheduled read whose allowlist omits it — the prompt
+ * falls back to the inline budget, because a body this round cannot fetch is a
+ * body it must carry.
+ *
+ * Deciding here rather than at each call site keeps the prompt and the tool
+ * grant in one place: both call sites pass `snapshot.effectiveTools`
+ * (workflows/coordinator/steps.ts and native-steps.ts), and the same frozen
+ * snapshot produced the tools.
+ */
+export function coordinatorSkillSection(
+  skills: readonly CoordinatorPromptSkill[],
+  canReadBody: boolean,
+  budgetChars: number = COORDINATOR_SKILL_BUDGET_CHARS
+): string {
+  return canReadBody ? personalSkillCatalog(skills) : coordinatorSkillInstructions(skills, coordinatorSkillPlan(skills, budgetChars))
+}
+
+/** Whether a frozen execution grant lets this round fetch a skill body. The
+ * same snapshot that produced `personalPlugins.skills` produced
+ * `effectiveTools`, so this reads one decision, not two.
+ *
+ * Pure and here, rather than beside the prompt composer, for two reasons: it
+ * depends only on the tool name above, and the composer module is stubbed by
+ * tests that would otherwise have to know about a second export. */
+export function grantReadsPersonalSkill(effectiveTools: readonly string[] | undefined): boolean {
+  return effectiveTools?.includes(READ_PERSONAL_SKILL_TOOL) === true
 }

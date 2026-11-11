@@ -37,6 +37,12 @@ test('native Ask uses one durable product receipt and existing personal operatio
     assert.equal(sends,1);assert.equal(cards,0)
     assert.equal((await bridge.execute(call,responder) as {status:string}).status,'done');assert.equal(sends,1)
     assert.equal((await eveApprovalStore(pool,'other',bot).read('unknown')),null)
+    deps.resolveAccount=async()=>({accountId:null,accounts:[{id:'account-a',alias:'Work'},{id:'account-b',alias:'Personal'}]})
+    const selection={...call,callId:'selection-call'}
+    assert.equal((await bridge.review(selection))?.status,'not-applicable')
+    assert.deepEqual(await bridge.execute(selection),{error:'integrationAccountSelectionRequired',accounts:[{id:'account-a',alias:'Work'},{id:'account-b',alias:'Personal'}]})
+    assert.equal(sends,1);assert.equal(cards,0)
+    deps.resolveAccount=async()=>({accountId:'account',accounts:[]})
 
     const action='append_notion_paragraph',runId=randomUUID(),revision=randomUUID(),definition={...DEFAULT_AGENT_DEFINITION,tools:[action]}
     const snapshot=makeSnapshot(revision,1,definition,'host',{harness:'ai_sdk',model:'openai/gpt-6-luna'})

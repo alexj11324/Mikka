@@ -93,7 +93,12 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
     assert.deepEqual(calls.map(call => call.reader).filter(reader => reader !== 'repositories' && reader !== 'profile'), ['execution', 'personal', 'github'])
     assert.deepEqual(calls.find(call => call.reader === 'execution')?.args, [owner, bot])
     assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, undefined, undefined, undefined, bot])
-    assert.deepEqual(calls.find(call => call.reader === 'personal')?.args, [owner, withCoordinatorPresentation(executionInstructions(snapshot)), personal, { servers: [], skills: [] }])
+    // The 5th argument is ALE-75's grant: whether this round's frozen tools can
+    // fetch a skill body, which decides whether the skills section carries
+    // metadata only or the bodies. This fixture's DEFAULT_AGENT_DEFINITION
+    // includes read_personal_skill, so the section is metadata only here. The
+    // assertion stays exact so a later change to this contract is not silent.
+    assert.deepEqual(calls.find(call => call.reader === 'personal')?.args, [owner, withCoordinatorPresentation(executionInstructions(snapshot)), personal, { servers: [], skills: [] }, { canReadPersonalSkill: true }])
   } finally {
     // Complete in reverse order; assembly order and the cache boundary must not change.
     gates.github!.resolve(); gates.personal!.resolve(); gates.execution!.resolve()

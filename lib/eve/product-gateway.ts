@@ -158,5 +158,5 @@ async function productTools(scope: Scope, execution: AgentExecution | null, sour
     ...(scheduledRead ? { readOnly: true, readToolIds: scheduledRead.allowedActions } : {}),
   })
   // Discovery, skills and generic MCP execution belong to eve's native capabilities.
-  return Object.fromEntries(Object.entries(tools).filter(([name]) => !['load_skill', 'list_personal_mcp_tools', 'call_personal_mcp_tool'].includes(name)))
+  return Object.fromEntries(Object.entries(tools).filter(([name]) => !['load_skill', 'read_personal_skill', 'list_personal_mcp_tools', 'call_personal_mcp_tool'].includes(name)))
 }
