@@ -30,7 +30,8 @@ export async function createUnstartedTask(input: CreateOnlyCommand) {
     const receipt = previous.rows[0]
     if (receipt && (receipt.workspaceId !== workspaceId || receipt.fingerprint !== fingerprint)) throw new ActionFailureError('submissionConflict')
     if (receipt) {
-      if (!await issueForUser(user, receipt.taskId, false, tx, { withoutBody: true })) throw new ActionFailureError('issueNotFound')
+      const current = await issueForUser(user, receipt.taskId, false, tx, { withoutBody: true })
+      if (!current || current.workspaceId !== workspaceId) throw new ActionFailureError('issueNotFound')
       return { version, taskId: receipt.taskId, identifier: receipt.identifier, dispatch: null }
     }
     const issue = await createIssueForUserInTransaction(tx, user.id, fields, activityActor(user.id), { workspaceId, deriveShortTitle: false })
