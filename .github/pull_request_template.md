@@ -6,6 +6,7 @@
 
 <!-- Delete this section if the PR has no UI. -->
 
+- For changes to a business entity, field, state or command, list its entry points and link the shared implementation and behavior test.
 - Review page (Artifact):
 - Accepted Figma frames:
 - Rules touched (docs/design/rules.md ids):

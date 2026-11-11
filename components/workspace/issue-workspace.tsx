@@ -24,7 +24,7 @@ import { MemoryPage } from '@ui-slot/memory'
 import { TasksPage } from '@ui-slot/tasks'
 import { INBOX_PHONE_HEADER, INBOX_TITLE, InboxPage } from '@ui-slot/inbox'
 import { AppFrame, AppShellContent, FRAME_LISTS_CHATS, FRAME_OWNS_HEADER, FRAME_OWNS_PANEL, SignOutBoundary, WindowBar } from '@/components/app-shell'
-import { ConversationPanels } from '@/components/coordinator/conversation-panels'
+import { ConversationPanels, EmbeddedTaskDetail, EmbeddedTaskLifecycle } from '@/components/coordinator/conversation-panels'
 import * as settingsFrameSlot from '@ui-slot/settings-frame'
 import * as reviewSummarySlot from '@ui-slot/review-summary'
 import * as pluginsSlot from '@ui-slot/plugins'
@@ -76,7 +76,7 @@ import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { InlineLoadError } from '@/components/load-error'
 import { PluginsPage as DefaultPluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
-import { backToTaskOrigin, dropQueryKeys, goTo, navigate as navigateWorkspace, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
+import { backToTaskOrigin, closeTask, dropQueryKeys, goTo, navigate as navigateWorkspace, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest, appHrefBeforeSettings, rememberAppHref } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
@@ -324,6 +324,14 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const [draftKey, setDraftKey] = useState(0)
   const dirtyRef = useRef(false)
   const flushDetail = useRef<(() => Promise<boolean>) | null>(null)
+  const embeddedEditors = useRef(new Map<symbol, () => Promise<boolean>>())
+  const embeddedLifecycle = useMemo(() => ({
+    onSaved: () => { void mutate() },
+    register: (owner: symbol, flush: (() => Promise<boolean>) | null) => {
+      if (flush) embeddedEditors.current.set(owner, flush)
+      else embeddedEditors.current.delete(owner)
+    },
+  }), [mutate])
   const leaving = useRef(false)
   const registerFlush = useCallback((flush: (() => Promise<boolean>) | null) => { flushDetail.current = flush }, [])
   /** Shows the task; the caller writes the address. */
@@ -381,6 +389,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   async function leave(action: () => void | Promise<void>) {
     leaving.current = true
     try {
+      for (const flush of embeddedEditors.current.values()) if (!await flush()) return false
       if (flushDetail.current) {
         if (!await flushDetail.current()) return false
       } else if (dirtyRef.current) return false
@@ -672,7 +681,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
   // the default keeps the workspace frame mounted around settings (#1603).
   // Both visual frames share the workspace's pending notes and computer registry.
-  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
+  return <SignOutBoundary pending={signingOut}><EmbeddedTaskLifecycle value={embeddedLifecycle}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
@@ -694,7 +703,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     </AppShellContent>
     {browserShown && !threadShown && !threadsView && !panelsInFrame && <BrowserPane onClose={() => showBrowser(false)} />}
     {threadShown && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
-    {taskShown && !threadShown && <TaskColumn issueId={taskShown} issue={tasks.find(task => task.id === taskShown)} threads={threads} overList={!!threadsView} />}
+    {taskShown && !threadShown && <TaskColumn issueId={taskShown} issue={tasks.find(task => task.id === taskShown)} threads={threads} overList={!!threadsView}>
+      <EmbeddedTaskDetail key={taskShown} issueId={taskShown} origin={originLabel} onOpenTask={id => open(id)} onClose={closeTask} />
+    </TaskColumn>}
     {threadsView && !threadShown && !taskShown && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} loading={threadsLoading} />}
     {/* Opening, closing and handing the column to a thread are instant (R-37). */}
     {isConversation && !panelsInFrame && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
@@ -717,5 +728,5 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     {artifactId && <ArtifactWindow artifactId={artifactId} />}
     </>}
     {dialogs}
-  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
+  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></EmbeddedTaskLifecycle></SignOutBoundary>
 }

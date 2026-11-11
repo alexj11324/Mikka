@@ -13,9 +13,10 @@ function applicationBuild() {
   try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return '' }
 }
 
-export async function frontendConfig({ target = 'web', command = 'build', outdir, clean = true } = {}) {
+export async function frontendConfig({ target = 'web', command = 'build', outdir, clean = true, serverPages = false } = {}) {
   if (!['web', 'desktop'].includes(target)) throw new Error('FRONTEND_TARGET_INVALID')
   if (!['build', 'serve'].includes(command)) throw new Error('FRONTEND_COMMAND_INVALID')
+  if (serverPages && (target !== 'web' || process.env.MIKKA_UI_OVERLAY_DIR?.trim() || process.env.MIKKA_UI_OVERLAY_SHA?.trim())) throw new Error('SERVER_PAGES_REQUIRE_PUBLIC_WEB_BUILD')
   const development = command === 'serve'
   const deploymentId = target === 'web' && !development ? configuredDeploymentId() ?? '' : ''
   return {
@@ -46,7 +47,7 @@ export async function frontendConfig({ target = 'web', command = 'build', outdir
       'process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka' : ''),
       'process.env': '{}',
     },
-    plugins: [await applicationPlugin(target, { deploymentId }), react(), await deploymentPlugin({ repository, deploymentId })],
+    plugins: [await applicationPlugin(target, { deploymentId, serverPages }), react(), await deploymentPlugin({ repository, deploymentId })],
     experimental: deploymentId ? { renderBuiltUrl: filename => pinnedUrl(`/mikka/${filename}`, deploymentId) } : {},
     // A hosted UI layer (docs/ui-overlay.md) may carry its own node_modules; React stays this repository's.
     resolve: { dedupe: ['react', 'react-dom'] },

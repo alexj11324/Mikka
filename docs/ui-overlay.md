@@ -1,5 +1,7 @@
 # UI slots
 
+The [One UI slot inventory](design/one-ui-slot-inventory.md) lists each Web/Desktop binding, its production imports, and its migration decision under Epic [#1646](https://github.com/alexj11324/Mikka/issues/1646).
+
 There is one UI ([decision 2026-11-08-2133](design/decisions/2026-11-08-2133-one-ui.md)).
 Its code lives in this repository and in the private `alexj11324/mikka-hosted-ui`.
 Slots are how official web and desktop builds bring the private code in

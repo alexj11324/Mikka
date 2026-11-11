@@ -14,6 +14,7 @@ import { GlassButton } from '@/components/GlassButton'
 import { HARNESS } from '@/lib/harness'
 import { useHome } from '@/lib/home'
 import { tasksLive } from '@/lib/live-keys'
+import { readPresentedTask } from '../model/task-presentation-read'
 import type { TaskActivity, TaskDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
@@ -42,7 +43,8 @@ export function TaskScreen() {
   const insets = useSafeAreaInsets()
   const bar = useScrolledUnderBar()
   const home = useHome().data
-  const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
+  const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`,
+    detail => tasksLive(home?.live?.workspaceId, detail?.live?.workspaceId ?? home?.workspace.id, [id]), readPresentedTask)
   const task = data?.task
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null

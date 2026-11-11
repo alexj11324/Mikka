@@ -141,7 +141,14 @@ const noSubscribe = () => () => {}
 
 function TaskForm({ initial, preview = false, thread: openThread, origin, user, onSaved, onDirty, onClose, onDeleted, onRegisterFlush, navigation, onOpen }: DetailProps & { initial: Issue; preview?: boolean }) {
   const t = useTranslations('Workspace.detail')
-  const { cache } = useSWRConfig()
+  const { cache, mutate: mutateCache } = useSWRConfig()
+  const publishSaved = useCallback((issue: Issue) => {
+    // A confirmed write also updates the preview that another placement opens immediately.
+    // Discard the old conditional token. A slower mutation must never move the cache backwards.
+    void mutateCache<IssueRead>(issueKeys.detail(issue.id), previous =>
+      previous && previous.revision > issue.revision ? previous : issue, { revalidate: false })
+    onSaved(issue.id)
+  }, [mutateCache, onSaved])
   const tDetail = useTranslations('IssueDetail')
   const actionError = useActionError()
   const saveMessages = useRef({ t, actionError })
@@ -287,7 +294,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
             acknowledged.current = snapshot.generation
             setDirty(draft.current.generation !== acknowledged.current)
             void refreshVersions().catch(() => {})
-            onSaved(result.issue.id)
+            publishSaved(result.issue)
           }
         } while (draft.current.generation !== acknowledged.current)
         return true
@@ -297,7 +304,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     flight.current = operation
     void operation.finally(() => { flight.current = null })
     return operation
-  }, [initial.id, preview, sync, onSaved, refreshVersions])
+  }, [initial.id, preview, sync, publishSaved, refreshVersions])
   useEffect(() => {
     // A preview cannot acquire an editable draft, so leaving it needs no save.
     // Keep save() itself refused until the normal read verifies access.
@@ -313,7 +320,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     if (issue.revision < savedRef.current.revision) return
     savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
     draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
-    void refreshVersions().catch(() => {}); onSaved(issue.id)
+    void refreshVersions().catch(() => {}); publishSaved(issue)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
   async function restore(version: NonNullable<typeof historyVersions>[number]) {
