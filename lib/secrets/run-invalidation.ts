@@ -8,10 +8,13 @@ import type { SecretsTx } from './store'
 
 export type SecretChange = { name: string } & (
   | { ownerId: string }
-  | { workspaceId: string; scopeType: 'workspace' | 'repository'; scopeRef: string }
+  | { id: string; workspaceId: string; scopeType: 'workspace' | 'repository'; scopeRef: string }
 )
 
-type Candidate = { id: string; userId: string; deviceId: string; workspaceId: string | null; remoteUrl: string | null }
+type Candidate = {
+  id: string; userId: string; deviceId: string; workspaceId: string | null; remoteUrl: string | null
+  hasEnvironment: boolean; environmentSecretIds: unknown
+}
 const key = (...parts: (string | null)[]) => JSON.stringify(parts)
 
 /**
@@ -30,7 +33,9 @@ export async function stopRunsForSecretChanges(tx: SecretsTx, changes: readonly 
   const { rows: candidates } = await tx.execute<Candidate>(sql`
     SELECT r.id,r."userId",r."deviceId",${workspace} AS "workspaceId",
       CASE WHEN r."agentDefinition" ? 'repositoryAdmission' THEN r."agentDefinition"->'repositoryAdmission'->>'remoteUrl'
-        ELSE repo."remoteUrl" END AS "remoteUrl"
+        ELSE repo."remoteUrl" END AS "remoteUrl",
+      COALESCE(jsonb_typeof(r."agentDefinition"->'projectExecution'->'environment')='object',false) AS "hasEnvironment",
+      r."agentDefinition"->'projectExecution'->'environment'->'secretIds' AS "environmentSecretIds"
     FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
     LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" AND repo."deviceId"=r."deviceId"
     WHERE r."stopRequestedAt" IS NULL AND r.status IN ('preparing','running','paused','waiting_input','finishing')
@@ -41,18 +46,27 @@ export async function stopRunsForSecretChanges(tx: SecretsTx, changes: readonly 
   const owners = [...new Set(candidates.map(run => run.userId))]
   const personalRows = names.length ? await tx.select({ userId: userSecrets.userId, name: userSecrets.name }).from(userSecrets)
     .where(and(inArray(userSecrets.userId, owners), inArray(userSecrets.name, names))) : []
-  const repositoryRows = names.length && workspaceIds.length ? await tx.select({ workspaceId: workspaceSecrets.workspaceId, scopeRef: workspaceSecrets.scopeRef, name: workspaceSecrets.name }).from(workspaceSecrets)
+  const repositoryRows = names.length && workspaceIds.length ? await tx.select({ id: workspaceSecrets.id, workspaceId: workspaceSecrets.workspaceId, scopeRef: workspaceSecrets.scopeRef, name: workspaceSecrets.name }).from(workspaceSecrets)
     .where(and(inArray(workspaceSecrets.workspaceId, workspaceIds), eq(workspaceSecrets.scopeType, 'repository'), inArray(workspaceSecrets.name, names))) : []
   const personal = new Set(personalRows.map(row => key(row.userId, row.name)))
-  const repositories = new Set(repositoryRows.map(row => key(row.workspaceId, row.scopeRef, row.name)))
+  const repositories = new Map(repositoryRows.map(row => [key(row.workspaceId, row.scopeRef, row.name), row.id]))
   const { remoteRepositoryRef } = await import('./runtime')
   const ids = candidates.filter(run => {
     const repository = remoteRepositoryRef(run.remoteUrl)
+    // No Environment preserves the ordinary workspace/repository inheritance.
+    // An Environment, including an empty selection, admits only its frozen IDs.
+    const selected = run.hasEnvironment
+      ? new Set(Array.isArray(run.environmentSecretIds) ? run.environmentSecretIds.filter((id): id is string => typeof id === 'string') : [])
+      : null
     return changes.some(change => {
       if ('ownerId' in change) return change.ownerId === run.userId
       if (run.workspaceId !== change.workspaceId || personal.has(key(run.userId, change.name))) return false
-      return change.scopeType === 'repository' ? repository === change.scopeRef
-        : !repository || !repositories.has(key(change.workspaceId, repository, change.name))
+      if (selected && !selected.has(change.id)) return false
+      if (change.scopeType === 'repository') return repository === change.scopeRef
+      const override = repository ? repositories.get(key(change.workspaceId, repository, change.name)) : undefined
+      // An unselected same-name repository row cannot hide a selected workspace
+      // Secret from rotation/deletion, because it never reached this Environment.
+      return !override || selected !== null && !selected.has(override)
     })
   }).map(run => run.id)
   if (!ids.length) return 0

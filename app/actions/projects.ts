@@ -1,200 +1,309 @@
 'use server'
 import { getTranslations } from 'next-intl/server'
-
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
-import { currentUser } from '@/lib/acting-user'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
-import { projectDb, projects, projectEvents } from '@/lib/db/projects'
-import { requireIssueAccess } from '@/lib/issue-access'
-import { updateIssueMetadata } from '@/app/actions/issue-metadata'
-import { projectInput, projectPatch, hasDependencyCycle, type ProjectChanges } from '@/lib/project-input'
-import { accessibleProjects, accessibleProjectReferences } from '@/lib/project-access'
+import { projectDb, projects, projectEvents, projectTasks, projectMembers } from '@/lib/db/projects'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
+import { issues, issueVersions } from '@/lib/db/schema'
+import { db } from '@/lib/db'
+import { requireUser } from '@/lib/issue-access'
+import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
+import { issueView } from '@/lib/task-identifier-server'
+import { activityActor } from '@/lib/activity-actor'
+import { issueListChanged } from '@/lib/live/lists'
+import { projectInput, projectPatch, projectPeople, hasDependencyCycle, type ProjectChanges } from '@/lib/project-input'
+import { accessibleProjects, accessibleProjectReferences, requireProjectWrite, type ProjectTransaction } from '@/lib/project-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
-import { teamIssues, teamProjects } from '@/lib/db/team-schema'
-import { inArray } from 'drizzle-orm'
 import { lockTeamRelations } from '@/lib/team-access'
-import { db, pool, withDatabaseTransaction } from '@/lib/db'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { withResourceAccess, lockResourcesAccess } from '@/lib/resource-access/store'
 import { registerProjectAccess, bindProjectTasks } from '@/lib/resource-access/projects'
 import { assertAccessConfirmation } from '@/lib/resource-access/confirm-access'
-import type { IssueReader } from '@/lib/issue-visibility'
-import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
+import { notifyStoppedPolicyRuns, runPolicyStopSQL, type StoppedPolicyRun } from '@/lib/run-policy-stop'
+import { deleteProjectData, projectLifecycleImpact, setProjectArchive } from '@/lib/project-lifecycle'
 
-async function projectUser() {
-  const user = await currentUser()
-  if (!user) throw new ActionFailureError('authRequired')
-  return user
+const batchSize = 200
+
+async function projectContext(workspaceId?: string) {
+  const user = await requireUser()
+  const context = await loadWorkspaceContext(workspaceId, user)
+  return { user, workspaceId: context.workspace.id }
 }
-export async function listProjects() {
+
+/** These locks precede the relation lock, just like Workspace membership edits. */
+async function lockPeople(tx: ProjectTransaction, workspaceId: string, people: ReturnType<typeof projectPeople>) {
+  const ids = [...new Set([people.leadUserId, ...people.memberIds].filter((id): id is string => Boolean(id)))].sort()
+  for (let offset = 0; offset < ids.length; offset += batchSize) {
+    const batch = ids.slice(offset, offset + batchSize)
+    const members = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.status, 'active'), inArray(workspaceMembers.userId, batch)))
+      .orderBy(asc(workspaceMembers.userId)).for('share')
+    if (members.length !== batch.length) throw new ActionFailureError('memberNotJoined')
+  }
+}
+
+async function emitProjectChange(tx: ProjectTransaction, projectId: string, actorId: string, message: string) {
+  await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: actorId, projectId, message })
+  await (await import('@/lib/live/project-map')).projectMapChanged(tx, projectId)
+}
+
+async function readProject(tx: ProjectTransaction | typeof projectDb, reader: Parameters<typeof accessibleProjects>[0], workspaceId: string, projectId: string) {
+  const [project] = await accessibleProjects(reader, tx, workspaceId, projectId)
+  if (!project) throw new ActionFailureError('projectNotFound')
+  return project
+}
+
+async function projectsInContext(workspaceId?: string) {
   return withDatabaseOperation('/actions/projects/list', async () => {
-    const context = await loadWorkspaceContext()
-    return (await accessibleProjects(await projectUser(), projectDb, context.workspace.id)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    const context = await projectContext(workspaceId)
+    return (await accessibleProjects(context.user, projectDb, context.workspaceId)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   })
 }
-async function persistProject(reader: Exclude<IssueReader, string>, input: unknown, partial: boolean) {
-  const owner = reader.id
-  const workspaceId = (await loadWorkspaceContext()).workspace.id
-  const requestedId = typeof input === 'object' && input !== null && 'id' in input && typeof input.id === 'string' ? input.id : undefined
-  const reference = requestedId ? (await accessibleProjectReferences(reader, workspaceId)).find(item => item.id === requestedId) : undefined
-  if (requestedId && !reference) throw new ActionFailureError('issueNotFound')
-  const i18nText = await getTranslations();
-  try {
-    return await withTaskWorkspace(reader, workspaceId, () => projectDb.transaction(async tx => {
-      await lockTeamRelations(tx)
-      if (reference) await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, reference.id)).for('update')
-      const owned = await accessibleProjects(reader, tx, workspaceId)
-      const patch = partial ? projectPatch.safeParse(input) : null
-      if (patch && !patch.success) return { error: patch.error.issues[0]?.message ?? i18nText("Errors.issueMetadataInvalid") }
-      const current = patch?.success ? owned.find(item => item.id === patch.data.id) : undefined
-      if (patch?.success && !current) return { error: i18nText("Errors.projectNotFound") }
-      const parsed = projectInput.safeParse(patch?.success ? { ...current, ...patch.data.changes, id: patch.data.id, revision: patch.data.revision } : input)
-      if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? i18nText("Errors.projectCheckFields") }
-      const { id, revision, ...values } = parsed.data
-      if (id && (!revision || !owned.some(item => item.id === id && item.revision === revision))) return { error: i18nText("Errors.projectStale") }
-      if (values.properties.dependencyIds.some(value => !owned.some(item => item.id === value))) return { error: i18nText("Errors.projectDependencyNotFound") }
-      const projectOwner = id ? owned.find(item => item.id === id)!.userId : owner
-      const links = id ? await tx.select().from(teamProjects).where(eq(teamProjects.projectId, id)) : []
-      if (links.length && values.properties.dependencyIds.length) {
-        const dependencies = await tx.select().from(teamProjects).where(inArray(teamProjects.projectId, values.properties.dependencyIds))
-        if (values.properties.dependencyIds.some(dependencyId => !dependencies.some(link => link.projectId === dependencyId && link.workspaceId === links[0].workspaceId))) return { error: i18nText("FeatureCopy.c_63ed64ea") }
-      }
-      const nextId = id ?? crypto.randomUUID()
-      if (hasDependencyCycle(nextId, values.properties.dependencyIds, owned)) return { error: i18nText("Errors.projectDependencyCycle") }
-      const save = async () => {
-      const [project] = id ? await tx.update(projects).set({ ...values, revision: revision! + 1, updatedAt: new Date() }).where(and(eq(projects.id, id), eq(projects.userId, projectOwner), eq(projects.revision, revision!))).returning() : await tx.insert(projects).values({ ...values, id: nextId, userId: owner, issueIds: [], revision: 1 }).returning()
-      if (!project) return { error: i18nText("Errors.projectSaveConflict") }
-      if (!id) await registerProjectAccess(reader, project.id, workspaceId)
-      const names: Record<string, string> = { status: i18nText("Projects.fields.status"), priority: i18nText("Projects.fields.priority"), lead: i18nText("Projects.fields.lead"), startDate: i18nText("Projects.fields.startDate"), targetDate: i18nText("Projects.fields.targetDate"), properties: i18nText("Projects.detail.detailsLabel"), name: i18nText("Settings.workspaceForm.name"), summary: i18nText("Projects.fields.summary"), description: i18nText("Projects.form.descriptionHeading"), team: i18nText("Settings.sections.teams.title") }
-      const message = patch?.success ? i18nText("FeatureCopy.c_976c2152", { value0: (Object.keys(patch.data.changes).map(key => names[key]).join('、')) }) : id ? i18nText("Projects.activity.updatedOverview") : i18nText("Projects.activity.created")
-      await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: projectOwner, projectId: project.id, message })
-      await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
-      return { project }
-      }
-      return reference ? withResourceAccess(reader, reference, 'canSteer', save) : save()
-    }))
-  } catch (error) {
-    if (error instanceof ActionFailureError) throw error
-    return { error: i18nText("Errors.projectSaveFailed") }
-  }
+
+/** Retain the zero-argument action signature: existing SWR consumers pass
+ * their cache key to the fetcher, which generated clients must discard. */
+export async function listProjects() {
+  return projectsInContext()
 }
-export async function saveProject(input: z.input<typeof projectInput>) {
-  return persistProject(await projectUser(), input, false)
+
+export async function listWorkspaceProjects(workspaceId: string) {
+  return projectsInContext(workspaceId)
 }
-export async function updateProjectProperties(input: { id: string; revision: number; changes: ProjectChanges }) {
-  return persistProject(await projectUser(), input, true)
-}
-export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null; confirmAccess?: boolean }) {
+
+async function persistProject(input: unknown, partial: boolean) {
   const i18nText = await getTranslations()
-  const reader = await projectUser()
-  const parsed = z.object({ issueId: z.uuid(), revision: z.number().int().positive(), projectId: z.uuid().nullable(), confirmAccess: z.boolean().optional() }).safeParse(input)
-  if (!parsed.success) return { error: i18nText("Errors.projectMoveInvalid") }
-  const { issue } = await requireIssueAccess(input.issueId)
-  if (!issue.workspaceId) throw new ActionFailureError('issueNotFound')
-  const workspaceId = issue.workspaceId
-  try {
-    return await withTaskWorkspace(reader, workspaceId, () => projectDb.transaction(async tx => {
+  const patch = partial ? projectPatch.safeParse(input) : null
+  if (patch && !patch.success) return { error: patch.error.issues[0]?.message ?? i18nText('Errors.issueMetadataInvalid') }
+  const requestedWorkspace = z.object({ workspaceId: z.uuid().optional() }).safeParse(input)
+  if (!requestedWorkspace.success) return { error: i18nText('Errors.projectCheckFields') }
+  const context = await projectContext(requestedWorkspace.data.workspaceId)
+  const reference = patch?.success
+    ? (await accessibleProjectReferences(context.user, context.workspaceId)).find(item => item.id === patch.data.id)
+    : undefined
+  if (patch?.success && !reference) return { error: i18nText('Errors.projectNotFound') }
+  const write = () => withTaskWorkspace(context.user, context.workspaceId, async (_workspace, tx) => {
+      const current = patch?.success ? await readProject(tx, context.user, context.workspaceId, patch.data.id) : undefined
+      const merged = patch?.success ? { ...current, ...patch.data.changes, id: patch.data.id, revision: patch.data.revision } : input
+      // Legacy patch fields and the explicit ID fields have the same authority.
+      // A stale hydrated alias must not override the field the caller changed.
+      if (patch?.success && merged && typeof merged === 'object') {
+        if ('lead' in patch.data.changes && !('leadUserId' in patch.data.changes)) delete (merged as Record<string, unknown>).leadUserId
+        if ('properties' in patch.data.changes && !('memberIds' in patch.data.changes)) delete (merged as Record<string, unknown>).memberIds
+      }
+      const parsed = projectInput.safeParse(merged)
+      if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? i18nText('Errors.projectCheckFields') }
+      const { id, revision, workspaceId: _workspaceId, leadUserId: _leadUserId, memberIds: _memberIds, ...values } = parsed.data
+      if (parsed.data.workspaceId && parsed.data.workspaceId !== context.workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+      const people = projectPeople(parsed.data, context.user.id)
+      await lockPeople(tx, context.workspaceId, people)
       await lockTeamRelations(tx)
-      const references = await accessibleProjectReferences(reader, workspaceId)
-      const owned = references.length ? await tx.select().from(projects).where(inArray(projects.id, references.map(row => row.id))).orderBy(projects.id).for('update') : []
-      const destination = owned.find(project => project.id === input.projectId)
-      if (input.projectId && !destination) return { error: i18nText("Errors.projectNotFound") }
-      if (destination && !destination.issueIds.includes(input.issueId) && destination.issueIds.length >= 100) return { error: i18nText("Errors.projectTaskLimit") }
-      const previousProject = owned.find(project => project.issueIds.includes(input.issueId))
-      const affected = owned.filter(project => project.issueIds.includes(input.issueId) || project.id === input.projectId)
-        .sort((left, right) => Number(left.id === input.projectId) - Number(right.id === input.projectId))
-      return db.transaction(app => withDatabaseTransaction(app, async () => {
-        await lockResourcesAccess(app, reader.id, [
-          ...affected.map(project => ({ reference: { kind: 'project' as const, id: project.id, workspaceId }, action: 'canSteer' as const })),
-          { reference: { kind: 'task' as const, id: issue.id, workspaceId }, action: 'canManageAccess' as const },
-        ], true)
-        const result = await updateIssueMetadata({ id: input.issueId, revision: input.revision, patch: { project: destination?.name ?? null } })
-        if (!('issue' in result) || !result.issue) return result
-        // Stopping runs below uses the other pool and outlives a rollback, so the
-        // confirmAccess answer is settled before it: a refused move must leave
-        // every run alone (ALE-26).
-        await assertAccessConfirmation(app, workspaceId, affected.map(project => ({
-          reference: { kind: 'task' as const, id: input.issueId },
-          parent: project.id === input.projectId ? { kind: 'project', id: project.id } : null,
-        })), parsed.data.confirmAccess === true)
-        if ((previousProject?.id ?? null) !== input.projectId) await stopRunsForPolicyChange(pool, { kind: 'task', issueId: input.issueId })
-        for (const project of affected) {
-          const issueIds = project.id === input.projectId ? [...new Set([...project.issueIds, input.issueId])] : project.issueIds.filter(id => id !== input.issueId)
-          await bindProjectTasks(app, reader, { kind: 'project', id: project.id, workspaceId }, project.issueIds, issueIds, { confirmAccess: parsed.data.confirmAccess })
-          await tx.update(projects).set({ issueIds, revision: project.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, project.id), eq(projects.userId, project.userId)))
-          await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: project.userId, projectId: project.id, message: project.id === input.projectId ? i18nText("Projects.activity.tasksAdded") : i18nText("Projects.activity.tasksRemoved") })
-          await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
+      const existing = id ? await requireProjectWrite(tx, context.user, id, context.workspaceId) : null
+      if (existing && existing.revision !== revision) return { error: i18nText('Errors.projectStale') }
+      const graph = await accessibleProjects(context.user, tx, context.workspaceId)
+      if (values.properties.dependencyIds.some(dependencyId => !graph.some(project => project.id === dependencyId))) return { error: i18nText('Errors.projectDependencyNotFound') }
+      const nextId = id ?? crypto.randomUUID()
+      if (hasDependencyCycle(nextId, values.properties.dependencyIds, graph)) return { error: i18nText('Errors.projectDependencyCycle') }
+      // These old columns are harmless compatibility snapshots, never relation inputs.
+      const stored = { ...values, lead: people.leadUserId ?? '', leadUserId: people.leadUserId, properties: { ...values.properties, members: people.memberIds } }
+      // Match the established lock order: Workspace/member, relations, then the
+      // APP content ACL. The already-held relation lock must not wait behind a
+      // second path that takes the ACL first.
+      const save = async () => {
+        // Signal that the matching canonical member writes below are part of this
+        // already-authorized transaction. The marker expires with this transaction.
+        await tx.execute(sql`select set_config('mikka.project_v2_writer', '1', true)`)
+        const [saved] = existing
+          ? await tx.update(projects).set({ ...stored, revision: existing.revision + 1, updatedAt: new Date() })
+            .where(and(eq(projects.id, nextId), eq(projects.workspaceId, context.workspaceId), eq(projects.revision, existing.revision))).returning()
+          : await tx.insert(projects).values({ ...stored, id: nextId, workspaceId: context.workspaceId, userId: context.user.id, issueIds: [], revision: 1 }).returning()
+        if (!saved) throw new ActionFailureError('projectSaveConflict')
+        // A new Project becomes a content resource only after its canonical row
+        // exists. The nested APP commit can leave an unreachable policy if this
+        // Workspace transaction later fails, never an unguarded Project.
+        if (!existing) await registerProjectAccess(context.user, nextId, context.workspaceId)
+        await tx.delete(projectMembers).where(eq(projectMembers.projectId, nextId))
+        for (let offset = 0; offset < people.memberIds.length; offset += batchSize) {
+          await tx.insert(projectMembers).values(people.memberIds.slice(offset, offset + batchSize).map(userId => ({ projectId: nextId, workspaceId: context.workspaceId, userId })))
         }
-        return result
-      }))
-    }))
+        await emitProjectChange(tx, nextId, context.user.id, i18nText(existing ? 'Projects.activity.updatedOverview' : 'Projects.activity.created'))
+        return { project: await readProject(tx, context.user, context.workspaceId, nextId) }
+      }
+      return reference ? withResourceAccess(context.user, reference, 'canSteer', save) : save()
+    })
+  try {
+    return await write()
   } catch (error) {
-    // A confirmation request is an answer the caller replays, not a failure.
-    if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
-    if (error instanceof ActionFailureError) throw error
-    return { error: i18nText("Errors.projectMoveFailed") }
+    return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectSaveFailed') }
   }
 }
 
-export async function listProjectEvents(id: string) {
-  const reader = await projectUser()
+export async function saveProject(input: z.input<typeof projectInput>) { return persistProject(input, false) }
+export async function updateProjectProperties(input: { id: string; revision: number; changes: ProjectChanges; workspaceId?: string }) { return persistProject(input, true) }
+
+export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null; workspaceId?: string; confirmAccess?: boolean }) {
+  const i18nText = await getTranslations()
+  const parsed = z.object({ issueId: z.uuid(), revision: z.number().int().positive(), projectId: z.uuid().nullable(), workspaceId: z.uuid().optional(), confirmAccess: z.boolean().optional() }).safeParse(input)
+  if (!parsed.success) return { error: i18nText('Errors.projectMoveInvalid') }
+  const context = await projectContext(parsed.data.workspaceId)
+  try {
+    const result = await withTaskWorkspace(context.user, context.workspaceId, async (_workspace, tx) => {
+      await lockTeamRelations(tx)
+      const [previous] = await tx.select().from(projectTasks).where(eq(projectTasks.issueId, parsed.data.issueId))
+      if (previous && previous.workspaceId !== context.workspaceId) throw new ActionFailureError('issueNotFound')
+      const projectIds = [...new Set([previous?.projectId, parsed.data.projectId].filter((id): id is string => Boolean(id)))].sort()
+      const linked: (typeof projects.$inferSelect)[] = []
+      for (const id of projectIds) linked.push(await requireProjectWrite(tx, context.user, id, context.workspaceId, { allowArchived: id !== parsed.data.projectId }))
+      const references = await accessibleProjectReferences(context.user, context.workspaceId)
+      const projectReferences = linked.map(project => references.find(reference => reference.id === project.id))
+      if (projectReferences.some(reference => !reference)) throw new ActionFailureError('projectNotFound')
+      const priorByProject = new Map<string, string[]>()
+      for (const project of linked) {
+        const rows = await tx.select({ id: projectTasks.issueId }).from(projectTasks).where(eq(projectTasks.projectId, project.id))
+        priorByProject.set(project.id, rows.map(row => row.id).sort())
+      }
+      return db.transaction(async application => {
+        await lockResourcesAccess(application, context.user.id, [
+          ...projectReferences.map(reference => ({ reference: reference!, action: 'canSteer' as const })),
+          { reference: { kind: 'task' as const, id: parsed.data.issueId, workspaceId: context.workspaceId }, action: 'canSteer' as const },
+        ], true)
+        const [task] = await application.select().from(issues).where(and(eq(issues.id, parsed.data.issueId), issueVisibilityPredicate(context.user.id, { allowedIds: [], workspaceIds: [context.workspaceId] }))).for('update')
+        if (!task) throw new ActionFailureError('issueNotFound')
+        if (task.revision !== parsed.data.revision) throw new ActionFailureError('issueOutdated')
+        if ((previous?.projectId ?? null) === parsed.data.projectId) return task
+        // Refuse before stopping runs or changing canonical Workspace relations.
+        await assertAccessConfirmation(application, context.workspaceId, [{
+          reference: { kind: 'task', id: task.id },
+          parent: parsed.data.projectId ? { kind: 'project', id: parsed.data.projectId } : null,
+        }], parsed.data.confirmAccess === true)
+        const stopped = await application.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId: task.id }))
+        notifyStoppedPolicyRuns(application, stopped.rows)
+        await tx.delete(projectTasks).where(eq(projectTasks.issueId, task.id))
+        if (parsed.data.projectId) await tx.insert(projectTasks).values({ issueId: task.id, projectId: parsed.data.projectId, workspaceId: context.workspaceId })
+        // Locks were acquired by ID; remove the old ACL parent before attaching
+        // the new one so a destination sorting first cannot invalidate removal.
+        for (const project of linked.toSorted((left, right) => Number(left.id === parsed.data.projectId) - Number(right.id === parsed.data.projectId))) {
+          const before = priorByProject.get(project.id) ?? []
+          const after = project.id === parsed.data.projectId
+            ? [...before.filter(id => id !== task.id), task.id].sort()
+            : before.filter(id => id !== task.id)
+          await bindProjectTasks(application, context.user, { kind: 'project', id: project.id, workspaceId: context.workspaceId }, before, after, { confirmAccess: parsed.data.confirmAccess })
+          await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date() }).where(eq(projects.id, project.id))
+          await emitProjectChange(tx, project.id, context.user.id, i18nText(project.id === parsed.data.projectId ? 'Projects.activity.tasksAdded' : 'Projects.activity.tasksRemoved'))
+        }
+        // The canonical relationship commits in the Workspace DB. APP keeps an
+        // optimistic-concurrency/version event, without a second project-name store.
+        const [saved] = await application.update(issues).set({ revision: task.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, task.id), eq(issues.revision, task.revision))).returning()
+        if (!saved) throw new ActionFailureError('issueOutdated')
+        await application.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(context.user.id) })
+        await issueListChanged(application, saved.id)
+        return saved
+      })
+    })
+    return { issue: await issueView(result) }
+  } catch (error) {
+    if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
+    return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectMoveFailed') }
+  }
+}
+
+export async function listProjectEvents(id: string, workspaceId?: string) {
   z.uuid().parse(id)
-  const workspaceId = (await loadWorkspaceContext(undefined, reader)).workspace.id
-  return withResourceAccess(reader, { kind: 'project', id, workspaceId }, 'canReadContent', async () => {
-    const [project] = await projectDb.select({ userId: projects.userId }).from(projects).where(eq(projects.id, id)).limit(1)
-    if (!project) throw new ActionFailureError('issueNotFound')
-    return projectDb.select().from(projectEvents).where(and(eq(projectEvents.projectId, id), eq(projectEvents.userId, project.userId))).orderBy(desc(projectEvents.createdAt)).limit(100)
+  const context = await projectContext(workspaceId)
+  const reference = (await accessibleProjectReferences(context.user, context.workspaceId)).find(item => item.id === id)
+  if (!reference) throw new ActionFailureError('projectNotFound')
+  return withResourceAccess(context.user, reference, 'canReadContent', async () => {
+    await readProject(projectDb, context.user, context.workspaceId, id)
+    return projectDb.select().from(projectEvents).where(eq(projectEvents.projectId, id)).orderBy(desc(projectEvents.createdAt)).limit(100)
   })
 }
-export async function setProjectIssues(input: { id: string; revision: number; issueIds: string[]; confirmAccess?: boolean }) {
-  const i18nText = await getTranslations();
-  const reader = await projectUser()
-  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), issueIds: z.array(z.uuid()).max(100), confirmAccess: z.boolean().optional() }).safeParse(input)
-  if (!parsed.success) return { error: i18nText("Errors.projectIssuesInvalid") }
-  const ids = [...new Set(parsed.data.issueIds)]
+
+export async function setProjectIssues(input: { id: string; revision: number; issueIds: string[]; workspaceId?: string; confirmAccess?: boolean }) {
+  const i18nText = await getTranslations()
+  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), issueIds: z.array(z.uuid()), workspaceId: z.uuid().optional(), confirmAccess: z.boolean().optional() }).safeParse(input)
+  if (!parsed.success) return { error: i18nText('Errors.projectIssuesInvalid') }
+  const context = await projectContext(parsed.data.workspaceId)
+  const reference = (await accessibleProjectReferences(context.user, context.workspaceId)).find(item => item.id === parsed.data.id)
+  if (!reference) return { error: i18nText('Errors.projectNotFound') }
+  const ids = [...new Set(parsed.data.issueIds)].sort()
   try {
-    const workspaceId = (await loadWorkspaceContext(undefined, reader)).workspace.id
-    for (const id of ids) await requireIssueAccess(id)
-    const reference = (await accessibleProjectReferences(reader, workspaceId)).find(item => item.id === input.id)
-    if (!reference) throw new ActionFailureError('issueNotFound')
-    return await withTaskWorkspace(reader, reference.workspaceId, () => projectDb.transaction(async tx => {
+    return await withTaskWorkspace(context.user, context.workspaceId, async (_workspace, tx) => {
       await lockTeamRelations(tx)
-      await tx.select({ id: projects.id }).from(projects).where(eq(projects.id, input.id)).for('update')
-      const owned = await accessibleProjects(reader, tx, reference.workspaceId)
-      const current = owned.find(project => project.id === input.id)
-      if (!current) return { error: i18nText("Errors.projectNotFound") }
-      const links = await tx.select().from(teamProjects).where(eq(teamProjects.projectId, current.id))
-      const taskLinks = ids.length ? await tx.select().from(teamIssues).where(inArray(teamIssues.issueId, ids)) : []
-      if (links.length && ids.some(id => !taskLinks.some(link => link.issueId === id && links.some(team => team.teamId === link.teamId)))) return { error: i18nText("FeatureCopy.c_bea413fd") }
-      if (ids.length) {
-        const conflicts = await tx.select({ id: projects.id }).from(projects).where(and(sql`${projects.id} <> ${current.id}`, sql`${projects.issueIds} ?| array[${sql.join(ids.map(id => sql`${id}`), sql`, `)}]`)).limit(1)
-        if (conflicts.length) return { error: i18nText("Errors.projectIssueAlreadyLinked") }
-      }
-      if (current.revision !== input.revision) return { error: i18nText("Errors.projectSaveConflict") }
-      return withResourceAccess(reader, reference, 'canSteer', () => db.transaction(app => withDatabaseTransaction(app, async () => {
-      // Runs with revoked access stop on the other pool and outlive a rollback, so
-      // the confirmAccess answer is settled before any of it (ALE-26).
-      const moves = [...new Set([...current.issueIds, ...ids])].map(id => ({
-        reference: { kind: 'task' as const, id },
-        parent: ids.includes(id) ? { kind: 'project', id: current.id } : null,
+      const current = await requireProjectWrite(tx, context.user, parsed.data.id, context.workspaceId)
+      if (current.revision !== parsed.data.revision) throw new ActionFailureError('projectSaveConflict')
+      const prior = await tx.select({ id: projectTasks.issueId }).from(projectTasks).where(eq(projectTasks.projectId, current.id))
+      const before = new Set(prior.map(row => row.id)), after = new Set(ids)
+      const changed = [...new Set([...before, ...after])].filter(id => before.has(id) !== after.has(id))
+      return withResourceAccess(context.user, reference, 'canSteer', () => db.transaction(async application => {
+        for (let offset = 0; offset < ids.length; offset += batchSize) {
+          const batch = ids.slice(offset, offset + batchSize)
+          const found = await application.select({ id: issues.id }).from(issues)
+            .where(and(inArray(issues.id, batch), issueVisibilityPredicate(context.user.id, { allowedIds: [], workspaceIds: [context.workspaceId] }))).orderBy(asc(issues.id)).for('share')
+          if (found.length !== batch.length) throw new ActionFailureError('issueNotFound')
+          const conflicts = await tx.select({ id: projectTasks.issueId }).from(projectTasks)
+            .where(and(inArray(projectTasks.issueId, batch), ne(projectTasks.projectId, current.id))).limit(1)
+          if (conflicts.length) throw new ActionFailureError('projectIssueAlreadyLinked')
+        }
+        await lockResourcesAccess(application, context.user.id, changed.map(id => ({
+          reference: { kind: 'task' as const, id, workspaceId: context.workspaceId }, action: 'canSteer' as const,
+        })))
+        await assertAccessConfirmation(application, context.workspaceId, changed.map(id => ({
+          reference: { kind: 'task' as const, id },
+          parent: after.has(id) ? { kind: 'project', id: current.id } : null,
+        })), parsed.data.confirmAccess === true)
+        if (changed.length) {
+          const stopped = await application.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'tasks', issueIds: changed }))
+          notifyStoppedPolicyRuns(application, stopped.rows)
+        }
+        await bindProjectTasks(application, context.user, reference, [...before].sort(), ids, { confirmAccess: parsed.data.confirmAccess })
+        await tx.delete(projectTasks).where(eq(projectTasks.projectId, current.id))
+        for (let offset = 0; offset < ids.length; offset += batchSize) {
+          await tx.insert(projectTasks).values(ids.slice(offset, offset + batchSize).map(issueId => ({ issueId, projectId: current.id, workspaceId: context.workspaceId })))
+        }
+        await tx.update(projects).set({ revision: current.revision + 1, updatedAt: new Date() }).where(eq(projects.id, current.id))
+        await emitProjectChange(tx, current.id, context.user.id, i18nText('FeatureCopy.c_310e5541', { value0: ids.length }))
+        for (const id of changed) await issueListChanged(application, id)
+        return { project: await readProject(tx, context.user, context.workspaceId, current.id), error: undefined }
       }))
-      await assertAccessConfirmation(app, reference.workspaceId, moves, parsed.data.confirmAccess === true)
-      await bindProjectTasks(app, reader, reference, current.issueIds, ids, { confirmAccess: parsed.data.confirmAccess })
-      const [project] = await tx.update(projects).set({ issueIds: ids, revision: input.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, input.id), eq(projects.userId, current.userId), eq(projects.revision, input.revision))).returning()
-      if (!project) return { error: i18nText("Errors.projectSaveConflict") }
-      const changedIssues = [...new Set([...current.issueIds, ...ids])].filter(id => current.issueIds.includes(id) !== ids.includes(id))
-      if (changedIssues.length) await stopRunsForPolicyChange(pool, { kind: 'tasks', issueIds: changedIssues })
-      await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: current.userId, projectId: project.id, message: i18nText("FeatureCopy.c_310e5541", { value0: (ids.length) }) })
-      await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
-      return { project }
-      })))
-    }))
+    })
   } catch (error) {
-    // A confirmation request is an answer the caller replays, not a failure.
     if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
-    if (error instanceof ActionFailureError) throw error
-    return { error: i18nText("Errors.projectIssuesSaveFailed") }
+    return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectIssuesSaveFailed') }
+  }
+}
+
+const lifecycleInput = z.object({ id: z.uuid(), workspaceId: z.uuid().optional(), revision: z.number().int().positive().optional() })
+
+export async function getProjectLifecycleImpact(input: { id: string; workspaceId?: string }) {
+  const parsed = lifecycleInput.parse(input)
+  const context = await projectContext(parsed.workspaceId)
+  return projectLifecycleImpact(context.user, context.workspaceId, parsed.id)
+}
+
+async function changeProjectArchive(input: { id: string; revision?: number; workspaceId?: string }, archived: boolean) {
+  const parsed = lifecycleInput.parse(input)
+  const context = await projectContext(parsed.workspaceId)
+  const i18nText = await getTranslations()
+  try {
+    return { project: await setProjectArchive(context.user, context.workspaceId, { ...parsed, archived,
+      message: i18nText(archived ? 'Projects.activity.archived' : 'Projects.activity.restored') }) }
+  } catch (error) {
+    if (error instanceof ActionFailureError) return { error: i18nText(`Errors.${error.code}`) }
+    throw error
+  }
+}
+
+export async function archiveProject(input: { id: string; revision?: number; workspaceId?: string }) { return changeProjectArchive(input, true) }
+export async function restoreProject(input: { id: string; revision?: number; workspaceId?: string }) { return changeProjectArchive(input, false) }
+
+export async function deleteProject(input: { id: string; revision: number; confirmation: string; workspaceId?: string }) {
+  const parsed = lifecycleInput.extend({ revision: z.number().int().positive(), confirmation: z.string().trim().max(200) }).parse(input)
+  const context = await projectContext(parsed.workspaceId)
+  const i18nText = await getTranslations()
+  try { return await deleteProjectData(context.user, context.workspaceId, parsed) }
+  catch (error) {
+    if (error instanceof ActionFailureError) return { error: i18nText(`Errors.${error.code}`) }
+    throw error
   }
 }

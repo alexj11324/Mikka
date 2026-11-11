@@ -62,7 +62,7 @@ async function issueConnections(id: string, reach: 'linked' | 'all', known?: Con
   }
   // Only each row's metadata is used: read the body's attrs, never every task's whole body.
   // Reuse the locked task's freshly checked tenant; team links only name rows.
-  const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
+  const rows = await tx.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
     .where(and(eq(issues.userId, issue.userId), related, issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [issue.workspaceId!] }))).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
   // The entry lookup is complete for this one task. Its missing link is only
@@ -71,9 +71,10 @@ async function issueConnections(id: string, reach: 'linked' | 'all', known?: Con
     ? new Map<string, { key: string; number: number }>() : undefined
   // The private whole-owner copy consumes structure only; labels belong to the public linked view.
   const identifiers = reach === 'linked'
-    ? await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), tx, knownTeams)
+    ? await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope,
+      number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })), tx, knownTeams)
     : new Map<string, string | null>()
-  return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
+  return live.map(({ content, issuedIdentifier: _issuedIdentifier, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
   })
 }
 
@@ -198,7 +199,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
           }
         }
         const number = await allocateIssueNumbers(tx, ownerId, originals.length + 1)
-        const newMetadata = { ...metadata, number, parentId: child ? source.id : null, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: child || source.userId === user.id ? metadata.assignee : null }
+        const newMetadata = { ...metadata, number, parentId: child ? source.id : null, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: child || source.userId === user.id ? metadata.assignee : null, delegate: child || source.userId === user.id ? metadata.delegate : null }
         const ownership = { workspaceId: workspace.id, ownershipState: 'bound' as const, scope: workspace.kind === 'personal' ? 'personal' as const : 'workspace' as const, scopeSetBy: 'user' as const, linearSyncPolicy: 'disabled' as const, linearSyncBlocked: true }
         const [created] = await tx.insert(issues).values({ id: crypto.randomUUID(), userId: ownerId, ...ownership, title: parsed.data.title ?? t('defaultDuplicateTitle', { title: source.title.slice(0, 195) }), content: withIssueMetadata(child ? { type: 'doc', content: [{ type: 'paragraph' }] } : source.content, newMetadata), status: 'todo', priority: source.priority, revision: 1 }).returning()
         const versions: typeof issueVersions.$inferInsert[] = [{ id: crypto.randomUUID(), issueId: created.id, userId: ownerId, revision: 1, title: created.title, content: created.content, status: created.status, priority: created.priority, ...activityActor(user.id) }]
@@ -214,7 +215,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
             const currentMetadata = readIssueMetadata(original.content)
             const parentId = currentMetadata.parentId!
             const id = crypto.randomUUID()
-            const copyMetadata = { ...currentMetadata, number: number + index + 1, parentId: mapping.get(parentId)!, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: source.userId === user.id ? currentMetadata.assignee : null }
+            const copyMetadata = { ...currentMetadata, number: number + index + 1, parentId: mapping.get(parentId)!, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: source.userId === user.id ? currentMetadata.assignee : null, delegate: source.userId === user.id ? currentMetadata.delegate : null }
             // The child copy is consumed only by its version snapshot and invalidation.
             // Read the stored values after triggers without returning unused task columns.
             const [copy] = await tx.insert(issues).values({ id, userId: ownerId, ...ownership, title: original.title, content: withIssueMetadata(original.content, copyMetadata), status: 'todo', priority: original.priority, revision: 1 })

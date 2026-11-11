@@ -22,7 +22,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { withTaskWorkspace } = await import('../lib/task-workspace')
+  const { withFactoryBackgroundWorkspace } = await import('../lib/factory/background-workspace')
   const { observePoolCommits } = await import('../lib/db/commit-effects')
   observePoolCommits(pool)
   const bots = await import('../lib/coordinator/coordinator-bot')
@@ -230,8 +230,15 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       pool.query('SELECT bot_key FROM agent_kit_heads WHERE owner_id=$1 ORDER BY bot_key', [p.id]).then(result => result.rows),
     ]))
     const once = await snapshot()
-    await Promise.all([bots.backfillCoordinatorChat(appPool, p.id, coordinator), bots.backfillCoordinatorChat(appPool, p.id, coordinator)])
-    assert.equal(await snapshot(), once, 'two more passes at once change nothing')
+    const concurrent = await Promise.allSettled([bots.backfillCoordinatorChat(appPool, p.id, coordinator), bots.backfillCoordinatorChat(appPool, p.id, coordinator)])
+    assert.ok(concurrent.some(result => result.status === 'fulfilled'), 'a concurrent pass must complete')
+    for (const result of concurrent) if (result.status === 'rejected') {
+      assert.equal(result.reason?.code, '55P03', 'only the documented busy/lock deferral is retryable')
+    }
+    // This is a best-effort migration: a chat lock can defer a concurrent pass.
+    // Join both transactions before retrying and verify the complete history.
+    await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+    assert.equal(await snapshot(), once, 'concurrent passes and a deferred retry change nothing')
     assert.equal(Number((await pool.query('SELECT count(*) FROM coordinator_bots WHERE "ownerId"=$1', [p.id])).rows[0].count), 1, 'one Coordinator row')
 
     // A row an older instance wrote the old way during a deploy goes after what the bot row already holds.
@@ -611,7 +618,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   await t.test('an in-flight null-Bot route defers migration; its unfrozen history moves after commit', { timeout: 10_000 }, async () => {
     const p = await person('route-before-backfill'), issueId = await seedIssue(pool, p.id), eventId = await sourceEvent(p.id)
     const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
-    await withTaskWorkspace(p.id, p.workspaceId, async () => {
+    await withFactoryBackgroundWorkspace(appPool, p.id, { kind: 'issue', id: issueId }, async () => {
       const writer = await pool.connect()
       try {
         await writer.query('BEGIN')

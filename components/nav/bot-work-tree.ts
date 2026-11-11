@@ -1,6 +1,7 @@
 import type { Thread } from '@/app/actions/task-runs'
 import type { listIssues } from '@/app/actions/issues'
-import { localTaskState, type TaskReason, type TaskState } from '@/hooks/use-bot-tasks'
+import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
+import { taskStateOf } from '@/lib/task-state'
 import { issueIdentifier } from '@/components/workspace/issue-properties'
 import { compactTaskTitle } from '@/lib/short-title'
 
@@ -34,7 +35,10 @@ export function botWorkTree(workspaceId: string | null, botIds: readonly string[
     const id = issue?.id ?? run.id
     let row = rows.get(id)
     if (!row) {
-      const own = issue ? localTaskState(issue, newest.get(issue.id)) : null
+      const current = issue ? newest.get(issue.id) : null
+      // The Bot tree is a task list: a closed Task stays closed even while its
+      // newest Run is still active. A standalone Run has no task state.
+      const own = issue ? taskStateOf(issue, current ? { ...current, runId: current.id } : null) : null
       const runTitle = run.prompt.split('\n').find(line => line.trim())?.trim() || run.agentName
       row = { id, issueId: issue?.id ?? null,
         name: issue ? [issueIdentifier(issue), compactTaskTitle(issue)].filter(Boolean).join(' ') : compactTaskTitle({ title: runTitle }),

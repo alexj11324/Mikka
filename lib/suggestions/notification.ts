@@ -29,6 +29,13 @@ export interface ExternalNotification {
   automated: boolean
   /** What the decision model reads besides the title. */
   excerpt: string
+  /**
+   * The repository (owner/repo) this is about, when the source names one, so a
+   * fact it teaches is scoped to that work and never surfaces in another
+   * project's chat (lib/profile/facts.ts, lib/profile/repository.ts). A
+   * notification with no repository teaches facts about the person themselves.
+   */
+  repository?: string | null
 }
 
 type Json = Record<string, unknown>
@@ -254,6 +261,8 @@ export function githubNotification(recipient: GitHubRecipient, event: string, pa
     // A GitHub App posts as a Bot user named `<app>[bot]` (Vercel, GitGuardian, CI).
     // Evidence for the Decisions API, never a filter: the model decides whether it is worth a card.
     automated: str(sender.type) === 'Bot' || str(sender.login).endsWith('[bot]'),
+    // A GitHub event names its repository exactly, so a fact it teaches is scoped to that work.
+    repository: repo || null,
   }
   const pr = record(payload.pull_request)
   const issue = record(payload.issue)

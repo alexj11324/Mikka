@@ -145,7 +145,7 @@ test('registered Project RPC reads and writes stay inside a native human session
         // Preserve the current missing-Project error contract; this test does
         // not require a new HTTP status design. The B control below must work.
         const expectedCode = new Map<number, string>([
-          [400, 'issueNotFound'], [403, 'workspaceAccessDenied'], [500, 'desktop_rpc_failed'],
+          [400, 'projectNotFound'], [403, 'workspaceAccessDenied'], [500, 'desktop_rpc_failed'],
         ]).get(events.response.status)
         assert.ok(expectedCode, 'use an existing native Project denial status')
         assert.equal(events.error?.code, expectedCode, 'preserve the actual native RPC status/code pairing')
