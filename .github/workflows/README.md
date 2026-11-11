@@ -58,9 +58,10 @@ There are two intentionally different classes of PR checks:
   SSH device backend, Site search read contract and Unattended sandbox
   acceptance) skip their runner jobs while the PR is a draft. Each workflow
   explicitly handles `ready_for_review` to execute its real proof on the
-  same code even without an extra commit, and `converted_to_draft` to
-  cancel obsolete work. Main push, merge-group and manual dispatch behavior
-  is unchanged. Exact-source required gate and release policies are unchanged.
+  same code even without an extra commit. On `converted_to_draft`, the
+  six jobs skip. The E2B offline job cancels an older eligible check when its
+  replacement enters the same PR group. An already running E2B check may
+  finish after conversion to draft.
 - Mobile OTA preview publication remains available on drafts for UI evidence
   and TestFlight-oriented review. Other specialized evidence may have its
   own intentional manual or source-version trigger.

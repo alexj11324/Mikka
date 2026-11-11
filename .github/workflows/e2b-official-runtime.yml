@@ -63,15 +63,14 @@ on:
 permissions:
   contents: read
 
-# Cancel superseded PR validation, never exact-main or manual publications.
-concurrency:
-  group: e2b-official-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   test:
     # Skip expensive PR proof while drafting; main/manual runs are unaffected.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    # Only offline checks share a PR group. Main and manual runs each get their own.
+    concurrency:
+      group: e2b-offline-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
