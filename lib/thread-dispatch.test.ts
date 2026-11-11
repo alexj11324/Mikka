@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
+import { EventEmitter } from 'node:events'
 
 let transaction = false
 let locked = false
@@ -27,6 +28,12 @@ const client = {
 }
 let dispatchToTask: typeof import('./thread-dispatch').dispatchToTask
 before(async () => {
+  const applicationPool = { options: {}, end: async () => undefined }
+  mock.module(new URL('./db/request-scope.ts', import.meta.url).href, { namedExports: { currentDatabasePool: () => applicationPool } })
+  mock.module('pg', { namedExports: { Pool: class extends EventEmitter {
+    connect() { return Promise.resolve(client) }
+    end() { return Promise.resolve() }
+  } } })
   mock.module(new URL('./agent-run-statuses.ts', import.meta.url).href, { namedExports: { UNFINISHED_RUN_STATUSES: ['queued', 'running'] } })
   mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: { execute: async (statement: { queryChunks?: unknown[] }) => { executed.push(JSON.stringify(statement.queryChunks ?? statement).includes('threadReplacedBy') ? 'replaced' : 'continues'); return { rows: [], rowCount: 1 } } }, pool: { connect: async () => client, query: async () => ({ rows: latest ? [latest] : [] }) } } })
   mock.module(new URL('./run-chain.ts', import.meta.url).href, { namedExports: { readRunChain: async () => null } })

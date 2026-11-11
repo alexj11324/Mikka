@@ -33,6 +33,11 @@ type Transaction = Parameters<Parameters<typeof defaultDatabase.transaction>[0]>
 const heldClient = new AsyncLocalStorage<PoolClient>()
 const transactionDatabase = new AsyncLocalStorage<Transaction | NodePgDatabase<typeof schema>>()
 
+/** The actual request-routed pool identity, before per-statement authority wrappers. */
+export function currentDatabasePool(): Pool {
+  return requestDatabase.getStore()?.pool ?? defaultPool
+}
+
 export const pool = new Proxy(defaultPool, {
   get(target, property) {
     if (property === COMMIT_EXECUTOR) return heldClient.getStore() ?? requestDatabase.getStore()?.pool ?? target
