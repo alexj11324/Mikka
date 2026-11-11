@@ -12,6 +12,12 @@ test('missing baseline fails before connecting to any database', () => {
   assert.throws(() => orderMigrations(['0001_a.sql']), /missing required baseline/)
 })
 
+test('an unrecorded migration older than the largest applied ID is still pending', () => {
+  const older = '20261110000000_independent_older.sql', newer = '20261111000000_newer.sql'
+  const applied = new Set([APPLICATION_BASELINE, newer])
+  assert.deepEqual(orderMigrations([newer, older, APPLICATION_BASELINE]).filter(name => !alreadyApplied(name, applied, 'SELECT 1;')), [older])
+})
+
 test('known legacy artifact compatibility runs before mainline artifact creation', () => {
   const names = [APPLICATION_BASELINE, '0001_a.sql', '20261027010100_artifacts.sql', ARTIFACT_COMPATIBILITY, '20261027164501_cloud_computers.sql']
   assert.deepEqual(orderMigrations(names), [APPLICATION_BASELINE, '0001_a.sql', ARTIFACT_COMPATIBILITY, '20261027010100_artifacts.sql', '20261027164501_cloud_computers.sql'])
