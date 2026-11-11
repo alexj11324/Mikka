@@ -6,7 +6,7 @@ import { digest } from '@/lib/agent-kit/definition'
 import { orderCandidates } from '@/lib/model-order'
 import { entryKey } from '@/lib/model-order-plan'
 import { agentProfileDigest, AgentProfileError, parseAgentProfile, type AgentProfile, type AgentProfileDefinition, type AgentProfileScope, type AgentProfileSkill } from './agent-profile-definition'
-import { resolveAgentProfileSkills } from './agent-profile-skills'
+import { resolveAgentProfileSkillsFor } from './agent-profile-skills'
 import { deriveProfileMark, profileMarkInputSchema, resolveProfileMark, type ProfileColor, type ProfileGlyph, type ProfileMarkInput } from './agent-profile-mark'
 import { borrowTaskWorkspaceMembership } from '@/lib/task-workspace'
 
@@ -89,7 +89,7 @@ export class AgentProfileStore {
   }
   /** The mark is presentation only: it is outside the definition and its digest, and an unchosen part is derived and stored. */
   async create(scope: AgentProfileScope, input: unknown, requestId?: string, markInput?: ProfileMarkInput) {
-    const definition = parseAgentProfile(input), skills = resolveAgentProfileSkills(definition.skills), hash = agentProfileDigest(definition, skills)
+    const definition = parseAgentProfile(input)
     const chosen = profileMarkInputSchema.parse(markInput ?? {}), derived = deriveProfileMark(definition)
     const mark = { icon: chosen.icon ?? derived.icon, color: chosen.color ?? derived.color }
     const id = requestId ? z.uuid().parse(requestId) : randomUUID()
@@ -98,10 +98,17 @@ export class AgentProfileStore {
       if (requestId) {
         const { rows: [existing] } = await client.query<ProfileRow>('SELECT * FROM factory_agent_profiles WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [id, scope.ownerId, scope.workspaceId])
         if (existing) {
-          if (existing.digest !== hash || existing.version !== 1 || existing.archivedAt) throw new AgentProfileError('agentProfileRequestConflict')
+          // A retried create returns exactly the pinned version it created; a
+          // later source edit must not turn the replay into a new request.
+          if (existing.version !== 1 || existing.archivedAt || digest(existing.definition) !== digest(definition) ||
+            existing.digest !== agentProfileDigest(definition, existing.skills)) throw new AgentProfileError('agentProfileRequestConflict')
           return profileView(existing)
         }
       }
+      // Resolve inside the transaction and lock scope: a concurrent
+      // unshare/disable cannot race a Profile into pinning content the owner
+      // is no longer entitled to.
+      const skills = await resolveAgentProfileSkillsFor(client, scope, definition.skills), hash = agentProfileDigest(definition, skills)
       if ((await readProfileRows(client, scope)).length >= 100) throw new AgentProfileError('agentProfileLimit', 400)
       await (this.deps.validateModel ?? validateFixedSource)(client, scope, definition)
       const { rows: [row] } = await client.query<ProfileRow>('INSERT INTO factory_agent_profiles (id,"ownerId","workspaceId",version,definition,skills,digest,icon,color) VALUES ($1,$2,$3,1,$4,$5,$6,$7,$8) RETURNING *', [id, scope.ownerId, scope.workspaceId, JSON.stringify(definition), JSON.stringify(skills), hash, mark.icon, mark.color])
@@ -110,14 +117,18 @@ export class AgentProfileStore {
   }
   /** A left-out mark keeps the stored one; null clears a part back to the derived default. */
   async update(scope: AgentProfileScope, id: string, version: number, input: unknown, markInput?: ProfileMarkInput) {
-    const definition = parseAgentProfile(input), skills = resolveAgentProfileSkills(definition.skills)
+    const definition = parseAgentProfile(input)
     const chosen = markInput === undefined ? undefined : profileMarkInputSchema.parse(markInput)
     z.number().int().positive().parse(version)
     return this.transaction(scope, async client => {
       const current = await readProfileRow(client, scope, id, 'update')
       if (current.archivedAt) throw new AgentProfileError('agentProfileArchived')
       if (current.version !== version) throw new AgentProfileError('agentProfileVersionConflict')
-      // A disconnected old source must not prevent disabling its profile.
+      // A disconnected old source must not prevent disabling its profile. An
+      // unchanged reference set keeps the exact pinned envelope; changing a
+      // Skill reference re-resolves against current entitlements.
+      const skills = digest(definition.skills) === digest(current.definition.skills)
+        ? current.skills : await resolveAgentProfileSkillsFor(client, scope, definition.skills)
       if (definition.enabled || digest(definition.model) !== digest(current.definition.model)) await (this.deps.validateModel ?? validateFixedSource)(client, scope, definition)
       const icon = chosen && 'icon' in chosen ? chosen.icon ?? null : current.icon ?? null
       const color = chosen && 'color' in chosen ? chosen.color ?? null : current.color ?? null

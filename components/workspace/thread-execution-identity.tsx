@@ -141,7 +141,21 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       <Quiet>· {profileT('version', { version: profile.version })} · {profileT(`selectionSources.${profile.source}`)}</Quiet>
       {/* A run frozen before reasons were codes holds an English sentence: the source already says how it was chosen. */}
       {profile.source === 'decision' && (DECISION_REASONS as readonly string[]).includes(profile.reason) && <Quiet>· {profileT(`selectionReasons.${profile.reason as DecisionReason}`)}</Quiet>}
-    </Line></ValueRow></dl>}
+    </Line></ValueRow>
+      {/* Configured is not used: only the daemon's own load receipts say loaded. */}
+      <ValueRow label={profileT('skills')}>
+        {evidence.configuredSkills?.length ? <div className="flex flex-col gap-1">
+          {evidence.configuredSkills.map(skill => {
+            const loaded = new Set((evidence.loadedSkills ?? []).map(item => item.id)).has((skill.id.includes(':') ? skill.id : `official:${skill.id}`).toLowerCase())
+            return <Line key={skill.id}>
+              <span className="min-w-0 truncate" title={skill.name}>{skill.name}</span>
+              <Quiet>· {profileT(`skillSources.${skill.source}`)}</Quiet>
+              <Quiet>· {profileT(loaded ? 'skillLoaded' : 'skillNotLoaded')}</Quiet>
+            </Line>
+          })}
+        </div> : <Quiet>{profileT('skillsNone')}</Quiet>}
+      </ValueRow>
+    </dl>}
     {!identity ? <p className="text-muted-foreground">{t('snapshotMissing')}</p> : <>
       <dl className="flex flex-col gap-3">
         {rolesByPerson(identity).map(row => <ValueRow key={row.personId} label={row.roles.length === 1 ? t(`roles.${row.roles[0]}`) : t('rolesTogether', { first: t(`roles.${row.roles[0]}`), last: t(`roles.${row.roles.at(-1)!}`) })}>

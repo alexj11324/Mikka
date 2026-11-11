@@ -1,6 +1,9 @@
 import type { RunAgentProfile } from '@/lib/agent-runs'
 import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
+import { agentProfileSkillSource } from '@/lib/factory/agent-profile-skills'
+import { profileSkillRunReportSchema } from '@mikka/protocol/skill'
 import 'server-only'
+import { z } from 'zod'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
 import {
@@ -306,6 +309,12 @@ export async function runEvidence(userId: string, runId: string) {
       'roles',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'roles','description',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'description',
       'icon',(select p.icon from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId}),
       'color',(select p.color from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId})) end`,
+    // Only frozen, non-secret references: the pinned bodies stay out of this
+    // response. `loadedSkills` comes from the daemon's own load receipts.
+    agentSkills: sql<unknown>`case when jsonb_typeof(${agentRuns.agentDefinition}->'agentProfile'->'skills')='array' then (
+      select coalesce(jsonb_agg(jsonb_build_object('id',skill->>'id','name',skill->>'name','version',skill->'version','digest',skill->>'digest')),'[]'::jsonb)
+      from jsonb_array_elements(${agentRuns.agentDefinition}->'agentProfile'->'skills') skill) else '[]'::jsonb end`,
+    profileSkillReport: sql<unknown>`${agentRuns.report}->'profileSkills'`,
     credentialType: sql<'subscription' | 'api_key' | 'unknown'>`CASE WHEN ${agentRuns.agentDefinition}->'apiKey' IS NOT NULL AND ${agentRuns.agentDefinition}->'apiKey'<>'null'::jsonb THEN 'api_key' WHEN ${agentRuns.agentDefinition}->'subscription' IS NOT NULL AND ${agentRuns.agentDefinition}->'subscription'<>'null'::jsonb THEN 'subscription' ELSE 'unknown' END`,
     subscriptionRoute: sql<string | null>`${agentRuns.agentDefinition}->'subscription'->>'route'` })
     .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
@@ -321,12 +330,32 @@ export async function runEvidence(userId: string, runId: string) {
   const documents = await runArtifactSubmissions(pool, userId, [runId])
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
+  const { agentSkills, profileSkillReport, ...runView } = run
   return {
-    run: { ...run, agentProfile: profileWithMark(run.agentProfile), executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null },
+    run: { ...runView, agentProfile: profileWithMark(run.agentProfile),
+      configuredSkills: configuredSkillRefs(agentSkills), loadedSkills: loadedSkillRefs(profileSkillReport),
+      executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null },
     recording: recording.length > 0,
     captures: captures.map(captureView),
     artifacts: documents.map(document => ({ ...document, createdAt: document.createdAt.toISOString() })),
   }
+}
+
+const frozenSkillRef = z.object({
+  id: z.string().min(1).max(160), name: z.string().min(1).max(80),
+  version: z.number().int().positive().nullable().optional(), digest: z.string().max(64).nullable().optional(),
+})
+/** What the Profile selected, without its pinned body or any private path. */
+function configuredSkillRefs(raw: unknown) {
+  const parsed = z.array(frozenSkillRef).max(24).safeParse(raw)
+  if (!parsed.success) return []
+  return parsed.data.slice(0, 12).map(skill => ({ id: skill.id, name: skill.name, version: skill.version ?? null,
+    digest: skill.digest ?? null, source: agentProfileSkillSource(skill.id) }))
+}
+/** The daemon-reported loads only; assigned is never reported as used. */
+function loadedSkillRefs(raw: unknown) {
+  const parsed = profileSkillRunReportSchema.safeParse(raw)
+  return parsed.success ? parsed.data.loaded : []
 }
 
 type RunAgentProfileMarkRow = RunAgentProfile & { roles?: unknown; description?: unknown; icon?: unknown; color?: unknown }
