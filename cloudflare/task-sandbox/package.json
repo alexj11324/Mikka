@@ -1,0 +1,8 @@
+{
+  "name": "@mikka/cloudflare-task-sandbox",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cloudflare/sandbox": "1.0.3"
+  }
+}
