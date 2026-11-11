@@ -18,9 +18,11 @@ export const sourceSuites = {
     'scripts/acceptance/cloud-startup-evidence.mjs',
     'scripts/acceptance/eve-session.mjs',
     'scripts/acceptance/owned-codex-actor.mjs',
+    'scripts/acceptance/personal-workspace.mjs',
     'scripts/acceptance/team-workspace.mjs',
     'lib/smoke-account.ts',
     'lib/desktop-rpc/wire.ts',
+    'packages/daemon/harness/pins.json',
   ],
 }
 
