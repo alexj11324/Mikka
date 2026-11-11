@@ -20,6 +20,9 @@ test('lists both primary storage statuses and every page, retaining only redacte
     ['eve', 'running'], ['eve', 'pending'], ['unclassified', 'pending'], ['mikka', 'running'],
   ])
   assert.match(report.activeRuns[0].fingerprint, /^[a-f0-9]{64}$/)
+  assert.equal(Object.hasOwn(report, 'projectId'), false)
+  assert.equal(Object.hasOwn(report, 'teamId'), false)
+  assert.equal(Object.hasOwn(report, 'environment'), false)
   assert.doesNotMatch(JSON.stringify(report), /wrun_|private|workflowEntry/)
 })
 

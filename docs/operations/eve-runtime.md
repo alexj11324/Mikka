@@ -101,21 +101,12 @@ and must never be discovered by the product compiler. Shared model descriptor
 validation stays in the pure `lib/hosted-model-selection.ts` module; provider,
 credential and database resolution remain on the Node side of the step boundary.
 
-## Inventory before retiring Vercel Workflow deployments
+## Workflow inventory
 
-Run the **Vercel production Workflow inventory** Actions workflow on `main`.
-It reads the Mikka production project's authoritative Workflow storage and
-attaches a JSON report for the time interval in the report. The existing
-production Infisical identity supplies the platform credential.
+`inventoryWorkflowRuns(listRuns)` scans the supplied Workflow World's pending
+and running views. It groups Eve, Mikka and unclassified workflows, deduplicates
+status transitions and returns deployment identifiers with hashed run identifiers.
+Use a read-only storage client and retain unclassified workflows during a drain.
 
-The artifact lists pending and running runs across all deployment IDs. Each
-row contains its deployment, observed status, workflow owner and a fingerprint
-of the run ID for matching subsequent observations. Known Eve workflows and
-Mikka workflows have separate owner labels. Keep unclassified runs in the
-drain inventory until an operator identifies their owner.
-
-Before retiring a deployment, #1954 must establish that the old revision
-can no longer admit runs, check the inventory again, and reconcile every
-remaining run with its authoritative completion or verified handoff. New
-admissions can race a live scan. The Vercel Agent Runs observability view
-alone does not establish that the Workflow World is empty.
+Authorized operators can find the managed deployment procedure in the
+[private operations entry](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/README.md).

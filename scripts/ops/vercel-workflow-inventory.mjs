@@ -1,6 +1,4 @@
 import { createHash } from 'node:crypto'
-import { pathToFileURL } from 'node:url'
-import { PROJECT, TEAM } from './deployment-regression.mjs'
 
 // A scan includes all Mikka workflows, even historical names we do not recognize.
 // A fingerprint lets operators reconcile reports without publishing an Eve session ID.
@@ -36,20 +34,6 @@ export async function inventoryWorkflowRuns(listRuns) {
       seen.add(cursor)
     } while (cursor)
   }
-  return { projectId: PROJECT, teamId: TEAM, environment: 'production', startedAt, finishedAt: new Date().toISOString(),
+  return { startedAt, finishedAt: new Date().toISOString(),
     pages, activeRuns: [...runs.values()] }
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try {
-    const { managedReader } = await import('../acceptance/workflow-migration-production.mjs')
-    const reader = await managedReader(process.env.VERCEL_TEAM_TOKEN)
-    console.log(JSON.stringify(await inventoryWorkflowRuns(reader.listRuns), null, 2))
-  } catch (error) {
-    const status = error?.status
-    const code = ['workflow_inventory_page_invalid', 'workflow_inventory_run_invalid', 'workflow_inventory_cursor_invalid',
-      'manager_token_required', 'manager_read_unavailable'].includes(error?.message) ? error.message : 'workflow_inventory_read_failed'
-    console.error(JSON.stringify({ code, ...(Number.isInteger(status) && { httpStatus: status }) }))
-    process.exitCode = 1
-  }
 }
