@@ -14,11 +14,13 @@ function httpsOrigin(value) {
 
 export function hostConfiguration(env) {
   if (!sha(env.EVE_SOURCE_SHA) || !sha(env.EVE_UI_SHA) || !release(env.EVE_RELEASE_ID)
-    || env.EVE_HOST_POLICY !== 'shared-warm') return invalid()
-  const warmUntil = typeof env.EVE_HOST_WARM_UNTIL === 'string' ? Date.parse(env.EVE_HOST_WARM_UNTIL) : NaN
+    || !['on-demand', 'shared-warm'].includes(env.EVE_HOST_POLICY)) return invalid()
+  const warm = env.EVE_HOST_POLICY === 'shared-warm'
+  const warmUntil = warm ? Date.parse(env.EVE_HOST_WARM_UNTIL ?? '') : Infinity
   // A trusted candidate lease bounds standby cost independently of HTTP traffic.
   // Expired configuration remains readable so restoration can stop the host.
-  if (!Number.isFinite(warmUntil) || warmUntil <= 0 || warmUntil > Date.now() + 24 * 60 * 60_000) return invalid()
+  if (warm && (!Number.isFinite(warmUntil) || warmUntil <= 0 || warmUntil > Date.now() + 24 * 60 * 60_000)) return invalid()
+  if (!warm && env.EVE_HOST_WARM_UNTIL !== undefined) return invalid()
   const publicOrigin = httpsOrigin(env.EVE_PUBLIC_ORIGIN)
   const runtime = {}
   for (const [key, value] of Object.entries(env)) {
@@ -41,7 +43,7 @@ export function hostConfiguration(env) {
   httpsOrigin(runtime.BETTER_AUTH_URL)
   return {
     releaseId: env.EVE_RELEASE_ID, sourceSha: env.EVE_SOURCE_SHA, uiSha: env.EVE_UI_SHA,
-    publicOrigin, policy: 'shared-warm', warmUntil,
+    publicOrigin, policy: env.EVE_HOST_POLICY, warmUntil,
     runtimeEnv: {
       ...runtime, NODE_ENV: 'production', MIKKA_EVE_HOST: 'cloudflare',
       MIKKA_EVE_WORKFLOW_WORLD: 'cloudflare', MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: env.WORLD_QUEUE_PUBLIC_KEY,

@@ -40,14 +40,14 @@ mock.module('@cloudflare/containers', { namedExports: {
 } })
 const { default: ingress, EveRuntime } = await import('../src/index.mjs')
 
-function fixture(map = new Map()) {
+function fixture(map = new Map(), bindings = env) {
   const storage = {
     kv: { get: key => map.get(key), put: (key, value) => map.set(key, value) },
     async get(key) { return structuredClone(map.get(key)) },
     async put(key, value) { map.set(key, structuredClone(value)) },
     async transaction(work) { return work(storage) },
   }
-  return { host: new EveRuntime({ storage, container: { async interceptOutboundHttps() {} }, exports: { EveWorldOutbound: x => x } }, env), map }
+  return { host: new EveRuntime({ storage, container: { async interceptOutboundHttps() {} }, exports: { EveWorldOutbound: x => x } }, bindings), map }
 }
 beforeEach(() => { calls = 0; forwarded = undefined; selected = new Response('native'); mock.restoreAll() })
 
@@ -161,4 +161,19 @@ test('SDK error bodies and thrown messages never become public configuration dis
     assert.deepEqual(await response.json(), { ok: false, error: 'coordinatorUnavailable' })
   }
   assert.ok(errors.every(value => !value.includes('private-token')))
+})
+
+test('an idle on-demand release sleeps and the next request can wake the same immutable host', async () => {
+  const bindings = { ...env, EVE_HOST_POLICY: 'on-demand' }
+  delete bindings.EVE_HOST_WARM_UNTIL
+  const { host, map } = fixture(new Map(), bindings)
+  await host.onStart()
+  assert.equal(host.pending.length, 0)
+  await host.onActivityExpired()
+  assert.equal(host.stops, 1)
+  assert.equal(host.pending.length, 0)
+  assert.equal(map.get(stateKey).stopped, false)
+  await host.startAndWaitForPorts()
+  assert.equal(host.started, true)
+  assert.equal(host.pending.length, 0)
 })

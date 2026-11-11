@@ -81,7 +81,7 @@ export class EveRuntime extends Container {
       await this.stop('SIGTERM')
       return
     }
-    if (!(await this.listSchedules(expiryCallback)).length) {
+    if (this.configuration.policy === 'shared-warm' && !(await this.listSchedules(expiryCallback)).length) {
       await this.schedule(new Date(this.configuration.warmUntil), expiryCallback, {
         releaseId: this.configuration.releaseId, warmUntil: this.configuration.warmUntil,
       })
@@ -89,14 +89,20 @@ export class EveRuntime extends Container {
   }
 
   async onActivityExpired() {
-    // Shared-service SLO, with max_instances=1 and explicit standby cost.
+    // The Containers SDK invokes this hook only after active requests finish.
+    // Queue messages and incoming Eve requests restart an on-demand host.
+    if (this.configuration.policy === 'on-demand') {
+      await this.stop('SIGTERM')
+      return
+    }
+    // The separately bounded warm qualification lease can retain standby.
     // A settled Task must not destroy other people's Eve sessions.
     if (Date.now() >= this.configuration.warmUntil) await this.stopForOwner(this.configuration.releaseId)
     else this.renewActivityTimeout()
   }
 
   async onStop() {
-    await this.queueRestart()
+    if (this.configuration.policy === 'shared-warm') await this.queueRestart()
   }
 
   async queueRestart(executing) {
