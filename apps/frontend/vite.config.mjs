@@ -40,7 +40,7 @@ export async function frontendConfig({ target = 'web', command = 'build', outdir
       'process.env.NEXT_PUBLIC_POSTHOG_HOST': JSON.stringify(target === 'web' ? process.env.POSTHOG_HOST ?? process.env.NEXT_PUBLIC_POSTHOG_HOST ?? '' : ''),
       'process.env.NEXT_PUBLIC_POSTHOG_KEY': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '' : ''),
       'process.env.NEXT_PUBLIC_COMPUTER_ACCEPTANCE': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_COMPUTER_ACCEPTANCE ?? '' : ''),
-      'process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT': JSON.stringify(target === 'web' ? process.env.VERCEL_ENV ?? '' : ''),
+      'process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT': JSON.stringify(target === 'web' ? process.env.MIKKA_DEPLOYMENT_ENVIRONMENT ?? process.env.VERCEL_ENV ?? '' : ''),
       'process.env.NEXT_PUBLIC_COMPUTER_ENABLED': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_COMPUTER_ENABLED ?? '' : ''),
       'process.env.NEXT_PUBLIC_COMPUTER_MOCK': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_COMPUTER_MOCK ?? '' : ''),
       'process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka' : ''),
