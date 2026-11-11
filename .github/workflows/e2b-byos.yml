@@ -3,6 +3,7 @@ name: E2B subscription custody
 # CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - 'lib/subscription*'
       - 'lib/infisical-workload*'
@@ -30,6 +31,8 @@ env:
 
 jobs:
   custody:
+    # Draft-only work is exercised locally; ready_for_review runs CI.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
