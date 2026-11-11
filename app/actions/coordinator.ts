@@ -18,7 +18,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatVersionState, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersionState, chatView, citationSources, storedReasoning, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import * as chatStore from '@/lib/coordinator/store'
 import { refreshChatMetadata, type UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
@@ -346,13 +346,7 @@ export async function retryCoordinatorTurn(botId: string | null = null): Promise
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
     if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false as const, reason: 'unavailable' as const }
-    const queued = await retryFailedTurn(session.user.id, bot.id)
-    if (queued) {
-      afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
-      return { queued: true as const }
-    }
-    const current = await chatView(session.user.id, 1, bot.id)
-    return { queued: false as const, reason: current.working ? 'working' as const : 'nothingToRetry' as const }
+    return (await import('@/lib/eve/retry')).retryEveTurn(session.user.id,bot.id,await headers())
   })
 }
 

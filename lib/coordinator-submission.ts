@@ -45,7 +45,7 @@ export async function personalSubmissionRecorded(executor: Pick<typeof db, 'sele
  * included (resolved where the message enters), or a suggestion's stored one
  * (null only on a suggestion from before it stored one).
  */
-export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string; humanSessionId?: string; filesValidated?: true;retryOf?:number }) {
+export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string; humanSessionId?: string; filesValidated?: true;retryOf?:number;taskRequestSourceEventId?:string }) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
   const botId = options.botId
   if (!options.filesValidated && splitChatFiles(text).files.length) {
@@ -58,10 +58,11 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   const profileId = agentProfileReferenceSchema.optional().parse(options.profileId)
   const taskTitle = taskTitleInputSchema.optional().parse(options.taskTitle)
   const retryOf = z.number().int().positive().optional().parse(options.retryOf)
+  const taskRequestSourceEventId=z.uuid().optional().parse(options.taskRequestSourceEventId)
   const dedupeKey = submissionId
     ? submissionKey(userId, botId, submissionId)
     : `user_message:${randomUUID()}`
-  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, source: 'person', ...(images.length ? { images } : {}), ...(taskDestination ? { taskDestination } : {}), ...(profileId ? { profileId } : {}), ...(taskTitle ? { taskTitle } : {}), ...(retryOf?{retryOf}:{}),...(options.humanSessionId ? { humanSessionId: options.humanSessionId } : {}) } }
+  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, source: 'person', ...(images.length ? { images } : {}), ...(taskDestination ? { taskDestination } : {}), ...(profileId ? { profileId } : {}), ...(taskTitle ? { taskTitle } : {}), ...(retryOf?{retryOf}:{}),...(taskRequestSourceEventId?{taskRequestSourceEventId}:{}),...(options.humanSessionId ? { humanSessionId: options.humanSessionId } : {}) } }
   const [inserted] = await executor.insert(coordinatorEvents).values({ id: randomUUID(), ...event })
     .onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
   if (inserted) return { duplicate: false, eventId: inserted.id }

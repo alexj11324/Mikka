@@ -458,3 +458,30 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     }
   })
 }
+
+
+/** Old SQL retry receipts remain regression fixtures, never production control. */
+export async function retryFailedTurn(userId: string, botId: string): Promise<boolean> {
+  return db.transaction(async tx => {
+    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
+    const [session] = await tx.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+    if (!session || coordinatorLeaseActive(session)) return false
+    // A recorded failure, or a turn that ended with neither a reply nor an error (its lease ran out):
+    // the person's message is the newest one, so nothing answered it.
+    let failure = session.lastError && session.lastErrorAt ? session.lastErrorAt.toISOString() : null
+    if (!failure) {
+      const [last] = await tx.select({ position: coordinatorMessages.position, role: sql<string>`${coordinatorMessages.message}->>'role'` })
+        .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(1)
+      const waiting = await tx.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt))).limit(1)
+      if (last?.role === 'user' && !waiting.length) failure = `unanswered:${last.position}`
+    }
+    if (!failure) return false
+    const inserted = await tx.insert(coordinatorEvents).values({
+      id: crypto.randomUUID(), userId, botId, kind: 'user_message', issueId: null, runId: null,
+      dedupeKey: `turn_retry:${userId}:${botId}:${failure}`,
+      payload: { text: '', postedToChat: true, retry: true },
+    }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
+    if (inserted.length) await botChatChanged(tx, userId, botId)
+    return inserted.length === 1
+  })
+}
