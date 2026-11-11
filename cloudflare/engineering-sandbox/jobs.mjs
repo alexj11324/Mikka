@@ -2,6 +2,7 @@ export const AUDIENCE = 'mikka-engineering-sandbox'
 export const REPOSITORY = 'alexj11324/Mikka'
 const workflow = '/.github/workflows/engineering-sandbox.yml@refs/heads/main'
 export const DEADLINE_MS = 10 * 60_000
+export const EVE_DEADLINE_MS = 15 * 60_000
 export const RECEIPT_MS = 7 * 24 * 60 * 60_000
 
 export const sourceSuites = {
@@ -28,6 +29,7 @@ export const sourceSuites = {
 
 export const jobs = {
   ...sourceSuites,
+  'eve-host-build': ['cloudflare/eve-runtime/test/compiled-host.mjs'],
   'postgres-policy': ['drizzle/20261029011701_cli_run_policy.sql'],
 }
 
