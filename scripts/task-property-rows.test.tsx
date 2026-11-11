@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
-import { act } from 'react'
+import { act, type ReactElement } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import type { IssueView } from '../app/actions/issues'
@@ -158,9 +158,10 @@ async function mount(metadata: Record<string, unknown> = {}) {
     panel: null, wide: false, resize: { handle: null, width: 360, dragging: false }, dialogs: null,
   }
   const { SWRConfig } = await import('swr')
+  const Frame = FramedTask as unknown as (p: typeof props) => ReactElement
   await act(async () => {
     root.render(<SWRConfig value={{ provider: () => new Map(), shouldRetryOnError: false }}>
-      <FramedTask {...props as never} />
+      <Frame {...props} />
     </SWRConfig>)
   })
   return props
