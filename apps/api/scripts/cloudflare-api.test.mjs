@@ -212,6 +212,20 @@ test('the private Eve API preserves session, signed body, stream cancellation an
   assert.equal(sent.signal.aborted, true)
 })
 
+test('Eve forwarding removes adjacent untrusted headers without skipping live iterator entries', async () => {
+  const { eveServiceRequest } = await import('../../../cloudflare/api/ingress/services.mjs')
+  const forbidden = ['cf-connecting-ip', 'cf-container-target-port', 'forwarded', 'host', 'keep-alive',
+    'x-forwarded-a', 'x-forwarded-b', 'x-mikka-unrelated-a', 'x-mikka-unrelated-b', 'x-vercel-a', 'x-vercel-b']
+  const allowed = { authorization: 'Bearer fixture', cookie: 'owned=fixture',
+    'x-mikka-submission-id': 'owned-operation', 'x-slack-signature': 'signed-fixture' }
+  let forwarded
+  await eveServiceRequest(new Request('https://eve.internal/eve/v1/session', {
+    headers: { ...Object.fromEntries(forbidden.map(name => [name, 'untrusted'])), ...allowed },
+  }), { fetch: async request => { forwarded = request; return new Response('receipt') } })
+  for (const name of forbidden) assert.equal(forwarded.headers.has(name), false, name)
+  assert.deepEqual(Object.fromEntries(forwarded.headers), allowed)
+})
+
 test('only the named business workflow callback forwards signed bytes to the matching private release', async () => {
   const { businessWorkflowDelivery, publicWorkflowDispatch } = await import('../../../cloudflare/api/ingress/services.mjs')
   const env = { PUBLIC_ORIGIN: 'https://app.example', MIKKA_DEPLOYMENT_ID: id, BUSINESS_WORLD: {} }

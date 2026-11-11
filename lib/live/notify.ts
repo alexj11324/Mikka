@@ -78,8 +78,12 @@ export function scheduleLive(work: () => Promise<void>) {
   // retained for fresh reads; permissions are still resolved by the work.
   afterJob('after:live-notify', async () => {
     try {
-      const { withoutWorkspaceClient } = await import('../workspace-db')
-      await withoutWorkspaceClient(work)
+      const [{ withoutDatabaseClient }, { withoutWorkspaceTransaction }] = await Promise.all([
+        import('../db/request-scope'), import('../workspace-db'),
+      ])
+      // APP may commit while its outer Workspace lease is still active. A
+      // deferred send can outlive both owners and must acquire its own locks.
+      await withoutDatabaseClient(() => withoutWorkspaceTransaction(work))
     } catch (error) {
       // By name and code only (decision 2026-11-05-0330): a message can carry database content.
       console.warn('[live] committed invalidation failed', { name: (error as Error | undefined)?.name, code: (error as { code?: unknown } | undefined)?.code })

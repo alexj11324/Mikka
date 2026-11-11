@@ -118,3 +118,37 @@ test('receipt history is resolved only against its existing application database
   assert.deepEqual([...ledgers.get('MIKKA_DATABASE_URL')], [old])
   assert.deepEqual([...ledgers.get('DATABASE_URL')], [old])
 })
+
+const driveHistory = [
+  ['20261112030506_drive_blob_workspace_admission.sql', '20261112030502_drive_blob_workspace_admission.sql', '556a765112dafd61fdaf922d4ff78a2fb133d02d47ece04fd9fc5d9847c42b53'],
+  ['20261112030507_scope_personal_drive_names_by_workspace.sql', '20261112030505_scope_personal_drive_names_by_workspace.sql', 'c46c75385e55cf5cca5770330c1da2ba763955efe8596e96b6d7dd3abd95c21d'],
+]
+
+test('Drive history aliases keep exact SQL and application ledgers without matching other migrations at the old timestamps', () => {
+  const unrelated = ['20261112030502_task_attachments.sql', '20261112030502_task_creation_receipts.sql', '20261112030505_task_creation_receipts.sql', '20261112030505_workspace_service_identities.sql']
+  for (const [name, old, hash] of driveHistory) {
+    const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+    assert.equal(createHash('sha256').update(sql).digest('hex'), hash)
+    assert.equal(planMigration(name, sql).target, 'MIKKA_DATABASE_URL')
+    assert.equal(alreadyApplied(name, new Set(), sql), false)
+    assert.equal(alreadyApplied(name, new Set([name]), sql), true)
+    const applied = new Set([old])
+    assert.equal(alreadyApplied(name, applied, sql), true)
+    assert.deepEqual([...applied], [old], 'retain the original filename in the executed ledger')
+    for (const foreign of [...unrelated, ...driveHistory.map(row => row[1]).filter(value => value !== old)]) {
+      assert.equal(alreadyApplied(name, new Set([foreign]), sql), false, foreign)
+    }
+    for (const changed of [sql + '\n-- modified', sql.replace('-- target: MIKKA_DATABASE_URL', '-- target: DATABASE_URL')]) {
+      assert.throws(() => alreadyApplied(name, applied, changed), /content changed/)
+    }
+    const ledgers = new Map([['MIKKA_DATABASE_URL', new Set()], ['DATABASE_URL', new Set([old])]])
+    assert.equal(alreadyApplied(name, ledgers.get(planMigration(name, sql).target), sql), false)
+    assert.deepEqual([...ledgers.get('DATABASE_URL')], [old])
+  }
+})
+
+test('the Drive admission migration remains before its folder namespace migration', () => {
+  const [admission, folderNames] = driveHistory.map(row => row[0])
+  const ordered = orderMigrations([folderNames, '20261112030505_task_creation_receipts.sql', admission, APPLICATION_BASELINE])
+  assert.ok(ordered.indexOf(admission) < ordered.indexOf(folderNames))
+})

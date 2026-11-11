@@ -7,6 +7,7 @@ import { db, pool } from '@/lib/db'
 import { readRunChain } from '@/lib/run-chain'
 import { sendOwnedRunMessage } from '@/lib/run-control'
 import { continuationNote } from '@/lib/thread-continuation'
+import { withTaskDispatchLock } from '@/lib/task-dispatch-lock'
 export { continuationNote } from '@/lib/thread-continuation'
 
 // One task, one thread (decision 2026-11-01-1330-one-thread-per-task, R-81).
@@ -62,24 +63,6 @@ export async function latestTaskRun(query: Query, userId: string, issueId: strin
   return { ...rest, cloud: cloudWorkspaceId && cloudBotId ? { workspaceId: cloudWorkspaceId, botId: cloudBotId } : null } as TaskThreadRun
 }
 
-/** Serializes dispatches to one person's task, so two at once cannot both start a thread. */
-async function withTaskLock<T>(userId: string, issueId: string, work: () => Promise<T>): Promise<T> {
-  const client = await pool.connect()
-  const key = JSON.stringify(['task-thread', userId, issueId])
-  let discard = false
-  try {
-    // PgBouncer transaction pooling cannot preserve session advisory locks.
-    await client.query('BEGIN')
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key])
-    const result = await work()
-    await client.query('COMMIT')
-    return result
-  } catch (error) {
-    try { await client.query('ROLLBACK') } catch { discard = true }
-    throw error
-  } finally { client.release(discard) }
-}
-
 /**
  * Whether the person asked, in their own words, for a new session or thread
  * instead of the task's existing one (a different agent, starting over).
@@ -121,7 +104,7 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
 }): Promise<ThreadDispatch<R> | E> {
   // An error the caller can act on (no machine, say) queued nothing; it goes back as it is.
   const queued = (result: R | E): result is R => 'runId' in result && typeof result.runId === 'string'
-  return withTaskLock(userId, issueId, async () => {
+  return withTaskDispatchLock(userId, issueId, async () => {
     if (input.creation) {
       const { eventId, botId, workspaceId } = input.creation
       // The Factory event and its physical Run commit together. Replaying the

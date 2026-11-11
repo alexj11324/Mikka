@@ -6,6 +6,62 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "app/api/drive/volumes/[volumeId]/blobs/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Upload bytes under the authenticated owner and record admission for the selected workspace before a manifest may reference them.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/entries/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Commit a bounded set of file changes against the expected head digest. Stale writes and references to blobs outside the selected workspace fail.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/files/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read bytes from the selected head or immutable version after workspace and owner authorization, and return them as an attachment.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/restore/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Restore an authorized prior version through a new manifest commit, retaining its history.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the head of an authorized private volume in the requested workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/versions/[versionId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one immutable version belonging to the authorized volume.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/[volumeId]/versions/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List the versions of the authorized volume using the installation database.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/drive/volumes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List and create the current owner's private volumes within an authorized workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/internal/github/workflow-result/route.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -70,6 +126,15 @@
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
   },
+  "drizzle/20261112030504_freeze_schedule_request_origin.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "The PostgreSQL migration retains distinct schedule request identities when their original bot or workspace is removed.",
+    "test": "lib/schedules/request-identity.db.test.ts",
+    "suite": "test:schedules-db"
+  },
   "drizzle/20261112030505_task_creation_receipts.sql": {
     "mode": "built-in",
     "environment": [
@@ -78,6 +143,24 @@
     "behavior": "Persist idempotent task creation receipts in PostgreSQL so a retry recovers the original task.",
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
+  },
+  "drizzle/20261112030506_drive_blob_workspace_admission.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Record PostgreSQL blob admissions by owner, digest and workspace to prevent cross-tenant reuse by digest alone.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "drizzle/20261112030507_scope_personal_drive_names_by_workspace.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Keep personal volume names unique within their workspace while allowing the same owner to use a name in a different workspace.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
   },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
@@ -183,6 +266,24 @@
     "behavior": "Dedicated connections preserve session locks and use the external installation's direct URL or its bundled PostgreSQL connection.",
     "test": "scripts/postgres-connection.test.mjs"
   },
+  "lib/db/request-scope.ts": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "NODE_ENV",
+      "VERCEL_ENV"
+    ],
+    "behavior": "Background work uses the selected installation database and starts its own transaction instead of reusing a request lease.",
+    "test": "tests/background-database-boundary.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/db/transaction-boundary.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Independent background work receives a separate transaction boundary, including for previously open project and workspace leases.",
+    "test": "tests/background-database-boundary.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/default-model-config.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -220,6 +321,20 @@
     "test": "lib/device-enrollment.db.test.ts",
     "suite": "test:device-enrollment-db"
   },
+  "lib/drive/client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installed same-origin Drive API, scope caches by workspace and account, and upload bytes before publishing the manifest.",
+    "test": "lib/drive/client.test.ts",
+    "suite": "test:drive"
+  },
+  "lib/drive/server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authorize workspace-scoped Drive requests and update versioned manifests in PostgreSQL. File bytes use the installation's existing artifact storage configuration, with inline database storage when no bucket is configured.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/eve/cloudflare-task-bridge.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -240,6 +355,13 @@
     "behavior": "Counts visible Factory evidence inside the existing PostgreSQL snapshot, scoped to the owner, workspace and visible Factory IDs.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "lib/github/comment-mention.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Recognizes mentions on GitHub pull requests and returns delivery identities without retaining comment text. The caller may supply its configured GitHub App slug.",
+    "test": "lib/github/comment-mention.test.ts",
+    "suite": "test:github"
   },
   "lib/github/workflow-result-store.ts": {
     "mode": "optional-cloud",
@@ -269,6 +391,20 @@
     "test": "lib/issue-threads.test.ts",
     "suite": "test:issues"
   },
+  "lib/linear-sync/markdown.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Converts Mikka task content to and from Linear Markdown locally and escapes plain text for comments.",
+    "test": "lib/linear-sync/markdown.test.ts",
+    "suite": "test:linear-sync"
+  },
+  "lib/linear-sync/run-comment.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Formats localized run comments, derives repeatable comment IDs, and builds task links from the installation origin and base path supplied by the caller.",
+    "test": "lib/linear-sync/run-comment.test.ts",
+    "suite": "test:linear-sync"
+  },
   "lib/platform/public-origin.ts": {
     "mode": "built-in",
     "environment": [],
@@ -282,6 +418,22 @@
     "behavior": "A run can use an installed toolkit only through the authorized account, tool list and scoped run token.",
     "test": "lib/run-app-mcp.test.ts",
     "suite": "test:integrations"
+  },
+  "lib/slack/api.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_BOT_TOKEN"
+    ],
+    "behavior": "An enabled Slack integration supplies its bot token to post a completion to the bound channel and thread. The client classifies Slack errors and retry timing without exposing the token.",
+    "test": "lib/slack/api.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/completion-message.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Formats a localized completion from the visible task label and status, escapes Slack mentions, and builds a link using the caller's installation origin and base path.",
+    "test": "lib/slack/completion-message.test.ts",
+    "suite": "test:slack"
   },
   "lib/task-activity-timeline.ts": {
     "mode": "built-in",
@@ -360,6 +512,13 @@
     "test": "apps/mobile/tests/task-groups.test.mts",
     "suite": "test:mobile"
   },
+  "lib/task-dispatch-lock.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An independent PostgreSQL pool takes a transaction-scoped advisory lock for each task, leaving application connections available for admission.",
+    "test": "tests/thread-dispatch-concurrency.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
   "lib/task-dispatch-receipt.ts": {
     "mode": "built-in",
     "environment": [],
@@ -387,6 +546,20 @@
     "behavior": "Native and Web readers request at most 200 distinct tasks per page and reject a workspace mismatch.",
     "test": "apps/mobile/tests/server-api.test.mts",
     "suite": "test:mobile"
+  },
+  "lib/task-resource-registration.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task resource registration persists its workspace and privacy defaults under the authorized PostgreSQL transaction.",
+    "test": "tests/task-resource-registration.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/task-workspace.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Workspace membership is checked against the current transaction boundary before granting task access.",
+    "test": "tests/factory-workspace-admission.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "lib/ui-overlay.mjs": {
     "mode": "built-in",

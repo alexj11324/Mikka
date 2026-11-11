@@ -7209,5 +7209,33 @@
     "content": "Content",
     "readFailed": "Unable to load {label}.",
     "refreshFailed": "Unable to refresh {label}. Previous content is shown."
+  },
+  "PersonalFiles": {
+    "overviewSub": "Files you keep and results from your tasks.",
+    "folders": "Folders",
+    "overviewEmpty": "No files yet.",
+    "createFolder": "New folder",
+    "folderName": "Folder name",
+    "folderNameTaken": "A folder with this name already exists. Choose another name.",
+    "create": "Create",
+    "personalFolder": "My files · {name}",
+    "back": "Artifact",
+    "file": "File",
+    "empty": "No files in this folder.",
+    "upload": "Upload files",
+    "history": "Version history",
+    "currentVersion": "Current version",
+    "version": "Version {seq} · {count} files · {date}",
+    "moreVersions": "More versions",
+    "moreFolders": "More folders",
+    "restore": "Restore version",
+    "restoreTitle": "Restore this version?",
+    "replace": "Replace files",
+    "replaceTitle": "Replace files with the same names?",
+    "conflict": "These files changed. Review the latest version before trying again.",
+    "tooLarge": "This file is too large.",
+    "accessUnavailable": "These files are no longer available to this account.",
+    "saveUnconfirmed": "The change could not be confirmed. Refresh the folder before trying again.",
+    "loadError": "Could not load personal files."
   }
 }

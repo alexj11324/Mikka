@@ -81,6 +81,7 @@ export function validateHostBuild(build, host, env) {
     || build.worldVersion !== '5.1.0' || !sha(build.revision)
     || !host || host.version !== 1 || !release(host.releaseId)
     || host.sourceSha !== build.revision || !sha(host.uiSha)
+    || (host.uiSource === 'public-server' && (host.uiSha !== host.sourceSha || env.MIKKA_DEPLOYMENT_STAGE === 'production'))
     || env.MIKKA_EVE_HOST !== 'cloudflare' || env.MIKKA_EVE_WORKFLOW_WORLD !== 'cloudflare'
     || env.MIKKA_BUILD_REVISION !== host.sourceSha || env.MIKKA_UI_OVERLAY_SHA !== host.uiSha
     || env.MIKKA_EVE_RELEASE_ID !== host.releaseId) return invalid()

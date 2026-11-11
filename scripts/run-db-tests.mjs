@@ -42,6 +42,8 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/governance/entitlements.ts', file: 'tests/governance-seats.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/task-workspace.ts', file: 'tests/task-workspace-governance.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/resource-access/store.ts', file: 'tests/resource-access.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'scripts/repair-personal-resource-privacy.mjs', file: 'tests/personal-resource-privacy.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/task-resource-registration.ts', file: 'tests/task-resource-registration.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
   { marker: 'lib/drive/store.ts', file: 'lib/drive/store.db.test.ts', script: 'test:drive-db' },
   { marker: 'lib/coding-workspace/requests.ts', file: 'lib/coding-workspace/files.db.test.ts', script: 'test:coding-workspace-db' },
@@ -149,8 +151,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/model-api-keys.ts', file: 'tests/model-api-keys.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/usage/read.ts', file: 'tests/usage.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/run-bot-name.ts', file: 'tests/run-agent-names.db.test.ts', script: 'test:workspace-admin-db' },
-  // This sweep claims every eligible fixture in its database, including other owners.
-  { marker: 'lib/run-outcome-judge.ts', file: 'tests/run-outcomes.db.test.ts', script: 'test:run-outcomes-db' },
+  { marker: 'lib/run-outcome-judge.ts', file: 'tests/run-outcomes.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/billing/service.ts', file: 'tests/billing.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/billing/management.ts', file: 'tests/billing-management.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/audit/query.ts', file: 'tests/audit-query.db.test.ts', script: 'test:workspace-admin-db' },
