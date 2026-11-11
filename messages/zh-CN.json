@@ -1881,6 +1881,7 @@
       "empty": "暂无记忆",
       "correct": "更正",
       "delete": "删除",
+      "scopedTo": "仅在 {repository}",
       "kinds": {
         "interest": "兴趣",
         "routine": "习惯",
