@@ -65,7 +65,7 @@ function fileLoader(plugin) {
   return loader
 }
 
-export async function applicationPlugin(target, { deploymentId = '', serverPages = false } = {}) {
+export async function applicationPlugin(target, { deploymentId = '', serverPages = false, publicTestFixture = false } = {}) {
   if (!['web', 'desktop'].includes(target)) throw new Error('FRONTEND_TARGET_INVALID')
   const allowed = registryActionNames(await readFile(resolve(repository, 'lib/desktop-rpc/registry.ts'), 'utf8'))
   const actions = new Map()
@@ -142,6 +142,7 @@ export async function applicationPlugin(target, { deploymentId = '', serverPages
       const modules = Object.fromEntries([...actions].sort(([a], [b]) => a.localeCompare(b)))
       inventory = {
         version: 1, target, modules, exports: Object.values(modules).reduce((sum, names) => sum + names.length, 0),
+        ...(serverPages && { serverPages: true }), ...(publicTestFixture && { publicTestFixture: true }),
         usedActions: [...used].sort(), sourceActions: (await readdir(actionDirectory)).filter(name => name.endsWith('.ts')).length,
         inputs: [...inputs].map(path => slash(relative(repository, path))).sort(), serverModules: [],
       }
