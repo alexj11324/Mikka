@@ -2562,6 +2562,7 @@
         },
         "token": {
           "created": "新建了令牌 {target}",
+          "rotated": "轮换了令牌 {target} 的密钥",
           "revoked": "撤销了令牌 {target}"
         },
         "auth": {

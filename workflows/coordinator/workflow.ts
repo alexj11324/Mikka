@@ -120,7 +120,11 @@ export async function coordinatorTurn(userId: string, botId: string, startupRece
     try {
       if(inbox.scheduledRead) await steps.assertScheduleRead(userId,botId,inbox.scheduledRead)
       const scheduleOptions = inbox.scheduledRead ? {readOnly:true,readToolIds:inbox.scheduledRead.allowedActions} : {}
-      const sourceOptions = inbox.sourceEventId ? {sourceEventId:inbox.sourceEventId} : {}
+      // Evidence-only run provenance: a scheduled read is a schedule, a
+      // Telegram turn names its chat/message, everything else is the app.
+      const entryOrigin = inbox.scheduledRead ? { origin:'schedule' as const }
+        : { origin: inbox.origin ?? 'web' as const, ...(inbox.originRef ? { originRef: inbox.originRef } : {}) }
+      const sourceOptions = { ...(inbox.sourceEventId ? {sourceEventId:inbox.sourceEventId} : {}), ...entryOrigin }
       const scheduledAuthority = inbox.scheduledRead ? {botId,occurrence:inbox.scheduledRead} : undefined
       let hosted: AgentExecution['snapshot']['runtime'] | Awaited<ReturnType<typeof kit.botRuntime>> | null = null
       let prepared: Awaited<ReturnType<typeof steps.prepareTurn>> | { mailboxTools: Awaited<ReturnType<typeof steps.mailboxCatalogue>>; prompt: null; contextMs: null }

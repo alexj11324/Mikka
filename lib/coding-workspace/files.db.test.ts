@@ -228,13 +228,13 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
     await t.test('files GET accepts real session/PAT authority and rejects missing, revoked, tenant and member credentials', async () => {
       const f = await fixture()
       const { auth } = await import('../auth')
-      const { createPersonalAccessToken } = await import('../tokens/store')
+      const { createLegacyPersonalAccessToken } = await import('../tokens/store')
       const { GET } = await import('../../app/api/runs/[runId]/workspace/files/route')
       const session = await (await auth.$context).internalAdapter.createSession(owner)
       assert.ok(session)
-      const ownerToken = await createPersonalAccessToken(owner, workspaceId, { name: 'Workspace fixture owner' })
-      const memberToken = await createPersonalAccessToken(member, workspaceId, { name: 'Workspace fixture member' })
-      const otherToken = await createPersonalAccessToken(owner, otherWorkspace, { name: 'Workspace fixture other tenant' })
+      const ownerToken = await createLegacyPersonalAccessToken(owner, workspaceId, { name: 'Workspace fixture owner' })
+      const memberToken = await createLegacyPersonalAccessToken(member, workspaceId, { name: 'Workspace fixture member' })
+      const otherToken = await createLegacyPersonalAccessToken(owner, otherWorkspace, { name: 'Workspace fixture other tenant' })
       const endpoint = `http://127.0.0.1:3199/api/runs/${f.runId}/workspace/files?repoId=${f.repoId}&workspaceId=${workspaceId}&kind=file&path=src%2Fexample.ts`
       const get = (credential?: string, signal?: AbortSignal) => GET(new Request(endpoint, { headers: credential ? { authorization: `Bearer ${credential}` } : {}, signal }), { params: Promise.resolve({ runId: f.runId }) })
       // Both credentials use their real database verifiers. A session bearer
@@ -773,14 +773,14 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
 
     await t.test('mention create and resolve reauthenticate real sessions and PATs after a pending device read', async () => {
       const f = await fixture(), { auth } = await import('../auth')
-      const { createPersonalAccessToken } = await import('../tokens/store')
+      const { createLegacyPersonalAccessToken } = await import('../tokens/store')
       const { POST } = await import('../../app/api/runs/[runId]/workspace/mentions/route')
       const { value: mention } = await exchange(f, signal => createFileMention(pool, pool, actor, f.runId, f.repoId,
         { kind: 'file', path: 'src/example.ts', range: { startLine: 1, endLine: 1 } }, signal))
       const origin = 'http://127.0.0.1:3199', endpoint = `${origin}/api/runs/${f.runId}/workspace/mentions`
       for (const action of ['create', 'resolve'] as const) for (const type of ['session', 'pat'] as const) {
         const session = type === 'session' ? await (await auth.$context).internalAdapter.createSession(owner) : null
-        const pat = type === 'pat' ? await createPersonalAccessToken(owner, workspaceId, { name: `Workspace in-flight ${action}` }) : null
+        const pat = type === 'pat' ? await createLegacyPersonalAccessToken(owner, workspaceId, { name: `Workspace in-flight ${action}` }) : null
         const credential = session?.token ?? pat?.token
         assert.ok(credential)
         const body = { action, repoId: f.repoId, workspaceId, ...(action === 'create'

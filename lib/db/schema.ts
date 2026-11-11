@@ -10,6 +10,7 @@ import type { DaemonUpdateFailure, SetupRecipe } from '@mikka/protocol/device'
 import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
 import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
+import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -416,6 +417,10 @@ export const agentRuns = pgTable('agent_runs', {
   outcomeAt: timestamp('outcomeAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),
+  /** Evidence-only entry provenance (lib/run-origin.ts). Null on legacy rows: unknown, never inferred as 'web'. */
+  origin: text('origin').$type<RunOrigin | null>(),
+  /** Opaque entry identifiers for `origin`. Evidence-only (lib/captures/store.ts): never projected into lists, chat, events, logs or analytics. */
+  originRef: jsonb('originRef').$type<RunOriginRef | null>(),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true; requiredSandboxId?:string} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */

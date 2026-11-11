@@ -19,7 +19,7 @@ test('schedules due timer: exact due times, no minute sweep', { skip: !valid }, 
   const schema = `schedule_due_${randomUUID().replaceAll('-', '')}`
   const admin = new Pool({ connectionString: target, max: 1 })
   await admin.query(`CREATE SCHEMA ${schema}`)
-  for (const table of ['"user"', 'coordinator_events', 'coordinator_messages', 'user_schedules', 'schedule_occurrences']) {
+  for (const table of ['"user"', 'bots', 'coordinator_events', 'coordinator_messages', 'user_schedules', 'schedule_occurrences']) {
     await admin.query(`CREATE TABLE ${schema}.${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`)
   }
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 4 })
@@ -29,9 +29,9 @@ test('schedules due timer: exact due times, no minute sweep', { skip: !valid }, 
     await admin.end()
   })
   let now = new Date('2030-01-01T00:00:00Z')
-  const owner = `schedule-due-${randomUUID()}`, sourceEventId = randomUUID()
-  const actor: Actor = { ownerId: owner, workspaceId: null, botId: null, sourceEventId }
-  const guard: WorkspaceGuard = async (_owner, _workspace, work) => work()
+  const owner = `schedule-due-${randomUUID()}`, sourceEventId = randomUUID(), workspaceId = randomUUID()
+  const actor: Actor = { ownerId: owner, workspaceId, botId: null, sourceEventId }
+  const guard: WorkspaceGuard = async (_owner, _workspace, work) => work({ role: 'admin' })
   const store = new ScheduleStore(pool, guard, async () => null, async () => {}, () => true, () => now)
   await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Owner',$2,true,now(),now())`, [owner, `${owner}@example.invalid`])
   await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier) VALUES($1,$2,'user_message',$3,'{"text":"schedule it"}','attention')`, [sourceEventId, owner, `due-source-${sourceEventId}`])

@@ -6,6 +6,7 @@ import { start } from 'workflow/api'
 import { pool } from '@/lib/db'
 import { slackTurn } from '@/workflows/slack/workflow'
 import { slackConfig, slackOwner } from './config'
+import { slackRunOriginRef } from '@/lib/run-origin'
 
 let bot: ReturnType<typeof createBot> | undefined
 
@@ -35,7 +36,9 @@ function createBot() {
       event: { type: 'app_mention', user: message.author.userId, text: message.text },
     })
     if (!userId || message.author.isBot === true || message.author.isMe) return
-    await start(slackTurn, [userId, thread.id, message.text.slice(0, 10_000)])
+    // The event's own team/channel/timestamp identify the entry; the chat
+    // adapter's thread id is not parsed for provenance.
+    await start(slackTurn, [userId, thread.id, message.text.slice(0, 10_000), { origin: 'slack', originRef: slackRunOriginRef(raw) }])
   })
   return chat
 }

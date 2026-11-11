@@ -25,6 +25,7 @@ import { quotaContinuationNote, quotaContinuationPrompt } from '@/lib/run-retry'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { RunApiKey } from '@/lib/run-credential-source'
 import { runListChanged } from '@/lib/live/lists'
+import { resolveRunOrigin } from '@/lib/run-origin'
 
 // A subscription's quota ran out mid-run: the daemon or hosted runner reports
 // `quota_exhausted` (packages/daemon/src/runs/quota-exhausted.ts). When
@@ -174,6 +175,9 @@ async function queueDeviceContinuation(tx: Tx, query: Query, run: Run, key: RunA
   const { prompt } = copied
   await tx.insert(agentRuns).values({
     id, userId: run.userId, workspaceId: run.workspaceId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
+    // The continuation keeps the paused run's entry; a legacy run keeps the
+    // host's automatic recovery as its origin rather than guessing 'web'.
+    ...resolveRunOrigin({ sourceRun: run, defaultOrigin: run.source === 'mcp' ? 'api' : 'automation' }),
     agentDefinition: await continuationDefinition(run, prompt, key), deviceId: run.deviceId, deviceRepoId: run.deviceRepoId,
     status: 'queued', kind: run.kind, baseBranch: run.baseBranch, ...copied, attempt: run.attempt, retryOf: run.id,
   })
@@ -220,6 +224,9 @@ export async function queueCloudQuotaContinuation(hint: Run, cloud: CloudBinding
         if (!target) throw new ActionFailureError('runInvalid')
         const repoId = target.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(run.userId, target.deviceId, target.remoteUrl, client)).id : target.repoId
         const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: target.agentId, deviceRepoId: repoId, readOnly: run.agentDefinition?.readOnly, title: issue.title, body: tiptapToText(issue.content),
+          // The quota continuation keeps the paused run's entry; a legacy run
+          // keeps the host's automatic recovery as its origin, never 'web'.
+          ...resolveRunOrigin({ sourceRun: run, defaultOrigin: 'automation' }),
           allowLocalRecovery: run.agentDefinition?.allowLocalRecovery, sourceEventId: run.agentDefinition?.allowLocalRecovery ? request?.sourceEventId : undefined,
           executionNote: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
           // Preserve the selected model and credential; tenant admission grants neither.
