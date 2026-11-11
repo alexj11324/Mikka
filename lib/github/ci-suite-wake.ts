@@ -57,7 +57,7 @@ export async function wakeLinkedCiSuite(
         text: 'Linked PR CI suite completed. Read the current GitHub PR head, every required check and branch rules before deciding on repair or merge. This signal is not authorization.',
         repository: suite.repository,
         pullUrl: row.pullUrl,
-        headSha: suite.headSha,
+        suiteHeadSha: suite.headSha,
         suiteId: suite.suiteId,
         conclusionHint: suite.conclusion,
       },
