@@ -58,6 +58,10 @@ test('real preparePrompt consumes provenance wrapper; native and Coordinator use
   assert.match(steps, /summary = preserveMessageSources\(text, folded, summary, summaryTrust\)/)
   assert.match(steps, /saveSummary\(userId, summary, cut/)
   const native = readFileSync('packages/daemon/src/agents/run-context.ts', 'utf8')
+  // The skills section still comes from the shared pure builder, and still sits
+  // between the run rules and the host's personal-message policy.
+  assert.match(native, /const skills = skillsPromptSection\(/)
+  assert.match(native, /skillPromptPlan\(this\.options\.skills \?\? \[\]\)/)
   assert.match(native, /skills,\s+PERSONAL_MESSAGE_INSTRUCTIONS,/)
   assert.doesNotMatch(native, /mailbox_recipients|mailbox_send/)
 })
@@ -182,6 +186,24 @@ test('real image content and authenticated machine destination survive the same 
   const projected = unwrap(compacted)
   assert.deepEqual(projected.retainedUserSource.taskDestination, { kind: 'cloud' })
   assert.equal(projected.retainedUserImages.length, 1)
+})
+
+test('a task title typed in the task form reaches the model only from a stored user event', () => {
+  const title = '修复回跳前缀'
+  const typed = sourcedEventMessage({ ...event, kind: 'user_message', payload: { text: 'Build it', taskTitle: title } }, 'Build it')
+  assert.equal(typed.mikkaUserEvent?.taskTitle, title)
+  assert.match(String(modelMessage(typed).content), /The person typed this task title in the task form: "修复回跳前缀"\. Create the task with exactly this title/)
+  const notified = sourcedEventMessage({ ...event, kind: 'run_finished', payload: { text: 'Build it', taskTitle: title } }, 'Build it')
+  assert.equal(notified.mikkaUserEvent, undefined)
+  const words = sourcedEventMessage({ ...event, kind: 'user_message', payload: { text: `The title is ${title}` } }, `The title is ${title}`)
+  assert.equal(words.mikkaUserEvent?.taskTitle, undefined)
+  assert.doesNotMatch(String(modelMessage(words).content), /typed this task title/)
+  for (const invalid of ['', '   ', 'x'.repeat(61), 'two\nlines', 42]) {
+    const message = sourcedEventMessage({ ...event, kind: 'user_message', payload: { text: 'Build it', taskTitle: invalid } }, 'Build it')
+    assert.equal(message.mikkaUserEvent?.taskTitle, undefined, `rejects ${JSON.stringify(invalid)}`)
+  }
+  const compacted = unwrap(preserveMessageSources('Task choice', [{ message: typed }], null, trust))
+  assert.equal(compacted.retainedUserSource.taskTitle, title)
 })
 
 for (const profileId of ['default', 'a1284000-0000-4000-8000-000000000005']) test(`task-form Profile ${profileId} provenance reaches the model only from a stored user event`, () => {

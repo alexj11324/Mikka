@@ -22,7 +22,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { withTaskWorkspace } = await import('../lib/task-workspace')
+  const { withFactoryBackgroundWorkspace } = await import('../lib/factory/background-workspace')
   const { observePoolCommits } = await import('../lib/db/commit-effects')
   observePoolCommits(pool)
   const bots = await import('../lib/coordinator/coordinator-bot')
@@ -101,6 +101,81 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     return { pid, resume, settled, reached }
   }
 
+  for (const legacyEvent of [false, true]) await t.test(
+    legacyEvent ? 'a captured legacy event still runs the execution migration' : 'an empty execution family skips its recursive update after every NOWAIT read',
+    async () => {
+      const p = await person(legacyEvent ? 'cost-event' : 'cost-empty')
+      const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
+      const eventId = legacyEvent ? await sourceEvent(p.id) : null
+      await pool.query(`INSERT INTO coordinator_messages (id,"userId","botId",position,message) VALUES ($1,$2,NULL,1,'{"role":"user","content":"old chat still moves"}')`, [randomUUID(), p.id])
+      await pool.query(`INSERT INTO chat_preferences ("userId","chatKey",muted) VALUES ($1,'coordinator',true)`, [p.id])
+      const tx = await pool.connect()
+      const statements: string[] = []
+      const originalQuery = tx.query, release = tx.release, query = tx.query.bind(tx)
+      tx.query = (async (text: string, values?: unknown[]) => {
+        statements.push(text)
+        return query(text, values)
+      }) as PoolClient['query']
+      tx.release = () => { tx.query = originalQuery; tx.release = release; release.call(tx) }
+      await bots.backfillCoordinatorChat({ connect: async () => tx } as Pick<import('pg').Pool, 'connect'>, p.id, coordinator)
+      const lockOrder = ['SELECT i.id FROM issues', 'SELECT id FROM factory_tasks', 'SELECT id FROM coordinator_events', 'SELECT id FROM agent_runs']
+        .map(prefix => statements.findIndex(statement => statement.startsWith(prefix)))
+      assert.ok(lockOrder.every((index, i) => index >= 0 && (i === 0 || index > lockOrder[i - 1])), 'all original NOWAIT reads run in their original order')
+      assert.equal(statements.filter(statement => statement.startsWith('WITH RECURSIVE')).length, legacyEvent ? 1 : 0)
+      assert.deepEqual((await messageRows(p.id)).rows.map(row => [row.botId, row.text]), [[coordinator.botId, 'old chat still moves']])
+      assert.deepEqual((await pool.query('SELECT "chatKey",muted FROM chat_preferences WHERE "userId"=$1', [p.id])).rows, [{ chatKey: coordinator.botId, muted: true }])
+      if (eventId) assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: coordinator.botId }])
+    },
+  )
+
+  await t.test('stale attention reads only settlement fields and preserves the decision input and owner log', async st => {
+    const p = await person('cost-attention')
+    const now = new Date('2030-01-02T12:00:00.000Z')
+    const earlier = new Date(now.getTime() - 45 * 60_000)
+    const matterId = randomUUID(), pendingId = randomUUID()
+    st.after(() => pool.query('DELETE FROM attention_matters WHERE "userId"=$1', [p.id]))
+    for (const id of [matterId, pendingId]) {
+      await pool.query(`INSERT INTO attention_matters(id,"userId","matterKey",source,title,level,assessment,evidence,state,reason,"personAsked",recheck,handoffs,"handedAt","updatedAt")
+        VALUES($1::uuid,$2,$1::text,'github','Renew the domain','high',$3,$3,'handed','deadline approaching',true,true,1,$4,$4)`,
+      [id, p.id, { unusedLargeSource: 'x'.repeat(30_000) }, earlier])
+      await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier,"deliveredAt")
+        VALUES($1,$2,'matter_handoff',$3,'{}','attention',$4)`,
+      [randomUUID(), p.id, `matter_handoff:${id}:1`, id === matterId ? earlier : null])
+    }
+    await pool.query(`INSERT INTO attention_log(id,"userId","matterId",action,spends,"createdAt") VALUES($1,$2,$3,'notify',true,$4)`,
+      [randomUUID(), p.id, matterId, new Date(now.getTime() - 5 * 60_000)])
+    const { releaseAttention } = await import('../lib/attention/store')
+    const { settleInput, settleQuestions } = await import('../lib/attention/interrupt')
+    const observed: Array<{ owner: string; purpose: string; input: string; questions: unknown }> = []
+    const statements: string[] = []
+    const originalQuery = appPool.query, query = appPool.query.bind(appPool)
+    appPool.query = (async (text: string, values?: unknown[]) => {
+      statements.push(typeof text === 'string' ? text : (text as unknown as { text: string }).text)
+      return query(text, values)
+    }) as typeof appPool.query
+    try {
+      assert.equal(await releaseAttention(p.id, now, async (owner, purpose, input, questions) => {
+        observed.push({ owner, purpose, input, questions })
+        return new Map([['settle', { type: 'choice' as const, name: 'settle', choice: 'quiet' }]])
+      }), false)
+    } finally { appPool.query = originalQuery }
+    assert.deepEqual(observed, [{
+      owner: p.id, purpose: 'attention-settle',
+      input: settleInput({ id: matterId, title: 'Renew the domain', level: 'high', reason: 'deadline approaching', personAsked: true, recheck: true, minutesWaiting: 45 }, { today: 1, minutesSinceLast: 5 }, now),
+      questions: settleQuestions(),
+    }])
+    const staleRead = statements.filter(statement => statement.includes('from "attention_matters"') && statement.includes('"handedAt"'))
+    assert.equal(staleRead.length, 1, 'one real stale-row query')
+    const projection = staleRead[0].split(' from ')[0]
+    assert.doesNotMatch(projection, /"assessment"|"evidence"/, 'unused large source fields never cross the database boundary')
+    assert.match(projection, /"userId"/)
+    assert.deepEqual((await pool.query('SELECT state,reason,"updatedAt" FROM attention_matters WHERE id=$1', [matterId])).rows, [{ state: 'quiet', reason: 'no decision recorded', updatedAt: now }])
+    assert.deepEqual((await pool.query('SELECT "userId","matterId",action,spends,reason FROM attention_log WHERE "matterId"=$1 AND action=\'quiet\'', [matterId])).rows,
+      [{ userId: p.id, matterId, action: 'quiet', spends: false, reason: 'no decision recorded' }])
+    assert.equal((await pool.query('SELECT state FROM attention_matters WHERE id=$1', [pendingId])).rows[0].state, 'handed', 'an undelivered handoff is not settled')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM attention_log WHERE "matterId"=$1', [pendingId])).rows[0].n, 0)
+  })
+
   await t.test('existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing', async () => {
     const p = await person('backfill')
     const agent = await seedAgent(pool, p.id)
@@ -124,7 +199,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const definition = { title: 'Morning brief', timezone: 'UTC', timing: { kind: 'once', at: '2030-01-01T09:00:00Z' }, task: { kind: 'reminder', text: 'x' }, misfire: 'skip', maxLatenessMinutes: 60 }
     await pool.query(`INSERT INTO user_schedules (id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at)
       VALUES ($1,$2,NULL,NULL,$3,$4,$5,$5,'active','2030-01-01T09:00:00Z')`, [schedule, p.id, event, randomUUID(), definition])
-    await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,NULL,$2)`, [p.id, JSON.stringify({ permissions: { git_push: 'deny' } })])
+    await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy,external_write_permissions) VALUES ($1,'coordinator',NULL,NULL,$2,$3)`, [p.id, JSON.stringify({ permissions: { git_push: 'deny' } }), JSON.stringify({ send_slack_message: 'deny' })])
 
     const coordinator = await bots.coordinatorBot(p.id, null)
     assert.equal(coordinator.workspaceId, p.workspaceId, 'older data has no workspace, so it moves to the personal workspace\'s Coordinator')
@@ -142,8 +217,10 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     assert.deepEqual((await pool.query('SELECT "botKey","bindingId" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: coordinator.botId, bindingId: null }])
     assert.deepEqual((await pool.query('SELECT "chatKey",muted FROM chat_preferences WHERE "userId"=$1', [p.id])).rows, [{ chatKey: coordinator.botId, muted: true }])
     assert.deepEqual((await pool.query('SELECT bot_id,workspace_id FROM user_schedules WHERE id=$1', [schedule])).rows, [{ bot_id: coordinator.botId, workspace_id: p.workspaceId }])
-    assert.deepEqual((await pool.query('SELECT bot_id,workspace_id,cli_run_policy FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=$2', [p.id, coordinator.botId])).rows,
-      [{ bot_id: coordinator.botId, workspace_id: p.workspaceId, cli_run_policy: { permissions: { git_push: 'deny' } } }], 'its run policies come with it')
+    assert.deepEqual((await pool.query('SELECT bot_id,workspace_id,cli_run_policy,external_write_permissions FROM agent_kit_heads WHERE owner_id=$1 AND bot_key=$2', [p.id, coordinator.botId])).rows,
+      [{ bot_id: coordinator.botId, workspace_id: p.workspaceId, cli_run_policy: {}, external_write_permissions: {} }], 'the new head carries no policy')
+    assert.deepEqual((await pool.query('SELECT cli_run_policy,external_write_permissions FROM workspace_computer_policies WHERE "workspaceId"=$1', [p.workspaceId])).rows,
+      [{ cli_run_policy: { permissions: { git_push: 'deny' } }, external_write_permissions: { send_slack_message: 'deny' } }], 'the legacy restrictions are folded into the workspace')
 
     const snapshot = async () => JSON.stringify(await Promise.all([
       messageRows(p.id).then(result => result.rows),
@@ -153,8 +230,15 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       pool.query('SELECT bot_key FROM agent_kit_heads WHERE owner_id=$1 ORDER BY bot_key', [p.id]).then(result => result.rows),
     ]))
     const once = await snapshot()
-    await Promise.all([bots.backfillCoordinatorChat(appPool, p.id, coordinator), bots.backfillCoordinatorChat(appPool, p.id, coordinator)])
-    assert.equal(await snapshot(), once, 'two more passes at once change nothing')
+    const concurrent = await Promise.allSettled([bots.backfillCoordinatorChat(appPool, p.id, coordinator), bots.backfillCoordinatorChat(appPool, p.id, coordinator)])
+    assert.ok(concurrent.some(result => result.status === 'fulfilled'), 'a concurrent pass must complete')
+    for (const result of concurrent) if (result.status === 'rejected') {
+      assert.equal(result.reason?.code, '55P03', 'only the documented busy/lock deferral is retryable')
+    }
+    // This is a best-effort migration: a chat lock can defer a concurrent pass.
+    // Join both transactions before retrying and verify the complete history.
+    await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+    assert.equal(await snapshot(), once, 'concurrent passes and a deferred retry change nothing')
     assert.equal(Number((await pool.query('SELECT count(*) FROM coordinator_bots WHERE "ownerId"=$1', [p.id])).rows[0].count), 1, 'one Coordinator row')
 
     // A row an older instance wrote the old way during a deploy goes after what the bot row already holds.
@@ -534,7 +618,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   await t.test('an in-flight null-Bot route defers migration; its unfrozen history moves after commit', { timeout: 10_000 }, async () => {
     const p = await person('route-before-backfill'), issueId = await seedIssue(pool, p.id), eventId = await sourceEvent(p.id)
     const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
-    await withTaskWorkspace(p.id, p.workspaceId, async () => {
+    await withFactoryBackgroundWorkspace(appPool, p.id, { kind: 'issue', id: issueId }, async () => {
       const writer = await pool.connect()
       try {
         await writer.query('BEGIN')

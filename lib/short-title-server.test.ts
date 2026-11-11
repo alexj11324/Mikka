@@ -17,6 +17,7 @@ mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db
 } } })
 mock.module(new URL('./live/lists.ts', import.meta.url).href, { namedExports: { issueListChanged: async (...args: unknown[]) => { pushed.push(args.slice(1)) } } })
 mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExports: { executionWorkspace: async () => 'fixture-workspace' } })
+mock.module(new URL('./cloud-services/runtime.ts', import.meta.url).href, { namedExports: { cloudClient: { capability: async () => null } } })
 mock.module(new URL('./abuse/model.ts', import.meta.url).href, { namedExports: {
   admitHostedModel: async () => { if (!allowed) throw new Error('modelRouteDenied'); return null },
   hostedModel: async (workspace: string, modelId: string, provider: unknown, owner: string) => {
@@ -51,6 +52,13 @@ test('a task that already has a short title is not named again', async () => {
   await writeShortTitle('task', 'owner')
   assert.equal(generateText.mock.callCount(), 0)
   assert.equal(writes.length, 0)
+})
+
+test('the model writer stores a bounded title even if the answer ignores the language and length instructions', async () => {
+  task = { ...task!, title: 'Fix login callback' }
+  answer = async () => ({ text: '{"title":"修复登录后回跳丢前缀并保留工作区参数"}' })
+  await writeShortTitle('task', 'owner')
+  assert.deepEqual(writes, [{ shortTitle: '修复登录后回跳丢前缀并保', shortTitleFrom: 'Fix login callback' }])
 })
 
 test('a rename that lands first keeps the person\'s title: nothing is pushed', async () => {

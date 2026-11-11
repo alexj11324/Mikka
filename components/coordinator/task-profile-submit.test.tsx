@@ -104,7 +104,7 @@ beforeEach(() => {
   submitted.length = 0; refreshes = 0; readError = undefined; outcomes = []; toasts.length = 0
   shown = { id: workspaceId, name: 'Fixture workspace', kind: 'team' }; nextShown = null; switcherReads = 0; readFails = false; switcherError = undefined; afterRead = null
   data = { profiles: [{
-    id: customId, name: 'Fixture role', description: '', roles: ['review'], enabled: true, harness: 'claude_code',
+    id: customId, name: 'Fixture role', description: '', roles: ['review'], icon: 'lens', color: 'pink', enabled: true, harness: 'claude_code',
     model: { mode: 'inherit' }, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64),
     createdAt: '2026-11-05T00:00:00Z', updatedAt: '2026-11-05T00:00:00Z', archivedAt: null,
   }], catalog: { models: [], skills: [] }, availability: { [customId]: { available: true } }, defaultAvailability: { available: true } }
@@ -285,4 +285,54 @@ test('a failed confirmation sends nothing and keeps the text for 重试', async 
   await act(async () => create().click())
   assert.equal(submitted.length, 1, 'retrying the same request after a successful read creates it')
   assert.equal(submitted[0].context?.expectedWorkspaceId, workspaceId)
+})
+
+const titleInput = () => container.querySelector<HTMLInputElement>('#new-task-name')!
+const typeTitle = async (value: string) => act(async () => {
+  const input = titleInput()
+  Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')!.set!.call(input, value)
+  input.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
+})
+const press = async (init: { metaKey?: boolean }) => act(async () => {
+  titleInput().dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init }) as unknown as Event)
+})
+
+test('a written title is sent as taskTitle beside the description', async () => {
+  await render(dialog())
+  assert.equal(titleInput().maxLength, 60)
+  assert.equal(create().disabled, false, 'description alone still enables submit')
+  await typeTitle('  Fix the login redirect  ')
+  await act(async () => create().click())
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].context?.taskTitle, 'Fix the login redirect')
+  assert.equal(submitted[0].text, 'Shell.newTaskDialog.prompt')
+})
+
+test('without a title nothing changes: no taskTitle key in the context', async () => {
+  await render(dialog())
+  await act(async () => create().click())
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].context?.taskTitle, undefined)
+})
+
+test('a title alone enables submit and becomes the request text', async () => {
+  await render(<NewTaskDialog open onOpenChange={() => {}} workspaceId={workspaceId} />)
+  assert.equal(create().disabled, true)
+  await typeTitle('Only a title')
+  assert.equal(create().disabled, false)
+  await act(async () => create().click())
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].text, 'Shell.newTaskDialog.prompt', 'the request text is built from the title')
+  assert.equal(submitted[0].context?.taskTitle, 'Only a title')
+})
+
+test('Enter in the title moves focus to the description; Ctrl or Cmd+Enter submits', async () => {
+  await render(dialog())
+  await typeTitle('Named task')
+  await press({})
+  assert.equal(submitted.length, 0)
+  assert.equal(browser.document.activeElement?.id, 'new-issue-title')
+  await press({ metaKey: true })
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].context?.taskTitle, 'Named task')
 })

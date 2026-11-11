@@ -5,12 +5,13 @@ import { displayTaskTitle } from '@/lib/short-title'
 import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, MessageSquare, Tag, Trash2 } from 'lucide-react'
+import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
 import { AvatarGroup, AvatarGroupCount } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { HarnessMark } from '@/components/labels/entity-labels'
@@ -27,6 +28,7 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components
 import { PriorityIcon } from '@/components/workspace/priority-icon'
 import { BOARD_COLUMNS, type AgentState, type BoardColumn, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
 import type { TaskBlock } from '@/lib/task-blocked'
+import type { TaskReason, TaskState } from '@/hooks/use-bot-tasks'
 import { blockLabel } from '@/components/workspace/block-label'
 import { BoardCard, BoardColumnFrame, BoardHiddenLane } from '@ui-slot/board'
 
@@ -82,6 +84,8 @@ export type CardHandlers = {
 export type CardContext = {
   properties: ReadonlySet<CardProperty>
   agentStates: ReadonlyMap<string, AgentState>
+  /** Each task's own state (localTaskState on its newest run), for a card's status line (decision #1864 point 6). */
+  taskStates?: ReadonlyMap<string, { state: TaskState; reason: TaskReason | null }>
   subtasks: ReadonlyMap<string, { done: number; total: number }>
   /** The Bot and coding agents working each task, from its threads. */
   owners?: ReadonlyMap<string, RunOwner>
@@ -140,7 +144,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   ].filter(Boolean)
 
   const card = <BoardCard id={task.id} title={displayTaskTitle(task)} fullTitle={task.title} identifier={show('identifier') && task.identifier ? task.identifier : null} done={done} overlay={isOverlay}
-    personal={null /* #1636: scope no longer decides who owns a task; the card shows no personal lock (#1659 P0) */}
+    personal={task.scope === 'personal' && !context.personalWorkspace ? <Tooltip><TooltipTrigger render={<span className="flex shrink-0" />}><Lock aria-label={tCard('personal')} className="size-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tCard('personalHint')}</TooltipContent></Tooltip> : null}
     hasAssignee={Boolean(assigneeGroup)}
     assignee={show('assignee') ? <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary> : null}
     status={<CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>}
@@ -167,31 +171,68 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
           onOpen(task.id)
         }
       }} />}>{card}</ContextMenuTrigger>
-      <ContextMenuContent className="w-56">
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={disabled}><Circle />{tCard('status')}<ContextMenuShortcut>S</ContextMenuShortcut></ContextMenuSubTrigger>
-          <ContextMenuSubContent><ContextMenuRadioGroup value={task.status} onValueChange={value => onStatusChange(task, value as IssueStatus)}>
-            {statusOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon className={option.indicatorClassName} />{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup></ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger disabled={disabled}><Flag />{tCard('priority')}<ContextMenuShortcut>P</ContextMenuShortcut></ContextMenuSubTrigger>
-          <ContextMenuSubContent><ContextMenuRadioGroup value={task.priority} onValueChange={value => onPriorityChange(task, String(value))}>
-            {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon {...option.iconProps} />{option.label}</ContextMenuRadioItem>)}
-          </ContextMenuRadioGroup></ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('assignee')}><CircleUserRound />{tCard('assignee')}<ContextMenuShortcut>A</ContextMenuShortcut></ContextMenuItem>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('labels')}><Tag />{tCard('labels')}</ContextMenuItem>
-        <ContextMenuItem disabled={disabled} onClick={() => ask('project')}><Box />{tCard('project')}</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem disabled={disabled} onClick={() => ask('pullRequests')}><Link2 />{tCard('linkPr')}</ContextMenuItem>
-        {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
-        <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
-      </ContextMenuContent>
+      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={!!block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
     </ContextMenu>
   </KanbanItem>
+}
+
+/** A card's context menu: status, priority, the metadata editors, 受阻, discuss and delete. */
+function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityChange, onDelete, onDiscuss, onBlockChange }: Pick<CardHandlers, 'onStatusChange' | 'onPriorityChange' | 'onDelete' | 'onDiscuss' | 'onBlockChange'> & {
+  task: BoardTask
+  disabled: boolean
+  block: boolean
+  ask: (target: MetadataRequest['target']) => void
+}) {
+  const tCard = useTranslations('Shell.board.card')
+  const tIssue = useTranslations('Issue')
+  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
+  const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
+  const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
+  return <>
+    <ContextMenuSub>
+      <ContextMenuSubTrigger disabled={disabled}><Circle />{tCard('status')}<ContextMenuShortcut>S</ContextMenuShortcut></ContextMenuSubTrigger>
+      <ContextMenuSubContent><ContextMenuRadioGroup value={task.status} onValueChange={value => onStatusChange(task, value as IssueStatus)}>
+        {statusOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon className={option.indicatorClassName} />{option.label}</ContextMenuRadioItem>)}
+      </ContextMenuRadioGroup></ContextMenuSubContent>
+    </ContextMenuSub>
+    <ContextMenuSub>
+      <ContextMenuSubTrigger disabled={disabled}><Flag />{tCard('priority')}<ContextMenuShortcut>P</ContextMenuShortcut></ContextMenuSubTrigger>
+      <ContextMenuSubContent><ContextMenuRadioGroup value={task.priority} onValueChange={value => onPriorityChange(task, String(value))}>
+        {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon {...option.iconProps} />{option.label}</ContextMenuRadioItem>)}
+      </ContextMenuRadioGroup></ContextMenuSubContent>
+    </ContextMenuSub>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('assignee')}><CircleUserRound />{tCard('assignee')}<ContextMenuShortcut>A</ContextMenuShortcut></ContextMenuItem>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('labels')}><Tag />{tCard('labels')}</ContextMenuItem>
+    <ContextMenuItem disabled={disabled} onClick={() => ask('project')}><Box />{tCard('project')}</ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem disabled={disabled} onClick={() => ask('pullRequests')}><Link2 />{tCard('linkPr')}</ContextMenuItem>
+    {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
+    <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
+    <ContextMenuSeparator />
+    <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
+  </>
+}
+
+/**
+ * The same context menu around a UI layer's own card (the `board` slot's BoardScreen), with the editors it opens kept
+ * off the card. The card stays as the layer draws it: the trigger adds no box of its own.
+ */
+export function TaskContextMenu({ task, disabled, block, children, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: Omit<CardHandlers, 'onOpen'> & {
+  task: BoardTask
+  disabled: boolean
+  block: boolean
+  children: ReactNode
+}) {
+  const [request, setRequest] = useState<MetadataRequest | null>(null)
+  const ask = (target: MetadataRequest['target']) => setRequest(current => ({ target, sequence: (current?.sequence ?? 0) + 1 }))
+  return <>
+    <ContextMenu>
+      <ContextMenuTrigger render={<div className="contents" />}>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
+    </ContextMenu>
+    <div hidden><IssueMetadataControls task={task} section="all" compact disabled={disabled} request={request} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>
+  </>
 }
 
 function RememberedColumn({ stateKey, ...props }: ComponentProps<typeof KanbanColumnContent> & { stateKey: string }) {

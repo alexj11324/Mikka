@@ -13,8 +13,9 @@ const USER = '8f8f435e-0ce2-4bea-965d-afbf508c694f'
 const TASK = 'b633a9e7-5f5a-518b-abcd-99eec3cc558c'
 const ARTIFACTS = ['97766bd2-4916-5144-adba-f7de75c48398', 'ce9a7c8a-f61b-5617-a5a9-78b806b7b1b5', '1ac28503-b5d2-584a-afac-af29b7cfdcc4']
 export const SHOTS = ['01-bots', '02-bot-chat', '03-task', '04-conversation', '05-artifact']
+export const MAESTRO_CHILD_TIMEOUT_MS = 600000
 
-const PHASES = new Set(['source', 'capture', 'cleanup', 'simulator-create', 'simulator-boot-initial',
+const PHASES = new Set(['source', 'capture', 'cleanup', 'driver-preflight', 'native-driver-preflight', 'simulator-create', 'simulator-boot-initial',
   'simulator-system-locale', 'simulator-boot-localized', 'backend-version-before', 'demo-readback',
   'demo-auth-sign-in', 'demo-home', 'demo-workspace', 'demo-bot-chat', 'demo-bot-metadata', 'demo-tasks',
   'demo-task-detail', 'demo-thread', 'demo-artifact', 'demo-auth-sign-out', 'simulator-install',
@@ -29,7 +30,100 @@ const ERROR_CODES = new Set(['ERR_ASSERTION', 'ERR_INVALID_ARG_TYPE', 'ERR_OUT_O
 const CHECKS = new Set(['backendVersionHTTPFailed', 'backendVersionSHARequired', 'backendOverlaySHARequired',
   'backendDeploymentChangedDuringCapture', 'demoReadbackHTTPFailed', 'reviewSessionRequired',
   'existingReviewCredentialRequired', 'screenshotSimulatorCleanupFailed', 'screenshotModeRequired',
-  'iPhone17ProAndIOS26Required'])
+  'iPhone17ProAndIOS26Required', 'preflightCredentialBoundaryRequired', 'driverPreflightCIRequired',
+  'driverPreflightIdentityRequired'])
+const NATIVE_FLOWS = new Set(['driver-preflight', 'login', 'workspace', ...SHOTS])
+const COMMAND_TYPES = ['applyConfigurationCommand', 'launchAppCommand', 'assertConditionCommand',
+  'tapOnElement', 'inputTextCommand', 'hideKeyboardCommand']
+const COMMAND_STATUSES = new Set(['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'WARNED', 'SKIPPED'])
+const SIGN_IN_SELECTORS = new Set(['signin-email', 'signin-password', 'signin-submit'])
+
+export function nativeDriverFlow() {
+  return 'appId: com.apple.Preferences\n---\n- launchApp\n- assertVisible: Settings\n'
+}
+
+export function nativeFlowDiagnostics(privateDir, name) {
+  assert.ok(NATIVE_FLOWS.has(name))
+  const result = { reason: 'unknown', commandReport: 'missing', commands: [] }
+  try {
+    if (readFileSync(join(privateDir, `${name}.log`), 'utf8').includes('iOS driver not ready in time')) {
+      result.reason = 'ios_driver_startup_timeout'
+    }
+  } catch { result.logReadFailed = true }
+  try {
+    // Maestro cli-2.12.1 writes <timestamp>/<known-flow[-collision]>/commands.json.
+    const output = join(privateDir, 'driver-output')
+    const timestamps = readdirSync(output, { withFileTypes: true })
+    assert.ok(timestamps.length <= 32)
+    const reports = []
+    for (const timestamp of timestamps) {
+      if (!timestamp.isDirectory() || !/^\d{4}-\d{2}-\d{2}_\d{6}$/.test(timestamp.name)) continue
+      const directory = join(output, timestamp.name)
+      const flows = readdirSync(directory, { withFileTypes: true })
+      assert.ok(flows.length <= 32)
+      for (const flow of flows) {
+        if (flow.isDirectory() && new RegExp(`^${name}(?:-(?:[2-9]|[1-9]\\d+))?$`).test(flow.name)) {
+          reports.push(join(directory, flow.name, 'commands.json'))
+        }
+      }
+    }
+    if (reports.length !== 1) {
+      result.commandReport = reports.length ? 'ambiguous' : 'missing'
+      return result
+    }
+    const records = JSON.parse(readFileSync(reports[0], 'utf8'))
+    assert.ok(Array.isArray(records) && records.length <= 256)
+    result.commands = records.map(record => {
+      const command = record.command ?? {}
+      const metadata = record.metadata ?? {}
+      const type = COMMAND_TYPES.find(key => command[key] != null) ?? 'unknown'
+      const projected = { type, status: COMMAND_STATUSES.has(metadata.status) ? metadata.status : 'unknown',
+        errorPresent: metadata.error != null }
+      for (const [key, value] of [['sequenceNumber', metadata.sequenceNumber], ['durationMs', metadata.duration]]) {
+        if (Number.isSafeInteger(value) && value >= 0) projected[key] = value
+      }
+      const selector = command.tapOnElement?.selector?.idRegex ?? command.assertConditionCommand?.condition?.visible?.idRegex
+        ?? command.assertConditionCommand?.condition?.notVisible?.idRegex
+      if (SIGN_IN_SELECTORS.has(selector)) projected.selectorId = selector
+      const message = metadata.error?.message
+      if (result.reason === 'unknown' && metadata.status === 'FAILED' && typeof message === 'string') {
+        if (message.startsWith('Assertion is false:')) result.reason = 'assertion_failed'
+        else if (message.startsWith('Element not found:') || message.startsWith('No visible element found:')) result.reason = 'element_not_found'
+      }
+      return projected
+    })
+    result.commandReport = 'available'
+  } catch (error) {
+    result.commandReport = error.code === 'ENOENT' ? 'missing' : 'unreadable'
+  }
+  return result
+}
+
+function nativeFlow(env, device, privateDir, name, flow, credentials = false) {
+  assert.ok(NATIVE_FLOWS.has(name))
+  return screenshotPhase(`native-${name}`, () => {
+    const flowPath = join(privateDir, `${name}.yaml`)
+    writeFileSync(flowPath, flow, { mode: 0o600 })
+    const log = openSync(join(privateDir, `${name}.log`), 'w', 0o600)
+    let result
+    try {
+      result = spawnSync('maestro', ['--device', device.udid, 'test', '--debug-output', join(privateDir, 'debug'),
+        '--test-output-dir', join(privateDir, 'driver-output'), flowPath], {
+        cwd: privateDir, timeout: MAESTRO_CHILD_TIMEOUT_MS, stdio: ['ignore', log, log],
+        env: { ...env, MAESTRO_CLI_NO_ANALYTICS: 'true', MAESTRO_DRIVER_STARTUP_TIMEOUT: '300000',
+          MAESTRO_REVIEW_EMAIL: credentials ? env.APP_STORE_REVIEW_EMAIL : '',
+          MAESTRO_REVIEW_PASSWORD: credentials ? env.APP_STORE_REVIEW_PASSWORD : '' },
+      })
+    } finally { closeSync(log) }
+    if (result.status !== 0) {
+      console.log(`native-screenshot-flow-failure ${JSON.stringify({ phase: `native-${name}`, ...nativeFlowDiagnostics(privateDir, name) })}`)
+      throw Object.assign(new Error('nativeUIFlowFailed', { cause: result.error }), {
+        code: 'NATIVE_UI_FLOW_FAILED', status: result.status, signal: result.signal,
+        timedOut: result.error?.code === 'ETIMEDOUT',
+      })
+    }
+  })
+}
 
 // Never serialize Error objects, messages, commands, stdout, stderr or assertion values.
 export function screenshotFailure(error) {
@@ -72,6 +166,18 @@ export function screenshotIdentity(env) {
   return identity
 }
 
+export function driverPreflightIdentity(env) {
+  assert.equal(env.GITHUB_ACTIONS, 'true', 'driverPreflightCIRequired')
+  assert.equal(env.GITHUB_EVENT_NAME, 'workflow_dispatch', 'driverPreflightIdentityRequired')
+  assert.equal(env.GITHUB_REPOSITORY, 'alexj11324/Mikka', 'driverPreflightIdentityRequired')
+  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699', 'driverPreflightIdentityRequired')
+  assert.equal(env.GITHUB_REPOSITORY_OWNER_ID, '183887963', 'driverPreflightIdentityRequired')
+  assert.match(env.GITHUB_REF ?? '', /^refs\/heads\/[^\s]+$/, 'driverPreflightIdentityRequired')
+  assert.match(env.GITHUB_SHA ?? '', /^[a-f0-9]{40}$/, 'driverPreflightIdentityRequired')
+  assert.match(env.GITHUB_RUN_ID ?? '', /^\d+$/, 'driverPreflightIdentityRequired')
+  return { sha: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID, ref: env.GITHUB_REF }
+}
+
 export async function backendVersion(expected, fetchImpl = fetch) {
   const response = await fetchImpl(`${ORIGIN}/api/version`, { cache: 'no-store', credentials: 'omit',
     redirect: 'error', headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(30000) })
@@ -96,6 +202,7 @@ export function pngDimensions(bytes) {
 export function loginFlow() {
   return `appId: ${BUNDLE}
 ---
+- launchApp
 - extendedWaitUntil:
     visible:
       id: signin-email
@@ -230,24 +337,7 @@ async function capture(env) {
   mkdirSync(output, { mode: 0o700 })
   const device = JSON.parse(readFileSync(join(privateDir, 'device.json'), 'utf8'))
   const simctl = (...args) => execFileSync('xcrun', ['simctl', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-  const maestro = (name, flow, credentials = false) => screenshotPhase(`native-${name}`, () => {
-    const flowPath = join(privateDir, `${name}.yaml`)
-    writeFileSync(flowPath, flow, { mode: 0o600 })
-    const log = openSync(join(privateDir, `${name}.log`), 'w', 0o600)
-    try {
-      const result = spawnSync('maestro', ['--device', device.udid, 'test', '--debug-output', join(privateDir, 'debug'),
-        '--test-output-dir', join(privateDir, 'driver-output'), flowPath], {
-        cwd: privateDir, timeout: 180000, stdio: ['ignore', log, log],
-        env: { ...env, MAESTRO_CLI_NO_ANALYTICS: 'true',
-          MAESTRO_REVIEW_EMAIL: credentials ? env.APP_STORE_REVIEW_EMAIL : '',
-          MAESTRO_REVIEW_PASSWORD: credentials ? env.APP_STORE_REVIEW_PASSWORD : '' },
-      })
-      if (result.status !== 0) throw Object.assign(new Error('nativeUIFlowFailed', { cause: result.error }), {
-        code: 'NATIVE_UI_FLOW_FAILED', status: result.status, signal: result.signal,
-        timedOut: result.error?.code === 'ETIMEDOUT',
-      })
-    } finally { closeSync(log) }
-  })
+  const maestro = (name, flow, credentials = false) => nativeFlow(env, device, privateDir, name, flow, credentials)
   const backendVersionBefore = await screenshotPhase('backend-version-before', () => backendVersion())
   const readback = await screenshotPhase('demo-readback', () => verifyDemo(env))
   const appPath = join(privateDir, 'build/Build/Products/Release-iphonesimulator/Mikka.app')
@@ -303,6 +393,13 @@ async function main(mode) {
     await waitForReleaseChecks(identity, { token: env.GITHUB_TOKEN })
   } else if (mode === 'capture') {
     await capture(env)
+  } else if (mode === 'driver-preflight') {
+    driverPreflightIdentity(env)
+    assert.ok(!env.APP_STORE_REVIEW_EMAIL && !env.APP_STORE_REVIEW_PASSWORD && !env.HOSTED_UI_READ_KEY,
+      'preflightCredentialBoundaryRequired')
+    const privateDir = join(env.RUNNER_TEMP, 'mikka-screenshots-private')
+    const device = JSON.parse(readFileSync(join(privateDir, 'device.json'), 'utf8'))
+    await nativeFlow(env, device, privateDir, 'driver-preflight', nativeDriverFlow())
   } else if (mode === 'cleanup') {
     const privateDir = join(env.RUNNER_TEMP, 'mikka-screenshots-private')
     try {

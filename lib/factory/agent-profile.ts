@@ -10,10 +10,11 @@ import { cloudModelSupport } from '@/lib/cloud-template-models'
 import { cloudReady } from '@/lib/rule-dispatch'
 import { hostedBillingScope } from '@/lib/abuse/context'
 import { invokeDecision } from '@/lib/coordinator/decide'
-import { BUILTIN_AGENT_PROFILE_ID, BUILTIN_AGENT_PROFILE_VERSION, builtinAgentProfileDefinition, builtinAgentProfileSelection, AgentProfileError, agentProfileDigest, agentProfileInstructions, parseAgentProfile, type AgentProfileScope, type AgentProfileSelection } from './agent-profile-definition'
+import { BUILTIN_AGENT_PROFILE_ID, BUILTIN_AGENT_PROFILE_VERSION, builtinAgentProfileDefinition, builtinAgentProfileSelection, AgentProfileError, agentProfileDigest, agentProfileInstructions, agentProfileLegacyInstructions, parseAgentProfile, type AgentProfileScope, type AgentProfileSelection } from './agent-profile-definition'
 import { acquireProfileMembership, profileView, readProfileRow, readProfileRows, validateProfileScope, type ProfileMembership, type ProfileQuery, type ProfileRow } from './agent-profile-store'
-import { agentProfileSkillsCatalog, resolveAgentProfileSkills } from './agent-profile-skills'
+import { agentProfileSkillAvailability, agentProfileSkillCatalog, agentProfileSkillSource } from './agent-profile-skills'
 import { maskFactoryNote } from './note-mask'
+import { resolveProfileMark, type ProfileMarkValue } from './agent-profile-mark'
 import { profileDecisionDiagnostics, profileDecisionInput, profileDecisionQuestions, profileDecisionSelection, type ProfileCheckWork, type PublicAgentProfile } from './agent-profile-decision'
 import type { ModelRoutingContext } from '@/lib/model-routing-server'
 
@@ -75,9 +76,16 @@ const requestConstraints = async (pool: Pool, scope: AgentProfileScope, request:
   }
   return { harness, deviceId }
 }
-function publicProfile(row: ProfileRow, target: Exclude<ModelDispatch, { kind: 'none' }>): PublicAgentProfile {
-  return { id: row.id, name: row.definition.name, description: row.definition.description, roles: [...row.definition.roles], harness: target.entry.harness, model: target.model }
+function publicProfile(row: ProfileRow, target: Exclude<ModelDispatch, { kind: 'none' }>, skills: ProfileRow['skills']): PublicAgentProfile {
+  return {
+    id: row.id, name: row.definition.name, description: row.definition.description, roles: [...row.definition.roles], harness: target.entry.harness, model: target.model,
+    // Only trusted, bounded metadata enters model context: never a body,
+    // private path or source revision. The Decision may not infer capabilities
+    // that were not declared here.
+    skills: skills.slice(0, 12).map(skill => ({ id: skill.id, name: skill.name, description: skill.description.slice(0, 200), source: agentProfileSkillSource(skill.id) })),
+  }
 }
+const SKILL_REASONS = { missing: 'skillMissing', disabled: 'skillDisabled', forbidden: 'skillForbidden', invalid: 'skillsChanged' } as const
 async function eligibleProfiles(pool: Pool, scope: DispatchScope, rows: ProfileRow[], request: Partial<AgentProfileDispatchRequest>, deps: DispatchDependencies = {}, readOnly = false, deferStaleQuota = false) {
   const constraints = await requestConstraints(pool, scope, request)
   const eligible: Eligible[] = [], availability: Record<string, { available: boolean; reason?: string }> = {}
@@ -89,23 +97,29 @@ async function eligibleProfiles(pool: Pool, scope: DispatchScope, rows: ProfileR
     if ((constraints.harness && harness && constraints.harness !== harness) || (fixed && ((constraints.harness && constraints.harness !== fixed.harness) || (request.asked?.model && request.asked.model !== fixed.model)))) {
       availability[row.id] = { available: false, reason: 'pinConflict' }; continue
     }
-    const skills = resolveAgentProfileSkills(definition.skills)
-    if (agentProfileDigest(definition, skills) !== row.digest) { availability[row.id] = { available: false, reason: 'skillsChanged' }; continue }
+    // The stored envelope is the pinned version; the current source only has
+    // to remain authorized. A text change never rewrites a saved Profile.
+    const skills = row.skills
+    if (!Array.isArray(skills) || agentProfileDigest(definition, skills) !== row.digest) { availability[row.id] = { available: false, reason: 'skillsChanged' }; continue }
+    const states = await agentProfileSkillAvailability(pool, scope, skills)
+    const unavailable = Object.values(states).find(state => !state.available)
+    if (unavailable) { availability[row.id] = { available: false, reason: SKILL_REASONS[unavailable.reason ?? 'missing'] }; continue }
     const target = await (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, {
       harness, agentId: request.agentId, withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose,
       ...(fixed ? { exactEntry: { id: `profile:${row.id}:${row.version}`, harness: fixed.harness, model: fixed.model, source: fixed.source } } : {}),
       bindSubscription: false, ...(readOnly ? { skipCatalogueRefresh: true, probeQuota: false, ...(deferStaleQuota ? { deferStaleQuota: true as const } : {}) } : {}),
     })
     availability[row.id] = target.kind === 'none' ? { available: false, reason: target.reason } : { available: true }
-    if (target.kind !== 'none') eligible.push({ row, target, public: publicProfile(row, target) })
+    if (target.kind !== 'none') eligible.push({ row, target, public: publicProfile(row, target, skills) })
   }
   return { eligible, availability, constraints }
 }
 
-/** Only the actor's authorized, currently runnable public summaries enter model context. */
-export async function listPublicAgentProfiles(pool: Pool, scope: DispatchScope, request: Partial<AgentProfileDispatchRequest> = {}): Promise<PublicAgentProfile[]> {
+/** Only the actor's authorized, currently runnable public summaries enter model context.
+ * The mark rides along here so a reply can name a Profile as the UI draws it; the Decision input stays without it. */
+export async function listPublicAgentProfiles(pool: Pool, scope: DispatchScope, request: Partial<AgentProfileDispatchRequest> = {}): Promise<(PublicAgentProfile & ProfileMarkValue)[]> {
   const member = await acquireProfileMembership(scope)
-  try { return (await eligibleProfiles(pool, scope, await readProfileRows(pool, scope), request, {}, true)).eligible.map(item => item.public) }
+  try { return (await eligibleProfiles(pool, scope, await readProfileRows(pool, scope), request, {}, true)).eligible.map(item => ({ ...item.public, ...resolveProfileMark(item.public, item.row) })) }
   finally { await member.close() }
 }
 
@@ -139,11 +153,12 @@ export async function agentProfileCatalog(pool: Pool, scope: AgentProfileScope) 
   const candidates = await orderCandidates(pool, scope)
   const order = await readOrder(pool, scope, candidates)
   const entries: OrderEntry[] = candidates.map(candidate => ({ id: `profile-catalog:${encodeURIComponent(entryKey(candidate))}`, harness: candidate.harness, model: candidate.model, source: candidate.source }))
-  const [states, devices, connectedAgents, claudeReady, codexReady, labels] = await Promise.all([
+  const [states, devices, connectedAgents, claudeReady, codexReady, labels, skills] = await Promise.all([
     credentialStates(pool, scope, entries, candidates, undefined, { probe: false }), poolDevices(pool, scope.ownerId),
     pool.query<{ deviceId: string; harness: string }>('SELECT DISTINCT "deviceId",harness FROM agents WHERE "userId"=$1 AND "deviceId" IS NOT NULL', [scope.ownerId]),
     cloudReady(pool, { ...scope, botId: null, harness: 'claude_code' }), cloudReady(pool, { ...scope, botId: null, harness: 'codex' }),
     pool.query<{ id: string; label: string | null }>('SELECT id::text AS id,"accountLabel" AS label FROM byos_connections WHERE "ownerId"=$1 UNION ALL SELECT id::text AS id,name AS label FROM model_api_keys WHERE "ownerId"=$1', [scope.ownerId]),
+    agentProfileSkillCatalog(pool, scope),
   ])
   const models = entries.map((entry, index) => {
     const compatible = devices.filter(device => connectedAgents.rows.some(agent => agent.deviceId === device.id && agent.harness === entry.harness))
@@ -154,7 +169,7 @@ export async function agentProfileCatalog(pool: Pool, scope: AgentProfileScope) 
     const sourceOrdinal = sourceIds.indexOf(sourceId) + 1
     return { harness: entry.harness, model: entry.model, source: entry.source, provider: candidates[index].provider, ...(sourceLabel ? { sourceLabel } : {}), sourceOrdinal, available: plan.kind !== 'none', ...(plan.kind === 'none' ? { reason: plan.reason } : {}) }
   })
-  return { models, skills: agentProfileSkillsCatalog() }
+  return { models, skills }
 }
 export async function readAgentProfileManagement(pool: Pool, scope: AgentProfileScope, preview: Pick<AgentProfileDispatchRequest, 'location' | 'deviceId'> = {}) {
   const member = await acquireProfileMembership(scope)
@@ -181,9 +196,14 @@ export async function assertProfileSelection(query: ProfileQuery, scope: AgentPr
     if (row.archivedAt) throw new AgentProfileError('agentProfileArchived')
     if (!row.definition.enabled) throw new AgentProfileError('agentProfileDisabled')
     if (row.version !== selection.version || row.digest !== selection.digest) throw new AgentProfileError('agentProfileVersionConflict')
-    definition = parseAgentProfile(row.definition); skills = resolveAgentProfileSkills(definition.skills)
+    definition = parseAgentProfile(row.definition); skills = row.skills
+    // A pinned body stays valid, but a source that was disabled, unshared or
+    // removed between dispatch and claim cannot silently keep running.
+    const states = await agentProfileSkillAvailability(query, scope, skills)
+    const unavailable = Object.entries(states).find(([, state]) => !state.available)
+    if (unavailable) throw new AgentProfileError('agentProfileSkillUnavailable', 409, { detail: unavailable[1].reason })
   }
-  if (agentProfileDigest(definition, skills) !== selection.digest || digest(definition) !== digest(selection.definition) || digest(skills) !== digest(selection.skills) || selection.instructions !== agentProfileInstructions(definition, skills) || selection.effort !== definition.effort || selection.name !== definition.name) throw new AgentProfileError('agentProfileSelectionInvalid')
+  if (agentProfileDigest(definition, skills) !== selection.digest || digest(definition) !== digest(selection.definition) || digest(skills) !== digest(selection.skills) || (selection.instructions !== agentProfileInstructions(definition, skills) && selection.instructions !== agentProfileLegacyInstructions(definition, skills)) || selection.effort !== definition.effort || selection.name !== definition.name) throw new AgentProfileError('agentProfileSelectionInvalid')
   await assertProfileTarget(query, scope, selection)
 }
 
@@ -294,7 +314,9 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
     chosen = eligible.find(item => item.row.id === result.selected.id); reason = result.selected.reason
   }
   if (!chosen) throw new AgentProfileError('agentProfileSelectionInvalid')
-  const definition = parseAgentProfile(chosen.row.definition), skills = resolveAgentProfileSkills(definition.skills)
+  // The stored envelope is the exact pinned version; `eligibleProfiles` has
+  // already rechecked that its sources remain authorized.
+  const definition = parseAgentProfile(chosen.row.definition), skills = chosen.row.skills
   // Role selection happens first. Its fixed model and a person's explicit
   // model are never replaced; only an inherited model list is routed.
   if (definition.model.mode !== 'fixed' && !request.asked?.model) {

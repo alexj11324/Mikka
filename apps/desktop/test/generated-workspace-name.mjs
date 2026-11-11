@@ -3,15 +3,17 @@ import { isDeepStrictEqual } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { tsImport } from 'tsx/esm/api'
 import { TestAccountPool } from '../../../scripts/test-accounts/pool.mjs'
+import { retainedAuditFingerprints, retainedAuditMatches } from '../../../scripts/test-accounts/retained-resource-audit.mjs'
 
 const importOptions = { parentURL: import.meta.url, tsconfig: fileURLToPath(new URL('../../../tsconfig.json', import.meta.url)) }
 
 const fail = code => { throw Object.assign(new Error(code), { code }) }
 const requireTrue = (value, code = 'WORKSPACE_NAME_CLEANUP_UNPROVEN') => { if (!value) fail(code) }
-const hashOwned = (owned, replacement) => {
+const hashOwned = (owned, receipts, replacement) => {
   const hash = createHash('sha256')
   for (const [table, rows] of [...owned].sort(([a], [b]) => a.localeCompare(b))) {
-    const texts = rows.map(row => replacement && table === 'mikka_workspaces' && row.value.id === replacement.id ? replacement.text : row.text).sort((a, b) => a.localeCompare(b))
+    const texts = rows.filter(row => !retainedAuditMatches(table, row, receipts))
+      .map(row => replacement && table === 'mikka_workspaces' && row.value.id === replacement.id ? replacement.text : row.text).sort((a, b) => a.localeCompare(b))
     hash.update(JSON.stringify([table, texts]))
   }
   return hash.digest('hex')
@@ -44,6 +46,10 @@ export async function captureGeneratedWorkspaceName(scope) {
       requireTrue(accounts.every(account => /^[a-f0-9]{64}$/.test(account.baseline)), 'WORKSPACE_NAME_SCOPE_REQUIRED')
       if (original) requireTrue(accounts[0].baseline === original.ownerBaseline && accounts[1].baseline === original.peerBaseline, 'WORKSPACE_NAME_SCOPE_REQUIRED')
       const owned = await Promise.all(owners.map(owner => scope.pool.ownedRows(client, owner)))
+      // Apply the pool's exact, immutable cleanup receipts to every digest,
+      // including the hypothetical name projection. Unregistered or modified
+      // events still prevent restoration; no audit history is deleted.
+      const receipts = await Promise.all(owners.map(owner => retainedAuditFingerprints(client, owner)))
       const users = (owned[0].get('user') ?? []).filter(row => row.value.id === owners[0])
       const personal = (owned[0].get('mikka_workspaces') ?? []).filter(row => row.value.userId === owners[0] && row.value.kind === 'personal')
       requireTrue(users.length === 1 && personal.length === 1, 'WORKSPACE_NAME_SCOPE_REQUIRED')
@@ -59,10 +65,10 @@ export async function captureGeneratedWorkspaceName(scope) {
         )).rows
         requireTrue(rows.length === 1 && typeof rows[0].data === 'string')
         requireTrue(isDeepStrictEqual(JSON.parse(rows[0].data), { ...workspace, name: projectName }))
-        projected = hashOwned(owned[0], { id: original.id, text: rows[0].data })
+        projected = hashOwned(owned[0], receipts[0], { id: original.id, text: rows[0].data })
       }
       await scope.pool.current(client, lease, { readOnly: true, requireUnexpired: true })
-      return { userName, workspace, ownerHash: hashOwned(owned[0]), peerHash: hashOwned(owned[1]), ownerBaseline: accounts[0].baseline, peerBaseline: accounts[1].baseline, projected }
+      return { userName, workspace, ownerHash: hashOwned(owned[0], receipts[0]), peerHash: hashOwned(owned[1], receipts[1]), ownerBaseline: accounts[0].baseline, peerBaseline: accounts[1].baseline, projected }
     }, { readOnly: true })
   }
 

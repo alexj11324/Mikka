@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg'
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db, pool } from '@/lib/db'
-import { agentRuns, bots, conversations, issues, teamIssueCreateRequests, teamIssuePromotions, workspaceBilling, workspaceCreditGrants, workspaceSettings } from '@/lib/db/schema'
+import { agentRuns, artifacts, bots, conversations, issues, teamIssueCreateRequests, teamIssuePromotions, workspaceBilling, workspaceCreditGrants, workspaceSettings } from '@/lib/db/schema'
 import { projectEvents, projects } from '@/lib/db/project-schema'
 import { teamIssueCreateReceipts, teamIssuePromotionReceipts, teamIssues, teamMembers, teamProjects, teams } from '@/lib/db/team-schema'
 import { workspaceInvitations, workspaceMembers, workspaceSlugRedirects, workspaces } from '@/lib/db/workspace-schema'
@@ -192,6 +192,10 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   const botIds = botRows.map(row => row.id)
   const runOwners = botIds.length || issueIds.length ? await tx.selectDistinct({ userId: agentRuns.userId }).from(agentRuns)
     .where(sql`${botIds.length ? inArray(agentRuns.botId, botIds) : sql`false`} OR ${issueIds.length ? inArray(agentRuns.issueId, issueIds) : sql`false`}`) : []
+  // A task deletion can cascade its run before the Artifact's SET NULL action.
+  // Its tenant guard must keep rejecting missing/mismatched parents, so remove
+  // this tenant's Artifacts before deleting either parent (including Bot-less runs).
+  await tx.delete(artifacts).where(eq(artifacts.workspaceId, workspaceId))
   // Rows that reference runs, bots or background tasks without ON DELETE CASCADE go first.
   await tx.execute(sql`delete from suggestion_executions where "workspaceId" = ${workspaceId}`)
   await tx.execute(sql`delete from thread_machines where "workspaceId" = ${workspaceId}`)
@@ -252,7 +256,7 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     const before = await workspaceListScopesBeforeChange(tx, workspaceId)
     const teamRows = await tx.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId)).for('update')
     const teamIds = teamRows.map(row => row.id)
-    const projectRows = await tx.select({ id: teamProjects.projectId }).from(teamProjects).where(eq(teamProjects.workspaceId, workspaceId))
+    const projectRows = await tx.select({ id: projects.id }).from(projects).where(eq(projects.workspaceId, workspaceId))
     const projectIds = [...new Set(projectRows.map(row => row.id))]
     // The machines' sandboxes are killed before their rows go, so no refused deletion may follow: the billing check runs first too.
     const [billing] = await db.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)

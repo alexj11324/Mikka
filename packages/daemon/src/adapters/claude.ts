@@ -462,9 +462,9 @@ function spawnBinary(binary?: string, oauthToken?: string) {
 
 function claudePrewarmOptionsKey(options: SessionOptions) {
   const { cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
-    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume } = options
+    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, profileSkills, repositorySkills, model, effort, runId, requireSessionResume } = options
   return JSON.stringify({ cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
-    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume,
+    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, profileSkills, repositorySkills, model, effort, runId, requireSessionResume,
     mailbox: options.mailbox?.tools })
 }
 
@@ -587,6 +587,8 @@ export class ClaudeAdapter implements AgentAdapter {
       policyHash: options.policyHash,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
+      profileSkills: options.profileSkills,
+      repositorySkills: options.repositorySkills,
       runDir,
       privateDir: paths.privateDir,
       // Its session store, so `resume` works; keyed by the cwd it sees.

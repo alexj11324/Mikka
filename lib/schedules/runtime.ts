@@ -9,13 +9,13 @@ import { nextScheduleDue, ScheduleStore, type WorkspaceGuard } from './store'
 import { ScheduleError, type Actor, type Command, type ScheduledRead } from './contract'
 
 const guard: WorkspaceGuard = async(owner,workspace,work)=>{
-  if(!workspace)return work()
+  if(!workspace)return work({role:'member'})
   const tx=await workspacePool.connect()
   try{
     await tx.query('BEGIN')
-    const member=await tx.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,owner])
+    const member=await tx.query<{role:'owner'|'admin'|'member'}>(`SELECT role FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,owner])
     if(!member.rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403)
-    const value=await work();await tx.query('COMMIT');return value
+    const value=await work({role:member.rows[0].role});await tx.query('COMMIT');return value
   }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
 }
 export function schedules(){return new ScheduleStore(pool,guard,async(tx,owner,id)=>{
@@ -40,6 +40,10 @@ export async function executeScheduleCommand(owner:string,botId:string|null,sour
 /** A scheduled read that failed is retried 30 s later, earlier than the lease the timer sleeps to. */
 export async function failScheduledRead(claim:{id:string;lease_token:string},error:unknown){await schedules().fail(claim,error);armDueTimerSoon('schedules')}
 /** The earliest persisted due time of any schedule work (epoch ms), or null. */
-export function scheduleNextDue(){return nextScheduleDue(pool)}
-export async function sweepSchedules(){const {wakeOwners,...counts}=await schedules().tick();await Promise.allSettled(wakeOwners.map(owner=>wakeCoordinator(owner)));return counts}
+export async function scheduleNextDue(){
+  const due = await Promise.all([nextScheduleDue(pool), (await import('@/lib/inbox/runtime')).inboxNextDue()])
+  const times = due.filter((at): at is number => at !== null)
+  return times.length ? Math.min(...times) : null
+}
+export async function sweepSchedules(){await (await import('@/lib/inbox/runtime')).expireInboxSnoozes();const {wakeOwners,...counts}=await schedules().tick();await Promise.allSettled(wakeOwners.map(owner=>wakeCoordinator(owner)));return counts}
 export async function assertScheduledRead(owner:string,botId:string|null,scope:ScheduledRead){return schedules().assertRead(owner,botId,scope)}

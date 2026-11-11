@@ -14,6 +14,12 @@ export const runtime = 'nodejs'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 
+/** The suggestions already handed over (an execution exists), by id: the list leaves them out of its groups. */
+async function startedSuggestions(userId: string, ids: string[]) {
+  const executions = ids.length ? (await pool.query('SELECT "suggestionId",status,"runId","subagentId" FROM suggestion_executions WHERE "ownerId"=$1 AND "suggestionId"=ANY($2::uuid[])', [userId, ids])).rows : []
+  return new Map(executions.map(row => [row.suggestionId as string, row]))
+}
+
 /**
  * The suggestions list: the shown suggestions grouped by source app. The
  * daily briefing is not part of it; the Coordinator delivers it in its chat
@@ -28,6 +34,13 @@ const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(request: Request) {
   const user = (await getApiSession({ headers: request.headers }))?.user
   if (!user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
+  // `count=1`, the count on 收件箱: how many cards the list shows, read only. No briefing written, no Coordinator
+  // woken, no trigger, zone or locale saved: a count shown on every page must change nothing.
+  if (new URL(request.url).searchParams.get('count') === '1') {
+    const items = await listSuggestions(user.id)
+    const started = await startedSuggestions(user.id, items.map(item => item.id))
+    return NextResponse.json({ count: items.filter(item => !started.has(item.id)).length }, { headers })
+  }
   // Hobby cron runs once a day, so opening the list is when a missing trigger gets re-created.
   afterJob('after:composio-triggers', async () => {
     try { await ensureComposioTriggers(user.id) }
@@ -51,8 +64,7 @@ export async function GET(request: Request) {
   // A zone picked in Settings wins over what this browser or IP reports.
   const timeZone = await manualTimeZone(user.id) ?? browserTimeZone ?? request.headers.get('x-vercel-ip-timezone')
   const [, items] = await Promise.all([todaysBriefing(user.id, timeZone, { onPushed: () => afterJob('after:coordinator-wake', () => wakeCoordinator(user.id)) }), listSuggestions(user.id)])
-  const executions = items.length ? (await pool.query('SELECT "suggestionId",status,"runId","subagentId" FROM suggestion_executions WHERE "ownerId"=$1 AND "suggestionId"=ANY($2::uuid[])', [user.id, items.map(item => item.id)])).rows : []
-  const execution = new Map(executions.map(row => [row.suggestionId as string, row]))
+  const execution = await startedSuggestions(user.id, items.map(item => item.id))
   const groups = new Map<SuggestionSource, typeof items>()
   for (const item of items) if (!execution.has(item.id)) groups.set(item.source, [...groups.get(item.source) ?? [], item])
   const view = (item: (typeof items)[number]) => ({ id: item.id, source: item.source, action: item.action, title: item.title, actionTitle: item.actionTitle, url: item.url, actor: item.actor, required: item.required, occurredAt: item.occurredAt })

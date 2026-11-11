@@ -1,6 +1,24 @@
 import type { PoolClient } from 'pg';
 import type { ReviewVerdict } from '@mikka/protocol/run';
 import type { FactoryTask } from './store';
+import { reviewCheckCounts, type ReviewCheckCounts } from '@/lib/github/review-checks';
+
+export interface FactoryReviewSummary {
+  branch: string | null; additions: number | null; deletions: number | null; changedFiles: number | null;
+  headSha: string | null; checks: ReviewCheckCounts | null; checksUpdatedAt: string | null;
+}
+/** Read only the persisted publication. Missing historical metadata stays unknown. */
+export function publicReviewSummary(pr: unknown, branch: unknown): FactoryReviewSummary | null {
+  if (!pr || typeof pr !== 'object' || Array.isArray(pr)) return null;
+  const value = pr as Record<string, unknown>;
+  if (typeof value.url !== 'string' || !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*$/.test(value.url)) return null;
+  const count = (field: string) => typeof value[field] === 'number' && Number.isSafeInteger(value[field]) && value[field] >= 0 ? value[field] : null;
+  const headSha = typeof value.headSha === 'string' && /^[a-f0-9]{40,64}$/.test(value.headSha) ? value.headSha : null;
+  const checks = reviewCheckCounts(value.reviewChecks, headSha);
+  return { branch: typeof value.branch === 'string' ? value.branch : typeof branch === 'string' ? branch : null,
+    additions: count('additions'), deletions: count('deletions'), changedFiles: count('changedFiles'), headSha,
+    checks: checks.counts, checksUpdatedAt: checks.updatedAt };
+}
 
 export const FACTORY_PUBLIC_STAGES = ['triage','spec','implement','review','handoff','completed','cancelled'] as const;
 export type FactoryPublicStage = typeof FACTORY_PUBLIC_STAGES[number];
@@ -9,7 +27,7 @@ export interface FactoryFlowView {
   version: 2; id: string; issueId: string; botId: string | null; revision: number;
   stage: FactoryPublicStage; stages: FactoryPublicStage[]; needsYou?: FactoryNeedsYou;
   completion?: 'merged' | 'accepted';
-  review: { verdict: ReviewVerdict | null; candidateId: string | null; currentCandidateReviewed: boolean } | null;
+  review: { verdict: ReviewVerdict | null; candidateId: string | null; currentCandidateReviewed: boolean; summary: FactoryReviewSummary | null } | null;
   acceptance: { artifactId: string; version: number; runId: string; candidateId: string; counts: Record<string, number>; media: FactoryAcceptanceMedia[] } | null;
   pullRequest: { url: string; state: string } | null;
 }
@@ -40,7 +58,7 @@ export function publicFactoryState(task: Pick<FactoryTask, 'stage' | 'status'>, 
 }
 
 /** One evidence read for an already-authorized issue list, never a detail read per task. */
-export async function readFactoryFlowStates(tx: Pick<PoolClient, 'query'>, tasks: readonly FactoryTask[]) {
+export async function readFactoryFlowStates(tx: Pick<PoolClient, 'query'>, tasks: readonly Pick<FactoryTask, 'id' | 'stage' | 'status'>[]) {
   if (!tasks.length) return new Map<string, Pick<FactoryFlowView, 'stage' | 'needsYou' | 'completion'>>();
   const { rows } = await tx.query<FlowStateEvidence & { id: string }>(`SELECT t.id,current."createdAt",current."finishedAt",q."updatedAt" AS "questionSince",
     EXISTS(SELECT 1 FROM factory_merges m WHERE m."taskId"=t.id AND m."candidateId"=t."candidateId" AND m."userId"=t."userId" AND m.status='merged' AND candidate.kind='repository') AS merged,
@@ -58,6 +76,7 @@ export async function readFactoryFlow(tx: Pick<PoolClient, 'query'>, task: Facto
   const { rows: [row] } = await tx.query(`SELECT current."createdAt",current."finishedAt",
     q."updatedAt" AS "questionSince", report."artifactId",report."candidateId" AS "reportCandidateId",report."runId" AS "reportRunId",report.counts,report.media,report_version.version AS "latestVersion",
     review."candidateId" AS "reviewCandidateId",review.output->'completion'->>'reviewVerdict' AS verdict,
+    publication."pullRequest" AS "reviewPublication",publication.branch AS "publicationBranch",
     CASE WHEN publication."pullRequest" IS NULL THEN NULL ELSE jsonb_build_object('url',left(publication."pullRequest"->>'url',2000),'state',publication."pullRequest"->>'state') END AS "pullRequest",
     EXISTS(SELECT 1 FROM factory_merges m WHERE m."taskId"=$1 AND m."candidateId"=$3 AND m."userId"=$2 AND m.status='merged' AND candidate.kind='repository') AS merged,
     EXISTS(SELECT 1 FROM factory_deliverable_acceptances accepted WHERE accepted."taskId"=$1 AND accepted."candidateId"=$3 AND accepted."userId"=$2 AND candidate.kind IN ('report','deliverable')) AS accepted
@@ -79,8 +98,9 @@ export async function readFactoryFlow(tx: Pick<PoolClient, 'query'>, task: Facto
   const stages = [...new Set(history.map(a => publicFactoryStage(a.stage, 'pending', false)))];
   if (!stages.includes(stage)) stages.push(stage);
   const verdict = ['passed','changes_requested','needs_judgment'].includes(row?.verdict) ? row.verdict as ReviewVerdict : null;
+  const summary = publicReviewSummary(row?.reviewPublication, row?.publicationBranch);
   return { version: 2, id: task.id, issueId: task.issueId, botId: task.botId, revision: task.revision, ...state, stages,
-    review: row?.reviewCandidateId ? { verdict, candidateId: row.reviewCandidateId, currentCandidateReviewed: row.reviewCandidateId === task.candidateId } : null,
+    review: row?.reviewCandidateId || summary ? { verdict, candidateId: row?.reviewCandidateId ?? null, currentCandidateReviewed: Boolean(row?.reviewCandidateId && row.reviewCandidateId === task.candidateId), summary } : null,
     acceptance: row?.artifactId && row.latestVersion ? { artifactId: row.artifactId, version: row.latestVersion, runId: row.reportRunId,
       candidateId: row.reportCandidateId, counts: row.counts, media: row.media } : null,
     pullRequest: row?.pullRequest ?? null };

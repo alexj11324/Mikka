@@ -21,10 +21,22 @@ mock.module(new URL('../subscription-runtime.ts', import.meta.url).href, { named
 } })
 mock.module(new URL('../rule-dispatch.ts', import.meta.url).href, { namedExports: { cloudReady: async () => true } })
 mock.module(new URL('../cloud-template-models.ts', import.meta.url).href, { namedExports: { cloudModelSupport: () => 'ready' } })
+const scope = { ownerId: 'requester', workspaceId: randomUUID() }
+const resourcePolicySql = "select w.kind,l.\"organizationId\",p.\"modelCredentialSharing\",p.\"mcpSharing\",p.\"allowedModelProviders\" from mikka_workspaces w left join mikka_organization_workspaces l on l.\"workspaceId\"=w.id left join mikka_organization_resource_policies p on p.\"organizationId\"=l.\"organizationId\" where w.id=$1"
+const unexpectedWorkspace = () => { throw new Error('Unexpected Workspace operation in fixed-target fixture') }
+mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: {
+  workspaceDb: { select: unexpectedWorkspace, transaction: unexpectedWorkspace },
+  workspacePool: { query: async (sql: string, params: unknown[]) => {
+    assert.equal(sql.replace(/\s+/g, ' ').trim(), resourcePolicySql)
+    assert.deepEqual(params, [scope.workspaceId])
+    // Only this known non-Org Team is modeled. Production resource policy
+    // remains in the call graph; other statements and tenants fail loudly.
+    return { rows: [{ kind: 'team', organizationId: null, modelCredentialSharing: null, mcpSharing: null, allowedModelProviders: null }], rowCount: 1 }
+  } },
+} })
 const { assertFrozenModelTarget, assertProfileTarget, assertProfileSelection } = await import('./agent-profile')
 const { resolveModelDispatch } = await import('../model-dispatch')
 
-const scope = { ownerId: 'requester', workspaceId: randomUUID() }
 type Connection = { id: string; ownerId: string; provider: 'claude' | 'codex'; models: string[]; state: string; paused: boolean; removed: boolean; epoch: string; bindingEpoch: string; quota: unknown }
 type Key = { id: string; ownerId: string; provider: 'custom' | 'deepseek'; name: null; baseUrl: string; protocol: 'openai' | 'anthropic'; last4: string; models: string[]; modelsError: string | null; responsesApi: boolean }
 type Call = { kind: string; params: unknown[]; rows: number }
@@ -47,7 +59,7 @@ function fixture() {
     } else if (sql.includes('FROM factory_agent_profiles')) {
       kind = 'profile_lock'
       rows = profile && params[0] === profile.profileId && params[1] === (profileState.ownerId ?? scope.ownerId) && params[2] === (profileState.workspaceId ?? scope.workspaceId)
-        ? [{ id: profile.profileId, ownerId: scope.ownerId, workspaceId: scope.workspaceId, version: profileState.version ?? profile.version, definition: { ...profile.definition, enabled: profileState.enabled ?? true }, digest: profile.digest, archivedAt: profileState.archivedAt ?? null }] : []
+        ? [{ id: profile.profileId, ownerId: scope.ownerId, workspaceId: scope.workspaceId, version: profileState.version ?? profile.version, definition: { ...profile.definition, enabled: profileState.enabled ?? true }, skills: profile.skills, digest: profile.digest, archivedAt: profileState.archivedAt ?? null }] : []
     } else if (sql.includes('WITH choices AS')) {
       kind = 'catalogue'
       rows = connections.filter(row => row.ownerId === params[0] && row.state === 'connected' && !row.paused && !row.removed && row.epoch === row.bindingEpoch)

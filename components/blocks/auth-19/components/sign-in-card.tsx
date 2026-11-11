@@ -35,6 +35,8 @@ type SignInCardProps = {
   onGitHubSignIn: () => Promise<void>
   /** Sign-up's Turnstile widget; renders nothing without a site key. */
   turnstile?: ReactNode
+  /** Company SSO entry from a UI layer (slot auth-sso); nothing in the open-source UI. */
+  sso?: ReactNode
 }
 
 type FieldName = 'name' | 'email' | 'password'
@@ -45,7 +47,7 @@ const FIELD = 'h-11 sm:h-10'
 const FIELD_ORDER: FieldName[] = ['name', 'email', 'password']
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile, sso }: SignInCardProps) {
   const t = useTranslations('Auth')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const oauthEnabled = googleEnabled || githubEnabled
@@ -116,6 +118,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           </Button>}
           {notice && <p role="status" className="text-xs leading-5">{notice}</p>}
         </div>}
+        {sso}
         {emailEnabled ? <>
         {oauthEnabled && <div className="flex items-center gap-3">
           <Separator className="flex-1" />

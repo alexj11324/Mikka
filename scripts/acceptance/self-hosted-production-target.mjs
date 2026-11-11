@@ -3,7 +3,10 @@ import { successfulRelease } from './project-decisions.mjs'
 
 export const CORE_MODE = 'self-hosted-core'
 export const CORE_WORKFLOW = '.github/workflows/self-hosted-production.yml'
-export const CORE_ISSUES = Object.freeze([1560, 1561, 1562, 1556])
+export const CORE_BUSINESS_ISSUES = Object.freeze([1560, 1561, 1562, 1556, 1826])
+// Inbox and Memory can use the exact read-only source proof without selecting Core's
+// credential/device business checks or permitting an Infisical account read.
+export const CORE_ISSUES = Object.freeze([...CORE_BUSINESS_ISSUES, 1820, 1821])
 export const CORE_ORIGIN = 'https://app.aspectlylabs.com'
 const REPOSITORY = 'alexj11324/Mikka'
 const API = 'https://api.github.com/repos/' + REPOSITORY
@@ -24,6 +27,8 @@ const check = (value, code, detail) => { if (!value) throw new CoreProductionErr
 export const coreTargetFailure = error => error instanceof CoreProductionError
   ? { code: error.code, detail: error.detail }
   : { code: 'core_read_failed', detail: 'response' }
+export const coreBusinessSelected = proof => proof?.status === 'ready' && proof.readable === true
+  && Array.isArray(proof.openIssues) && proof.openIssues.some(issue => CORE_BUSINESS_ISSUES.includes(issue))
 
 export function coreProductionGuard(env, event) {
   check(env.MIKKA_ACCEPTANCE_TARGET_MODE === CORE_MODE, 'core_configuration', 'mode')

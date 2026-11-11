@@ -2,8 +2,16 @@
 // not emulate PostgreSQL triggers or provide DB/concurrency acceptance.
 import { registerHooks } from 'node:module'
 import assert from 'node:assert/strict'
-import { PgDialect } from 'drizzle-orm/pg-core'
+import { PgDialect, QueryBuilder } from 'drizzle-orm/pg-core'
 import * as schema from '../../lib/db/schema.ts'
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and (\"mikka_workspaces\".\"kind\" = $3 or (\"mikka_workspaces\".\"kind\" = $4 and \"mikka_workspaces\".\"userId\" = $5))) order by \"mikka_workspaces\".\"createdAt\" asc"
+function expandMembershipAliases(sql) {
+  for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+    sql = sql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+      .replaceAll('"' + name + '".', '"' + table + '".')
+  }
+  return sql
+}
 const dialect = new PgDialect()
 const rows = (table, columns, condition) => {
   const p=globalThis.scopeStoreProbe
@@ -35,17 +43,35 @@ const tx={
 }
 export const scopeStoreDatabase={select:tx.select,transaction:async callback=>callback(tx)}
 export const scopeStorePool={query(){throw Error('unexpected raw App query in scope store fixture')}}
-function workspaceQuery() {
-  let table,condition
+function workspaceQuery(columns) {
+  let table,condition,statement = new QueryBuilder().select(columns)
   const query={
-    from(value){table=value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')];return query},
-    innerJoin(){return query},
-    where(value){condition=dialect.sqlToQuery(value);return query},
-    async orderBy(){
+    from(value){table=value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')];statement=statement.from(value);return query},
+    innerJoin(value,predicate){statement=statement.innerJoin(value,predicate);return query},
+    leftJoin(value,predicate){
+      if(table==='mikka_workspace_members') {
+        assert.equal(value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')],'mikka_organization_workspaces')
+        const join=dialect.sqlToQuery(predicate)
+        assert.equal(join.sql,'"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+        assert.deepEqual(join.params,[])
+      }
+      statement=statement.leftJoin(value,predicate);return query
+    },
+    where(value){condition=dialect.sqlToQuery(value);statement=statement.where(value);return query},
+    async orderBy(order){
       const p=globalThis.scopeStoreProbe,userId=condition.params[0]
-      assert.equal(table,'mikka_workspaces')
-      assert.deepEqual(condition.params,[userId,'active','team','personal',userId])
-      return p.activeMembers.has(userId)?[p.workspace]:[]
+      assert.deepEqual(Object.keys(columns),['id','kind','organizationId'])
+      const compiled=statement.orderBy(order).toSQL()
+      assert.equal(expandMembershipAliases(compiled.sql),expectedMembershipSql)
+      assert.deepEqual(compiled.params,[userId,'active','team','personal',userId])
+      return p.activeMembers.has(userId)?[{...p.workspace,organizationId:null}]:[]
+    },
+    async limit(count){
+      // This scope-store fixture has no Organization link; its real gate still runs.
+      assert.equal(table,'mikka_organization_workspaces')
+      assert.deepEqual(condition.params,[globalThis.scopeStoreProbe.workspace.id])
+      assert.equal(count,1)
+      return []
     },
     async for(mode){
       const p=globalThis.scopeStoreProbe

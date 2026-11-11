@@ -9,7 +9,8 @@ import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { displayTaskTitle } from '@/lib/short-title'
 import { boardBlocks } from '@/components/blocks/kanban-board-1/components/data'
 import { newestTaskRuns, taskScheduleLabels } from '@/lib/task-block-runs'
-import { mobileTaskGroup } from '@/lib/mobile-task-view'
+import { taskStateOf } from '@/lib/task-state'
+import { taskReviewSummaries } from '@/lib/coding-workspace/task-review/summaries'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,7 @@ async function handleGET(request: Request) {
       // authorized list. A revocation that wins admission cannot return it.
       return withTaskWorkspace(user, workspaceId, async () => {
         const snapshots = await newestTaskRuns(user.id, issues.map(issue => issue.id), workspaceId, await taskScheduleLabels())
+        const reviews = await taskReviewSummaries(user, snapshots.filter(row => row.codingReview).map(row => row.issueId), workspaceId)
         const runs = snapshots.flatMap(row => row.runId && row.status ? [{ ...row, runId: row.runId, status: row.status }] : [])
         const byIssue = new Map(snapshots.map(row => [row.issueId, row]))
         const runByIssue = new Map(runs.map(row => [row.issueId, row]))
@@ -40,9 +42,10 @@ async function handleGET(request: Request) {
               // The short title the small model wrote, while the task keeps the title it was written from (lib/short-title.ts).
               id: issue.id, identifier: issue.identifier, title: displayTaskTitle(issue), status: issue.status, priority: issue.priority,
               owner: issue.ownerName, updatedAt: issue.updatedAt,
-              createdAt: issue.createdAt, group: mobileTaskGroup(issue, runByIssue.get(issue.id), Boolean(block)),
+              createdAt: issue.createdAt, ...taskStateOf(issue, runByIssue.get(issue.id), { block, schedule: byIssue.get(issue.id)?.schedule }),
               bot: byIssue.get(issue.id)?.bot ?? null, schedule: byIssue.get(issue.id)?.schedule ?? null,
               blocked: block ? { reason: block.reason, blocker: block.blockerIdentifier ?? null } : null,
+              review: reviews.get(issue.id) ?? null,
             }
           }),
         })

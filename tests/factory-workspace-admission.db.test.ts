@@ -82,8 +82,8 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   const owner = 'factory-lease-' + randomUUID(), stranger = 'factory-stranger-' + randomUUID()
   const personal = randomUUID(), alpha = randomUUID(), beta = randomUUID()
   for (const id of [owner, stranger]) await controls.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,\'Factory fixture\',$2,true,now(),now())', [id, id + '@example.invalid'])
-  for (const [id, kind] of [[personal, 'personal'], [alpha, 'team'], [beta, 'team']]) {
-    await controls.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Factory fixture\',$3)', [id, owner, kind])
+  for (const [id, kind, createdAt] of [[personal, 'personal', '2020-01-03T00:00:00.000Z'], [alpha, 'team', '2020-01-01T00:00:00.000Z'], [beta, 'team', '2020-01-02T00:00:00.000Z']]) {
+    await controls.query('INSERT INTO mikka_workspaces(id,"userId",name,kind,"createdAt") VALUES($1,$2,\'Factory fixture\',$3,$4)', [id, owner, kind, createdAt])
     await controls.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,\'Factory fixture\',$3,\'admin\',\'active\')', [id, owner, owner + '@example.invalid'])
   }
   const { auth } = await import('../lib/auth')
@@ -91,9 +91,10 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   const { getApiSession } = await import('../lib/api-auth')
   const { actAs } = await import('../lib/acting-user')
   const { withTaskWorkspace, borrowTaskWorkspaceMembership, taskReaderScope } = await import('../lib/task-workspace')
-  const { withFactoryWorkspace, factoryWorkspaceReader } = await import('../lib/factory/workspace-reader')
+  const { withFactoryMembership, withFactoryWorkspace, factoryWorkspaceReader } = await import('../lib/factory/workspace-reader')
+  const { withProjectResourceLease, requireProjectResourceLease } = await import('../lib/project-resources/store')
   const { acquireProfileMembership } = await import('../lib/factory/agent-profile-store')
-  const { pool } = await import('../lib/db')
+  const { pool, withDatabaseClient } = await import('../lib/db')
   const { factoryHumanStore } = await import('../lib/factory/server')
   const intake = await import('../app/api/factory/tasks/route/route')
   const tasks = await import('../app/api/factory/tasks/route')
@@ -103,6 +104,7 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   const approval = await import('../app/api/factory/tasks/[taskId]/approval/route')
   const questions = await import('../app/api/factory/questions/route')
   const question = await import('../app/api/factory/questions/[questionId]/route')
+  const workspaceSettings = await import('../app/api/workspace/route')
   const profiles = await import('../app/api/factory/agent-profiles/route')
   const profileDetail = await import('../app/api/factory/agent-profiles/[profileId]/route')
   type Handler = (request: Request) => Promise<Response>
@@ -129,6 +131,57 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1) AS runs,
     (SELECT count(*)::int FROM issue_versions WHERE "userId"=$1) AS history,
     (SELECT coalesce(jsonb_agg(jsonb_build_array(id,revision,status,"continuationRunId","answerId") ORDER BY id),'[]') FROM factory_questions WHERE "userId"=$1) AS questions`, [owner])).rows[0]
+  await t.test('a session without a Workspace selector uses Personal for settings, Profile catalog and creation even when Teams are older', async t => {
+    const unselected = (path: string, handler: Handler, body?: unknown) => {
+      const req = new Request(origin + '/mikka' + path, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: { authorization: 'Bearer ' + native.token, origin, 'content-type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      })
+      assert.equal(req.headers.get('x-mikka-workspace-id'), null)
+      assert.equal(req.headers.get('cookie'), null)
+      return run(req, handler)
+    }
+    const selected = await unselected('/api/workspace', workspaceSettings.GET)
+    assert.equal(selected.status, 200)
+    const settings = await selected.json() as { currentUserId: string; workspace: { id: string; kind: string }; choices: Array<{ id: string }> }
+    assert.equal(settings.currentUserId, owner)
+    assert.deepEqual(settings.choices.map(choice => choice.id), [alpha, beta, personal])
+    assert.equal(settings.workspace.id, personal)
+    assert.equal(settings.workspace.kind, 'personal')
+    t.diagnostic('The real Workspace API selected owned Personal for the selector-free native session after two older Teams.')
+
+    const path = '/api/factory/agent-profiles?workspaceId=' + settings.workspace.id
+    const listed = await unselected(path, profiles.GET)
+    assert.equal(listed.status, 200, 'Profile and catalog must use the Personal selected by the real Workspace API')
+    type Profile = { id: string; version: number; model: { mode: string } }
+    const initial = await listed.json() as { profiles: Profile[]; catalog: { models: unknown[]; skills: unknown[] } }
+    assert.deepEqual(initial.profiles, [])
+    assert.ok(Array.isArray(initial.catalog.models))
+    assert.ok(Array.isArray(initial.catalog.skills))
+
+    const profileId = randomUUID()
+    const created = await unselected(path, profiles.POST, {
+      workspaceId: settings.workspace.id, requestId: profileId,
+      profile: { name: 'Personal default profile', harness: 'auto', model: { mode: 'inherit' }, roles: [], skills: [],
+        instructions: 'A management fixture only; do not dispatch a model or task.' },
+    })
+    assert.equal(created.status, 201)
+    const body = await created.json() as { profile: Profile }
+    assert.equal(body.profile.id, profileId)
+    assert.equal(body.profile.version, 1)
+    assert.deepEqual(body.profile.model, { mode: 'inherit' })
+    assert.deepEqual((await controls.query('SELECT id,"ownerId","workspaceId",version FROM factory_agent_profiles WHERE id=$1', [profileId])).rows,
+      [{ id: profileId, ownerId: owner, workspaceId: personal, version: 1 }])
+    const readback = await unselected(path, profiles.GET)
+    assert.equal(readback.status, 200)
+    const saved = await readback.json() as { profiles: Profile[] }
+    assert.deepEqual(saved.profiles.map(profile => profile.id), [profileId])
+    assert.deepEqual(saved.profiles[0].model, { mode: 'inherit' })
+    assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+    assert.equal(unexpectedNetwork, 0)
+  })
+
   let taskNumber = 0
   const createTask = async (workspaceId: string) => {
     const issueId = randomUUID(), sourceEventId = randomUUID()
@@ -163,6 +216,47 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 
+  await t.test('the actual Factory task list retains membership through its read without an execution resource lease or writes', async () => {
+    const before = await state()
+    const originalList = factoryHumanStore.listForIssue.bind(factoryHumanStore)
+    let borrowed: ReturnType<typeof borrowTaskWorkspaceMembership> | undefined
+    // Observe the real store result inside the HTTP admission. Authorization,
+    // its APP transaction and every SQL query still use production code.
+    const observed = mock.method(factoryHumanStore, 'listForIssue', async (...args: Parameters<typeof originalList>) => {
+      const result = await originalList(...args)
+      assert.equal(args[0], owner); assert.equal(args[1], a.issueId)
+      const reader = await factoryWorkspaceReader(owner)
+      if (typeof reader === 'string') assert.fail('task discovery must retain its verified principal')
+      assert.equal(reader[enterprisePrincipal]?.kind, 'session')
+      assert.equal(taskReaderScope(reader).workspaceId, alpha)
+      borrowed = borrowTaskWorkspaceMembership(owner, alpha)
+      assert.ok(borrowed)
+      await borrowed.check()
+      assert.throws(() => requireProjectResourceLease(owner, alpha), error => code(error) === 'projectEnvironmentUnavailable')
+      const writer = await controls.connect()
+      try {
+        await writer.query('BEGIN')
+        assert.equal((await writer.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired',
+          ['project-resources:' + alpha])).rows[0].acquired, true, 'discovery does not hold the execution resource lock')
+        await writer.query("SET LOCAL lock_timeout='100ms'")
+        await assert.rejects(writer.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner]), error => code(error) === '55P03')
+      } finally { await writer.query('ROLLBACK'); writer.release() }
+      return result
+    })
+    try {
+      const response = await call('/api/factory/tasks?issueId=' + a.issueId, alpha, tasks.GET)
+      assert.equal(response.status, 200)
+      const body = await response.json()
+      assert.equal(body.liveWorkspaceId, alpha)
+      assert.deepEqual(body.tasks.map((task: { id: string }) => task.id), [a.task.id])
+      assert.equal(observed.mock.callCount(), 1)
+      assert.deepEqual(await state(), before)
+      assert.ok(borrowed)
+      await assert.rejects(borrowed.check(), error => code(error) === 'workspaceAccessDenied')
+      assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+    } finally { observed.mock.restore() }
+  })
+
   await t.test('the initial cookie choice and full native principal stay fixed for the whole handler', async () => {
     const req = new Request(origin + '/mikka/api/factory/tasks', { headers: { authorization: 'Bearer ' + native.token, cookie: 'mikka-workspace=' + alpha } })
     const scope = context.createRequestScope(req)
@@ -173,10 +267,62 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
       assert.equal(taskReaderScope(reader).workspaceId, alpha)
       if (typeof reader === 'string') assert.fail('human reader must retain its principal')
       assert.equal(reader[enterprisePrincipal], session.user[enterprisePrincipal])
+      requireProjectResourceLease(owner, alpha)
       assert.equal((await factoryHumanStore.read(owner, a.task.id)).task.id, a.task.id)
       await assert.rejects(factoryHumanStore.read(owner, b.task.id), error => code(error) === 'factoryNotFound')
     })))
     await scope.after.finish()
+  })
+
+  await t.test('the human adapter holds the resource lease before APP for spec approval and acceptance consumers', async () => {
+    const req = request('/api/factory/tasks/' + a.task.id + '/flow', alpha)
+    await run(req, () => actAs(session.user, () => withFactoryWorkspace(owner, async () => {
+      requireProjectResourceLease(owner, alpha)
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        await withDatabaseClient(tx, () => withProjectResourceLease(session.user, alpha, async () => {
+          assert.equal((await tx.query('SELECT 1 AS present')).rows[0].present, 1)
+        }, true))
+        const writer = await controls.connect()
+        try {
+          await writer.query('BEGIN')
+          assert.equal((await writer.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired',
+            ['project-resources:' + alpha])).rows[0].acquired, false, 'configuration cannot change while the human mutation owns APP')
+        } finally { await writer.query('ROLLBACK'); writer.release() }
+        await tx.query('COMMIT')
+      } catch (error) { await tx.query('ROLLBACK'); throw error }
+      finally { tx.release() }
+    })))
+    assert.throws(() => requireProjectResourceLease(owner, alpha), error => code(error) === 'projectEnvironmentUnavailable')
+    assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+  })
+
+  await t.test('Profile management pins the verified membership without granting a Project execution lease', async () => {
+    const req = request('/api/factory/agent-profiles?workspaceId=' + alpha, alpha)
+    let borrowed: ReturnType<typeof borrowTaskWorkspaceMembership> | undefined
+    await run(req, () => actAs(session.user, () => withFactoryMembership(owner, async () => {
+      const reader = await factoryWorkspaceReader(owner)
+      if (typeof reader === 'string') assert.fail('Profile management must retain its principal')
+      assert.equal(reader[enterprisePrincipal], session.user[enterprisePrincipal])
+      assert.equal(taskReaderScope(reader).workspaceId, alpha)
+      borrowed = borrowTaskWorkspaceMembership(owner, alpha)
+      assert.ok(borrowed)
+      await borrowed.check()
+      assert.throws(() => borrowTaskWorkspaceMembership(owner, beta), error => code(error) === 'workspaceAccessDenied')
+      assert.throws(() => requireProjectResourceLease(owner, alpha), error => code(error) === 'projectEnvironmentUnavailable')
+      const writer = await controls.connect()
+      try {
+        await writer.query('BEGIN')
+        assert.equal((await writer.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired',
+          ['project-resources:' + alpha])).rows[0].acquired, true, 'Profile management does not serialize Project configuration')
+        await writer.query("SET LOCAL lock_timeout='100ms'")
+        await assert.rejects(writer.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner]), error => code(error) === '55P03')
+      } finally { await writer.query('ROLLBACK'); writer.release() }
+    })))
+    assert.ok(borrowed)
+    await assert.rejects(borrowed.check(), error => code(error) === 'workspaceAccessDenied')
+    assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 
   await t.test('Profile borrows are exact, cannot close their owner, and expire after nested rollback or return', async () => {
@@ -307,20 +453,35 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
 
   await t.test('a committed revocation rejects reads and dispatch with no task, run or history side effects', async () => {
     const before = await state()
+    const profilesBefore = (await controls.query('SELECT id,version,digest FROM factory_agent_profiles WHERE "ownerId"=$1 ORDER BY id', [owner])).rows
     await controls.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner])
     try {
       assert.equal((await call('/api/factory/tasks/' + a.task.id, alpha, req => detail.GET(req, params(a.task.id)))).status, 404)
+      assert.equal((await call('/api/factory/tasks?issueId=' + a.issueId, alpha, tasks.GET)).status, 404)
       assert.equal((await call('/api/factory/tasks', alpha, tasks.POST, { binding: a.binding, agentId, deviceRepoId: repoId, profileId: profile.id })).status, 404)
+      assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + alpha, alpha, profiles.GET)).status, 404)
+      assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + alpha, alpha, profiles.POST,
+        { workspaceId: alpha, profile: { ...definition, name: 'Revoked member must not create' } })).status, 404)
       assert.deepEqual(await state(), before)
+      assert.deepEqual((await controls.query('SELECT id,version,digest FROM factory_agent_profiles WHERE "ownerId"=$1 ORDER BY id', [owner])).rows, profilesBefore)
     } finally { await controls.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner]) }
     assert.equal((await call('/api/factory/tasks/' + b.task.id, beta, req => detail.GET(req, params(b.task.id)))).status, 200)
   })
 
   await t.test('a PAT cannot override its pin and concurrent same-issue reads never cross tenant buckets', async () => {
-    const { createPersonalAccessToken } = await import('../lib/tokens/store')
-    const pat = await createPersonalAccessToken(owner, alpha, { name: 'Factory lease PAT' })
+    const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+    const pat = await createLegacyPersonalAccessToken(owner, alpha, { name: 'Factory lease PAT' })
     const before = await state()
+    const profilesBefore = (await controls.query('SELECT id,version,digest FROM factory_agent_profiles WHERE "ownerId"=$1 ORDER BY id', [owner])).rows
     assert.equal((await call('/api/factory/tasks/' + b.task.id, beta, req => detail.GET(req, params(b.task.id)), undefined, pat.token)).status, 404)
+    assert.equal((await call('/api/factory/tasks?issueId=' + b.issueId, beta, tasks.GET, undefined, pat.token)).status, 404)
+    const pinnedList = await call('/api/factory/tasks?issueId=' + a.issueId, alpha, tasks.GET, undefined, pat.token)
+    assert.equal(pinnedList.status, 200)
+    assert.equal((await pinnedList.json()).tasks[0].id, a.task.id)
+    assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + beta, beta, profiles.GET, undefined, pat.token)).status, 404)
+    assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + beta, beta, profiles.POST,
+      { workspaceId: beta, profile: { ...definition, name: 'Pinned PAT must not create' } }, pat.token)).status, 404)
+    assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + alpha, alpha, profiles.GET, undefined, pat.token)).status, 200)
     const [own, other] = await Promise.all([
       call('/api/factory/tasks?issueId=' + a.issueId, alpha, tasks.GET),
       call('/api/factory/tasks?issueId=' + a.issueId, beta, tasks.GET),
@@ -328,6 +489,7 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     assert.equal(own.status, 200); assert.equal(other.status, 404)
     assert.equal((await own.json()).tasks[0].id, a.task.id)
     assert.deepEqual(await state(), before)
+    assert.deepEqual((await controls.query('SELECT id,version,digest FROM factory_agent_profiles WHERE "ownerId"=$1 ORDER BY id', [owner])).rows, profilesBefore)
   })
 
   await t.test('one Alpha question survives 51 newer Beta questions before the pending cap', async () => {

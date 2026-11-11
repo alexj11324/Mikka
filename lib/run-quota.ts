@@ -19,11 +19,13 @@ import { agentRuns, issues } from '@/lib/db/schema'
 import { apiKeyWorkerDefinition, retryWorkerDefinition, type WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
 import { workerDefinitionDigest } from '@/lib/agent-kit/worker-digest'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
-import { runCredentialSwitchedEvent, runQuotaPausedEvent, type QuotaApiKey, type QuotaSubscription } from '@/lib/coordinator-events'
+import { runBlockedEvent, runCredentialSwitchedEvent, runQuotaPausedEvent, type QuotaApiKey, type QuotaSubscription } from '@/lib/coordinator-events'
+import { assertRunProjectResources, isProjectExecutionRefusal, type ProjectExecutionRefusal } from './project-resources/run-lease'
 import { quotaContinuationNote, quotaContinuationPrompt } from '@/lib/run-retry'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { RunApiKey } from '@/lib/run-credential-source'
 import { runListChanged } from '@/lib/live/lists'
+import { resolveRunOrigin } from '@/lib/run-origin'
 
 // A subscription's quota ran out mid-run: the daemon or hosted runner reports
 // `quota_exhausted` (packages/daemon/src/runs/quota-exhausted.ts). When
@@ -54,7 +56,8 @@ async function withQuotaRunWorkspace<T>(userId: string, runId: string, work: (wo
     throw new ActionFailureError('runNotFound')
   const reader = { id: userId, [tokenWorkspace]: workspaceId,
     ...(acting?.enterprisePrincipal ? { [enterprisePrincipal]: acting.enterprisePrincipal } : {}) }
-  const run = () => actAs(reader, () => work(workspaceId), acting?.actor)
+  const { withProjectResourceLease } = await import('./project-resources/store')
+  const run = () => actAs(reader, () => withProjectResourceLease(reader, workspaceId, () => work(workspaceId)), acting?.actor)
   const borrowed = borrowTaskWorkspaceMembership(userId, workspaceId)
   if (borrowed) {
     try { await borrowed.check(); return await run() }
@@ -75,7 +78,7 @@ interface QuotaScope {
 }
 
 /** What the server does with a `quota_exhausted` run. Null: it was not on a subscription, so it is an ordinary error. */
-export type QuotaPlan = QuotaScope & ({ key: QuotaApiKey; why?: never } | { key?: never; why: 'apiKeyAfterQuotaOff' | 'noApiKey' })
+export type QuotaPlan = QuotaScope & { resourceRefusal?: ProjectExecutionRefusal } & ({ key: QuotaApiKey; why?: never } | { key?: never; why: 'apiKeyAfterQuotaOff' | 'noApiKey' })
 
 async function quotaScope(query: Query, run: Run): Promise<QuotaScope | null> {
   // A run already on an API key is never switched; its rate limit is an error.
@@ -127,6 +130,15 @@ export async function planQuotaExhausted(query: Query, run: Run): Promise<QuotaP
   const { apiKeyAfterQuota } = await import('@/lib/model-api-keys')
   if (!(await apiKeyAfterQuota(query, run.userId))) return { ...scope, why: 'apiKeyAfterQuotaOff' }
   const key = await quotaKey(query, run, scope)
+  if (key && !scope.cloud) {
+    try { await assertRunProjectResources(query, run) }
+    catch (error) {
+      // The worker's quota report remains a valid completion even when the
+      // administrator has withdrawn permission to create its continuation.
+      if (!isProjectExecutionRefusal(error)) throw error
+      return { ...scope, key, resourceRefusal: error.code }
+    }
+  }
   return key ? { ...scope, key } : { ...scope, why: 'noApiKey' }
 }
 
@@ -156,13 +168,18 @@ async function continuationDefinition(run: Run, prompt: string, key: RunApiKey |
 }
 
 /** A device run's continuation, in the caller's transaction, after the original ended. */
-async function queueDeviceContinuation(tx: Tx, run: Run, key: RunApiKey | null): Promise<string> {
+async function queueDeviceContinuation(tx: Tx, query: Query, run: Run, key: RunApiKey | null): Promise<string> {
+  await assertRunProjectResources(query, run)
   const id = crypto.randomUUID()
-  const prompt = quotaContinuationPrompt(run.prompt)
+  const copied = quotaContinuationPrompt(run)
+  const { prompt } = copied
   await tx.insert(agentRuns).values({
     id, userId: run.userId, workspaceId: run.workspaceId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
+    // The continuation keeps the paused run's entry; a legacy run keeps the
+    // host's automatic recovery as its origin rather than guessing 'web'.
+    ...resolveRunOrigin({ sourceRun: run, defaultOrigin: run.source === 'mcp' ? 'api' : 'automation' }),
     agentDefinition: await continuationDefinition(run, prompt, key), deviceId: run.deviceId, deviceRepoId: run.deviceRepoId,
-    status: 'queued', kind: run.kind, baseBranch: run.baseBranch, prompt, attempt: run.attempt, retryOf: run.id,
+    status: 'queued', kind: run.kind, baseBranch: run.baseBranch, ...copied, attempt: run.attempt, retryOf: run.id,
   })
   await runListChanged(tx, id)
   await runChanged(tx, id)
@@ -207,8 +224,11 @@ export async function queueCloudQuotaContinuation(hint: Run, cloud: CloudBinding
         if (!target) throw new ActionFailureError('runInvalid')
         const repoId = target.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(run.userId, target.deviceId, target.remoteUrl, client)).id : target.repoId
         const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: target.agentId, deviceRepoId: repoId, readOnly: run.agentDefinition?.readOnly, title: issue.title, body: tiptapToText(issue.content),
+          // The quota continuation keeps the paused run's entry; a legacy run
+          // keeps the host's automatic recovery as its origin, never 'web'.
+          ...resolveRunOrigin({ sourceRun: run, defaultOrigin: 'automation' }),
           allowLocalRecovery: run.agentDefinition?.allowLocalRecovery, sourceEventId: run.agentDefinition?.allowLocalRecovery ? request?.sourceEventId : undefined,
-          note: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
+          executionNote: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
           // Preserve the selected model and credential; tenant admission grants neither.
           ...(key ? { apiKey: key, model: key.model } : { ...threadRunModel(run.agentDefinition), model: run.agentDefinition?.model ?? '' }) }, client)
         const [queued] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId), eq(agentRuns.workspaceId, workspaceId))).limit(1)
@@ -239,10 +259,16 @@ async function endPausedRun(tx: Tx, runId: string, userId: string, workspaceId: 
  * run's continuation and the event. A cloud run with a key returns `cloud`:
  * its continuation is queued after commit (`continueCloudQuotaRun`).
  */
-export async function settleQuotaExhausted(tx: Tx, run: Run, plan: QuotaPlan, resetsAt: string | null): Promise<{ cloud: boolean; deviceId?: string | null }> {
+export async function settleQuotaExhausted(tx: Tx, run: Run, plan: QuotaPlan, resetsAt: string | null, query: Query): Promise<{ cloud: boolean; deviceId?: string | null }> {
+  if (plan.resourceRefusal) {
+    const event = runBlockedEvent(run, `Quota continuation requires unchanged, currently authorized project resources (${plan.resourceRefusal}). No continuation was created; review the project configuration before retrying.`)
+    await recordCoordinatorEvent(tx, { ...event, dedupeKey: `quota_resources_blocked:${run.id}`,
+      payload: { ...event.payload, reasonCode: plan.resourceRefusal, resetsAt } })
+    return { cloud: false }
+  }
   if (plan.key && plan.cloud) return { cloud: true }
   if (plan.key) {
-    const retryRunId = await queueDeviceContinuation(tx, run, plan.key)
+    const retryRunId = await queueDeviceContinuation(tx, query, run, plan.key)
     await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, plan.from, plan.key, retryRunId, resetsAt))
     return { cloud: false, deviceId: run.deviceId }
   }
@@ -265,7 +291,7 @@ export async function continueCloudQuotaRun(run: Run, plan: QuotaPlan, resetsAt:
         })
         await (await import('@/lib/run-completion-effects')).afterRunEnded(run.userId, run.id)
         await (await import('@/lib/run-leases')).startThreadMachine({ userId: run.userId, workspaceId }, retryRunId)
-      } catch {
+      } catch (error) {
         // A genuine queue failure keeps the existing paused card. Recheck its
         // locked source; a denied tenant or a stopped run creates no new event.
         const client = await pool.connect()
@@ -275,7 +301,11 @@ export async function continueCloudQuotaRun(run: Run, plan: QuotaPlan, resetsAt:
             if ('continuation' in locked) return
             const current = await quotaScope(client, locked.run)
             if (!current?.cloud || current.cloud.workspaceId !== workspaceId || current.cloud.botId !== cloud.botId) return
-            await recordCoordinatorEvent(tx, runQuotaPausedEvent(locked.run, current.from, resetsAt, 'noApiKey'))
+            if (isProjectExecutionRefusal(error)) {
+              const event = runBlockedEvent(locked.run, `Quota continuation requires unchanged, currently authorized project resources (${error.code}). No continuation was created; review the project configuration before retrying.`)
+              await recordCoordinatorEvent(tx, { ...event, dedupeKey: `quota_resources_blocked:${run.id}`,
+                payload: { ...event.payload, reasonCode: error.code, resetsAt } })
+            } else await recordCoordinatorEvent(tx, runQuotaPausedEvent(locked.run, current.from, resetsAt, 'noApiKey'))
           }))
         } finally { client.release() }
       }
@@ -324,8 +354,9 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
       const key = mode === 'apiKey' ? await quotaKey(client, run, scope) ?? null : null
       if (mode === 'apiKey' && !key) throw new ActionFailureError('apiKeyNotFound')
       if (scope.cloud) { cloud = { run, plan: scope, key }; return }
+      await assertRunProjectResources(client, run)
       if (!await endPausedRun(tx, run.id, userId, workspaceId)) throw new ActionFailureError('runNotActive')
-      const retryRunId = await queueDeviceContinuation(tx, run, key)
+      const retryRunId = await queueDeviceContinuation(tx, client, run, key)
       if (key) await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, scope.from, key, retryRunId, run.quotaResetsAt?.toISOString() ?? null))
       wake = run.deviceId
       result = { runId: retryRunId }

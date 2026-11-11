@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
 import { signInRefusal, signupRefusal, turnstileHeaders } from '@/lib/signup-refusal'
 import { Turnstile, type TurnstileHandle } from '@/components/auth/turnstile'
+import { AuthSso } from '@ui-slot/auth-sso'
 
 const DESKTOP_OAUTH_STATE_KEY = 'mikka:desktop-oauth'
 const DESKTOP_OAUTH_TTL_MS = 10 * 60_000
@@ -78,6 +79,8 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     : getPathname({ locale, href: returnPath }))
   // A desktop browser handoff must come back to the app, not stay in the browser.
   const afterSignIn = webFlow ? webAuthSignInPath(webFlow) : desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
+  // 公司登录 returns the way Google and GitHub do: Desktop and official-Web keep their own confirmation, PKCE and return (#1659).
+  const ssoCallbackURL = typeof window === 'undefined' ? home : webFlow ? new URL(webAuthSignInPath(webFlow), window.location.origin).href : desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
   function desktopSignInURL(state: string, next: string, callback: string): string {
     const target = new URL(withBasePath(getPathname({ locale, href: '/sign-in' })), window.location.origin)
     target.search = new URLSearchParams({ desktop: '1', desktop_state: state, desktop_next: next, desktop_callback: callback }).toString()
@@ -277,7 +280,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     <DesktopAccountChoice account={signedInAs} continueHref={webFlow ? webAuthReturnPath(webFlow) : desktopAuthReturnPath(desktopFlow!.state, desktopFlow!.next, desktopFlow!.callback)} pending={pending} error={error} onSwitch={switchAccount} />
   </Auth>
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
-    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={webFlow ? webAuthQuery(webFlow) : desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={webFlow ? webAuthQuery(webFlow) : desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} sso={!registering ? <AuthSso callbackURL={ssoCallbackURL} disabled={pending} /> : undefined} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>

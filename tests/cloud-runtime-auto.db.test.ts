@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
 import type { Pool as PgPool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
-import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedUser, seedPersonalWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
@@ -55,7 +55,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   const { ensureBotRuntime } = await import('../lib/computer/bot-runtime')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { withTaskWorkspace } = await import('../lib/task-workspace')
+  const { withFactoryBackgroundWorkspace } = await import('../lib/factory/background-workspace')
+  const { withProjectResourceLease } = await import('../lib/project-resources/store')
   const users: string[] = []
   const realProvision = botRuntimeProvisioner.provision
   let provisioned = 0
@@ -99,20 +100,26 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   })
 
   const order = await import('../lib/model-order')
+  // Canonical identity freezes at INSERT. Chosen fixture numbers must be
+  // present then; changing document metadata later cannot rename a Task.
+  const numberedTask = async (userId: string, workspaceId: string, number: number) => {
+    const issueId = randomUUID()
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+      VALUES($1,$2,$3,'bound','personal','disabled',true,'Task',$4,'todo','normal')`,
+    [issueId, userId, workspaceId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [] })])
+    return issueId
+  }
   // A new workspace: the person's own E2B key and a connected Codex subscription whose account lists gpt-5,
   // 优先使用的模型 left as filled by default (that model) and 运行位置 云端; no cloud runtime.
-  const person = async (label: string, e2bKey = true) => {
+  const person = async (label: string, e2bKey = true, taskNumber = 7) => {
     const id = await seedUser(pool, label)
     users.push(id)
     // Connected in 插件 › GitHub, with the App on octo/repo: dispatch checks the live list.
     await connectGitHub(github, id, String(++githubAccount), ['octo/repo'])
     // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
     await recordPushGrant(pool, id, normalizeRepository('octo/repo').key)
-    const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    // Their own workspace: the personal one, where work with no workspace of its own goes.
-    await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
-    const issueId = await seedIssue(pool, id)
-    await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
+    const ws = { id: await seedPersonalWorkspace(pool, id) }
+    const issueId = await numberedTask(id, ws.id, taskNumber)
     const botId = await seedBot(pool, ws.id, id)
     const connection = randomUUID()
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject',$6)`, [connection, id, ws.id, 'a'.repeat(64), `synthetic-${connection}`, JSON.stringify({ revision: '1', models: ['gpt-5'] })])
@@ -138,9 +145,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`, [runId])).rows[0]
   // Another numbered task of the same person: a task has one thread (lib/thread-dispatch.ts), so reuse is shown on a second task.
   const anotherTask = async (userId: string, number: number) => {
-    const issueId = await seedIssue(pool, userId)
-    await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } } })])
-    return issueId
+    return numberedTask(userId, await seedPersonalWorkspace(pool, userId), number)
   }
 
   await t.test('no runtime yet: the run goes to the cloud and the runtime is created; a second dispatch reuses it', async () => {
@@ -176,6 +181,12 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       await pool.query('UPDATE factory_tasks SET "botId"=NULL WHERE id IN (SELECT "taskId" FROM factory_attempts WHERE "runId"=$1)', [first.runId])
     }
     const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+    const originalPublication = (await pool.query('SELECT "issueId","userId",identifier,branch FROM run_publications WHERE "runId"=$1', [first.runId])).rows[0]
+    if (mode === 'mcp') {
+      assert.equal(original.botId, null)
+      assert.equal(original.agentDefinition.repositoryAdmission.workspaceId, a.workspaceId, 'an MCP result destination does not remove the Task Workspace')
+      assert.ok(originalPublication?.branch, 'the MCP continuation starts with actual publication authority')
+    }
     const runtime = (await pool.query('SELECT * FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId])).rows[0]
     assert.notEqual(original.deviceRepoId, runtime.repoId, 'a task runs on its own machine, not the Bot computer')
     await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`, [first.runId])
@@ -192,6 +203,14 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.deepEqual(run.agentDefinition.subscription, original.agentDefinition.subscription)
     assert.equal(run.agentDefinition.model, original.agentDefinition.model)
     assert.equal(run.agentDefinition.readOnly, original.agentDefinition.readOnly)
+    if (mode === 'mcp') {
+      assert.equal(run.agentDefinition.repositoryAdmission?.authority, 'owner_credential')
+      assert.equal(run.agentDefinition.repositoryAdmission?.workspaceId, run.workspaceId, 'the new unbound Run retains its canonical Workspace receipt')
+      assert.deepEqual((await pool.query('SELECT "issueId","userId",identifier,branch FROM run_publications WHERE "runId"=$1', [next.runId])).rows[0], originalPublication,
+        'a new worker preserves the published Task identifier and branch')
+      assert.deepEqual((await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [first.runId])).rows[0].agentDefinition, original.agentDefinition,
+        'host handoff does not rewrite the original frozen definition')
+    }
     assert.match(run.prompt, /Continue with the missing edge case/)
     assert.equal(lifecycleStarts, before + 1)
     assert.deepEqual((await pool.query('SELECT "sandboxId","deviceId" FROM thread_machines WHERE "runId"=$1', [next.runId])).rows[0], originalMachine,
@@ -337,8 +356,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal((await frozen(named.runId!)).model, 'gpt-5')
   })
   for (const entryPoint of ['coordinator', 'desktop'] as const) await t.test(`a default thread may explicitly select another authorized model through ${entryPoint} without claiming the old native Profile origin`, async () => {
-    const who = await person(`default-explicit-model-${entryPoint}`)
-    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [who.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: entryPoint === 'coordinator' ? 801 : 802 } } })])
+    const who = await person(`default-explicit-model-${entryPoint}`, true, entryPoint === 'coordinator' ? 801 : 802)
     const { templateModelsFixture } = await import('./support/template-models')
     const models = templateModelsFixture(['gpt-5', 'gpt-5-next'])
     try {
@@ -370,8 +388,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   })
 
   for (const [index, entryPoint, askedModel] of [[0, 'coordinator', 'gpt-5'], [1, 'desktop', 'gpt-5'], [2, 'desktop', 'gpt-5-next']] as const) await t.test(`a historical thread ${entryPoint} selection of ${askedModel} preserves native compatibility only for the exact old target`, async () => {
-    const who = await person(`legacy-model-${entryPoint}-${index}`)
-    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [who.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 901 + index } } })])
+    const who = await person(`legacy-model-${entryPoint}-${index}`, true, 901 + index)
     const { templateModelsFixture } = await import('./support/template-models')
     const models = templateModelsFixture(['gpt-5', 'gpt-5-next'])
     try {
@@ -510,7 +527,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE a."runId"=$1', [producer.runId])).rows[0]
     const actor = { userId: personState.id, workspaceId: personState.workspaceId }
     const beforeProviderCalls = provisioned, beforeHandoffs = stageHandoffs.length
-    await withTaskWorkspace(personState.id, personState.workspaceId, async () => {
+    await withProjectResourceLease(personState.id, personState.workspaceId, async () => {
       const client = await appPool.connect()
       try {
         await client.query('BEGIN')
@@ -662,7 +679,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal((await handleFactory(humanStore, {...request,userId:'another-owner'})).status, 404)
     assert.equal((await handleFactory(factoryRuntimeForBot(null).store, request)).status, 404, 'runtime scope stays fixed; only human APIs resolve the persisted Bot')
     const merges = createFactoryMerges(pool, async () => true, humanStore, { pullRequest: noGitHub, mergeMethods: noGitHub, merge: noGitHub })
-    const accepted = await withTaskWorkspace(personState.id, personState.workspaceId, () =>
+    const accepted = await withFactoryBackgroundWorkspace(pool, personState.id, { kind: 'task', id: pending.id }, () =>
       merges.accept({ userId: personState.id, sessionId }, { binding: factoryBinding(pending), eventId: randomUUID() }, null))
     assert.equal(accepted.status, 'accepted')
     assert.deepEqual([(await current()).stage, (await current()).status], ['approval', 'passed'])
@@ -706,8 +723,11 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     return ready
   }
   for (const [index, entry] of ['coordinator', 'desktop', 'http'].entries()) await t.test(`normal ${entry} cloud needsSpec starts a genuine plan without publication authority`, async () => {
-    const who = await person(`cloud-spec-${entry}`)
-    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [who.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1201 + index } } })])
+    // The writable executor must receive its own branch; changing document
+    // metadata after creation cannot rename the already issued CLOU-7.
+    const who = await person(`cloud-spec-${entry}`, true, 1201 + index)
+    const { rows: [taskIdentity] } = await pool.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [who.issueId])
+    assert.equal(taskIdentity.issuedIdentifier, `CLOU-${1201 + index}`)
     const { AgentProfileStore } = await import('../lib/factory/agent-profile')
     const profiles = new AgentProfileStore(pool), profileScope = { ownerId: who.id, workspaceId: who.workspaceId }
     const definition = (role: string) => ({ name: role, description: `${role} for an isolated cloud spec regression`, roles: [role], enabled: true,
@@ -797,8 +817,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       factoryAutomaticRuntime.enqueue = threadMachines.enqueueDurable
       let replies: Awaited<ReturnType<typeof approve>>[]
       try { replies = await Promise.all([
-        withTaskWorkspace(who.id, who.workspaceId, () => approve({ userId: who.id, sessionId }, approval)),
-        withTaskWorkspace(who.id, who.workspaceId, () => approve({ userId: who.id, sessionId }, approval)),
+        withFactoryBackgroundWorkspace(pool, who.id, { kind: 'task', id: ready.task.id }, () => approve({ userId: who.id, sessionId }, approval)),
+        withFactoryBackgroundWorkspace(pool, who.id, { kind: 'task', id: ready.task.id }, () => approve({ userId: who.id, sessionId }, approval)),
       ]) }
       finally { factoryAutomaticRuntime.enqueue = previousEnqueue }
       assert.equal(replies.filter(reply => reply.replayed).length, 1)
@@ -835,6 +855,12 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       assert.equal(implementation.run.machineState, 'running')
       assert.equal(implementation.run.agentDefinition.repositoryAdmission?.authority, 'owner_credential')
       assert.equal(implementation.counts.publications, 1)
+      const { rows: [publication] } = await pool.query('SELECT "issueId","userId",identifier,branch FROM run_publications WHERE "runId"=$1', [implementation.run.id])
+      assert.deepEqual(publication, { issueId: who.issueId, userId: who.id, identifier: taskIdentity.issuedIdentifier,
+        branch: `mikka/${taskIdentity.issuedIdentifier.toLowerCase()}` })
+      assert.equal(implementation.run.agentDefinition.repositoryAdmission.targetBranch, publication.branch)
+      assert.equal((await pool.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [who.issueId])).rows[0].issuedIdentifier, taskIdentity.issuedIdentifier,
+        'planning, human approval and execution preserve the issued Task identifier')
       assert.match(implementation.run.prompt, /Factory implementation owns validation/)
       assert.match(implementation.run.prompt, /APPROVED_SPEC_CONTEXT_1276/, 'the fresh executor receives the actual approved plan content')
       assert.match(implementation.run.prompt, /OWNER_PLAN_CONTEXT_1276/, 'the fresh executor retains the Owner clarification consumed during planning')

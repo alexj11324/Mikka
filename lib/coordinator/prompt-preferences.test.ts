@@ -28,6 +28,8 @@ function deferred() {
 }
 let gates: Partial<Record<ReadKind, ReturnType<typeof deferred>>> = {}, started: Record<string, ReturnType<typeof deferred>> = {}
 let errors: Partial<Record<ReadKind, Error>> = {}
+let profileText = ''
+const profileReads: { owner: string; bot: string; enabled: boolean | undefined }[] = []
 const forbidden = () => { throw new Error('External, write and model effects are forbidden in prompt preference fixture') }
 const database = {
   select(selection?: Record<string, unknown>) {
@@ -105,6 +107,11 @@ stub('../artifacts/store.ts', { artifactSummaries: forbidden })
 stub('./bot-instructions.ts', { botInstructions: forbidden })
 stub('./execution-context.ts', { executionContextParts: async () => ({ models: 'Synthetic allowed models', live: 'Synthetic current availability' }) })
 stub('./github-context.ts', { githubPromptContext: async () => 'Synthetic authorized repositories' })
+stub('../profile/memory.ts', { memoryForBotPrompt: async (who: string, botId: string, enabled?: boolean) => {
+  profileReads.push({ owner: who, bot: botId, enabled })
+  assert.equal(enabled, true, 'the same prompt preference snapshot supplies the profile switch')
+  return profileText
+} })
 stub('./summary-model.ts', { summarizeConversation: forbidden })
 stub('../personal-mailbox-config.ts', { personalMailboxEnabled: () => false })
 stub('../search/index.ts', { webSearch: forbidden })
@@ -127,6 +134,7 @@ before(async () => {
 after(() => overrideDeploymentSwitch('factoryRouting', undefined))
 beforeEach(() => {
   reads.length = 0; gates = {}; errors = {}; started = {}
+  profileReads.length = 0; profileText = ''
   preferences = {
     [owner]: { memoryEnabled: true, personalInstructions: 'Synthetic personal instruction' },
     [peer]: { memoryEnabled: false, personalInstructions: 'Synthetic peer instruction' },
@@ -153,6 +161,19 @@ test('actual hosted preparation reads prompt preferences once without attention 
     messages: promptMessages(null, plainMessages, { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([owner, bot]) }),
   })
   assert.equal(reads.length, 3, 'session, messages and one shared preference query only')
+  assert.deepEqual(profileReads, [{ owner, bot, enabled: true }])
+})
+
+test('approved profile facts join the current owner prompt and the memory switch suppresses all profile reads', async () => {
+  profileText = 'Synthetic approved profile fact'
+  const first = await sdk.preparePrompt(owner, bot, snapshot)
+  assert.match(first.instructions, /Synthetic approved profile fact/)
+  assert.match(first.instructions, /Synthetic saved memory/)
+  preferences[owner].memoryEnabled = false
+  const second = await sdk.preparePrompt(owner, bot, snapshot)
+  assert.doesNotMatch(second.instructions, /Synthetic approved profile fact|Synthetic saved memory/)
+  assert.deepEqual(profileReads, [{ owner, bot, enabled: true }], 'disabled memory does not query or record usage')
+  assert.equal(reads.filter(row => row.kind === 'preferences').length, 2, 'one preference read per preparation')
 })
 
 test('next hosted prompt uses fresh changed and cleared values without changing stored memory', async () => {
@@ -170,11 +191,11 @@ test('next hosted prompt uses fresh changed and cleared values without changing 
 test('prompt reader keeps missing-row defaults, owner scope and the legacy/native output contract', async () => {
   delete preferences[owner]
   const result = await store.loadConversationForPrompt(owner, bot)
-  assert.equal(result.memory, 'Synthetic saved memory'); assert.equal(result.personalInstructions, '')
+  assert.equal(result.memory, 'Synthetic saved memory'); assert.equal(result.personalInstructions, ''); assert.equal(result.memoryEnabled, true)
   assert.deepEqual(result.messages.map(row => row.position), [3, 4])
   assert.deepEqual(result.messages[1].message, { role: 'user', content: `${owner} current request` })
   const other = await store.loadConversationForPrompt(peer, bot)
-  assert.equal(other.memory, ''); assert.equal(other.personalInstructions, 'Synthetic peer instruction')
+  assert.equal(other.memory, ''); assert.equal(other.personalInstructions, 'Synthetic peer instruction'); assert.equal(other.memoryEnabled, false)
   assert.doesNotMatch(JSON.stringify(other), /synthetic-prompt-owner|Synthetic saved memory/)
   const legacy = await store.loadConversation(owner, bot)
   assert.deepEqual(legacy, { summary: result.summary, memory: result.memory, messages: result.messages })

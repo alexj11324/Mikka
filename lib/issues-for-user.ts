@@ -5,28 +5,31 @@ import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
 import { teamIssues } from '@/lib/db/team-schema'
-import { issueAttrsContent } from '@/lib/issue-summary-columns'
+import { issueAttrsContent, issueLatestRun, type IssueLatestRun } from '@/lib/issue-summary-columns'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { taskReviewSourceHint } from '@/lib/coding-workspace/task-review/summary-selection'
 import type { TeamScope } from '@/lib/team-access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { workspaceDb } from '@/lib/workspace-db'
 
 // Its own module, beside lib/issue-access.ts: unit tests stub that module with only the names they use.
 const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues)
-const citationColumns = { id: issues.id, userId: issues.userId, scope: issues.scope, title: issues.title,
-  shortTitle: issues.shortTitle, shortTitleFrom: issues.shortTitleFrom, status: issues.status, content: issueAttrsContent }
+const citationColumns = { id: issues.id, userId: issues.userId, scope: issues.scope, issuedIdentifier: issues.issuedIdentifier, title: issues.title,
+  shortTitle: issues.shortTitle, shortTitleFrom: issues.shortTitleFrom, status: issues.status, content: issueAttrsContent, latestRun: issueLatestRun,
+  codingReview: taskReviewSourceHint }
 type Issue = typeof issues.$inferSelect
-type CitationIssue = Pick<Issue, keyof typeof citationColumns>
+type CitationIssue = Pick<Issue, Exclude<keyof typeof citationColumns, 'latestRun' | 'codingReview'>> & { issuedIdentifier: string | null; latestRun: IssueLatestRun; codingReview: boolean }
 type ReadOptions = { withoutBody?: boolean; teams?: readonly TeamScope[]; identifierTeams?: Map<string, { key: string; number: number }>; withTeamLinks?: false; projection?: 'citation' }
 type Executor = Pick<typeof db, 'select'>
 
 /**
  * `issueForUser` for many tasks in one read: the same visibility, token
  * workspace and deletion rules, with a fixed number of queries whatever the
- * count. `teams`: a membership read made earlier in this same operation.
- * `withTeamLinks: false` skips display/grouping links only; the token's
- * independent exact-link mismatch check below still reads current links.
+ * count. `teams` is a legacy compatibility hint; each read checks current
+ * canonical Workspace membership independently of that hint.
+ * Display/grouping links are omitted; the token's independent exact-link
+ * mismatch check below still reads current links.
  * `projection: 'citation'` keeps that same gate and returns only citation data.
  */
 export function issuesForUser(reader: IssueReader, ids: readonly string[], includeDeleted: boolean | undefined, executor: Executor | undefined, options: ReadOptions & { projection: 'citation' }): Promise<Map<string, CitationIssue>>
@@ -37,14 +40,9 @@ export async function issuesForUser(reader: IssueReader, ids: readonly string[],
   if (!wanted.length) return found
   const acting = actingContext.getStore()
   const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
-  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, {
-    onlyIssueIds: wanted, teams: options.teams, withTeamLinks: options.withTeamLinks, ...(options.identifierTeams ? { withIdentifierTeams: true } : {}),
-  })
-  if (options.identifierTeams && visibility.taskTeams) {
-    // This operation's complete later read can also remove an earlier link.
-    for (const id of wanted) options.identifierTeams.delete(id)
-    for (const [id, team] of visibility.taskTeams) options.identifierTeams.set(id, team)
-  }
+  // Canonical tenant authorization does not consume Team naming/grouping rows.
+  // The exact token/link consistency check below remains a separate read.
+  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: wanted, withTeamLinks: false })
   const rows = options.projection === 'citation'
     ? await executor.select({ issue: citationColumns }).from(issues).where(and(inArray(issues.id, wanted), visibility.predicate))
     : options.withoutBody

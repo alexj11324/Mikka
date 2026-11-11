@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic'
 const schema = z.discriminatedUnion('operation', [
   z.object({ operation:z.literal('read'), runId:z.uuid() }).strict(),
   z.object({ operation:z.literal('readAgent'), agentId:z.uuid(), botId:z.uuid().nullable() }).strict(),
-  z.object({ operation:z.literal('setAgent'), agentId:z.uuid(), botId:z.uuid().nullable(), target:z.enum(['agent','worker','workspace']), expectedRevision:z.string().regex(/^[a-f0-9]{64}$/), policy:z.unknown() }).strict(),
-  z.object({ operation:z.literal('set'), runId:z.uuid(), target:z.enum(['agent','worker','workspace','team','project']), expectedRevision:z.string().regex(/^[a-f0-9]{64}$/), policy:z.unknown() }).strict(),
+  z.object({ operation:z.literal('setAgent'), agentId:z.uuid(), botId:z.uuid().nullable(), target:z.enum(['workspace']), expectedRevision:z.string().regex(/^[a-f0-9]{64}$/), policy:z.unknown() }).strict(),
+  z.object({ operation:z.literal('set'), runId:z.uuid(), target:z.enum(['workspace','team','project']), expectedRevision:z.string().regex(/^[a-f0-9]{64}$/), policy:z.unknown() }).strict(),
 ])
 export async function POST(request: Request) {
   const sessionHeaders = humanSessionHeaders(request)

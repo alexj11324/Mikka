@@ -139,7 +139,7 @@ const switches={issueTools:true,factoryRouting:false,factoryLifecycle:false}
 const mailboxCatalogue=async(...args:unknown[])=>{record('mailboxCatalogue')(...args);return ['mailbox_inbox']}
 const noteQuotaSwitch=async(...args:unknown[])=>{record('quotaSwitch')(...args)}
 let preparedPrompt:Record<string,unknown>|null=null
-let contextMs:{execution:number;personal:number;github:number}|undefined
+let contextMs:{execution:number;personal:number;github:number;profile:number}|undefined
 const preparePrompt=async(...args:unknown[])=>{record('prompt')(...args);return preparedPrompt ?? {prompt:'synthetic request'}}
 stub('../../workflows/coordinator/steps.ts',{
   turnSettings:async()=>{legacySettingsReads++;await deliverEarlyStop('settings');return {computerEnabled:false,mailboxEnabled,writeEnabled:false,agentKitEnabled:kitSetting,switches,coordinator:false,runtime:{harness:'ai_sdk'}}},
@@ -198,7 +198,7 @@ test('real workflow entry uses the returned execution snapshot for model, prompt
   assert.deepEqual(calls.find(c=>c.name==='frozenBegin')?.args,[owner,bot,'synthetic-workflow',0,{harness:'ai_sdk'},true])
   assert.deepEqual(calls.find(c=>c.name==='hosted')?.args[0],execution!.snapshot.runtime)
   assert.equal(calls.find(c=>c.name==='prompt')?.args[2],execution!.snapshot)
-  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[]}])
+  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[],origin:'web'}])
   assert.equal(calls.filter(c=>c.name==='hosted').length,1)
   const hosted=calls.find(c=>c.name==='hosted')!.args[2] as {writable:WritableStream;preventClose:boolean}
   const modelWriter=hosted.writable.getWriter()
@@ -221,16 +221,17 @@ test('hosted caller preserves full GitHub context when the frozen tools omit rep
 })
 test('normal completion reports fixed preparation timings only in the existing post-commit turn log',async()=>{
   reset('ai_sdk')
-  contextMs={execution:13,personal:5,github:21}
+  contextMs={execution:13,personal:5,github:21,profile:7}
   await coordinatorTurn(owner,bot)
   const timings=calls.filter(call=>call.name==='timing')
   assert.equal(timings.length,1)
   const line=timings[0].args[0] as {phaseMs:Record<string,number>;preparationBodyMs:Record<string,number>}
-  assert.deepEqual(Object.keys(line.phaseMs).sort(),['agentPreparation','execution','github','inbox','personal','settings'])
+  assert.deepEqual(Object.keys(line.phaseMs).sort(),['agentPreparation','execution','github','inbox','personal','profile','settings'])
   assert.ok(Object.values(line.phaseMs).every(value=>Number.isFinite(value)&&value>=0))
   assert.equal('begin' in line.phaseMs,false,'the old separate durable span is absent, never a fabricated zero')
   assert.equal('prepare' in line.phaseMs,false,'combined elapsed has its own Workflow event-clock name')
   assert.deepEqual([line.phaseMs.execution,line.phaseMs.personal,line.phaseMs.github],[13,5,21])
+  assert.equal(line.phaseMs.profile,7,'the profile read reports its own measured time, not a fabricated zero')
   assert.deepEqual(Object.keys(line.preparationBodyMs).sort(),['begin','prepare'])
   assert.ok(Object.values(line.preparationBodyMs).every(value=>Number.isFinite(value)&&value>=0))
   const committed=calls.findIndex(call=>call.name==='stream'&&(call.args[1] as {type:string}).type==='coordinator-turn-committed')
@@ -360,7 +361,7 @@ test('real workflow carries the host catalogue into named options and prompt wit
   const snapshot=execution!.snapshot, before=JSON.stringify(snapshot)
   await coordinatorTurn(owner,bot)
   assert.deepEqual(calls.find(c=>c.name==='mailboxCatalogue')?.args,[owner,bot,execution!.id])
-  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:true,mailboxTools:['mailbox_inbox']}])
+  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:true,mailboxTools:['mailbox_inbox'],origin:'web'}])
   assert.deepEqual(calls.find(c=>c.name==='prompt')?.args,[owner,bot,snapshot,['mailbox_inbox']])
   assert.equal(JSON.stringify(snapshot),before)
 })
@@ -369,7 +370,7 @@ test('real workflow forwards a host task event without changing the frozen execu
   reset('ai_sdk');taskEventId='10000000-0000-4000-8000-000000000004'
   const before=JSON.stringify(execution!.snapshot)
   await coordinatorTurn(owner,bot)
-  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[],taskEventId}])
+  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[],taskEventId,origin:'web'}])
   assert.equal(JSON.stringify(execution!.snapshot),before)
 })
 

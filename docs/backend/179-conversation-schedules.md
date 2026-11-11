@@ -1,19 +1,39 @@
 # Conversation schedules (#179)
 
 The existing Coordinator and Bot chat tools create, list/history, update,
-pause/resume and cancel owner-scoped schedules. No management UI is added.
+pause/resume and cancel workspace schedules. No management UI is added.
 The seven tool IDs are `schedule_create`, `schedule_list`, `schedule_history`,
 `schedule_update`, `schedule_pause`, `schedule_resume`, `schedule_cancel`.
 Mutations require the host's current user-message event, never a model-supplied
 owner, Bot, workspace or source identity. Creation uses the SDK tool-call ID as
 its request key; replay after commit returns the same definition and schedule.
 
+New schedules belong to the current workspace (`visibility='workspace'`,
+non-null `workspace_id`). Active workspace members may list, read history,
+pause and cancel them. Only the creator or an `owner`/`admin` member may update
+or resume; an ordinary member gets `scheduleAdminRequired`. Legacy rows keep
+`visibility='owner'` and remain visible and mutable only to their
+`owner_id`/`bot_id`. A workspace member's result still publishes to the
+schedule creator's original chat. If its Bot is deleted, `bot_id` becomes null
+and the result falls back to the creator's Coordinator chat.
+
 The clock supports explicit UTC-offset one-shot times, intervals anchored at an
-explicit future start, and daily IANA local times. Missing DST wall times skip
-that date; repeated wall times require an explicit earlier/later choice.
-Paused slots never catch up. For an unexpected outage, `skip` or
-`catch_up_once` and the accepted lateness are recorded in the definition. One
-sweep coalesces an interval backlog into at most one due slot per schedule.
+explicit future start, daily IANA local times, and five-field cron expressions
+(minute hour day-of-month month day-of-week) in the definition's IANA timezone.
+Cron rejects macros, seconds, `L`, `W`, `#` and `?`; `JUL` and `WED` remain
+valid names. Missing DST wall times skip that date; repeated wall times require
+an explicit earlier/later choice. Cron uses the pinned `cron-parser` behavior in
+the requested IANA zone. Paused slots never catch up. For an unexpected outage,
+`skip` or `catch_up_once` and the accepted lateness are recorded in the
+definition. One sweep coalesces an interval backlog into at most one due slot
+per schedule.
+
+`maxConcurrent` is optional in the definition (1-5, default 1). It is enforced
+when an occurrence executes, under the schedule row lock, by counting only
+running occurrences that started earlier. A later slot above the limit becomes
+`skipped` with `error='concurrencyLimit'`, reports once and does not queue.
+Misfire skips keep `error='misfireSkipped'`. Scheduled reads still create no
+`agent_runs` row.
 
 `GET /api/cron/schedules` uses the existing `CRON_SECRET`. Its numeric result
 contains `materialized` and `executed`. Due work starts from persisted events

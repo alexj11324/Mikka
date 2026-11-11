@@ -3,7 +3,7 @@
 import { withFreshSession } from '@/lib/fresh-session'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, eq, gt, ne } from 'drizzle-orm'
+import { and, eq, ne } from 'drizzle-orm'
 import { cookies, headers } from 'next/headers'
 import { auth, type DeviceSessionSummary } from '@/lib/auth'
 import { z } from 'zod'
@@ -12,22 +12,36 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/workspace-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { slugIsReserved } from '@/lib/workspace-admin/general'
-import { releaseDepartingMember, restoreReturningMember, transferOnSuspend } from '@/lib/workspace-admin/members'
+import { transferOnSuspend } from '@/lib/workspace-admin/members'
 import { auditRequestContext } from '@/lib/audit/record'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 import { ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { ownerWorkspaceListsChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '@/lib/live/lists'
 
+import { acceptHumanInvitation, updateHumanMembership } from '@/lib/governance/member-admission'
+import { drainMemberLifecycleOutbox } from '@/lib/governance/member-outbox'
+import { planInvitations } from '@/lib/batch-outcome'
+import { GovernanceError } from '@/lib/governance/errors'
+
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
 const workspaceSlug = z.string().trim().min(3).max(64).regex(/^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])$/)
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
 
+/** One address of an invitation batch: the link it got, or why it was skipped (ALE-28). */
+type InvitationOutcome =
+  | { email: string; created: true; path: string }
+  | { email: string; created: false; reason: 'alreadyMember' | 'duplicate' }
+
 async function result<T>(operation: () => Promise<T>) {
   try {
     return { ok: true as const, data: await operation() }
   } catch (error) {
+    if (error instanceof GovernanceError) {
+      const t = await getTranslations('RunErrors.governance_denied')
+      return { ok: false as const, error: t(error.detail ?? 'default') }
+    }
     const t = await getTranslations('Errors')
     if (error instanceof WorkspaceError) {
       return { ok: false as const, error: t.has(error.code as never) ? t(error.code as never) : error.message }
@@ -109,32 +123,54 @@ export async function switchWorkspace(...args: Parameters<typeof switchWorkspace
   return withFreshSession(() => switchWorkspaceBody(...args))
 }
 
-async function createWorkspaceInvitationBody(input: { workspaceId: string; emails: string[]; role: string }) {
+/**
+ * One outcome per address (ALE-28). A batch of up to 20 addresses reports which
+ * ones got a link and which were skipped, instead of failing all of them for one
+ * address that is already a member: the person can correct exactly those.
+ */
+/** The links this action returns as `data`, and the per-address answer beside them. */
+type InvitationBatch = { links: { email: string; path: string }[]; outcomes: InvitationOutcome[] }
+
+async function createWorkspaceInvitationBody(input: { workspaceId: string; emails: string[]; role: string }): Promise<{ ok: true; data: InvitationBatch } | { ok: false; error: string }> {
   return result(async () => {
     const user = await requireUser()
     const role = roleSchema.parse(input.role)
     const emails = [...new Set(z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase())))]
     const request = auditRequestContext(await headers())
-    return workspaceDb.transaction(async tx => {
+    const outcomes = await workspaceDb.transaction(async tx => {
       const { workspace } = await requireWorkspace(tx, input.workspaceId, user.id, true)
       // A personal workspace has exactly one member (decision 2026-10-31-2130).
       if (workspace.kind === 'personal') throw new WorkspaceError('workspacePersonal')
-      const members = await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))
-      if (emails.some(email => members.some(member => member.email.toLowerCase() === email))) throw new WorkspaceError('workspaceMemberExists')
-      const links: { email: string; path: string }[] = []
-      for (const email of emails) {
+      const members = new Set((await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))).map(member => member.email.toLowerCase()))
+      const results: InvitationOutcome[] = []
+      for (const outcome of planInvitations(emails, members)) {
+        if (!outcome.used) { results.push({ email: outcome.item, created: false, reason: outcome.reason }); continue }
+        const email = outcome.item
         const token = randomBytes(32).toString('hex')
         const tokenHash = hashToken(token)
         const expiresAt = new Date(Date.now() + 7 * 86400000)
         await tx.insert(workspaceInvitations).values({ id: crypto.randomUUID(), workspaceId: input.workspaceId, userId: user.id, email, role, tokenHash, expiresAt })
           .onConflictDoUpdate({ target: [workspaceInvitations.workspaceId, workspaceInvitations.email], set: { userId: user.id, role, tokenHash, status: 'pending', expiresAt, createdAt: new Date() } })
         await enqueueWorkspaceAudit(tx, { workspaceId: input.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invited', target: { type: 'invitation', label: email }, metadata: { role }, ...request })
-        links.push({ email, path: `/invite/${token}` })
+        results.push({ email, created: true, path: `/invite/${token}` })
       }
-      await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
-      return links
+      // A batch with nothing to create wrote nothing; its outcomes still say why,
+      // which is the answer the person needs, so it is not read as a failure.
+      if (results.some(result => result.created)) await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
+      return results
     })
+    return {
+      links: outcomes.flatMap(outcome => outcome.created ? [{ email: outcome.email, path: outcome.path }] : []),
+      outcomes,
+    }
   })
+}
+
+/** Puts the per-address answers beside the links, in the shape callers already read. */
+async function invitationBatch(...args: Parameters<typeof createWorkspaceInvitationBody>) {
+  const body = await createWorkspaceInvitationBody(...args)
+  if (!body.ok) return body
+  return { ok: true as const, data: body.data.links, outcomes: body.data.outcomes }
 }
 
 /**
@@ -162,13 +198,12 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
       if (target.status !== status) await enqueueWorkspaceAudit(tx, { ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       const before = await workspaceListScopesBeforeChange(tx, input.workspaceId)
-      await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
+      await updateHumanMembership(tx, { workspaceId: input.workspaceId, userId: input.userId, role, status })
       if (target.role !== role || target.status !== status) await workspaceListScopeChanged(tx, input.workspaceId, before)
       return target.status
     })
     // §8.3: a suspended member's share and bots leave with them; reactivation brings their bots back.
-    if (previous !== 'suspended' && status === 'suspended') await releaseDepartingMember(input.workspaceId, input.userId)
-    if (previous === 'suspended' && status === 'active') await restoreReturningMember(input.workspaceId, input.userId)
+    if (previous !== status) await drainMemberLifecycleOutbox(input.workspaceId, input.userId)
   })
 }
 
@@ -193,22 +228,11 @@ async function acceptWorkspaceInvitationBody(token: string) {
     const request = auditRequestContext(await headers())
     await ensurePersonalFirst(user)
     const workspaceId = await workspaceDb.transaction(async tx => {
-      const [candidate] = await tx.select({ workspaceId: workspaceInvitations.workspaceId }).from(workspaceInvitations).where(and(eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).limit(1)
-      if (!candidate) throw new WorkspaceError('inviteInvalid')
-      const [target] = await tx.select({ kind: workspaces.kind }).from(workspaces).where(eq(workspaces.id, candidate.workspaceId)).for('update')
-      if (target?.kind === 'personal') throw new WorkspaceError('inviteInvalid')
-      const [invitation] = await tx.select({ id: workspaceInvitations.id, role: workspaceInvitations.role }).from(workspaceInvitations).where(and(eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.tokenHash, hashToken(token)), eq(workspaceInvitations.email, user.email.toLowerCase()), eq(workspaceInvitations.status, 'pending'), gt(workspaceInvitations.expiresAt, new Date()))).for('update').limit(1)
-      if (!invitation) throw new WorkspaceError('inviteExpired')
-      const [existing] = await tx.select({ status: workspaceMembers.status }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, candidate.workspaceId), eq(workspaceMembers.userId, user.id))).limit(1)
-      if (existing?.status === 'suspended') throw new WorkspaceError('workspaceMembershipSuspended')
-      if (!existing) {
-        await tx.insert(workspaceMembers).values({ workspaceId: candidate.workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: invitation.role })
-        await enqueueWorkspaceAudit(tx, { workspaceId: candidate.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.joined', target: { type: 'member', id: user.id }, metadata: { role: invitation.role }, ...request })
-      }
-      await tx.update(workspaceInvitations).set({ status: 'accepted' }).where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.email, user.email.toLowerCase())))
-      await workspaceListChanged(tx, candidate.workspaceId, ['workspace_settings', 'issue_list'])
+      const admission = await acceptHumanInvitation(tx, user, hashToken(token))
+      if (admission.joined) await enqueueWorkspaceAudit(tx, { workspaceId: admission.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.joined', target: { type: 'member', id: user.id }, metadata: { role: admission.role }, ...request })
+      await workspaceListChanged(tx, admission.workspaceId, ['workspace_settings', 'issue_list'])
       await ownerWorkspaceListsChanged(tx, user.id, ['workspace_settings'])
-      return candidate.workspaceId
+      return admission.workspaceId
     })
     await rememberWorkspace(workspaceId)
     return { workspaceId }
@@ -216,7 +240,11 @@ async function acceptWorkspaceInvitationBody(token: string) {
 }
 
 // Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
-export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) { return withFreshSession(() => createWorkspaceInvitationBody(...args)) }
+/// `data` keeps the array of links this action has always returned, so every
+/// existing caller and RPC consumer keeps working; `outcomes` sits beside it
+/// with one entry per address (ALE-28). The fresh-session wrapper stays the
+/// one-line shape `tests/session-cookie-cache.db.test.ts` pins for this action.
+export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) { return withFreshSession(() => invitationBatch(...args)) }
 export async function updateWorkspaceMember(...args: Parameters<typeof updateWorkspaceMemberBody>) { return withFreshSession(() => updateWorkspaceMemberBody(...args)) }
 export async function revokeWorkspaceInvitation(...args: Parameters<typeof revokeWorkspaceInvitationBody>) { return withFreshSession(() => revokeWorkspaceInvitationBody(...args)) }
 export async function acceptWorkspaceInvitation(...args: Parameters<typeof acceptWorkspaceInvitationBody>) { return withFreshSession(() => acceptWorkspaceInvitationBody(...args)) }

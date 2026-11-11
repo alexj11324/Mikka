@@ -1,3 +1,4 @@
+import { resourceBoundDispatchConstructor } from '../../tests/helpers/factory-resource-boundary'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -120,7 +121,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const fetch = globalThis.fetch
     globalThis.fetch = async () => { providerCalls++; throw new Error('fixed target must not call a provider') }
     try {
-      for (const [name, selection, expectedQueries] of [['own subscription', ownSelection, 5], ['shared subscription', sharedSelection, 6], ['own key', ownKey, 6], ['shared key', sharedKey, 6]] as const) await t.test(name, async t => {
+      for (const [name, selection, expectedQueries] of [['own subscription', ownSelection, 5], ['shared subscription', sharedSelection, 6], ['own key', ownKey, 5], ['shared key', sharedKey, 6]] as const) await t.test(name, async t => {
         const original = await inspect(selection, true), fixed = await inspect(selection, false)
         assert.deepEqual(original.result, { ok: true }); assert.deepEqual(fixed.result, original.result)
         assert.equal(fixed.statements.length, expectedQueries)
@@ -504,9 +505,10 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   })
 
   await t.test('public Factory Default dispatch requires the original user pin without changing UUID or host-selected paths', async () => {
-    const [{ db }, { recordPersonalSubmission }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun }, order] = await Promise.all([
+    const [{ db }, { recordPersonalSubmission }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun }, order] = await Promise.all([
       import('../db'), import('../coordinator-submission'), import('./store'), import('./dispatch'), import('../agent-runs'), import('../model-order'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
     const botId = await seedBot(pool, scope.workspaceId, scope.ownerId), repoId = randomUUID()
     const repository = normalizeRepository(`https://github.com/synthetic/default-task-${randomUUID()}.git`)
     await pool.query(`INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,'main')`, [repoId, scope.ownerId, deviceId, repository.key, repository.remoteUrl])
@@ -883,7 +885,12 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.ok(selected.target.subscriptionBindingId)
     const binding = (await pool.query('SELECT "connectionId"::text,"modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
     assert.deepEqual(binding, { connectionId: exactClaude, modelId: 'claude-haiku-5-5' })
-    assert.ok(selected.agentProfile!.instructions.includes('Start from the observed failure'))
+    // Progressive disclosure: the brief names the capability and how to load
+    // it, while the frozen body stays in the pinned envelope.
+    assert.ok(selected.agentProfile!.instructions.includes('load_skill'))
+    assert.ok(selected.agentProfile!.instructions.includes('official:systematic-debugging'))
+    assert.ok(!selected.agentProfile!.instructions.includes('Start from the observed failure'))
+    assert.ok(selected.agentProfile!.skills[0]?.content.includes('Start from the observed failure'))
     assert.equal(selected.agentProfile!.effort, 'low')
     await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, asked: { harness: 'codex', model: 'gpt-6-luna' } }), { code: 'agentProfilePinConflict' })
   })
@@ -1046,12 +1053,13 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal((await store.history(scope, ui.id)).at(-1)!.digest, frozen.digest)
   })
   for (const mode of ['fixed', 'inherit', 'legacy', 'botless'] as const) await t.test(mode === 'legacy' ? 'watchdog preserves historical absence of Profile through queue and first claim on B' : `watchdog ${mode} Profile uses B's real source and retains the started role through queue and first claim`, async () => {
-    const [{ createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun }, { automaticFactoryDispatch },
+    const [{ createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun }, { automaticFactoryDispatch },
       { sweepFactoryWatchdog }, { claimLocalRun }, { assertRunProfileClaim, admitProfileSelection }, { profileNativeSessionMatches },
       { DAEMON_PROTOCOL_VERSION }, { workerDefinitionDigest }] = await Promise.all([
       import('./store'), import('./dispatch'), import('../agent-runs'), import('./automatic-dispatch'), import('./watchdog'),
       import('../computer/claim'), import('./profile-admission'), import('./profile-native-session'), import('@mikka/protocol/daemon'), import('../agent-kit/worker-digest'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
     const who = await person(`watchdog-profile-${mode}`)
     const botId = mode === 'botless' ? null : await seedBot(pool, who.workspaceId, who.ownerId)
     if (mode === 'botless') {
@@ -1214,4 +1222,43 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const pinned = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: issue, profileId: claudeOnly.id, location: 'local' })
     assert.equal(pinned.agentProfile!.targetEntry.harness, 'claude_code')
   })
+})
+
+test('Agent Profile marks: derived on create, kept or cleared on update, closed by the column checks', { skip: !dbUrl, timeout: 60_000 }, async t => {
+  const pool = new Pool({ connectionString: dbUrl, max: 4 })
+  const [profiles, { deriveProfileMark }] = await Promise.all([import('./agent-profile'), import('./agent-profile-mark')])
+  for (const file of ['20261104231000_agent_profiles.sql', '20261110070000_agent_profile_marks.sql']) {
+    const sql = await readFile(new URL(`../../drizzle/${file}`, import.meta.url), 'utf8')
+    await pool.query(sql); await pool.query(sql)
+  }
+  const ownerId = await seedUser(pool, 'profile-marks')
+  const workspace = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
+  t.after(async () => {
+    await pool.query('DELETE FROM factory_agent_profiles WHERE "ownerId"=$1', [ownerId])
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspace.id])
+    await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspace.id])
+    await pool.query('DELETE FROM "user" WHERE id=$1', [ownerId])
+    await pool.end()
+  })
+  const scope = { ownerId, workspaceId: workspace.id }
+  // Membership and model checks have their own suites above; this one is about the mark columns.
+  const store = new profiles.AgentProfileStore(pool, { validateModel: async () => {}, membership: async () => ({ check: async () => {}, close: async () => {} }) })
+  const reviewer = { name: 'Reviewer', roles: ['review'], harness: 'auto', model: { mode: 'inherit' } }
+  const created = await store.create(scope, reviewer)
+  assert.deepEqual({ icon: created.icon, color: created.color }, deriveProfileMark({ name: 'Reviewer', roles: ['review'] }))
+  assert.equal(created.icon, 'lens')
+  const stored = (await pool.query('SELECT icon,color FROM factory_agent_profiles WHERE id=$1', [created.id])).rows[0]
+  assert.deepEqual(stored, { icon: created.icon, color: created.color }, 'a new Profile stores its derived mark')
+  const chosen = await store.create(scope, { ...reviewer, name: 'Chosen' }, undefined, { icon: 'diamond' })
+  assert.equal(chosen.icon, 'diamond'); assert.equal(chosen.color, deriveProfileMark({ name: 'Chosen', roles: ['review'] }).color)
+  const recolored = await store.update(scope, chosen.id, chosen.version, { ...reviewer, name: 'Chosen' }, { color: 'pink' })
+  assert.deepEqual([recolored.icon, recolored.color, recolored.digest], ['diamond', 'pink', chosen.digest], 'the mark is outside the digest')
+  const toggled = await store.update(scope, chosen.id, recolored.version, { ...reviewer, name: 'Chosen', enabled: false })
+  assert.deepEqual([toggled.icon, toggled.color], ['diamond', 'pink'], 'a save without a mark keeps it')
+  const cleared = await store.update(scope, chosen.id, toggled.version, { ...reviewer, name: 'Chosen', roles: ['deploy'] }, { icon: null, color: null })
+  assert.deepEqual((await pool.query('SELECT icon,color FROM factory_agent_profiles WHERE id=$1', [chosen.id])).rows[0], { icon: null, color: null })
+  assert.deepEqual({ icon: cleared.icon, color: cleared.color }, deriveProfileMark({ name: 'Chosen', roles: ['deploy'] }), 'null reads as the derived default')
+  await assert.rejects(store.create(scope, reviewer, undefined, { icon: 'skull' } as never))
+  await assert.rejects(pool.query("UPDATE factory_agent_profiles SET icon='skull' WHERE id=$1", [created.id]), { code: '23514' })
+  await assert.rejects(pool.query("UPDATE factory_agent_profiles SET color='red' WHERE id=$1", [created.id]), { code: '23514' })
 })

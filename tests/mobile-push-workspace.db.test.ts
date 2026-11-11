@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 const target = process.env.E2E_DATABASE_URL
@@ -30,7 +30,7 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
   process.env.BETTER_AUTH_SECRET ||= randomBytes(32).toString('hex')
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   const owner = 'phone-workspace-' + randomUUID(), peer = 'phone-peer-' + randomUUID()
-  const personal = randomUUID(), alpha = randomUUID(), beta = randomUUID()
+  const personal = randomUUID(), alpha = randomUUID(), beta = randomUUID(), organizationId = randomUUID()
   const personalBot = randomUUID(), alphaBot = randomUUID(), betaBot = randomUUID(), foreignBot = randomUUID()
   const alphaIssue = randomUUID(), otherAlphaIssue = randomUUID(), betaIssue = randomUUID(), pendingIssue = randomUUID()
   const agent = randomUUID(), peerAgent = randomUUID()
@@ -69,6 +69,8 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     provider.mock.restore(); wake.restore(); workflow.restore()
     globals.mikkaPool = previous.app; globals.workspacePool = previous.workspace
     await admin.query('DELETE FROM mobile_push_receipts WHERE user_id=ANY($1::text[])', [[owner, peer]])
+    await admin.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
+    await admin.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
     await admin.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[alphaRun, otherTaskRun, betaRun, peerRun]])
     await admin.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[alphaIssue, otherAlphaIssue, betaIssue, pendingIssue]])
     await admin.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agent, peerAgent]])
@@ -228,7 +230,7 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     assert.equal(sent.length, before + 1)
   })
 
-  async function blockedDuringSend(sql: string, values: unknown[]) {
+  async function blockedDuringSend(sql: string | ((client: PoolClient) => Promise<unknown>), values: unknown[] = []) {
     const entered = Promise.withResolvers<void>(), released = Promise.withResolvers<void>()
     onSend = async () => { entered.resolve(); await released.promise }
     const sending = push()
@@ -237,7 +239,7 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     try {
       await client.query('BEGIN')
       await client.query("SET LOCAL lock_timeout='100ms'")
-      await assert.rejects(client.query(sql, values), error => pgCode(error) === '55P03')
+      await assert.rejects(typeof sql === 'string' ? client.query(sql, values) : sql(client), error => pgCode(error) === '55P03')
     } finally {
       await client.query('ROLLBACK'); client.release()
       released.resolve(); await sending; onSend = undefined
@@ -289,8 +291,8 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     const before = sent.length
     await push(); assert.equal(sent.length, before)
     await rebind()
-    const { createPersonalAccessToken } = await import('../lib/tokens/store')
-    const pat = await createPersonalAccessToken(owner, alpha, { name: 'Phone negative fixture', expiresAt: null })
+    const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+    const pat = await createLegacyPersonalAccessToken(owner, alpha, { name: 'Phone negative fixture', expiresAt: null })
     const signature = createHmac('sha256', context.secret).update(ownerSession.token).digest('base64')
     const cookie = context.authCookies.sessionToken.name + '=' + encodeURIComponent(ownerSession.token + '.' + signature)
     const snapshot = await tokenRows()
@@ -353,5 +355,158 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
       partialFailure = false
       await admin.query('DELETE FROM mobile_push_tokens WHERE token=$1', [second])
     }
+  })
+
+  // P2 adds a real organization policy without manufacturing SSO assurance.
+  // Real OIDC and SCIM delivery cases live in enterprise/http.db.test.ts.
+  const { revokeOrganizationLiveCapabilities } = await import('../lib/enterprise/live-store')
+  const changePolicy = async (enforceSso: boolean) => {
+    const client = await admin.connect()
+    try {
+      await client.query('BEGIN')
+      try {
+        await revokeOrganizationLiveCapabilities(client, organizationId)
+        await client.query('INSERT INTO enterprise_org_policy ("organizationId","enforceSso") VALUES($1,$2) ON CONFLICT ("organizationId") DO UPDATE SET "enforceSso"=excluded."enforceSso"', [organizationId, enforceSso])
+        await client.query('COMMIT')
+      } catch (error) { await client.query('ROLLBACK'); throw error }
+    } finally { client.release() }
+  }
+
+  await t.test('organization phone authorization belongs to the registered native receiver, not an ambient PAT', async () => {
+    await admin.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'Phone organization\',$2)', [organizationId, owner])
+    await admin.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES($1,$2)', [alpha, organizationId])
+    await changePolicy(false)
+    const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+    const { getApiSession } = await import('../lib/api-auth')
+    const { actAs } = await import('../lib/acting-user')
+    const pat = await createLegacyPersonalAccessToken(owner, beta, { name: 'Phone ambient fixture', expiresAt: null })
+    const caller = await getApiSession({ headers: new Headers({ authorization: 'Bearer ' + pat.token }), query: { disableCookieCache: true } })
+    assert.ok(caller)
+    const before = sent.length
+    await actAs(caller.user, () => push())
+    assert.equal(sent.length, before + 1)
+    assert.deepEqual(sent.at(-1)?.message.to, [token])
+    assert.equal(sent.at(-1)?.message.data.botId, alphaBot)
+    const destinations = await tokenRows()
+    await changePolicy(true)
+    await actAs(caller.user, () => push())
+    assert.equal(sent.length, before + 1, 'a real PAT never supplies assurance for its ordinary native phone session')
+    assert.deepEqual(await tokenRows(), destinations)
+    await push(personalBot)
+    assert.equal(sent.length, before + 2, 'a policy for Alpha does not revoke the Personal origin')
+    await changePolicy(false)
+    // The target reader must keep this phone's explicit principal, even when
+    // an ambient PAT selects Beta. Reuse the real policy and native session.
+    const targetBefore = sent.length
+    await actAs(caller.user, () => targetPush())
+    assert.equal(sent.length, targetBefore + 1)
+    assert.equal(sent.at(-1)?.message.data.workspaceId, alpha)
+    assert.equal(sent.at(-1)?.message.data.issueId, alphaIssue)
+    assert.equal(sent.at(-1)?.message.data.runId, alphaRun)
+    await changePolicy(true)
+    try {
+      await actAs(caller.user, () => targetPush())
+      assert.equal(sent.length, targetBefore + 1, 'a target hint cannot supply missing receiver SSO assurance')
+      assert.deepEqual(await tokenRows(), destinations)
+    } finally { await changePolicy(false) }
+  })
+
+  await t.test('organization policy and native session revocation wait for an admitted send with both pools at one', async () => {
+    assert.equal((await admin.query("SELECT count(*)::int AS count FROM pg_trigger WHERE tgname IN ('enterprise_live_session_deleted','enterprise_live_session_authority_changed') AND NOT tgisinternal")).rows[0].count, 2)
+    await blockedDuringSend(async client => {
+      await revokeOrganizationLiveCapabilities(client, organizationId)
+      await client.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
+    })
+    await blockedDuringSend('DELETE FROM "session" WHERE id=$1', [ownerSession.id])
+    await blockedDuringSend('UPDATE "session" SET "userId"=$2 WHERE id=$1', [ownerSession.id, peer])
+    await blockedDuringSend('UPDATE "session" SET "expiresAt"=now()-interval \'1 second\' WHERE id=$1', [ownerSession.id])
+    const before = sent.length, destinations = await tokenRows()
+    await changePolicy(true)
+    await push()
+    assert.equal(sent.length, before)
+    assert.deepEqual(await tokenRows(), destinations)
+    await changePolicy(false)
+    assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1); assert.equal(backendIds.size, 1)
+  })
+
+  await t.test('a policy committed after initial admission is rechecked under the Org barrier', async () => {
+    const entered = Promise.withResolvers<void>(), proceed = Promise.withResolvers<void>()
+    const raw = await app.connect()
+    const query = raw.query.bind(raw) as (...args: unknown[]) => unknown
+    let paused = false
+    const observe = mock.method(raw, 'query', ((...args: unknown[]) => {
+      if (!paused && typeof args[0] === 'string' && args[0].includes('pg_advisory_xact_lock_shared')
+        && Array.isArray(args[1]) && args[1][0] === 'enterprise-live-org:' + organizationId) {
+        paused = true
+        return (async () => { entered.resolve(); await proceed.promise; return query(...args) })()
+      }
+      return query(...args)
+    }) as PoolClient['query'])
+    raw.release()
+    const before = sent.length, destinations = await tokenRows()
+    const sending = push()
+    await entered.promise
+    try {
+      await changePolicy(true)
+      proceed.resolve(); await sending
+      assert.equal(sent.length, before)
+      assert.deepEqual(await tokenRows(), destinations)
+    } finally {
+      proceed.resolve(); await sending
+      observe.mock.restore()
+      await changePolicy(false)
+    }
+  })
+
+  await t.test('an Org send never takes a session row lock behind its advisory barrier', async () => {
+    // Pause only after the actual shared session advisory lock has completed.
+    // A competing native DELETE then owns the row before its trigger waits
+    // for the advisory. The sender must finish using MVCC, not request that row.
+    const entered = Promise.withResolvers<void>(), proceed = Promise.withResolvers<void>()
+    const raw = await app.connect()
+    const query = raw.query.bind(raw) as (...args: unknown[]) => unknown
+    let paused = false
+    const observe = mock.method(raw, 'query', ((...args: unknown[]) => {
+      const result = query(...args)
+      if (!paused && typeof args[0] === 'string' && args[0].includes('pg_advisory_xact_lock_shared')
+        && Array.isArray(args[1]) && args[1][0] === 'enterprise-live-session:' + ownerSession.id) {
+        paused = true
+        assert.ok(result instanceof Promise)
+        return result.then(async value => { entered.resolve(); await proceed.promise; return value })
+      }
+      return result
+    }) as PoolClient['query'])
+    raw.release()
+    const before = sent.length
+    const sending = push()
+    await entered.promise
+    const revoker = await admin.connect()
+    let committed = false
+    try {
+      await revoker.query('BEGIN')
+      await revoker.query("SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='5s'")
+      assert.equal((await revoker.query('SELECT id FROM "session" WHERE id=$1 FOR UPDATE', [ownerSession.id])).rowCount, 1)
+      const deleting = revoker.query('DELETE FROM "session" WHERE id=$1', [ownerSession.id])
+      // Attach the rejection handler immediately; a lock failure remains an
+      // assertion failure even when the admitted send is still finishing.
+      const deleted = deleting.then(value => ({ value }), error => ({ error }))
+      proceed.resolve()
+      await sending
+      assert.equal(sent.length, before + 1)
+      const result = await deleted
+      if ('error' in result) throw result.error
+      assert.equal(result.value.rowCount, 1)
+      await revoker.query('COMMIT'); committed = true
+    } finally {
+      proceed.resolve(); await sending
+      if (!committed) await revoker.query('ROLLBACK')
+      revoker.release(); observe.mock.restore()
+    }
+    await push()
+    assert.equal(sent.length, before + 1, 'after DELETE commits no later send can reuse the dead native session')
+    ownerSession = await nativeSession(owner)
+    await rebind(); await push()
+    assert.equal(sent.length, before + 2)
+    assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 })

@@ -10,8 +10,8 @@ import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { remoteKey } from '@mikka/protocol/repository'
 import { db, pool, withDatabaseClient, withDatabaseTransaction } from '@/lib/db'
 import { agentRuns, devices, issues, issueVersions, runPublications, runTokens, type RunStatus } from '@/lib/db/schema'
-import { taskIdentifiers, taskPrefixInput } from '@/lib/task-identifier-server'
-import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { readIssueMetadata, withIssueMetadata, pullRequestSchema } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { workspaceDb } from '@/lib/workspace-db'
 import { systemActor } from '@/lib/activity-actor'
@@ -24,6 +24,7 @@ import { mayCompleteIssue, withRunWorkspace } from './run-completion'
 import type { QuotaPlan } from './run-quota'
 import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
 import { launchProviderContinuation, pendingProviderFallback, providerCompletion, recoverProviderFailure } from './run-provider-fallback'
+import { withProjectResourceLease } from './project-resources/store'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Run = typeof agentRuns.$inferSelect
@@ -66,7 +67,7 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
   // Kept for old readers only: pushing needs no approval (decision 2026-11-02-1600).
   const pushApproved = true
   const row = await withPublicationWorkspace(run.userId, stored.workspaceId, () => db.transaction(async tx => {
-    const [task] = await tx.select({ id: issues.id, userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, ownershipState: issues.ownershipState, scopeVersion: issues.scopeVersion, title: issues.title, content: issueAttrsContent, prefixInput: taskPrefixInput(sql`issues."userId"`) }).from(issues).where(eq(issues.id, issueId)).for('update')
+    const [task] = await tx.select({ id: issues.id, userId: issues.userId, workspaceId: issues.workspaceId, ownershipState: issues.ownershipState, scope: issues.scope, scopeVersion: issues.scopeVersion, title: issues.title, issuedIdentifier: issues.issuedIdentifier, content: issueAttrsContent }).from(issues).where(eq(issues.id, issueId)).for('update')
     if (!task || !await mayCompleteIssue(task, run.userId, stored.workspaceId)) throw new PublicationError('issue_unavailable')
     const [currentRun] = await tx.select({ id: agentRuns.id, workspaceId: agentRuns.workspaceId }).from(agentRuns).where(and(eq(agentRuns.id, run.id), eq(agentRuns.userId, run.userId), eq(agentRuns.issueId, issueId))).for('update')
     if (!currentRun || currentRun.workspaceId !== stored.workspaceId) throw new PublicationError('issue_unavailable')
@@ -81,7 +82,7 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
     const [previous] = await tx.select().from(runPublications)
       .where(and(eq(runPublications.issueId, issueId), eq(runPublications.remoteKey, key), sql`${runPublications.branch} is not null`))
       .orderBy(asc(runPublications.createdAt)).limit(1)
-    const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, prefixInput: task.prefixInput }], tx)).get(issueId) ?? null
+    const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier }], tx)).get(issueId) ?? null
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (admission && branch !== admission.targetBranch) throw new PublicationError('publication_mismatch')
     if (branch) {
@@ -111,7 +112,7 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
     const accessible = task && (expectedScopeVersion === undefined || task.scopeVersion === expectedScopeVersion) && await mayCompleteIssue(task, run.userId, run.workspaceId)
     if (task && accessible && !readIssueMetadata(task.content).deletedAt) {
       const metadata = readIssueMetadata(task.content)
-      const pr = attachPullRequest ? publication?.pullRequest : null
+      const pr = attachPullRequest && publication?.pullRequest ? pullRequestSchema.parse(publication.pullRequest) : null
       let content = task.content
       if (pr) {
         const found = metadata.pullRequests.some(existing => existing.url.replace(/\/$/, '') === pr.url)
@@ -129,7 +130,8 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
     } else if (attachPullRequest && publication?.pullRequest) throw new PublicationError('issue_unavailable')
   }
   // A used-up quota has its own event (lib/run-quota.ts): switched to a key, or paused.
-  if (run.stopReason !== 'quota_exhausted' && run.stopReason !== 'provider_failure') await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: run.stopReason ?? 'error', report, publication }))
+  if (run.stopReason !== 'quota_exhausted' && run.stopReason !== 'provider_failure') await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: run.stopReason ?? 'error', report,
+    publication: publication?.pullRequest ? { ...publication, pullRequest: pullRequestSchema.parse(publication.pullRequest) } : publication }))
   return review
 }
 
@@ -165,7 +167,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
   const [stored] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId)).where(owner).limit(1)
   if (!stored?.workspaceId) return null
-  return withRunWorkspace(userId, stored.workspaceId, async () => {
+  return withRunWorkspace(userId, stored.workspaceId, () => withProjectResourceLease(userId, stored.workspaceId!, async () => {
   const client = await pool.connect()
   let wakeDevice: string | null | undefined
   let committed = false
@@ -197,7 +199,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
       // a run that was not on a subscription has no quota to switch from, so it is an error.
       const quota = completion.stopReason === 'quota_exhausted' ? await (await import('./run-quota')).planQuotaExhausted(client, run) : undefined
       if (quota === null) completion = { ...completion, stopReason: 'error' }
-      const paused = Boolean(quota && (!quota.key || quota.cloud))
+      const paused = Boolean(quota && (!quota.key || quota.cloud || quota.resourceRefusal))
       const resetsAt = completion.report?.resetsAt ?? null
       const prepared = await prepareRunCompletionEffects(client, run, completion, factoryBound)
       // runReport strips unknown worker fields. The recovery receipt belongs
@@ -229,7 +231,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
       await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound, completion.report)
       if (quota) {
-        const settled = await (await import('./run-quota')).settleQuotaExhausted(tx, run, quota, resetsAt)
+        const settled = await (await import('./run-quota')).settleQuotaExhausted(tx, run, quota, resetsAt, client)
         if (settled.cloud) quotaCloud = { run, plan: quota, resetsAt }
         if (settled.deviceId) wakeDevice = settled.deviceId
       }
@@ -254,7 +256,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
     client.release()
     if (committed && wakeDevice) (await import('./device-gateway-notify')).notifyDeviceWork(wakeDevice)
   }
-  })
+  }))
 }
 
 async function claimPublication(runId: string) {

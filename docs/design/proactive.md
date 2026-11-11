@@ -53,6 +53,7 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 | 字段 | 说明 |
 |---|---|
 | `id`, `userId` | 归个人账户，不按工作区共享 |
+| `repository` | 这条事实对哪个仓库成立（折叠后的 `owner/repo`，`lib/profile/repository.ts`）。`null` 表示关于本人、处处成立；有值时只在处理该仓库的对话里出现（见 § 2.2.1） |
 | `kind` | `interest`、`routine`、`place`、`subscription`、`deadline`、`tool`、`person`、`preference` |
 | `subject` | 一句话，例如「川菜」「工作日 12:00 前后点外卖」「Verizon 套餐，尾号 0001」 |
 | `value` | jsonb：金额、日期、时间窗、地点、商家等结构化信息 |
@@ -63,8 +64,28 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 | `userEdited` | 用户在「记忆」里改过的，以用户为准，模型不再覆盖 |
 
 「记忆」设置使用 `app/actions/memory.ts` 读取事实、修改、删除和清空，并写入个人
-`memoryEnabled` 偏好。事实按种类分组显示，可逐条修改或删除。关闭后不提炼画像。
+`memoryEnabled` 偏好。事实按种类分组显示，可逐条修改或删除；属于某个仓库的事实会注明
+「仅在 owner/repo」，免得被当成处处成立。关闭后不提炼画像，也不把它读进任何对话。
 对记忆提问保留为设计方向。
+
+#### 2.2.1 事实进入对话上下文
+
+事实不只给「记忆」页看：它会被写进 Coordinator 的系统提示，位置对齐 Capy 的
+`memoryNote`（`lib/profile/prompt.ts` 的 `profileSection`）。具体规则：
+
+- 它是独立的一节「What Mikka knows about the person」，排在本人笔记
+  （`coordinator_sessions.memory`，「What the person asked you to remember」）**之后**——
+  本人的话优先于 Mikka 的推断。两者不合并成一节。
+- 它跟着 memory 一起落在缓存前缀之后的那段系统提示里，参与 system digest 与 provider 的
+  prefix 缓存，不放进每轮都变的 tail。
+- 只有与该对话的仓库相关的事实会被写进去：本人的事实（`repository` 为 `null`）处处成立；
+  属于某仓库的事实只在那条对话的 workspace 确实用过该仓库时出现。这就是「项目 A 的习惯不
+  出现在项目 B 的对话里」的实现。
+- 同一事实在不同仓库可以有不同答案：唯一键是 `(userId, repository, kind, subjectKey)`，
+  夜间合并在同一个仓库内分组，跨仓库的答案不会互相投票、也不会互相作废。
+- 有上限（`PROMPT_FACTS_MAX` 条、`PROMPT_FACTS_MAX_CHARS` 字符），按种类轮流分配，
+  免得一个人兴趣很多就把习惯、工具挤没了。用户更正过的事实优先于模型推断的。
+- 事实只是背景，永远不是指令；正文里明说本人的话优先，事实不对就直说。
 
 ### 2.3 生成候选卡片
 
@@ -156,7 +177,8 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 
 ## 5. 分期
 
-1. **画像（已实现）**：打分后提炼，写入 `user_facts`，夜间合并，接到「记忆」设置。
+1. **画像（已实现）**：打分后提炼，写入 `user_facts`，夜间合并，接到「记忆」设置，
+   并按 § 2.2.1 写进 Coordinator 的系统提示。
 2. **夜间后台调研**：截止日期类和关注类先做（不依赖外部搜索之外的东西），再接兴趣 × 外部新信息
    （依赖 #342 的分身或搜索接口）。
 3. **排序、限量和反馈**：加 `suggestion_feedback`，卡片上加「不感兴趣」「这不对」，并用于调整可信度。

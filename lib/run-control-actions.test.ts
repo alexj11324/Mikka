@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { before, mock, test } from 'node:test'
-import { PgDialect } from 'drizzle-orm/pg-core'
+import { afterEach, before, mock, test } from 'node:test'
+import { PgDialect, QueryBuilder, type PgTable, type SelectedFields } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
 import { agentRuns, issueMembers, runChunks, runMessages } from './db/schema'
@@ -13,15 +13,18 @@ const issueId = '31300000-0000-4000-8000-000000000002'
 const botId = '31300000-0000-4000-8000-000000000003'
 const workspaceId = '31300000-0000-4000-8000-000000000004'
 const dialect = new PgDialect()
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
 let viewer: string | null = 'owner'
 let requestHeaders = new Headers({cookie: 'synthetic-session'})
 let sessionUser: string | null = null
 let freshSession = true
 function fixture() {
-  const run = { id: runId, issueId, workspaceId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
+  const run = { id: runId, issueId, workspaceId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', promptTaskStart: 0, promptTaskLength: Array.from('Private thread').length, report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
   return { factoryStages: new Map<string, string>(), controlReads: [] as unknown[][], questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], epochReads: [] as unknown[][], run, continuation: null as typeof run | null, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, ordinaryDispatches: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined, recovery: null as Record<string,unknown> | null, recoveryReads: 0, recoveryCalls: [] as Array<{actor:unknown;input:unknown}> }
 }
 let current = fixture()
+const revisionFailures: unknown[] = []
+afterEach(() => assert.deepEqual(revisionFailures.splice(0), [], 'Live revision SQL cannot fail silently in a source-only action test'))
 class Selection {
   table: unknown
   condition?: SQL
@@ -144,6 +147,18 @@ before(async () => {
       assert.match(sql,/r\."userId"=\$1/);assert.match(sql,/q\."userId"=\$1/);assert.match(sql,/t\."userId"=\$1/);
       return {rows:current.recovery?[current.recovery]:[]};
     }
+    // The thread's context usage (lib/context-usage.ts) counts characters in
+    // SQL and returns no text, so it never re-sends the brief.
+    if (sql.includes('AS "conversationAscii"')) {
+      // The real query, so this fixture cannot silently drift from it.
+      const { CONTEXT_CHARS_SQL } = await import('./context-usage')
+      assert.equal(sql, CONTEXT_CHARS_SQL, 'the context read is the shipped query')
+      assert.ok(sql.includes('ANY($1::uuid[])'), 'context reads bind the run chain')
+      assert.equal(params[1], current.run.id, 'context reads the root brief')
+      assert.ok((params[0] as string[]).includes(current.run.id))
+      return { rows: [{ conversationAscii: 0, conversationOther: 0, messageAscii: 0, messageOther: 0,
+        promptAscii: 14, promptOther: 0, taskAscii: 14, taskOther: 0, model: null }] }
+    }
     if (!/FROM factory_questions/.test(sql)) return runChainQuery(sql, params)
     // Factory questions are the other pool read on the thread path (lib/issue-thread-questions.ts).
     current.questionReads.push(params)
@@ -155,18 +170,68 @@ before(async () => {
       && (!questionOwner || (current.questionOwners.get(id) ?? current.run.userId) === viewerId)
       && (!taskOwner || current.run.userId === viewerId)).map(id => ({ runId: id, status: current.questions.get(id) })) }
   } } } })
+  // revision-read intentionally uses the request executor directly. Keep its
+  // real key normalization/batching while replacing this otherwise live pool.
+  mock.module('@/lib/db/request-scope', { namedExports: {
+    inDatabaseTransaction: () => false,
+    withoutDatabaseClient: (work: () => unknown) => work(),
+    pool: { async query(sql: string, params: [string[], string[]]) {
+      try {
+        assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT r.kind, r.id::text AS id, r.revision FROM live_revisions r JOIN unnest($1::text[], $2::uuid[]) AS t(k, i) ON r.kind = t.k AND r.id = t.i')
+        assert.deepEqual(params[0], ['run', 'thread'])
+        assert.equal(params[1].length, 2); assert.equal(params[1][0], params[1][1])
+        return { rows: params[0].flatMap((kind, index) => [current.run.id, current.continuation?.id].includes(params[1][index])
+          ? [{ kind, id: params[1][index], revision: '7' }] : []) }
+      } catch (error) { revisionFailures.push(error); throw error }
+    } },
+  } })
   mock.module('@/lib/workspace-db', { namedExports: {
     workspacePool: { query: () => { throw new Error('Unexpected raw workspace read') } },
-    workspaceDb: { select: () => ({ from: (table: unknown) => {
-      const query = { innerJoin: () => query, where: (condition: SQL) => {
-        const sql = dialect.sqlToQuery(condition)
-        assert.ok(sql.params.includes(workspaceId)); assert.ok(sql.params.includes('active'))
-        assert.ok(table === workspaceMembers || table === workspaces)
-        const rows = table === workspaceMembers ? [...current.members].map(id => ({ id }))
-          : current.members.has(String(sql.params[0])) ? [{ id: workspaceId, kind: 'team' }] : []
-        const result = Promise.resolve(rows)
-        return Object.assign(result, { orderBy: () => result })
-      } }
+    workspaceDb: { select: (projection?: Record<string, unknown>) => ({ from: (table: PgTable) => {
+      let member: PgTable | undefined, organization: PgTable | undefined
+      let memberJoin: SQL | undefined, organizationJoin: SQL | undefined
+      const query = {
+        innerJoin: (joined: PgTable, predicate: SQL) => {
+          assert.equal(member, undefined); member = joined; memberJoin = predicate
+          return query
+        },
+        leftJoin: (joined: PgTable, predicate: SQL) => {
+          assert.ok(member); assert.equal(organization, undefined)
+          organization = joined; organizationJoin = predicate
+          return query
+        },
+        where: (condition: SQL) => {
+          if (projection?.organizationId) {
+            assert.deepEqual(Object.keys(projection), ['id', 'kind', 'organizationId'])
+            assert.ok(member && organization && memberJoin && organizationJoin)
+            const selected = new QueryBuilder().select(projection as SelectedFields).from(table)
+              .innerJoin(member, memberJoin).leftJoin(organization, organizationJoin).where(condition)
+            return { orderBy: async (order: SQL) => {
+              const compiled = selected.orderBy(order).toSQL()
+              let actualSql = compiled.sql
+              // Expand only fixed aliases; compare every base table, column,
+              // join, predicate and parameter against the original query.
+              for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+                actualSql = actualSql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+                  .replaceAll('"' + name + '".', '"' + table + '".')
+              }
+              assert.equal(actualSql, expectedMembershipSql)
+              assert.deepEqual(compiled.params, [viewer, 'active', workspaceId, 'team', 'personal', viewer])
+              // SQL NULL keeps the real Enterprise filter on the ordinary
+              // Shared path; membership still follows this fixture's state.
+              return current.members.has(String(viewer)) ? [{ id: workspaceId, kind: 'team', organizationId: null }] : []
+            } }
+          }
+          const sql = dialect.sqlToQuery(condition)
+          assert.ok(sql.params.includes(workspaceId)); assert.ok(sql.params.includes('active'))
+          assert.ok(table === workspaceMembers || table === workspaces)
+          assert.equal(member, undefined); assert.equal(organization, undefined)
+          const rows = table === workspaceMembers ? [...current.members].map(id => ({ id }))
+            : current.members.has(String(sql.params[0])) ? [{ id: workspaceId, kind: 'team' }] : []
+          const result = Promise.resolve(rows)
+          return Object.assign(result, { orderBy: () => result })
+        },
+      }
       return query
     } }) },
   } })
@@ -215,6 +280,7 @@ test('actual thread actions preserve owner detail/Bot display and attribute an a
   current = fixture(); viewer = 'owner'
   const detail = await actions.getIssueThread(issueId, runId)
   assert.equal(detail.thread.detail?.agentName, 'Owned Bot')
+  assert.deepEqual(detail.live?.revisions, { [`run:${runId}`]: 7, [`thread:${runId}`]: 7 })
   await actions.sendIssueThreadMessage({ issueId, runId, text: '  continue  ' })
   assert.deepEqual(current.messages.map(({ runId: run, userId, text }) => ({ run, userId, text })), [{ run: runId, userId: 'owner', text: 'continue' }])
   assert.equal(current.transactions, 1)

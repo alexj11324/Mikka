@@ -120,7 +120,11 @@ export async function coordinatorTurn(userId: string, botId: string, startupRece
     try {
       if(inbox.scheduledRead) await steps.assertScheduleRead(userId,botId,inbox.scheduledRead)
       const scheduleOptions = inbox.scheduledRead ? {readOnly:true,readToolIds:inbox.scheduledRead.allowedActions} : {}
-      const sourceOptions = inbox.sourceEventId ? {sourceEventId:inbox.sourceEventId} : {}
+      // Evidence-only run provenance: a scheduled read is a schedule, a
+      // Telegram turn names its chat/message, everything else is the app.
+      const entryOrigin = inbox.scheduledRead ? { origin:'schedule' as const }
+        : { origin: inbox.origin ?? 'web' as const, ...(inbox.originRef ? { originRef: inbox.originRef } : {}) }
+      const sourceOptions = { ...(inbox.sourceEventId ? {sourceEventId:inbox.sourceEventId} : {}), ...entryOrigin }
       const scheduledAuthority = inbox.scheduledRead ? {botId,occurrence:inbox.scheduledRead} : undefined
       let hosted: AgentExecution['snapshot']['runtime'] | Awaited<ReturnType<typeof kit.botRuntime>> | null = null
       let prepared: Awaited<ReturnType<typeof steps.prepareTurn>> | { mailboxTools: Awaited<ReturnType<typeof steps.mailboxCatalogue>>; prompt: null; contextMs: null }
@@ -224,7 +228,7 @@ export async function coordinatorTurn(userId: string, botId: string, startupRece
       // After the reply is stored and committed, so it never delays what the person sees.
       await steps.logTurnTiming({ workflowRunId:holder,round,route:selected.harness !== 'ai_sdk' ? 'native' : hosted?.modelSelection ? 'subscription' : 'hosted',untilStoredMs:storedAt - takenAt,...(startupReceiptVersion === 1 ? {storeTimingOrigin} : {}),modelCalls:(result as { modelCalls?: number }).modelCalls ?? null,tools:(result as { toolTimings?: ToolTiming[] }).toolTimings ?? [],
         // Context reads overlap inside prepare: their durations are not additive.
-        phaseMs: { ...phaseMs, execution:prepared.contextMs?.execution ?? 0,personal:prepared.contextMs?.personal ?? 0,github:prepared.contextMs?.github ?? 0 },...(preparationBodyMs ? {preparationBodyMs} : {}) })
+        phaseMs: { ...phaseMs, execution:prepared.contextMs?.execution ?? 0,personal:prepared.contextMs?.personal ?? 0,github:prepared.contextMs?.github ?? 0,profile:prepared.contextMs?.profile ?? 0 },...(preparationBodyMs ? {preparationBodyMs} : {}) })
     } catch (error) {
       // Either branch can fail first: wait for a possible late execution commit
       // and for the already-started writer before terminal cleanup/publication.

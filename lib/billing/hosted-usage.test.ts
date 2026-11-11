@@ -15,6 +15,7 @@ test('shows the allowance and purchased points as one balance, 100 points per do
   assert.equal(balancePoints({ verified: true, free: 1_000_000, purchased: 0 }), 100)
   assert.equal(balancePoints({ verified: true, free: 734_999, purchased: 2_000_000 }), 273)
   assert.equal(balancePoints({ verified: false, free: 0, purchased: -5 }), 0)
+  assert.equal(balancePoints({ verified: true, free: 0, plan: 2_340_000, purchased: 10_000 }), 235)
 })
 
 test('the refusal line offers only what the person\'s state allows', () => {
@@ -35,6 +36,7 @@ test('the refusal line offers only what the person\'s state allows', () => {
   assert.deepEqual(refusalOffer('usage_in_progress', usage({})), { transient: true, billing: false, card: false, connect: false, topUp: false })
   // Before the state is read, nothing is offered that may turn out wrong.
   assert.deepEqual(refusalOffer('verification_required', null), { transient: false, billing: false, card: false, connect: false, topUp: false })
+  assert.deepEqual(refusalOffer('usage_budget_exhausted', usage({})), { transient: false, billing: true, card: false, connect: false, topUp: false })
 })
 
 test('a refused turn moves to the person\'s own subscription: the first in the menu\'s order', async () => {

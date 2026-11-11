@@ -67,6 +67,21 @@ test('Stripe purchased points ledger', { skip: !dbUrl }, async t => {
     assert.deepEqual(grants.filter(row => row.reason === 'refund').map(row => [row.points, row.amountCents]), [[-250, -250], [-750, -750]])
   })
 
+  await t.test('Managed Payments tax remains on the receipt; proportional refunds cannot erase or mint extra points', async () => {
+    const purchase = { ...session(), amount_subtotal: 1000, amount_total: 1080,
+      total_details: { amount_tax: 80, amount_discount: 0, amount_shipping: 0 } }
+    await applyStripeEvent(event('checkout.session.completed', purchase), options)
+    assert.deepEqual((await rows(purchase.payment_intent)).map(row => [row.points, row.amountCents]), [[1000, 1080]])
+    const first = refund(540), second = refund(540)
+    await applyStripeEvent(event('charge.refunded', charge(purchase, [first])), options)
+    assert.equal((await rows(purchase.payment_intent)).reduce((sum, row) => sum + row.points, 0), 500)
+    await applyStripeEvent(event('charge.refunded', charge(purchase, [first, second])), options)
+    const settled = await rows(purchase.payment_intent)
+    assert.equal(settled.reduce((sum, row) => sum + row.points, 0), 0)
+    assert.equal(settled.reduce((sum, row) => sum + row.amountCents, 0), 0)
+    assert.equal(settled.filter(row => row.reason === 'refund').every(row => row.parentGrantId === settled.find(row => row.reason === 'purchase').id), true)
+  })
+
   await t.test('refund delivered before its purchase stays retryable and later applies', async () => {
     const purchase = session(), refunded = event('charge.refunded', charge(purchase, [refund(100)]))
     await assert.rejects(applyStripeEvent(refunded, options), /purchase has not arrived/)
@@ -128,5 +143,81 @@ test('Stripe purchased points ledger', { skip: !dbUrl }, async t => {
     await applyStripeEvent(event('checkout.session.completed', purchase), options)
     await applyStripeEvent(succeeded, options)
     assert.equal((await rows(purchase.payment_intent)).reduce((sum, row) => sum + row.points, 0), 900)
+  })
+
+  await t.test('a foreign pending entitlement projection cannot fail this webhook', async () => {
+    const foreign = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const trigger = `synthetic_billing_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`create function ${trigger}() returns trigger language plpgsql as $$ begin if NEW."workspaceId"='${foreign.id}'::uuid then raise exception 'synthetic_workspace_outage'; end if; return NEW; end $$;
+      create trigger ${trigger} before insert or update on mikka_workspace_entitlements for each row execute function ${trigger}()`)
+    const foreignEvent = id('evt')
+    try {
+      await pool.query(`insert into stripe_webhook_events (id,type) values ($1,'customer.subscription.updated')`, [foreignEvent])
+      await pool.query(`insert into billing_entitlement_outbox ("eventId","workspaceId","subscriptionId",plan,"expiresAt",revision,"billingModel")
+        values ($1,$2,$3,'pro',$4,1,'resource_v1')`, [foreignEvent, foreign.id, id('sub'), new Date(Date.now() + 86_400_000)])
+      // The drain attempts the foreign row, but only this event's own failure may fail this webhook.
+      const purchase = session()
+      assert.equal(await applyStripeEvent(event('checkout.session.completed', purchase), options), true)
+      assert.equal((await rows(purchase.payment_intent)).length, 1)
+      assert.equal((await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId"=$1 and "deliveredAt" is null', [foreignEvent])).rows[0].n, 1)
+    } finally {
+      await pool.query(`drop trigger if exists ${trigger} on mikka_workspace_entitlements; drop function if exists ${trigger}()`)
+    }
+    // Any later webhook drains the durable row once the foreign Workspace recovers.
+    await applyStripeEvent(event('checkout.session.completed', session()), options)
+    assert.equal((await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId"=$1 and "deliveredAt" is not null', [foreignEvent])).rows[0].n, 1)
+  })
+
+  await t.test('a foreign failing refund receipt cannot fail this webhook', async () => {
+    const foreign = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const paymentIntent = id('pi'), sourceEvent = id('evt'), receipt = id('re')
+    await pool.query(`insert into stripe_webhook_events (id,type) values ($1,'refund.updated')`, [sourceEvent])
+    await pool.query(`insert into workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId","paymentAllocations","amountCents",currency,"stripeInvoiceId")
+      values ($1,$2,'plan',1000,'subscription',$3,$4::jsonb,1000,'usd',$5)`,
+      [randomUUID(), foreign.id, 'plan:' + sourceEvent, JSON.stringify({ [paymentIntent]: { paidCents: 1000, totalCents: 1000 } }), id('in')])
+    await pool.query(`insert into billing_refund_receipts (id,"paymentIntentId","chargeId","amountCents",currency,"sourceEventId") values ($1,$2,$3,100,'usd',$4)`,
+      [receipt, paymentIntent, id('ch'), sourceEvent])
+    const trigger = `synthetic_refund_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`create function ${trigger}() returns trigger language plpgsql as $$ begin if NEW."workspaceId"='${foreign.id}'::uuid and NEW.reason='refund' then raise exception 'synthetic_refund_outage'; end if; return NEW; end $$;
+      create trigger ${trigger} before insert on workspace_credit_grants for each row execute function ${trigger}()`)
+    try {
+      // A different tenant's webhook succeeds and leaves the receipt for its own retry.
+      const purchase = session()
+      assert.equal(await applyStripeEvent(event('checkout.session.completed', purchase), options), true)
+      assert.equal((await pool.query('select "reconciledAt" from billing_refund_receipts where id=$1', [receipt])).rows[0].reconciledAt, null)
+      // The receipt's own event is the one allowed to fail its webhook.
+      await assert.rejects(applyStripeEvent({ id: sourceEvent, type: 'refund.updated', data: { object: {} } }, options),
+        (error: Error & { cause?: Error }) => /synthetic_refund_outage/.test(`${error.message} ${error.cause?.message ?? ''}`))
+    } finally {
+      await pool.query(`drop trigger if exists ${trigger} on workspace_credit_grants; drop function if exists ${trigger}()`)
+    }
+    // Its durable receipt still reconciles from a later webhook after recovery.
+    await applyStripeEvent(event('checkout.session.completed', session()), options)
+    assert.ok((await pool.query('select "reconciledAt" from billing_refund_receipts where id=$1', [receipt])).rows[0].reconciledAt)
+  })
+
+  await t.test('a foreign entitlement backlog cannot fail this webhook', async () => {
+    const foreign = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const prefix = 'evt' + randomUUID().replaceAll('-', '')
+    await pool.query(`insert into stripe_webhook_events (id,type) select $1||g,'customer.subscription.updated' from generate_series(1,100) g`, [prefix])
+    // Revisions are unique per Workspace, so the full batch must differ by revision.
+    await pool.query(`insert into billing_entitlement_outbox ("eventId","workspaceId","subscriptionId",plan,"expiresAt",revision,"billingModel")
+      select $1||g,$2,$3,'pro',now()+interval '30 days',g,'resource_v1' from generate_series(1,100) g`, [prefix, foreign.id, id('sub')])
+    const pending = async () => (await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId" like $1 and "deliveredAt" is null', [prefix + '%'])).rows[0].n
+    const delivered = async () => (await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId" like $1 and "deliveredAt" is not null', [prefix + '%'])).rows[0].n
+    const trigger = `synthetic_billing_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`create function ${trigger}() returns trigger language plpgsql as $$ begin if NEW."workspaceId"='${foreign.id}'::uuid then raise exception 'synthetic_workspace_outage'; end if; return NEW; end $$;
+      create trigger ${trigger} before insert or update on mikka_workspace_entitlements for each row execute function ${trigger}()`)
+    try {
+      // A full batch of 100 foreign rows all fails but is swallowed; this webhook still succeeds.
+      assert.equal(await applyStripeEvent(event('checkout.session.completed', session()), options), true)
+      assert.equal(await pending(), 100)
+    } finally {
+      await pool.query(`drop trigger if exists ${trigger} on mikka_workspace_entitlements; drop function if exists ${trigger}()`)
+    }
+    // The same full batch now delivers; no own row remains, so it is not a backlog failure.
+    for (let attempt = 0; attempt < 3 && await delivered() < 100; attempt++)
+      assert.equal(await applyStripeEvent(event('checkout.session.completed', session()), options), true)
+    assert.equal(await delivered(), 100)
   })
 })

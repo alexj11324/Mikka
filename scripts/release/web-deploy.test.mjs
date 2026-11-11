@@ -8,7 +8,7 @@ import { join, matchesGlob } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { buildEnvironment, productionSha, verifyProductionBuild, PRODUCTION_VERSION_URL, REQUIRED,
-  assertCurrentMain, waitForWebDeployment, deploymentPlan, runtimeRefreshRequired, RUNTIME_RELEASE_PATHS } from './web-deploy.mjs'
+  assertCurrentMain, waitForWebDeployment, webDeploymentWaitOptions, deploymentPlan, runtimeRefreshRequired, RUNTIME_RELEASE_PATHS } from './web-deploy.mjs'
 
 const SHA = 'a'.repeat(40)
 const pulled = [
@@ -396,11 +396,13 @@ test('explicit runtime refresh always builds while ordinary docs-only classifica
 test('both release paths use one non-cancelling pending queue, and the Web wait remains outside it', () => {
   const web = readFileSync(new URL('../../.github/workflows/web-deploy.yml', import.meta.url), 'utf8')
   const e2b = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
+    + readFileSync(new URL('../../.github/workflows/e2b-runtime-release.yml', import.meta.url), 'utf8')
   assert.doesNotMatch(web, /^concurrency:/m, 'caller and reusable job must not acquire the same group twice')
   assert.match(web, /\n    concurrency:\n(?:[^\n]*\n)*?      group: web-deploy-production\n      cancel-in-progress: false\n      queue: max\n/)
   assert.equal((web.match(/group: web-deploy-production/g) ?? []).length, 1)
-  const callerQueue = e2b.slice(e2b.indexOf('\nconcurrency:'), e2b.indexOf('\njobs:'))
-  assert.match(callerQueue, /cancel-in-progress: false\n  queue: max/)
+  assert.doesNotMatch(e2b, /^concurrency:/m)
+  const callerQueue = e2b.slice(e2b.indexOf('\n  release:'), e2b.indexOf('name: E2B serialized'))
+  assert.match(callerQueue, /cancel-in-progress: false\n      queue: max/)
   assert.match(callerQueue, /e2b-official-runtime-release/)
   assert.doesNotMatch(callerQueue, /web-deploy-production/)
   const waitJob = e2b.slice(e2b.indexOf('\n  await-web:'), e2b.indexOf('\n  subscriptions:'))
@@ -411,11 +413,11 @@ test('both release paths use one non-cancelling pending queue, and the Web wait 
   assert.match(e2b, /uses: \.\/\.github\/workflows\/web-deploy\.yml/)
   assert.match(e2b, /runtime-refresh: true/)
   assert.match(e2b, /workflow_dispatch:\n    inputs:\n      runtime-refresh:\n        description: [^\n]+\n        type: boolean\n        default: false/)
-  assert.match(e2b, /if \[ "\$RUNTIME_REFRESH" = true \] \|\| \[ "\$wanted" != "\$live" \]; then echo "changed=true"/)
-  assert.match(e2b, /validate:\n    needs: \[test, check\]\n    if: needs\.check\.outputs\.changed == 'true'/)
+  assert.match(e2b, /if \[ "\$MANUAL_RETRY" = true \] \|\| \[ "\$RUNTIME_REFRESH" = true \] \|\| \[ "\$wanted" != "\$live" \]; then echo "changed=true"/)
+  assert.match(e2b, /release:\n    needs: \[test, check\]\n    if: needs\.check\.outputs\.changed == 'true'/)
   assert.match(e2b, /runtime-worker-sha: \$\{\{ needs\.validate\.outputs\.source-sha \}\}/)
   assert.match(e2b, /runtime-template-models-sha256: \$\{\{ needs\.validate\.outputs\.template-models-sha256 \}\}/)
-  const checkJob = e2b.slice(e2b.indexOf('\n  check:'), e2b.indexOf('\n  validate:'))
+  const checkJob = e2b.slice(e2b.indexOf('\n  check:'), e2b.indexOf('\n  release:'))
   assert.match(checkJob, /fetch-depth: 0/)
   const checkGuard = checkJob.indexOf('node scripts/release/web-deploy.mjs main')
   assert.ok(checkGuard >= 0 && checkGuard < checkJob.indexOf('uses: Infisical/'))
@@ -443,15 +445,16 @@ test('runtime env, build and upload are ordered under the same job with fixed id
   assert.deepEqual([...new Set([...web.matchAll(/project-id: (.+)/g)].map(match => match[1]))], ['89850d6a-f020-4936-863e-df77380dfe40'])
 })
 
-test('the actual dispatch comparison only bypasses unchanged-hash optimization when explicitly requested', () => {
+test('the actual comparison builds on manual dispatch, control refresh or a changed worker', () => {
   const e2b = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
-  const condition = e2b.split('\n').find(line => line.trim().startsWith('if [ "$RUNTIME_REFRESH"'))?.trim()
+    + readFileSync(new URL('../../.github/workflows/e2b-runtime-release.yml', import.meta.url), 'utf8')
+  const condition = e2b.split('\n').find(line => line.trim().startsWith('if [ "$MANUAL_RETRY"'))?.trim()
   assert.ok(condition)
   const dir = mkdtempSync(join(tmpdir(), 'runtime-dispatch-'))
   try {
-    for (const [refresh, live, changed] of [['', SHA, false], ['false', SHA, false], ['true', SHA, true], ['false', OTHER, true]]) {
-      const output = join(dir, `${refresh || 'push'}-${live}`)
-      execFileSync('bash', ['-euc', condition], { env: { PATH: process.env.PATH, RUNTIME_REFRESH: refresh, wanted: SHA, live, GITHUB_OUTPUT: output } })
+    for (const [manual, refresh, live, changed] of [['', '', SHA, false], ['false', 'false', SHA, false], ['false', 'true', SHA, true], ['false', 'false', OTHER, true], ['true', 'false', SHA, true]]) {
+      const output = join(dir, `${manual || 'push'}-${refresh}-${live}`)
+      execFileSync('bash', ['-euc', condition], { env: { PATH: process.env.PATH, MANUAL_RETRY: manual, RUNTIME_REFRESH: refresh, wanted: SHA, live, GITHUB_OUTPUT: output } })
       assert.equal(readFileSync(output, 'utf8'), `changed=${changed}\n`)
     }
   } finally { rmSync(dir, { recursive: true, force: true }) }
@@ -716,7 +719,8 @@ test('large runtime reports cross jobs only as immutable artifact files', () => 
     assert.doesNotMatch(text, /candidate-report=|release-evidence=|CANDIDATE_REPORT:|RUNTIME_RELEASE_EVIDENCE:|TEMPLATE_MODELS:/,
       'a complete report or model catalogue must not enter a job output, input, argv or environment')
   }
-  const [builder, runtime, web] = files
+  const [builder, caller, web] = files
+  const runtime = caller + readFileSync(new URL('../../.github/workflows/e2b-runtime-release.yml', import.meta.url), 'utf8')
   assert.match(builder, /candidate-artifact-id:.*steps\.candidates\.outputs\.artifact-id/)
   assert.match(builder, /name: e2b-candidates-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
   assert.match(builder, /name: e2b-candidate-build-cleanup-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
@@ -762,4 +766,52 @@ test('duplicate required step cannot hide a failure or pending record behind one
     { status: 'completed', result: 'webDeploy:matchingWebBuildSkippedOrIncomplete', elapsed: 0, publicReads: 0 },
     { status: 'pending', result: 'webDeploy:matchingWebBuildSkippedOrIncomplete', elapsed: 0, publicReads: 0 },
   ])
+})
+
+test('runtime CLI waits beyond forty minutes for the latest Web run instead of accepting an older successful push', async () => {
+  const latestSucceedsAt = 40 * 60_000 + 9_000
+  const fixture = webFixture({
+    // An older successful push and matching public version cannot admit the latest pending dispatch.
+    runs: elapsed => [
+      webRun({ id: 69, run_attempt: 1, event: 'push' }),
+      webRun({ event: 'workflow_dispatch',
+        ...(elapsed < latestSucceedsAt ? { status: 'in_progress', conclusion: null } : {}) }),
+    ],
+    version: () => SHA,
+  })
+  const result = await fixture.run({ ...webDeploymentWaitOptions('await-web'), intervalMs: 10_000 })
+  assert.equal(result.webRunId, 70)
+  assert.equal(result.webAttempt, 2)
+  assert.equal(result.sourceCommit, SHA)
+  assert.equal(result.publicBuild, SHA)
+  assert.equal(fixture.elapsed(), 40 * 60_000 + 10_000)
+  assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at),
+    [40 * 60_000 + 10_000], 'an older successful push cannot bypass the latest pending dispatch')
+})
+
+test('desktop CLI still times out at forty minutes while the latest Web run is pending', async () => {
+  const latestSucceedsAt = 40 * 60_000 + 9_000
+  const fixture = desktopWebFixture({
+    runs: (build, elapsed) => [
+      webRun({ head_sha: build, id: 69, run_attempt: 1, event: 'push' }),
+      webRun({ head_sha: build, event: 'workflow_dispatch',
+        ...(elapsed < latestSucceedsAt ? { status: 'in_progress', conclusion: null } : {}) }),
+    ],
+  })
+  await assert.rejects(fixture.run({ ...webDeploymentWaitOptions('await-desktop-web'), intervalMs: 10_000 }),
+    /matchingWebDeploymentTimedOut/)
+  assert.equal(fixture.elapsed(), 40 * 60_000)
+  assert.equal(fixture.calls.some(call => /\/actions\/runs\/\d+\/attempts\/\d+\/jobs/.test(call.url)), false,
+    'the older successful push cannot provide build evidence while the latest dispatch is pending')
+})
+
+test('runtime CLI stops at ninety minutes while required Web step evidence remains pending without reading public', async () => {
+  const job = buildJob()
+  Object.assign(job.steps[2], { status: 'pending', conclusion: null })
+  const fixture = webFixture({ job })
+  await assert.rejects(fixture.run({ ...webDeploymentWaitOptions('await-web'), intervalMs: 10_000 }),
+    /matchingWebDeploymentTimedOut/)
+  assert.equal(fixture.elapsed(), 90 * 60_000)
+  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0,
+    'matching public output cannot replace unfinished required Web step evidence')
 })

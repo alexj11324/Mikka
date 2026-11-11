@@ -99,7 +99,66 @@ interface SuggestionSourceView { app: 'gmail' | 'googlecalendar' | 'notion' | 's
 
 ### `getMemory()`
 
-Unchanged, except that it also returns `total`, the number of active facts. `facts` still lists at most 500. It throws `authRequired` without a session (`requireUser`), as before.
+Returns `enabled`, `total`, `facts`, `pending`, `undoable` and `scopeOptions` for the
+signed-in person and the selected authorized workspace. `total` counts approved,
+active facts; `facts` and `pending` each list at most 500. Each item includes its
+review status, source, scope, usage and allowed actions, plus the existing row's
+immutable `createdAt` and `firstSeenAt` as ISO timestamps. `createdAt` is the time
+the row was stored; `firstSeenAt` is the original observed event time. Repeated
+extraction and source enrichment do not reset either field. They are read from
+the ledger, without historical inference or backfill. It throws `authRequired`
+without a session.
+
+`usedCount` and `recentUses` cover currently readable targets in the selected
+workspace, not an aggregate of hidden workspaces. Thread targets must still
+belong to that person and workspace; task targets need canonical bound ownership
+and must not be deleted. A global fact does not expose another workspace's bot or
+task identifiers. Links for internal threads and tasks are constructed from the
+authorized target ID, never copied from an arbitrary stored URL. A known source
+kind may have `id: null` and `url: null` when its locator cannot be authorized.
+Historical facts with no trusted source remain `null`.
+
+Source references follow the producer that actually wrote the fact:
+
+| Producer | `source.kind` | `source.id` and link |
+| --- | --- | --- |
+| Manual `addFact` | `told` | The actual fact ID identifies that saved user assertion; no invented URL. Replaying its request returns the same fact. |
+| Gmail/Slack messages, GitHub/Linear issue discussions | `thread` | `suggestion:<UUID>` names the saved external notification, not an internal Bot. |
+| Notion page notification | `file` | `suggestion:<UUID>` names the saved external document notification, not an internal Artifact. |
+| Existing internal Bot reference | `thread` | The currently owned Bot ID and its constructed local URL. |
+| Applied profile consolidation answer | `decision` | The ID of a real `user_fact_decisions` row, bound to its output fact and stored parent fact IDs. No decision URL exists. |
+
+External references are exposed only when the saved suggestion, its evidence
+reference and its Bot all belong to this person, and the Bot is in the current
+authorized workspace. Provider URLs must also match the stored thread, page or
+GitHub event identity. Slack ingestion has no permalink and Linear's stored UUID
+does not prove the URL's human issue identifier, so these keep a verified ID with
+`url: null`. An unverified provider URL never substitutes for the original source.
+
+The existing consolidation path only reads global facts. Applying a pattern
+rechecks and locks its global, active, same-owner parents; a changed or restricted
+parent refuses that derived write. Restricted workspace/project facts are left
+unchanged. The output and its `consolidation_answer` record are written in one
+transaction, with a stable key for replaying that same answer. This records an
+applied answer, without inferring a model/provider identity; ordinary expiry and
+decay updates do not create a decision source. Reading a decision ID also requires
+every stored parent fact to be currently readable. Forget hides the source
+immediately; undo restores the same reference. The existing undo-expiry cleanup
+removes the forgotten fact's decision records, and clear removes all of this
+owner's decision records. No historical decision or file ID is fabricated.
+
+The action passes the original session or token principal to the canonical
+workspace admission helpers. Membership and projects use `DATABASE_URL` through
+`workspaceDb` / `projectDb`; person-owned facts, undo snapshots and usage use
+`MIKKA_DATABASE_URL`. A pinned token cannot choose another workspace or its
+owner's unrelated personal projects. Admission remains held through a scoped
+read or write, including the application's fact transaction.
+
+`memory.addFact`, `memory.reviewFact`, `memory.setFactScope` and
+`memory.undoRemoveFact` are registered in the shared browser/Desktop RPC registry.
+Their strict schemas accept no client owner. Manual inserts require a UUID
+`requestId`; scope is `global` with no IDs, or `workspaces` / `projects` with one
+to 50 authorized UUIDs. Deletion offers a two-minute owner-only undo window.
 
 ### `clearMemory(): Promise<ActionResult<{ removed: number }>>`
 

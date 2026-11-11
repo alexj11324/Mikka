@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { ProjectMapError, recordDecisionSchema, type RecordDecisionInput } from './contracts'
+import { ownLiveRuntime } from '../../tests/support/live-runtime'
 
 test('decision input rejects forged authority, malformed choices and unsupported external sources', () => {
   const valid = { kind: 'choose', title: 'Choose a store', summary: 'Use PostgreSQL', reason: 'Atomic writes', options: [
@@ -24,6 +25,7 @@ test('decision input rejects forged authority, malformed choices and unsupported
 })
 
 test('project decisions: real PostgreSQL authority, atomic appends, retries and correction', { skip: !dbUrl }, async t => {
+  const live = await ownLiveRuntime(t)
   const { Pool } = await import('pg')
   const connection = new Pool({ connectionString: dbUrl, max: 3 })
   const { recordProjectDecision, listProjectDecisions } = await import('./decisions')
@@ -31,19 +33,18 @@ test('project decisions: real PostgreSQL authority, atomic appends, retries and 
   const { issueRunToken, revokeRunTokens } = await import('@/lib/mcp/worker')
   const { pool } = await import('@/lib/db')
   const { workspacePool } = await import('@/lib/workspace-db')
-  t.after(async () => { await Promise.all([connection.end(), pool.end(), workspacePool.end()]) })
+  t.after(async () => { try { await live.close() } finally { await Promise.all([connection.end(), pool.end(), workspacePool.end()]) } })
   const owner = await seedUser(connection, 'decision-owner')
   const stranger = await seedUser(connection, 'decision-stranger')
   const member = await seedUser(connection, 'decision-member')
-  const personal = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }])
-  await connection.query('update mikka_workspaces set kind=\'personal\' where id=$1', [personal.id])
+  const personal = { id: await seedPersonalWorkspace(connection, owner) }
   const other = await seedWorkspace(connection, stranger, [{ userId: stranger, role: 'admin' }])
   const teamWorkspace = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   const team = await seedTeam(connection, teamWorkspace.id, owner)
   const projectId = await seedProject(connection, owner, [])
   const sharedProject = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: teamWorkspace.id }])
   const issueId = await seedIssue(connection, owner)
-  await connection.query('update workspace_projects set "issueIds"=$2 where id=$1', [projectId, JSON.stringify([issueId])])
+  await seedProjectTasks(connection, projectId, [issueId])
   const botId = await seedBot(connection, personal.id, owner)
   const agentId = await seedAgent(connection, owner)
   const human = { kind: 'human' as const, user: owner, workspaceId: personal.id }

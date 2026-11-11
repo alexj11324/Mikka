@@ -1,4 +1,7 @@
 import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type NativeCoordinatorCommand } from "@mikka/protocol/coordinator"
+import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
+import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
+import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-git'
 // HTTP transport for `ServerLink`: the routes apps/server serves for the
 // daemon (ADR 0016). Paths and payloads come from packages/protocol
 // (`devicePaths`, `runCompletePath` and their zod schemas); responses are
@@ -28,6 +31,7 @@ import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCap
 import {
   CLIENT_VERSION_HEADER,
   REPO_ORIGIN_HEADER,
+  PROJECT_ENVIRONMENT_HEADER,
   RECOVERY_WORKTREE_HEADER,
   MODEL_CREDENTIAL_HEADER,
   RUN_CREDENTIALS_HEADER,
@@ -298,6 +302,7 @@ export class HttpServerLink implements ServerLink {
           [SKILL_ARTIFACT_HEADER]: '1',
           [TEAM_SKILL_HEADER]: '1',
           [REPO_ORIGIN_HEADER]: '1',
+          [PROJECT_ENVIRONMENT_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
           [TASK_SECRETS_HEADER]: TASK_SECRETS_VERSION,
@@ -305,6 +310,9 @@ export class HttpServerLink implements ServerLink {
           ...(initialRepository ? { [INITIAL_REPOSITORY_HEADER]: '1' } : {}),
           [SUBSCRIPTION_MODEL_CATALOGUE_HEADER]: '1',
           [MAILBOX_NOTICE_HEADER]: '1',
+          [WORKSPACE_REQUEST_HEADER]: '1',
+          [WORKSPACE_DIFF_REQUEST_HEADER]: '1',
+          [WORKSPACE_GIT_REQUEST_HEADER]: '1',
           ...daemonTracer.headers(),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
@@ -539,6 +547,8 @@ export class HttpServerLink implements ServerLink {
       onQueuedRuns,
       updates,
       onUpdates,
+      workspaceSkip = [],
+      onWorkspaceRequests,
     }: FetchCommandsOptions = {}
   ): Promise<RunCommand[]> {
     const response = await this.call(
@@ -548,7 +558,7 @@ export class HttpServerLink implements ServerLink {
         waitSeconds,
         skipRuns.map(checkId),
         updates && { daemonLatest: updates.daemonLatest, skipDeviceCommands: updates.skipDeviceCommands?.map(checkId) }
-      ),
+      ) + (workspaceSkip.length ? `&skipWorkspaceRequests=${workspaceSkip.map(checkId).join(',')}` : ''),
       {
         schema: runCommandsResponse,
         timeoutMs: (waitSeconds + 15) * 1000,
@@ -556,8 +566,28 @@ export class HttpServerLink implements ServerLink {
       }
     )
     if (response.queuedRuns?.length) onQueuedRuns?.(response.queuedRuns)
+    if (response.workspaceRequests?.length) onWorkspaceRequests?.(response.workspaceRequests)
     if (response.daemonVersions || response.deviceCommands?.length) onUpdates?.({ daemonVersions: response.daemonVersions, deviceCommands: response.deviceCommands ?? [] })
     return response.commands
+  }
+
+  async answerWorkspaceRead(deviceId: string, requestId: string, receipt: WorkspaceReadReceipt, options: { expiresAt: string; signal?: AbortSignal }) {
+    // One bounded delivery operation: a transient 5xx/network error cannot
+    // strand a request while the push socket stays open. Keep source only in
+    // memory, retry at most twice, and stop at the original request deadline.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const remaining = Date.parse(options.expiresAt) - Date.now()
+      options.signal?.throwIfAborted()
+      if (remaining <= 0) throw new ServerUnreachableError('Workspace receipt expired')
+      try {
+        await this.call('POST', `/v1/devices/${checkId(deviceId)}/workspace/requests/${checkId(requestId)}`, {
+          body: receipt, signal: options.signal, timeoutMs: Math.min(4000, remaining),
+        })
+        return
+      } catch (error) {
+        if (!(error instanceof ServerUnreachableError) || error.cause === 429 || attempt === 2) throw error
+      }
+    }
   }
 
   async ackCommands(deviceId: string, delivered: string[]) {

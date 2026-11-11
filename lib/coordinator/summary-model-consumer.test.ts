@@ -14,7 +14,8 @@ let streamFinishOverride:string|undefined, streamErrorEvent=false
 const model={synthetic:true}
 const resolved: unknown[][]=[]
 let modelCalls = 0
-stub('./store.ts', { loadConversation: async () => conversation, loadConversationForPrompt: async () => ({ ...conversation, personalInstructions: '' }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
+stub('./store.ts', { loadConversation: async () => conversation, loadConversationForPrompt: async () => ({ ...conversation, personalInstructions: '', memoryEnabled: true }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
+stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('./native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('./bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
 stub('./personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base, withPersonalInstructionText: async (_owner: string, base: string) => base })

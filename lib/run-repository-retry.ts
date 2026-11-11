@@ -1,4 +1,5 @@
 import { withRunWorkspace } from './run-completion'
+import { withProjectResourceLease } from './project-resources/store'
 import 'server-only'
 import { serverRunFailure } from './run-failure-details'
 import { db, pool, withDatabaseClient } from './db'
@@ -17,6 +18,7 @@ import { FactoryError } from './factory/contract'
 import { deviceOnlineStates } from './device-presence'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { isNoLooserThan, networkDomainsWithin } from '@mikka/protocol/agent-policy'
+import { resolveRunOrigin } from './run-origin'
 import { LEASED_RUN_STATUSES, MAX_RUN_ATTEMPTS, retryPrompt } from './run-retry'
 
 type Run = typeof agentRuns.$inferSelect
@@ -31,7 +33,7 @@ class CloudPauseUnconfirmed extends Error {}
 export async function readmitLostLocalRun(original: Run, target: AdmittedTakeover, now: Date, queued = false, cloudSource?: CloudRecoverySource): Promise<{ retried: boolean; blocked?: string }> {
   const { rows: [stored] } = await pool.query<{ workspaceId: string | null }>(
     'SELECT "workspaceId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [original.id, original.userId])
-  return await withRunWorkspace(original.userId, stored?.workspaceId ?? null, async () => {
+  return await withRunWorkspace(original.userId, stored?.workspaceId ?? null, () => withProjectResourceLease(original.userId, stored!.workspaceId!, async () => {
   const tx = await pool.connect()
   try {
     await tx.query('BEGIN')
@@ -118,7 +120,7 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
         throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
       const definition = await rebindExecutionDevice(tx, run, target.deviceId)
       if (!definition) throw new ActionFailureError('executionAccountUnavailable')
-      const recovery = await (await import('./factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run.prompt, run.attempt + 1), tx)
+      const recovery = await (await import('./factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run, run.attempt + 1), tx)
       if (recovery.blocked) return { retried: false, blocked: recovery.blocked }
       const retryId = crypto.randomUUID()
       // The active-task admission gate must see A as terminal. Token revocation
@@ -127,8 +129,12 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
         [run.id, `The machine went offline; handed to another device as attempt ${run.attempt + 1} of ${MAX_RUN_ATTEMPTS}.`, now, JSON.stringify(serverRunFailure(run.id, now))])
       await revokeRunTokens(run.id)
       await acceptLocalRun({ id: retryId, userId: run.userId, issueId: run.issueId, botId: run.botId, source: run.source,
+        // A device-bound repository retry keeps the original entry; a legacy
+        // row keeps the host's automatic recovery as its origin, never 'web'.
+        ...resolveRunOrigin({ sourceRun: run, defaultOrigin: run.source === 'mcp' ? 'api' : 'automation' }),
         deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentId: target.agentId, prompt: recovery.prompt,
-        definition: retryWorkerDefinition(definition, recovery.prompt)!, continuation: true,
+        promptTaskStart: recovery.promptTaskStart, promptTaskLength: recovery.promptTaskLength,
+        definition: retryWorkerDefinition(definition, recovery.prompt)!, continuation: true, frozenSourceRunId: run.id,
         ...(admission.requestEventId ? { requestEventId: admission.requestEventId } : {}) }, tx)
       const { rows: [retry] } = await tx.query<Run>(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,cli_policy_hierarchy=$6 WHERE id=$1 RETURNING *`,
         [retryId, run.id, run.attempt + 1, run.kind, run.baseBranch, originalPolicy.hierarchy ?? null])
@@ -161,5 +167,5 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
       return { retried: false, blocked: `Recovery requires a currently authorized device, repository and unchanged execution resources (${error instanceof ActionFailureError ? error.params?.reason ?? error.code : error instanceof FactoryError ? error.code : 'executionAccountUnavailable'}). Select an available device and retry this task.` }
     throw error
   } finally { tx.release() }
-  }) ?? { retried: false, blocked: 'Recovery requires active membership in the original workspace.' }
+  })) ?? { retried: false, blocked: 'Recovery requires active membership in the original workspace.' }
 }

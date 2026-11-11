@@ -6,6 +6,7 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits, databaseCommitScope, captureDatabaseQuery } from '../db/commit-effects'
 import { documentLiveTargets, runLiveTargets, runChanged, threadLiveReferences } from './panels'
@@ -77,9 +78,13 @@ test('panel notifications follow actual committed writes and persisted owner/wor
     for (const [id, owner, kind] of [[personal, 'owner', 'personal'], [a, 'owner', 'team'], [b, 'owner', 'team'], [foreignPersonal, 'foreign', 'personal']]) {
       await databasePool.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
-    for (const [workspace, userId, status] of [[personal, 'owner', 'active'], [personal, 'peer', 'active'], [personal, 'foreign', 'active'], [a, 'owner', 'active'], [a, 'peer', 'active'], [a, 'suspended', 'suspended'], [b, 'owner', 'active'], [foreignPersonal, 'foreign', 'active']]) {
+    for (const [workspace, userId, status] of [[personal, 'owner', 'active'], [a, 'owner', 'active'], [a, 'peer', 'active'], [a, 'suspended', 'suspended'], [b, 'owner', 'active'], [foreignPersonal, 'foreign', 'active']]) {
       await databasePool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,\'member\',$3)', [workspace, userId, status])
     }
+    for (const userId of ['peer', 'foreign']) await assert.rejects(databasePool.query(
+      `INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member','active')`,
+      [personal, userId],
+    ), { code: '23514' }, 'a Personal workspace cannot admit another owner')
     const agentIds = new Map<string, string>()
     for (const owner of ['owner', 'foreign']) {
       const id = randomUUID(); agentIds.set(owner, id)
@@ -89,7 +94,10 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       const id = randomUUID()
       const workspaceId = workspace ?? (owner === 'foreign' ? foreignPersonal : personal)
       await databasePool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES ($1,$2,$3,'bound','Fixture','{"type":"doc","content":[]}','todo','normal',$4)`, [id, owner, workspaceId, workspace ? 'workspace' : 'personal'])
-      if (workspace) await databasePool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [id, randomUUID(), workspace, owner])
+      if (workspace) {
+        const grouping = await seedTeam(databasePool, workspace, owner)
+        await databasePool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [id, grouping.id, workspace, owner])
+      }
       return id
     }
     async function run(issueId: string | null, owner = 'owner', botId: string | null = null) {
@@ -126,7 +134,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
         { id: privateRun, workspaceId: personal }, { id: teamRun, workspaceId: a }, { id: taskFree, workspaceId: b }, { id: legacyTaskFree, workspaceId: null }, { id: foreignRun, workspaceId: null },
       ])
       assert.deepEqual(await runLiveTargets(databasePool, databasePool, legacyTaskFree, 'run'), [], 'an unresolved legacy run cannot gain a tenant from a later computer binding')
-      assert.deepEqual(await threadLiveReferences(databasePool, databasePool, [wrongPersonalRun], 'foreign'), [{ id: wrongPersonalRun, workspaceId: null }], 'accidental membership cannot authorize another account\'s personal run channel')
+      assert.deepEqual(await threadLiveReferences(databasePool, databasePool, [wrongPersonalRun], 'foreign'), [{ id: wrongPersonalRun, workspaceId: null }], 'another account cannot authorize a Personal run channel')
       assert.deepEqual(await runLiveTargets(databasePool, databasePool, wrongPersonalRun, 'run'), [])
       const child = await run(personalIssue)
       await assert.rejects(databasePool.query('UPDATE agent_runs SET "retryOf"=$2,"continuesRunId"=$3,"questionContinuation"=$4 WHERE id=$1', [child, privateRun, foreignRun, JSON.stringify({ originRunId: wrongIssueRun })]), { code: '23514' }, 'a new cross-owner or cross-workspace lineage is refused atomically')

@@ -20,6 +20,23 @@ Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额�
 向 Agent 批量注入所有 Secret。任何订阅凭证、设备身份、签名密钥或工作区数据均
 不得进入可复用模板。
 
+模板依赖安装使用同一 release 内新增的私有构建工作区，只选择 daemon、protocol、
+config 三个 worker 工作区；保留这些包的完整源码及生产、开发依赖。原始源码归档
+不改写，原 workspace 安装策略、overrides、patches 和锁定版本继续生效。派生根项目
+不带 Web 依赖，安装锁只投影所需 importer；包与 snapshot 记录不重新解析版本。
+正常 `--frozen-lockfile` 安装及获准的生命周期脚本仍须成功，再通过相对
+`node_modules` 链接供原 worker 构建入口和 CLI manifest 读取。工作区与链接均在
+该 release 内，整体 staging 发布移动后仍须可解析，并可供正常 worker 用户读取。
+
+这一区分来自 2026-11-09 的两次实际构建失败：
+[第一次](https://github.com/alexj11324/Mikka/actions/runs/42566225093/attempts/1)
+在根项目专用的 `ffmpeg-static` 二进制下载收到 HTTP 504，
+[第二次](https://github.com/alexj11324/Mikka/actions/runs/42566225093/attempts/2)
+则在 desktop 的同包 LICENSE 下载失败。该包原安装器仅凭二进制已存在就可提前
+返回成功，因此原地重试不能证明下载文件齐全。修复针对 worker 的安装集合，
+不通过禁用脚本、忽略缺文件或降低校验门槛放行。原失败与清理回执继续保留；
+隔离构建通过也不替代新模板的完整文件守恒、双真实订阅及生产五秒验收。
+
 ## 发布门槛
 
 `scripts/e2b/build-template.py` 使用 E2B 的 `Template.from_template` 在构建时执行
@@ -71,7 +88,7 @@ worker digest、CLI manifest 和实际选择。CI 从新建的无身份候选实
 的 Java trust store。[该阶段的收据](../research/2026-11-06-e2b-fresh-create-certificates.json)
 与 `scripts/e2b/e2b-certificate-relinks.json` 固定每一条原路径、原 SHA-256、精确
 链接目标、权限变化和适用模板；普通证书解析链接后的内容也必须保持原摘要。
-仅 Codex 已观测到的两条 E2B root 引用可指向本次 provider 注入的 root。
+该次控制仅在 Codex 观测到两条 E2B root 引用指向本次 provider 注入的 root。
 未列出的证书路径或目标也拒绝，不豁免整个证书目录。
 
 2026-11-07，主线候选的 fresh 检查拦下 Claude 的
@@ -90,6 +107,57 @@ Codex 已有的规则保持不变。
 原 CLI 和普通证书内容继续严格校验。此控制不代表全文件发布保全、真实订阅通过
 或生产时延达标；本次 Claude 控制模板和实例均已回收。
 
+2026-11-09 的[纯官方定点控制](https://github.com/alexj11324/Mikka/actions/runs/42628079564)
+又证明 Desktop 在 fresh 阶段将两个原普通文件重新链接：
+`/etc/ssl/certs/1560546e.0` 在 fresh 阶段的精确 symlink target 为 `e2b-ca.pem`，
+`/etc/ssl/certs/e2b-ca.pem` 在 fresh 阶段的精确 symlink target 为 `/usr/local/share/ca-certificates/e2b-ca.crt`。
+两条规则仅适用于 `desktop`，原文件 SHA-256 均须为
+`4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1`，
+解析终点必须是该精确根路径的普通文件，内容与同阶段 provider root 一致。
+本轮 mode 和 uid/gid 均未变化，不增加 mode 例外，不改变 Codex 规则；
+strict 安装阶段仍拒绝原文件转链接，仅显式 finalization 接受这两条受控变换。
+[原控制收据](../../operations/evidence/1506-official-desktop-certificate-relinks-20261109.json)
+及[范围说明](../../operations/evidence/1506-official-desktop-certificate-relinks-20261109.md)
+保留 Codex 的阴性结果；该定点控制不代表全量文件保全、真实订阅或发布通过。
+
+2026-11-09，实际主线 `8db16095f46be955df22f42914e0f89b6e5f3d11` 的
+[R7 42656120803/1](https://github.com/alexj11324/Mikka/actions/runs/42656120803)
+在 Claude fresh 检查被同两条 CA 引用的 file→link 转换拦下。原发布 owner 的
+[失败和精确清理回执](https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6745930838)
+记录两份原文件的 SHA-256 均为 `4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1`，
+fresh 的精确链接依次为 `e2b-ca.pem` 和 `/usr/local/share/ca-certificates/e2b-ca.crt`。
+三项本 run 候选均已删除，最终清理确认精确名字 absent、sandbox 和 errors 列表为空；
+真实双订阅和公开发布均未执行。这个失败不等于新运行时或五秒验收通过。
+
+后续独立官方 Claude 对照
+[42661569263/1](https://github.com/alexj11324/Mikka/actions/runs/42661569263)
+在没有安装 Mikka 产品、worker 或执行 CLI/模型的情况下复现了同一变化。
+固定观察源码为 `7fd8a2681cd71bb6603a485854c8beda2044911b`；
+`623a1afd8715433a58c3e88ce88f8fbcc29d1761` 仅是该控制所用 cleanup helper 的产品上下文，
+不是失败 R7 的源码，也不是官方 base 身份。观察程序只新增 `/opt/mikka` 下的诊断文件。
+四阶段 `before / pre_finalization / ready / fresh` 中，前三阶段两条 CA 引用都是
+上述 `4e04ce…` 普通文件，仅 fresh 变为上述精确链接；三节点全程 mode `0777`、
+uid/gid `0/0`。根证书保持普通文件，本轮 fresh 摘要是
+`0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4`，
+两条实际解析链的终点路径和摘要都与它一致。
+[控制来源、完整结构化观测、原件摘要和清理回执](../../operations/evidence/1782-official-claude-certificate-relinks-20261109.json)
+保留四阶段观测及本轮一个私有模板、一个 fresh sandbox 的精确清理回执。
+原 schema 没有采集官方 base 的 immutable ID、base build ID 或 envd version，
+这些字段保持 unknown，不能用诊断衍生 build ID 替代。
+
+因此仅为 `claude` 追加两条精确规则并同步摘要和控制来源，原 320 条规则保持。
+匹配算法不变：原摘要、原 file 类型、精确链接、mode/uid/gid 不变及精确
+provider root 普通文件终点均继续校验；provider 每次启动的实际 root 摘要
+可轮换，不要求它等于旧 `4e04ce…`。不增加 mode 例外；strict 安装阶段、
+官方 CLI、普通证书、其他路径和模板的拒绝条件保持。
+测试保留原用例和原失败证据，仅将已被新行为取代的 Claude 正确形状旧负例
+更新为 Claude 错误旧摘要负例，并增加针对该规则的正例和拒绝回归。
+本 PR 的本地回归为 34/34、0 skip；完整红绿原件固定于
+[800eff40 的候选证据](https://github.com/alexj11324/Mikka/tree/800eff40eeead9c78fb83cd2260adc0cf40fbd4f/claude-ca-relink-candidate-20261109)。
+导入的控制发布者范围说明保留其独立的 33 项回归结果，不混作本 PR 的测试计数。
+这个三路径定点控制不代表全量文件保全或发布通过；完整保全、真实双订阅及
+同一生产元组六次 ≤5000ms 仍须由后续实际发布和正常 Task 验收完成。
+
 构建记录轻量 CLI manifest，包含构建前官方 CLI 的真实路径和摘要；官方原本缺少
 某个 harness 时，才记录 `/opt/mikka` 内补装的位置。每个 worker release 保存
 自己的 `.mikka-original-cli.json`，与 worker symlink 一起切换和回退。生产 worker、
@@ -99,6 +167,10 @@ HOME 或 session；新 manifest 完整后才标记 worker ready。
 
 CI 还必须在候选模板上用真实订阅分别完成 Claude Code (`claude-haiku-5-5`) 和
 Codex (`gpt-6-luna`) 的一次执行，使用正常的设备注册、任务绑定与订阅授权。
+每条路径至少完成一次独立于 handoff 的成功工具执行，并在工具完成后给出正确回复；
+`submit` 等 handoff 只证明交付，submit-only 不算执行证明。
+Codex 原生 `bash` 必须 `exitCode === 0`，`apply_patch` 必须 `status === 'completed'` 才计成功；
+Codex MCP 的 `status === 'failed'` 即使 `error` 为空也保留为工具错误，显式 `error` 同样如此。
 只探测 CLI 版本、模型列表或启动进程不足以通过验收。两个结果和文件保全收据
 都必须绑定同一候选模板、source commit 和 worker digest。没有完整收据就不能
 公开候选模板或更新生产模板 ID。
@@ -900,3 +972,108 @@ main759五条publisher及主CI均已终态；Desktop42470724706最后因匹配We
 本次只追加真实主线整合与门槛状态；官方文件只增不删、原校验和、真实双订阅/sidecar采用、39 stages/14次实际版本检查/原完整公式与5000ms阈值均不变。公开进度见 [PR1689完整f94回执](https://github.com/alexj11324/Mikka/pull/1689#issuecomment-6721326928) 和 [同child维护回执](https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6721380079)。
 
 独立整合复核已闭合（manifest43401fffb3f3cee5eb25be202846cdeba9d0e67a2721283031b8926c8b18f612；固定27f验证9638eb77e5c7f735d30a0584dc5606e49f68a59259b1ba366933e9a3e977a018）：470个原始输入对象中469个逐字相同，唯一变动是package.json的test:mobile脚本；正式worker投影排除此脚本，因此指纹9da相同。这里不把原始blob相同与投影相同混为一谈，也不把静态整合证明称为新CI或运行时通过。
+
+### 2026-11-09：Codex 根证书权限的官方定点对照
+
+在同一个 #1505 修复 PR 中继续保留“只许加、不许删或覆盖官方文件”的决定。
+主线 `5ba1f9e2359ce714d83cd16fc040f2567c40a6d0` 的 R7
+`42661874195/A1` 报告 Codex 根证书权限与 Desktop APT 备份摘要变化；
+两者分别归因，不能将已证的 Claude 重链接行为扩展到其他路径。
+
+新的 [官方定点对照 42670291715/A1](https://github.com/alexj11324/Mikka/actions/runs/42670291715)
+仅从官方 codex/desktop 模板在 `/opt/mikka` 添加观察器，不安装 Mikka、
+执行 CLI/模型、修改官方文件或 APT/timer，也不追加全盘扫描或等待。
+Ops `b75871ea1753f75769daa33b095704475cf9a4a2` 的有序父为固定产品源
+`5ba1f9e2359ce714d83cd16fc040f2567c40a6d0` 与已关闭载体
+`b52445d24978dc46235b0744783eb7ebb3c3e397`，产品树仅增加三个普通文件。
+完整原件、安全投影及边界见
+[对照说明](../../operations/evidence/1505-official-path-control-20261109.md)
+和[可重建 JSON](../../operations/evidence/1505-official-path-control-20261109.json)。
+
+Codex `/usr/local/share/ca-certificates/e2b-ca.crt` 在 before/pre_finalization
+均为普通文件、uid/gid=0、0644；ready 时变为0777而摘要仍相同，fresh
+时保持0777、证书摘要随后变化。这提供了不含 Mikka 安装的正向证据，
+仅支持 Codex 该普通文件的精确 `0644→0777` finalization 转换。
+策略继续使用现有 matcher，保留原每次启动 CA 摘要语义、同一路径、
+同一类型、未变所有者及 SHA256 格式校验，原有证书重链接目标校验不变；其他权限对、路径和类型
+仍须拒绝。安装之后的 strict 检查与官方 CLI 原始摘要门槛不变。
+
+Desktop 的 active/backup APT 节点在四阶段的摘要、大小、权限、所有者、
+inode、device、mtime/ctime 全部相同，四个 APT unit 的已采属性也未变。
+本次没有复现 Desktop 问题，因此不增加该路径例外。未采 cron 或写者
+PID，不能从四个 unit 的静止状态证明所有后台写入均已排除。此前失败
+仍保留；若正式构建再次出现该变化，须按当轮首次变化阶段定位写入者。
+阴性对照和未激活的备用诊断不构成额外发布门槛，也不阻止完整 R7 通过后继续验收。
+
+本对照未采 immutable 官方 base/build ID 或 envd 版本，私有输出 build
+不能代替它们；控制的四个阶段名也不等于其他 R7 的失败阶段。两个私有
+模板和两个实例均有 exact-ID 不存在的清理收据、errors=[]。入口正常
+FF 关闭至 `376298951e4eee5970e2f0d00e21acb3ffba4e18`，关闭运行
+`42670790551` SKIPPED。首轮 `42668993157` 的离线 guard 断言失败
+及其 SDK/OIDC/观察全跳过事实一并保留；后来的成功不覆盖历史失败。
+
+这些定点证据不替代三个官方模板的完整文件与 CLI 保全、两个真实订阅
+CI 发布门槛，也不替代同一 APP/DPL/runtime/worker/template 元组下
+Claude×3、Codex×3 的生产普通任务、工具与后续回复验收。#1505 仍须
+六次完整 dispatch→agent 时间各不超过5000ms，目标2000–3000ms。
+
+### 2026-11-09：发布端执行同一文件类型合同
+
+构建端的 `official-files.py` 为每条 provider 变化无条件记录外层 `kind`，
+并按策略 `_kind` 校验原节点类型；`before/after` 只包含发生变化的字段。
+发布端 `assertConservation` 必须执行同一约束：策略声明 `_kind` 时，
+外层 `change.kind` 必须精确相等，缺失、null 或错误类型均拒绝。当前
+这两条声明仅为 Claude `/usr/local/share/e2b` 的 directory 与 Codex
+根证书路径的 file。此校验不要求未变化的字段重复出现在差异中，合法的
+mode-only、mode+SHA、SHA-only 回执继续使用原合同。
+
+Codex 根证书的 `0644→0777` 已由上述官方对照支持，因此发布器旧测试
+不再将它作为非法转换；负例改用未经许可的 `0644→0755`，并覆盖真实
+对照的权限和摘要转换，以及类型缺失、错误权限、所有者和路径变化。
+这次补齐消费端既有类型约束，不修改 Python matcher 或扩大策略允许集合，
+也不替代 strict 安装前后摘要、官方 CLI、真实订阅和生产时延门槛。
+
+### 2026-11-09：Codex 0.167.0 的匿名初始化版本拒绝
+
+[R7 42690423873/A1 的订阅检查](https://github.com/alexj11324/Mikka/actions/runs/42690423873/job/129425290133)
+绑定产品源 `7848e79df9c5af67e526aeed1c828858db392066`、worker
+`aa7efbbe2969d8b1578bdba093e6400a26749e07`。Claude 的真实订阅及
+bootstrap adoption 完整通过；Codex 的共享订阅执行、真实工具、工具后
+回复及 runtime evidence 通过，但 `template_gate_bootstrap_adoption_missing`
+使发布失败。Codex 的启动回执为1548.509ms，其中正常 `cli_init`
+为88.531ms，准备回执为 unavailable/null；这不是完整 dispatch→agent
+时间，也不能据此报告五秒验收通过。
+
+该轮候选记录的官方 CLI 是 `0.167.0`，原始二进制摘要为
+`e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af`。
+失败原件 `subscription-diagnostics.json` 保持6384B，SHA256为
+`ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e`。
+原件没有匿名 `initialize` 响应或拒绝原因，不能补造一条已观测的异常。
+源码中的 `startAnonymousCodex.prepare()` 只接受 `0.166.0`，因此正常的
+`0.167.0` user agent 会在发送 `initialized` 前被拒绝。候选随后关闭，
+适配器走原冷启动路径，只有成功采用候选才公开的准备回执保持缺失。
+
+版本扩展依据官方固定提交 `6ff1e1ca3b30fc8b914720681fcf5fe62e95f856`
+（0.166.0）与 `086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a`
+（0.167.0）的定点源码对照：
+[user agent 生成](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/login/src/auth/default_client.rs)
+仍使用官方包版本；`initialize` 的请求与响应合同不变，
+[新增的 requiredHumanApproval](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server-protocol/src/protocol/v1.rs)
+为默认 false 的选择项。两版 `ThreadStartParams`、
+[线程启动处理](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server/src/request_processors/thread_processor.rs)
+的相关完整函数，以及配置合并实现逐字相同。
+
+本修复只明确允许 `0.166.0` 和 `0.167.0` 的匿名初始化，其他版本继续
+拒绝；不降级或覆盖官方 CLI。既有 hint profile 保持原 wire 标识，
+无凭据的匿名握手、fresh claim 身份与环境比对、一次性采用、撤销及
+一 Task 一 VM 边界不变，不给普通 Task 增加字段或轮询。
+固定 `12458fe22e1217f644e8b28f82ab856211e73b72` 基线的合成 IPC
+回归先证明旧保护恰好拒绝3个0.167.0正例，其余29例通过；修复后，
+候选、hosted adapter 与配置保护三套60例全部通过、无跳过。它们使用
+无生产凭据的非 root Linux/Node24.22.1，不执行真实模型，也不证明
+0.167.0 的生产采用或整套上游功能兼容。
+
+官方文件只增不删、原校验和、两条真实订阅及实际 bootstrap adoption
+发布门槛保持原样。后继仍须自己的完整 CI 和正式发布，再以同一实际
+APP/DPL/runtime/worker/template 元组完成 Claude×3、Codex×3 的普通
+生产任务；六次完整 dispatch→agent 各不超过5000ms 后才关闭 #1505。

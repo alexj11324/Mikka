@@ -27,8 +27,8 @@
 | **Bot** | Lives in one workspace and has one owner. Runs on Mikka's own AI SDK on Vercel; when it has work to do, it sends a thread through the daemon to Claude Code or Codex (R-05). |
 | **Thread** | The work a bot dispatched (`agent_runs`). Each turn of it is a **run**. |
 | **Agent** | The coding worker that runs a thread: Claude Code or Codex. Code may say `harness`; the UI says Agent (R-43). |
-| **Model credential** | A Claude or ChatGPT/Codex subscription login, an API key, or a custom provider. Bound to the account and managed on the page 「模型与订阅」 ([1400](decisions/2026-11-02-1400-model-order-dispatch.md)). |
-| **Share** | 「分享给团队成员」: a member's opt-in, in one team workspace, to let other members' bots use one of their credentials. Off by default. The owner's own bots need no share ([2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). |
+| **Model credential** | A personal Claude Code/Codex subscription, a personal API key, or an Organization API key/gateway/custom endpoint. Subscription credentials remain account-owned. Model and credential are frozen at admission. |
+| **Share** | An explicit resource ACL for content. It grants no model, device, personal memory, Secret or payment authority. Personal API key grants remain separate; personal subscriptions cannot enter a member pool ([0017](decisions/2026-11-10-0017-collaboration-governance.md)). |
 | **Mikka 默认** | The hosted model, paid from the workspace's credits. It is a **model**, never a machine. |
 | **Machine (电脑)** | Where an Agent runs: **Mikka Cloud** (a sandbox on the run owner's own E2B key) or a **device** (a personal computer running the desktop app, or a server running the daemon). Both are **runners** with one contract (§3). |
 | **Mikka Cloud** | The cloud machine. It is a **machine**, never a model. Mikka hosts no sandbox of its own. |
@@ -357,6 +357,17 @@ credentials, prompts and native session contents are excluded. The separate
 anonymous warm pool and its retention remain independent of task ownership.
 
 ## 6. Credentials lifecycle
+
+[Issue #1849](https://github.com/alexj11324/Mikka/issues/1849) and
+[decision 0017](decisions/2026-11-10-0017-collaboration-governance.md) amend the
+sharing rules. A shared Thread retains its Owner and records each message's
+actual Actor. A collaborator cannot borrow an Owner's personal subscription or
+local device. Any allowed owner-funded cloud turn requires a separate, bounded,
+revocable authorization; the Run freezes the Actor, Thread Owner, executor,
+credential owner, model payer and compute payer. The admission and renewal
+paths revalidate that authority without adding a proxy before native model or
+tool calls. The implementation and acceptance status is tracked per PR in
+[collaboration governance](collaboration-governance.md).
 
 This section follows Alex's [#1505 decision of 2026-11-06](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md).
 One task, one VM is the cloud execution boundary. The former placeholder,

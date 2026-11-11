@@ -6,12 +6,14 @@ import { pool, withDatabaseClient } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
 import { auditDigest } from '@/lib/audit/integrity'
-import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
+import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeProjectRetention, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
 import type { AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountConnections } from './external-cleanup'
 import { AccountDeletionBusy, AccountDeletionLockLost, acquireAccountDeletionLock } from './deletion-lock'
 import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
 import { armDueTimerSoon } from '@/lib/due-timer'
+import { GovernanceError } from '@/lib/governance/errors'
+import { lockAccountOrganizationOwnership } from '@/lib/governance/organization-ownership'
 
 export type DeletionStage = 'preparing' | 'requested' | 'external_pending' | 'main_deleted' | 'workspace_deleted' | 'storage_pending' | 'completed' | 'cancelled'
 export interface AccountDeletionJob {
@@ -77,7 +79,8 @@ export async function requestAccountDeletion(userId: string, email: string, requ
     assertHeld()
     if (job.stage === 'preparing') {
       const refused = await prepare(job, options, assertHeld)
-      if (refused) return { ok: false, soleAdminOf: refused }
+      if (refused && 'lastOrganizationOwner' in refused) throw new GovernanceError('last_owner')
+      if (refused) return { ok: false, soleAdminOf: refused.soleAdminOf }
     }
   } catch (error) { return await rethrow(error) } finally { await close() }
   // The deletion itself runs on the account-deletions due timer, now (#1371).
@@ -85,34 +88,53 @@ export async function requestAccountDeletion(userId: string, email: string, requ
   return { ok: true, id }
 }
 
-async function prepare(job: AccountDeletionJob, options: AccountDeletionOptions, assertHeld: () => void): Promise<string[] | null> {
+type PreparationRefusal = { soleAdminOf: string[] } | { lastOrganizationOwner: true }
+const lastOrganizationOwner = (error: unknown): error is GovernanceError =>
+  error instanceof GovernanceError && error.detail === 'last_owner'
+
+async function clearWorkspaceGuards(client: PoolClient, job: AccountDeletionJob) {
+  await client.query('DELETE FROM account_deletion_workspace_guards WHERE "jobId"=$1', [job.id])
+  await client.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2', [job.subjectUserId, job.id])
+}
+async function cancelUnstartedMain(job: AccountDeletionJob, main: Pool, assertHeld: () => void, reason: 'sole_workspace_admin' | 'last_owner') {
+  await transaction(main, async client => {
+    assertHeld()
+    await client.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2', [job.subjectUserId, job.id])
+    await client.query(`UPDATE account_deletion_jobs SET stage='cancelled',"blockedReasons"=$2,"updatedAt"=now() WHERE id=$1`, [job.id, JSON.stringify([reason])])
+    assertHeld()
+  })
+}
+
+async function prepare(job: AccountDeletionJob, options: AccountDeletionOptions, assertHeld: () => void): Promise<PreparationRefusal | null> {
   const { main, workspace } = targets(options)
   assertHeld()
   const plan = await transaction(workspace, async client => {
     assertHeld()
+    // This canonical guard and the Organization owner check commit together.
+    // A refused request removes its guard while still holding the Org row.
     await guard(client, job.subjectUserId, job.id, job.requestedAt)
-    const planned = await planWorkspaces(drizzle(client), job.subjectUserId)
-    if ('soleAdminOf' in planned) {
-      await client.query('DELETE FROM account_deletion_workspace_guards WHERE "jobId"=$1', [job.id])
-      await client.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2', [job.subjectUserId, job.id])
+    let planned: Plan | PreparationRefusal = await planWorkspaces(drizzle(client), job.subjectUserId)
+    if (!('soleAdminOf' in planned)) {
+      try { await lockAccountOrganizationOwnership(drizzle(client), job.subjectUserId) }
+      catch (error) {
+        if (!lastOrganizationOwner(error)) throw error
+        planned = { lastOrganizationOwner: true }
+      }
     }
-    if (!('soleAdminOf' in planned) && planned.solo.length) {
+    if ('soleAdminOf' in planned || 'lastOrganizationOwner' in planned) {
+      await clearWorkspaceGuards(client, job)
+    } else if (planned.solo.length) {
       await client.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") SELECT unnest($1::uuid[]),$2 ON CONFLICT DO NOTHING', [planned.solo, job.id])
     }
     assertHeld()
     return planned
   })
   assertHeld()
-  if ('soleAdminOf' in plan) {
-    await transaction(main, async client => {
-      assertHeld()
-      await client.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2', [job.subjectUserId, job.id])
-      await client.query('UPDATE account_deletion_jobs SET stage=\'cancelled\',"blockedReasons"=\'["sole_workspace_admin"]\',"updatedAt"=now() WHERE id=$1', [job.id])
-      assertHeld()
-    })
-    return plan.soleAdminOf
+  if ('soleAdminOf' in plan || 'lastOrganizationOwner' in plan) {
+    await cancelUnstartedMain(job, main, assertHeld, 'lastOrganizationOwner' in plan ? 'last_owner' : 'sole_workspace_admin')
+    return plan
   }
-  await main.query('UPDATE account_deletion_jobs SET plan=$2,stage=\'requested\',"updatedAt"=now() WHERE id=$1 AND stage=\'preparing\'', [job.id, JSON.stringify(plan)])
+  await main.query(`UPDATE account_deletion_jobs SET plan=$2,stage='requested',"updatedAt"=now() WHERE id=$1 AND stage='preparing'`, [job.id, JSON.stringify(plan)])
   return null
 }
 
@@ -128,6 +150,21 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
     if (job.stage === 'preparing') { await prepare(job, options, assertHeld); job = await load(lease, id) }
     if (job.stage === 'cancelled') return job
     if (job.stage === 'requested' || job.stage === 'external_pending') {
+      try {
+        await transaction(workspace, async client => {
+          assertHeld()
+          await guard(client, job.subjectUserId, id, job.requestedAt)
+          await lockAccountOrganizationOwnership(drizzle(client), job.subjectUserId)
+          assertHeld()
+        })
+      } catch (error) {
+        if (!lastOrganizationOwner(error) || job.stage !== 'requested' || options.replayPlan) throw error
+        // No irreversible step has started. Keep the remaining owner usable,
+        // including when two owners requested deletion concurrently.
+        await transaction(workspace, client => clearWorkspaceGuards(client, job))
+        await cancelUnstartedMain(job, main, assertHeld, 'last_owner')
+        return await load(lease, id)
+      }
       await lease.query('UPDATE account_deletion_jobs SET stage=\'external_pending\',"updatedAt"=now() WHERE id=$1', [id])
       let report: AccountCleanupReport
       try {
@@ -147,6 +184,7 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       const frozen = await transaction(workspace, async client => {
         assertHeld()
         const plan = options.replayPlan ?? await planWorkspaces(drizzle(client), job.subjectUserId)
+        await lockAccountOrganizationOwnership(drizzle(client), job.subjectUserId)
         if (!('soleAdminOf' in plan) && plan.solo.length) await client.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") SELECT unnest($1::uuid[]),$2 ON CONFLICT DO NOTHING', [plan.solo, id])
         assertHeld()
         return plan
@@ -169,11 +207,15 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
         assertHeld()
         const checked = await planWorkspaces(drizzle(workspaceClient), job.subjectUserId)
         if (!options.replayPlan && ('soleAdminOf' in checked || auditDigest(checked) !== auditDigest(frozen))) throw new Error('accountDeletionWorkspaceChanged')
+        const projectRetained = await freezeProjectRetention(drizzle(workspaceClient), job.subjectUserId, frozen)
+        // Existing order is Workspace -> Organization -> APP. Keep the Org
+        // ownership decision locked until the APP deletion has committed.
+        await lockAccountOrganizationOwnership(drizzle(workspaceClient), job.subjectUserId)
         // Include objects written before the request's write barrier, and durable old-avatar references.
         assertHeld()
         const retained = await transaction(main, async client => {
           assertHeld()
-          const retained = await freezeTaskRetention(client, job.subjectUserId, frozen)
+          const retained = await freezeTaskRetention(client, job.subjectUserId, projectRetained)
           const objects = await accountStorageKeys(client, job.subjectUserId, retained)
           const notBefore = !options.deleteObject && artifactStorage() === 'inline' ? (options.now?.() ?? new Date()) : objects.notBefore
           assertHeld()
@@ -193,13 +235,15 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
     }
     if (job.stage === 'main_deleted') {
       assertHeld()
-      await transaction(workspace, async client => {
+      const retained = await transaction(workspace, async client => {
         assertHeld()
         await guard(client, job.subjectUserId, id, job.requestedAt)
-        await deleteWorkspaceData(drizzle(client), job.subjectUserId, job.subjectEmailHash, job.plan!)
+        const retained = await freezeProjectRetention(drizzle(client), job.subjectUserId, job.plan!)
+        await deleteWorkspaceData(drizzle(client), job.subjectUserId, job.subjectEmailHash, retained)
         assertHeld()
+        return retained
       })
-      await lease.query('UPDATE account_deletion_jobs SET stage=\'workspace_deleted\',"updatedAt"=now() WHERE id=$1', [id])
+      await lease.query('UPDATE account_deletion_jobs SET stage=\'workspace_deleted\',plan=$2,"updatedAt"=now() WHERE id=$1', [id, JSON.stringify(retained)])
       job = await load(lease, id)
     }
     if (job.stage === 'workspace_deleted' || job.stage === 'storage_pending') {
@@ -222,7 +266,16 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       await lease.query('UPDATE account_deletion_jobs SET stage=\'completed\',"completedAt"=now(),"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1', [id])
     }
     return await load(lease, id)
-  } catch (error) { return await rethrow(error) } finally { await close() }
+  } catch (error) {
+    if (lastOrganizationOwner(error)) {
+      assertHeld()
+      // An irreversible stage may already have run: keep its receipt/guards
+      // retryable, and do not describe it as an undone cancellation.
+      await lease.query(`UPDATE account_deletion_jobs SET "blockedReasons"='["last_owner"]',"updatedAt"=now() WHERE id=$1`, [id])
+      return await load(lease, id)
+    }
+    return await rethrow(error)
+  } finally { await close() }
 }
 
 /** Cancellation is possible only before any external or irreversible step starts. */
@@ -278,6 +331,8 @@ export async function applyAccountDeletionManifest(manifest: AccountDeletionMani
       // Preserve that frozen decision without expanding the source solo deletion set.
       const retained: Plan = { ...source.plan!, keptIssueIds: [...new Set([
         ...source.plan!.keptIssueIds, ...(existing?.plan?.keptIssueIds ?? []),
+      ])].sort(), keptProjectIds: [...new Set([
+        ...(source.plan!.keptProjectIds ?? []), ...(existing?.plan?.keptProjectIds ?? []),
       ])].sort() }
       await guard(client, source.subjectUserId, source.id, new Date(source.requestedAt))
       // A retry must preserve the pending object list after its DB pointers have already gone.

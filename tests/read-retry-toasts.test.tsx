@@ -75,6 +75,8 @@ stub('components/nav/conversation-pill.tsx', { ConversationPill: Empty })
 stub('components/nav/group-avatar.tsx', { GroupAvatar: Empty, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) })
 stub('components/nav/letter-avatar.tsx', { LetterAvatar: Empty })
 stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Empty })
+// The task page's layer frame (docs/ui-overlay.md task-detail); this test reads through the open-source layout.
+stub('components/workspace/task-detail-frame.tsx', { FramedTask: Empty })
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
 const Workspace = () => <main data-fixture-workspace="">Retained workspace</main>
@@ -96,7 +98,7 @@ stub('components/workspace/workspace-loading.tsx', { WorkspaceLoading: Empty })
 stub('components/workspace/create-workspace-form.tsx', { CreateWorkspaceForm: Empty })
 stub('components/workspace/invitation-card.tsx', { InvitationCard: Empty })
 stub('components/device-authorization.tsx', { DeviceAuthorization: Empty })
-mock.module(at('app/[locale]/not-found.tsx'), { defaultExport: Empty })
+mock.module(at('components/app-shell/not-found.tsx'), { defaultExport: Empty })
 
 const browser = new Window({ url: 'https://fixture.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']

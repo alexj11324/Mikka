@@ -130,7 +130,7 @@ test.beforeAll(async () => {
     await workspacePool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Synthetic search\',\'team\')', [id, user])
     await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'admin\',\'active\')', [id, user, `${user}@example.invalid`])
   }
-  await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,\'Synthetic search\',$4,$5)', [randomUUID(), owner, workspace, scopedToken.tokenHash, scopedToken.hint])
+  await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,\'Synthetic search\',$4,$5,ARRAY[\'legacy:full\']::text[])', [randomUUID(), owner, workspace, scopedToken.tokenHash, scopedToken.hint])
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1999-01-01T00:00:00Z\')', [archivedId, owner, `${prefix}-archive-locator`])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'synthetic archived question\',$4,\'complete\',$5)', [randomUUID(), archivedId, owner, archivedCompletion, randomUUID()])
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1998-01-01T00:00:00Z\')', [emptyArchiveId, owner, `${prefix}-empty-archive`])
@@ -141,7 +141,8 @@ test.beforeAll(async () => {
   await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$3,$4,$5,\'todo\',\'normal\',\'workspace\')', [boundary.issue, owner, workspace, `${prefix}-thread-boundary`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 133 } } })])
   await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [boundary.issue, boundaryTeam, workspace, owner])
   await pool.query('insert into agents (id,"userId",harness,name,instructions) values ($1,$2,\'codex\',\'BOUNDARY_PRIVATE_AGENT\',\'BOUNDARY_PRIVATE_INSTRUCTIONS\')', [boundary.agent, outsider])
-  await pool.query('insert into agent_runs (id,"userId","issueId","agentId",status,prompt,report,"workspaceId") values ($1,$2,$3,$4,\'running\',\'BOUNDARY_PRIVATE_PROMPT\',$5,$6)', [boundary.run, outsider, boundary.issue, boundary.agent, JSON.stringify({ summary: 'BOUNDARY_PRIVATE_REPORT' }), workspace])
+  await pool.query(`insert into agent_runs (id,"userId","issueId","agentId",status,prompt,"promptTaskStart","promptTaskLength",report,"workspaceId")
+    values ($1,$2,$3,$4,'running','BOUNDARY_PRIVATE_PROMPT',0,char_length('BOUNDARY_PRIVATE_PROMPT'),$5,$6)`, [boundary.run, outsider, boundary.issue, boundary.agent, JSON.stringify({ summary: 'BOUNDARY_PRIVATE_REPORT' }), workspace])
   await pool.query('insert into run_chunks (id,"runId",seq,chunk) values ($1,$2,1,$3)', [randomUUID(), boundary.run, JSON.stringify({ type: 'text-delta', delta: 'BOUNDARY_PRIVATE_CHUNK' })])
   await pool.query('insert into agent_sessions (id,"userId",title) values ($1,$2,$3)', [boundary.history, outsider, `${prefix}-thread-boundary`])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'private archive question\',\'BOUNDARY_PRIVATE_ARCHIVE\',\'complete\',$4)', [randomUUID(), boundary.history, outsider, randomUUID()])

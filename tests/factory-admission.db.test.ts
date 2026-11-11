@@ -38,12 +38,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const coordinator = await isolateCoordinatorWakes(t)
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { withTaskWorkspace } = await import('../lib/task-workspace')
+  const { withProjectResourceLease } = await import('../lib/project-resources/store')
   const { readOrder } = await import('../lib/model-order')
   const { queueRun, queueFactoryRun } = await import('../lib/agent-runs')
   const { acceptedEventStillMatches } = await import('../lib/run-admission-store')
-  const { lockCliAgentPolicy, readCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-store')
-  const { setCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-settings')
+  const { lockCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-store')
   const { factoryStore, dispatchFactoryRun, factoryQuestions } = await import('../lib/factory/server')
   const { factoryBinding } = await import('../lib/factory/dispatch')
   const { beginFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../lib/factory/transaction')
@@ -53,15 +52,20 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const { previewPersonalScope, changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const fixtures: Fixture[] = []
 
-  async function transaction<T>(work: (tx: PoolClient) => Promise<T>) {
+  async function transaction<T>(f: Fixture, work: (tx: PoolClient) => Promise<T>) {
+    return withProjectResourceLease(f.userId, f.workspaceId, async () => {
     const tx = await pool.connect()
     try { await tx.query('BEGIN'); const value = await work(tx); await tx.query('COMMIT'); return value }
     catch (error) { await tx.query('ROLLBACK'); throw error }
     finally { tx.release() }
+    })
   }
+  // The workspace is the only policy source (per-Bot and per-worker layers are
+  // retired), so the fixture writes the workspace row directly.
   async function policy(f: Fixture, permission: 'allow' | 'ask' | 'deny') {
-    const current = await readCliAgentPolicy(pool, f.userId, f.agentId, null)
-    await setCliAgentPolicy(pool, f.userId, f.agentId, null, 'agent', current.revision, { permissions: { git_push: permission } })
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy)
+      VALUES ($1,'allow',jsonb_build_object('permissions',jsonb_build_object('git_push',$2::text)))
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [f.workspaceId, permission])
   }
   async function addEvent(f: Pick<Fixture, 'userId' | 'issueId' | 'deviceId'>, options: { destination?: unknown; bound?: boolean; delivered?: boolean; botId?: string } = {}) {
     const id = randomUUID()
@@ -150,7 +154,8 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal(run.agentDefinition.repositoryAdmission.remoteKey, f.remoteKey)
       assert.equal(run.dispatchKey, `factory:${f.task.attemptId}`)
       assert.equal(publication.scopeVersion, 1)
-      assert.equal(publication.branch, 'mikka/fadm-1')
+      assert.equal(publication.identifier, (await pool.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [f.issueId])).rows[0].issuedIdentifier)
+      assert.equal(publication.branch, `mikka/${publication.identifier.toLowerCase()}`)
       assert.equal((await pool.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [f.task.attemptId])).rows[0].runId, admitted.runId)
       const before = await rowsFor(f)
       assert.equal((await dispatch(f)).runId, admitted.runId)
@@ -159,7 +164,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'no approval card')
     })
 
-    async function lostAdmission(options: { destination?: 'selected'; revoke?: boolean; legacyEpoch?: boolean; workerPolicy?: unknown } = {}) {
+    async function lostAdmission(options: { destination?: 'selected'; revoke?: boolean; legacyEpoch?: boolean; policyCeiling?: unknown } = {}) {
       const f = await fixture(options)
       const admitted = await dispatch(f)
       const deviceB = randomUUID(), agentB = randomUUID()
@@ -173,9 +178,11 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const before = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
       if (options.revoke) await pool.query(`UPDATE byos_connections SET paused=true WHERE "ownerId"=$1`, [f.userId])
       if (options.legacyEpoch) await pool.query(`UPDATE factory_attempts SET output=output-'requestEpoch' WHERE id=$1`, [f.task.attemptId])
-      if (options.workerPolicy) {
-        const current = await readCliAgentPolicy(pool, f.userId, f.agentId, null)
-        await setCliAgentPolicy(pool, f.userId, f.agentId, null, 'worker', current.revision, options.workerPolicy)
+      if (options.policyCeiling) {
+        // A frozen ceiling (provider fallback / Factory check) is the one
+        // stricter-than-live policy that survives the workspace-only model.
+        await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{policyCeiling}',$2::jsonb) WHERE id=$1`,
+          [admitted.runId, JSON.stringify(options.policyCeiling)])
       }
       return { f, admitted, deviceB, agentB, now, before }
     }
@@ -299,13 +306,16 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0].status, 'blocked')
     })
 
+    // RunPolicy shape: every permission filled in, plus the workspace allow-list.
+    const livePermissions = { install_dependency: 'allow' as const, write_outside_repo: 'ask' as const, git_push: 'allow' as const, network: 'allow' as const, computer_use: 'ask' as const }
+    const liveNetwork = ['github.com', '*.github.com', '*.githubusercontent.com']
     for (const options of [
       { label: 'owner pinned A', destination: 'selected' as const },
       { label: 'the frozen model grant was revoked', revoke: true },
       { label: 'a legacy attempt has no epoch', legacyEpoch: true },
-      { label: 'B would drop an A worker deny', workerPolicy: { permissions: { install_dependency: 'deny' } } },
-      { label: 'B would drop A read-only mode', workerPolicy: { approvalMode: 'read_only' } },
-      { label: 'B would widen A network ceiling', workerPolicy: { networkAllow: ['allowed.example.com'] } },
+      { label: 'the original run had a frozen action deny', policyCeiling: { permissions: { ...livePermissions, install_dependency: 'deny' }, networkAllow: liveNetwork } },
+      { label: 'the original run was frozen read-only', policyCeiling: { permissions: livePermissions, networkAllow: liveNetwork, readOnly: true } },
+      { label: 'the original run had a frozen network ceiling', policyCeiling: { permissions: livePermissions, networkAllow: liveNetwork, networkCeiling: ['allowed.example.com'] } },
     ]) await t.test(`admitted recovery blocks without replaying offline A when ${options.label}`, async () => {
       const { f, admitted, now } = await lostAdmission(options)
       await reclaim(f.userId, now)
@@ -353,7 +363,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const before = await rowsFor(f)
       let runId: string | undefined
       // The caller owns both leases: Workspace first, then its APP transaction.
-      await withTaskWorkspace(f.userId, f.workspaceId, async () => {
+      await withProjectResourceLease(f.userId, f.workspaceId, async () => {
         const tx = await pool.connect()
         try {
           await beginFactoryTransaction(tx)
@@ -420,7 +430,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       // each supplied promise now, as nested after callbacks may do in production.
       globals[contextKey] = { get: () => ({ waitUntil: (promise: Promise<unknown>) => pending.push(promise) }) }
       try {
-        await withTaskWorkspace(f.userId, f.workspaceId, async () => {
+        await withProjectResourceLease(f.userId, f.workspaceId, async () => {
           const tx = await pool.connect()
           try {
             await beginFactoryTransaction(tx)
@@ -469,8 +479,8 @@ test('real Factory admission preserves host scope, policy and transaction owners
         assert.deepEqual(await rowsFor(f), before)
       }
       const f = await fixture()
-      await assert.rejects(transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f), null, { sourceEventId: f.eventId, attemptId: randomUUID() })), /runInvalid/)
-      await assert.rejects(transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f))), /runInvalid/, 'the host must supply exactly one existing Factory or Skill origin')
+      await assert.rejects(transaction(f, tx => queueFactoryRun(tx, f.userId, internalInput(f), null, { sourceEventId: f.eventId, attemptId: randomUUID() })), /runInvalid/)
+      await assert.rejects(transaction(f, tx => queueFactoryRun(tx, f.userId, internalInput(f))), /runInvalid/, 'the host must supply exactly one existing Factory or Skill origin')
       assert.equal((await rowsFor(f)).runs, 0)
     })
 
@@ -583,14 +593,14 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const f = await fixture({ destination: 'selected' })
       const origin = await dispatch(f)
       await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now(),"sessionId"=\'synthetic-completed-source\' WHERE id=$1', [origin.runId])
-      const next = await transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
+      const next = await transaction(f, tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
       const child = (await pool.query('SELECT "botId","agentDefinition" FROM agent_runs WHERE id=$1', [next.runId])).rows[0]
       assert.equal(child.botId, null)
       assert.equal(child.agentDefinition.repositoryAdmission.requestEventId, f.eventId)
       assert.equal(await acceptedEventStillMatches(child.agentDefinition.repositoryAdmission, null), true)
       await changePublicationGeneration(f)
       await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [next.runId])
-      const continued = await transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
+      const continued = await transaction(f, tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
       const persisted = (await pool.query('SELECT "workspaceId","agentDefinition" FROM agent_runs WHERE id=$1', [continued.runId])).rows[0]
       assert.equal(persisted.workspaceId, f.workspaceId)
       assert.equal(persisted.agentDefinition.executionIdentity.workspaceId, f.workspaceId)
