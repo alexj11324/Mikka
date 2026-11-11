@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
-import * as boardSlot from '@ui-slot/board'
+import { BoardScreen } from '@ui-slot/board'
 import type { BoardScreenCard, BoardScreenColumn, BoardScreenProps } from '@/components/slots/board-contract'
 import { TaskContextMenu, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { cardStateKind, type BoardColumn, type BoardTask } from '@/components/blocks/kanban-board-1/components/data'
@@ -13,9 +13,6 @@ import { displayTaskTitle } from '@/lib/short-title'
 import { formatDateOnly } from '@/lib/date-only'
 import type { TaskBlock } from '@/lib/task-blocked'
 import { useIssueBoardSaves } from './issue-board'
-
-/** A UI layer's whole board, when the `board` slot has one (docs/ui-overlay.md). */
-export const BoardScreen = boardSlot.BoardScreen ?? null
 
 const DONE = ['done', 'canceled', 'duplicate']
 
@@ -42,7 +39,7 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
   const stateLabel = useTaskStateLabel()
   const format = useFormatter()
   const saves = useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBusyChange })
-  if (!BoardScreen) return null
+  if (!BoardScreen) throw new Error('Required product UI export missing: board.BoardScreen')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const show = (property: Parameters<CardContext['properties']['has']>[0]) => context.properties.has(property)
 
