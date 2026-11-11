@@ -68,21 +68,26 @@ export class EveQueueClaim extends WorkflowRunDO {
   }
 }
 
+export async function serveQueueRequest(request, env) {
+  const path = new URL(request.url).pathname
+  if (path === '/world/queue/publish') return publishQueueRequest(request, env)
+  if (request.method !== 'POST' || !['/world/queue/claim', '/world/queue/release'].includes(path)) {
+    return new Response(null, { status: 404 })
+  }
+  const { key, owner, staleMs } = await request.json()
+  if (typeof key !== 'string' || typeof owner !== 'string' || !key || !owner) return new Response(null, { status: 400 })
+  const claim = env.EVE_CLAIMS.getByName(key)
+  if (path === '/world/queue/release') {
+    await claim.releaseIfOwner(owner)
+    return new Response(null, { status: 204 })
+  }
+  if (!Number.isSafeInteger(staleMs) || staleMs < 1) return new Response(null, { status: 400 })
+  return Response.json(await claim.claimInflight({ messageId: owner, staleMs }))
+}
+
 export class WorldQueueService extends WorkerEntrypoint {
-  async fetch(request) {
-    const path = new URL(request.url).pathname
-    if (path === '/world/queue/publish') return publishQueueRequest(request, this.env)
-    if (request.method !== 'POST' || !['/world/queue/claim', '/world/queue/release'].includes(path)) {
-      return new Response(null, { status: 404 })
-    }
-    const { key, owner, staleMs } = await request.json()
-    if (typeof key !== 'string' || typeof owner !== 'string' || !key || !owner) return new Response(null, { status: 400 })
-    const claim = this.env.EVE_CLAIMS.getByName(key)
-    if (path === '/world/queue/release') {
-      await claim.releaseIfOwner(owner)
-      return new Response(null, { status: 204 })
-    }
-    if (!Number.isSafeInteger(staleMs) || staleMs < 1) return new Response(null, { status: 400 })
-    return Response.json(await claim.claimInflight({ messageId: owner, staleMs }))
+  fetch(request) {
+    if (this.env.WORLD_WORKLOAD === 'business') return new Response(null, { status: 404 })
+    return serveQueueRequest(request, this.env)
   }
 }

@@ -3,7 +3,9 @@ import {
   DEFAULT_TIMESTAMP_THRESHOLD_FUTURE_MS, isStepEventType, isTerminalWorkflowRunStatus, slotToEventId,
   SPEC_VERSION_SUPPORTS_HOOK_FORCE_CLAIM, ulidToDate, workflowRunIdSchema,
 } from '@workflow/world'
+import { applyAttributeChanges, validateAttributeChanges } from '@workflow/world/attributes-validation'
 import { START_HOOK_CANDIDATE_MAX_AGE_MS, startHookId } from '@workflow/world/start-hook.js'
+import { initializeCatalog } from './catalog.mjs'
 import { changeStep, changeWait, initializeExecution } from './execution.mjs'
 import { decodeRecord, encodeRecord, fail, first } from './records.mjs'
 
@@ -25,6 +27,19 @@ export function initializeWorldStorage(storage) {
     run_id TEXT PRIMARY KEY, token TEXT NOT NULL, conflicting_run TEXT, recorded_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS world_start_decision_age ON world_start_admissions(recorded_at)`)
+  initializeCatalog(storage)
+  const eventColumns = storage.sql.exec('PRAGMA table_info(world_events)').toArray().map(row => row.name)
+  if (!eventColumns.includes('correlation_id')) {
+    storage.sql.exec('ALTER TABLE world_events ADD COLUMN correlation_id TEXT')
+    storage.sql.exec('ALTER TABLE world_events ADD COLUMN indexed_event INTEGER NOT NULL DEFAULT 0')
+  }
+  storage.sql.exec(`CREATE INDEX IF NOT EXISTS world_events_correlation ON world_events(run_id,correlation_id,slot);
+    CREATE INDEX IF NOT EXISTS world_events_uncatalogued ON world_events(run_id,indexed_event);
+    CREATE TABLE IF NOT EXISTS world_attribute_writes (run_id TEXT NOT NULL, correlation TEXT NOT NULL, PRIMARY KEY(run_id,correlation));
+    CREATE TABLE IF NOT EXISTS world_hook_resumes (
+      run_id TEXT NOT NULL, resume_id TEXT NOT NULL, hook_id TEXT NOT NULL, digest TEXT, slot INTEGER NOT NULL,
+      PRIMARY KEY(run_id,resume_id)
+    )`)
 }
 
 
@@ -47,13 +62,27 @@ export function readEvent(storage, runId, slot) {
   return row ? decodeRecord(row.record) : null
 }
 
-export function listEvents(storage, runId, { limit = 20, sortOrder = 'asc', cursor } = {}) {
+export function listEvents(storage, runId, { limit = 20, sortOrder = 'asc', cursor } = {}, correlationId) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new RangeError('Invalid event page size')
   const ascending = sortOrder === 'asc'
   const slot = cursor == null ? (ascending ? 0 : Number.MAX_SAFE_INTEGER) : eventIdToSlot(cursor)
   if (slot === null) throw new RangeError('Invalid event cursor')
-  const rows = storage.sql.exec(`SELECT slot,record FROM world_events WHERE run_id=? AND slot ${ascending ? '>' : '<'} ?
-    ORDER BY slot ${ascending ? 'ASC' : 'DESC'} LIMIT ?`, runId, slot, limit + 1).toArray()
+  let filter = ''
+  const args = [runId, slot]
+  if (correlationId !== undefined) {
+    // A rollback can add pre-index events. Read and index those rows
+    // once before applying a correlation filter to this run.
+    for (;;) {
+      const old = storage.sql.exec('SELECT slot,record FROM world_events WHERE run_id=? AND indexed_event=0 LIMIT 100', runId).toArray()
+      if (!old.length) break
+      for (const row of old) storage.sql.exec('UPDATE world_events SET correlation_id=?,indexed_event=1 WHERE run_id=? AND slot=?',
+        decodeRecord(row.record).correlationId ?? null, runId, row.slot)
+    }
+    filter = ' AND correlation_id=?'
+    args.push(correlationId)
+  }
+  const rows = storage.sql.exec(`SELECT slot,record FROM world_events WHERE run_id=? AND slot ${ascending ? '>' : '<'} ?${filter}
+    ORDER BY slot ${ascending ? 'ASC' : 'DESC'} LIMIT ?`, ...args, limit + 1).toArray()
   const page = rows.slice(0, limit)
   const hasMore = rows.length > limit
   return { data: page.map(row => decodeRecord(row.record)), hasMore, cursor: hasMore ? slotToEventId(page.at(-1).slot) : null }
@@ -62,14 +91,16 @@ export function listEvents(storage, runId, { limit = 20, sortOrder = 'asc', curs
 function appendEvent(storage, runId, request, now) {
   const { slot } = first(storage.sql.exec('SELECT COALESCE(MAX(slot),0)+1 AS slot FROM world_events WHERE run_id=?', runId))
   const event = EventSchema.parse({ ...request, runId, eventId: slotToEventId(slot), createdAt: new Date(now) })
-  storage.sql.exec('INSERT INTO world_events(run_id,slot,record) VALUES(?,?,?)', runId, slot, encodeRecord(event))
+  storage.sql.exec('INSERT INTO world_events(run_id,slot,record,correlation_id,indexed_event) VALUES(?,?,?,?,1)',
+    runId, slot, encodeRecord(event), event.correlationId ?? null)
   return event
 }
 
 function saveRun(storage, values) {
   const run = WorkflowRunSchema.parse(values)
-  storage.sql.exec(`INSERT INTO world_runs(run_id,status,record) VALUES(?,?,?)
-    ON CONFLICT(run_id) DO UPDATE SET status=excluded.status,record=excluded.record`, run.runId, run.status, encodeRecord(run))
+  storage.sql.exec(`INSERT INTO world_runs(run_id,status,record,created_ms,workflow_name) VALUES(?,?,?,?,?)
+    ON CONFLICT(run_id) DO UPDATE SET status=excluded.status,record=excluded.record,created_ms=excluded.created_ms,workflow_name=excluded.workflow_name`,
+    run.runId, run.status, encodeRecord(run), run.createdAt.getTime(), run.workflowName)
   return run
 }
 
@@ -81,8 +112,8 @@ function cleanReleasedToken(storage, token, now) {
 function saveHook(storage, runId, hookId, fields, specVersion, now) {
   const hook = HookSchema.parse({ ...fields, hookId, runId, specVersion, createdAt: new Date(now),
     ownerId: '', projectId: '', environment: '', isWebhook: fields.isWebhook ?? false, isSystem: fields.isSystem ?? false })
-  storage.sql.exec('INSERT INTO world_hooks(token,hook_id,run_id,retain_until,record) VALUES(?,?,?,?,?)',
-    hook.token, hookId, runId, fields.tokenRetentionUntil?.getTime() ?? null, encodeRecord(hook))
+  storage.sql.exec('INSERT INTO world_hooks(token,hook_id,run_id,retain_until,record,created_ms) VALUES(?,?,?,?,?,?)',
+    hook.token, hookId, runId, fields.tokenRetentionUntil?.getTime() ?? null, encodeRecord(hook), hook.createdAt.getTime())
   return hook
 }
 
@@ -134,10 +165,11 @@ function startRun(storage, runId, request, now) {
   } else if (request.eventType === 'run_started' && isTerminalWorkflowRunStatus(run.status)) {
     return fail(410, 'RUN_EXPIRED')
   }
-  return { ok: true, run, event: event ?? readEvent(storage, runId, 1), replayed: Boolean(prior) }
+  if (!event && request.eventType === 'run_created') event = readEvent(storage, runId, 1)
+  return { ok: true, run, ...(event ? { event } : {}), replayed: Boolean(prior) }
 }
 
-function changeHook(storage, run, request, now) {
+function changeHook(storage, run, request, now, params) {
   const { eventType, eventData, correlationId: hookId, specVersion } = request
   const { runId } = run
   if (eventType === 'hook_created') {
@@ -163,6 +195,12 @@ function changeHook(storage, run, request, now) {
   }
   const hook = readHookById(storage, hookId, now)
   if (!hook || hook.runId !== runId || (eventData?.token && eventData.token !== hook.token)) return fail(404, 'HOOK_NOT_FOUND')
+  if (eventType === 'hook_received' && params?.resumeId) {
+    const event = appendEvent(storage, runId, { ...request, resumeId: params.resumeId }, now)
+    storage.sql.exec('INSERT INTO world_hook_resumes(run_id,resume_id,hook_id,digest,slot) VALUES(?,?,?,?,?)',
+      runId, params.resumeId, hookId, params.resumePayloadDigest ?? null, eventIdToSlot(event.eventId))
+    return { ok: true, event, hook }
+  }
   if (eventType === 'hook_disposed') storage.sql.exec('DELETE FROM world_hooks WHERE hook_id=?', hookId)
   return { ok: true, hook, event: appendEvent(storage, runId, request, now) }
 }
@@ -171,7 +209,7 @@ const terminal = { run_completed: 'completed', run_failed: 'failed', run_cancell
 
 /** One transaction owns the admission, token, run and event slots of a World
  * namespace, including both logs when a forced claim moves a token. */
-export function applyWorldEvent(storage, runId, request, now = Date.now()) {
+export function applyWorldEvent(storage, runId, request, now = Date.now(), params) {
   if (!workflowRunIdSchema.safeParse(runId).success) return fail(400, 'INVALID_RUN_ID')
   const parsed = CreateEventSchema.safeParse(request)
   if (!parsed.success) return request?.eventData?.startHook
@@ -181,10 +219,32 @@ export function applyWorldEvent(storage, runId, request, now = Date.now()) {
     if (event.eventType === 'run_created' || event.eventType === 'run_started') return startRun(storage, runId, event, now)
     const run = readRun(storage, runId)
     if (!run) return fail(404, 'RUN_NOT_FOUND')
+    if (event.eventType === 'hook_received' && params?.resumeId) {
+      const prior = first(storage.sql.exec('SELECT hook_id,digest,slot FROM world_hook_resumes WHERE run_id=? AND resume_id=?', runId, params.resumeId))
+      if (prior) {
+        if (prior.hook_id !== event.correlationId || (prior.digest && params.resumePayloadDigest && prior.digest !== params.resumePayloadDigest)) {
+          return fail(409, 'ENTITY_CONFLICT')
+        }
+        return { ok: true, event: readEvent(storage, runId, prior.slot) }
+      }
+    }
     if (isStepEventType(event.eventType)) return changeStep(storage, run, event, now, appendEvent)
     if (event.eventType === 'wait_created' || event.eventType === 'wait_completed') return changeWait(storage, run, event, now, appendEvent)
     if (isTerminalWorkflowRunStatus(run.status)) return fail(410, 'RUN_EXPIRED')
-    if (['hook_created', 'hook_disposed', 'hook_received'].includes(event.eventType)) return changeHook(storage, run, event, now)
+    if (['hook_created', 'hook_disposed', 'hook_received'].includes(event.eventType)) return changeHook(storage, run, event, now, params)
+    if (event.eventType === 'attr_set') {
+      try {
+        validateAttributeChanges(event.eventData.changes, { existingKeys: Object.keys(run.attributes ?? {}),
+          allowReservedAttributes: event.eventData.allowReservedAttributes === true })
+      } catch { return fail(400, 'INVALID_ATTRIBUTES') }
+      if (event.correlationId) {
+        const claimed = storage.sql.exec('INSERT OR IGNORE INTO world_attribute_writes(run_id,correlation) VALUES(?,?)', runId, event.correlationId)
+        if (!claimed.rowsWritten) return fail(409, 'ENTITY_CONFLICT')
+      }
+      const attributes = applyAttributeChanges(run.attributes, event.eventData.changes)
+      const updated = saveRun(storage, { ...run, attributes, updatedAt: new Date(now) })
+      return { ok: true, run: updated, event: appendEvent(storage, runId, event, now) }
+    }
     if (!Object.hasOwn(terminal, event.eventType)) return fail(501, 'UNSUPPORTED_EVENT')
     storage.sql.exec('DELETE FROM world_waits WHERE run_id=?', runId)
     const completedAt = new Date(now)

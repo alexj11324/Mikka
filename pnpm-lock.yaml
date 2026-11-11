@@ -817,13 +817,13 @@ importers:
       cbor-x:
         specifier: 1.6.0
         version: 1.6.0
+      ulid:
+        specifier: 3.0.2
+        version: 3.0.2
     devDependencies:
       '@workflow/world-local':
         specifier: 5.2.1
         version: 5.2.1(@opentelemetry/api@1.10.0)
-      ulid:
-        specifier: 3.0.2
-        version: 3.0.2
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(happy-dom@15.11.7)(vite@8.3.6(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.0))

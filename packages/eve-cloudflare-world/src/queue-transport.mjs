@@ -78,9 +78,12 @@ async function deliver(message, env) {
   if (!target) throw new Error('Eve deployment binding unavailable')
   const body = entry.key ? await env.EVE_QUEUE_PAYLOADS.get(entry.key) : undefined
   if (entry.key && !body) throw new Error('World queue bytes unavailable')
-  const response = await target.fetch(new Request(new URL(WORKFLOW_FLOW_ROUTE, 'https://eve.internal'), {
+  const business = env.WORLD_WORKLOAD === 'business'
+  const material = env.WORLD_QUEUE_ED25519_PRIVATE_KEY ? 'ed25519-pkcs8:' + env.WORLD_QUEUE_ED25519_PRIVATE_KEY : undefined
+  if (business && !material) throw new Error('Business workflow signer unavailable')
+  const response = await target.fetch(new Request(new URL(WORKFLOW_FLOW_ROUTE, business ? 'https://business-workflow.internal' : 'https://eve.internal'), {
     method: 'POST', redirect: 'manual',
-    headers: await deliveryHeaders(env.EVE_QUEUE_SIGNING_KEY, entry.revision, message.attempts - 1,
+    headers: await deliveryHeaders(material ?? env.EVE_QUEUE_SIGNING_KEY, entry.revision, message.attempts - 1,
       entry.key ? entry.key.slice('eve-queue/'.length) : await bodyDigest(entry.body)),
     body: body?.body ?? entry.body, duplex: 'half',
   }))
