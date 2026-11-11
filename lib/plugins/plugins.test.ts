@@ -19,6 +19,19 @@ test('MCP input rejects credential URLs, private targets, forwarded headers and 
   assert.equal(updateMcpSchema.safeParse({ id: randomUUID(), url: 'https://another.dev' }).success, false)
 })
 
+test('native MCP setup accepts explicit STDIO environment and multiple HTTP headers without caller-owned scope', () => {
+  assert.equal(createMcpSchema.safeParse({name:'Local',transport:'stdio',command:'npx',args:['-y','@example/docs-mcp'],cwd:'/workspace/project',env:{API_TOKEN:'synthetic'}}).success,true)
+  assert.equal(createMcpSchema.safeParse({name:'HTTP',url:'https://mcp.acme.dev',headers:{Authorization:'Bearer synthetic','X-Account':'team'}}).success,true)
+  for (const value of [
+    {name:'Local',transport:'stdio',command:'node',url:'https://mcp.acme.dev'},
+    {name:'Local',transport:'stdio',command:'node\0bad'},
+    {name:'Local',transport:'stdio',command:'node',ownerId:'other'},
+    {name:'HTTP',url:'https://mcp.acme.dev',headers:{Host:'other.example'}},
+    {name:'HTTP',url:'https://mcp.acme.dev',headers:{Authorization:'a\r\nb'}},
+    {name:'HTTP',url:'https://mcp.acme.dev',headers:{Authorization:'x'},auth:{name:'Authorization',value:'y'}},
+  ]) assert.equal(createMcpSchema.safeParse(value).success,false)
+})
+
 test('connection-owned credentials are masked from pre-call diagnostics as well as tool results', async () => {
   const secret = 'SYNTHETICSHAREDOWNERSECRET', endpoint = 'https://mcp.acme.dev/private-endpoint'
   const printed: string[] = [], warn = console.warn

@@ -62,7 +62,7 @@ import {
   type ComputerSpecProvider,
 } from "../agents/run-context"
 import { requireRunToolApproval } from "../agents/tool-approval"
-import type { RunApps } from "../agents/run-apps"
+import { nativeMcpProcess, type RunApps } from "../agents/run-apps"
 import type { AgentSandbox } from "../agents/sandbox"
 import { carryHistory, ownDir, wipeRunCredentials } from "../agents/harness-home"
 import { claudeCredentialEnv, credentialDomain } from "../agents/run-credential"
@@ -142,7 +142,12 @@ export class ClaudeInitializationError extends Error {
  * socket, endpoint, platform bearer or extra filesystem permission in child. */
 /** One HTTP MCP entry per connected app, each pointing at the Mikka server. */
 export function claudeAppServers(apps?: RunApps) {
-  return Object.fromEntries((apps?.apps ?? []).map(app => [app.name, { type: 'http' as const, url: app.url, headers: { Authorization: `Bearer ${apps!.token}` } }]))
+  return {
+    ...Object.fromEntries((apps?.apps ?? []).map(app => [app.name, { type: 'http' as const, url: app.url, headers: { Authorization: `Bearer ${apps!.token}` } }])),
+    ...Object.fromEntries((apps?.servers ?? []).map(server => [server.name, server.transport === 'stdio'
+      ? { type: 'stdio' as const, ...nativeMcpProcess(server) }
+      : { type: server.transport, url: server.url, headers: server.headers }])),
+  }
 }
 
 export function claudeMailboxServer(mailbox: RunMailbox) {

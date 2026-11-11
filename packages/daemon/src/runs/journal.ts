@@ -19,11 +19,12 @@ import { withoutTaskEnv } from "../task-env"
  */
 function persisted(entries: Record<string, JournalEntry>): Record<string, JournalEntry> {
   return Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
-    const { modelCredential, subscriptionLease, github, ...rest } = withoutTaskEnv(entry.assignment) as RunAssignment
+    const { modelCredential, subscriptionLease, github, mcp, ...rest } = withoutTaskEnv(entry.assignment) as RunAssignment
     const { token: githubToken, ...githubBinding } = github ?? {}
-    const assignment = { ...rest, ...(github ? { github: githubBinding } : {}) }
+    const { servers: _mcpSecrets, ...mcpBinding } = mcp ?? {}
+    const assignment = { ...rest, ...(mcp ? { mcp: mcpBinding } : {}), ...(github ? { github: githubBinding } : {}) }
     return [id, { ...entry, assignment: assignment as RunAssignment,
-      ...(entry.assignment.taskSecrets || entry.assignment.taskEnv ? { taskSecretsWithheld: true as const } : {}),
+      ...(entry.assignment.taskSecrets || entry.assignment.taskEnv || entry.assignment.mcp?.servers?.length ? { taskSecretsWithheld: true as const } : {}),
       ...(modelCredential ? { credentialWithheld: true as const } : {}) }]
   }))
 }

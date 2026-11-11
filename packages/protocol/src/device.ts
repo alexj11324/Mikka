@@ -16,6 +16,7 @@
 //
 // Naming (firm): the machine is a `device`; agents are named by `harness`.
 import { z } from "zod"
+import { taskMcpServerSchema } from './task-mcp'
 import { workspaceReadCommand } from './coding-workspace'
 
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
@@ -489,6 +490,8 @@ export const runAssignmentSchema = z.object({
     mailboxCatalogue: mailboxCatalogueSchema.optional(),
     /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
     apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
+    /** User/Workspace MCP configuration; credentials are deliberately readable by this task. */
+    servers: z.array(taskMcpServerSchema).max(64).optional(),
   }).optional(),
   /**
    * The run owner's own GitHub credential for git and gh, prepared once at

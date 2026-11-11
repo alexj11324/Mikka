@@ -393,14 +393,15 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
         let apps = harness === 'claude_code' || harness === 'codex'
           ? await (await import('@/lib/app-tools-server')).runAppToolkits(caller.userId, run.botId ?? null).catch(() => [])
           : []
-        if ((harness === 'claude_code' || harness === 'codex') && run.agentDefinition?.customMcp) {
-          const { CUSTOM_MCP_TOOLKIT, runMcpAdvertised } = await import('@/lib/plugins/run-mcp')
-          if (await runMcpAdvertised(caller.userId, run.id)) apps = [...apps.filter(app => app !== CUSTOM_MCP_TOOLKIT).slice(0, 63), CUSTOM_MCP_TOOLKIT]
-        }
+        // Export only the connection references frozen for this task. The official
+        // CLI connects directly; Composio continues through its existing toolkit endpoints.
+        const servers = run.agentDefinition?.customMcp && ['claude_code','codex','cursor'].includes(harness)
+          ? await (await import('@/lib/plugins/runtime')).personalPlugins.nativeMcpConnections(caller.userId, run.agentDefinition.customMcp)
+          : []
         return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token,
           decisionCatalogue: RUN_DECISION_CATALOGUE,
           mailboxCatalogue: { version: 1 as const, transport: 'mikka-stateless-2025-06-18' as const, tools },
-          ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}) }
+          ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}), ...(servers.length ? { servers } : {}) }
       })
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
   // A retry after a lost lease works on in the lost attempt's worktree and,
