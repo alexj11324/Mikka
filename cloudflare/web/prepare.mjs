@@ -1,6 +1,7 @@
 import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { rendererActionContract } from '../../lib/renderer-actions.mjs'
 import { isValidDeploymentId } from '../../lib/deployment-id.mjs'
 import { assertNoSourceMaps } from '../../scripts/release/hosted-ui.mjs'
 
@@ -54,6 +55,8 @@ export async function prepareRelease(input, outputDirectory) {
       return !file.split(sep).some(segment => segment.startsWith('.'))
         && !['renderer-manifest.json', '_headers', '_redirects'].includes(file)
     } })
+    const inventory = JSON.parse(await readFile(join(source, 'renderer-manifest.json'), 'utf8'))
+    await writeFile(join(published, 'renderer-actions.json'), JSON.stringify(rendererActionContract(inventory)) + '\n')
     config.assets.directory = published
     return config
   } catch (error) {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { readRendererActions, rendererActionContract } from '../../../lib/renderer-actions.mjs'
 import gateway from '../../../cloudflare/web/gateway.mjs'
 import release from '../../../cloudflare/web/release.mjs'
 import { gatewayConfig, prepareRelease, releaseConfig } from '../../../cloudflare/web/prepare.mjs'
@@ -77,7 +78,8 @@ test('release config requires the official compiled shell, matching pins and pri
   const assets = await mkdtemp(join(tmpdir(), 'cf-web-'))
   t.after(() => rm(assets, { recursive: true, force: true }))
   const input = { sourceSha: 'abcdef0' + '0'.repeat(33), overlaySha: 'b'.repeat(40), id: 'abcdef0-1-1', assets, api: 'mikka-api-fixture', cloud: 'mikka-cloud-fixture' }
-  const inventory = { target: 'web', serverModules: [], inputs: ['components/slots/navigation.tsx'] }
+  const inventory = { version: 1, rendererBuild: 'a'.repeat(64), usedActions: ['issues.pollIssue'],
+    modules: { issues: ['pollIssue', 'unusedAction'], internal: ['privateExport'] }, target: 'web', serverModules: [], inputs: ['components/slots/navigation.tsx'] }
   const put = data => writeFile(join(assets, 'renderer-manifest.json'), JSON.stringify(data))
   await put(inventory)
   await writeFile(join(assets, 'index.html'), '<script src="/mikka/assets/main.js?dpl=abcdef0-1-1"></script>')
@@ -95,7 +97,10 @@ test('release config requires the official compiled shell, matching pins and pri
   await writeFile(join(assets, '.vite', 'manifest.json'), '{}')
   await writeFile(join(assets, '_redirects'), '/old /new')
   const ready = await prepareRelease(input, parent)
-  assert.deepEqual(await readdir(ready.assets.directory), ['index.html'])
+  assert.deepEqual((await readdir(ready.assets.directory)).sort(), ['index.html', 'renderer-actions.json'])
+  const actions = JSON.parse(await readFile(join(ready.assets.directory, 'renderer-actions.json'), 'utf8'))
+  assert.deepEqual(actions, { version: 1, target: 'web', rendererBuild: 'a'.repeat(64),
+    usedActions: ['issues.pollIssue'], modules: { issues: ['pollIssue'] } })
   assert.equal(await readFile(join(ready.assets.directory, 'index.html'), 'utf8'), await readFile(join(assets, 'index.html'), 'utf8'))
   assert.ok((await readFile(join(assets, 'renderer-manifest.json'), 'utf8')).includes('.hosted-ui'))
   await assert.rejects(prepareRelease(input, assets), /OUTPUT_INSIDE_BUILD/)
@@ -136,4 +141,26 @@ test('version recovers from a stale overlay, unavailable backend and invalid doc
   const env = { RELEASE_SHA: source, OVERLAY_SHA: overlay, API: { fetch: async () => replies.shift() } }
   for (let i = 0; i < 4; i++) assert.equal((await release.fetch(request('/mikka/api/version'), env)).status, 503)
   assert.deepEqual(await (await release.fetch(request('/mikka/api/version'), env)).json(), value)
+})
+
+test('published actions retain the compiler evidence and use the same deployment pin on the private-manifest 404', async () => {
+  const compiled = { version: 1, target: 'web', rendererBuild: 'b'.repeat(64),
+    usedActions: ['issues.pollIssue'], modules: { issues: ['pollIssue', 'unused'] } }
+  const contract = rendererActionContract(compiled)
+  for (const changed of [{ rendererBuild: 'wrong' }, { modules: {} },
+    { modules: { issues: ['pollIssue', 'pollIssue'] } }, { usedActions: ['issues.unregistered'] }]) {
+    assert.throws(() => rendererActionContract({ ...compiled, ...changed }))
+  }
+  const calls = []
+  const result = await readRendererActions(async path => {
+    calls.push(path)
+    return path.includes('renderer-manifest') ? new Response(null, { status: 404 }) : Response.json(contract)
+  }, '/mikka', 'abcdef0-1-1')
+  assert.deepEqual(calls, ['/mikka/renderer-manifest.json?dpl=abcdef0-1-1', '/mikka/renderer-actions.json?dpl=abcdef0-1-1'])
+  assert.deepEqual(await result.json(), contract)
+  for (const status of [200, 401, 403, 500]) {
+    let count = 0
+    assert.equal((await readRendererActions(async () => { count++; return new Response(null, { status }) })).status, status)
+    assert.equal(count, 1)
+  }
 })
