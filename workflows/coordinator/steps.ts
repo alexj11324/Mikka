@@ -378,10 +378,12 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
     const started = Date.now()
     try { return await work() } finally { contextMs[part] = Math.max(0, Date.now() - started) }
   }
-  const [execution, rules, github] = await Promise.all([
+  const { memoryForBotPrompt } = await import('@/lib/profile/memory')
+  const [execution, rules, github, approvedFacts] = await Promise.all([
     timed('execution', () => executionContextParts(userId, botId)),
     timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, { canReadPersonalSkill: canReadPersonalSkill(githubScope, skillGrant) })),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
+    conversation.memoryEnabled ? memoryForBotPrompt(userId, botId, conversation.memoryEnabled) : Promise.resolve(''),
   ])
   // What Mikka has learnt about the person (R-73). It reaches only the chat's own
   // repositories' facts, so one project's habits never surface in another's
@@ -398,7 +400,10 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
   // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
   // The person's memory and what Mikka knows about them ride together just after it, then live model availability.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
+  // `approvedFacts` is the scoped, usage-recording prompt block this branch adds;
+  // `profile` is main's repository-filtered section. Both reach the model, in
+  // that order, just after the cached repository/model context.
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), [memory, approvedFacts].filter(Boolean).join('\n'), factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
   return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
 }
 
