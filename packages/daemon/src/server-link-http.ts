@@ -1,6 +1,7 @@
 import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type NativeCoordinatorCommand } from "@mikka/protocol/coordinator"
 import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
 import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
+import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-git'
 // HTTP transport for `ServerLink`: the routes apps/server serves for the
 // daemon (ADR 0016). Paths and payloads come from packages/protocol
 // (`devicePaths`, `runCompletePath` and their zod schemas); responses are
@@ -23,6 +24,7 @@ import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRES
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
+import { TASK_MCP_HEADER, TASK_MCP_VERSION } from '@mikka/protocol'
 import { nativeBrokerContextSchema, nativeLeaseSchema, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
@@ -306,11 +308,13 @@ export class HttpServerLink implements ServerLink {
           [MODEL_CREDENTIAL_HEADER]: '1',
           [TASK_SECRETS_HEADER]: TASK_SECRETS_VERSION,
           [RUN_CREDENTIALS_HEADER]: '1',
+          [TASK_MCP_HEADER]: TASK_MCP_VERSION,
           ...(initialRepository ? { [INITIAL_REPOSITORY_HEADER]: '1' } : {}),
           [SUBSCRIPTION_MODEL_CATALOGUE_HEADER]: '1',
           [MAILBOX_NOTICE_HEADER]: '1',
           [WORKSPACE_REQUEST_HEADER]: '1',
           [WORKSPACE_DIFF_REQUEST_HEADER]: '1',
+          [WORKSPACE_GIT_REQUEST_HEADER]: '1',
           ...daemonTracer.headers(),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),

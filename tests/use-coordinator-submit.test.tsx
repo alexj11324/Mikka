@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict'
+import { before, mock, test } from 'node:test'
+import { act } from 'react'
+import { Window } from 'happy-dom'
+import { ClientError } from 'eve/client'
+import type { UseEveAgentReturn } from 'eve/react'
+
+let owner = 'owner-a'
+mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: {
+  getSession: async () => ({ data: { user: { id: owner } }, error: null }),
+} } })
+const browser = new Window()
+let createRoot: typeof import('react-dom/client')['createRoot']
+let useCoordinatorSubmit: typeof import('../components/coordinator/use-coordinator-submit')['useCoordinatorSubmit']
+before(async () => {
+  for (const [key, value] of Object.entries({ window: browser, document: browser.document, navigator: browser.navigator, IS_REACT_ACT_ENVIRONMENT: true })) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
+  ;({ createRoot } = await import('react-dom/client'))
+  ;({ useCoordinatorSubmit } = await import('../components/coordinator/use-coordinator-submit'))
+})
+
+test('uncertain native sends retain their logical identity across other sends and account changes', async () => {
+  const sent: { text: string; id: string }[] = []
+  let fail = false, conflict = false
+  const agent = { send: async (text: string, options: { headers: Record<string, string> }) => {
+    sent.push({ text, id: options.headers['x-mikka-submission-id'] })
+    if (conflict) throw new ClientError(409, '{"code":"submissionConflict"}')
+    if (fail) throw new TypeError('network unavailable')
+  } } as unknown as Pick<UseEveAgentReturn, 'send'>
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  let composer!: ReturnType<typeof useCoordinatorSubmit>
+  function Probe() { composer = useCoordinatorSubmit(agent); return null }
+  try {
+    await act(async () => { root.render(<Probe />) })
+    fail = true
+    assert.equal((await composer.submit('Original')).kind, 'uncertain')
+    const original = sent.at(-1)!.id
+    fail = false
+    assert.equal((await composer.submit('Another')).kind, 'accepted')
+    assert.equal((await composer.submit('Original')).kind, 'accepted')
+    assert.equal(sent.at(-1)!.id, original, 'a later message cannot replace an unresolved delivery identity')
+    assert.equal((await composer.submit('Original')).kind, 'accepted')
+    assert.notEqual(sent.at(-1)!.id, original, 'the same text after acceptance is a new operation')
+    fail = true
+    await composer.submit('Account retry')
+    const firstAccount = sent.at(-1)!.id
+    owner = 'owner-b'; fail = false
+    await composer.submit('Account retry')
+    assert.notEqual(sent.at(-1)!.id, firstAccount)
+    owner = 'owner-a'
+    await composer.submit('Account retry')
+    assert.equal(sent.at(-1)!.id, firstAccount)
+    conflict = true
+    assert.equal((await composer.submit('Conflicting')).kind, 'conflict')
+    const requests = sent.length
+    assert.equal((await composer.submit('Conflicting')).kind, 'conflict')
+    assert.equal(sent.length, requests, 'a terminal conflict cannot mint another key and send again')
+  } finally { await act(async () => { root.unmount() }) }
+})

@@ -117,22 +117,24 @@ the old release stops. This wait is outside the shared deployment queue so it
 cannot block the Web job it is waiting for. Desktop's Web wait and direct callers
 keep their existing 40-minute default.
 
-Changes to release-control paths in `RUNTIME_RELEASE_PATHS`, including the release
-workflows, `scripts/release/web-deploy.mjs` and
-`scripts/e2b/publish-template-env.mjs` also require the full runtime validation
-and reusable publication, even when the worker hash is unchanged. The check
-compares the actual complete push (`github.event.before` to `github.sha`) with
-full history; missing or invalid endpoints fail instead of counting as unchanged.
-These paths are included in the runtime workflow's `runtime_paths` list. Documentation
-and test-only changes do not force paid instance validation.
+Automatic E2B builds compare the complete push (`github.event.before` to
+`github.sha`) with the canonical `build-template.py --worker-hash` projection.
+That projection includes installed daemon sources, reachable runtime dependencies
+and the template recipe. Eve/Web dependencies, unrelated lock entries, application
+code, migrations, documentation and Web/acceptance helper edits do not rebuild an
+unchanged runtime. A stale published worker does not turn an unrelated push into
+a retry. Missing or invalid push endpoints fail before credentials or paid work.
+The workflow's broader `runtime_paths` list selects offline PR checks only.
 
 The E2B caller checks failed runtime input fingerprints before taking the distinct
 `e2b-official-runtime-release` queue. A matching failed build or subscription gate
 makes an automatic push succeed with `skipped: same inputs as failed run <id>`;
 it creates no E2B machine and takes no publication queue. The fingerprint covers
-the workflow's `runtime_paths` Git entries, including the dependency lock. Failure
-artifacts last 90 days; a missing or expired artifact allows the ordinary worker
-comparison, while an Actions API error fails the check.
+the same canonical worker hash used to stamp the installed runtime. Failure
+artifacts last 90 days; a missing or expired artifact permits an actual runtime
+input change, while an Actions API error fails the check. An unchanged push skips
+before the history query. A manual runtime retry requires a recorded reason and
+bypasses failure suppression, retaining all real validation and publication gates.
 
 Only `e2b-runtime-release.yml` runs under that non-cancelling `queue: max` lock,
 through candidate validation, Web wait, subscriptions, publication and cleanup.

@@ -248,6 +248,19 @@
     "connectionStatusFailed": "Couldn't read connection status for {names}"
   },
   "Auth": {
+    "sso": {
+      "open": "Sign in with company SSO",
+      "label": "Work email or company domain",
+      "placeholder": "you@company.com",
+      "hint": "You'll be sent to your organization's identity provider.",
+      "invalid": "Enter a work email or a domain, such as acme.com.",
+      "notFound": "No company sign-in was found for that email or domain. Check that your organization has verified its domain, or use another way to sign in.",
+      "tooMany": "Too many attempts. Try again in a moment.",
+      "failed": "Couldn't start company SSO. Try again.",
+      "returnedFailed": "Company SSO sign-in didn't finish. Try again, or contact your organization's admin.",
+      "cancel": "Back",
+      "continue": "Continue"
+    },
     "haveAccount": "Already have an account?",
     "noAccountShort": "No account yet?",
     "signIn": "Sign in",
@@ -1852,11 +1865,12 @@
       "secrets": {
         "title": "Secrets and environment"
       },
-      "environments": {
-        "title": "Run environments"
-      },
       "audit": {
         "title": "Audit log"
+      },
+      "organization": {
+        "title": "Organization",
+        "keywords": "SSO SAML OIDC SCIM single sign-on enterprise identity directory policy approvals legal hold"
       },
       "usage": {
         "title": "Usage"
@@ -1867,117 +1881,6 @@
       "cloud": {
         "title": "Mikka Cloud",
         "keywords": "cloud Mikka 云服务 自托管 self-hosted"
-      }
-    },
-    "environments": {
-      "title": "Run environments",
-      "description": "Scripts and actions a task machine runs. Saving affects new tasks only.",
-      "memberDescription": "Only administrators can change run environments.",
-      "add": "Add environment",
-      "addTitle": "New run environment",
-      "editTitle": "Edit run environment",
-      "name": "Name",
-      "descriptionField": "Description",
-      "project": "Project",
-      "workspaceDefault": "Workspace default",
-      "runtime": "Run on",
-      "runtimeCloud": "Mikka Cloud",
-      "runtimeLocal": "Local daemon",
-      "workdir": "Working directory",
-      "workdirPlaceholder": "Relative to the repository root, for example apps/web",
-      "installScript": "Install script",
-      "installPlaceholder": "For example pnpm install",
-      "setupScript": "Setup script",
-      "setupPlaceholder": "For example pnpm db:migrate",
-      "scriptsHint": "Runs in the new worktree before the Agent starts. A failure stops the task.",
-      "repositories": "Allowed repositories",
-      "repositoriesPlaceholder": "One owner/repo or clone URL per line. Empty allows every repository.",
-      "defaultTitle": "Default for this scope",
-      "defaultDescription": "A project default wins over the workspace default.",
-      "actions": "Run Actions",
-      "actionsHint": "Started by a person, recorded separately from the Agent's steps. Mikka Cloud machines only.",
-      "addAction": "Add action",
-      "noActions": "No run actions.",
-      "actionKind": "Kind",
-      "actionName": "Name",
-      "actionTimeout": "Timeout",
-      "actionCommand": "Command",
-      "actionCommandPlaceholder": "For example pnpm test",
-      "moveUp": "Move up",
-      "moveDown": "Move down",
-      "removeAction": "Remove {name}",
-      "revisionHint": "Saving adds a revision. Running tasks keep the revision they started with.",
-      "saved": "Run environment saved",
-      "loading": "Loading run environments",
-      "empty": "No run environments.",
-      "version": "v{version}",
-      "actionCount": "{count} actions",
-      "lastExecution": "Last {name} · {status}",
-      "hasScripts": "Install or setup script set",
-      "noScripts": "No scripts set",
-      "defaultBadge": "Default",
-      "boundRuns": "{count} frozen tasks",
-      "duplicate": "Duplicate",
-      "copyTitle": "Duplicate run environment",
-      "actionsNamed": "Actions for {name}",
-      "edit": "Edit",
-      "archive": "Archive",
-      "archiveNamed": "Archive “{name}”?",
-      "tryTitle": "Test an action",
-      "tryDescription": "Runs a frozen action on a live cloud task and records its output separately.",
-      "noLiveRuns": "No live cloud tasks.",
-      "chooseRun": "Choose task",
-      "chooseAction": "Choose action",
-      "runWithoutEnvironment": "This task has no frozen run environment. New tasks use one after you set a default.",
-      "localUnsupported": "Local daemon tasks cannot run actions here yet.",
-      "machineUnavailable": "The task machine is unavailable.",
-      "frozenAt": "{name} · v{revision}",
-      "starting": "Starting",
-      "runAction": "Run",
-      "cancelAction": "Cancel",
-      "noOutput": "No output.",
-      "outputTruncated": "Output exceeded the limit; later output was dropped.",
-      "exitCode": "Exit code {code}",
-      "startedAt": "Started {time}",
-      "finishedAt": "Finished {time}",
-      "stdout": "Standard output",
-      "stderr": "Error output",
-      "status": {
-        "queued": "Queued",
-        "running": "Running",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "cancelled": "Cancelled",
-        "timed_out": "Timed out"
-      },
-      "runStatus": {
-        "preparing": "Preparing",
-        "running": "Running",
-        "waiting_input": "Waiting for input",
-        "finishing": "Finishing"
-      },
-      "kinds": {
-        "run": "Run",
-        "dev": "Dev server",
-        "test": "Test",
-        "build": "Build"
-      },
-      "errors": {
-        "generic": "Could not save the run environment.",
-        "environmentNotFound": "This run environment no longer exists.",
-        "environmentConflict": "The configuration changed. Reload before saving.",
-        "environmentInvalid": "The configuration is invalid.",
-        "environmentNameTaken": "An environment with this name already exists in this scope.",
-        "environmentLimitReached": "This workspace has reached its environment limit.",
-        "environmentPermissionDenied": "Only administrators can change run environments.",
-        "environmentProjectUnavailable": "The project is unavailable.",
-        "environmentSaveFailed": "Could not save the run environment.",
-        "environmentUnbound": "This task has no frozen run environment.",
-        "environmentActionNotFound": "This action no longer exists.",
-        "environmentRepositoryNotAllowed": "The repository is not in this environment's allow-list.",
-        "environmentMachineUnsupported": "The task machine cannot run actions.",
-        "environmentActionBusy": "Another action is already running.",
-        "environmentUnavailable": "Run environments are unavailable."
       }
     },
     "appearance": {
@@ -2676,6 +2579,7 @@
         },
         "token": {
           "created": "created token {target}",
+          "rotated": "rotated the secret for token {target}",
           "revoked": "revoked token {target}"
         },
         "auth": {
@@ -2897,8 +2801,26 @@
       "checkAgain": "Check again",
       "confirmTitle": "Share {name} with members of {workspace}?",
       "currentWorkspace": "this workspace",
-      "confirmAuthority": "Members can use the tools authorized for this connection. External services may charge the connected account.",
-      "confirmShare": "Share connection"
+      "confirmAuthority": "Members' tasks can use this connection and read its configured credentials on their task machines. External services may charge the connected account.",
+      "confirmShare": "Share connection",
+      "add": "Add MCP server",
+      "empty": "No MCP servers",
+      "name": "Name",
+      "transport": "Connection type",
+      "command": "Command",
+      "arguments": "Arguments",
+      "oneArgumentPerLine": "One argument per line.",
+      "cwd": "Working directory (optional)",
+      "url": "Server URL",
+      "variables": "Environment variables",
+      "headers": "Headers",
+      "variableName": "Name {index}",
+      "variableValue": "Value {index}",
+      "removeVariable": "Remove entry {index}",
+      "addVariable": "Add variable",
+      "addHeader": "Add header",
+      "taskReadable": "The task machine and its CLI can read these credentials.",
+      "invalidConfiguration": "Check the server configuration and entry names."
     },
     "apiKeys": {
       "add": "Add API key",
@@ -3615,6 +3537,10 @@
     "unknownClient": "An unnamed app"
   },
   "Coordinator": {
+    "eve": {
+      "submit": "Send",
+      "open": "Open"
+    },
     "waitingQuestions": "{count, plural, one {# task is waiting for your answer} other {# tasks are waiting for your answer}}",
     "stop": "Stop",
     "stopped": "Stopped",
@@ -6243,6 +6169,467 @@
     "checkUpdate": "Check for update",
     "renderFailed": "This view could not open",
     "renderHint": "Retry to reopen the view."
+  },
+  "Organization": {
+    "title": "Organization",
+    "intro": "An Organization is a management layer over shared workspaces: one sign-in method, directory sync, resource policy and Organization audit. Organization roles only manage the Organization. They never grant access to a workspace, its tasks or content; workspace members are still managed in Members.",
+    "loadFailed": "Couldn't load the Organization",
+    "retry": "Retry",
+    "loading": "Loading…",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saved": "Saved.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "roles": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    },
+    "unbound": {
+      "title": "This workspace isn't in an Organization",
+      "memberNote": "Only a workspace admin can bind this workspace to an Organization.",
+      "body": "Once bound, the Organization's sign-in requirements and resource policy apply here, and seats count distinct active members across all its workspaces. Each workspace keeps its own members, tasks and resources.",
+      "bodyTitle": "What binding does",
+        "bindLabel": "Bind to an Organization",
+      "bindNote": "You need to be an owner or admin of that Organization and an admin of this workspace.",
+      "bind": "Bind",
+      "createLabel": "New Organization",
+      "createNote": "You become its owner, then this workspace is bound to it.",
+      "namePlaceholder": "Organization name",
+      "create": "Create and bind"
+    },
+    "bound": {
+      "notAdmin": "This workspace belongs to an Organization",
+      "notAdminNote": "Only the Organization's owners and admins can see its settings. Your access to this workspace still follows Members."
+    },
+    "tabs": {
+      "label": "Organization settings",
+      "overview": "Overview",
+      "identity": "Sign-in and directory",
+      "policy": "Resource policy",
+      "audit": "Organization audit"
+    },
+    "overview": {
+      "title": "Details",
+      "created": "Created {date}",
+      "rename": "Rename",
+      "renamed": "Organization renamed.",
+      "nameLabel": "Organization name",
+      "planEnterprise": "Enterprise",
+      "planFree": "Organization (no Enterprise)",
+      "seats": "{count} / {limit} people",
+      "seatsUnlimited": "{count} people · no seat limit",
+      "seatsNote": "Active members are counted once across all the Organization's workspaces. Agents, bots, devices and pending invitations don't take a seat.",
+      "planFreeNote": "Single sign-on, SCIM, resource policy and Organization audit export need Enterprise. Mikka turns it on by hand for now; send us the Organization ID below.",
+      "overLimit": "Active members are over the limit of {limit}. Existing members and data are kept, but no one new can join until you're back under it.",
+      "organizationId": "Organization ID"
+    },
+    "workspaces": {
+      "title": "Bound workspaces",
+      "description": "Each workspace keeps its own members, tasks and resource permissions. Organization admins don't see a workspace's content because of this.",
+      "unbindTitle": "Unbind “{name}” from the Organization?",
+      "unbindBody": "The Organization's sign-in requirements and resource policy stop applying here, and seats are counted for this workspace alone again. Its members and content don't change; the Organization's audit records are kept.",
+      "unbind": "Unbind",
+      "notMember": "A workspace you're not a member of",
+      "current": "This workspace",
+      "ownMembers": "Members and content are managed by the workspace itself",
+      "notMemberNote": "Organization roles don't grant access"
+    },
+    "members": {
+      "title": "Organization admins and members",
+      "description": "Organization roles only decide who manages the Organization: owners can change owners and archive it, admins manage everything else, members can't manage anything.",
+      "removeTitle": "Remove {name} from the Organization?",
+      "removeBody": "Suspends them in every workspace of this Organization and revokes their tokens, runs and shares there. Their personal account, personal workspace and other Organizations aren't affected; rejoining later doesn't restore their old role.",
+      "removed": "Removed from the Organization.",
+      "remove": "Remove",
+      "suspended": "Suspended",
+      "roleLabel": "{name}'s Organization role",
+      "roleChanged": "Organization role updated.",
+      "added": "Added to the Organization.",
+      "addLabel": "Add an Organization member",
+      "addNote": "Choose an existing account from this workspace's members; an email alone can't add anyone. Joining the Organization gives no workspace access.",
+      "choose": "Choose a member",
+      "roleNew": "Organization role",
+      "add": "Add",
+      "noCandidates": "Everyone in this workspace is already in the Organization."
+    },
+    "archive": {
+      "title": "Danger zone",
+      "label": "Archive Organization",
+      "body": "Unbind every workspace first, this one included, and turn off every sign-in method and SCIM connection. After archiving, its audit records are kept under the retention period and legal hold.",
+      "action": "Archive Organization"
+    },
+    "identity": {
+      "title": "Sign-in and directory",
+      "needsEnterprise": "Single sign-on and SCIM need Enterprise",
+      "needsEnterpriseNote": "Without it you can still turn off existing sign-in methods, revoke SCIM, stop enforcing SSO and use owner recovery.",
+      "providers": {
+        "title": "Single sign-on",
+        "description": "Sign in with your identity provider (OIDC or SAML 2.0). Each method works only after its domain is verified. Existing accounts with the same email are never merged automatically.",
+        "empty": "No sign-in methods yet",
+        "emptyNote": "After adding one, publish the verification record in DNS and register the callback address with your identity provider.",
+        "disableTitle": "Turn off {id}?",
+        "disableBody": "Sessions signed in with it lose their SSO status and its SCIM connection is revoked. If the Organization enforces SSO, those members need another sign-in method or owner recovery.",
+        "disabled": "Sign-in method turned off.",
+        "disable": "Turn off",
+        "add": "Add sign-in method",
+        "addNote": "OIDC or SAML 2.0.",
+        "verified": "Domain verified",
+        "unverified": "Domain not verified",
+        "updated": "Updated {date}",
+        "unverifiedNote": "Publish the TXT record below in DNS, then verify.",
+        "unverifiedLost": "The verification value is shown only once, when you save. Save this sign-in method again to get a new one.",
+        "verify": "Verify domain",
+        "signIn": "Sign in with SSO",
+        "signInNote": "Sign in again with this method. You need this before enforcing SSO.",
+        "link": "Link my account",
+        "linkNote": "Link your existing Mikka account to the same person at your identity provider. You need to have signed in within the last 5 minutes.",
+        "rotate": "Create SCIM credential"
+      },
+      "setup": {
+        "title": "Finish setting up the sign-in method",
+        "description": "These values are shown only after this save. Register them in DNS and with your identity provider, then verify the domain.",
+        "dnsName": "DNS TXT name",
+        "dnsValue": "DNS TXT value",
+        "dnsOnce": "Shown only this once. After you leave, save the sign-in method again to get a new value.",
+        "callback": "Sign-in callback address",
+        "postLogout": "Post-logout redirect address",
+        "postLogoutNote": "Register this separately in your identity provider's logout redirect allowlist, apart from the sign-in callback.",
+        "samlLogout": "Single logout",
+        "samlLogoutNote": "SAML single logout uses your identity provider's logout address and ends only the sessions of that SAML sign-in.",
+        "verifyLabel": "Verify domain",
+        "verifyNote": "DNS records can take a few minutes to take effect.",
+        "dismiss": "Later",
+        "verify": "Verify",
+        "verified": "Domain verified. The sign-in method is ready."
+      },
+      "scim": {
+        "title": "SCIM directory sync",
+        "description": "Your identity provider syncs users and groups over SCIM 2.0. Deactivating or deleting a directory user blocks their sign-in at once and revokes their access to this Organization's workspaces. Groups sync directory information only and grant no workspace access.",
+        "onceTitle": "Copy and save the SCIM credential",
+        "onceNote": "It's shown only this once; Mikka never shows it again.",
+        "baseURL": "SCIM base URL",
+        "token": "Bearer credential",
+        "saved": "Once it's saved in your identity provider, closing this removes it from the page.",
+        "done": "Saved it",
+        "empty": "No SCIM connections",
+        "emptyNote": "Create a SCIM credential on a verified sign-in method.",
+        "needsVerified": "Verify a sign-in method's domain first.",
+        "revokeTitle": "Revoke this SCIM connection?",
+        "revokeBody": "Your identity provider can't sync anymore. Synced users lose their Organization identity and their access to this Organization's workspaces; personal accounts aren't affected.",
+        "revoked": "SCIM connection revoked.",
+        "revoke": "Revoke",
+        "revokedTag": "Revoked",
+        "active": "Syncing",
+        "connectionNote": "Created {date}. Creating a credential again replaces the old one."
+      },
+      "policy": {
+        "title": "Sign-in requirements",
+        "description": "Apply to every workspace in this Organization.",
+        "enforce": "Require SSO",
+        "enforceNote": "When on, Organization workspaces can only be opened after signing in with this Organization's SSO. Use “Sign in with SSO” first, or turning it on is refused.",
+        "enforced": "SSO is now required.",
+        "relaxed": "SSO is no longer required.",
+        "machine": "Allow machine credentials",
+        "machineNote": "Lets personal access tokens and devices keep working in Organization workspaces while SSO is required.",
+        "retry": "Retry revocations",
+        "retryNote": "After turning off, revoking or tightening, revocations retry in the background. Use this to try again right away.",
+        "retryAction": "Retry now",
+        "retried": "Pending revocations retried."
+      },
+      "breakGlass": {
+        "title": "Owner recovery",
+        "description": "If your identity provider is unavailable, an owner can bypass required SSO for a short time to turn it off or fix the configuration. It applies only to the current session and every use is recorded in the Organization audit.",
+        "active": "Recovery active until {time}",
+        "activeNote": "Applies only to this session and ends on its own.",
+        "reason": "Reason",
+        "placeholder": "e.g. The identity provider certificate expired; need to stop requiring SSO",
+        "hint": "At least 10 characters. You need to have signed in within the last 5 minutes; it lasts 15 minutes.",
+        "start": "Start recovery"
+      },
+      "form": {
+        "protocol": "Protocol",
+        "slug": "Sign-in method ID",
+        "slugHint": "Saved as {id}. Used in the callback address and can't be changed later.",
+        "slugInvalid": "Use lowercase letters, numbers and hyphens, at least 2 characters.",
+        "domain": "Email domain",
+        "domainHint": "Your members' email domain. You'll verify ownership in DNS.",
+        "domainInvalid": "Enter a valid domain, such as acme.com.",
+        "httpsOnly": "Addresses must be public https addresses.",
+        "missing": "Fill in every required field.",
+        "issuer": "Issuer",
+        "issuerHint": "Mikka reads its OpenID configuration.",
+        "clientId": "Client ID",
+        "clientSecret": "Client secret",
+        "secretHint": "Stored encrypted and never shown again.",
+        "tokenAuth": "Token endpoint authentication",
+        "spEntityId": "SP entity ID",
+        "spEntityIdHint": "This service's identifier as registered at your identity provider.",
+        "idpEntityId": "IdP entity ID",
+        "entryPoint": "Single sign-on address",
+        "cert": "IdP signing certificate",
+        "certHint": "PEM, currently valid.",
+        "logoutRedirect": "Single logout address (Redirect)",
+        "logoutHint": "Optional; one each for the Redirect and POST bindings.",
+        "logoutPost": "Single logout address (POST)",
+        "replaceNote": "Saving replaces any configuration with the same ID: existing SSO sign-ins lose their status and the domain must be verified again.",
+        "submit": "Save"
+      }
+    },
+    "policy": {
+      "title": "Resource sharing policy",
+      "description": "Decides whether members can share their own model credentials, subscriptions and MCP into Organization workspaces. Sharing still needs the resource's own permission; this policy can only make it stricter.",
+      "needsEnterprise": "Resource policy needs Enterprise.",
+      "modelCredentialSharing": {
+        "label": "Model credentials and subscriptions",
+        "note": "Members sharing API keys or model subscriptions."
+      },
+      "mcpSharing": {
+        "label": "MCP servers",
+        "note": "Members sharing personal MCP servers."
+      },
+      "rules": {
+        "allow": "Allow",
+        "approval_required": "Needs approval",
+        "deny": "Don't allow"
+      },
+      "providers": {
+        "label": "Allowed model sources",
+        "note": "Runs in Organization workspaces can use only the checked sources.",
+        "any": "Any",
+        "none": "Choose at least one source, or Organization workspaces can't run models.",
+        "names": {
+          "vercel-gateway": "Mikka hosted models (Gateway)",
+          "zerocat": "Mikka hosted models (ZeroCat)",
+          "openai-subscription": "OpenAI subscription",
+          "anthropic-subscription": "Anthropic subscription",
+          "api-key": "Your own API key"
+        }
+      },
+      "retention": {
+        "label": "Organization audit retention",
+        "note": "Expired Organization audit records are deleted. Deletion pauses while an export is open or legal hold is on.",
+        "keep": "Keep",
+        "days": "For a number of days",
+        "daysLabel": "Days to keep"
+      },
+      "legalHold": {
+        "label": "Legal hold",
+        "note": "While on, no Organization audit record is deleted and retention doesn't apply."
+      },
+      "revision": "Policy revision {revision}",
+      "tightenNote": "When you tighten it, shares that no longer fit are withdrawn and their runs stop.",
+      "approvals": {
+        "title": "Sharing approvals",
+        "description": "With “Needs approval”, shared resources wait here. Denying withdraws the resource from the workspace; approving never bypasses the resource's own permission.",
+        "empty": "No sharing requests",
+        "emptyNote": "Requests appear when members share model credentials, subscriptions or MCP into Organization workspaces.",
+        "approvedDone": "Approved.",
+        "deniedDone": "Denied; the share was withdrawn.",
+        "kinds": {
+          "subscription": "Model subscription",
+          "api_key": "API key",
+          "mcp": "MCP server"
+        },
+        "status": {
+          "pending": "Pending",
+          "approved": "Approved",
+          "denied": "Denied"
+        },
+        "from": "{owner} · {workspace}",
+        "someone": "An Organization member",
+        "otherWorkspace": "Another workspace",
+        "deny": "Deny",
+        "withdraw": "Withdraw approval",
+        "approve": "Approve"
+      }
+    },
+    "audit": {
+      "title": "Organization audit",
+      "description": "The Organization's administrative events: members and roles, workspace binding, sign-in methods, directory sync, policy and exports. No tokens, assertions or workspace content.",
+      "system": "System",
+      "operator": "Mikka operations",
+      "unknownActor": "An account outside the Organization",
+      "retentionLabel": "Retention",
+      "retentionKeep": "Kept",
+      "retentionDays": "Kept for {count} days",
+      "legalHold": "Legal hold on",
+      "workspaceEvents": "Workspace content events",
+      "workspaceEventsNote": "Task, run and resource events are viewed and exported in Audit log, by that workspace's admins.",
+      "workspaceEventsLink": "Open Audit log",
+      "recentTitle": "Recent events",
+      "recentEmpty": "No Organization events yet.",
+      "exportTitle": "Export",
+      "exportDescription": "An export freezes the events in the range. For 15 minutes you can page through and download it; each page checks your admin access and the records' integrity again.",
+      "from": "From",
+      "until": "To",
+      "create": "Create export",
+      "utcNote": "UTC dates; the end date is included.",
+      "limitNote": "Up to 50,000 events and 366 days at a time; shorten the range if needed.",
+      "manifest": "{count} events exported",
+      "expires": "Available until {time}",
+      "digest": "Digest",
+      "download": "Download JSON",
+      "pageOf": "{from}–{to} of {count}",
+      "previous": "Previous",
+      "next": "Next",
+      "columns": {
+        "time": "Time",
+        "action": "Event",
+        "actor": "By",
+        "result": "Result"
+      },
+      "results": {
+        "success": "Succeeded",
+        "denied": "Denied",
+        "failure": "Failed"
+      },
+      "actions": {
+        "organization": {
+          "created": "Organization created",
+          "renamed": "Organization renamed",
+          "archived": "Organization archived",
+          "member_changed": "Organization role changed",
+          "member_removed": "Removed from Organization",
+          "workspace_attached": "Workspace bound",
+          "workspace_detached": "Workspace unbound",
+          "policy_changed": "Resource policy changed",
+          "resource_requested": "Sharing approval requested",
+          "resource_decided": "Sharing approval decided",
+          "audit_exported": "Organization audit exported",
+          "retention_applied": "Deleted under retention"
+        },
+        "entitlement": {
+          "changed": "Plan changed"
+        },
+        "scim": {
+          "user_created": "Directory user created",
+          "user_updated": "Directory user updated",
+          "user_suspended": "Directory user deactivated",
+          "user_deleted": "Directory user deleted",
+          "group_changed": "Directory group changed"
+        },
+        "sso": {
+          "configured": "Sign-in method configured",
+          "domain_verified": "Domain verified",
+          "policy_changed": "Sign-in requirements changed",
+          "signed_in": "SSO sign-in",
+          "sign_in_failed": "SSO sign-in failed",
+          "signed_out": "SSO sign-out",
+          "logout_failed": "SSO sign-out failed"
+        }
+      },
+      "errors": {
+        "auditExportLimitExceeded": "More than 50,000 events in this range. Shorten it and export again.",
+        "auditExportUnavailable": "This export expired or isn't available. Create it again.",
+        "auditExportChanged": "The exported records no longer match. Create the export again.",
+        "default": "The export didn't finish. Try again."
+      }
+    }
+  },
+  "Governance": {
+    "plan": {
+      "title": "Plan and seats",
+      "edition": {
+        "personal": "Personal",
+        "community": "Community",
+        "team_free": "Team Free",
+        "team_pro": "Team Pro",
+        "enterprise": "Enterprise"
+      },
+      "seats": "{count} of {limit} active members",
+      "seatsUnlimited": "{count} active members, no limit",
+      "seatsNote": "Only active people count. Pending invitations, suspended members, bots, agents and devices don't take a seat.",
+      "overLimit": "Active members are over this plan's limit of {limit}. Everyone stays; until the count is back within the limit, invitations can't be accepted and members can't be restored.",
+      "concurrency": "Hosted model calls at once: {count}",
+      "features": "Team features",
+      "usageExport": "Team usage report and CSV export",
+      "approvalTemplatesName": "Approval templates",
+      "approvalTemplates": "Approval templates (up to {count})",
+      "included": "Included",
+      "notIncluded": "Not included",
+      "upgradeTitle": "Need more seats or team features",
+      "upgradeBody": "Team Pro adds seats, the team usage report with CSV export, and approval templates. It is set up by hand for now, with no online payment: contact Mikka with the workspace ID below.",
+      "memberNote": "Workspace admins manage seats and the plan. Ask an admin if you need more seats.",
+      "workspaceId": "Workspace ID",
+      "copy": "Copy",
+      "copied": "Copied",
+      "loadFailed": "Couldn't load the plan.",
+      "retry": "Retry"
+    },
+    "usage": {
+      "title": "Hosted usage report by date",
+      "description": "Settled hosted model usage and run counts for this workspace over a date range, with CSV export. Dates are UTC, both ends included, up to 93 days.",
+      "from": "From",
+      "to": "To",
+      "show": "Show",
+      "csv": "Export CSV",
+      "rangeInvalid": "The end date can't be before the start date, and the range can be at most 93 days.",
+      "hostedTitle": "Hosted model usage",
+      "day": "Date",
+      "model": "Model",
+      "requests": "Requests",
+      "inputTokens": "Input tokens",
+      "outputTokens": "Output tokens",
+      "cost": "Cost",
+      "noHosted": "No settled hosted model usage in these dates. Your own models, devices and services aren't billed here.",
+      "runsTitle": "Runs",
+      "runsNone": "No runs in these dates.",
+      "total": "Total",
+      "noEntitlement": "The hosted usage report by date and its CSV export are part of Team Pro, which this plan doesn't include. This month's usage by bot and by member above, and its export, are unaffected.",
+      "noAdmin": "Only workspace admins can see the hosted usage report by date. This month's usage by bot and by member above is unaffected.",
+      "loading": "Loading usage…"
+    },
+    "templates": {
+      "title": "Approval templates",
+      "description": "Save an agent approval mode and permissions as a template, and apply it to the whole workspace when needed.",
+      "applyNote": "Applying replaces this workspace's agent policy and stops this workspace's active runs that hold permissions on a computer. Deleting a template doesn't undo a policy already applied.",
+      "count": "{count} of {limit} templates",
+      "empty": "No approval templates yet.",
+      "create": "New template",
+      "edit": "Edit",
+      "apply": "Apply",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel",
+      "name": "Name",
+      "namePlaceholder": "For example: contractor repos read-only",
+      "approvalMode": "Approval mode",
+      "approvalModes": {
+        "unset": "Not set",
+        "ask": "Ask when needed",
+        "read_only": "Read-only"
+      },
+      "permissions": "Permissions",
+      "actions": {
+        "install_dependency": "Install dependencies",
+        "write_outside_repo": "Write outside the repository",
+        "git_push": "Push branches",
+        "network": "Access the network"
+      },
+      "decisions": {
+        "unset": "Not set",
+        "allow": "Allow",
+        "ask": "Ask",
+        "deny": "Deny"
+      },
+      "networkAllow": "Allowed domains",
+      "networkAllowHint": "One domain per line. Leave empty to not set it.",
+      "rulesEmpty": "Set at least one rule.",
+      "nameEmpty": "Enter a name.",
+      "applyTitle": "Apply “{name}”?",
+      "deleteTitle": "Delete “{name}”?",
+      "deleteBody": "A policy already applied stays as it is.",
+      "saved": "Saved",
+      "applied": "Applied “{name}”",
+      "deleted": "Deleted",
+      "rulesSummary": "{count, plural, one {# rule} other {# rules}}",
+      "updated": "Updated {date}",
+      "noEntitlement": "Approval templates are part of Team Pro, which this plan doesn't include.",
+      "noAdmin": "Only workspace admins can manage approval templates.",
+      "loading": "Loading templates…"
+    }
   },
   "MobileServer": {
     "title": "Choose a server",

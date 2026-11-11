@@ -9,7 +9,7 @@ import { makeSnapshot } from '../agent-kit/definition'
 import { DEFAULT_AGENT_DEFINITION } from '../agent-kit/builtin'
 import { executionInstructions } from '../agent-kit/execution-instructions'
 import { withCoordinatorPresentation } from './native-prompt'
-import { instructionsWithPersonal, cachedContextLines, promptMessages, promptWithCachedContext } from './context'
+import { instructionsWithPersonal, cachedContextLines, promptWithCachedContext } from './context'
 import { SCHEDULE_INSTRUCTIONS } from '../schedules/contract'
 
 const owner = 'synthetic-prompt-owner', peer = 'synthetic-prompt-peer'
@@ -28,6 +28,8 @@ function deferred() {
 }
 let gates: Partial<Record<ReadKind, ReturnType<typeof deferred>>> = {}, started: Record<string, ReturnType<typeof deferred>> = {}
 let errors: Partial<Record<ReadKind, Error>> = {}
+let profileText = ''
+const profileReads: { owner: string; bot: string; enabled: boolean | undefined; nativeTurn: unknown }[] = []
 const forbidden = () => { throw new Error('External, write and model effects are forbidden in prompt preference fixture') }
 const database = {
   select(selection?: Record<string, unknown>) {
@@ -105,7 +107,7 @@ stub('../artifacts/store.ts', { artifactSummaries: forbidden })
 stub('./bot-instructions.ts', { botInstructions: forbidden })
 stub('./execution-context.ts', { executionContextParts: async () => ({ models: 'Synthetic allowed models', live: 'Synthetic current availability' }) })
 stub('./github-context.ts', { githubPromptContext: async () => 'Synthetic authorized repositories' })
-stub('./summary-model.ts', { summarizeConversation: forbidden })
+stub('../profile/memory.ts', { memoryForBotPrompt: async (who: string, botId: string, enabled?: boolean, nativeTurn?: unknown) => { profileReads.push({ owner: who, bot: botId, enabled, nativeTurn }); return profileText } })
 stub('../personal-mailbox-config.ts', { personalMailboxEnabled: () => false })
 stub('../search/index.ts', { webSearch: forbidden })
 // The real prompt/tool graph imports session helpers; reading preferences must never authenticate.
@@ -127,6 +129,7 @@ before(async () => {
 after(() => overrideDeploymentSwitch('factoryRouting', undefined))
 beforeEach(() => {
   reads.length = 0; gates = {}; errors = {}; started = {}
+  profileReads.length = 0; profileText = ''
   preferences = {
     [owner]: { memoryEnabled: true, personalInstructions: 'Synthetic personal instruction' },
     [peer]: { memoryEnabled: false, personalInstructions: 'Synthetic peer instruction' },
@@ -144,24 +147,36 @@ beforeEach(() => {
 })
 
 test('actual hosted preparation reads prompt preferences once without attention or a second instruction query', async () => {
-  const prompt = await sdk.preparePrompt(owner, bot, snapshot)
+  const prompt = await sdk.prepareEveInstructions(owner, bot, snapshot)
   assert.equal(reads.filter(row => row.kind === 'preferences' || row.kind === 'attention').length, 1)
   assert.deepEqual(reads.filter(row => row.kind === 'preferences').map(row => row.selection), [['memoryEnabled', 'personalInstructions']])
-  const plainMessages = [{ position: 3, message: { role: 'assistant' as const, content: 'Synthetic previous reply' } }, { position: 4, message: { role: 'user' as const, content: `${owner} current request` } }]
-  assert.deepEqual(prompt, {
-    ...promptWithCachedContext(instructionsWithPersonal(withCoordinatorPresentation(executionInstructions(snapshot)), preferences[owner].personalInstructions), cachedContextLines('Synthetic authorized repositories', 'Synthetic allowed models'), sessions[owner].memory, '\n' + SCHEDULE_INSTRUCTIONS + '\nSynthetic current availability'),
-    messages: promptMessages(null, plainMessages, { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([owner, bot]) }),
-  })
-  assert.equal(reads.length, 3, 'session, messages and one shared preference query only')
+  assert.equal(prompt, promptWithCachedContext(instructionsWithPersonal(withCoordinatorPresentation(executionInstructions(snapshot)), preferences[owner].personalInstructions), cachedContextLines('Synthetic authorized repositories', 'Synthetic allowed models'), sessions[owner].memory, '\n' + SCHEDULE_INSTRUCTIONS + '\nSynthetic current availability').instructions)
+  assert.equal(reads.length, 2, 'memory and one shared preference query; no history read')
+  assert.equal(reads.some(row => row.kind === 'messages'), false)
+
+})
+
+test('approved facts use the native turn and one preference snapshot; disabled memory records no use', async () => {
+  profileText = 'Synthetic approved profile fact'
+  const nativeTurn = { sessionId: 'wrun_actual', turnId: 'turn_1' }
+  const first = await sdk.prepareEveInstructions(owner, bot, snapshot, nativeTurn)
+  assert.match(first, /Synthetic approved profile fact/)
+  assert.match(first, /Synthetic saved memory/)
+  assert.deepEqual(profileReads, [{ owner, bot, enabled: true, nativeTurn }])
+  preferences[owner].memoryEnabled = false
+  const second = await sdk.prepareEveInstructions(owner, bot, snapshot, nativeTurn)
+  assert.doesNotMatch(second, /Synthetic approved profile fact|Synthetic saved memory/)
+  assert.equal(profileReads.length, 1, 'disabled memory never queries or records facts')
+  assert.equal(reads.filter(row => row.kind === 'preferences').length, 2)
 })
 
 test('next hosted prompt uses fresh changed and cleared values without changing stored memory', async () => {
-  const first = await sdk.preparePrompt(owner, bot, snapshot)
+  const first = await sdk.prepareEveInstructions(owner, bot, snapshot)
   preferences[owner] = { memoryEnabled: false, personalInstructions: '' }
-  const second = await sdk.preparePrompt(owner, bot, snapshot)
-  assert.match(first.instructions, /Synthetic personal instruction/)
-  assert.match(first.instructions, /Synthetic saved memory/)
-  assert.doesNotMatch(second.instructions, /Synthetic personal instruction|Synthetic saved memory/)
+  const second = await sdk.prepareEveInstructions(owner, bot, snapshot)
+  assert.match(first, /Synthetic personal instruction/)
+  assert.match(first, /Synthetic saved memory/)
+  assert.doesNotMatch(second, /Synthetic personal instruction|Synthetic saved memory/)
   assert.equal(sessions[owner].memory, 'Synthetic saved memory')
   assert.equal(reads.filter(row => row.kind === 'preferences').length, 2)
   assert.equal(reads.filter(row => row.kind === 'attention').length, 0)
@@ -169,15 +184,15 @@ test('next hosted prompt uses fresh changed and cleared values without changing 
 
 test('prompt reader keeps missing-row defaults, owner scope and the legacy/native output contract', async () => {
   delete preferences[owner]
-  const result = await store.loadConversationForPrompt(owner, bot)
-  assert.equal(result.memory, 'Synthetic saved memory'); assert.equal(result.personalInstructions, '')
-  assert.deepEqual(result.messages.map(row => row.position), [3, 4])
-  assert.deepEqual(result.messages[1].message, { role: 'user', content: `${owner} current request` })
-  const other = await store.loadConversationForPrompt(peer, bot)
-  assert.equal(other.memory, ''); assert.equal(other.personalInstructions, 'Synthetic peer instruction')
+  const result = await store.loadProductPromptContext(owner, bot)
+  assert.equal(result.memory, 'Synthetic saved memory'); assert.equal(result.personalInstructions, ''); assert.equal(result.memoryEnabled, true)
+  assert.deepEqual(Object.keys(result).sort(), ['memory', 'memoryEnabled', 'personalInstructions'])
+  const other = await store.loadProductPromptContext(peer, bot)
+  assert.equal(other.memory, ''); assert.equal(other.personalInstructions, 'Synthetic peer instruction'); assert.equal(other.memoryEnabled, false)
   assert.doesNotMatch(JSON.stringify(other), /synthetic-prompt-owner|Synthetic saved memory/)
   const legacy = await store.loadConversation(owner, bot)
-  assert.deepEqual(legacy, { summary: result.summary, memory: result.memory, messages: result.messages })
+  assert.equal(legacy.memory, result.memory)
+  assert.deepEqual(legacy.messages.map(row => row.position), [3, 4])
   assert.equal('personalInstructions' in legacy, false)
 })
 
@@ -193,43 +208,22 @@ test('already-read personal formatter preserves bytes and the legacy reader stil
   assert.equal(reads.filter(row => row.kind === 'preferences').length, 2)
 })
 
-test('preference read overlaps session and messages without making messages outrun summaryThrough', async () => {
+test('product preference and memory reads overlap without reading history', async () => {
   gates = { session: deferred(), preferences: deferred() }
-  started = { session: deferred(), preferences: deferred(), messages: deferred() }
-  const pending = store.loadConversationForPrompt(owner, bot)
+  started = { session: deferred(), preferences: deferred() }
+  const pending = store.loadProductPromptContext(owner, bot)
   try {
     await Promise.all([started.session.promise, started.preferences.promise])
     assert.equal(reads.some(row => row.kind === 'messages'), false)
-    gates.session!.resolve()
-    await started.messages.promise
-    assert.equal(reads.filter(row => row.kind === 'preferences').length, 1)
-  } finally {
-    gates.session!.resolve(); gates.preferences!.resolve()
-    await pending
-  }
+  } finally { gates.session!.resolve(); gates.preferences!.resolve(); await pending }
 })
 
-test('early preference failure waits for the active conversation read before rejecting with its original cause', async () => {
-  gates = { session: deferred() }; started = { preferences: deferred(), messages: deferred() }
-  const denied = errors.preferences = new Error('Synthetic preference refusal')
-  let settled = false
-  const pending = store.loadConversationForPrompt(owner, bot)
-  const observed = pending.then(() => { settled = true; return undefined }, error => { settled = true; return error })
-  await started.preferences.promise
-  await Promise.resolve()
-  assert.equal(settled, false)
-  gates.session!.resolve()
-  assert.equal(await observed, denied)
-  assert.equal(reads.filter(row => row.kind === 'messages').length, 1)
-})
-
-for (const failure of ['session', 'messages', 'preferences', 'both'] as const) {
-  test(`prompt input ${failure} failure retains the original cause with no retry or default fallback`, async () => {
-    const conversationError = new Error('Synthetic conversation refusal'), preferenceError = new Error('Synthetic preference refusal')
-    if (failure === 'session' || failure === 'both') errors.session = conversationError
-    if (failure === 'messages') errors.messages = conversationError
+for (const failure of ['session', 'preferences', 'both'] as const) {
+  test(`product input ${failure} failure retains the original cause`, async () => {
+    const memoryError = new Error('Synthetic memory refusal'), preferenceError = new Error('Synthetic preference refusal')
+    if (failure === 'session' || failure === 'both') errors.session = memoryError
     if (failure === 'preferences' || failure === 'both') errors.preferences = preferenceError
-    await assert.rejects(store.loadConversationForPrompt(owner, bot), error => error === (failure === 'preferences' ? preferenceError : conversationError))
+    await assert.rejects(store.loadProductPromptContext(owner, bot), error => error === (failure === 'preferences' ? preferenceError : memoryError))
     assert.equal(reads.filter(row => row.kind === 'preferences').length, 1)
     assert.equal(reads.filter(row => row.kind === 'session').length, 1)
   })

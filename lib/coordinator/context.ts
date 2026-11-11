@@ -370,6 +370,8 @@ export interface ChatItem {
   createdAt: string
   /** Still in the inbox: its position is inferred, not a coordinator_messages row, so it can't be marked read. */
   pending?: true
+  /** The host recorded native Eve admission; only its settlement can fail it. */
+  native?: true
   /** What the person quoted from an artifact, shown above their text. */
   quote?: ArtifactQuote
   /** Notes the person pinned on pages in the browser, shown as chips above their text. */
@@ -506,7 +508,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         // The turn that answered this message failed (store.failTurn): the reason stays under it.
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
         const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
-        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
+        items.push({ ...base, from: 'person', text, ...((message as {mikkaEveAccepted?:unknown}).mikkaEveAccepted===true?{native:true as const}:{}), ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {
       const schedule = scheduleChatResultSchema.safeParse((message as { mikkaScheduleResult?: unknown }).mikkaScheduleResult)

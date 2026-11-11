@@ -35,30 +35,13 @@ export function observeReads(page, requirements, actionIds, basePath) {
   const waits = requirements.map(requirement => {
     let phase = 'response'
     let timer
-    // A read that never produces a response leaves only silence in the report.
-    // Record its actual response statuses and transport failures so a timeout
-    // separates "never requested" from "aborted or cached".
-    const seen = []
-    const path = requirement.path ? `${basePath}${requirement.path}` : null
-    const onResponse = response => {
-      if (path && new URL(response.url()).pathname === path) seen.push(`response:${response.status()}`)
-    }
-    const onFailed = request => {
-      if (path && new URL(request.url()).pathname === path) seen.push(`failed:${request.failure()?.errorText ?? 'unknown'}`)
-    }
-    if (path) { page.on('response', onResponse); page.on('requestfailed', onFailed) }
     const read = page.waitForResponse(response => {
       const request = response.request()
       const pathname = new URL(response.url()).pathname
       if (requirement.path) return request.method() === 'GET' && pathname === `${basePath}${requirement.path}`
       return observedAction(request, pathname, basePath, actionIds)?.action === requirement.action
     }, { timeout: 45_000 }).then(async response => {
-      if (!response.ok()) {
-        // Keep the exact failure, with the status and a bounded body so the
-        // packaged runtime names the refused read instead of only its path.
-        const body = await response.text().catch(() => '')
-        assert.fail(`Read must succeed: ${requirement.path ?? requirement.action} (${response.status()}) ${body.slice(0, 300)}`)
-      }
+      assert.equal(response.ok(), true, `Read must succeed: ${requirement.path ?? requirement.action}`)
       const headers = response.headers()
       const action = observedAction(response.request(), new URL(response.url()).pathname, basePath, actionIds)
       if (requirement.action && action?.kind === 'flight') {
@@ -88,11 +71,8 @@ export function observeReads(page, requirements, actionIds, basePath) {
     // Ordinary JSON headers are not completion. Keep the same total deadline
     // while waiting for that real body, and report its exact unfinished phase.
     return Promise.race([read, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`PARITY_READ_TIMEOUT:${requirement.path ?? requirement.action}:${phase}:${seen.join(',') || (path ? 'no-request' : 'action')}`)), 45_000)
-    })]).finally(() => {
-      clearTimeout(timer)
-      if (path) { page.off('response', onResponse); page.off('requestfailed', onFailed) }
-    })
+      timer = setTimeout(() => reject(new Error(`PARITY_READ_TIMEOUT:${requirement.path ?? requirement.action}:${phase}`)), 45_000)
+    })]).finally(() => clearTimeout(timer))
   })
   // Attach rejection handlers immediately, including if an earlier DOM check
   // fails. A timed-out observation must never become an unhandled rejection.

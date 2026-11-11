@@ -9,7 +9,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { execFileSync } from 'node:child_process'
 import { shouldSkip } from '../vercel-ignore-build.mjs'
 
 /** Must be non-empty in the final build environment: inlined client keys, the migration targets, the worker build. */
@@ -23,14 +22,6 @@ const REPOSITORY = 'alexj11324/Mikka'
 const WEB_WORKFLOW = '.github/workflows/web-deploy.yml'
 const BUILD_STEPS = ['Build (runs migrations last, as the Vercel build did)',
   'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
-export const RUNTIME_RELEASE_PATHS = ['.github/workflows/e2b-official-runtime.yml', '.github/workflows/e2b-template.yml', '.github/workflows/e2b-runtime-release.yml', '.github/workflows/web-deploy.yml',
-  'scripts/e2b/validate-template-subscriptions.mjs', 'scripts/e2b/cleanup-template-candidates.py',
-  'scripts/e2b/runtime-report.mjs', 'scripts/e2b/acceptance-daemon.mts', 'scripts/e2b/acceptance-bootstrap.mts',
-  'lib/captures/bootstrap-evidence.ts', 'app/api/runs/[runId]/evidence/route.ts',
-  'lib/computer/claude-startup-hint.ts', 'lib/computer/codex-startup-hint.ts',
-  'scripts/acceptance/cloud-startup.mjs', 'scripts/acceptance/cloud-startup-evidence.mjs',
-  'scripts/acceptance/team-workspace.mjs', 'lib/smoke-account.ts',
-  'scripts/e2b/publish-template-env.mjs', 'scripts/release/web-deploy.mjs', 'scripts/release/build-vercel.mjs']
 
 function parse(text) {
   const entries = new Map()
@@ -228,22 +219,6 @@ export async function deploymentPlan({ expectedBuild, runtimeRefresh = false, to
   return classify({ VERCEL_ENV: 'production', VERCEL_GIT_PREVIOUS_SHA: previous, VERCEL_GIT_COMMIT_SHA: expectedBuild })
 }
 
-/** Publication-control edits need their own real release validation even though
- * they intentionally do not alter the daemon's content hash. Compare the entire
- * push, never just HEAD's parent. Missing history is an error, not "unchanged". */
-export function runtimeRefreshRequired({ expectedBuild, eventName, event, explicit = false }, diff = (before, after) =>
-  execFileSync('git', ['diff', '--name-only', '--no-renames', before, after, '--', ...RUNTIME_RELEASE_PATHS], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim().split('\n').filter(Boolean)) {
-  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
-  if (eventName !== 'push') return eventName === 'workflow_dispatch' && explicit === true
-  if (!SHA.test(event?.before ?? '') || /^0+$/.test(event.before) || event.after !== expectedBuild || event.ref !== 'refs/heads/main') {
-    throw Error('webDeploy:invalidPushSource')
-  }
-  let files
-  try { files = diff(event.before, expectedBuild) } catch { throw Error('webDeploy:releaseControlDiffUnavailable') }
-  if (!Array.isArray(files) || !files.every(path => typeof path === 'string')) throw Error('webDeploy:releaseControlDiffUnavailable')
-  return files.some(path => RUNTIME_RELEASE_PATHS.includes(path))
-}
-
 /** Verify the public application while this job still owns the deployment
  * queue. Deployment metadata alone does not prove what the public route serves. */
 export async function verifyProductionBuild({ expectedBuild, fetchImpl = fetch, maxWaitMs = 120_000,
@@ -295,15 +270,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   } else if (command === 'main') {
     await assertCurrentMain({ expectedBuild: process.env.GITHUB_SHA, token: process.env.GITHUB_TOKEN })
     console.log('Current main matches this release')
-  } else if (command === 'runtime-refresh') {
-    let event
-    if (process.env.GITHUB_EVENT_NAME === 'push') {
-      try { event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) } catch { throw Error('webDeploy:invalidPushEvent') }
-    }
-    const refresh = runtimeRefreshRequired({ expectedBuild: process.env.GITHUB_SHA, eventName: process.env.GITHUB_EVENT_NAME,
-      event, explicit: process.env.RUNTIME_REFRESH === 'true' })
-    console.log(`Runtime release control refresh: ${refresh}`)
-    if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `refresh=${refresh}\n`, { flag: 'a' })
   } else if (command === 'await-web' || command === 'await-desktop-web') {
     const result = await waitForWebDeployment({ expectedBuild: process.env.GITHUB_SHA,
       ...webDeploymentWaitOptions(command),
@@ -314,5 +280,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log(JSON.stringify({ event: 'production_version_verified', ...result }))
     if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY,
       `\n### Public production version verified\n${result.url}\n\nBuild: \`${result.build}\`\n\nUTC: ${result.verifiedAt}\n`, { flag: 'a' })
-  } else throw Error('usage: web-deploy.mjs env <file> | skip | main | runtime-refresh | await-web | await-desktop-web | verify')
+  } else throw Error('usage: web-deploy.mjs env <file> | skip | main | await-web | await-desktop-web | verify')
 }

@@ -103,6 +103,7 @@ import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
 import { readWorkspaceReceipt } from './coding-workspace/files'
 import { readWorkspaceDiffReceipt } from './coding-workspace/diff'
+import { handleWorkspaceGitRequest } from './coding-workspace/git'
 import type { WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
 import { RepositoryCache } from "./repositories"
 import { prepareRunRepository } from './run-repository'
@@ -248,8 +249,6 @@ export class Daemon {
   private registrationTraceContext?: RunTraceContext
   private journal!: RunJournal
   private readonly workspaceReads = new Set<string>()
-  /** This claim's frozen environment recipe, until its run finishes. */
-  private readonly claimedSetups = new Map<string, NonNullable<DeviceRepo['setup']>>()
   private captureUploader!: CaptureUploader
   private worktrees!: WorktreeManager
   private repositories!: RepositoryCache
@@ -1007,6 +1006,10 @@ export class Daemon {
             if (!entry) return { result: { ok: false as const, code: 'workspace_checkout_unavailable' as const }, files: [] }
             return readWorkspaceDiffReceipt(request, entry, this.repository(entry.assignment).path)
           }
+          if (request.request.kind.startsWith('git_')) {
+            if (!entry) return { result: { ok: false as const, code: 'workspace_checkout_unavailable' as const }, files: [] }
+            return handleWorkspaceGitRequest(request, entry, this.repository(entry.assignment).path)
+          }
           return readWorkspaceReceipt(request, entry)
         })
       // Stop commands keep their existing independent path while bounded file
@@ -1633,10 +1636,6 @@ export class Daemon {
     }, { root: true }) }
     catch (error) { initialSync?.received?.(); throw error }
     const projected = deviceRepoSchema.safeParse(assignment.repo)
-    // The claim may carry this run's frozen environment recipe. It only affects
-    // the worktree bootstrap and is never journaled into daemon state.
-    if (projected.success && projected.data.repoId === assignment.repoId && projected.data.setup)
-      this.claimedSetups.set(assignment.runId, projected.data.setup)
     initialSync?.received?.(assignment.runId === runId && assignment.deviceId === deviceId &&
       !assignment.continuesRunId && !assignment.resumeFrom && !assignment.resumeSessionId && !assignment.requireSessionResume && !assignment.requireWorktreeContinuation &&
       assignment.remoteUrl && projected.success && projected.data.repoId === assignment.repoId && projected.data.remoteUrl === assignment.remoteUrl
@@ -1682,8 +1681,7 @@ export class Daemon {
       throw new ServerUnreachableError('Device session changed while claiming run')
     // The initial discovery receipt is consumed here, never journaled for resume.
     const { repo: _initialRepository, ...runAssignment } = assignment
-    try { return await this.supervisor.start(runAssignment) }
-    finally { this.claimedSetups.delete(assignment.runId) }
+    return await this.supervisor.start(runAssignment)
   }
 
   /**
@@ -1758,15 +1756,11 @@ export class Daemon {
 
   private repository(assignment: RunAssignment): DeviceRepo {
     const settings = this.device.repos?.find(repo => repo.repoId === assignment.repoId)
-    // The frozen environment recipe overrides the repository's stored recipe
-    // for this run only; the next claim freezes its own. The server sets
-    // `approved` because the person saved the scripts.
-    const setup = this.claimedSetups.get(assignment.runId) ?? settings?.setup
     if (assignment.remoteUrl) {
       const { key } = normalizeRepository(assignment.remoteUrl, { allowFile: daemonTestMode(process.env) })
-      return { ...settings, ...(setup ? { setup } : {}), repoId: assignment.repoId, name: key.split('/').at(-1)!, path: this.repositories.pathFor(assignment.remoteUrl) }
+      return { ...settings, repoId: assignment.repoId, name: key.split('/').at(-1)!, path: this.repositories.pathFor(assignment.remoteUrl) }
     }
-    if (this.usesHostedWorkspace(assignment) && settings) return setup ? { ...settings, setup } : settings
+    if (this.usesHostedWorkspace(assignment) && settings) return settings
     throw new DaemonError(DAEMON_RPC_ERRORS.repoNotAllowed, 'Repository URL required; dispatch a new thread.')
   }
 

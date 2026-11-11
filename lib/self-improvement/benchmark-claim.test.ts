@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 import { transpileModule, ModuleKind } from 'typescript'
+import { TASK_MCP_HEADER, TASK_MCP_VERSION } from '@mikka/protocol'
 import * as codedErrorProtocol from '@mikka/protocol/coded-error'
 import * as daemonProtocol from '@mikka/protocol/daemon'
 import * as deviceProtocol from '@mikka/protocol/device'
@@ -49,6 +50,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const db={select:()=>{selectionsRead++;return {from:()=>({where:()=>({limit:async()=>[selections.shift()]})})}},update:()=>({set:(values:object)=>({where:()=>({returning:async()=>{calls.push('block');Object.assign(run,values);return [{id:run.id}]}})})})}
   const benchmark={harness:'codex',model:'actual-observed-model',verifyCommand:'git diff --exit-code HEAD --',policy:{readOnly:true,networkAllow:[],permissions:{install_dependency:'deny',write_outside_repo:'deny',git_push:'deny',network:'ask'}},benchmark:{caseId:'case',benchmarkDigest:'digest',sourceCommit:'frozen-sha'}}
   const modules:Record<string,unknown>={
+    '@mikka/protocol':{TASK_MCP_HEADER,TASK_MCP_VERSION},
     // This VM owns frozen benchmark composition, not credential admission;
     // the actual route/fence and token revocation have real PostgreSQL tests.
     '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(projectLease.active,true);assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,workspaceId:run.workspaceId,ownershipState:'bound',scope:'personal',content:{type:'doc'}}}},
@@ -122,10 +124,6 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       githubMachineCredential:async()=>{credentialChecks.push('credential');throw new Error('This benchmark fixture must not open GitHub credentials')},
     },
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
-    // This benchmark fixture owns frozen benchmark composition, not Run
-    // environments; the environments DB suites cover freezing.
-    '@/lib/workspace-db':{workspacePool:{query:async()=>({rows:[]})}},
-    '@/lib/environments/runs':{freezeRunEnvironment:async()=>null},
     '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token',...(options.cloud?{scopeDeviceId:'device',scopeWorkspaceId:'task-workspace'}:{})}),ownedDevice:async()=>({enabled:true,kind:options.cloud?'cloud':'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,kind:options.cloud?'cloud':'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{assert.equal(projectLease.active,true);calls.push('token');return {token:'synthetic-test-token'}}},

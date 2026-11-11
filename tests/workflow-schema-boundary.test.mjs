@@ -25,9 +25,9 @@ function imports(file) {
   })
 }
 
-test('Coordinator schemas cannot bring Node/server modules across the durable Workflow boundary', () => {
-  // The schemas reach the workflow through its tool registries (tools.ts, factory-tools.ts), so walk
-  // workflow.ts and every coordinator module it bundles. Step files ('use step') run outside the sandbox.
+test('product tool schemas keep their durable invocation boundary free of server modules', () => {
+  // Product tool registries remain callable from durable business workflows.
+  // Eve owns the agent loop; Node work still belongs in the tool implementations.
   const names = new Set(['factoryCheckRecoverySchema', 'factoryDispatchSchema', 'contextQuestionAnswerSchema', 'questionReferenceSchema', 'questionEscalationSchema', 'commandSchema', 'skillEvaluationCommandSchema'])
   const coordinator = resolve(root, 'workflows/coordinator')
   const bundled = new Set()
@@ -39,7 +39,7 @@ test('Coordinator schemas cannot bring Node/server modules across the durable Wo
       if (dependency && dirname(dependency) === coordinator) bundle(dependency)
     }
   }
-  bundle(resolve(coordinator, 'workflow.ts'))
+  bundle(resolve(coordinator, 'tools.ts'))
   const found = new Set()
   const roots = [...bundled].flatMap(file => source(file).statements.flatMap(statement => {
     if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly || !statement.importClause?.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) return []

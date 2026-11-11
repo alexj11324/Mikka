@@ -199,8 +199,8 @@ test('byte-exact normalization of invalid UTF-8 yields only binary metadata', ()
 
 test('public diff identity, source version, file metadata and patch content cannot be substituted', () => {
   const cases: Array<[string, (value: Fixture) => void]> = [
-    ['other owner', value => { if (value.receipt.result.ok) value.receipt.result.identity.ownerId = 'other-owner' }],
-    ['other device', value => { if (value.receipt.result.ok) value.receipt.result.identity.deviceId = randomUUID() }],
+    ['other owner', value => { if (value.receipt.result.ok && 'identity' in value.receipt.result) value.receipt.result.identity.ownerId = 'other-owner' }],
+    ['other device', value => { if (value.receipt.result.ok && 'identity' in value.receipt.result) value.receipt.result.identity.deviceId = randomUUID() }],
     ['source version', value => { if (value.receipt.result.ok && value.receipt.result.kind === 'diff_file') value.receipt.result.sourceVersion = 'f'.repeat(64) }],
     ['file metadata', value => { if (value.receipt.result.ok && value.receipt.result.kind === 'diff_file') value.receipt.result.file.newSize = 1 }],
     ['device-authored patch', value => { if (value.receipt.result.ok && value.receipt.result.kind === 'diff_file') value.receipt.result.patch = '+forged public content\n' }],

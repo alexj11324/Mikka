@@ -5,6 +5,7 @@ import type { ComposioAccountChoice } from '@/lib/composio-actions'
 import { appCallSettingKeys } from '@/lib/operations/app-permission-keys'
 import { permissionDecision } from '@/lib/operations/permission-precedence'
 import type { WriteJudge } from '@/lib/operations/write-judgment'
+import type { NativeWriteReview } from '@/lib/operations/native-write-review'
 
 // Any app a person connected from the 插件 store, through the tools Composio
 // lists for that toolkit; nothing is written per app (decision 2026-10-31).
@@ -153,7 +154,7 @@ export async function listAppTools(deps: AppToolDeps, raw: unknown) {
 }
 
 /** Runs one tool call in the person's own connected account, or turns it into a card. */
-export async function callAppTool(deps: AppToolDeps, raw: unknown) {
+export async function callAppTool(deps: AppToolDeps, raw: unknown, native?: { ownerId: string; botId: string | null; review: NativeWriteReview }) {
   const parsed = callAppToolInput.safeParse(raw)
   if (!parsed.success) return { error: 'invalidIntegrationInput' }
   const { toolkit, tool: slug, arguments: args, account_id } = parsed.data
@@ -170,9 +171,13 @@ export async function callAppTool(deps: AppToolDeps, raw: unknown) {
   // exactly as an unset key does (decision 2026-11-01-1330); `deps.setting`
   // logs the failure by name and returns null rather than refusing.
   const setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
-  if (setting === 'deny') return { error: 'integrationActionDenied' }
-  const card = setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask')
-  if (card) return deps.propose(call, ready.accountId)
+  let decision = setting === 'deny' ? 'deny' as const : setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask') ? 'ask' as const : 'allow' as const
+  if (native) {
+    const reviewed = await native.review(decision, { ownerId: native.ownerId, botId: native.botId, action: 'app_tool_call', input: call, accountId: ready.accountId, version: call.version, policy: setting })
+    if (decision !== 'deny') decision = reviewed
+  }
+  if (decision === 'deny') return { error: 'integrationActionDenied' }
+  if (decision === 'ask') return deps.propose(call, ready.accountId)
   if (!isReadOnlyTool(tool)) return runRecorded(deps, call, ready.accountId)
   try {
     const result = await deps.execute(call, ready.accountId)

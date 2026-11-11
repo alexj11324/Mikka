@@ -28,8 +28,6 @@ export const DISK_USAGE_TTL_MS = 5 * 60_000
 
 /** How long fetching an issue branch may take before the run starts from base. */
 export const FETCH_TIMEOUT_MS = 60_000
-/** Bound on the approved setup recipe; a hung install stops the run. */
-export const SETUP_TIMEOUT_MS = 30 * 60_000
 
 /** Git config for fetching into the main repo: no hooks, no `ext::`. */
 export const FETCH_GIT = [
@@ -255,7 +253,6 @@ export class WorktreeManager {
         env: withTaskEnv(buildChildEnv(), taskEnv).env,
         extendEnv: false,
         stdio: "ignore",
-        timeout: SETUP_TIMEOUT_MS,
       })
     }
     return "done"

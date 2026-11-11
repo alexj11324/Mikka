@@ -44,6 +44,8 @@ export interface RunSource {
 export type CitationSource = IssueSource | RunSource
 
 export interface ChatItem {
+  /** eve mirror identity; native replay is hidden once this historical row arrives. */
+  streamId?: string
   id?: string
   position: number
   from: 'person' | 'coordinator' | 'event'

@@ -52,7 +52,7 @@ function conversation(): Record<string, unknown>[] {
 
 dbTest('the chat reads compact parts and shows exactly what the full messages show', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { chatItems, QUOTE_PREVIEW_CHARS }, { compactChatMessage, compactChatToolMetadata, TOOL_PREVIEW_CHARS }, { asc, eq, and, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('./context'), import('./chat-projection'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('./context'), import('./chat-projection'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-chat-projection-${randomUUID()}`, botId = randomUUID()
@@ -124,7 +124,7 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
 
 dbTest('exhausted recovery saves completed receipts once, keeps evidence and releases the failed lease atomically', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { asc, eq, and, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-tool-recovery-${randomUUID()}`, botId = randomUUID(), holder = 'wrun_tool-recovery-fixture'

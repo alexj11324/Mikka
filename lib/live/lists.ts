@@ -9,7 +9,7 @@ import { ownerLiveScope } from './owner-scope'
 type Database = Pick<PoolClient, 'query'>
 export type OwnerListKind = 'thread_list' | 'task_run_list' | 'bot_chat_list' | 'device_list'
 export type WorkspaceListKind = 'issue_list' | 'bot_list' | 'group_list' | 'workspace_settings'
-type ListKind = OwnerListKind | WorkspaceListKind | 'model_settings' | 'environment_execution'
+type ListKind = OwnerListKind | WorkspaceListKind | 'model_settings'
 type Target = { scope: LiveScope; events: LiveInvalidation[] }
 
 const target = (scope: LiveScope, kinds: readonly ListKind[]): Target => ({
@@ -44,17 +44,6 @@ export async function runListTargets(database: Database, workspaceDatabase: Data
   return reference?.workspaceId ? [target({ ownerId: run.userId, workspaceId: reference.workspaceId },
     previewOnly || !run.issueId ? ['thread_list'] : ['thread_list', 'task_run_list'])] : []
 }
-
-/** A run action's status or output changed. Only the run's owner, in the
- * run's tenant, re-reads the actions panel; no command or log text is sent. */
-export async function environmentExecutionTargets(database: Database, workspaceDatabase: Database, runId: string) {
-  const { rows: [run] } = await database.query<{ userId: string }>('SELECT "userId" FROM agent_runs WHERE id=$1', [runId])
-  if (!run) return []
-  const { threadLiveReferences } = await import('./panels')
-  const [reference] = await threadLiveReferences(database, workspaceDatabase, [runId], run.userId)
-  return reference?.workspaceId ? [target({ ownerId: run.userId, workspaceId: reference.workspaceId }, ['environment_execution'])] : []
-}
-export const environmentExecutionChanged = (executor: object, runId: string) => changed(executor, `run-actions:${runId}`, (database, workspace) => environmentExecutionTargets(database, workspace, runId))
 
 type IssueScope = { id: string; userId: string; scope: string; workspaceId: string | null }
 

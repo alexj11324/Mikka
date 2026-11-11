@@ -13,7 +13,7 @@ mock.module('../live/notify', { namedExports: {
   ...original,
   scheduleLive: (work: () => Promise<void>) => { pending.push(work()) },
 } })
-const { appendMessages } = await import('../coordinator/store')
+const { appendMessages } = await import('../../tests/support/legacy-coordinator-store')
 const { pool } = await import('../db')
 const { workspacePool } = await import('../workspace-db')
 try {

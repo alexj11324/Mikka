@@ -62,5 +62,4 @@ export const settingsKeys = {
   teamDirectory: (id?: string) => ['team-directory', id ?? null] as const,
   teamMembers: (id: string) => ['team-members', id] as const,
   audit: (id: string, filter: string, cursor: string | null) => ['settings:audit', id, filter, cursor] as const,
-  environments: (id: string) => ['settings:environments', id] as const,
 }

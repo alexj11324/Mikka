@@ -45,6 +45,7 @@ export function ConnectedList({ apps, ownRead, href, onOpen, workspaceId, worksp
       </EmptyHeader>
       <Button variant="secondary" size="sm" nativeButton={false} render={<Link href={workspaceLink({ section: 'plugins' })} />}>{t('openStore')}</Button>
     </Empty>
+    {workspaceId && <McpConnections workspaceId={workspaceId} workspaceName={workspaceName} read={mcp} />}
   </div>
   return <div className="flex flex-col gap-4">
     <ConnectedAppsStatus apps={apps} />

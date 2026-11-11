@@ -6,7 +6,7 @@
 export type SettingsSectionId =
   | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'bot-permissions' | 'models'
   | 'logins' | 'privacy' | 'computers' | 'developer'
-  | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'environments' | 'audit' | 'usage' | 'billing' | 'cloud'
+  | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'audit' | 'organization' | 'usage' | 'billing' | 'cloud'
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
@@ -47,9 +47,10 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
   // Members see it too and write repository entries (permissions.ts); one page with 密钥与登录 (decision 2026-11-02-2120).
   { id: 'secrets', group: 'workspace', title: 'Secrets and environment' },
-  // Setup/install scripts and reusable actions a task machine runs before and beside the Agent.
-  { id: 'environments', group: 'workspace', title: 'Run environments' },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
+  // Enterprise (#1608 P2): the Organization this team is bound to. Only a UI layer that draws it
+  // shows it (slot settings-organization, ORGANIZATION_SETTINGS); the open-source UI has none.
+  { id: 'organization', group: 'workspace', title: 'Organization' },
   { id: 'usage', group: 'workspace', title: 'Usage' },
   // Members see 付款 here (their card designation and credit share); plan, balance and top-ups are admins' (C19).
   { id: 'billing', group: 'workspace', title: 'Billing' },
@@ -99,8 +100,8 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
  * personal workspace has every setting of the workspace itself (常规,
  * 密钥与环境, 用量, 计费) and none of these: 成员, 团队, 团队权限, 审计日志.
  */
-export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'teams', 'permissions', 'audit'])
+export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'teams', 'permissions', 'audit', 'organization'])
 
-export function visibleSettingsSections({ admin, personal = false, billing = true, cloudAdmin = false }: { admin: boolean; personal?: boolean; billing?: boolean; cloudAdmin?: boolean }): SettingsSectionDef[] {
-  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)) && (billing || s.id !== 'billing') && (cloudAdmin || s.id !== 'cloud'))
+export function visibleSettingsSections({ admin, personal = false, billing = true, cloudAdmin = false, organization = false }: { admin: boolean; personal?: boolean; billing?: boolean; cloudAdmin?: boolean; /** A UI layer draws 组织. */ organization?: boolean }): SettingsSectionDef[] {
+  return SETTINGS_SECTIONS.filter(s => !s.unbuilt && (admin || !s.adminOnly) && !(personal && TEAM_ONLY_SECTIONS.has(s.id)) && (billing || s.id !== 'billing') && (cloudAdmin || s.id !== 'cloud') && (organization || s.id !== 'organization'))
 }

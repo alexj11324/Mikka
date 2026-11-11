@@ -9,7 +9,8 @@ import type { RunFailure } from '@mikka/protocol/run-failure'
 import type { DaemonUpdateFailure, SetupRecipe } from '@mikka/protocol/device'
 import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
-import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
+import type { UserFactKind, UserFactState, MemorySourceKind, MemoryReviewStatus, MemoryScopeKind } from '@/lib/profile/kinds'
+import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -416,6 +417,10 @@ export const agentRuns = pgTable('agent_runs', {
   outcomeAt: timestamp('outcomeAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),
+  /** Evidence-only entry provenance (lib/run-origin.ts). Null on legacy rows: unknown, never inferred as 'web'. */
+  origin: text('origin').$type<RunOrigin | null>(),
+  /** Opaque entry identifiers for `origin`. Evidence-only (lib/captures/store.ts): never projected into lists, chat, events, logs or analytics. */
+  originRef: jsonb('originRef').$type<RunOriginRef | null>(),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true; requiredSandboxId?:string} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
@@ -606,13 +611,12 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
 
-/** First inbox and run settings are committed together, before preparation.
- * Replays still check the current chat lease and fresh execution authority. */
+/** Historical rows retained for database compatibility; eve owns new session state. */
 export const coordinatorStartupReceipts = pgTable('coordinator_startup_receipts', {
   userId: text('userId').notNull(), botId: uuid('botId').notNull(), holder: text('holder').notNull(),
   round: integer('round').notNull(), version: integer('version').notNull().default(1),
-  settings: jsonb('settings').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupSettings>().notNull(),
-  inbox: jsonb('inbox').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupInbox>().notNull(),
+  settings: jsonb('settings').$type<Record<string, unknown>>().notNull(),
+  inbox: jsonb('inbox').$type<Record<string, unknown>>().notNull(),
 }, table => [
   primaryKey({ columns: [table.userId, table.botId, table.holder, table.round] }),
   foreignKey({ columns: [table.userId, table.botId], foreignColumns: [coordinatorSessions.userId, coordinatorSessions.botId] }).onDelete('cascade'),
@@ -761,9 +765,53 @@ export const userFacts = pgTable('user_facts', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
   state: text('state').$type<UserFactState>().notNull().default('active'),
   userEdited: boolean('userEdited').notNull().default(false),
+  reviewStatus: text('reviewStatus').$type<MemoryReviewStatus>().notNull().default('approved'),
+  sourceKind: text('sourceKind').$type<MemorySourceKind>(),
+  sourceId: text('sourceId'),
+  sourceUrl: text('sourceUrl'),
+  scopeKind: text('scopeKind').$type<MemoryScopeKind>().notNull().default('global'),
+  scopeIds: uuid('scopeIds').array().notNull().default(sql`'{}'::uuid[]`),
+  clientRequestId: uuid('clientRequestId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('user_facts_repository_subject_key').on(table.userId, table.repository, table.kind, table.subjectKey).nullsNotDistinct(), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind), index('user_facts_repository_idx').on(table.userId, table.repository, table.state)])
+
+/** A persisted consolidation answer and the actual facts it derived from. No provider/model attribution is inferred. */
+export const userFactDecisions = pgTable('user_fact_decisions', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull(),
+  factId: uuid('factId').notNull().references(() => userFacts.id, { onDelete: 'cascade' }),
+  sourceFactIds: uuid('sourceFactIds').array().notNull(),
+  method: text('method').$type<'consolidation_answer'>().notNull(),
+  decisionKey: text('decisionKey').notNull(),
+  decidedAt: timestamp('decidedAt', { withTimezone: true }).notNull(),
+}, table => [unique('user_fact_decisions_request_unique').on(table.userId, table.decisionKey), index('user_fact_decisions_fact_idx').on(table.userId, table.factId)])
+
+/** Short-lived, owner-private snapshot. The main fact is scrubbed immediately on delete. */
+export const userFactUndo = pgTable('user_fact_undo', {
+  factId: uuid('factId').primaryKey().references(() => userFacts.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  snapshot: jsonb('snapshot').$type<{
+    value: Record<string, unknown>; evidence: UserFactEvidence[];
+    reviewStatus: MemoryReviewStatus; sourceKind: MemorySourceKind | null;
+    sourceId: string | null; sourceUrl: string | null;
+  }>().notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+}, table => [index('user_fact_undo_expires_idx').on(table.expiresAt)])
+
+/** Only trusted server-side prompt/consumer events can write actual usage. */
+export const userFactUses = pgTable('user_fact_uses', {
+  factId: uuid('factId').notNull().references(() => userFacts.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  eventId: uuid('eventId').notNull(),
+  targetKind: text('targetKind').$type<'thread' | 'task'>().notNull(),
+  targetId: uuid('targetId').notNull(),
+  targetUrl: text('targetUrl'),
+  usedAt: timestamp('usedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.factId, table.eventId] }),
+  index('user_fact_uses_recent_idx').on(table.userId, table.factId, table.usedAt.desc()),
+])
 
 /** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person (lib/profile/store.ts). The 记忆 switch is userPreferences.memoryEnabled. */
 export const userFactConsolidations = pgTable('user_fact_consolidations', {

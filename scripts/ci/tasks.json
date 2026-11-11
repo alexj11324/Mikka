@@ -195,7 +195,7 @@
     "env": {}
   },
   "core-41": {
-    "command": "pnpm test:coordinator-native-relay",
+    "command": "pnpm test:eve",
     "kind": "core",
     "env": {}
   },

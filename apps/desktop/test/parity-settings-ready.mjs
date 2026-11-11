@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 
-const SECTIONS = new Set(['members', 'preferences', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'environments', 'audit', 'usage', 'billing'])
+const SECTIONS = new Set(['members', 'preferences', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'audit', 'usage', 'billing'])
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
 
 function sectionId(id) {
@@ -20,9 +20,6 @@ export function settingsReadRequirements(id, fixture) {
     case 'general': return [{ action: 'workspace-settings.listArchivedBots' }]
     case 'permissions': return [{ path: `/api/workspaces/${fixture.workspace}/computer-policy` }]
     case 'billing': return [{ path: '/api/settings/credit-billing' }]
-    // The settings read adapter binds the selected workspace through the query;
-    // observation compares only the pathname.
-    case 'environments': return [{ path: '/api/settings/environments' }]
     // 设备 no longer reads the model order (#1578): its rows render from the device list alone.
     case 'connections': return [
       { path: '/api/integrations/composio' },
@@ -180,11 +177,6 @@ export async function settingsReady(page, id, fixture, messages, observed = { li
     case 'billing':
       await visible(role('status', 'Errors.billingNotConfigured').or(body.locator('[role="status"]').filter({ hasText: t('Errors.billingNotConfigured') })).first())
       await enabled(role('switch', 'Settings.creditShare.mine', section('payment-designation-heading')))
-      break
-    case 'environments':
-      // The parity account owns no Run environment; the empty state renders
-      // only after the real settings read settles (loading first).
-      await visible(text('Settings.environments.empty'))
       break
   }
   // These are a final refusal check after positive completion, never the

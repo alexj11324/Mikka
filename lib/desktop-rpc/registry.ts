@@ -42,7 +42,6 @@ import * as actions32 from '@/app/actions/user-secrets'
 import * as actions33 from '@/app/actions/workspace'
 import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
-import * as actions36 from '@/app/actions/environments'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
@@ -51,8 +50,6 @@ const functions = {
   'desktop.session': desktopSession,
   'desktop.accounts': desktopAccounts,
   'desktop.workspaceLink': desktopWorkspaceLink,
-  'environments.saveEnvironment': actions36.saveEnvironment,
-  'environments.archiveEnvironment': actions36.archiveEnvironment,
   'account.updateDisplayName': actions0.updateDisplayName,
   'account.uploadAvatar': actions0.uploadAvatar,
   'account.getPasswordStatus': actions0.getPasswordStatus,
@@ -163,8 +160,13 @@ const functions = {
   'link-preview.getLinkPreview': actions16.getLinkPreview,
   'memory.getMemory': actions17.getMemory,
   'memory.setMemory': actions17.setMemory,
+  'memory.clearMemory': actions17.clearMemory,
+  'memory.addFact': actions17.addFact,
   'memory.removeFact': actions17.removeFact,
   'memory.updateFact': actions17.updateFact,
+  'memory.reviewFact': actions17.reviewFact,
+  'memory.setFactScope': actions17.setFactScope,
+  'memory.undoRemoveFact': actions17.undoRemoveFact,
   'model-api-keys.getApiKeys': actions18.getApiKeys,
   'model-api-keys.refetchApiKeyModels': actions18.refetchApiKeyModels,
   'model-api-keys.updateApiKeyAfterQuota': actions18.updateApiKeyAfterQuota,

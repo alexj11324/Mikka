@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { apiProxyOptions, developmentPages } from './dev-http.mjs'
 import { assertApiBuildConfiguration, nodeRuntimePackages } from '../build-contract.mjs'
+import { startEveService } from '../../../scripts/eve-service.mjs'
 
 const execute = promisify(execFile)
 const repository = fileURLToPath(new URL('../../../', import.meta.url))
@@ -210,7 +211,7 @@ export async function startDevelopment({ args = [], root = repository, log = con
     process.stderr.write(`[dev] WARNING: serving uncommitted routes (--allow-stale-routes): ${stale.map(entry => entry.path).join(', ')}\n`)
   }
   await generate()
-  let nitro, vite, closing, workerReady
+  let nitro, vite, closing, workerReady, eve
   const proxyAgent = new Agent({ keepAlive: true, maxSockets: 256, maxTotalSockets: 256, maxFreeSockets: 64 })
   const close = () => closing ??= (async () => {
     // Keep the public origin alive while the real Workflow close hook drains.
@@ -219,10 +220,11 @@ export async function startDevelopment({ args = [], root = repository, log = con
     try { await nitro?.close() }
     finally {
       try { await vite?.close() }
-      finally { proxyAgent.destroy() }
+      finally { proxyAgent.destroy(); await eve?.close() }
     }
   })()
   try {
+    eve = await startEveService({ root, development: true })
     nitro = await createNitro({
       rootDir: root, workspaceDir: root, dev: true, preset: 'nitro-dev', builder: 'rolldown',
       buildDir: join(directory, 'build'), output: { dir: join(directory, 'output') },

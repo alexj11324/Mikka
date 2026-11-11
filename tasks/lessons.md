@@ -219,3 +219,11 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 - 纠正：Oracle 缺 socat、rg 导致 daemon 不上报 Agent，我的首选修法是手动 `apt install` 救这一台，用户指出安装 daemon 时就该装好这些依赖。
 - 规则：定位到「环境缺依赖」后，先问为什么安装流程没有处理它。首选修安装流程；手动命令只是临时救急，不算修复。
 - 同时：读可能含凭据的文件时不要用正则脱敏，只取需要的字段（如 `jq -r .deviceId`）。这次脱敏正则没匹配上，device credential 明文进了对话记录。
+
+## 2026-11-10 迁移测试要重放真实 SQL，切片不要留死 action
+
+- 纠正：PAT 回填测试一开始把 `update ... where scopes is null` 手抄到临时表，删掉真实迁移里那行测试照样绿；reviewer 要求用 `set local search_path` 在事务里重放 `drizzle/20261110230000_api_tokens.sql`，断言存量行变 `legacy:full`、新行默认公开、混合 audience 被 CHECK 拒绝。
+- 规则：
+  1. 数据迁移的测试必须执行真实迁移文件（临时 schema + rollback 可隔离），不要复制 SQL 自证。
+  2. 只为测试存在的 fail-open 缺省要改成 fail-closed：新 token 默认公开 scope，pre-M4 token 用显式 helper。
+  3. 删除未接线模块的标准同样适用于新增 action：没有调用方就只留 store 函数 + 测试，等 UI 接入时再加 server action。

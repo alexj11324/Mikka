@@ -12,7 +12,7 @@ import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { setAppPolicyInput } from '@/lib/app-policy/apps'
 import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
 import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-batch-contract'
-import { environmentSaveInputSchema } from '@/lib/environments/contract'
+import { USER_FACT_KINDS } from '@/lib/profile/kinds'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -28,6 +28,11 @@ const object = z.strictObject
 const oneId = tuple(uuid)
 const none = tuple()
 const inWorkspace = tuple(workspace)
+const memoryScope = z.discriminatedUnion('kind', [
+  object({ kind: z.literal('global'), ids: z.tuple([]) }),
+  object({ kind: z.literal('workspaces'), ids: z.array(uuid).min(1).max(50) }),
+  object({ kind: z.literal('projects'), ids: z.array(uuid).min(1).max(50) }),
+])
 const secret = text(65_536)
 const scope = z.discriminatedUnion('type', [object({ type: z.literal('workspace') }), object({ type: z.literal('repository'), repository: text(2048).min(1) })])
 const secretBase = { name: text(200).min(1), kind: z.enum(['secret', 'env']), value: secret, note: text(2000).optional() }
@@ -216,8 +221,13 @@ export const desktopActionSchemas = {
   'link-preview.getLinkPreview': tuple(z.url({ protocol: /^https?$/ }).max(2048)),
   'memory.getMemory': none,
   'memory.setMemory': tuple(bool),
+  'memory.clearMemory': none,
+  'memory.addFact': tuple(object({ requestId: uuid, kind: z.enum(USER_FACT_KINDS), subject: text(200).trim().min(1), scope: memoryScope.optional() })),
   'memory.removeFact': oneId,
   'memory.updateFact': tuple(uuid, text(200)),
+  'memory.reviewFact': tuple(uuid, z.enum(['approve', 'reject'])),
+  'memory.setFactScope': tuple(uuid, memoryScope),
+  'memory.undoRemoveFact': oneId,
   'model-api-keys.getApiKeys': inWorkspace,
   'model-api-keys.refetchApiKeyModels': tuple(uuid, workspace),
   'model-api-keys.updateApiKeyAfterQuota': tuple(bool, workspace),
@@ -297,8 +307,6 @@ export const desktopActionSchemas = {
   'workspace-secrets.deleteSecret': tuple(object({ id: uuid }), workspace),
   'workspace-secrets.saveE2BKey': tuple(object({ apiKey: text(1024).min(1) }), workspace),
   'workspace-secrets.deleteE2BKey': inWorkspace,
-  'environments.saveEnvironment': tuple(environmentSaveInputSchema, workspace),
-  'environments.archiveEnvironment': tuple(object({ id: uuid, revision: positive }), workspace),
   'workspace-settings.getWorkspaceGeneral': inWorkspace,
   'workspace-settings.getWorkspaceDeletionImpact': inWorkspace,
   'workspace-settings.getWorkspaceTransferTargets': inWorkspace,

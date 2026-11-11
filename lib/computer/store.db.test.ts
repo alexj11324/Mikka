@@ -71,7 +71,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     }
     await pool.query('CREATE TABLE user_e2b_keys ("userId" text PRIMARY KEY); CREATE TABLE workspace_e2b_keys ("createdBy" text)')
     await pool.query('INSERT INTO user_e2b_keys VALUES ($1),($2)', [actor.userId, bob.userId])
-    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz, "agentDefinition" jsonb, "dispatchFingerprint" text, "promptTaskStart" integer, "promptTaskLength" integer, "workspaceId" uuid)')
+    await pool.query('CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "issueId" uuid, "agentId" uuid, "botId" uuid REFERENCES bots(id), status text NOT NULL, kind text, prompt text, "baseBranch" text, "deviceRepoId" uuid, "deviceId" uuid, "startedAt" timestamptz, "finishedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz, "stopRequestedAt" timestamptz, "agentDefinition" jsonb, "dispatchFingerprint" text, "promptTaskStart" integer, "promptTaskLength" integer, "workspaceId" uuid, origin text, "originRef" jsonb)')
     const bindingMigration = await readFile(new URL('../../drizzle/20261027164502_computer_run_bindings.sql', import.meta.url), 'utf8')
     await pool.query(bindingMigration); await pool.query(bindingMigration)
     await pool.query(await readFile(new URL('../../drizzle/20261030234636_run_human_control_pause.sql', import.meta.url), 'utf8'))

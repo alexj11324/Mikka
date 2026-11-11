@@ -41,7 +41,7 @@ The section list is `SETTINGS_SECTIONS` in `lib/settings-sections.ts`; the
 sidebar, URL parsing and page body all read it.
 
 - **Personal (account):** Account, Security, Preferences, Notifications, Memory, Connections, 模型与订阅 (subscriptions, API keys, 运行位置 and 优先使用的模型; it replaced API 与订阅 and Bot 与 Agents), Secrets and logins, Data and privacy, Devices. The same in every workspace. Personal access tokens are built but hidden (`unbuilt`).
-- **Workspace:** General, App & run permissions, Members, Teams, Team permissions (admins), Secrets and environment, Run environments, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators). A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
+- **Workspace:** General, App & run permissions, Members, Teams, Team permissions (admins), Secrets and environment, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators). A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
 
 Account and Security hold how the person signs in, including linking Google
 to the Mikka account. Connections holds connected apps (Gmail, Calendar,

@@ -122,6 +122,7 @@ export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpCo
       const entry = snapshot?.servers.find(server => server.id === command.serverId)
       if (snapshot && !entry) throw new PluginError('mcpNotEnabledForExecution', 403)
       const connection = await store.mcpConnection(userId, command.serverId, entry?.revision, snapshot?.mcpAuthority)
+      if (connection.transport === 'stdio') throw new PluginError('mcpUnavailable', 400)
       revision = connection.revision
       // The connection may belong to a teammate. Mask its own secret values,
       // not only the requester's secret registry; the endpoint also stays private.

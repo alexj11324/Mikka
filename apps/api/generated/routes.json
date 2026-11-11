@@ -97,6 +97,18 @@
       "sourceHash": "66f8f6e5665a0367cb6238ed92333505998927de8953d18d9fc2e768a854dddb"
     },
     {
+      "path": "/mikka/api/agents/[...path]",
+      "template": "/api/agents/[...path]",
+      "source": "app/api/agents/[...path]/route.ts",
+      "methods": [
+        "GET",
+        "OPTIONS",
+        "POST"
+      ],
+      "maxDuration": 800,
+      "sourceHash": "1bd809a804324c88a4e8166ad71166e2d8c3e27963b49eb68b3c102559caccfc"
+    },
+    {
       "path": "/mikka/api/approved-writes",
       "template": "/api/approved-writes",
       "source": "app/api/approved-writes/route.ts",
@@ -582,16 +594,6 @@
       "sourceHash": "cea72e01b9b56bc51e6d5c3cc9041c192c1f423a958c25653726de73a4591858"
     },
     {
-      "path": "/mikka/api/coordinator/stream",
-      "template": "/api/coordinator/stream",
-      "source": "app/api/coordinator/stream/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "maxDuration": 300,
-      "sourceHash": "1843db486151b4f496242bd19e32b1aafb2e5ec8f6e36179689cfb51bf605f31"
-    },
-    {
       "path": "/mikka/api/credentials",
       "template": "/api/credentials",
       "source": "app/api/credentials/route.ts",
@@ -739,7 +741,7 @@
         "GET"
       ],
       "maxDuration": 60,
-      "sourceHash": "0d1bf999aba2847b3c562b6520b20557a399fb0a44722595ec88dc9754a3389e"
+      "sourceHash": "9c2a81ff6ca542a6b228d86b0675dc1c0daffbbcd2f470cda661d4dced44c4e2"
     },
     {
       "path": "/mikka/api/desktop/begin",
@@ -1255,6 +1257,16 @@
       "sourceHash": "d450b093e5517282b41f6a49e6b712675ee8f33e8a0be7b4bafa04fa483ecf31"
     },
     {
+      "path": "/mikka/api/internal/eve/tools",
+      "template": "/api/internal/eve/tools",
+      "source": "app/api/internal/eve/tools/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 300,
+      "sourceHash": "a2d812cd50ff6fdb8683f4fe06e70ee76f4dc7361e916b2aa9120e3d177bcfef"
+    },
+    {
       "path": "/mikka/api/issues/search",
       "template": "/api/issues/search",
       "source": "app/api/issues/search/route.ts",
@@ -1347,7 +1359,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "19c5cf47f4f90fb565adb103d466719f63503af89a8a5cf2085f37dbdcba0342"
+      "sourceHash": "048664e1e6ceb53a28f29da3c5848199cd2ff145081b2eeecf650b37caa3b684"
     },
     {
       "path": "/mikka/api/mobile/chat/stop",
@@ -1715,37 +1727,6 @@
       "sourceHash": "a89ce5cce11e96b7588f0e84abd485dc5f09d9a58016a5631f21617f987b3aeb"
     },
     {
-      "path": "/mikka/api/runs/[runId]/actions",
-      "template": "/api/runs/[runId]/actions",
-      "source": "app/api/runs/[runId]/actions/route.ts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "maxDuration": 300,
-      "sourceHash": "47776e9f50be69cbf5eabfc0ce6546424823b64706bfe26a070185202f09ec51"
-    },
-    {
-      "path": "/mikka/api/runs/[runId]/actions/[executionId]",
-      "template": "/api/runs/[runId]/actions/[executionId]",
-      "source": "app/api/runs/[runId]/actions/[executionId]/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "maxDuration": 30,
-      "sourceHash": "12b4eb4ed1ca843dc6ede5a926e219983b29c3443e51bf30d28e75de2a8dda97"
-    },
-    {
-      "path": "/mikka/api/runs/[runId]/actions/[executionId]/cancel",
-      "template": "/api/runs/[runId]/actions/[executionId]/cancel",
-      "source": "app/api/runs/[runId]/actions/[executionId]/cancel/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "maxDuration": 60,
-      "sourceHash": "63ea2362b56872e14900a92243bfdcd5327a1abe0764ef1e7da10b692b3b758b"
-    },
-    {
       "path": "/mikka/api/runs/[runId]/evidence",
       "template": "/api/runs/[runId]/evidence",
       "source": "app/api/runs/[runId]/evidence/route.ts",
@@ -1828,6 +1809,96 @@
       "sourceHash": "e8d815c9b938f970ece9b1b51a9775c17e2cfa547feffb8f5acd58ab36c8a717"
     },
     {
+      "path": "/mikka/api/runs/[runId]/workspace/git/checkpoints",
+      "template": "/api/runs/[runId]/workspace/git/checkpoints",
+      "source": "app/api/runs/[runId]/workspace/git/checkpoints/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "01396738190b4730fa0ae375207db64d58ba8cad8a28f52a295cd8c03d15a52c"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/checkpoints/restore",
+      "template": "/api/runs/[runId]/workspace/git/checkpoints/restore",
+      "source": "app/api/runs/[runId]/workspace/git/checkpoints/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "d254d57c0e82f164003da3e11ae63c8dfc0f1459efbdf74e5ddebe809ceb278f"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/checkpoints/restore/preview",
+      "template": "/api/runs/[runId]/workspace/git/checkpoints/restore/preview",
+      "source": "app/api/runs/[runId]/workspace/git/checkpoints/restore/preview/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "3c6734bc991f3ecb9a5f0751d34603fbf00095c1486a3001eed81b8cb1dac5a0"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/commits/[commitSha]/diff",
+      "template": "/api/runs/[runId]/workspace/git/commits/[commitSha]/diff",
+      "source": "app/api/runs/[runId]/workspace/git/commits/[commitSha]/diff/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "4e11a875f9b68b0dc0efca45b48f788464a1120498a6c3019fd6875f47a1448a"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/history",
+      "template": "/api/runs/[runId]/workspace/git/history",
+      "source": "app/api/runs/[runId]/workspace/git/history/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "b9bd61eab8a125e0e446b6f029b5eaae82ee78a902ced8c316979335e80c033a"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/revert",
+      "template": "/api/runs/[runId]/workspace/git/revert",
+      "source": "app/api/runs/[runId]/workspace/git/revert/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "aadd3e463964c349e4a299f12a2f258684d714cfffbe515181f4d836b6e145a8"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/revert/preview",
+      "template": "/api/runs/[runId]/workspace/git/revert/preview",
+      "source": "app/api/runs/[runId]/workspace/git/revert/preview/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "6299c49ff4997dd82967bbf09b35e86fb545f32e8cdc0f2678f216f8dec0f631"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/status",
+      "template": "/api/runs/[runId]/workspace/git/status",
+      "source": "app/api/runs/[runId]/workspace/git/status/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "9e590b832d3caddb34d3f8270b9e30b9e568baff696ce3a48b3fb25eaaa63922"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/undo",
+      "template": "/api/runs/[runId]/workspace/git/undo",
+      "source": "app/api/runs/[runId]/workspace/git/undo/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "62f1f253a80e0ce1e8321cc3160dd1f3b6fd4d8c46a8c3412959b8f53d171260"
+    },
+    {
       "path": "/mikka/api/runs/[runId]/workspace/identity",
       "template": "/api/runs/[runId]/workspace/identity",
       "source": "app/api/runs/[runId]/workspace/identity/route.ts",
@@ -1904,7 +1975,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "3dbb26c634a17d89496fb59171a2aa0da9cfbaa90c0e672ec9fe611a66765195"
+      "sourceHash": "c117f9998933e20bbd9ac0c602f5fa1b5381c717994e438663da5f771f7e39f5"
     },
     {
       "path": "/mikka/api/skills",
@@ -2258,7 +2329,7 @@
         "POST"
       ],
       "maxDuration": 60,
-      "sourceHash": "b1e491789af5f7523d91f5e13be4ccb43615dbd6d775e64f42a4e07dd202cb37"
+      "sourceHash": "95cbf7838529897157a8a12cb8351a708ff9f9aee30d5c9e385c858ed6012a52"
     },
     {
       "path": "/mikka/api/webhooks/telegram",
@@ -2392,7 +2463,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "6046bbbdea7eac16df7cbd338a91bfda0838bf0fac8d16d4de72737596ecd32d"
+      "sourceHash": "734b0665e530fa61dfc3f9b76e282b12e8170d411a2290741b6f4be700858743"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/commands/ack",
@@ -2500,7 +2571,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "5c26911931b8bf8bdc298a223289ba834207e9529db74f048bcde3e0f82388e1"
+      "sourceHash": "175a6b1fac6995a7896d9c8e536f23efac031d618ec9806fc832b95505051a9d"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",

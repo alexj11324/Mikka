@@ -81,9 +81,6 @@ function workspaceQuery(columns) {
 export const claimWorkspaceDatabase = { select: workspaceQuery, transaction: callback => callback({ select: workspaceQuery }) }
 export const claimWorkspacePool = { async query(sql, args) {
   const p = globalThis.claimResponseProbe
-  // This claim fixture has no Run environment; freezing is covered by the
-  // environments DB suites.
-  if (sql.includes('FROM project_environments')) return { rows: [] }
   assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status=\'active\'')
   assert.deepEqual(args[1], [p.run.userId])
   p.membershipReads.push(args)
@@ -200,9 +197,6 @@ let checkedOutClient
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
 export const pool={async query(sql,args){
   const p=globalThis.claimResponseProbe
-  // Environment freezing runs after the claim transaction and this fixture has
-  // no frozen binding; the environments DB suites cover the real write.
-  if(sql.includes('FROM run_environment_bindings'))return {rows:[]}
   assert.equal(p.appActive,1,'execution identity remains inside the checked-out APP transaction')
   assert.equal(sql,'SELECT "ownerId",kind,enabled FROM devices WHERE id=$1')
   assert.deepEqual(args,[p.device.id]);return {rows:[p.device]}
@@ -241,7 +235,7 @@ const sources = new Map([
   ['/lib/run-publications.ts', 'export async function prepareRunPublication(){const p=globalThis.claimResponseProbe;p.preparation.push("publication");return structuredClone(p.publication)};export async function persistRunCompletion(_owner,_run,completion){const p=globalThis.claimResponseProbe;if(completion.stopReason==="error"&&completion.report.summary==="The task is no longer available to this thread."){p.preparation.push("issue-unavailable");return}if(!p.run.retryOf||completion.stopReason!=="blocked")throw new Error("unexpected publication failure");p.preparation.push("blocked-recovery");p.run.status="stopped";p.run.stopReason="blocked"}'],
   ['/lib/issue-team-access.ts', 'export async function issueTeamAccess(){return {allowed:globalThis.claimResponseProbe.memberAllowed}}'],
   ['/lib/issue-access.ts', 'export async function issueForUser(){const p=globalThis.claimResponseProbe;if(p.issueAccessError)throw p.issueAccessError;return p.memberAllowed&&!p.issue?.content?.attrs?.mikka?.deletedAt?p.issue:null}'],
-  ['/lib/mcp/worker.ts', 'export async function issueRunToken(){const p=globalThis.claimResponseProbe;p.preparation.push("token");await p.beforeToken?.();if(p.tokenError)throw new Error("synthetic token refusal");return {token:"synthetic-only"}}'],
+  ['/lib/mcp/worker.ts', 'export async function issueRunToken(){const p=globalThis.claimResponseProbe;p.preparation.push("token");await p.beforeToken?.();if(p.tokenError)throw Object.assign(new Error("synthetic token refusal"),{name:"FixtureRunTokenRefusal"});return {token:"synthetic-only"}}'],
   // These claims have no frozen mailbox grant. Validate that fact through the
   // real capability contract instead of accidentally failing its module load.
   ['/lib/personal-mailbox-runtime.ts', `import assert from 'node:assert/strict'

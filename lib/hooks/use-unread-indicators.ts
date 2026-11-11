@@ -94,26 +94,36 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
 
   useEffect(() => { const id = requestAnimationFrame(measure); return () => cancelAnimationFrame(id) }, [items, divider, measure])
 
-  // The scroller can finish anchor placement or reveal content-visibility items
-  // after its scroll event. Observe the resulting geometry as well: a scroll
-  // measurement is not evidence that the final visible messages were measured.
+  // Scroll and a new row already remeasure. Watching every row does not: on the
+  // translucent desktop window those resize and intersection callbacks (the old
+  // thresholds were 0, 0.5 and 1) arrive every frame, and each one laid out the
+  // whole transcript. One observer on the transcript and its viewport is enough:
+  // a row that grows after it is mounted changes the content height, a window or
+  // panel resize changes the viewport height, and a subpixel change is not a new
+  // height. Both still coalesce into a single rAF.
   const messagePositions = items.map(item => item.position).join(',')
   useEffect(() => {
     const element = viewport()
-    if (!element) return
+    const content = element?.querySelector<HTMLElement>('[data-slot="message-scroller-content"]')
+    if (!element || !content) return
     let frame: number | null = null
-    const scheduleMeasure = () => {
+    let lastHeight = content.scrollHeight
+    let lastViewportHeight = element.clientHeight
+    const size = new ResizeObserver(() => {
       if (frame !== null) return
-      frame = requestAnimationFrame(() => { frame = null; measure() })
-    }
-    const nodes = [...element.querySelectorAll<HTMLElement>(`[${MESSAGE_POSITION_ATTR}]`)]
-    const visibility = new IntersectionObserver(scheduleMeasure, { root: element, threshold: [0, 0.5, 1] })
-    const size = new ResizeObserver(scheduleMeasure)
+      frame = requestAnimationFrame(() => {
+        frame = null
+        const height = content.scrollHeight
+        const viewportHeight = element.clientHeight
+        if (Math.abs(height - lastHeight) < 1 && viewportHeight === lastViewportHeight) return
+        lastHeight = height
+        lastViewportHeight = viewportHeight
+        measure()
+      })
+    })
+    size.observe(content)
     size.observe(element)
-    for (const node of nodes) { visibility.observe(node); size.observe(node) }
-    scheduleMeasure()
     return () => {
-      visibility.disconnect()
       size.disconnect()
       if (frame !== null) cancelAnimationFrame(frame)
     }

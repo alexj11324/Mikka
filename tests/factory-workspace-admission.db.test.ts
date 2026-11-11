@@ -469,8 +469,8 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   })
 
   await t.test('a PAT cannot override its pin and concurrent same-issue reads never cross tenant buckets', async () => {
-    const { createPersonalAccessToken } = await import('../lib/tokens/store')
-    const pat = await createPersonalAccessToken(owner, alpha, { name: 'Factory lease PAT' })
+    const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+    const pat = await createLegacyPersonalAccessToken(owner, alpha, { name: 'Factory lease PAT' })
     const before = await state()
     const profilesBefore = (await controls.query('SELECT id,version,digest FROM factory_agent_profiles WHERE "ownerId"=$1 ORDER BY id', [owner])).rows
     assert.equal((await call('/api/factory/tasks/' + b.task.id, beta, req => detail.GET(req, params(b.task.id)), undefined, pat.token)).status, 404)
