@@ -23,7 +23,8 @@ try {
       } finally { rmSync(directory, { recursive: true, force: true }) }
     }
   } finally { writeFileSync(manifestPath, manifest) }
-  run(process.execPath, ['apps/desktop/scripts/build.mjs'])
+  // The SSH fixture exercises the actual packaged preload against the daemon.
+  run(process.execPath, ['apps/desktop/scripts/build.mjs', '--public-test-fixture'])
   run('docker', ['build', '-t', 'mikka-491-ssh-test', 'tests/ssh-install'], { stdio: 'inherit' })
   run('docker', ['run', '-d', '--rm', '--privileged', '--name', container, '--tmpfs', '/run', '--tmpfs', '/run/lock', '-p', '127.0.0.1:22491:22', 'mikka-491-ssh-test'])
   // systemd starts sshd asynchronously; wait for its actual readiness.
