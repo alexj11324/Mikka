@@ -7,6 +7,7 @@ import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE } from '../lib/bot-shapes'
 import { issueWithMetadata } from '../lib/issue-metadata'
+import { taskPresentation } from '../lib/task-presentation'
 
 // Idle request budget (#1212): each main page's real client component, real SWR with the app's defaults
 // (components/swr-defaults.tsx) and a healthy live channel, over one idle, visible minute on fake timers.
@@ -180,7 +181,7 @@ const noop = () => {}
 const AT = '2026-11-05T08:00:00.000Z'
 const live = { ownerId: OWNER, workspaceId: OWNER_HOME }
 const doc = (text: string) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
-const issue = (id: string, title: string, status = 'todo') => ({ ...issueWithMetadata({ id, userId: OWNER, title, content: doc(title), status, priority: 'normal', scope: 'workspace' as const, scopeVersion: 1, linearSyncBlocked: false, scopeSetBy: 'user' as const, scopeConfidence: null, revision: 3, createdAt: new Date(AT), updatedAt: new Date(AT) }), identifier: 'MIK-7', linearTargetVerified: false })
+const issue = (id: string, title: string, status = 'todo') => ({ ...issueWithMetadata({ id, userId: OWNER, workspaceId: WORKSPACE, title, content: doc(title), status, priority: 'normal', scope: 'workspace' as const, scopeVersion: 1, linearSyncBlocked: false, scopeSetBy: 'user' as const, scopeConfidence: null, revision: 3, createdAt: new Date(AT), updatedAt: new Date(AT) }), identifier: 'MIK-7', linearTargetVerified: false })
 const CHAT_VERSION = '0123456789abcdef0123456789abcdef'
 const chat = { botId: BOT, enabled: true, version: CHAT_VERSION, working: false, error: null, cursor: 2, sources: {}, artifacts: {}, persistedStreamIds: [], live, items: [
   { id: 'm1', position: 1, from: 'person', text: 'Can you fix the sign-in redirect?', tools: [], threads: [], artifacts: [], createdAt: AT },
@@ -198,6 +199,11 @@ Object.assign(fixtures, {
   'issues.listIssueVersions': () => [],
   'issue-operations.getDeletedIssue': () => null,
   'issue-operations.listIssueConnections': () => [],
+  'task-domain.getTaskPresentations': (input: { workspaceId: string; issueIds: string[] }) => ({
+    version: 1, workspaceId: input.workspaceId, items: Object.fromEntries(input.issueIds.map(id => [
+      id, taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, undefined, null, () => false),
+    ])),
+  }),
   // The authorized live scope each read returns (app/actions/collaboration.ts, agents.ts).
   'collaboration.exchangeDocument': () => ({ version: 'v1', workspaceId: WORKSPACE }),
   'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true, live: { workspaceId: WORKSPACE } }),
