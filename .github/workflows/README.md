@@ -196,3 +196,7 @@ a frozen install on a miss. PRs do not upload dependency caches. See
 [cache boundaries and performance evidence](../../docs/ci/1765-optimizations.md).
 `ci-dependencies.yml` warms Desktop's Linux/macOS dependency keys when install
 inputs change on main; dispatch it to repopulate evicted or changed-image keys.
+
+## Engineering sandbox
+
+`engineering-sandbox.yml` deploys the dedicated Cloudflare Worker from checked main and runs the Factory handoff and startup-timing suites there. External agents can dispatch either suite on a committed source SHA using the [engineering runner instructions](../../docs/operations/engineering-sandbox.md).
