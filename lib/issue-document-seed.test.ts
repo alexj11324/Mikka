@@ -76,7 +76,7 @@ test('the real editor schema is the one wired into the editor, the detail page a
   assert.match(detail, /useState\(\(\) => seed && !locked \? new DocumentSync\(initial\.id, seed\) : null\)/)
   assert.match(detail, /const syncKey = sync \? issueKeys\.document\(saved\.id, sync\.doc\.clientID\) : null/)
   assert.match(detail, /useSWR\(syncKey,/)
-  assert.match(detail, /useLiveKey\('issue_document', sync \? saved.id : null,/)
+  assert.match(detail, /useLiveKey\('issue_document', sync \|\| reader \? saved\.id : null,/)
   assert.match(detail, /sharedDoc=\{sync\?\.doc\}/)
   assert.match(detail, /readOnly && <Alert><AlertDescription>\{t\('invalidContentReadOnly'\)\}/)
   for (const file of ['../app/actions/collaboration.ts', './issue-create.ts'])
