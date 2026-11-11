@@ -79,7 +79,7 @@ export async function markEventAccepted(scope:EveScope,eventId:string) {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${scope.ownerId}:${scope.botId}`},0))`)
     const event = (await tx.execute(sql`SELECT * FROM coordinator_events WHERE id=${eventId}::uuid AND "userId"=${scope.ownerId} AND "botId"=${scope.botId}::uuid FOR UPDATE`)).rows[0] as any
     if (!event || event.deliveredAt) return
-    const message = maskDeep(sourcedEventMessage({...event,createdAt:new Date(event.createdAt),deliveredAt:new Date()},eventPrompt(event)),credentialMasker)
+    const message = maskDeep({...sourcedEventMessage({...event,createdAt:new Date(event.createdAt),deliveredAt:new Date()},eventPrompt(event)),mikkaEveAccepted:true},credentialMasker)
     await tx.execute(sql`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT ${crypto.randomUUID()}::uuid,${scope.ownerId},${scope.botId}::uuid,coalesce(max(position),0)+1,${JSON.stringify(message)}::jsonb FROM coordinator_messages WHERE "userId"=${scope.ownerId} AND "botId"=${scope.botId}::uuid`)
     await tx.execute(sql`UPDATE coordinator_events SET "deliveredAt"=now() WHERE id=${eventId}::uuid`)
     await botChatChanged(tx,scope.ownerId,scope.botId)

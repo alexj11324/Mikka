@@ -9,7 +9,7 @@ if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Eve settlement te
 
 test('host settlement receipts preserve product publication across native RPC retries', {skip:!valid}, async t => {
   const {pool} = await import('../db')
-  for (const migration of ['20261111070100_eve_sessions.sql','20261111070200_eve_settlements.sql']) await pool.query(await readFile(new URL('../../drizzle/'+migration,import.meta.url),'utf8'))
+  for (const migration of ['20261111070100_eve_sessions.sql','20261111070200_eve_settlements.sql','20261111170000_eve_outcome_deliveries.sql']) await pool.query(await readFile(new URL('../../drizzle/'+migration,import.meta.url),'utf8'))
   const {finishEveTurn} = await import('./settlement')
   const {registerSession} = await import('./scope')
   const ownerId='eve-settlement-'+randomUUID(),botId=randomUUID(),workspaceId=randomUUID()
@@ -31,6 +31,38 @@ test('host settlement receipts preserve product publication across native RPC re
     await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name)VALUES($1,$2,'Eve settlement fixture')`,[workspaceId,ownerId])
     await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role)VALUES($1,$2,'Owner',$3,'admin')`,[workspaceId,ownerId,ownerId+'@example.invalid'])
     await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name)VALUES($1,$2,$3,'Eve settlement fixture')`,[botId,ownerId,workspaceId])
+    await t.test('native admission stays pending until its own root projection, including queued and quiet turns',async()=>{
+      const {markEventAccepted}=await import('./submission')
+      const {chatView,chatVersion,botChatSnapshot}=await import('../coordinator/store')
+      const {chatFailure}=await import('../chat-failure')
+      const {eveStreamId}=await import('./projection')
+      const sessionId=await nativeSession(),sources=[randomUUID(),randomUUID(),randomUUID()]
+      const publish=async(index:number)=>{
+        await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload)VALUES($1,$2,$3,'user_message',($1::uuid)::text,$4)`,[sources[index],ownerId,botId,{source:'person',text:'Native queue '+index}])
+        await markEventAccepted(scope,sources[index])
+      }
+      const bind=async(index:number)=>{
+        await pool.query('INSERT INTO eve_turn_sources(session_id,turn_id,source_event_id)VALUES($1,$2,$3)',[sessionId,'queued_'+index,sources[index]])
+        await (await import('./projection')).projectTurnState(scope,sessionId,'queued_'+index,true)
+      }
+      await publish(0)
+      let chat=await chatView(ownerId,200,botId)
+      assert.equal(chat.working,true,'a durably admitted message is not a failed legacy wake')
+      assert.equal(chatFailure(chat),null)
+      assert.equal((await chatVersion(ownerId,200,botId)).working,true)
+      assert.equal((await botChatSnapshot(ownerId)).items[botId].working,true)
+      await publish(1);await bind(0)
+      await finishEveTurn(scope,{sessionId,turnId:'queued_0',outcome:'completed',messages:[{role:'assistant',content:'First native reply',mikkaStreamId:eveStreamId(sessionId,'queued_0')}]})
+      assert.equal((await chatView(ownerId,200,botId)).working,true,'a later queued input remains native work after the earlier reply')
+      await bind(1)
+      await finishEveTurn(scope,{sessionId,turnId:'queued_1',outcome:'failed',messages:[{role:'assistant',content:[],mikkaFailure:'turn_failed',mikkaStreamId:eveStreamId(sessionId,'queued_1')}]})
+      chat=await chatView(ownerId,200,botId)
+      assert.equal(chat.working,false);assert.equal(chatFailure(chat)?.kind,'failed')
+      await publish(2);await bind(2)
+      await finishEveTurn(scope,{sessionId,turnId:'queued_2',outcome:'completed',messages:[{role:'assistant',content:[],mikkaStreamId:eveStreamId(sessionId,'queued_2')}]})
+      chat=await chatView(ownerId,200,botId)
+      assert.equal(chat.working,false);assert.equal(chatFailure(chat),null,'a successful quiet native outcome is not inferred to have crashed')
+    })
     await t.test('completed root survives concurrent finish and effect committed before receipt acknowledgement',async()=>{
       const {sessionId,occurrenceId}=await scheduled()
       const input={sessionId,turnId:'turn_0',outcome:'completed' as const,messages:[{role:'assistant',content:[{type:'text',text:'Combined root result'}]}]}
