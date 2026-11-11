@@ -1,0 +1,833 @@
+{
+  "kind": "visual-only",
+  "commit": "01045865813568a71349dbb2648df9cc101cd1ec",
+  "run": "43119205965",
+  "origins": [
+    "http://127.0.0.1:44553",
+    "http://127.0.0.1:36991"
+  ],
+  "synthetic": true,
+  "oauthAccepted": false,
+  "runtimeAccepted": false,
+  "reviewed": false,
+  "coverage": "Existing Web component composition and real Expo Web export. GET fixtures only; dialogs and local server-choice views only.",
+  "limitations": "No real account, OAuth, billing, save, server discovery, live push, native iOS keyboard, Keychain, system browser or TestFlight acceptance.",
+  "mobileAssets": [
+    {
+      "file": "_expo/static/css/global-eecd5e29650b1c192e527948637a1c1d.css",
+      "bytes": 97264,
+      "sha256": "7b8388ac5ae5734a58b4bbadaae8b8e4bfd97741028aebe4dfbbd46908c6ad73"
+    },
+    {
+      "file": "_expo/static/css/native-tabs.module-ed2cf550eeffafc79227d6319df819ed.css",
+      "bytes": 2553,
+      "sha256": "00f722432d3c04e437099dfe3c44f6380a0ed42f754a8eff10e97645f32d917b"
+    },
+    {
+      "file": "_expo/static/js/web/__common-9615f3b16b8e649109d31636a66bdebb.js",
+      "bytes": 6441861,
+      "sha256": "f4da3013bb42fc79af7570c8de14ca1dc17d921fa3b1b8f62a6ebdf87c28db5a"
+    },
+    {
+      "file": "_expo/static/js/web/__expo-metro-runtime-8c088df87a31e4e6accd81c554ec290d.js",
+      "bytes": 3751,
+      "sha256": "80e3ab02b3bac22608cdf29a2e3cc1270616a695bbe479f7f500941e8d2bbe41"
+    },
+    {
+      "file": "_expo/static/js/web/_layout-0ebc7b2f4d8d872385d844be2557b3e3.js",
+      "bytes": 308,
+      "sha256": "e03aca1f07c61238303691dcb661b2d7b200bbd1feb2f1b1b7f8719ec3ac37a7"
+    },
+    {
+      "file": "_expo/static/js/web/_layout-3f6d131c408939483554f17b780a6267.js",
+      "bytes": 367,
+      "sha256": "a4e27c82433d67e0bef0c1e468b6e690ec561c7efa33db64eccd9fa25e0fce7a"
+    },
+    {
+      "file": "_expo/static/js/web/_layout-58bed7df7ccc300d2cabe07401883bec.js",
+      "bytes": 308,
+      "sha256": "da6cdc57a7ebe1e34696f4cf5542894799a39cb6da07181924538d3dde9c7c21"
+    },
+    {
+      "file": "_expo/static/js/web/_layout-90c7cbd463b4d3f6745a4b98ca6bc75f.js",
+      "bytes": 308,
+      "sha256": "88da971238e7c41a1ffbc874fd76aba51ddaf3979c8e454547b46ee3c722c5c8"
+    },
+    {
+      "file": "_expo/static/js/web/_layout-c8c8b28a519bd1abf4faf44154b89cb1.js",
+      "bytes": 48999,
+      "sha256": "dfcec81fc285c1cbb722d47ca381e925f487c6e90dc278e41b64f56356852fdf"
+    },
+    {
+      "file": "_expo/static/js/web/_layout-ccf7063beb2d2bd11b16ed87845f2366.js",
+      "bytes": 308,
+      "sha256": "a8f23c8eabe080f4b7144885a8cbfb6ab3bb6ed090a92e0a532f47d45adc74c3"
+    },
+    {
+      "file": "_expo/static/js/web/_layout-e41773cf225e7adc17259b0dca9f0631.js",
+      "bytes": 286878,
+      "sha256": "34d2188af955e95f16beb6b2974a94ca129c27327bde7c6c50e0cec5f757fbec"
+    },
+    {
+      "file": "_expo/static/js/web/[id]-21bb47e91649602a21675602c0b683b2.js",
+      "bytes": 9874,
+      "sha256": "04d5f861a7a30ce74173f4ee05432bf1401671c2f30d7a12ae84117f2cd5b043"
+    },
+    {
+      "file": "_expo/static/js/web/[id]-5e42d5885dcdcab129c8d315e1555dda.js",
+      "bytes": 1740,
+      "sha256": "36ccbb032df5ebfa4b3fc5b81757386f8873309cc81e2001d82e63ac03fd11e2"
+    },
+    {
+      "file": "_expo/static/js/web/[id]-e719e944eaa46e18e8bbb1a5e2ab255c.js",
+      "bytes": 6763,
+      "sha256": "06fba076b12748a81f3c80622a671b69909068aaf7c500296775bfd187d9ba79"
+    },
+    {
+      "file": "_expo/static/js/web/accounts-efe8a85baed0b4efd49623a7fded887e.js",
+      "bytes": 1940,
+      "sha256": "ae1ca57eae96560cabd90c0c162490b1cdf982ab2acaaa995c3f397d7741dd8e"
+    },
+    {
+      "file": "_expo/static/js/web/attach-bdc6a28b90d19c42f7c54875a557207d.js",
+      "bytes": 3627,
+      "sha256": "d21ce68b0e6a1f5717c6897f4aa775bd3a929ee4ff9c6387768fc8c6c1e035d0"
+    },
+    {
+      "file": "_expo/static/js/web/batch-5273c81d39e9d26c6a7ac88b8afbc862.js",
+      "bytes": 2627,
+      "sha256": "e87142ffcc71905f6ceb658f8748eb08216e2f44810a35c1dd07e26dac74d029"
+    },
+    {
+      "file": "_expo/static/js/web/billing-c489d389926f15e2cc79433afe035243.js",
+      "bytes": 77003,
+      "sha256": "ff92efc76dd8a1bda862b4022cc275d5109a1ec776987214f46c222eb82496cd"
+    },
+    {
+      "file": "_expo/static/js/web/comment-035962f64f82c196952a6e7b2824eeb6.js",
+      "bytes": 2438,
+      "sha256": "dcf5b9bd258b5c7708fd2bb0ff86637ffe419caf1114a107a1d675f5801653c5"
+    },
+    {
+      "file": "_expo/static/js/web/conversation-72b514cec01ea449e999dbd1b4e6af77.js",
+      "bytes": 10113,
+      "sha256": "c39bb2358f7f0cf0c34809132af4574771d14d7aaf3715e4c48d5b0cb1a05d19"
+    },
+    {
+      "file": "_expo/static/js/web/entry-30a67ab3393a96a253b3294abee8f486.js",
+      "bytes": 1284871,
+      "sha256": "e9f01cf4f8c868d14b08a4aa6ede7d4f31ecb8cb1cfb054fde841cb01b67c1af"
+    },
+    {
+      "file": "_expo/static/js/web/file-7e865cab607dd0d7af70bb1204f1c18a.js",
+      "bytes": 5484,
+      "sha256": "5538f7907e9de51c6bbd70d961707ef53e05c38892c1fb852f80b7cab9bc718f"
+    },
+    {
+      "file": "_expo/static/js/web/hidden-chats-39531b2cba6a28865f5ee2a146f20e6a.js",
+      "bytes": 2002,
+      "sha256": "a8b5a32e895daa02b68367169b1d2755c414c032b20f572d6729a112747b4649"
+    },
+    {
+      "file": "_expo/static/js/web/index-1178376dd0392f7734bbd14543cf09cf.js",
+      "bytes": 4411,
+      "sha256": "16bbe20fc5ebaf18b95f8a4d36e8d50c80824e58d5b146ff1b6885a26cbbb94c"
+    },
+    {
+      "file": "_expo/static/js/web/index-41501a2b033e6376c5ef72ec463f8491.js",
+      "bytes": 7809,
+      "sha256": "11241378651641460445adf3c5029280727f0891a88df1bbba47c91c8c36c0a2"
+    },
+    {
+      "file": "_expo/static/js/web/index-4a7775b173819796697c0ea8e71b44be.js",
+      "bytes": 2078,
+      "sha256": "28b73d0f0655f9b60aac47dc9de799b16dd087459678a190fb6063fa2f444dd4"
+    },
+    {
+      "file": "_expo/static/js/web/index-7e22fdd024ca00c38407f4b529382f42.js",
+      "bytes": 86891,
+      "sha256": "ccbcc597eb4a6cbf6372f5de57b8f103ce4426f23c5642a91f32b09602bd9f40"
+    },
+    {
+      "file": "_expo/static/js/web/index-94c8be2db6869a36172b5eba360c8af8.js",
+      "bytes": 4246,
+      "sha256": "40fe5a2b826a891243d31ea1bf2e63aabd6fba8b022ff93d86939be437ff24c7"
+    },
+    {
+      "file": "_expo/static/js/web/index-c2862bf692fca3c5334c718f2e241672.js",
+      "bytes": 18044,
+      "sha256": "5729df2c0d9410932c5a3e0b33dc2d6dba5711a0199ac14dcc3d6a821547efee"
+    },
+    {
+      "file": "_expo/static/js/web/index-ed0294e74ef805a8501437e06204960b.js",
+      "bytes": 1283,
+      "sha256": "aa9c275ef59e71ce21fd13acd098134485bc52feffc37320a107843375bb3726"
+    },
+    {
+      "file": "_expo/static/js/web/info-c1551aa941c0a2137ff5613712d0cbdf.js",
+      "bytes": 6416,
+      "sha256": "f30df7dbc1d71cb5fb45d8d8f7f341dc6ea0f509981815cc355ede10ca6065f8"
+    },
+    {
+      "file": "_expo/static/js/web/memory-3699ff0ce1306637a69b71d5fbebbf78.js",
+      "bytes": 925,
+      "sha256": "0cd189a853aae6be446b15634240b94ec976bd7f8577ccd4de7de7de25902366"
+    },
+    {
+      "file": "_expo/static/js/web/memory-summary-856352d8aa531f337cdacb00d3f42ccd.js",
+      "bytes": 3283,
+      "sha256": "db4442aee47b48a06f1ee3f1b0b0a3ef672bcb18c1ad1f04bab12fe307bcb46c"
+    },
+    {
+      "file": "_expo/static/js/web/message-69d1b8e549bffaba8d218e3a76b412b2.js",
+      "bytes": 2891,
+      "sha256": "ec1ec80f965879cd7df8ea6edc4f7dd7567ac96ba275d2dd70c06be86d0ab60c"
+    },
+    {
+      "file": "_expo/static/js/web/message-text-66cc1c2229f6d6bb110fded817c46b23.js",
+      "bytes": 864,
+      "sha256": "9ac5534891520ebe4cd83f96bf6dd2b342aa849098991318fdf33ce2556efd6c"
+    },
+    {
+      "file": "_expo/static/js/web/new-bot-55ea2d71a4d8ee5f8f6705a1fa8c3554.js",
+      "bytes": 4595,
+      "sha256": "c8991f38827a8e21949f7ad2c873be1b9486b6cb346a76411fa40218bdde7729"
+    },
+    {
+      "file": "_expo/static/js/web/new-group-df8c6978fd1607d3b5dcbc7f9b08d4d6.js",
+      "bytes": 3704,
+      "sha256": "c1c4e01cc93b6f0a5e444c0e2418fc4eaa492fe1ff6daebae7fdc99d461257cc"
+    },
+    {
+      "file": "_expo/static/js/web/new-task-d343cc181263ea329d7b2b87d8f0addc.js",
+      "bytes": 8260,
+      "sha256": "988d13b373c197cfefee2f425443674fc18bf50f382523dd2fc21a932cd5e2ea"
+    },
+    {
+      "file": "_expo/static/js/web/note-e01690e9ae99743f95673bf3055a450f.js",
+      "bytes": 1527,
+      "sha256": "dd5c1ce9a04215212ba2a60d320d261ab32dd20fe5ecac8f74fbbe55c9b16a55"
+    },
+    {
+      "file": "_expo/static/js/web/notifications-f1cdcef2368d0eefedf9acac3a59c751.js",
+      "bytes": 1420,
+      "sha256": "b28a1b37549cdbcdbc33afb683a4562c905431d384793311622a2a06cec33a9b"
+    },
+    {
+      "file": "_expo/static/js/web/plugins-66d90f8435229ff50abae8d6545ff87d.js",
+      "bytes": 207,
+      "sha256": "764e46f03e82a3e2113f6712f92e84b3a1d6357a95898a66e769ffe4f13bd473"
+    },
+    {
+      "file": "_expo/static/js/web/plugins-75fc9e1984accae1e2a3a32f9a898667.js",
+      "bytes": 207,
+      "sha256": "f6926b8091c1e8f80e15c1072c8f9b0448ba7660362e7f9f1da31a9f1b6957c5"
+    },
+    {
+      "file": "_expo/static/js/web/profile-ddd53ea6b8078d07ff9daee7510d4c34.js",
+      "bytes": 2738,
+      "sha256": "fde268e0eb42fcb9e9c92942d53e2d0ca7b67179f17b948634b63eeac44e63f9"
+    },
+    {
+      "file": "_expo/static/js/web/push-1c994a920811b9beb4281d70aa052ecd.js",
+      "bytes": 87743,
+      "sha256": "321b8bcae44bbe9a2c210ab8a32eb5251bfef15d17e794c88cb07bb1be70ac6c"
+    },
+    {
+      "file": "_expo/static/js/web/review-a0f888631d72baf99e7fce6d9ba5f616.js",
+      "bytes": 8152,
+      "sha256": "d66c32bc7b2a6ab3519300a9425696d9eb8c8d197d2e52bfc3097578cea088d9"
+    },
+    {
+      "file": "_expo/static/js/web/tasks-90f52eaf290a143baecb38601a3d8b3b.js",
+      "bytes": 764,
+      "sha256": "cd68811742d3a735583b3aa5108b37b7de899e8cb9d4f675821d474648f67ba2"
+    },
+    {
+      "file": "_expo/static/js/web/workspace-cba3cedcdf7c0214908e1865e6fe292c.js",
+      "bytes": 1228,
+      "sha256": "456c932293f4a1434a424193536befb5665f3cb90589bb37fc6374a6ef3ba765"
+    },
+    {
+      "file": "_expo/static/js/web/workspaces-351a76090973a720dc7ee519cbac13cd.js",
+      "bytes": 8496,
+      "sha256": "c7f530f3b35d4d50a9f93deb2abf4cd38aae7cb1c7c37132f5adbde04f6df452"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/arrow_down.017bc6ba3fc25503e5eb5e53826d48a8.png",
+      "bytes": 9456,
+      "sha256": "6deca32b56b97fa1fa87facd6996b46cc45190a553400e7febdf1d2093099b57"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/error.d1ea1496f9057eb392d5bbf3732a61b7.png",
+      "bytes": 469,
+      "sha256": "c15ec72a74d13957211808313d5c35deb7f7606c6d22dbddceb0000d4e0547ad"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/file.19eeb73b9593a38f8e9f418337fc7d10.png",
+      "bytes": 138,
+      "sha256": "a69a2edb5b6c60b8433d5b6d23c69f520ccd8a602f3f60e7996e489718bc175c"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/forward.d8b800c443b8972542883e0b9de2bdc6.png",
+      "bytes": 188,
+      "sha256": "708a79cf561b8a2a4850ce0254584d3a5231046be08fb7fadf4b6edfdb31178b"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/pkg.ab19f4cbc543357183a20571f68380a3.png",
+      "bytes": 364,
+      "sha256": "27f4d229d440925bf7212d5dfffa45d596b2c7b3bb2905c96b839b2081a1dbeb"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/back-icon-mask.0a328cd9c1afd0afe8e3b1ec5165b1b4.png",
+      "bytes": 653,
+      "sha256": "9adb8c5efca932e2b732b293da813bd2e31952263056bce9e2517fec0f0b6a76"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/back-icon.35ba0eaec5a4f5ed12ca16fabeae451d.png",
+      "bytes": 207,
+      "sha256": "84cf5eb3b20250f69e0e4733beb4da5f417f0682892a5ad1b5e62570753c21b1"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55.png",
+      "bytes": 220,
+      "sha256": "d03a5cd7a66ef10c5147916f9d5878b2d0a0a5ad46f405a31cd9967efaa55afd"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55@2x.png",
+      "bytes": 334,
+      "sha256": "ab5613d2ce70fa67c5926e831353664945199fc195fa6fe76c5fe3cec452e31a"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55@3x.png",
+      "bytes": 502,
+      "sha256": "c4e54e6a0a7de636aa153378fbc62ea4a41695bfedf807f90df7b18ffd733f67"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55@4x.png",
+      "bytes": 645,
+      "sha256": "c86bb485eee687e06c500fc4234f51a6784b4530c2ae11d0c76481110bce3105"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/close-icon.808e1b1b9b53114ec2838071a7e6daa7.png",
+      "bytes": 141,
+      "sha256": "b1bc1810ca23e2c38cd76971c43591d726161061240d8b792b05757196ddb528"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/close-icon.808e1b1b9b53114ec2838071a7e6daa7@2x.png",
+      "bytes": 201,
+      "sha256": "cbdf9213e55f65c48d076acd8423b7c9aee4f1b81101ff6c95a38c4cd8a86461"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/close-icon.808e1b1b9b53114ec2838071a7e6daa7@3x.png",
+      "bytes": 266,
+      "sha256": "d05c9d30d79f45a78e5585a2e7ec67c6a06a883dd9137e1d5059e8c87b33ce76"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/close-icon.808e1b1b9b53114ec2838071a7e6daa7@4x.png",
+      "bytes": 332,
+      "sha256": "2325c53a73e54c438cbbc60dffdd8b513d471ba42e2f56713ef404b95e0ca1fc"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/react-navigation/elements/search-icon.286d67d3f74808a60a78d3ebf1a5fb57.png",
+      "bytes": 928,
+      "sha256": "5d075e0c287c4f4441b5b5c8fc7ea5cd27c11bb617ecea09755955bcb1889083"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png",
+      "bytes": 465,
+      "sha256": "acf691957a3bcce7d195856dce98a5cf14dce10bea28aa5c10b3550c078e23b5"
+    },
+    {
+      "file": "assets/__node_modules/.pnpm/expo-router@58.0.29_e53a62a11ae0db221128a3621153e3e2/node_modules/expo-router/assets/unmatched.20e71bdf79e3a97bf55fd9e164041578.png",
+      "bytes": 4752,
+      "sha256": "efc79da3c4c97dfb1571bff6202958ab0529c5aa31e8392600578b3e359d1447"
+    },
+    {
+      "file": "assets/assets/tabs/bot-fill.f4212df2ef7b80c9506298b0d3a78d37.png",
+      "bytes": 433,
+      "sha256": "c9f29673a2b0ce517b210e37213b02335b498daa9855bf6d9282440c742c8d14"
+    },
+    {
+      "file": "assets/assets/tabs/bot-fill.f4212df2ef7b80c9506298b0d3a78d37@2x.png",
+      "bytes": 700,
+      "sha256": "d91c8191ac7ba2b8630fdd33a84b8b44bfe5a3e918afa987dd7cbda1cf47220c"
+    },
+    {
+      "file": "assets/assets/tabs/bot-fill.f4212df2ef7b80c9506298b0d3a78d37@3x.png",
+      "bytes": 970,
+      "sha256": "1cd759fd5b44aed45fe1656e211f37fa6bfd8c75392665f2ec456d3cb6067073"
+    },
+    {
+      "file": "assets/assets/tabs/bot.17eacff29c4c79dda503da5c1c033c5b.png",
+      "bytes": 500,
+      "sha256": "0e7f72b01ae740a7246aff7acb6d2768b932aacddc325e4bf4c9a4cce40f9517"
+    },
+    {
+      "file": "assets/assets/tabs/bot.17eacff29c4c79dda503da5c1c033c5b@2x.png",
+      "bytes": 811,
+      "sha256": "d6cab169b5f808b6793b7a44050202ed49d2a1502cdcb06940d9174c662a9704"
+    },
+    {
+      "file": "assets/assets/tabs/bot.17eacff29c4c79dda503da5c1c033c5b@3x.png",
+      "bytes": 1094,
+      "sha256": "7fcba9f2e64489440b27bcc3e01fec0f6e851526c2b97f874e03e91317321147"
+    },
+    {
+      "file": "index.html",
+      "bytes": 1774,
+      "sha256": "5dfe124526b862283da643fd8974f5201a1c0f0d4396926c2bb830857c95e6c4"
+    },
+    {
+      "file": "metadata.json",
+      "bytes": 49,
+      "sha256": "aa5f19cc84d41c0f8c70ececb2bc82e863227ea1e121632aca879eb616056991"
+    }
+  ],
+  "evidence": [
+    {
+      "file": "synthetic-zh-CN-light-server-empty.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=server&state=empty&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-server-connected.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=server&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-server-disconnect-dialog.png",
+      "source": "existing CloudSettings dialog; no submit",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=server&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-personal-connected.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=personal&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-personal-revoked.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=personal&state=revoked&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-models-connected.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=models&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-server-error.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=server&state=error&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-github-empty.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=empty&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-github-create-dialog.png",
+      "source": "existing GitHubAppSettings dialog; no submit",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=empty&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-github-connected.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-github-error.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=error&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-light-personal-revoked-narrow.png",
+      "source": "existing CloudSettings; team connected but personal authorization revoked",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=personal&state=revoked&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-server-empty.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=server&state=empty&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-server-connected.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=server&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-server-disconnect-dialog.png",
+      "source": "existing CloudSettings dialog; no submit",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=server&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-personal-connected.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=personal&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-personal-revoked.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=personal&state=revoked&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-models-connected.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=models&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-server-error.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=server&state=error&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-github-empty.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=empty&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-github-create-dialog.png",
+      "source": "existing GitHubAppSettings dialog; no submit",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=empty&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-github-connected.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=connected&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-github-error.png",
+      "source": "existing production settings components; synthetic GET records",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=error&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-personal-revoked-narrow.png",
+      "source": "existing CloudSettings; team connected but personal authorization revoked",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=personal&state=revoked&locale=zh-CN"
+    },
+    {
+      "file": "synthetic-en-light-github-organization-dialog.png",
+      "source": "existing GitHubAppSettings; organization field; no submit",
+      "theme": "light",
+      "locale": "en",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:44553",
+      "path": "/mikka/?view=github&state=empty&locale=en"
+    },
+    {
+      "file": "synthetic-zh-CN-light-mobile-375-sign-in.png",
+      "source": "real Expo production export; no account session",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-light-mobile-375-server-choice.png",
+      "source": "real Expo ServerSelection; local presentation only",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-light-mobile-375-self-hosted.png",
+      "source": "real Expo self-hosted address form; no connect or login",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-light-mobile-430-sign-in.png",
+      "source": "real Expo production export; no account session",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-light-mobile-430-server-choice.png",
+      "source": "real Expo ServerSelection; local presentation only",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-light-mobile-430-self-hosted.png",
+      "source": "real Expo self-hosted address form; no connect or login",
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-mobile-375-sign-in.png",
+      "source": "real Expo production export; no account session",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-mobile-375-server-choice.png",
+      "source": "real Expo ServerSelection; local presentation only",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-mobile-375-self-hosted.png",
+      "source": "real Expo self-hosted address form; no connect or login",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 375,
+        "height": 812
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-mobile-430-sign-in.png",
+      "source": "real Expo production export; no account session",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-mobile-430-server-choice.png",
+      "source": "real Expo ServerSelection; local presentation only",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    },
+    {
+      "file": "synthetic-zh-CN-dark-mobile-430-self-hosted.png",
+      "source": "real Expo self-hosted address form; no connect or login",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "origin": "http://127.0.0.1:36991",
+      "path": "/"
+    }
+  ]
+}
