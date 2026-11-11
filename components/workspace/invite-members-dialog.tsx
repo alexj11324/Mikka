@@ -71,6 +71,7 @@ export function InviteMembersDialog({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [links, setLinks] = useState<{ email: string; url: string }[]>([]);
+  const [skipped, setSkipped] = useState<{ email: string; reason: 'alreadyMember' | 'duplicate' }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const busy = pending || importing;
   const recipients = invitationEmails(emails);
@@ -201,6 +202,13 @@ export function InviteMembersDialog({
           url: new URL(withBasePath(link.path), publicAppOrigin()).href,
         })),
       );
+      // Every address gets an answer (ALE-28): these ones were skipped, and the
+      // reason is what the person has to correct.
+      setSkipped(
+        (result.outcomes ?? [])
+          .filter((outcome) => !outcome.created)
+          .map((outcome) => ({ email: outcome.email, reason: outcome.reason })),
+      );
       try {
         await onCreated();
       } catch {
@@ -225,8 +233,9 @@ export function InviteMembersDialog({
     setDragging(false);
     setError("");
     setNotice("");
-    if (links.length) {
+    if (links.length || skipped.length) {
       setLinks([]);
+      setSkipped([]);
       setEmails("");
       setFileName("");
       setRole("member");
@@ -256,7 +265,7 @@ export function InviteMembersDialog({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        {links.length ? (
+        {links.length || skipped.length ? (
           <div className="flex flex-col gap-4">
             <Alert>
               <Mail />
@@ -286,6 +295,21 @@ export function InviteMembersDialog({
                 </Field>
               ))}
             </FieldGroup>
+            {skipped.length ? (
+              <Alert>
+                <AlertTitle>{t("skippedTitle", { count: skipped.length })}</AlertTitle>
+                <AlertDescription>
+                  <ul className="flex flex-col gap-1">
+                    {skipped.map((entry) => (
+                      <li key={`${entry.email}-${entry.reason}`} className="flex flex-wrap items-baseline gap-2">
+                        <span className="break-all">{entry.email}</span>
+                        <span className="text-muted-foreground">{t(`skipped${entry.reason[0].toUpperCase()}${entry.reason.slice(1)}`)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            ) : null}
             {notice && (
               <p role="status" className="text-xs text-muted-foreground">
                 {notice}

@@ -21,12 +21,18 @@ import { ownerWorkspaceListsChanged, workspaceListChanged, workspaceListScopesBe
 
 import { acceptHumanInvitation, updateHumanMembership } from '@/lib/governance/member-admission'
 import { drainMemberLifecycleOutbox } from '@/lib/governance/member-outbox'
+import { planInvitations } from '@/lib/batch-outcome'
 import { GovernanceError } from '@/lib/governance/errors'
 
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
 const workspaceSlug = z.string().trim().min(3).max(64).regex(/^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])$/)
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
+
+/** One address of an invitation batch: the link it got, or why it was skipped (ALE-28). */
+type InvitationOutcome =
+  | { email: string; created: true; path: string }
+  | { email: string; created: false; reason: 'alreadyMember' | 'duplicate' }
 
 async function result<T>(operation: () => Promise<T>) {
   try {
@@ -117,31 +123,40 @@ export async function switchWorkspace(...args: Parameters<typeof switchWorkspace
   return withFreshSession(() => switchWorkspaceBody(...args))
 }
 
+/**
+ * One outcome per address (ALE-28). A batch of up to 20 addresses reports which
+ * ones got a link and which were skipped, instead of failing all of them for one
+ * address that is already a member: the person can correct exactly those.
+ */
 async function createWorkspaceInvitationBody(input: { workspaceId: string; emails: string[]; role: string }) {
   return result(async () => {
     const user = await requireUser()
     const role = roleSchema.parse(input.role)
     const emails = [...new Set(z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase())))]
     const request = auditRequestContext(await headers())
-    return workspaceDb.transaction(async tx => {
+    const outcomes = await workspaceDb.transaction(async tx => {
       const { workspace } = await requireWorkspace(tx, input.workspaceId, user.id, true)
       // A personal workspace has exactly one member (decision 2026-10-31-2130).
       if (workspace.kind === 'personal') throw new WorkspaceError('workspacePersonal')
-      const members = await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))
-      if (emails.some(email => members.some(member => member.email.toLowerCase() === email))) throw new WorkspaceError('workspaceMemberExists')
-      const links: { email: string; path: string }[] = []
-      for (const email of emails) {
+      const members = new Set((await tx.select({ email: workspaceMembers.email }).from(workspaceMembers).where(eq(workspaceMembers.workspaceId, input.workspaceId))).map(member => member.email.toLowerCase()))
+      const results: InvitationOutcome[] = []
+      for (const outcome of planInvitations(emails, members)) {
+        if (!outcome.used) { results.push({ email: outcome.item, created: false, reason: outcome.reason }); continue }
+        const email = outcome.item
         const token = randomBytes(32).toString('hex')
         const tokenHash = hashToken(token)
         const expiresAt = new Date(Date.now() + 7 * 86400000)
         await tx.insert(workspaceInvitations).values({ id: crypto.randomUUID(), workspaceId: input.workspaceId, userId: user.id, email, role, tokenHash, expiresAt })
           .onConflictDoUpdate({ target: [workspaceInvitations.workspaceId, workspaceInvitations.email], set: { userId: user.id, role, tokenHash, status: 'pending', expiresAt, createdAt: new Date() } })
         await enqueueWorkspaceAudit(tx, { workspaceId: input.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.invited', target: { type: 'invitation', label: email }, metadata: { role }, ...request })
-        links.push({ email, path: `/invite/${token}` })
+        results.push({ email, created: true, path: `/invite/${token}` })
       }
-      await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
-      return links
+      // A batch with nothing to create wrote nothing; its outcomes still say why,
+      // which is the answer the person needs, so it is not read as a failure.
+      if (results.some(result => result.created)) await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
+      return results
     })
+    return outcomes
   })
 }
 
@@ -212,7 +227,18 @@ async function acceptWorkspaceInvitationBody(token: string) {
 }
 
 // Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
-export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) { return withFreshSession(() => createWorkspaceInvitationBody(...args)) }
+/**
+ * `data` is the links this action always returned, so its callers keep working;
+ * `outcomes` adds one entry per address, which is what a partially skipped batch
+ * needs to report (ALE-28).
+ */
+export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) {
+  return withFreshSession(async () => {
+    const body = await createWorkspaceInvitationBody(...args)
+    if (!body.ok) return body
+    return { ok: true as const, data: body.data.flatMap(outcome => outcome.created ? [{ email: outcome.email, path: outcome.path }] : []), outcomes: body.data }
+  })
+}
 export async function updateWorkspaceMember(...args: Parameters<typeof updateWorkspaceMemberBody>) { return withFreshSession(() => updateWorkspaceMemberBody(...args)) }
 export async function revokeWorkspaceInvitation(...args: Parameters<typeof revokeWorkspaceInvitationBody>) { return withFreshSession(() => revokeWorkspaceInvitationBody(...args)) }
 export async function acceptWorkspaceInvitation(...args: Parameters<typeof acceptWorkspaceInvitationBody>) { return withFreshSession(() => acceptWorkspaceInvitationBody(...args)) }
