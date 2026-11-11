@@ -23,6 +23,11 @@ test('the safety-net check names exactly the jobs with work already due', { skip
   const admin = new Pool({ connectionString: target, max: 1 })
   await admin.query(`CREATE SCHEMA ${schema}`)
   for (const table of TABLES) await admin.query(`CREATE TABLE ${schema}.${table} (LIKE public.${table} INCLUDING DEFAULTS)`)
+  // LIKE copies the origin column's NOT NULL, but not its generating trigger.
+  // Reuse the installed production function instead of hard-coding a seed key.
+  const originTrigger = (await admin.query<{ definition: string }>(`SELECT pg_get_triggerdef(oid) AS definition
+    FROM pg_trigger WHERE tgrelid='public.user_schedules'::regclass AND tgname='schedule_request_origin'`)).rows[0]
+  if (originTrigger) await admin.query(originTrigger.definition.replace('ON public.user_schedules ', `ON ${schema}.user_schedules `))
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 2 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
   const due = () => reconcileDue(pool, { factoryLifecycle: true, workspace: pool })
