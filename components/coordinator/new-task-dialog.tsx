@@ -13,6 +13,7 @@ import { TASK_TITLE_MAX } from '@/lib/task-title-input'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import type { TaskDestination } from '@/lib/task-destination'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
+import { AccessChangeDialog } from '@/components/workspace/issue-metadata-controls'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -57,7 +58,7 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
  * request goes into the Coordinator conversation, where its reply shows up. A UI layer's new-task slot draws the
  * window instead (docs/ui-overlay.md); the data, state and sending stay here.
  */
-export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId, teamId, onCreated, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
+export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, workspaceId, teamId, onCreated, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSent?: () => void
@@ -66,6 +67,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   initialBotId?: string
   /** Project page the request came from. */
   project?: string | null
+  projectId?: string
   workspaceId?: string
   teamId?: string
   /** Keys typed before the dialog finished opening. */
@@ -79,7 +81,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const { mutate } = useSWRConfig()
   const actionError = useActionError()
   const [intent, setIntent] = useState(initialIntent)
-  const only = Boolean(onCreated && workspaceId && !project && intent === 'create_only')
+  const only = Boolean(onCreated && workspaceId && intent === 'create_only')
   const dispatching = open && !only
   const pending = useRef(false)
   const createRequests = useRef(new Map<string, string>())
@@ -92,6 +94,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const [profilePick, setProfilePick] = useState<{ workspaceId: string; id: string } | null>(null)
   const profileId = profilePick?.workspaceId === workspaceId ? profilePick?.id : undefined
   const profileAllowed = !profileId || (!profiles.error && taskProfileSelectable(profileId, profiles.data))
+  const [accessChange, setAccessChange] = useState<{ fingerprint: string; tasks: number } | null>(null)
   const [coordinatorUnavailable, setCoordinatorUnavailable] = useState(false)
   const tCoordinator = useTranslations('Coordinator')
   const { data: available = true } = useSWR(dispatching ? 'issue-creation-available' : null, () => issueCreationAvailable())
@@ -142,21 +145,23 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
     setDraft(next)
   }
 
-  async function submit() {
+  async function submit(confirmedFingerprint?: string) {
     const name = title.trim()
     const text = draft.trim() || name
+    const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, picked, botPick, profileId])
+    const confirmAccess = confirmedFingerprint === fingerprint
     if (!text || pending.current || attachments.locked || (!only && (!available || !profileAllowed || botPick && !handler))) return
     pending.current = true
     setSending(true)
     setCoordinatorUnavailable(false)
     try {
       if (only && workspaceId) {
-        const fingerprint = JSON.stringify([workspaceId, teamId, name, text])
         const requestId = createRequests.current.get(fingerprint) ?? crypto.randomUUID()
         createRequests.current.set(fingerprint, requestId)
         const { createTaskOnly } = await import('@/app/actions/issues')
-        const result = await createTaskOnly({ version: 1, intent: 'create_only', workspaceId, requestId, ...(teamId ? { teamId } : {}),
+        const result = await createTaskOnly({ version: 1, intent: 'create_only', workspaceId, requestId, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}), ...(confirmAccess ? { confirmAccess: true } : {}),
           ...backlogTaskDraft(name, text) })
+        if (result.error && 'confirmable' in result && result.confirmable) { setAccessChange({ fingerprint, tasks: Number(result.params?.tasks ?? 1) }); return }
         if (result.error || !('taskId' in result)) { toast.error(actionError(result.error)); return }
         createRequests.current.delete(fingerprint)
         setDraft('')
@@ -165,7 +170,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
         onCreated?.(result.taskId)
         return
       }
-      const key = JSON.stringify([workspaceId, teamId, text, name, picked, project ?? null, handler?.id ?? null, profileId ?? null])
+      const key = JSON.stringify([workspaceId, teamId, projectId, text, name, picked, project ?? null, handler?.id ?? null, profileId ?? null])
       if (composed.current?.key !== key) {
         const destination = pickedTaskDestination(picked)
         const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
@@ -173,7 +178,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
           ...(name ? { taskTitle: name } : {}),
           ...(destination ? { taskDestination: destination } : {}) }
       }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, taskTitle: composed.current.taskTitle, expectedWorkspaceId: workspaceId, ...(workspaceId && !project ? { taskCommand: { version: 1, intent: 'create_and_dispatch', description: text, ...(teamId ? { teamId } : {}) } } : {}) })
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, taskTitle: composed.current.taskTitle, expectedWorkspaceId: workspaceId, ...(confirmAccess ? { confirmTaskAccess: true } : {}), ...(workspaceId ? { taskCommand: { version: 1, intent: 'create_and_dispatch', description: text, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}) } } : {}) })
+      if (outcome.kind === 'rejected' && outcome.error === 'accessChangeConfirmationRequired') { setAccessChange({ fingerprint, tasks: 1 }); return }
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
@@ -195,7 +201,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
 
   const profileChoices = useTaskProfileChoices({ workspaceId, value: profileId ?? null, data: profiles.data })
   const keyDialogNode = keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />
-  const chooseIntent = onCreated && workspaceId && !project ? <Field>
+  const chooseIntent = onCreated && workspaceId ? <Field>
     <FieldLabel htmlFor="new-task-intent">{t('intent')}</FieldLabel>
     <Select value={intent} onValueChange={value => { if (value === 'create_only' || value === 'create_and_dispatch') setIntent(value) }}
       disabled={sending || attachments.locked || attachments.files.length > 0} items={[
@@ -225,5 +231,11 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
       profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
       intent={chooseIntent ? intent : undefined} notices={notices} sending={sending} canSubmit={(only || available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
     {keyDialogNode}
+    {accessChange && <AccessChangeDialog change={accessChange} pending={sending} onCancel={() => setAccessChange(null)} onConfirm={async () => {
+      const current = accessChange
+      setAccessChange(null)
+      await submit(current.fingerprint)
+      return true
+    }} />}
   </>
 }

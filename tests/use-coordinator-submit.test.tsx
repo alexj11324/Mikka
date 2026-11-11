@@ -87,3 +87,23 @@ test('a lost Task receipt retries only the authorized read of the accepted deliv
     assert.equal(outcome.sourceEventId, 'event')
   } finally { returnReceipt = true; await act(async () => { root.unmount() }) }
 })
+
+
+test('confirming a hosted Project scope retries the same submission ID', async () => {
+  const sent: { id: string; approved: boolean }[] = []
+  const agent = { send: async (_text: string, options: { headers: Record<string, string>; clientContext: { confirmTaskAccess?: boolean } }) => {
+    const approved = options.clientContext.confirmTaskAccess === true
+    sent.push({ id: options.headers['x-mikka-submission-id'], approved })
+    if (!approved) throw new ClientError(409, '{"code":"accessChangeConfirmationRequired"}')
+  } } as unknown as Pick<UseEveAgentReturn, 'send'>
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  let hook!: ReturnType<typeof useCoordinatorSubmit>
+  function Probe() { hook = useCoordinatorSubmit(agent); return null }
+  const context = { expectedWorkspaceId: 'workspace', taskCommand: { version: 1, intent: 'create_and_dispatch', description: 'Do work', projectId: 'project' } } as const
+  try {
+    await act(async () => { root.render(<Probe />) })
+    assert.deepEqual(await hook.submit('Do work', context), { kind: 'rejected', error: 'accessChangeConfirmationRequired' })
+    assert.equal((await hook.submit('Do work', { ...context, confirmTaskAccess: true })).kind, 'accepted')
+    assert.deepEqual(sent, [{ id: sent[0].id, approved: false }, { id: sent[0].id, approved: true }])
+  } finally { await act(async () => root.unmount()) }
+})

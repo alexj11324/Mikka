@@ -14,7 +14,7 @@ import { personalSubmissionInput, recordPersonalSubmission,personalSubmissionEve
 const quote = z.object({ artifactId:z.uuid(),version:z.number().int().positive(),kind:z.enum(['text','element']),text:z.string().min(1).max(QUOTE_TEXT_MAX),label:z.string().max(200).optional(),selector:z.string().max(1000).optional() })
 const notes = z.array(z.object({n:z.number().int().positive(),kind:z.enum(['element','region']),url:z.url({protocol:/^https?$/}).max(2000),label:z.string().min(1).max(200),note:z.string().min(1).max(NOTE_MAX),selector:z.string().max(1000).optional(),rect:z.object({x:z.number(),y:z.number(),width:z.number().nonnegative(),height:z.number().nonnegative(),viewportWidth:z.number().nonnegative(),viewportHeight:z.number().nonnegative()}).optional()})).max(NOTES_MAX)
 export const eveProductContext = z.object({
-  taskCommand:dispatchTaskIntent.optional(),quote:quote.nullish(),notes:notes.nullish(),taskDestination:taskDestinationSchema.optional(),
+  taskCommand:dispatchTaskIntent.optional(),confirmTaskAccess:z.boolean().optional(),quote:quote.nullish(),notes:notes.nullish(),taskDestination:taskDestinationSchema.optional(),
   profileId:agentProfileReferenceSchema.optional(),taskTitle:taskTitleInputSchema.optional(),
   expectedWorkspaceId:z.uuid().optional(),retryOf:z.number().int().positive().optional(),botId:z.uuid().nullish(),
 }).strict()
@@ -57,7 +57,7 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
     const session = await auth.api.getSession({headers,query:{disableCookieCache:true}})
     if (session?.user.id === scope.ownerId && !session.tokenWorkspaceId) humanSessionId = session.session.id
   }
-  if (product.taskCommand?.teamId && !humanSessionId) throw new Error('teamIssueAccessDenied')
+  if ((product.taskCommand?.teamId || product.taskCommand?.projectId) && !humanSessionId) throw new Error('teamIssueAccessDenied')
   const options={botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,taskCommand:product.taskCommand,...(product.retryOf?{retryOf:product.retryOf}:{}),...(retry?{taskRequestSourceEventId:retry.taskRequestSourceEventId}:{}),...(humanSessionId ? {humanSessionId} : {})}
   const record=(executor:Parameters<typeof recordPersonalSubmission>[0])=>recordPersonalSubmission(executor,scope.ownerId,text,options)
   let recorded
@@ -74,7 +74,7 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
   if (product.taskCommand) {
     const { createIssueFromRequest } = await import('../coordinator/issue-create')
     const title = product.taskTitle ?? product.taskCommand.description.split(/\r?\n/, 1)[0]!.slice(0, 200)
-    createdTaskId = (await createIssueFromRequest(scope.ownerId, { sourceEventId: retry?.taskRequestSourceEventId ?? eventId, title })).issueId
+    createdTaskId = (await createIssueFromRequest(scope.ownerId, { sourceEventId: retry?.taskRequestSourceEventId ?? eventId, title, confirmAccess: product.confirmTaskAccess })).issueId
   }
   ingress.set(request,{scope,eventId})
   const contextual = text === input.text ? [] : [withQuote(withBrowserNotes('',product.notes) ?? '',product.quote)]

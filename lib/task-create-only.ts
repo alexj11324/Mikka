@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { ActionFailureError } from '@/lib/action-error'
 import { actingContext, activityActor } from '@/lib/activity-actor'
 import { requireUser } from '@/lib/issue-access'
-import { insertExplicitTask } from './task-create-scope'
+import { attachInitialProject, insertExplicitTask, reconcileInitialProject } from './task-create-scope'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { effectiveRequestWorkspace } from '@/lib/request-workspace'
 import { withTaskCreationReceipt } from './task-creation-receipt'
@@ -14,14 +14,22 @@ import { createOnlyCommand, type CreateOnlyCommand } from './task-create-command
 export async function createUnstartedTask(input: CreateOnlyCommand) {
   const parsed = createOnlyCommand.safeParse(input)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
-  const { requestId, workspaceId, version, intent, teamId, ...fields } = parsed.data
-  if (teamId && actingContext.getStore()) throw new ActionFailureError('teamIssueAccessDenied')
+  const { requestId, workspaceId, version, intent, teamId, projectId, confirmAccess = false, ...fields } = parsed.data
+  if ((teamId || projectId) && actingContext.getStore()) throw new ActionFailureError('teamIssueAccessDenied')
   const user = await requireUser()
   if (await effectiveRequestWorkspace(user) !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   return withTaskWorkspace(user, workspaceId, () => db.transaction(async tx => {
-    const create = () => insertExplicitTask(tx, user.id, workspaceId, requestId, fields, activityActor(user.id), teamId)
-    const receipt = await withTaskCreationReceipt(tx, user, workspaceId, requestId, { version, intent, ...(teamId ? { teamId } : {}), ...fields }, create,
-      teamId ? async expected => { if ((await create()).taskId !== expected) throw new ActionFailureError('submissionConflict') } : undefined)
+    const actor = activityActor(user.id)
+    const insert = () => insertExplicitTask(tx, user.id, workspaceId, requestId, fields, actor, teamId)
+    const receipt = await withTaskCreationReceipt(tx, user, workspaceId, requestId,
+      { version, intent, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}), ...fields }, async () => {
+        const created = await insert()
+        if (projectId) await attachInitialProject(tx, user.id, workspaceId, created.taskId, projectId, actor, confirmAccess)
+        return created
+      }, teamId || projectId ? async expected => {
+        if (teamId && (await insert()).taskId !== expected) throw new ActionFailureError('submissionConflict')
+        if (projectId) await reconcileInitialProject(tx, user.id, workspaceId, expected, projectId, actor, confirmAccess)
+      } : undefined)
     return { version, ...receipt, dispatch: null }
   }))
 }

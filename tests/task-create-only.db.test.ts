@@ -150,3 +150,39 @@ test('an explicit Team backlog task checks the exact selected tenant and reconci
     await pool.query('delete from "user" where id=any($1::text[])', [[user, other]])
   }
 })
+
+test('Project UUID is checked before commit and survives duplicate names, rename, retries and a subsequent move', { skip: !enabled }, async () => {
+  const { pool } = await import('../lib/db')
+  const { createTaskOnly } = await import('../app/actions/issues')
+  const { moveIssueToProject } = await import('../app/actions/projects')
+  const { seedUser, seedPersonalWorkspace, seedProject } = await import('./support/workspace-admin-db')
+  const user = await seedUser(pool, 'Project-task-owner'), other = await seedUser(pool, 'Unrelated-project-owner')
+  try {
+    const workspaceId = await seedPersonalWorkspace(pool, user)
+    const first = await seedProject(pool, user, []), target = await seedProject(pool, user, []), foreign = await seedProject(pool, other, [])
+    const input: CreateOnlyCommand = { version: 1, intent: 'create_only', workspaceId, projectId: target, requestId: randomUUID(),
+      title: 'Project task', content: { type: 'doc' }, status: 'todo', priority: 'normal' }
+    const run = <T,>(operation: () => Promise<T>) => withActivitySession(user, operation, workspaceId)
+    assert.ok((await run(() => createTaskOnly({ ...input, projectId: foreign }))).error)
+    assert.equal((await pool.query('select 1 from issues where "userId"=$1', [user])).rowCount, 0)
+    assert.equal((await pool.query('select 1 from task_creation_receipts where "userId"=$1', [user])).rowCount, 0)
+    await pool.query('update workspace_projects set name=$2 where id=$1', [target, 'Renamed target'])
+    const receipt = await run(() => createTaskOnly(input))
+    assert.ok('taskId' in receipt && receipt.taskId, JSON.stringify(receipt))
+    const taskId = receipt.taskId
+    const relation = async () => (await pool.query('select "projectId" from workspace_project_tasks where "issueId"=$1', [taskId])).rows[0]?.projectId
+    assert.equal(await relation(), target)
+    assert.deepEqual(await run(() => createTaskOnly(input)), receipt)
+    await pool.query('delete from workspace_project_tasks where "issueId"=$1', [taskId])
+    assert.deepEqual(await run(() => createTaskOnly(input)), receipt, 'a lost Workspace commit is repairable from the original APP binding')
+    assert.equal(await relation(), target)
+    const revision = (await pool.query('select revision from issues where id=$1', [taskId])).rows[0].revision
+    assert.ok('issue' in await run(() => moveIssueToProject({ workspaceId, projectId: first, issueId: taskId, revision })))
+    assert.deepEqual(await run(() => createTaskOnly(input)), receipt)
+    assert.equal(await relation(), first)
+    assert.equal((await pool.query('select 1 from agent_runs where "issueId"=$1', [taskId])).rowCount, 0)
+  } finally {
+    await pool.query('delete from issues where "userId"=any($1::text[])', [[user, other]])
+    await pool.query('delete from "user" where id=any($1::text[])', [[user, other]])
+  }
+})

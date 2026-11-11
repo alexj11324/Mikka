@@ -35,10 +35,14 @@ mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) 
 let data: AgentProfilesView | undefined, readError: Error | undefined
 const submitted: { text: string; context?: CoordinatorMessageContext }[] = []
 const manualCommands: import('../../lib/task-create-command').CreateOnlyCommand[] = []
-let failManual = false
+let failManual = false, requireConsent = false
+mock.module(new URL('../workspace/issue-metadata-controls.tsx', import.meta.url).href, { namedExports: {
+  AccessChangeDialog: ({ onConfirm }: { onConfirm: () => Promise<boolean> }) => <button data-confirm onClick={() => void onConfirm()}>Confirm</button>,
+} })
 mock.module(new URL('../../app/actions/issues.ts', import.meta.url).href, { namedExports: { createTaskOnly: async (command: import('../../lib/task-create-command').CreateOnlyCommand) => {
   manualCommands.push(command)
   if (failManual) throw new Error('response lost')
+  if (requireConsent && !command.confirmAccess) return { error: 'accessChangeConfirmationRequired', params: { tasks: 1 }, confirmable: true }
   return { version: 1, taskId: 'one-task', identifier: 'TEST-1', dispatch: null }
 } } })
 let refreshes = 0
@@ -89,7 +93,7 @@ before(async () => {
   ;({ NewTaskDialog } = await import('./new-task-dialog'))
 })
 beforeEach(() => {
-  manualCommands.length = 0; failManual = false
+  manualCommands.length = 0; failManual = false; requireConsent = false
   submitted.length = 0; refreshes = 0; readError = undefined
   data = { profiles: [{
     id: customId, name: 'Fixture role', description: '', roles: ['review'], icon: 'lens', color: 'pink', enabled: true, harness: 'claude_code',
@@ -271,4 +275,19 @@ test('Team creation retains its chosen identity when switching from backlog to d
   await act(async () => create().click())
   assert.equal(submitted[0].context?.taskCommand?.teamId, teamId)
   assert.equal(submitted[0].context?.expectedWorkspaceId, workspaceId)
+})
+
+
+test('Project creation binds the UUID and retries only after a real access refusal is confirmed', async () => {
+  const projectId = '12250000-0000-4000-8000-000000000004'
+  requireConsent = true
+  await render(<NewTaskDialog open workspaceId={workspaceId} project="Same name" projectId={projectId} initialIntent="create_only" initialText="Prepare release."
+    onCreated={() => {}} onOpenChange={() => {}} />)
+  await act(async () => create().click())
+  assert.equal(manualCommands[0].projectId, projectId)
+  assert.equal(manualCommands[0].confirmAccess, undefined)
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-confirm]')!.click())
+  assert.equal(manualCommands[1].requestId, manualCommands[0].requestId)
+  assert.equal(manualCommands[1].confirmAccess, true)
+  assert.equal(submitted.length, 0)
 })
