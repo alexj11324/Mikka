@@ -30,7 +30,6 @@ import {
   skillsPromptSection,
   type RunSkill,
   type SkillAssignmentReceipt,
-  type SkillPromptPlan,
 } from "@mikka/protocol/skill"
 import { verifyAssignedSkills, verifyMountedSkill } from './skill-artifact'
 
@@ -430,15 +429,6 @@ export class RunContext {
   }
 
   /**
-   * What this run's skills section carries, and which skills it lists by
-   * description alone. The prompt is built from this same plan, so what the
-   * run reports is exactly what its agent was given.
-   */
-  skillsPlan(): SkillPromptPlan {
-    return skillPromptPlan(this.options.skills ?? [])
-  }
-
-  /**
    * The run's rules for the agent, with this workspace's permissions and the
    * workspace's skills. A skill body that fits the prompt budget is inlined,
    * so a harness that reads nothing but its prompt still applies it; one that
@@ -446,12 +436,17 @@ export class RunContext {
    * (`skillBodyPath`). The directory is named so attached files can be opened.
    */
   instructions(): string {
-    const skills = this.options.skills ?? []
-    const section = skillsPromptSection(skills, this.skillsDir, this.skillsPlan())
+    // The same pure plan the report is derived from, so what the app shows and
+    // what the agent was given cannot disagree.
+    const skills = skillsPromptSection(
+      this.options.skills ?? [],
+      this.skillsDir,
+      skillPromptPlan(this.options.skills ?? []),
+    )
     return [
       runInstructions(this.worktree, this.options.policy, this.options.github, this.options.kind),
       this.options.kind === "plan" ? planInstructions() : "",
-      section,
+      skills,
       PERSONAL_MESSAGE_INSTRUCTIONS,
       this.options.mailboxEnabled ? 'The supplied mailbox tools use this run’s existing authority. Use stable keys, explicit inbox/ACK; queued or acknowledged never means executed. Do not poll or infer approval.' : '',
     ]
