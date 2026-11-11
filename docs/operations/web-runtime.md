@@ -174,3 +174,16 @@ Owner要求的桌面后代Web兼容和过期任务取消已通过正常合并落
 ## 文档更新的发布影响
 
 最终十个Markdown/SVG路径的实际静态分类为docs-only，且不匹配桌面release路径；已核8180→74d及74d→f363的比较没有改动这些路径、分类器或发布workflow，后来的README许可、贡献和任务编号内容保持。Web workflow另有独立规则：每次正常main push都设置runtime refresh并要求实际Web build。因此docs-only不等于不构建Web；最终文档须通过正常PR并保留这条发布规则，不修改分类器或发布门禁。后续main若改变相关workflow或README，提交前重新只读核对。完整静态调用、源码hash及历史记录在[完整证据](../acceptance/issue-1415/final-evidence.md)。
+
+### Cloudflare Node 24 API image
+
+Build the shared API as `NITRO_PRESET=node-server` with the official frontend output from the same release. Set `MIKKA_BUILD_REVISION`, `MIKKA_UI_OVERLAY_SHA` and `MIKKA_DEPLOYMENT_ID` in that build. Package only the completed API output using a named Docker build context.
+
+```sh
+docker buildx build --platform linux/amd64 \
+  --build-context release=.output \
+  --build-arg MIKKA_BUILD_REVISION --build-arg MIKKA_UI_OVERLAY_SHA \
+  --build-arg MIKKA_DEPLOYMENT_ID -f cloudflare/api/Dockerfile cloudflare/api
+```
+
+The image verifies all three identifiers while building. At startup the unprivileged Node process requires the cloud edition, the existing application and workspace PostgreSQL connections, the canonical HTTPS application origin, its authentication secret, a separate HTTPS Eve origin and an explicit hosted Workflow target. Supply runtime configuration through the approved private deployment identity. The image starts the existing Nitro listener once. The release owns database migrations. The separate Eve service owns agent sessions and their lifetime. The existing `/mikka/api/health` endpoint tests process liveness, and `/mikka/api/version` reports the compiled release. The Web release Worker owns frontend assets for this target.

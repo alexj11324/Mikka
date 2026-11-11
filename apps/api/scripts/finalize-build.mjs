@@ -130,6 +130,8 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     }
     await writeFile(path, `${JSON.stringify(config, null, 2)}\n`)
   } else if (preset === 'node-server') {
+    evidence.overlaySha = process.env.MIKKA_UI_OVERLAY_SHA || null
+    evidence.deploymentId = configuredDeploymentId() ?? null
     const server = join(output, 'server')
     await readFile(join(server, 'index.mjs'))
     const dockerApplication = await readFile(join(server, 'docker-entry.mjs'))
