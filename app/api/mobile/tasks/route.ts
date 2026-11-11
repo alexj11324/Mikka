@@ -36,6 +36,7 @@ async function handleGET(request: Request) {
         const runByIssue = new Map(runs.map(row => [row.issueId, row]))
         const blocks = boardBlocks(issues, runs)
         return json({
+          workspaceId,
           tasks: issues.map(issue => {
             const block = blocks.get(issue.id)
             return {

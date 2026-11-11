@@ -5,6 +5,9 @@ import { taskStateOf, type TaskStateContext, type TaskStateRun, type TaskStateVi
 
 export type TaskPresentation = TaskStateView & {
   version: 1
+  /** Opt-in list context for opening the authorized Factory on user selection. */
+  factoryTaskId?: string
+  factoryExtraCount?: number
   primaryStatus: IssueStatus
   factoryStage: FactoryFlowView['stage'] | null
   runStatus: string | null

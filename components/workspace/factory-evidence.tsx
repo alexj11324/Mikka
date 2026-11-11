@@ -51,7 +51,7 @@ function Exit({ code }: { code: number | null }) {
 }
 
 /** Figma `Factory/EvidenceThumb`: 104×65, a screenshot, a recording with its length, or a terminal tile for text. */
-function EvidenceThumb({ taskId, item, selected, label, onOpen }: { taskId: string; item: AcceptanceItem; selected?: boolean; label: string; onOpen: () => void }) {
+function EvidenceThumb({ taskId, item, selected, label, onOpen, mediaSource }: { taskId: string; item: AcceptanceItem; selected?: boolean; label: string; onOpen: () => void; mediaSource?: (entry: EvidenceEntry) => string | null }) {
   const { entry, command } = item
   const media = mediaKind(entry)
   const duration = formatDuration(entry.durationMs)
@@ -60,7 +60,7 @@ function EvidenceThumb({ taskId, item, selected, label, onOpen }: { taskId: stri
     data-kind={media ?? 'text'}
     className={cn('relative h-[65px] w-[104px] shrink-0 overflow-hidden rounded-lg bg-muted p-0',
       media === null && 'flex-col items-start justify-center gap-0.5 bg-foreground px-2.5 text-background hover:bg-foreground/90 hover:text-background', selected && 'ring-2 ring-primary')}>
-    {media === 'image' && !broken && <img src={mediaUrl(taskId, entry)!} alt="" loading="lazy" draggable={false} onError={() => setBroken(true)} className="size-full object-cover object-top" />}
+    {media === 'image' && !broken && <img src={(mediaSource ? mediaSource(entry) : mediaUrl(taskId, entry)) ?? undefined} alt="" loading="lazy" draggable={false} onError={() => setBroken(true)} className="size-full object-cover object-top" />}
     {media === 'video' && <>
       <span className="flex size-6 items-center justify-center rounded-full bg-background/90 text-foreground"><Play data-icon="inline-start" aria-hidden="true" className="size-3 fill-current" /></span>
       {duration && <span className="absolute right-1 bottom-1 rounded-sm bg-foreground/70 px-1 text-xs text-background">{duration}</span>}
@@ -104,7 +104,7 @@ type Load = { state: 'loading' } | { state: 'ready'; content?: string } | { stat
  * filmstrip, and ←/→ to move. The header names the criterion with its result.
  * Media comes from the captures serve path; text from the approval route.
  */
-export function EvidenceViewer({ taskId, items, index, title, passed, sha, environment, readText, onIndex, onClose }: {
+export function EvidenceViewer({ taskId, items, index, title, passed, sha, environment, readText, onIndex, onClose, mediaSource }: {
   taskId: string
   items: readonly AcceptanceItem[]
   index: number
@@ -114,6 +114,8 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
   sha?: string
   environment?: string | null
   readText: (artifact: string) => Promise<string>
+  /** Activity callers supply their authorized task media URLs, including historical captures. */
+  mediaSource?: (entry: EvidenceEntry) => string | null
   onIndex: (index: number) => void
   onClose: () => void
 }) {
@@ -163,7 +165,7 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
   }
   if (!item || !entry) return null
   const label = itemLabel(t, item)
-  const url = mediaUrl(taskId, entry)
+  const url = mediaSource ? mediaSource(entry) : mediaUrl(taskId, entry)
   const src = url && attempt ? `${url}?attempt=${attempt}` : url
   const download = url ?? (load.state === 'ready' && load.content !== undefined ? `data:text/plain;charset=utf-8,${encodeURIComponent(load.content)}` : null)
   const retry = () => { setLoad({ state: 'loading' }); setAttempt(value => value + 1) }
@@ -227,7 +229,7 @@ export function EvidenceViewer({ taskId, items, index, title, passed, sha, envir
       </div>
       <div ref={strip} role="group" aria-label={t('allEvidence')} className="flex h-[89px] shrink-0 items-center gap-2 overflow-x-auto px-4 sm:justify-center">
         {items.map((other, position) => <EvidenceThumb key={other.entry.artifact + position} taskId={taskId} item={other} selected={position === index}
-          label={itemLabel(t, other)} onOpen={() => onIndex(position)} />)}
+          label={itemLabel(t, other)} onOpen={() => onIndex(position)} mediaSource={mediaSource} />)}
       </div>
     </DialogContent>
   </Dialog>

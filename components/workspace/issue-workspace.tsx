@@ -45,8 +45,9 @@ import { cn } from '@/lib/utils'
 import { BrowserPane } from '@/components/browser/browser-pane'
 import { browserAddressRequest, browserAddressVersion, subscribeBrowserAddress } from '@/lib/browser/navigation'
 import { ThreadColumn } from './thread-column'
-import { AllThreadsColumn, AllThreadsToggle, waitingCount } from '@/components/nav/all-threads'
-import { pendingTaskCount } from '@/hooks/use-bot-tasks'
+import { AllThreadsColumn, AllThreadsToggle } from '@/components/nav/all-threads'
+import { TaskPresentationsContext, useWorkspaceTaskPresentations } from '@/hooks/use-task-collection'
+import { groupPresentedTasks, waitingTasks } from '@/lib/task-collection'
 import { useInboxCount } from '@/hooks/use-inbox-count'
 import { TaskColumn } from './task-column'
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
@@ -208,7 +209,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const listWorkspaceId = workspaceData?.workspace.id ?? workspaceContext?.workspace.id
   const listsPaused = boardBusy || settingsShown
   const { data: taskList, mutate, error, isLoading: tasksLoading } = useLiveIssueList(user.id, listWorkspaceId, listsPaused)
-  const tasks = taskList?.items ?? []
+  const tasks = useMemo(() => taskList?.items ?? [], [taskList])
+  const presentation = useWorkspaceTaskPresentations(user.id, listWorkspaceId, workspaceHome, tasks, !listsPaused)
   useEffect(() => {
     if (!(error instanceof ListReadScopeError) || error.kind !== 'workspace') return
     // Revoked membership may make the normal server context select the home.
@@ -221,10 +223,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const listErrorMessage = t('listError')
   useEffect(() => {
     const id = `issue-list-error-${user.id}`
-    if (error) toast.error(listErrorMessage, { id, duration: Infinity })
+    if (error || presentation.error) toast.error(listErrorMessage, { id, duration: Infinity })
     else toast.dismiss(id)
     return () => { toast.dismiss(id) }
-  }, [error, listErrorMessage, user.id])
+  }, [error, presentation.error, listErrorMessage, user.id])
   const { data: projects = [], error: projectError, isLoading: projectsLoading, mutate: refreshProjects } = useSWR(['projects', user.id], listProjects, whileSettings)
   const { data: teams = [] } = useSWR('teams', listTeams, whileSettings)
   const { data: projectTeams = [], mutate: refreshProjectTeams } = useSWR('project-teams', listProjectTeams, whileSettings)
@@ -266,16 +268,17 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // 全部线程 in the right column, from any page (?threads=all, or one bot's id).
   const [threadsView, setThreadsView] = useState<string | null>(() => readLocation(params).threads)
   // 全部线程's button counts the threads waiting on you (Figma 802:56).
-  const threadsWaiting = useMemo(() => waitingCount(threads, tasks), [threads, tasks])
+  const taskGroups = useMemo(() => groupPresentedTasks(tasks, threads, presentation.items, 'workspace'), [tasks, threads, presentation.items])
+  const threadsWaiting = useMemo(() => waitingTasks(taskGroups, []).length, [taskGroups])
   // The count on 收件箱, for a frame that shows it there (FRAME_OWNS_HEADER): what the Inbox lists, from the same reads.
-  const inboxItems = useInboxCount(threads, tasks, FRAME_OWNS_HEADER)
+  const inboxItems = useInboxCount(threads, taskGroups, FRAME_OWNS_HEADER)
   // FRAME_OWNS_HEADER: no 全部线程 list beside the page (the frame shows the waiting count on 收件箱); an old address
   // keeps its open thread beside the page it was on, and without one lands on 任务.
   useEffect(() => {
     if (FRAME_OWNS_HEADER && threadsView) goTo(threadId ? { threads: null } : { threads: null, section: 'tasks' }, 'replace')
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only the old address moves; the thread goes with it
   }, [threadsView])
-  const tasksPending = useMemo(() => pendingTaskCount(threads, tasks), [threads, tasks])
+  const tasksPending = threadsWaiting
   useEffect(() => {
     const wide = window.matchMedia('(min-width: 80rem)')
     const close = () => { if (wide.matches) setPanelSheet(false) }
@@ -672,7 +675,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
   // the default keeps the workspace frame mounted around settings (#1603).
   // Both visual frames share the workspace's pending notes and computer registry.
-  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
+  return <TaskPresentationsContext value={presentation.items}><SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
@@ -717,5 +720,5 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     {artifactId && <ArtifactWindow artifactId={artifactId} />}
     </>}
     {dialogs}
-  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
+  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary></TaskPresentationsContext>
 }

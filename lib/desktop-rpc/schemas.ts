@@ -203,7 +203,7 @@ export const desktopActionSchemas = {
   'issues.listWorkspaceIssues': oneId,
   'issues.getIssue': oneId,
   'issues.pollIssue': tuple(uuid, version.optional()),
-  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
+  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), workspaceId: uuid.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
   'issues.promoteIssueToTeam': tuple(object({ requestId: uuid, issueId: uuid, revision: positive, teamId: uuid, expectedTeamId: uuid.nullable() })),
   'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), revision: positive })),
   'issues.changeIssuePriority': tuple(object({ id: uuid, priority: z.enum(ISSUE_PRIORITY_CODES), revision: positive })),

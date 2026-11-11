@@ -142,6 +142,31 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       assert.doesNotMatch(JSON.stringify(own), /private body|private prompt|private reason/)
     })
 
+    await t.test('evidence directory counts preserve submitted versions and require the authorized Factory source', async () => {
+      const issue = await makeTask(), factory = await makeFactory(issue), run = await makeRun(issue)
+      const unrelated = await makeTask(), invalid = await makeFactory(unrelated, { sourceKind: 'assistant_message' })
+      const artifact = randomUUID()
+      const folders = (actor = owner) => as(actor, shared, () => getTaskPresentations({ workspaceId: shared,
+        issueIds: [issue, unrelated], folderStoredIds: [artifact] }))
+      assert.equal((await folders()).items[issue].factoryExtraCount, undefined, 'an empty Factory has no evidence folder')
+      await application.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1', [factory.attempt, run])
+      await application.query(`INSERT INTO artifacts(id,"userId","workspaceId","issueId","runId",kind,title)
+        VALUES($1,$2,$3,$4,$5,'markdown','Fixed report')`, [artifact, owner, shared, issue, run])
+      for (const version of [1, 2]) {
+        await application.query(`INSERT INTO artifact_versions(id,"artifactId",version,"storageKey",sha256,size,"authorName")
+          VALUES($1,$2,$3,'fixture','fixture',1,'Fixture')`, [randomUUID(), artifact, version])
+        await application.query(`INSERT INTO coordinator_events(id,"userId","issueId","runId",kind,"dedupeKey",payload)
+          VALUES($1,$2,$3,$4,'artifact_submitted',$5,$6)`, [randomUUID(), owner, issue, run,
+          `artifact_submitted:${artifact}:${version}`, JSON.stringify({ artifactId: artifact, version })])
+        const result = await folders()
+        assert.equal(result.items[issue].factoryTaskId, factory.id)
+        assert.equal(result.items[issue].factoryExtraCount, version - 1, 'one catalog entry is replaced even for two immutable submissions')
+        assert.equal(result.items[unrelated].factoryTaskId, undefined)
+        assert.ok(!JSON.stringify(result).includes(invalid.id))
+      }
+      assert.equal((await folders(peer)).items[issue].factoryExtraCount, undefined, 'a peer cannot read the owner’s evidence')
+    })
+
     await t.test('missing, quarantined, tombstoned, foreign-Workspace and malformed Team-linked IDs are omitted alike', async () => {
       const valid = await makeTask(), foreign = await makeTask(other), privateTask = await makeTask(personal)
       const deleted = await makeTask(shared, { deletedAt: new Date().toISOString() })

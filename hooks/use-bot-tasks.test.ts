@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { groupPresentedTasks, waitingTasks } from '../lib/task-collection'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { taskStateOf, type TaskState as CanonicalTaskState, type TaskReason, type TaskStateRun } from '@/lib/task-state'
@@ -180,4 +181,22 @@ test("收件箱's count is what it lists: one row per waiting task (not per thre
   assert.deepEqual(listed.questions.map(question => question.questionId), ['q1', 'q2'])
   assert.equal(inboxCount(threads, issues, questions, 4), 1 + 2 + 4)
   assert.equal(inboxCount(threads, issues, [], 0), 2, 'without its question, task b waits on the person itself')
+})
+
+test('workspace and Bot lists use the authorized Task presentation, including work without a thread', () => {
+  const issues = [issue('draft', 'todo'), issue('review', 'doing'), issue('other-bot'), issue('revoked')]
+  const threads = [thread('finished', 'review', 'succeeded', '2026-11-07', 'done'), thread('elsewhere', 'other-bot', 'queued', '2026-11-08')]
+  const state = { version: 1, state: 'todo', reason: null, group: 'todo', blockedBy: null, primaryStatus: 'todo',
+    runStatus: null, factoryStage: null, needsAction: null, blockedReason: null, completion: null } as const
+  const presentations = { draft: state, review: { ...state, state: 'waiting', reason: 'pr_review', group: 'pending',
+    primaryStatus: 'doing', runStatus: 'succeeded', factoryStage: 'handoff', needsAction: 'pr_review' }, 'other-bot': state } as const
+  const workspace = groupPresentedTasks(issues, threads, presentations, 'workspace')
+  assert.deepEqual(workspace.todo.map(row => [row.issue.id, row.attempts]), [['draft', 0], ['other-bot', 1]])
+  assert.equal(workspace.todo[0]!.current, null)
+  assert.equal(workspace.pending[0]!.state, 'waiting')
+  assert.deepEqual(waitingTasks(workspace, [{ issueId: 'review' }]), [])
+  const dispatched = groupPresentedTasks(issues, [threads[0]!], presentations, 'dispatched')
+  assert.deepEqual(dispatched.todo, [])
+  assert.deepEqual(dispatched.pending.map(row => row.issue.id), ['review'])
+  assert.equal(dispatched.pending[0]!.factoryStage, 'handoff')
 })
