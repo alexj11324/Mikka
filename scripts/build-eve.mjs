@@ -10,10 +10,17 @@ export async function buildEve({ root = process.cwd(), env = process.env, execut
   if (!['node-server', 'vercel'].includes(preset)) throw new Error('EVE_BUILD_PRESET_INVALID')
   const eve = JSON.parse(await readFile(join(root, 'node_modules/eve/package.json'), 'utf8')).version
   if (eve !== '1.0.0-rc.9') throw new Error('EVE_BUILD_VERSION_MISMATCH')
+  const childEnv = { ...env, NITRO_PRESET: preset, EVE_PUBLIC_ROUTE_PREFIX: '/mikka/api/agents' }
+  // eve emits its namespaced queue consumers and triggers only in Vercel
+  // build mode; selecting Nitro's preset alone does not enable those rules.
+  if (preset === 'vercel') childEnv.VERCEL ||= '1'
+  else delete childEnv.VERCEL
   execute(process.execPath, [join(root, 'node_modules/eve/bin/eve.js'), 'build'], {
-    cwd: join(root, 'apps/eve'), stdio: 'inherit', env: { ...env, NITRO_PRESET: preset, EVE_PUBLIC_ROUTE_PREFIX: '/mikka/api/agents' },
+    cwd: join(root, 'apps/eve'), stdio: 'inherit', env: childEnv,
   })
-  const output = join(root, 'apps/eve', preset === 'vercel' ? '.vercel/output' : '.output')
+  // The public eve CLI publishes .output for every Nitro preset, including
+  // Vercel's config.json and functions tree.
+  const output = join(root, 'apps/eve/.output')
   await writeFile(join(output, 'mikka-eve-build.json'), `${JSON.stringify({ version: 1, eve, revision, preset })}\n`)
 }
 
