@@ -87,7 +87,7 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
         // zeros this used to record, which made every routing decision look free.
         if (store) await store.settle(callId,cost,decisionTokenCount(tokens.inputTokens),decisionTokenCount(tokens.outputTokens),
           gatewayGenerationId(receipt.provider_metadata),
-          { read: decisionTokenCount(tokens.inputTokenDetails.cacheReadTokens, null), write: decisionTokenCount(tokens.inputTokenDetails.cacheWriteTokens, null) })
+          { read: decisionTokenCountOrNull(tokens.inputTokenDetails.cacheReadTokens), write: decisionTokenCountOrNull(tokens.inputTokenDetails.cacheWriteTokens) })
         if (store && isCloudEdition()) await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
       }
       const answers = validatedAnswers(payload, requestedQuestions)
@@ -137,14 +137,21 @@ function decisionTokenUsage(value: unknown) {
 }
 
 /**
- * A ledger count, or `fallback` when the envelope carried no usable number.
- * Input and output totals fall back to 0 because the ledger column has always
- * meant "this call ran"; cache detail falls back to null because absent there
- * means the provider reported none, which is not the same as reporting zero.
+ * A ledger token total, or 0 when the envelope carried no usable number. These
+ * columns have always meant "this call ran", so an absent total stays 0 here.
  */
-function decisionTokenCount(value: unknown, fallback: number | null = 0): number | null {
+function decisionTokenCount(value: unknown): number {
+  const count = decisionTokenCountOrNull(value)
+  return count ?? 0
+}
+
+/**
+ * A cache count, or null when absent. Absent means the provider reported no cache
+ * figure, which is not the same fact as reporting zero, so it must stay null.
+ */
+function decisionTokenCountOrNull(value: unknown): number | null {
   const count = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN
-  return Number.isSafeInteger(count) && count >= 0 ? count : fallback
+  return Number.isSafeInteger(count) && count >= 0 ? count : null
 }
 /** Compatibility for callers that need answers only. Use invokeDecision when
  * binding a downstream operation/evaluation to the actual model invocation. */
