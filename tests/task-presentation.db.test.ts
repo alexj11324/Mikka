@@ -142,6 +142,27 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       assert.doesNotMatch(JSON.stringify(own), /private body|private prompt|private reason/)
     })
 
+    await t.test('a read-only member sees the same threadless and Factory states in citation cards and detail', async () => {
+      const threadless = await makeTask(shared, {}, 'backlog')
+      const reviewed = await makeTask()
+      await makeFactory(reviewed, { userId: peer, stage: 'spec', status: 'passed' })
+      const ids = [threadless, reviewed]
+      for (const id of ids) {
+        await application.query("UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=$1", [id])
+        await application.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+          VALUES ('task',$1,'account',$2,ARRAY['canReadContent'])`, [id, peer])
+        const { rows: [rights] } = await application.query(`SELECT mikka_resource_acl_allowed('account',$1,$2,'task',$3,'canReadContent') AS read,
+          mikka_resource_acl_allowed('account',$1,$2,'task',$3,'canSteer') AS steer`, [peer, shared, id])
+        assert.deepEqual(rights, { read: true, steer: false })
+      }
+      const { items } = await as(peer, shared, () => getTaskPresentations({ workspaceId: shared, issueIds: ids, includeReview: true }))
+      assert.deepEqual(ids.map(id => [items[id].state, items[id].reason]), [['todo', null], ['waiting', 'approval']])
+      for (const id of ids) {
+        const detail = await as(peer, shared, () => getTaskPresentation(id))
+        assert.deepEqual([items[id].state, items[id].reason], [detail.state, detail.reason])
+      }
+    })
+
     await t.test('evidence directory counts preserve submitted versions and require the authorized Factory source', async () => {
       const issue = await makeTask(), factory = await makeFactory(issue), run = await makeRun(issue)
       const unrelated = await makeTask(), invalid = await makeFactory(unrelated, { sourceKind: 'assistant_message' })
