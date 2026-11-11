@@ -51,7 +51,7 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], userNa
     submitting.current = true; setPending(true); setError('')
     try {
       const result = await saveProject({ ...draft, id: project?.id, revision: project?.revision })
-      if (!result.project) { setError(result.error ?? i18nText("FeatureCopy.c_052ebc86")); return }
+      if (!('project' in result) || !result.project) { setError(('error' in result ? result.error : undefined) ?? i18nText("FeatureCopy.c_052ebc86")); return }
       if (!project && teamId) {
         try {
           const relation = await setProjectTeams({ projectId: result.project.id, revision: result.project.revision, teamIds: [teamId], primaryTeamId: teamId })

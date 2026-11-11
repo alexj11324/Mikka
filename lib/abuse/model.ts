@@ -13,6 +13,7 @@ import type { HostedUsageStore } from './store'
 import { withSharedCredits } from '@/lib/credit-shares'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { observedModel, recordAiRoute, recordAiUsage, type AiMetadata } from '@/lib/tracing/ai'
+import { modelTokenUsage } from '@/lib/model-call-timing'
 import { createZeroCatModel, gatewayCredential, pauseZeroCat, recordModelRoute, zeroCatConfig, zeroCatCost, zeroCatErrorStatus, zeroCatFailureReason, zeroCatPaused, ZEROCAT_FIRST_TOKEN_TIMEOUT_MS, type ZeroCatFallbackReason } from './zerocat'
 import {
   gatewayCost,
@@ -93,7 +94,10 @@ export async function hostedModel(
     if (provider) throw new ModelAdmissionError('modelRouteDenied')
     return observedModel(selfHostedDefaultModel(scope), { ...metadata, userId: scope.ownerId, route: 'self_hosted' })
   }
-  await withSharedCredits(workspaceId, billingAdapter?.admit ?? canUseMikkaPaid)
+  const billingPrincipal = await withSharedCredits(workspaceId, async payer => {
+    await (billingAdapter?.admit ?? canUseMikkaPaid)(payer)
+    return { payer, organizationId: hostedBillingScope.getStore()?.billingOrganizationId ?? null }
+  })
   const zeroCat = isZeroCatModel(modelId)
   // The default model's fallback is its own Gateway route; a caller may hand in
   // only the trusted Gateway transport for it, never an arbitrary provider.
@@ -126,7 +130,7 @@ export async function hostedModel(
     )
     if (promptBytes > 16 * 1024 * 1024)
       throw new PaidResourceError('usage_cost_unavailable')
-    await withSharedCredits(workspaceId, payer => hostedUsage.reserve(payer, modelId, id, process.env))
+    await withSharedCredits(workspaceId, payer => hostedUsage.reserve(payer, modelId, id, process.env), billingPrincipal)
   }
   const bounded = (value: CallArgs, signals: AbortSignal[] = []) => ({
     maxOutputTokens: Math.min(value.maxOutputTokens ?? 4096, 4096),
@@ -199,12 +203,14 @@ export async function hostedModel(
             const cost = served === 'zerocat' ? zeroCatCost(result.usage) : gatewayCost(result.providerMetadata)
             recordAiUsage(result.usage)
             recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
+            const tokens = modelTokenUsage(result.usage)
             await hostedUsage.settle(
               id,
               cost,
               result.usage.inputTokens.total ?? 0,
               result.usage.outputTokens.total ?? 0,
               served === 'gateway' ? gatewayGenerationId(result.providerMetadata) : undefined,
+              { read: tokens.cacheReadTokens, write: tokens.cacheWriteTokens },
             )
             if (hostedUsage.metered !== false) await checkAbuseAlerts()
             if (hostedUsage.metered !== false && cost === null)
@@ -308,12 +314,14 @@ export async function hostedModel(
                       const cost = served === 'zerocat' ? zeroCatCost(chunk.usage) : gatewayCost(chunk.providerMetadata)
                       recordAiUsage(chunk.usage)
                       recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
+                      const tokens = modelTokenUsage(chunk.usage)
                       await hostedUsage.settle(
                         id,
                         cost,
                         chunk.usage.inputTokens.total ?? 0,
                         chunk.usage.outputTokens.total ?? 0,
                         served === 'gateway' ? gatewayGenerationId(chunk.providerMetadata) ?? generationId : undefined,
+                        { read: tokens.cacheReadTokens, write: tokens.cacheWriteTokens },
                       )
                       finished = true
                       if (hostedUsage.metered !== false) await checkAbuseAlerts()

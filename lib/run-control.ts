@@ -12,45 +12,51 @@ import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
 
 export type RunControlDatabase = Pick<typeof db, 'transaction'>
+export type RunMessageWriter = Pick<typeof db, 'select' | 'insert'>
 
 /** Lock the owned run before checking its state so completion and messages serialize. */
 export async function sendOwnedRunMessage(database: RunControlDatabase, userId: string, input: { runId: string; text: string; messageId?: string }, origin: 'user' | 'peer' = 'user') {
-  const deviceId = await database.transaction(async tx => {
-    const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt,
-      agentDefinition: agentRuns.agentDefinition, deviceRepoId: agentRuns.deviceRepoId, deviceId: agentRuns.deviceId,
-      issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId })
-      .from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1).for('update')
-    if (!run) throw new ActionFailureError('runNotFound')
-    if (input.messageId) {
-      const [prior] = await tx.select().from(runMessages).where(eq(runMessages.id, input.messageId)).limit(1)
-      if (prior) {
-        if (prior.runId !== run.id || prior.userId !== userId || prior.origin !== (origin === 'user' ? 'owner' : 'peer')
-          || prior.text !== personalRunMessageText(input.messageId, input.text, origin)) throw new ActionFailureError('submissionConflict')
-        return null
-      }
-    }
-    if (run.stopRequestedAt || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
-    if (run.deviceRepoId) {
-      const [repo] = await tx.select().from(deviceRepos).where(and(eq(deviceRepos.id, run.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
-      if (!repo || !repo.remoteUrl) throw new ActionFailureError('runInvalid')
-      let key: string
-      try { key = remoteKey(repo.remoteUrl) } catch { throw new ActionFailureError('runInvalid') }
-      // The receipt binds the task to its repository and branch.
-      const receipt = run.agentDefinition?.repositoryAdmission
-      if (receipt) {
-        const [bot] = run.botId ? await tx.select().from(bots).where(and(eq(bots.id, run.botId), eq(bots.ownerId, userId))).for('share') : []
-        if (!run.issueId || !run.deviceId || repo.deviceId !== run.deviceId || repo.repoPath !== key || !matchesRepositoryAdmission(receipt, { userId, issueId: run.issueId, deviceId: run.deviceId, agentId: run.agentId,
-          remoteKey: key, remoteUrl: repo.remoteUrl, targetBranch: receipt.targetBranch, workspaceId: bot?.workspaceId, workspaceLinked: receipt.workspaceLinked, requestEventId: receipt.requestEventId })
-          || !await (await import('./run-admission-store')).acceptedEventStillMatches(receipt, run.botId, tx)) throw new ActionFailureError('runInvalid')
-      }
-    }
-    const id = input.messageId ?? crypto.randomUUID()
-    await tx.insert(runMessages).values({ id, runId: run.id, userId, text: personalRunMessageText(id, input.text, origin),
-      origin: origin === 'user' ? 'owner' : 'peer', mailboxWakeDepth: origin === 'user' ? -1 : MAILBOX_NOTIFICATION_LIMIT })
-    await runChanged(tx, run.id)
-    return run.deviceId
-  })
+  const deviceId = await database.transaction(tx => sendOwnedRunMessageInTransaction(tx, userId, input, origin))
   notifyDeviceWork(deviceId)
+}
+
+/** Compose with an existing authorization transaction. The caller owns its
+ * commit and the subsequent device wake; no second inbox or nested commit. */
+export async function sendOwnedRunMessageInTransaction(tx: RunMessageWriter, userId: string,
+  input: { runId: string; text: string; messageId?: string }, origin: 'user' | 'peer' = 'user') {
+  const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt,
+    agentDefinition: agentRuns.agentDefinition, deviceRepoId: agentRuns.deviceRepoId, deviceId: agentRuns.deviceId,
+    issueId: agentRuns.issueId, agentId: agentRuns.agentId, botId: agentRuns.botId, workspaceId: agentRuns.workspaceId })
+    .from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1).for('update')
+  if (!run) throw new ActionFailureError('runNotFound')
+  if (input.messageId) {
+    const [prior] = await tx.select().from(runMessages).where(eq(runMessages.id, input.messageId)).limit(1)
+    if (prior) {
+      if (prior.runId !== run.id || prior.userId !== userId || prior.origin !== (origin === 'user' ? 'owner' : 'peer')
+        || prior.text !== personalRunMessageText(input.messageId, input.text, origin)) throw new ActionFailureError('submissionConflict')
+      return null
+    }
+  }
+  if (run.stopRequestedAt || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
+  if (run.deviceRepoId) {
+    const [repo] = await tx.select().from(deviceRepos).where(and(eq(deviceRepos.id, run.deviceRepoId), eq(deviceRepos.userId, userId))).limit(1)
+    if (!repo || !repo.remoteUrl) throw new ActionFailureError('runInvalid')
+    let key: string
+    try { key = remoteKey(repo.remoteUrl) } catch { throw new ActionFailureError('runInvalid') }
+    // The receipt binds the task to its repository and branch.
+    const receipt = run.agentDefinition?.repositoryAdmission
+    if (receipt) {
+      const [bot] = run.botId ? await tx.select().from(bots).where(and(eq(bots.id, run.botId), eq(bots.ownerId, userId))).for('share') : []
+      if ((run.botId && bot?.workspaceId !== run.workspaceId) || !run.issueId || !run.deviceId || repo.deviceId !== run.deviceId || repo.repoPath !== key || !matchesRepositoryAdmission(receipt, { userId, issueId: run.issueId, deviceId: run.deviceId, agentId: run.agentId,
+        remoteKey: key, remoteUrl: repo.remoteUrl, targetBranch: receipt.targetBranch, workspaceId: run.workspaceId ?? undefined, workspaceLinked: receipt.workspaceLinked, requestEventId: receipt.requestEventId })
+        || !await (await import('./run-admission-store')).acceptedEventStillMatches(receipt, run.botId, tx)) throw new ActionFailureError('runInvalid')
+    }
+  }
+  const id = input.messageId ?? crypto.randomUUID()
+  await tx.insert(runMessages).values({ id, runId: run.id, userId, text: personalRunMessageText(id, input.text, origin),
+    origin: origin === 'user' ? 'owner' : 'peer', mailboxWakeDepth: origin === 'user' ? -1 : MAILBOX_NOTIFICATION_LIMIT })
+  await runChanged(tx, run.id)
+  return run.deviceId
 }
 
 /**

@@ -9,9 +9,9 @@ import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
  * dispatch ("continuesRunId", lib/thread-dispatch.ts); a chain is a root and every run reachable from it.
  *
  * No chain column: chains are resolved on the read path with a recursive CTE
- * over those links. A link counts only between runs of the same owner on the same
- * issue (an issue belongs to exactly one personal or workspace scope, so this also keeps a
- * chain inside one workspace). Recursion has a depth limit of 64. Chains that
+ * over those links. A link counts only between runs of the same owner, issue
+ * and non-null persisted workspace, including task-free historical runs.
+ * Recursion has a depth limit of 64. Chains that
  * exceed it are rejected, including corrupt cycles; no path arrays or fallback
  * roots are maintained. Within a chain, attempts are ordered by createdAt then
  * uuid; the last one is latestRunId (deterministic on ties).
@@ -46,9 +46,10 @@ export interface RunChain {
 const UUID = `'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'`
 /** The continuation origin as a uuid, only when well-formed, so it compares to the primary key. */
 const ORIGIN = (alias: string) => `(CASE WHEN ${alias}."questionContinuation"->>'originRunId' ~ ${UUID} THEN (${alias}."questionContinuation"->>'originRunId')::uuid END)`
-/** Both read models follow exactly these links, with the same owner and issue fence. */
+/** Every read model follows the same owner, issue and immutable tenant fence. */
 const PARENT = (child: string, parent: string) => `${parent}.id IN (${child}.origin, ${child}."retryOf", ${child}."continuesRunId")
-  AND ${parent}."userId" = ${child}."userId" AND ${parent}."issueId" IS NOT DISTINCT FROM ${child}."issueId"`
+  AND ${parent}."userId" = ${child}."userId" AND ${parent}."issueId" IS NOT DISTINCT FROM ${child}."issueId"
+  AND ${parent}."workspaceId" = ${child}."workspaceId"`
 
 
 /**
@@ -58,7 +59,7 @@ const PARENT = (child: string, parent: string) => `${parent}.id IN (${child}.ori
 function chainSql(scope: string, depth: string) {
   return `
     runs AS (
-      SELECT r.id, r."userId", r."issueId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId" FROM agent_runs r WHERE ${scope}
+      SELECT r.id, r."userId", r."issueId", r."workspaceId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId" FROM agent_runs r WHERE ${scope}
     ), edges AS (
       SELECT DISTINCT c.id AS child, p.id AS parent FROM runs c JOIN runs p
         ON ${PARENT('c', 'p')}
@@ -93,7 +94,8 @@ const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text
  */
 export async function listIssueRunChains(q: RunChainQueryable, issueId: string, userIds: readonly string[], limit: number): Promise<RunChain[]> {
   const { rows } = await q.query(`
-    WITH RECURSIVE ${chainSql(`r."issueId" = $1 AND r."userId" = ANY($2::text[])`, '$4')},
+    WITH RECURSIVE ${chainSql(`r."issueId" = $1 AND r."userId" = ANY($2::text[])
+      AND EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=r."workspaceId")`, '$4')},
     roots AS (
       SELECT DISTINCT a.root, n."createdAt" FROM assigned a JOIN runs n ON n.id = a.root
       ORDER BY n."createdAt" DESC, a.root DESC LIMIT $3
@@ -110,10 +112,10 @@ export async function listBotRunRoots(q: RunChainQueryable, botIds: readonly str
   // month, so resolve them by primary key without widening the visible result.
   const { rows } = await q.query(`
     WITH RECURSIVE up AS (
-      SELECT r.id AS start, r.id AS node, r."userId", r."issueId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId", 0 AS depth
-      FROM agent_runs r WHERE r."botId" = ANY($1::uuid[]) AND r."createdAt" >= $2::timestamptz AND r."createdAt" < $3::timestamptz
+      SELECT r.id AS start, r.id AS node, r."userId", r."issueId", r."workspaceId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId", 0 AS depth
+      FROM agent_runs r WHERE r."botId" = ANY($1::uuid[]) AND r."workspaceId" IS NOT NULL AND r."createdAt" >= $2::timestamptz AND r."createdAt" < $3::timestamptz
       UNION
-      SELECT u.start, p.id, p."userId", p."issueId", p."createdAt", ${ORIGIN('p')}, p."retryOf", p."continuesRunId", u.depth + 1
+      SELECT u.start, p.id, p."userId", p."issueId", p."workspaceId", p."createdAt", ${ORIGIN('p')}, p."retryOf", p."continuesRunId", u.depth + 1
       FROM up u JOIN agent_runs p ON ${PARENT('u', 'p')}
       WHERE u.depth < $4
     ), assigned AS (
@@ -151,18 +153,51 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
     })
 }
 
+/** Shared by attempt and checkpoint reads, with identical tenant/depth fences. */
+function selectedChainSql() {
+  return `start AS (
+      SELECT "issueId","workspaceId" FROM agent_runs WHERE id = $1::uuid AND "userId" = $2 AND "workspaceId" IS NOT NULL
+    ), ${chainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId" AND r."workspaceId"=s."workspaceId")`, '$3')},
+    selected AS (
+      SELECT * FROM assigned WHERE root = (SELECT root FROM assigned WHERE id = $1::uuid)
+    )`
+}
+
 /** The whole chain containing `runId`, if `userId` owns that run; null otherwise. */
 export async function readRunChain(q: RunChainQueryable, userId: string, runId: string): Promise<RunChain | null> {
   if (!new RegExp(UUID.slice(1, -1)).test(runId)) return null
   const { rows } = await q.query(`
-    WITH RECURSIVE start AS (
-      SELECT "issueId" FROM agent_runs WHERE id = $1::uuid AND "userId" = $2
-    ), ${chainSql(`r."userId" = $2 AND EXISTS (SELECT 1 FROM start s WHERE r."issueId" IS NOT DISTINCT FROM s."issueId")`, '$3')}
+    WITH RECURSIVE ${selectedChainSql()}
     SELECT ${selectAttempts(true)}, now() AS "rootCreatedAt"
-    FROM assigned a JOIN agent_runs x ON x.id = a.id
-    WHERE a.root = (SELECT root FROM assigned WHERE id = $1::uuid)`, [runId, userId, RUN_CHAIN_MAX_DEPTH])
+    FROM selected a JOIN agent_runs x ON x.id = a.id`, [runId, userId, RUN_CHAIN_MAX_DEPTH])
   const [chain] = foldChains(rows)
   return chain && chain.attempts.some(attempt => attempt.runId === runId) ? chain : null
+}
+
+/** Read one checkpoint for the authorized chain without transporting every
+ * attempt or issuing another query for its ids. A malformed chain still fails
+ * before checkpoint content is read. */
+export async function readRunChainCheckpoint(q: RunChainQueryable, userId: string, runId: string): Promise<{
+  runIds: string[]
+  checkpoint: { patch: Buffer; unavailableReason: string | null } | null
+}> {
+  if (!new RegExp(UUID.slice(1, -1)).test(runId)) return { runIds: [], checkpoint: null }
+  const { rows: [row] } = await q.query(`
+    WITH RECURSIVE ${selectedChainSql()}, grouped AS (
+      SELECT coalesce(array_agg(id::text ORDER BY id), ARRAY[]::text[]) AS "runIds",
+        coalesce(bool_or("depthExceeded"), false) AS "depthExceeded" FROM selected
+    )
+    SELECT grouped."runIds", grouped."depthExceeded", checkpoint.patch, checkpoint."unavailableReason"
+    FROM grouped LEFT JOIN LATERAL (
+      SELECT patch,"unavailableReason" FROM run_checkpoints
+      WHERE NOT grouped."depthExceeded" AND "runId"=ANY(grouped."runIds"::uuid[])
+      ORDER BY "updatedAt" DESC LIMIT 1
+    ) checkpoint ON true`, [runId, userId, RUN_CHAIN_MAX_DEPTH])
+  if (row.depthExceeded) throw new Error('runChainDepthExceeded')
+  return {
+    runIds: row.runIds as string[],
+    checkpoint: row.patch === null ? null : { patch: row.patch as Buffer, unavailableReason: row.unavailableReason as string | null },
+  }
 }
 
 export type StopTargets =

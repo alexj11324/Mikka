@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import { isolatedPostgresURL } from './helpers/isolated-postgres.mjs'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
@@ -45,8 +46,8 @@ test('real Postgres dispatch transactions and recovery', {
   const deviceId = randomUUID(), agentId = randomUUID(), deviceRepoId = randomUUID()
   const brief = { deviceId, baseBranch: 'main', prompt: 'Controlled dispatch acceptance; no external actions.' }
   async function task(userId = owner): Promise<DispatchInput> {
-    const issueId = randomUUID()
-    await db.insert(issues).values({ id: issueId, userId, title: 'Dispatch acceptance fixture', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })
+    const issueId = randomUUID(), workspaceId = await seedFixtureWorkspace(client, userId)
+    await db.insert(issues).values({ id: issueId, userId, workspaceId, title: 'Dispatch acceptance fixture', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })
     return { issueId, agentId, deviceRepoId }
   }
   const isFailure = (code: string) => (error: unknown) => error instanceof ActionFailureError && error.code === code
@@ -70,6 +71,23 @@ test('real Postgres dispatch transactions and recovery', {
       await db.update(agentRuns).set({ status: 'succeeded' }).where(eq(agentRuns.id, runId))
       assert.deepEqual(await insertRunOnce(db, owner, input, { ...brief, prompt: 'Later issue text' }), { runId, status: 'succeeded', replayed: true })
       assert.notEqual((await insertRunOnce(db, owner, { ...input, requestKey: 'next-round' }, brief)).runId, runId)
+    })
+    await t.test('origin is written once and a replay never rewrites it', async () => {
+      const input = { ...await task(), requestKey: 'origin-request' }
+      const originRef = { kind: 'slack' as const, teamId: 'T1', channelId: 'C1', threadTs: '1.1' }
+      const first = await insertRunOnce(db, owner, input, { ...brief, origin: 'slack', originRef })
+      const [stored] = await db.select({ origin: agentRuns.origin, originRef: agentRuns.originRef }).from(agentRuns).where(eq(agentRuns.id, first.runId))
+      assert.deepEqual(stored, { origin: 'slack', originRef })
+      // First writer wins: a replay from another entry must not rewrite it.
+      await db.update(agentRuns).set({ origin: 'web', originRef: null }).where(eq(agentRuns.id, first.runId))
+      assert.deepEqual(await insertRunOnce(db, owner, input, { ...brief, origin: 'telegram', originRef: { kind: 'telegram', chatId: '9', messageId: 1 } }),
+        { ...first, replayed: true })
+      const [after] = await db.select({ origin: agentRuns.origin, originRef: agentRuns.originRef }).from(agentRuns).where(eq(agentRuns.id, first.runId))
+      assert.deepEqual(after, { origin: 'web', originRef: null })
+      // This legacy/helper path names the host Factory stage by default.
+      const defaulted = await insertRunOnce(db, owner, await task(), brief)
+      const [hostRun] = await db.select({ origin: agentRuns.origin }).from(agentRuns).where(eq(agentRuns.id, defaulted.runId))
+      assert.equal(hostRun.origin, 'factory')
     })
     await t.test('keys cannot be rebound to a different issue, agent, repo or note', async () => {
       const input = { ...await task(), requestKey: 'bound-input' }

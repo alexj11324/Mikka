@@ -19,8 +19,8 @@ test('MCP permission grants require the existing human session boundary', { skip
       user: { id: owner, name: 'Fixture', email: `${owner}@example.invalid`, image: null }, session: { id: 'synthetic-human-session' },
     } : null } },
   } })
-  const { createPersonalAccessToken } = await import('../tokens/store')
-  const token = await createPersonalAccessToken(owner, home.id, { name: 'Confined fixture token' })
+  const { createLegacyPersonalAccessToken } = await import('../tokens/store')
+  const token = await createLegacyPersonalAccessToken(owner, home.id, { name: 'Confined fixture token' })
   const { personalPlugins, workspaceMcp } = await import('./runtime')
   const server = await personalPlugins.createMcp(owner, { name: 'Private fixture', url: 'https://mcp.example.invalid/', transport: 'http', enabled: true })
   const route = await import('../../app/api/integrations/mcp/shares/route')

@@ -21,7 +21,7 @@ import { colors } from '@/lib/theme'
 import { currentAccount, servers } from '@/lib/config'
 import { serverCopy } from '@/lib/server-copy'
 import { openPrivacyPolicy } from '@/lib/web'
-import messages from '../../../../../messages/zh-CN.json'
+import { mobileMessages as messages } from '@/lib/messages'
 
 /** A row's icon (Comma design 18): a white glyph on a colored rounded square, as in the system Settings app. */
 const icon = (name: SymbolName, Icon: typeof Bell, background: string) => (
@@ -79,6 +79,7 @@ export default function SettingsScreen() {
           </Group>
           <Group>
             <Row icon={icon('briefcase.fill', BriefcaseBusiness, '#8E8E93')} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspaces')} />
+            {data.billingScope && <Row label={messages.Billing.management.billingEntry} onPress={() => router.push('/settings/billing')} />}
           </Group>
           <Group>
             <Row icon={icon('bell.fill', Bell, '#FF3B30')} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />

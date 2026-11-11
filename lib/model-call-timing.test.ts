@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { timedModelStream, type ModelCallTiming } from './model-call-timing'
-import { timedTools, type ToolTiming } from './subscription-workflow-turn'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,7 +12,7 @@ import { SubscriptionCallTiming, withSubscriptionTiming } from '../packages/daem
 type Part = { type: string; [key: string]: unknown }
 
 // A real child/line transport, with in-memory provider SSE and no network/DB.
-function timingWorker(t: TestContext, mode: 'valid' | 'missing' | 'invalid' | 'wrong_id' | 'oversize' | 'refused' = 'valid', resolveIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[2], streamIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[3]) {
+function timingWorker(t: TestContext, mode: 'valid' | 'missing' | 'invalid' | 'wrong_id' | 'oversize' | 'refused' = 'valid', resolveIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[2], streamIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[3], transportTiming?: unknown) {
   const dir = mkdtempSync(join(tmpdir(), 'mikka-stage-timing-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
   const script = join(dir, 'worker.mjs')
@@ -23,6 +22,7 @@ const frame=JSON.parse(line);if(!config){config=frame;return}
 const mode=${JSON.stringify(mode)};const id=mode==='wrong_id'?'different-id':frame.id;
 const timing=mode==='invalid'?{version:1,token:'fixture-private-token'}:{version:1,rpcBodyMs:7,authorizeMs:2,readCalls:1,readMs:1,accessReadBackend:'snapshot'};
 const diagnostic=mode==='missing'?{}:{timing};
+if(frame.method==='executeStream'&&${JSON.stringify(transportTiming)}!==undefined)diagnostic.transportTiming=${JSON.stringify(transportTiming)};
 if(mode==='oversize'){console.log(JSON.stringify({id,result:'x'.repeat(262145),...diagnostic}));return}
 if(mode==='refused'){console.log(JSON.stringify({id,error:'reconnect_required',result:{mustNotWin:true},...diagnostic}));return}
 if(frame.method==='executeStream'){
@@ -72,20 +72,6 @@ test('a call with no text and a failing stream still logs once, marked interrupt
   assert.deepEqual([lines[0].interrupted, lines[0].firstTokenMs, lines[0].firstTextMs, lines[0].inputTokens, lines[0].cacheReadTokens, lines[0].cacheWriteTokens, lines[0].workflowRunId], [true, null, null, null, null, null, null])
   const silent = timedModelStream({ stream: streamOf([{ type: 'finish', usage: {} }]) }, { route: 'hosted', model: 'm', tools: 0, startedAt: 0, requestedAt: 0 }, clock(5), () => { throw new Error('log sink down') })
   assert.equal((await drain(silent.stream)).length, 1, 'a failing log never fails the call')
-})
-
-test('each tool call is timed by name, failures included, and its result is unchanged', async () => {
-  const timings: ToolTiming[] = []
-  const tools = timedTools({
-    dispatch_run: { description: 'd', inputSchema: undefined as never, execute: async (input: { repo: string }) => ({ runId: `run-${input.repo}` }) },
-    broken: { description: 'b', inputSchema: undefined as never, execute: async () => { throw new Error('tool failed') } },
-    schema_only: { description: 's', inputSchema: undefined as never },
-  } as never, timings, clock(100, 2_600, 3_000, 3_400))
-  const options = { toolCallId: 'c', messages: [] } as never
-  assert.deepEqual(await tools.dispatch_run.execute!({ repo: 'Mikka_test' }, options), { runId: 'run-Mikka_test' })
-  await assert.rejects(tools.broken.execute!({}, options), /tool failed/)
-  assert.equal(tools.schema_only.execute, undefined, 'a tool without execute is left as it is')
-  assert.deepEqual(timings, [{ tool: 'dispatch_run', ms: 2_500, failed: false }, { tool: 'broken', ms: 400, failed: true }])
 })
 
 test('provider error parts mark timing interrupted and malformed counts or finish text are not logged', async () => {
@@ -266,4 +252,59 @@ test('a same-call warm projection produces one real worker row plus separate pri
   const encoded = JSON.stringify(logs[0])
   assert.doesNotMatch(encoded, /fixture-private|accessToken|accessSnapshot|workloadToken|databaseUrl|connectionId|mikka-byos/)
   t.diagnostic('warm_model_timing_fixture_bytes=' + Buffer.byteLength(encoded))
+})
+
+test('real worker HTTP timing uses a separate bounded log without enlarging the original model receipt', async t => {
+  const transport = { version: 1, getConnCalls: 1, dnsCalls: 1, connectCalls: 2, tlsCalls: 1, writeCalls: 1,
+    getConnMs: 0, dnsStartMs: 1, dnsDoneMs: 2, connectStartMs: 3, connectDoneMs: 6,
+    tlsStartMs: 7, tlsDoneMs: 11, gotConnMs: 12, wroteRequestMs: 13, firstByteMs: 30,
+    headersMs: 32, firstEventMs: 34, firstTextMs: 38, reused: false, connectFailed: false }
+  for (const [name, value, state] of [
+    ['valid', transport, 'reported'], ['legacy', undefined, 'missing'],
+    ['invalid', { ...transport, host: 'fixture-private-host' }, 'invalid'],
+    ['null', null, 'invalid'],
+  ] as const) await t.test(name, async child => {
+    const call = new SubscriptionCallTiming(), client = timingWorker(child, 'valid', undefined, undefined, value)
+    let requests = 0
+    const model = createOpenAICompatible({ name: 'fixture', baseURL: 'https://fixture.invalid/v1', fetch: async () => {
+      requests++
+      return new Response(client.stream(1, 'fixture-model', {}), { headers: { 'content-type': 'text/event-stream' } })
+    } })('fixture-model')
+    const result = await withSubscriptionTiming(call, () => model.doStream({ prompt: [{ role: 'user', content: [{ type: 'text', text: 'fixture-private-prompt' }] }] }))
+    const original: ModelCallTiming[] = [], diagnostics: Record<string, unknown>[] = []
+    const seen = await drain(timedModelStream(result, { route: 'subscription', model: 'fixture-model', tools: 0, startedAt: 10, requestedAt: 20, subscriptionTiming: call, workflowRunId: 'wrun_fixture', stepId: 'step_fixture', attempt: 1 }, () => 40, line => original.push(line), line => diagnostics.push(line)).stream)
+    assert.equal(requests, 1)
+    assert.equal(seen.filter(part => part.type === 'finish').length, 1)
+    assert.equal(original.length, 1)
+    assert.equal(original[0].firstTextMs, 20)
+    assert.equal(original[0].subscriptionStages!.workers[1].go!.rpcBodyMs, 7)
+    assert.doesNotMatch(JSON.stringify(original), /transportTiming|getConnMs|connectCalls/)
+    assert.equal(diagnostics.length, 1)
+    assert.deepEqual(diagnostics[0], {
+      msg: 'subscription_transport_timing', workflowRunId: 'wrun_fixture', stepId: 'step_fixture', attempt: 1,
+      workerOrdinal: 2, outcome: 'result', state, ...(state === 'reported' ? transport : {}),
+    })
+    if (state !== 'reported') assert.equal(Object.hasOwn(diagnostics[0], 'dnsStartMs'), false)
+    assert.ok(Buffer.byteLength(JSON.stringify(diagnostics[0])) < 1024)
+    assert.doesNotMatch(JSON.stringify(diagnostics), /fixture-private|https?:|Authorization|Bearer|accessToken|requestBody/i)
+    for (const key of ['host', 'url', 'headers', 'token', 'body']) assert.equal(Object.hasOwn(diagnostics[0], key), false)
+  })
+})
+
+test('the complete HTTP log is below one KiB and neither log sink can change the stream', async () => {
+  const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+  const http: Record<string, unknown> = { version: 1 }
+  for (const key of ['getConnMs', 'gotConnMs', 'dnsStartMs', 'dnsDoneMs', 'connectStartMs', 'connectDoneMs', 'tlsStartMs', 'tlsDoneMs', 'wroteRequestMs', 'firstByteMs', 'headersMs', 'firstEventMs', 'firstTextMs']) http[key] = 3_599_999.999
+  for (const key of ['getConnCalls', 'dnsCalls', 'connectCalls', 'tlsCalls', 'writeCalls']) http[key] = 1_000_000
+  for (const key of ['reused', 'dnsFailed', 'connectFailed', 'tlsFailed', 'writeFailed']) http[key] = false
+  worker.terminalTransport(http, true); worker.settle('result')
+  const rows: Record<string, unknown>[] = []
+  const start = { route: 'subscription' as const, model: 'fixture', tools: 0, startedAt: 0, requestedAt: 0, subscriptionTiming: call,
+    workflowRunId: 'wrun_' + 'x'.repeat(123), stepId: 'step_' + 'x'.repeat(123), attempt: 1_000_000 }
+  await drain(timedModelStream({ stream: streamOf([{ type: 'finish' }]) }, start, () => 1, () => { throw new Error('old sink failed') }, row => rows.push(row)).stream)
+  assert.equal(rows.length, 1)
+  assert.ok(Buffer.byteLength(JSON.stringify(rows[0])) < 1024)
+  assert.equal(rows[0].firstByteMs, 3_599_999.999)
+  const seen = await drain(timedModelStream({ stream: streamOf([{ type: 'text-delta', delta: 'kept' }, { type: 'finish' }]) }, start, () => 1, () => {}, () => { throw new Error('transport sink failed') }).stream)
+  assert.equal(seen[0].delta, 'kept')
 })

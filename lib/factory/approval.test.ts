@@ -1,4 +1,5 @@
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -163,8 +164,8 @@ test(
         [actor.userId],
       );
       await pool.query(
-        `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Approval fixture','{}','todo','normal')`,
-        [issueId, actor.userId],
+        `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,$2,'Approval fixture','{}','todo','normal',$3,'bound')`,
+        [issueId, actor.userId, await seedFixtureWorkspace(pool, actor.userId)],
       );
       await pool.query(
         `INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,'Fixture upstream','codex')`,
@@ -1422,11 +1423,17 @@ test(
         },
       );
       await t.test(
-        "real HTTP + Better Auth + PG cookie authentication (synthetic account, no human OAuth acceptance)",
-        async () => {
+        "real HTTP + Better Auth + PG credential-only human approval",
+        async (t) => {
+          // A linked OAuth fixture must not hide password-only account behavior.
+          await pool.query('DELETE FROM account WHERE id=$1 AND "userId"=$2', ["fixture-account", actor.userId]);
           await pool.query(
             `INSERT INTO account (id,"userId","providerId","accountId",password,"createdAt","updatedAt") VALUES ('fixture-credential',$1,'credential',$1,$2,now(),now())`,
             [actor.userId, await hashPassword("disposable-contract-password")],
+          );
+          assert.deepEqual(
+            (await pool.query('SELECT "providerId" FROM account WHERE "userId"=$1 ORDER BY "providerId"', [actor.userId])).rows,
+            [{ providerId: "credential" }],
           );
           const s = await prepare();
           let origin = "";
@@ -1468,9 +1475,9 @@ test(
               );
               const result = await handleFactoryApproval(local, {
                 actor: authenticated,
-                authorization: request.headers.get("authorization"),
+                authorization: authenticated ? null : request.headers.get("authorization"),
                 method: request.method,
-                taskId: s.task.id,
+                taskId: new URL(request.url).pathname.split("/")[4],
                 origin: request.headers.get("origin"),
                 url: request.url,
                 body: body ? JSON.parse(body) : undefined,
@@ -1571,53 +1578,116 @@ test(
               ).status,
               403,
             );
-            const approved = await fetch(endpoint, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ operation: "approve", input }),
+            await t.test("credential-only session approves and publishes", async () => {
+              const approved = await fetch(endpoint, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ operation: "approve", input }),
+              });
+              assert.equal(approved.status, 200);
+              const approval = await approved.json();
+              assert.equal(
+                (
+                  await pool.query(
+                    'SELECT "userId" FROM factory_approvals WHERE id=$1',
+                    [approval.approvalId],
+                  )
+                ).rows[0].userId,
+                actor.userId,
+              );
+              const published = await fetch(endpoint, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  operation: "publish",
+                  input: {
+                    approvalId: approval.approvalId,
+                    binding: approval.binding,
+                    action: input.action,
+                    target: input.target,
+                    targetEnvironment: input.targetEnvironment,
+                    eventId: randomUUID(),
+                  },
+                }),
+              });
+              assert.equal(published.status, 200);
+              const publication = await published.json();
+              assert.match(publication.receipt.reference, /^local-artifact:/);
+              assert.equal(
+                publication.receipt.verifiedTarget.sha,
+                input.candidate.sha,
+              );
+              assert.deepEqual(
+                JSON.parse(
+                  await readFile(
+                    join(targetDirectory, `${publication.publicationId}.json`),
+                    "utf8",
+                  ),
+                ).candidate,
+                input.candidate,
+              );
+              sources.push({
+                taskId: s.task.id,
+                approvalId: approval.approvalId,
+                publicationId: publication.publicationId,
+                eventId: input.eventId,
+                request:
+                  "HTTP credential-only cookie read/approve/local-publish/readback",
+                origin: "loopback ephemeral port",
+                auth: "real Better Auth with only a disposable credential account; no OAuth link or production acceptance",
+              });
             });
-            assert.equal(approved.status, 200);
-            const approval = await approved.json();
-            assert.equal(
-              (
-                await pool.query(
-                  'SELECT "userId" FROM factory_approvals WHERE id=$1',
-                  [approval.approvalId],
-                )
-              ).rows[0].userId,
-              actor.userId,
-            );
-            const published = await fetch(endpoint, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                operation: "publish",
-                input: {
-                  approvalId: approval.approvalId,
-                  binding: approval.binding,
-                  action: input.action,
-                  target: input.target,
-                  targetEnvironment: input.targetEnvironment,
-                  eventId: randomUUID(),
-                },
-              }),
+
+            await t.test("credential-only session requests changes and delegated credentials cannot replace it", async () => {
+              const pending = await prepare();
+              const rejectEndpoint = `${origin}/api/factory/tasks/${pending.task.id}/approval`;
+              const before = await fetch(rejectEndpoint, { headers });
+              assert.equal(before.status, 200);
+              const evidence = await before.json();
+              const rejection = {
+                binding: evidence.binding,
+                eventId: randomUUID(),
+                candidateId: evidence.binding.candidateId,
+                note: "Please correct the implementation.",
+              };
+              for (const token of ["mkp_", "mka_", "mkr_", ""].map(prefix => prefix + "x".repeat(43))) {
+                const denied = await fetch(rejectEndpoint, {
+                  method: "POST",
+                  headers: { ...headers, Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ operation: "reject", input: rejection }),
+                });
+                assert.equal(denied.status, 401);
+                assert.deepEqual(await denied.json(), { error: "factoryHumanRequired" });
+              }
+              assert.equal(
+                (await fetch(rejectEndpoint, {
+                  method: "POST",
+                  headers: { ...headers, Origin: "https://foreign.invalid" },
+                  body: JSON.stringify({ operation: "reject", input: rejection }),
+                })).status,
+                403,
+              );
+              const rejected = await fetch(rejectEndpoint, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ operation: "reject", input: rejection }),
+              });
+              assert.equal(rejected.status, 200, JSON.stringify(await rejected.clone().json()));
+              const result = await rejected.json();
+              assert.equal(result.rejectionId, rejection.eventId);
+              assert.deepEqual(
+                (await pool.query("SELECT stage,status FROM factory_tasks WHERE id=$1", [pending.task.id])).rows,
+                [{ stage: "execute", status: "pending" }],
+              );
+              assert.equal((await local.ledger(actor, pending.task.id)).rejections.at(-1)!.actor.userId, actor.userId);
+              sources.push({
+                taskId: pending.task.id,
+                eventId: rejection.eventId,
+                request: "HTTP credential-only cookie request-changes and reject delegated bearer/foreign origin",
+                origin: "loopback ephemeral port",
+                auth: "real Better Auth with only a disposable credential account",
+              });
             });
-            assert.equal(published.status, 200);
-            const publication = await published.json();
-            assert.match(publication.receipt.reference, /^local-artifact:/);
-            assert.equal(
-              publication.receipt.verifiedTarget.sha,
-              input.candidate.sha,
-            );
-            assert.deepEqual(
-              JSON.parse(
-                await readFile(
-                  join(targetDirectory, `${publication.publicationId}.json`),
-                  "utf8",
-                ),
-              ).candidate,
-              input.candidate,
-            );
             // Actual sign-out invalidates this session, not the unrelated fixture session.
             assert.equal(
               (
@@ -1630,16 +1700,7 @@ test(
               200,
             );
             assert.equal((await fetch(endpoint, { headers })).status, 401);
-            sources.push({
-              taskId: s.task.id,
-              approvalId: approval.approvalId,
-              publicationId: publication.publicationId,
-              eventId: input.eventId,
-              request:
-                "HTTP cookie read/approve/local-publish/readback/sign-out",
-              origin: "loopback ephemeral port",
-              auth: "real Better Auth with synthetic credential/OAuth-link fixtures; not actual human",
-            });
+
           } finally {
             await new Promise<void>((resolve, reject) =>
               server.close((error) => (error ? reject(error) : resolve())),

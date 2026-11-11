@@ -1,5 +1,5 @@
 // Every turn the Coordinator and every Bot are told the allowed models (优先使用的模型) before they dispatch, and the
-// host takes only those: against a real PostgreSQL, through preparePrompt and the dispatch steps. Model ids are
+// host takes only those: against a real PostgreSQL, through prepareEveInstructions and the dispatch steps. Model ids are
 // fixtures standing for what an account reported.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -77,7 +77,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
 
   await t.test('the Coordinator and a Bot both get the whole list, in the cached prefix, byte for byte the same on the next turn', async () => {
     for (const botId of [coordinator, bot]) {
-      const { instructions, stable } = await steps.preparePrompt(userId, botId)
+      const instructions = await steps.prepareEveInstructions(userId, botId)
       const head = instructions.indexOf('Allowed models (优先使用的模型), in the order a new thread tries them')
       assert.ok(head >= 0, `the list reaches ${botId === bot ? 'the Bot' : 'the Coordinator'}`)
       const lines = instructions.slice(head).split('\n').slice(1, 6)
@@ -87,15 +87,14 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
       assert.equal(lines[0], `1. Codex (codex) fx-codex-a · codex subscription · runs on: Fixture Mac (computer) · not on: ${old}`)
       assert.equal(lines[2], `3. Codex (codex) fx-codex-c · codex subscription · runs on: Fixture Mac (computer) · not on: ${old}`)
       assert.equal(lines[3], '4. Claude Code (claude_code) fx-claude-a · claude subscription · runs on: nowhere yet · not on: Fixture Mac (computer): Agent not installed; Old Mac (computer): Agent not installed')
-      assert.ok(head + instructions.slice(head).indexOf(lines[4]!) + lines[4]!.length <= stable, 'the list is inside the cached prefix')
-      assert.equal((await steps.preparePrompt(userId, botId)).instructions.slice(0, stable), instructions.slice(0, stable), 'the prefix is stable across turns')
+      assert.equal(await steps.prepareEveInstructions(userId, botId), instructions, 'unchanged product context is stable across turns')
     }
   })
 
   const runs = async () => (await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [userId])).rows[0].n as number
 
   await t.test('dispatch_run: a model outside the list, even one an account offers, is refused and nothing is queued', async () => {
-    const issueId = await seedIssue(pool, userId)
+    const issueId = await seedIssue(pool, userId, ws.id)
     // A numbered task, so its thread gets a publication branch.
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
     const dispatch = (model: { harness: 'codex' | 'claude_code'; model?: string }) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', model, requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
@@ -112,7 +111,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
     assert.equal(queued.status, 'queued', JSON.stringify(queued))
     assert.deepEqual((await pool.query('SELECT "agentDefinition"->>\'model\' AS model,"deviceId" FROM agent_runs WHERE "userId"=$1', [userId])).rows, [{ model: 'fx-codex-a', deviceId }], 'only the computer with subscription injection')
     // An allowed model absent from CLI shortcuts runs exactly as selected.
-    const other = await seedIssue(pool, userId)
+    const other = await seedIssue(pool, userId, ws.id)
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":8}}}' WHERE id=$1`, [other])
     const unreported = await steps.dispatchRun(userId, { issueId: other, repo: 'octo/repo', model: { harness: 'codex', model: 'fx-codex-c' }, requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator) as { status?: string; runId?: string; error?: string }
     assert.equal(unreported.status, 'queued', JSON.stringify(unreported))
@@ -123,7 +122,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
 
   await t.test('dispatch_bot_computer: a model outside the list is refused before anything is queued', async () => {
     const before = await runs()
-    const issueId = await seedIssue(pool, userId)
+    const issueId = await seedIssue(pool, userId, ws.id)
     const refused = await steps.dispatchComputerThread(userId, { botId: bot, issueId, harness: 'codex', model: 'fx-not-offered' }, `call-${randomUUID()}`) as { error: string; allowed: unknown[] }
     assert.equal(refused.error, 'modelNotAllowed')
     assert.ok(refused.allowed.length > 0)

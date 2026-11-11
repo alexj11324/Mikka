@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { gzipSync, gunzipSync } from 'node:zlib'
@@ -5,6 +6,8 @@ import test from 'node:test'
 import { Pool, type PoolClient } from 'pg'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { remoteKey } from '@mikka/protocol/repository'
+import { runPromptParts } from '../lib/run-prompt'
+import { threadPromptView } from '../lib/thread-prompt'
 
 const connection = process.env.E2E_DATABASE_URL
 if (connection) {
@@ -26,19 +29,21 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
   })
   const now = new Date()
   // The other device takes part in dispatch (参与调度) unless a test says otherwise (decision 2026-11-02-1400).
+  const fixtureOriginRef = { kind: 'telegram', chatId: '42', messageId: 7 }
   async function fixture(attempt = 1, definition: unknown = null, otherTakesPart = true) {
     const userId = `recovery-${randomUUID()}`, issueId = randomUUID(), agentId = randomUUID()
     const deviceId = randomUUID(), otherDeviceId = randomUUID(), repoId = randomUUID(), id = randomUUID()
     const remote = 'https://github.com/isolated/recovery-fixture.git'
     await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,\'Recovery fixture\',\'{}\',\'todo\',\'normal\')', [issueId, userId])
+    const workspaceId = await seedFixtureWorkspace(pool, userId)
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,\'Recovery fixture\',\'{}\',\'todo\',\'normal\')', [issueId, userId, workspaceId])
     await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","protocolVersion") VALUES ($1,$3,\'Old device\',\'local\',true,$4,$5,$6),($2,$3,\'New device\',\'local\',$8,$4,$7,$6)',
       [deviceId, otherDeviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }]), new Date(now.getTime() - 600_000), DAEMON_PROTOCOL_VERSION, now, otherTakesPart])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Recovery worker\')', [agentId, userId, deviceId])
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, userId, remoteKey(remote), remote])
-    await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,attempt,"leaseExpiresAt","agentDefinition") VALUES ($1,$2,$3,$4,$5,$6,\'running\',\'Controlled recovery fixture\',$7,$8,$9)',
-      [id, userId, issueId, agentId, deviceId, repoId, attempt, new Date(now.getTime() - 1000), definition])
-    return { id, userId, deviceId, otherDeviceId, issueId, agentId, repoId }
+    await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,attempt,"leaseExpiresAt","agentDefinition",origin,"originRef") VALUES ($1,$2,$3,$4,$5,$6,\'running\',\'Controlled recovery fixture\',$7,$8,$9,\'telegram\',$10)',
+      [id, userId, issueId, agentId, deviceId, repoId, attempt, new Date(now.getTime() - 1000), definition, JSON.stringify(fixtureOriginRef)])
+    return { id, userId, workspaceId, deviceId, otherDeviceId, issueId, agentId, repoId }
   }
   async function checkpointRetry(previousId: string, stopReason = 'provider_failure') {
     const id = randomUUID()
@@ -144,12 +149,20 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
 
   await t.test('ten independent cron scans create one retry and fence the old attempt', async () => {
     const run = await fixture()
+    const { prompt, taskLength } = runPromptParts('Recovery 🧪', 'Keep the task body.', 'SYNTHETIC_INTERNAL_STANDING_INSTRUCTION')
+    const prefix = 'Factory host guidance 🔍\n\n'
+    await pool.query('UPDATE agent_runs SET prompt=$2,"promptTaskStart"=$3,"promptTaskLength"=$4 WHERE id=$1',
+      [run.id, prefix + prompt, Array.from(prefix).length, taskLength])
     const old = await issueRunToken({ id: run.id, userId: run.userId })
     await Promise.all(Array.from({ length: 10 }, () => sweepExpiredRunLeases(now)))
-    const { rows } = await pool.query('SELECT id,status,attempt,"deviceId" FROM agent_runs WHERE "retryOf"=$1', [run.id])
+    const { rows } = await pool.query('SELECT id,status,attempt,"deviceId",prompt,"promptTaskStart","promptTaskLength",origin,"originRef" FROM agent_runs WHERE "retryOf"=$1', [run.id])
     assert.equal(rows.length, 1)
     assert.equal(rows[0].attempt, 2)
     assert.equal(rows[0].deviceId, run.otherDeviceId)
+    assert.equal(rows[0].origin, 'telegram', 'the device retry copies the lost run’s entry')
+    assert.deepEqual(rows[0].originRef, fixtureOriginRef)
+    assert.equal(threadPromptView(rows[0].prompt, rows[0].promptTaskStart, rows[0].promptTaskLength).task, '# Recovery 🧪\n\nKeep the task body.')
+    assert.ok(rows[0].prompt.includes('SYNTHETIC_INTERNAL_STANDING_INSTRUCTION'))
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [run.id])).rows[0].status, 'failed')
     assert.equal(Boolean(await verifyRunToken(new Request('http://localhost/mikka/api/mcp'), old.token)), false)
     await pool.query('UPDATE agent_runs SET status=\'preparing\',"leaseExpiresAt"=$2 WHERE id=$1', [rows[0].id, new Date(Date.now() + 90_000)])
@@ -325,15 +338,31 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     assert.equal(gunzipSync(Buffer.from((await latestCheckpoint(retryId))!.patch, 'base64')).toString(), 'confirmed newer worktree')
   })
 
-  await t.test('checkpoint ancestry cannot cross owner, task or repository boundaries', async () => {
+  await t.test('checkpoint ancestry rejects foreign owner/tenant writes and cannot cross task or repository boundaries', async () => {
     const run = await fixture(), foreign = await fixture()
-    await saveCheckpoint(run.id)
-    await saveCheckpoint(foreign.id)
+    await saveCheckpoint(run.id, 'authorized same-task checkpoint')
+    await saveCheckpoint(foreign.id, 'foreign owner checkpoint')
     const retryId = await checkpointRetry(run.id)
-    await pool.query('UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1', [retryId, foreign.id])
-    assert.equal(await latestCheckpoint(retryId), null, 'a foreign owner cannot supply the patch')
+    const otherWorkspaceId = await seedFixtureWorkspace(pool, run.userId, 'team')
+    const foreignTaskId = randomUUID(), foreignRunId = randomUUID()
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,\'Other tenant recovery task\',\'{}\',\'todo\',\'normal\')', [foreignTaskId, run.userId, otherWorkspaceId])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status)
+      SELECT $2,"userId",$3,"agentId","deviceId","deviceRepoId",'failed' FROM agent_runs WHERE id=$1`, [run.id, foreignRunId, foreignTaskId])
+    await saveCheckpoint(foreignRunId, 'same owner other tenant checkpoint')
+    const lineage = async () => (await pool.query('SELECT "userId","workspaceId","issueId","retryOf","deviceRepoId",status FROM agent_runs WHERE id=$1', [retryId])).rows[0]
+    const beforeLineage = await lineage()
+    const checkpoint = await latestCheckpoint(retryId)
+    assert.ok(checkpoint)
+    assert.equal(gunzipSync(Buffer.from(checkpoint.patch, 'base64')).toString(), 'authorized same-task checkpoint')
+    for (const [label, parentId] of [['foreign owner', foreign.id], ['same owner, other tenant', foreignRunId]]) {
+      await assert.rejects(pool.query('UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1', [retryId, parentId]), { code: '23514' }, label)
+      assert.deepEqual(await lineage(), beforeLineage, `${label}: no persisted lineage or execution changes`)
+      assert.deepEqual(await latestCheckpoint(retryId), checkpoint, `${label}: the rejected parent cannot replace the authorized checkpoint`)
+    }
     const otherIssueId = randomUUID()
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,\'Other recovery task\',\'{}\',\'todo\',\'normal\')', [otherIssueId, run.userId])
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,\'Other recovery task\',\'{}\',\'todo\',\'normal\')', [otherIssueId, run.userId, run.workspaceId])
+    // A same-tenant relation can still be unsuitable for checkpoint recovery.
+    // Keep the independent task and repository read fences below.
     await pool.query('UPDATE agent_runs SET "retryOf"=$2,"issueId"=$3 WHERE id=$1', [retryId, run.id, otherIssueId])
     assert.equal(await latestCheckpoint(retryId), null, 'a different task cannot supply the patch')
     const otherRepoId = randomUUID(), otherRemote = 'https://github.com/isolated/other-recovery-repo.git'
@@ -353,6 +382,26 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     await pool.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3 WHERE id=$1', [retryId, run.otherDeviceId, repoId])
     const recovered = await latestCheckpoint(retryId)
     assert.equal(gunzipSync(Buffer.from(recovered!.patch, 'base64')).toString(), 'same repository work')
+  })
+
+  await t.test('task-free unresolved runs cannot receive or recover checkpoints despite matching owner and repository', async () => {
+    const run = await fixture(), unresolvedId = randomUUID(), boundId = randomUUID()
+    // A historical task-free row may have no provable tenant. This is a legal
+    // row with no lineage edge; never disable the tenant trigger to create it.
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","deviceRepoId",status)
+      SELECT $2,"userId","agentId","deviceId","deviceRepoId",'failed' FROM agent_runs WHERE id=$1`, [run.id, unresolvedId])
+    await assert.rejects(saveCheckpoint(unresolvedId, 'unresolved legacy checkpoint'), { code: '23514' })
+    assert.equal((await pool.query('SELECT count(*)::int AS count FROM run_checkpoints WHERE "runId"=$1', [unresolvedId])).rows[0].count, 0,
+      'the child-row tenant guard rejects the write without storing checkpoint bytes')
+    assert.deepEqual((await pool.query('SELECT "issueId","botId","workspaceId" FROM agent_runs WHERE id=$1', [unresolvedId])).rows[0],
+      { issueId: null, botId: null, workspaceId: null })
+    assert.equal(await latestCheckpoint(unresolvedId), null, 'owner and repository do not infer a legacy tenant')
+    await pool.query(`INSERT INTO agent_runs (id,"userId","workspaceId","agentId","deviceId","deviceRepoId",status)
+      SELECT $2,"userId","workspaceId","agentId","deviceId","deviceRepoId",'failed' FROM agent_runs WHERE id=$1`, [run.id, boundId])
+    await saveCheckpoint(boundId, 'bound task-free checkpoint')
+    const recovered = await latestCheckpoint(boundId)
+    assert.ok(recovered, 'a legitimately bound task-free run retains its own recovery snapshot')
+    assert.equal(gunzipSync(Buffer.from(recovered.patch, 'base64')).toString(), 'bound task-free checkpoint')
   })
 
   await t.test('post-commit cleanup failure cannot lose the terminal event needed after a worker restart', async () => {

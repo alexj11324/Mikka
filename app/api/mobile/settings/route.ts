@@ -7,6 +7,7 @@ import { COMPOSIO_TOOLKITS, getComposio, isComposioToolkit } from '@/lib/composi
 import { listComposioPages } from '@/lib/composio-pagination'
 import { readPreferences } from '@/lib/preferences'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { listOrganizations } from '@/lib/governance/organizations'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 
 export const dynamic = 'force-dynamic'
@@ -46,7 +47,9 @@ async function handleGET(request: Request) {
       .where(and(eq(coordinatorSessions.userId, user.id), eq(coordinatorSessions.botId, coordinator))).limit(1),
     connectedApps(user.id),
   ])
+  const organization = context.role === 'admin' ? null : (await listOrganizations(user.id)).find(item => item.role === 'owner' || item.role === 'admin')
   return json({
+    billingScope: context.role === 'admin' ? { kind: 'workspace', id: context.workspace.id } : organization ? { kind: 'organization', id: organization.id } : null,
     user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null },
     workspace: context.workspace,
     workspaces: context.choices,

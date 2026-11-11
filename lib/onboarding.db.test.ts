@@ -23,7 +23,7 @@ test('onboarding backfill, new accounts and session-owned idempotent completion'
     mock.module('@/lib/db', { namedExports: { db: drizzle(pool) } })
     mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
     // Only the existing session boundary is synthetic; storage and the action execute for real.
-    mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser } } : null } } } })
+    mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser }, session: { id: 'onboarding-fixture-session' } } : null } } } })
     const { onboardingDone } = await import('./onboarding')
     const { completeOnboarding, resetOnboarding } = await import('../app/actions/onboarding')
 

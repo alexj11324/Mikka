@@ -4,6 +4,7 @@ import type { Pool } from 'pg'
 import { freezeWorkerDefinition, retryWorkerDefinition } from './agent-kit/worker'
 import { freezeExecutionIdentity, revalidateExecutionIdentity, rebindExecutionDevice, ExecutionIdentityError } from './execution-identity'
 
+const resourcePolicySql = "select w.kind,l.\"organizationId\",p.\"modelCredentialSharing\",p.\"mcpSharing\",p.\"allowedModelProviders\" from mikka_workspaces w left join mikka_organization_workspaces l on l.\"workspaceId\"=w.id left join mikka_organization_resource_policies p on p.\"organizationId\"=l.\"organizationId\" where w.id=$1"
 const id = (last: number) => `10000000-0000-4000-8000-${String(last).padStart(12, '0')}`
 function fixture() {
   const members = new Set(['requester', 'bot-owner', 'resource-owner'])
@@ -18,6 +19,11 @@ function fixture() {
     else if (sql.includes('FROM model_api_keys')) rows = [{ ownerId: state.keyOwner, shared: state.share }]
     else if (sql.includes('FROM byos_bindings')) rows = state.subscription ? [{ ownerId: state.keyOwner, workspaceId: state.workspace, revision: state.revision, shared: state.share, modelId: 'example-model', route: 'codex_cli' }] : []
     else if (sql.includes('FROM user_e2b_keys')) rows = state.e2b ? [{ found: 1 }] : []
+    else if (sql.replace(/\s+/g, ' ').trim() === resourcePolicySql) {
+      assert.deepEqual(args, [state.workspace])
+      // The fixture's real policy reader sees this exact non-Org Team row.
+      rows = [{ kind: 'team', organizationId: null, modelCredentialSharing: null, mcpSharing: null, allowedModelProviders: null }]
+    }
     else throw new Error(`Unexpected query: ${sql.slice(0, 80)} ${args}`)
     return { rows, rowCount: rows.length }
   } } as unknown as Pick<Pool, 'query'>
@@ -135,5 +141,7 @@ test('usage attributes the frozen payer and leaves external amounts unknown', as
   assert.equal(rows.find(row => row.kind === 'local_device')?.ownerId, 'requester')
   assert.equal(rows[0].runs, 2); assert.equal(rows[0].seconds, 60)
   assert.equal(rows.find(row => row.kind === 'api_key')?.amount, 'provider_unknown')
+  assert.ok(rows.every(row => row.costMicroUsd === null && row.chargedByMikka === false))
+  assert.equal(rows.find(row => row.kind === 'api_key')?.lane, 'model')
   assert.deepEqual(executionAccountUsage([{ identity: null, seconds: 10 }]), [])
 })

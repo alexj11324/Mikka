@@ -7,10 +7,12 @@ import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
 import { runMobileDaemonProof, newEnrollmentCredential } from './production-mobile-daemon.mjs'
 import { CORE_MODE, CORE_WORKFLOW, CORE_ISSUES, attestCoreProduction } from '../acceptance/self-hosted-production-target.mjs'
 import { liveReady } from '../../lib/live/events.ts'
+import { recoverCoreCleanup } from './production-mobile-daemon-recovery.mjs'
 
 const id = n => '30000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const OWNER = id(1), WORKSPACE = id(2), OLD_DEVICE = id(3), NEW_DEVICE = id(4), OLD_TOKEN = id(5), NEW_TOKEN = id(6)
 const TEAM_WORKSPACE = id(8), SECOND_TEAM = id(9)
+const HISTORICAL_TOKEN = id(10), HISTORICAL_DEVICE = id(11)
 // Public Owner identity from comment #1504/6691409495; fixture data, never a login.
 const POLICY_ADMIN_EMAIL = 'alex@acme.aspectlylabs.com', POLICY_ADMIN_ID = 'policy-admin'
 const CREDENTIAL = 'orv_' + 'c'.repeat(43), GRANT = 'orv_' + 'g'.repeat(43)
@@ -22,13 +24,17 @@ const ENV = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/ops
 const response = (body, status = 200, headers) => Response.json(body, { status, headers })
 const storedToken = (tokenId, name = 'Existing token') => ({ id: tokenId, name,
   createdAt: '2026-11-06T12:00:00.000Z', lastUsedAt: null, expiresAt: null, revokedAt: null,
-  revokedBy: null, boundDeviceId: null })
+  revokedBy: null, boundDeviceId: null, deviceIds: [] })
 
 function fixture(options = {}) {
   let clock = Date.parse('2026-11-06T13:00:00.000Z'), activeSession = false, newDevice = null, removed = false
   const tokenRows = Array.from({ length: options.tokenCount ?? 1 }, (_, i) => storedToken(i === 0 ? OLD_TOKEN : id(100 + i)))
   const oldDevice = { id: OLD_DEVICE, name: 'Existing protected device', enabled: true, online: false,
     hostname: 'existing', platform: 'other', arch: 'other', harnesses: [], lastSeenAt: null, repos: [] }
+  const historicalDevice = options.historical ? { ...oldDevice, id: HISTORICAL_DEVICE, name: 'historical transient',
+    hostname: 'historical transient', enabled: false } : null
+  let historicalRemoved = false
+  if (historicalDevice) tokenRows.push({ ...storedToken(HISTORICAL_TOKEN, 'SSH'), deviceIds: [HISTORICAL_DEVICE] })
   const requests = []
   const sockets = []
   const ticketProtocol = () => 'mikka-ticket-' + Math.floor((clock + 299_000) / 1000) + '-' + 'a'.repeat(64)
@@ -63,7 +69,7 @@ function fixture(options = {}) {
   const devices = () => {
     if (newDevice && clock - newDevice.seen >= 60_000) newDevice.online = false
     const own = newDevice && !removed ? [{ ...newDevice, seen: undefined }] : []
-    return [oldDevice, ...own]
+    return [oldDevice, ...(historicalDevice && !historicalRemoved ? [historicalDevice] : []), ...own]
   }
   async function fetchImpl(input, init = {}) {
     const url = new URL(input instanceof Request ? input.url : input)
@@ -149,9 +155,19 @@ function fixture(options = {}) {
         return response({ tokens: page.map(row => ({ ...row })), nextCursor })
       }
       if (path.endsWith('/api/devices/enrollment')) return response({ token: GRANT })
+      if (historicalDevice && path.endsWith('/api/device-tokens/' + HISTORICAL_TOKEN + '/revoke')) {
+        const token = tokenRows.find(row => row.id === HISTORICAL_TOKEN)
+        token.revokedAt = new Date(clock).toISOString(); token.revokedBy = OWNER
+        return response({ tokenId: token.id, revokedAt: token.revokedAt, revokedBy: token.revokedBy, unattributedActiveRuns: 0 })
+      }
       if (path.endsWith('/api/device-tokens/' + NEW_TOKEN + '/revoke')) {
+        if (options.revokeReply) {
+          const { body: failure, status } = options.revokeReply
+          return typeof failure === 'string' ? new Response(failure, { status }) : response(failure, status)
+        }
         const token = tokenRows.find(row => row.id === NEW_TOKEN)
         token.revokedAt = new Date(clock).toISOString(); token.revokedBy = OWNER
+        if (options.wrongRevokeReceipt) return response({ tokenId: OLD_TOKEN, revokedAt: token.revokedAt, revokedBy: OWNER })
         return response({ tokenId: token.id, revokedAt: token.revokedAt, revokedBy: token.revokedBy, unattributedActiveRuns: 0 })
       }
       if (path.endsWith('/api/rpc')) {
@@ -176,10 +192,18 @@ function fixture(options = {}) {
           newDevice.enabled = false
           result = { success: true }
         } else if (body.action === 'agents.removeDevice') {
+          if (historicalDevice && args[0] === HISTORICAL_DEVICE) {
+            assert.deepEqual(args, [HISTORICAL_DEVICE])
+            assert.equal(tokenRows.find(row => row.id === HISTORICAL_TOKEN)?.revokedBy, OWNER)
+            assert.equal(historicalDevice.online, false)
+            historicalRemoved = true
+            return response({ version: 1, ok: true, result: encode({ id: HISTORICAL_DEVICE, revokedTokens: 0, uninstall: 'not_possible' }) })
+          }
           assert.deepEqual(args, [NEW_DEVICE])
           assert.equal(tokenRows.find(row => row.id === NEW_TOKEN)?.revokedBy, OWNER)
           assert.equal(newDevice.online, false)
           assert.equal(newDevice.enabled, false)
+          if (options.removeReply) return response(options.removeReply.body, options.removeReply.status)
           removed = true
           result = { id: NEW_DEVICE, revokedTokens: 0, uninstall: 'not_possible' }
         } else assert.fail('Unexpected RPC action')
@@ -198,7 +222,14 @@ function fixture(options = {}) {
     assert.equal(headers.get('authorization'), 'Bearer ' + CREDENTIAL)
     // The actual repository HttpServerLink supplies these; no fake client implementation.
     assert.equal(headers.get('x-mikka-client-version'), '0.0.1')
-    if (tokenRows.find(row => row.id === NEW_TOKEN)?.revokedAt) return response({ error: 'Unauthorized' }, 401)
+    if (tokenRows.find(row => row.id === NEW_TOKEN)?.revokedAt) {
+      if (options.rejectedCredentialTransportFailure) throw new Error('transport-error-' + CREDENTIAL)
+      if (options.rejectedCredentialReply) {
+        const { body: failure, status } = options.rejectedCredentialReply
+        return typeof failure === 'string' ? new Response(failure, { status }) : response(failure, status)
+      }
+      return response({ error: 'Unauthorized' }, 401)
+    }
     if (path === '/mikka/v1/devices/register') {
       assert.equal(body.daemonVersion, '0.0.1')
       assert.equal(body.protocolVersion, 3)
@@ -207,6 +238,7 @@ function fixture(options = {}) {
       newDevice = { id: NEW_DEVICE, name: options.wrongDeviceMarker ? 'Unconfirmed other device' : body.name,
         hostname: body.hostname, platform: body.platform,
         arch: body.arch, harnesses: [], online: true, enabled: true, seen: clock, repos: [] }
+      tokenRows.find(row => row.id === NEW_TOKEN).deviceIds = [NEW_DEVICE]
       sockets.find(socket => socket.url.includes('/v1/live/'))?.dispatchEvent(new MessageEvent('message', {
         data: JSON.stringify({ kind: 'device_list', id: WORKSPACE }),
       }))
@@ -227,14 +259,15 @@ function fixture(options = {}) {
     }
     assert.fail('Unexpected path: ' + path)
   }
-  return { requests, tokenRows, oldDevice, fetchImpl, socketFactory, sockets, now: () => clock, get removed() { return removed },
+  return { requests, tokenRows, oldDevice, fetchImpl, socketFactory, sockets, now: () => clock,
+    get removed() { return removed }, get historicalRemoved() { return historicalRemoved }, get deviceName() { return newDevice?.name },
     run: overrides => runMobileDaemonProof({ env: ENV, fetchImpl, now: () => clock,
       wait: async ms => { clock += ms }, deploymentGate: async () => {}, ...overrides }) }
 }
 
 function noSensitiveReport(report) {
   const value = JSON.stringify(report)
-  for (const secret of [CREDENTIAL, GRANT, COOKIE, OWNER, WORKSPACE, TEAM_WORKSPACE, SECOND_TEAM, OLD_TOKEN, NEW_TOKEN, OLD_DEVICE, NEW_DEVICE,
+  for (const secret of [CREDENTIAL, GRANT, COOKIE, OWNER, WORKSPACE, TEAM_WORKSPACE, SECOND_TEAM, OLD_TOKEN, NEW_TOKEN, OLD_DEVICE, NEW_DEVICE, HISTORICAL_TOKEN, HISTORICAL_DEVICE,
     ENV.SMOKE_OWNER_EMAIL, ENV.SMOKE_OWNER_PASSWORD, ENV.GH_TOKEN, POLICY_ADMIN_EMAIL, POLICY_ADMIN_ID,
     'unrelated-admin@example.invalid', 'transport-error-'])
     assert.equal(value.includes(secret), false, 'closed report must omit identities, credentials and raw error')
@@ -263,6 +296,11 @@ test('real source HTTP client proves mobile owner, enroll, disabled heartbeat, r
   assert.equal(f.removed, true)
   assert.equal(f.tokenRows.find(row => row.id === OLD_TOKEN).revokedAt, null)
   assert.equal(f.oldDevice.enabled, true)
+  assert.deepEqual(report.resourceBindings, { algorithm: 'sha256',
+    credentialId: createHash('sha256').update('device-token-id\0' + NEW_TOKEN).digest('hex'),
+    deviceId: createHash('sha256').update('device-id\0' + NEW_DEVICE).digest('hex'),
+    deviceNonce: createHash('sha256').update('device-nonce\0' + f.deviceName).digest('hex') })
+  assert.equal(JSON.stringify(report).includes(f.deviceName), false)
   noSensitiveReport(report)
 })
 
@@ -275,6 +313,108 @@ test('complete paginated token history preserves all 263 originals through enrol
   assert.equal(f.tokenRows.filter(row => row.revokedAt !== null).length, 1)
   assert.equal(f.tokenRows.find(row => row.id === NEW_TOKEN).revokedBy, OWNER)
   assert.ok(f.requests.filter(row => row.path.endsWith('/api/device-tokens') && row.search.startsWith('?cursor=')).length >= 6)
+  noSensitiveReport(report)
+})
+
+test('cleanup retains failed revoke HTTP status and redacted body without replaying the mutation', async () => {
+  for (const [status, code] of [[500, 'internal_error'], [401, 'authRequired']]) {
+    const f = fixture({ revokeReply: { status, body: { error: code, message: CREDENTIAL,
+      cookie: COOKIE, [ENV.SMOKE_OWNER_PASSWORD]: ENV.SMOKE_OWNER_EMAIL } } })
+    const report = await f.run()
+    const failure = report.errors.find(row => row.phase === 'cleanup-credential')
+    assert.equal(report.status, 'fail')
+    assert.equal(failure.code, 'token_revoke_failed')
+    assert.deepEqual(failure.http, { operation: 'device-tokens.revoke', method: 'POST', status,
+      body: { error: code, message: '[redacted]', redactedFields: 2 } })
+    assert.equal(report.cleanup.credentialRevoked, false)
+    assert.equal(report.cleanup.oldCredentialRejected, false)
+    assert.equal(report.cleanup.deviceRemoved, false)
+    assert.equal(report.cleanup.sessionClosed, true)
+    assert.equal(f.requests.filter(row => row.path.endsWith('/revoke')).length, 1)
+    assert.equal(f.requests.some(row => row.action === 'agents.removeDevice'), false)
+    assert.equal(f.tokenRows.find(row => row.id === OLD_TOKEN).revokedAt, null)
+    noSensitiveReport(report)
+  }
+})
+
+test('a 200 revoke reply with another token still fails and exposes only contract diagnostics', async () => {
+  const f = fixture({ wrongRevokeReceipt: true }), report = await f.run()
+  const failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.equal(failure.code, 'token_revoke_failed')
+  assert.deepEqual(failure.http, { operation: 'device-tokens.revoke', method: 'POST', status: 200,
+    body: { tokenId: '[redacted]', revokedAt: '[redacted]', revokedBy: '[redacted]' } })
+  assert.equal(report.cleanup.credentialRevoked, false)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('a non-JSON revoke error keeps its status and size while withholding the raw body', async () => {
+  const body = '<html>' + CREDENTIAL + COOKIE + '</html>'
+  const f = fixture({ revokeReply: { status: 502, body } }), report = await f.run()
+  const failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.equal(failure.code, 'response_invalid')
+  assert.deepEqual(failure.http, { operation: 'device-tokens.revoke', method: 'POST', status: 502,
+    body: { format: 'non-json', bytes: Buffer.byteLength(body) } })
+  assert.equal(report.cleanup.sessionClosed, true)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('device removal failure records its own RPC response rather than the prior revoke response', async () => {
+  const f = fixture({ removeReply: { status: 503, body: { version: 1, ok: false,
+    error: { code: 'deviceNotFound', message: COOKIE, private: CREDENTIAL } } } })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-device')
+  assert.deepEqual(failure.http, { operation: 'agents.removeDevice', method: 'POST', status: 503,
+    body: { version: 1, ok: false, error: { code: 'deviceNotFound', message: '[redacted]', redactedFields: 1 } } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, true)
+  assert.equal(report.cleanup.deviceRemoved, false)
+  assert.equal(report.cleanup.sessionClosed, true)
+  noSensitiveReport(report)
+})
+
+test('post-revoke credential probe records its own JSON failure instead of the successful revoke reply', async () => {
+  const f = fixture({ rejectedCredentialReply: { status: 503, body: { error: 'internal_error', message: CREDENTIAL, cookie: COOKIE } } })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.equal(failure.code, 'credential_still_admitted')
+  assert.deepEqual(failure.http, { operation: 'devices.repos', method: 'GET', status: 503,
+    body: { error: 'internal_error', message: '[redacted]', redactedFields: 1 } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, false)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('post-revoke non-JSON response retains its status and size without consuming the client response', async () => {
+  const body = '<html>' + CREDENTIAL + COOKIE + '</html>'
+  const f = fixture({ rejectedCredentialReply: { status: 502, body } })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.deepEqual(failure.http, { operation: 'devices.repos', method: 'GET', status: 502,
+    body: { format: 'non-json', bytes: Buffer.byteLength(body) } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, false)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('post-revoke admitted credential records the repos 200 rather than the prior revoke 200', async () => {
+  const f = fixture({ rejectedCredentialReply: { status: 200, body: { repos: [] } } })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.equal(failure.code, 'credential_still_admitted')
+  assert.deepEqual(failure.http, { operation: 'devices.repos', method: 'GET', status: 200, body: { redactedFields: 1 } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, false)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('post-revoke transport failure clears the successful revoke HTTP response', async () => {
+  const f = fixture({ rejectedCredentialTransportFailure: true })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.deepEqual(failure.http, { operation: 'devices.repos', method: 'GET', status: null, body: { format: 'unavailable' } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, false)
+  assert.equal(f.removed, false)
   noSensitiveReport(report)
 })
 
@@ -538,7 +678,7 @@ test('mobile requires the switched cookie readback and the actual home to identi
   }
 })
 
-function coreFixture(business, { changed = () => false } = {}) {
+function coreFixture(business, { changed = () => false, recover = false } = {}) {
   const env = { ...ENV, MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY_OWNER: 'alexj11324',
     GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REF: 'refs/heads/main', GITHUB_RUN_ATTEMPT: '1',
     GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/' + CORE_WORKFLOW + '@refs/heads/main' }
@@ -558,7 +698,7 @@ function coreFixture(business, { changed = () => false } = {}) {
         status: 'in_progress', conclusion: null })
       if (url.pathname.includes('/issues/')) {
         const number = Number(url.pathname.split('/').at(-1)); assert.ok(CORE_ISSUES.includes(number))
-        return response({ number, url: url.href, repository_url: api, state: 'open' })
+        return response({ number, url: url.href, repository_url: api, state: number === 1826 && !recover ? 'closed' : 'open' })
       }
       if (url.href === api + '/git/ref/heads/main') return response({ ref: 'refs/heads/main', object: { type: 'commit', sha: changed() ? 'c'.repeat(40) : env.GITHUB_SHA } })
       if (url.href === release.url) return response(release)
@@ -609,4 +749,129 @@ test('core gateway refusal and later deployment drift still close sockets and cl
     else assert.deepEqual(report.targetFailure, { code: 'core_target_changed', detail: 'main' })
     noSensitiveReport(report)
   }
+})
+
+const recoveryAnchor = { sourceRunId: 42612612253, sourceRevision: 'e'.repeat(40),
+  credentialId: createHash('sha256').update('device-token-id\0' + NEW_TOKEN).digest('hex'),
+  deviceId: createHash('sha256').update('device-id\0' + NEW_DEVICE).digest('hex') }
+
+function recoveryFixture(options = {}) {
+  const target = { ...storedToken(options.wrongToken ? id(91) : NEW_TOKEN, 'SSH'), deviceIds: [NEW_DEVICE] }
+  if (options.revoked) Object.assign(target, { revokedAt: '2026-11-06T12:01:00.000Z', revokedBy: OWNER })
+  if (options.unrelatedDevice) target.deviceIds = [id(92)]
+  if (options.multipleDevices) target.deviceIds.push(id(92))
+  const other = { ...storedToken(OLD_TOKEN), deviceIds: options.sharedCredential ? [NEW_DEVICE] : [] }
+  if (options.expiredOther) other.expiresAt = '2026-11-06T11:00:00.000Z'
+  const targetDevice = { id: NEW_DEVICE, name: 'transient fixture', hostname: 'transient fixture', platform: 'linux', arch: 'x64',
+    enabled: false, online: options.online ?? false, harnesses: [], repos: [] }
+  const protectedDevice = { id: OLD_DEVICE, name: 'protected fixture', hostname: 'protected fixture', platform: 'linux', arch: 'x64',
+    enabled: true, online: false, harnesses: [], repos: [] }
+  let rows = options.absentDevice ? [protectedDevice] : [targetDevice, protectedDevice]
+  const calls = { revoke: 0, remove: 0, target: 0 }
+  const parameters = { ownerId: OWNER, anchor: recoveryAnchor, now: () => Date.parse('2026-11-06T13:00:00.000Z'),
+    listTokens: async () => structuredClone([target, other]), listDevices: async () => structuredClone(rows),
+    verifyTarget: async () => { calls.target++; if (options.driftAt === calls.target) throw new Error('target changed') },
+    revokeToken: async tokenId => {
+      assert.equal(tokenId, NEW_TOKEN); calls.revoke++
+      if (options.revokeFailure) throw new Error(CREDENTIAL)
+      Object.assign(target, { revokedAt: '2026-11-06T13:00:00.000Z', revokedBy: OWNER })
+      return { tokenId: options.wrongReceipt ? OLD_TOKEN : tokenId, revokedAt: target.revokedAt, revokedBy: OWNER }
+    },
+    removeDevice: async deviceId => {
+      assert.equal(deviceId, NEW_DEVICE); assert.ok(target.revokedAt); calls.remove++
+      if (!options.keepDevice) rows = rows.filter(row => row.id !== deviceId)
+      if (options.changeBaseline) protectedDevice.name = 'changed unexpectedly'
+      return { id: deviceId, uninstall: 'not_possible', revokedTokens: 0 }
+    },
+  }
+  return { parameters, calls, target, other, run: () => recoverCoreCleanup(parameters) }
+}
+
+test('historical recovery uses exact token and recorded device fingerprints without pretending to possess the old bearer', async () => {
+  const f = recoveryFixture(), report = await f.run()
+  assert.equal(report.status, 'pass')
+  assert.equal(report.credentialDatabaseStateBefore, 'active')
+  assert.equal(report.credentialRevoked, true)
+  assert.equal(report.revokedByOwner, true)
+  assert.equal(report.deviceAssociationConfirmed, true)
+  assert.equal(report.deviceDisposition, 'removed_by_normal_owner')
+  assert.equal(report.originalBearerRejection, 'not_exercised_original_credential_unavailable')
+  assert.equal(report.originalCredentialsPreserved, true)
+  assert.equal(report.originalDevicesPreserved, true)
+  assert.deepEqual(f.calls, { revoke: 1, remove: 1, target: 4 })
+  noSensitiveReport(report)
+})
+
+test('historical recovery is idempotent for a revoked token and an already absent active device', async () => {
+  const f = recoveryFixture({ revoked: true, absentDevice: true }), report = await f.run()
+  assert.equal(report.status, 'pass')
+  assert.equal(report.credentialDatabaseStateBefore, 'revoked')
+  assert.equal(report.deviceDisposition, 'already_absent_from_active_owner_list')
+  assert.equal(f.calls.revoke, 0); assert.equal(f.calls.remove, 0)
+  noSensitiveReport(report)
+})
+
+test('historical cleanup cannot infer a token or device from a prefix, timestamp, or unrelated registration', async () => {
+  for (const options of [{ wrongToken: true }, { unrelatedDevice: true }, { multipleDevices: true }, { online: true }]) {
+    const f = recoveryFixture(options), report = await f.run()
+    assert.equal(report.status, 'fail')
+    assert.equal(f.calls.revoke, options.wrongToken ? 0 : 1, 'only the exact failed credential can be revoked, even if device cleanup remains blocked')
+    assert.equal(f.calls.remove, 0)
+    assert.equal(f.other.revokedAt, null)
+    noSensitiveReport(report)
+  }
+})
+
+test('historical device removal preserves every other unrevoked credential, including an expired one', async () => {
+  for (const expiredOther of [false, true]) {
+    const f = recoveryFixture({ sharedCredential: true, expiredOther }), report = await f.run()
+    assert.equal(report.status, 'fail')
+    assert.deepEqual(report.errors, [{ code: 'recovery_other_unrevoked_credential' }])
+    assert.equal(report.credentialRevoked, true)
+    assert.equal(f.calls.remove, 0); assert.equal(f.other.revokedAt, null)
+    noSensitiveReport(report)
+  }
+})
+
+test('historical recovery keeps version drift and mutation/readback failures failed without retrying', async () => {
+  for (const options of [{ driftAt: 1 }, { driftAt: 2 }, { driftAt: 3 }, { revokeFailure: true }, { wrongReceipt: true }, { keepDevice: true }, { changeBaseline: true }]) {
+    const f = recoveryFixture(options), report = await f.run()
+    assert.equal(report.status, 'fail')
+    assert.equal(report.errors.length, 1)
+    assert.ok(f.calls.revoke <= 1 && f.calls.remove <= 1)
+    if (options.driftAt === 1 || options.driftAt === 2) assert.equal(f.calls.revoke, 0)
+    if (options.driftAt || options.revokeFailure || options.wrongReceipt) assert.equal(f.calls.remove, 0)
+    noSensitiveReport(report)
+  }
+})
+
+test('Core refuses an unresolved historical cleanup before creating another credential and still signs out', async () => {
+  const f = fixture({ core: true }), target = coreFixture(f, { recover: true })
+  const report = await f.run({ ...target, recoveryAnchor, attestation: await target.proof() })
+  assert.equal(report.status, 'fail')
+  assert.deepEqual(report.historicalCleanup.errors, [{ code: 'recovery_token_not_unique' }])
+  assert.equal(report.resources.enrollmentAttempts, 0)
+  assert.equal(f.requests.some(row => row.path.endsWith('/devices/enroll') || row.path.endsWith('/register')), false)
+  assert.equal(report.cleanup.sessionClosed, true)
+  noSensitiveReport(report)
+})
+
+test('Core cleans the exact historical association through normal owner HTTP before its new credential baseline', async () => {
+  const f = fixture({ core: true, historical: true }), target = coreFixture(f, { recover: true })
+  const anchor = { ...recoveryAnchor,
+    credentialId: createHash('sha256').update('device-token-id\0' + HISTORICAL_TOKEN).digest('hex'),
+    deviceId: createHash('sha256').update('device-id\0' + HISTORICAL_DEVICE).digest('hex') }
+  const report = await f.run({ ...target, recoveryAnchor: anchor, attestation: await target.proof() })
+  assert.equal(report.status, 'pass', JSON.stringify(report))
+  assert.equal(report.historicalCleanup.status, 'pass')
+  assert.equal(report.historicalCleanup.originalBearerRejection, 'not_exercised_original_credential_unavailable')
+  assert.equal(report.cleanup.oldCredentialRejected, true, 'only the newly issued credential has a real typed 401 observation')
+  assert.equal(f.historicalRemoved, true); assert.equal(f.removed, true)
+  assert.equal(f.tokenRows.find(row => row.id === OLD_TOKEN).revokedAt, null)
+  const oldRevoke = f.requests.findIndex(row => row.path.endsWith('/' + HISTORICAL_TOKEN + '/revoke'))
+  const firstRemoval = f.requests.findIndex(row => row.action === 'agents.removeDevice')
+  const enrollment = f.requests.findIndex(row => row.path.endsWith('/api/devices/enrollment'))
+  assert.ok(oldRevoke >= 0 && oldRevoke < firstRemoval && firstRemoval < enrollment)
+  assert.equal(f.requests.filter(row => row.path.endsWith('/' + HISTORICAL_TOKEN + '/revoke')).length, 1)
+  noSensitiveReport(report)
 })

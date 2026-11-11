@@ -28,6 +28,8 @@ export type PaidResourceCode =
   | 'usage_in_progress'
   | 'usage_concurrency_limit'
   | 'usage_cost_unavailable'
+  | 'usage_budget_exhausted'
+  | 'billing_authorization_revoked'
 export class PaidResourceError extends CodedError<PaidResourceCode> {
   constructor(code: PaidResourceCode, options?: CodedErrorOptions) {
     super(code, options)

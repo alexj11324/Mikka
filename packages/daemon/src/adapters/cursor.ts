@@ -1,3 +1,4 @@
+import { nativeMcpProcess, type RunApps } from '../agents/run-apps'
 // Cursor adapter (ADR 0003): the user's own signed-in Cursor CLI as an ACP
 // agent (`agent acp`), one process per session, inside the run's sandbox,
 // with an isolated `CURSOR_CONFIG_DIR` (its login stays in the Keychain).
@@ -37,6 +38,16 @@ import type {
   SessionOptions,
   StartOptions,
 } from "./types"
+
+/** Native ACP configuration contains only this task's authorized connections. */
+export function cursorAppServers(apps?: RunApps): acp.McpServer[] {
+  return [
+    ...(apps?.apps ?? []).map(app => ({ type: 'http' as const, name:app.name,url:app.url,headers:[{name:'Authorization',value:`Bearer ${apps!.token}`}] })),
+    ...(apps?.servers ?? []).map(server => server.transport === 'stdio'
+      ? { name:server.name,...nativeMcpProcess(server),env:Object.entries(server.env).map(([name,value])=>({name,value})) }
+      : { type:server.transport,name:server.name,url:server.url,headers:Object.entries(server.headers).map(([name,value])=>({name,value})) }),
+  ]
+}
 
 export interface CursorAdapterOptions {
   sandbox: AgentSandbox
@@ -239,6 +250,8 @@ export class CursorAdapter implements AgentAdapter {
       policyHash: options.policyHash,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
+      profileSkills: options.profileSkills,
+      repositorySkills: options.repositorySkills,
       runDir,
       privateDir: paths.privateDir,
     })
@@ -383,6 +396,7 @@ export class CursorAdapter implements AgentAdapter {
       ...(computerMcp ? [{ name: COMPUTER_MCP_SERVER_NAME, command: computerMcp.command,
         args: computerMcp.args, env: Object.entries(computerMcp.env).map(([name, value]) => ({ name, value })) }] : []),
     ]
+    mcpServers.push(...cursorAppServers(options.apps))
     const ready = <T>(step: Promise<T>, label: string) =>
       untilReady(child, step, `cursor ${label}`)
     try {

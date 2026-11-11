@@ -18,20 +18,24 @@ const stub = (path: string, namedExports: Record<string, unknown>) => mock.modul
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = { summary: null, memory: '', messages: [] }
 const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []
 let modelCalls = 0
-stub('../coordinator/store.ts', { loadConversation: async () => conversation, saveSummary: async (...args: unknown[]) => { saved.push(args) } })
+stub('../coordinator/store.ts', { loadConversation: async () => conversation, loadProductPromptContext: async () => ({ ...conversation, personalInstructions: '', memoryEnabled: true }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
+stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('../coordinator/native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('../coordinator/bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
-stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base })
+stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base, withPersonalInstructionText: async (_owner: string, base: string) => base })
 stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: () => { throw Error('No database transaction in prompt fixture') } })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('No database in pure test') } })
 stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwarded.push(args) }, queueRun: () => {}, queueFactoryRun: () => { throw Error('No Factory dispatch in prompt fixture') }, readRun: () => {}, requestRunStop: () => {}, visibleRuns: () => {} })
 stub('../search/index.ts', { webSearch: () => {} })
-stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused' })
+// The real prompt/tool graph imports session helpers, but prompt assembly must never authenticate.
+const unexpectedAuth = () => { throw new Error('Unexpected authentication or OAuth effect in pure prompt fixture') }
+stub('../auth.ts', { auth: new Proxy({}, { get: unexpectedAuth }), authBaseURL: 'https://auth-fixture.example.invalid' })
+stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused', issueDeviceToken: unexpectedAuth })
 stub('../composio.ts', { runComposioAction: () => {} })
 // Factory issue-link registration is imported by the tool graph; prompt tests never authorize GitHub reads.
 stub('../github/user-access.ts', { readAuthorizedIssue: () => { throw Error('No GitHub authorization or provider I/O in prompt fixture') } })
 stub('../pending-action-store.ts', { proposeAction: () => {}, writeAccountAction: () => {}, proposeRepositoryPush: () => {} })
-stub('../issue-access.ts', { issueForUser: () => {} })
+stub('../issue-access.ts', { issueForUser: () => {}, requireUser: () => { throw new Error('User access unavailable in prompt fixture') } })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
@@ -59,17 +63,16 @@ test('frozen SDK, CC and Codex prompts retain current host message policy withou
         {...DEFAULT_AGENT_DEFINITION, instructions: 'Synthetic saved guidance'},
         'Historical host policy without the later message policy', {harness, model: 'frozen-model'})
       const before = JSON.stringify(snapshot)
-      const prompt = await sdk.preparePrompt('owner', 'private-bot', snapshot)
-      assert.ok(prompt.instructions.includes(PERSONAL_MESSAGE_INSTRUCTIONS), `${harness}: current host policy missing`)
-      assert.ok(prompt.instructions.includes(snapshot.hostInstructions))
-      assert.ok(prompt.instructions.includes(snapshot.definition.instructions))
-      assert.equal(prompt.messages[1].content, human.payload.text)
-      assert.equal(JSON.parse(prompt.messages[0].content as string).authority, 'coordination_data_only')
+      const prompt = await sdk.prepareEveInstructions('owner', 'private-bot', snapshot)
+      assert.ok(prompt.includes(PERSONAL_MESSAGE_INSTRUCTIONS), `${harness}: current host policy missing`)
+      assert.ok(prompt.includes(snapshot.hostInstructions))
+      assert.ok(prompt.includes(snapshot.definition.instructions))
       if (harness !== 'ai_sdk') {
         await native.enqueue('owner', 'holder', 0, {harness: harness as 'claude_code' | 'codex', deviceId: 'synthetic-device'}, [], 'private-bot', snapshot)
         const input = enqueued.at(-1)![4] as {context: string; instructions: string}
-        assert.deepEqual(JSON.parse(input.context).messages, prompt.messages)
-        assert.equal(input.instructions, prompt.instructions)
+        assert.equal(JSON.parse(input.context).messages[1].content, human.payload.text)
+        assert.ok(input.instructions.includes(PERSONAL_MESSAGE_INSTRUCTIONS))
+        assert.ok(input.instructions.includes(snapshot.hostInstructions))
         assert.ok(!input.context.includes(secret))
       }
       assert.equal(JSON.stringify(snapshot), before)

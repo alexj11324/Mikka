@@ -9,9 +9,10 @@ const input = { remoteKey: 'v2/github.com/owner/repo', githubAccountId: '456', t
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
 
-function stub(options: { installation?: 'allowed' | 'denied'; title?: string; userId?: number; repository?: 'missing' | 'renamed'; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; lines?: { additions: number; deletions: number } } = {}) {
+function stub(options: { installation?: 'allowed' | 'denied'; title?: string; userId?: number; repository?: 'missing' | 'renamed'; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; lines?: { additions: number; deletions: number }; review?: boolean; checksDenied?: boolean; detailFailure?: number | 'timeout'; detailOverride?: Record<string, unknown>; createdOverride?: Record<string, unknown> } = {}) {
   const calls: { path: string; method: string; body: Record<string, unknown> | null; authorization: string }[] = []
   let created = false
+  let createdPr: typeof pr & { title?: string; additions?: number; deletions?: number; changed_files?: number } = pr
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     const parsed = new URL(String(url))
     assert.equal(parsed.origin, 'https://api.github.com')
@@ -30,14 +31,25 @@ function stub(options: { installation?: 'allowed' | 'denied'; title?: string; us
     if (path.endsWith('/pulls') && method === 'GET') {
       assert.equal(parsed.searchParams.get('head'), 'owner:mikka/mik-42')
       assert.equal(parsed.searchParams.get('state'), 'all')
-      return Response.json(created ? [pr] : options.existing ?? [])
+      return Response.json(created ? [createdPr] : options.existing ?? [])
     }
+    if (path.endsWith('/pulls/77') && method === 'GET') {
+      if (options.detailFailure === 'timeout') throw new Error('synthetic-detail-secret')
+      if (options.detailFailure) return Response.json({ message: 'synthetic-detail-secret' }, { status: options.detailFailure })
+      return Response.json({ ...(created ? createdPr : options.existing?.[0] as object ?? pr), ...options.lines,
+        ...(options.review ? { head: { ...pr.head, sha: commit }, changed_files: 3 } : {}), ...options.detailOverride })
+    }
+    if (path.endsWith('/check-runs')) return options.checksDenied ? Response.json({}, { status: 403 }) : Response.json({ total_count: 1, check_runs: [
+      { id: 1, name: 'CI', head_sha: commit, app: { id: 10 }, check_suite: { id: 100 }, status: 'completed', conclusion: 'success', started_at: '2026-11-09T13:00:00Z', completed_at: '2026-11-09T13:01:00Z' },
+    ] })
+    if (path.endsWith('/status')) return Response.json({ sha: commit, total_count: 0, statuses: [] })
     if (path.endsWith('/pulls') && method === 'POST') {
       created = true
+      createdPr = { ...pr, ...(options.title ? { title: options.title } : {}), ...options.lines, draft: body?.draft === true, ...options.createdOverride }
       if (options.create === 'timeout') throw new Error('transport failure containing synthetic-secret')
       if (options.create === '422') return Response.json({ message: 'synthetic-secret' }, { status: 422 })
       if (options.create === 'malformed') return Response.json({}, { status: 201 })
-      return Response.json({ ...pr, ...(options.title ? { title: options.title } : {}), ...options.lines, draft: body?.draft === true }, { status: 201 })
+      return Response.json(createdPr, { status: 201 })
     }
     if (path === '/graphql') return Response.json({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
     throw new Error(`Unexpected test request ${method} ${path}`)
@@ -87,6 +99,89 @@ test('a duplicate completion finds its existing PR without posting', async () =>
   const { calls, fetcher } = stub({ existing: [pr] })
   assert.deepEqual(await openRunPullRequest({ ...input, fetcher }), { url: pr.html_url, state: 'open' })
   assert.equal(calls.filter(call => call.path.endsWith('/pulls') && call.method === 'POST').length, 0)
+})
+
+test('publication ingestion resolves list omissions and synchronizes checks once for the verified PR head', async () => {
+  const { calls, fetcher } = stub({ existing: [pr], lines: { additions: 8, deletions: 2 }, review: true })
+  const result = await openRunPullRequest({ ...input, fetcher })
+  assert.equal(result.branch, input.branch)
+  assert.equal(result.headSha, commit)
+  assert.equal(result.changedFiles, 3)
+  assert.equal(result.additions, 8)
+  assert.equal(result.reviewChecks?.complete, true)
+  assert.deepEqual(Object.values(result.reviewChecks!.entries).map(item => item.state), ['passed'])
+  assert.equal(calls.filter(call => call.path.endsWith('/pulls/77')).length, 1)
+  assert.equal(calls.filter(call => call.path.includes(`/commits/${commit}/`)).length, 2)
+  assert.equal(calls.filter(call => call.method === 'POST').length, 0)
+})
+
+test('a newly created PR resolves full details before persisting its approval summary', async () => {
+  const { calls, fetcher } = stub({ review: true, lines: { additions: 7, deletions: 1 } })
+  const result = await openRunPullRequest({ ...input, fetcher })
+  assert.equal(result.changedFiles, 3)
+  assert.equal(result.additions, 7)
+  assert.equal(result.reviewChecks?.complete, true)
+  assert.ok(calls.findIndex(call => call.path.endsWith('/pulls/77')) > calls.findIndex(call => call.path.endsWith('/pulls') && call.method === 'POST'))
+})
+
+test('a missing checks permission leaves review metadata unknown without blocking an existing publication', async () => {
+  const { fetcher } = stub({ existing: [pr], review: true, checksDenied: true })
+  const result = await openRunPullRequest({ ...input, fetcher })
+  assert.equal(result.url, pr.html_url)
+  assert.equal(result.reviewChecks, null)
+})
+
+test('an optional detail refusal retains the verified PR with unknown checks and no recovery or second write', async () => {
+  for (const existing of [undefined, [{ ...pr, head: { ...pr.head, sha: commit } }]]) {
+    for (const detailFailure of ['timeout', 401, 403, 404, 429, 502] as const) {
+      const { calls, fetcher } = stub({ existing, detailFailure })
+      const result = await openRunPullRequest({ ...input, fetcher })
+      assert.equal(result.url, pr.html_url); assert.equal(result.state, 'open')
+      assert.equal(result.reviewChecks, null)
+      assert.equal(result.additions, undefined); assert.equal(result.deletions, undefined); assert.equal(result.changedFiles, undefined)
+      assert.equal(result.headSha, existing ? commit : undefined)
+      assert.equal(calls.filter(call => call.path.endsWith('/pulls/77')).length, 1, 'one optional enrichment attempt')
+      assert.equal(calls.filter(call => call.path.endsWith('/pulls') && call.method === 'GET').length, 1, 'detail failure is not an ambiguous POST')
+      assert.equal(calls.filter(call => call.path.endsWith('/pulls') && call.method === 'POST').length, existing ? 0 : 1)
+      assert.equal(calls.filter(call => call.path.includes('/commits/')).length, 0, 'a refused detail does not trigger more metadata reads')
+      assert.doesNotMatch(JSON.stringify(result), /synthetic-detail-secret|synthetic-user-token/)
+    }
+  }
+})
+
+test('a contradictory detail identity is a hard failure after a successful POST, never a fallback to old evidence', async () => {
+  const cases = [
+    [{ body: 'Unrelated human work' }, 'pull_request_conflict'],
+    [{ head: { ...pr.head, ref: 'mikka/mik-43' } }, 'pull_request_conflict'],
+    [{ head: { ...pr.head, repo: { id: 999 } } }, 'pull_request_conflict'],
+    [{ base: { repo: { id: 999 } } }, 'pull_request_conflict'],
+    [{ head: { ...pr.head, sha: 'b'.repeat(40) } }, 'branch_changed'],
+    [{ number: 78, html_url: 'https://github.com/owner/repo/pull/78' }, 'pull_request_conflict'],
+    [{ node_id: 'PR_other' }, 'pull_request_conflict'],
+    [{ html_url: 'https://other.invalid/pull/77' }, 'github_request_failed'],
+  ] as const
+  for (const [detailOverride, code] of cases) {
+    const { calls, fetcher } = stub({ detailOverride })
+    await assert.rejects(openRunPullRequest({ ...input, fetcher }), { code })
+    assert.equal(calls.filter(call => call.path.endsWith('/pulls/77')).length, 1)
+    assert.equal(calls.filter(call => call.path.endsWith('/pulls') && call.method === 'GET').length, 1)
+    assert.equal(calls.filter(call => call.path.endsWith('/pulls') && call.method === 'POST').length, 1)
+  }
+})
+
+test('optional detail data cannot rescue an invalid original POST receipt', async () => {
+  const { calls, fetcher } = stub({ createdOverride: { body: 'Unrelated human work' }, detailOverride: { body: pr.body } })
+  await assert.rejects(openRunPullRequest({ ...input, fetcher }), { code: 'pull_request_conflict' })
+  assert.equal(calls.filter(call => call.path.endsWith('/pulls/77')).length, 0)
+  assert.equal(calls.filter(call => call.path.endsWith('/pulls') && call.method === 'GET').length, 1)
+})
+
+test('a detail refusal still requires the normal authority fence to convert an unverified PR to draft', async () => {
+  const { calls, fetcher } = stub({ existing: [pr], detailFailure: 502 })
+  await assert.rejects(openRunPullRequest({ ...input, fetcher, draft: true,
+    withWrite: async () => { throw new PublicationError('issue_unavailable') },
+  }), { code: 'issue_unavailable' })
+  assert.equal(calls.filter(call => call.path === '/graphql').length, 0)
 })
 
 test('missing verification opens an explicitly unverified draft PR', async () => {

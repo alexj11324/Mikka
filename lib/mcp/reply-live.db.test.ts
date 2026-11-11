@@ -22,6 +22,7 @@ import { LiveChannel } from '../live/channel'
 import { liveTicket } from '../live/scope'
 import { ScheduleStore, type WorkspaceGuard } from '../schedules/store'
 import { ScheduleError, type Definition } from '../schedules/contract'
+import { tokenWorkspace } from '../tokens/principal'
 
 const target = process.env.E2E_DATABASE_URL
 const valid = target && disposableDatabase(process.env, target)
@@ -107,7 +108,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
   const independent = new Pool({ connectionString: target, max: 4 })
   observePoolCommits(independent)
   const app = await import('../db/request-scope')
-  const store = await import('../coordinator/store')
+  const store = await import('@/tests/support/legacy-coordinator-store')
   const live = await import('./reply-live')
   const replyObservers: { botId: string; closed: number; lost: () => boolean }[] = []
   const replies = mock.module('./reply-live', { namedExports: {
@@ -119,6 +120,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
     },
   } })
   const { readCoordinatorMessages } = await import('./tools')
+  const { actAs } = await import('../acting-user')
   const request = app.createRequestDatabaseScope(target!)
   const chats: { owner: string; botId: string; workspaceId: string }[] = []
   const controllers: AbortController[] = []
@@ -156,7 +158,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
     })
     const closeWeb = web.subscribe('coordinator_session', identity.botId, [identity.botId], () => {})
     controller.signal.addEventListener('abort', closeWeb, { once: true })
-    const promise = request.run(() => readCoordinatorMessages(identity.owner, { waitSeconds: 90 }, controller.signal))
+    const promise = request.run(() => actAs({ id: identity.owner, [tokenWorkspace]: identity.workspaceId }, () => readCoordinatorMessages(identity.owner, { waitSeconds: 90 }, controller.signal)))
     // A later failure still cancels this local waiter; tests never leave a 90s timer.
     void promise.catch(() => {})
     return { controller, promise, open: async () => {
@@ -252,11 +254,32 @@ test('MCP waits use committed PG notifications; independent web observers still 
         child.stdout.on('data', chunk => { stdout += String(chunk) })
         child.stderr.on('data', chunk => { stderr += String(chunk) })
         const exited = once(child, 'exit')
-        const reply = await bounded(waiter.promise, 15_000)
+        // A writer that dies never commits, so the reply cannot arrive and the
+        // reply deadline alone would report "no committed push" for every cause.
+        // Surface its own exit at once instead. A successful exit may still be
+        // a moment ahead of the notification the parent has not read yet.
+        const died = new Promise<never>((_resolve, reject) => {
+          // A spawn that cannot start reports only 'error', never 'exit'.
+          child.once('error', (error: Error) => reject(new Error(`the separate writer could not start: ${error.message}`)))
+          child.once('exit', (code, signal) => {
+            if (code === 0 && signal === null) return
+            reject(new Error(`the separate writer exited before the reply arrived (code ${code}, signal ${signal}): ${stderr.trim() || stdout.trim()}`))
+          })
+        })
+        died.catch(() => {})
+        // The writer runs its module graph before it can write: measured 2.5s
+        // here and 5.9s under 6x CPU saturation, on the same fixture.
+        const reply = await bounded(Promise.race([waiter.promise, died]), 15_000)
         const [code, signal] = await bounded(exited, 15_000)
         assert.equal(code, 0, stderr)
         assert.equal(signal, null)
-        assert.deepEqual(JSON.parse(stdout.trim()), { written: true, notifications: 2 })
+        // Diagnostics such as db_transport_sample share this stdout; only the
+        // writer's own record is the fixture's result.
+        const written = stdout.split('\n').flatMap(line => {
+          try { const value: unknown = JSON.parse(line); return value && typeof value === 'object' && 'written' in value ? [value] : [] }
+          catch { return [] }
+        })
+        assert.deepEqual(written, [{ written: true, notifications: 2 }])
         await eventually(() => socket.received.some(value => JSON.stringify(value) === JSON.stringify({ kind: 'coordinator_session', id: identity.botId })), 'the independent web observer did not receive the committed live key')
         assert.deepEqual(reply.messages.map(value => value.text), ['Reply from a separate writer process'])
       } finally { waiter.controller.abort() }
@@ -271,7 +294,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
         try {
           await tx.query('BEGIN')
           if (!(await tx.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\' FOR SHARE', [workspace, owner])).rowCount) throw new ScheduleError('scheduleWorkspaceAccessDenied', 403)
-          const result = await work()
+          const result = await work({ role: 'admin' })
           await tx.query('COMMIT')
           return result
         } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
@@ -307,7 +330,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
         await flush()
         await delay(150)
         assert.deepEqual(socket.received, [])
-        const peerRead = await request.run(() => readCoordinatorMessages(peer.owner, {}))
+        const peerRead = await request.run(() => actAs({ id: peer.owner, [tokenWorkspace]: peer.workspaceId }, () => readCoordinatorMessages(peer.owner, {})))
         assert.deepEqual(peerRead.messages.map(value => value.text), ['Private peer reply'])
         await request.run(() => store.appendMessages(identity.owner, 'mcp-fixture-holder', [{ role: 'assistant', content: 'Own reply only' }], null, identity.botId))
         const ownRead = await bounded(waiter.promise)
@@ -357,7 +380,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
         assert.equal(deferred.length, 2, 'the main list and reply resolvers both retain the original request')
         // Simulate after() invoking a queued callback outside the originating ALS scope.
         await Promise.all(deferred.map(work => work()))
-        assert.deepEqual(deliveries.slice(before), [{ ownerId: owner, workspaceId: intended, events: [{ kind: 'coordinator_session', id: botId }] }])
+        assert.deepEqual(ordered(deliveries.slice(before)), ordered(committedChatEvents({ owner, workspaceId: intended, botId })), 'both chat and reply keys retain the original database and tenant')
         assert.equal((await independent.query('SELECT id FROM coordinator_messages WHERE "userId"=$1', [owner])).rowCount, 0)
         assert.equal((await isolated.query('SELECT id FROM coordinator_messages WHERE "userId"=$1', [owner])).rowCount, 1)
       } finally {

@@ -45,6 +45,7 @@ let root: Root, container: HTMLDivElement, cache: Map<string, State>, tickets: s
 let refresh: Partial<Record<Kind, () => Promise<unknown>>>
 let replaceObserved: (value: Read) => Promise<unknown>
 let automaticReadiness = true
+let automaticOpen = true
 const sockets: FakeSocket[] = []
 
 /** Real React, SWR and LiveChannels; only authenticated read and WS boundaries
@@ -62,11 +63,12 @@ class FakeSocket {
     assert.equal(new URL(url).searchParams.get('revisions'), '1')
     this.url = url.split('?')[0]
     sockets.push(this)
-    queueMicrotask(() => {
-      if (this.readyState !== 0) return
-      this.readyState = 1; this.onopen?.()
-      if (automaticReadiness) this.message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS })
-    })
+    queueMicrotask(() => { if (automaticOpen) this.open() })
+  }
+  open() {
+    if (this.readyState !== 0) return
+    this.readyState = 1; this.onopen?.()
+    if (automaticReadiness) this.message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS })
   }
   send(value: string) { if (value === 'ping') this.onmessage?.({ data: 'pong' }); else this.sent.push(JSON.parse(value)) }
   close() { this.readyState = 3; this.onclose?.() }
@@ -96,7 +98,7 @@ before(async () => {
   ;({ useListExpiry } = await import('../hooks/use-list-expiry'))
 })
 beforeEach(() => {
-  reads = []; cursors = []; scopeError = null; automaticReadiness = true; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
+  reads = []; cursors = []; scopeError = null; automaticReadiness = true; automaticOpen = true; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   for (const kind of ['issues', 'threads', 'tasks', 'bots', 'groups', 'roster'] as const) replies.set(kind, async () => snapshot(kind))
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
@@ -856,3 +858,100 @@ test('a bot-list push re-reads the bot list only, never a mounted whole Coordina
   assert.equal(count('bots'), bots + 1, 'the list itself re-reads')
   assert.equal(chatReads, chats, 'a list push is not a reason to read 200 chat messages again (#1414)')
 })
+
+
+/** Direct snapshot readers use the real Native queue, JSON codec and fetch
+ * boundary. Only authenticated HTTP responses and socket events are fixtures.
+ * MessageChannel is the runtime implementation, not a timer/mock scheduler. */
+for (const { kind, action, liveKind } of [
+  { kind: 'tasks', action: 'task-runs.pollTaskRuns', liveKind: 'task_run_list' },
+  { kind: 'bots', action: 'coordinator.pollBotChatSummaries', liveKind: 'bot_chat_list' },
+  { kind: 'roster', action: 'bots.pollBots', liveKind: 'bot_list' },
+] as const) for (const grouped of [false, true]) for (const beforeReady of [false, true]) {
+  test(`native dispatch proof: ${kind} ${grouped ? 'batch' : 'single'} HTTP ${beforeReady ? 'before' : 'after'} readiness`, async t => {
+    const { callAction } = await import('../apps/desktop/src/renderer/rpc')
+    const { resetReadBatchScope } = await import('../apps/desktop/src/renderer/read-batch')
+    const { encode, decode } = await import('../lib/desktop-rpc/wire')
+    const phases: string[] = []
+    const dispatched = deferred<void>()
+    let listCalls = 0, physicalCalls = 0, revision = 5
+    const originalMessage = FakeSocket.prototype.message
+    FakeSocket.prototype.message = function (value: unknown) {
+      originalMessage.call(this, value)
+      if ((value as { type?: unknown })?.type === 'live_ready') phases.push('live_ready')
+    }
+    automaticOpen = !beforeReady
+    resetReadBatchScope()
+    replies.set(kind, () => {
+      phases.push('list_fetcher')
+      const pending = callAction<Read>(action, [])
+      phases.push('native_enqueued')
+      return pending
+    })
+    const ticketFetch = globalThis.fetch
+    globalThis.fetch = async (input, options) => {
+      const url = new URL(String(input), 'https://mikka.example')
+      if (url.pathname.endsWith('/api/live/ticket')) return ticketFetch(input, options)
+      assert.ok(url.pathname.endsWith('/api/desktop/rpc'))
+      assert.equal(options?.method, 'POST')
+      assert.equal(options?.cache, 'no-store')
+      const envelope = JSON.parse(String(options?.body)) as { version: number; action: string; args: unknown }
+      assert.equal(envelope.version, 1)
+      const args = decode(envelope.args) as unknown[]
+      const batch = envelope.action === 'desktop.readBatch'
+      const calls = batch ? args[0] as { action: string; args: unknown[] }[] : [{ action: envelope.action, args }]
+      assert.ok(calls.length >= 1 && calls.length <= 2)
+      phases.push('fetch_dispatch')
+      physicalCalls++
+      const results = calls.map(call => {
+        assert.deepEqual(call.args, [])
+        if (call.action === action) {
+          listCalls++
+          const result = snapshot(kind, 'owner', home)
+          result.live.revisions = { [`${liveKind}:${home}`]: revision }
+          return { ok: true as const, result }
+        }
+        assert.equal(call.action, 'projects.listProjects')
+        return { ok: true as const, result: [] }
+      })
+      dispatched.resolve()
+      return Response.json({ version: 1, ok: true, result: encode(batch ? results : results[0].result) })
+    }
+    function HomeAnchor() {
+      useLiveKeys([{ kind: 'bot_list', id: home, workspaceId: home }], ['native-dispatch-anchor'])
+      return null
+    }
+    function Projects() {
+      useSWR('native-dispatch-projects', () => callAction('projects.listProjects', []), { revalidateOnFocus: false, revalidateOnReconnect: false })
+      return null
+    }
+    try {
+      await act(async () => root.render(<SWRConfig value={{ provider: () => cache, use: [staleOnFocus], dedupingInterval: 0, shouldRetryOnError: false }}>
+        <LiveProvider ownerId="owner" workspaceId={home}>
+          <HomeAnchor />
+          {kind === 'tasks' && <Tasks owner="owner" />}
+          {kind === 'bots' && <Bots owner="owner" />}
+          {kind === 'roster' && <Roster owner="owner" workspace={home} />}
+          {grouped && <Projects />}
+        </LiveProvider>
+      </SWRConfig>))
+      await dispatched.promise
+      if (beforeReady) {
+        revision = 6
+        await act(async () => { sockets.find(socket => socket.url.endsWith(home))!.open() })
+      }
+      await settled()
+      const firstSend = phases.indexOf('fetch_dispatch'), ready = phases.indexOf('live_ready')
+      assert.ok(firstSend >= 0 && ready >= 0)
+      assert.ok(phases.indexOf('native_enqueued') < firstSend)
+      assert.equal(firstSend < ready, beforeReady, 'the actual RPC fetch boundary establishes the tested order')
+      assert.equal(JSON.parse(view(kind)!).live.revisions[`${liveKind}:${home}`], beforeReady ? 6 : 5)
+      t.diagnostic(JSON.stringify({ kind: 'native_dispatch_order', action, grouped, beforeReady, phases, listCalls, physicalCalls }))
+      assert.equal(listCalls, beforeReady ? 2 : 1, 'only a read actually dispatched after coverage may satisfy the late subscription')
+      assert.equal(physicalCalls, beforeReady ? 2 : 1)
+    } finally {
+      FakeSocket.prototype.message = originalMessage
+      resetReadBatchScope()
+    }
+  })
+}

@@ -58,9 +58,15 @@ test('a cloud run\'s subscription context read stays within its statement budget
   const harnesses = [{ harness: 'claude_code', installed: true, toolApproval: true, subscriptionBroker: true, models: ['fixture-opus'] }]
   const threadMachines = await fakeThreadMachines(pool, harnesses)
   const userId = await seedUser(pool, 'route-queries')
+  const organizationId = randomUUID(), providerId = `route-budget-${randomUUID()}`, directoryConnectionId = randomUUID(), directoryUserId = randomUUID()
   t.after(async () => {
     for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value
     threadMachines.restore()
+    await pool.query('DELETE FROM enterprise_scim_user WHERE id=$1', [directoryUserId])
+    await pool.query('DELETE FROM enterprise_scim_connection WHERE id=$1', [directoryConnectionId])
+    await pool.query('DELETE FROM enterprise_sso_provider WHERE "providerId"=$1', [providerId])
+    await pool.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
+    await pool.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
     await pool.query('DELETE FROM byos_native_runs n USING agent_runs r WHERE r.id=n."runId" AND r."userId"=$1', [userId])
     for (const table of ['computer_run_bindings', 'thread_machines']) await pool.query(`DELETE FROM ${table} WHERE "ownerId"=$1`, [userId])
     await pool.query('DELETE FROM agent_runs WHERE "userId"=$1', [userId])
@@ -73,7 +79,7 @@ test('a cloud run\'s subscription context read stays within its statement budget
 
   // The person's own subscription, a workspace Bot and its task: the shape of the traced runs.
   const workspaceId = (await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])).id
-  const botId = await seedBot(pool, workspaceId, userId), issueId = await seedIssue(pool, userId)
+  const botId = await seedBot(pool, workspaceId, userId), issueId = await seedIssue(pool, userId, workspaceId)
   const connectionId = randomUUID(), model = 'fixture-opus'
   const quota = { vendor: 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] }
   await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject",quota,"modelCatalog") VALUES ($1,$2,$3,'claude','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
@@ -126,6 +132,59 @@ test('a cloud run\'s subscription context read stays within its statement budget
   // The run policy is resolved once per model admission (there are two), not again for its membership lease.
   assert.equal(seen.filter(text => text.startsWith('SELECT "botId","agentId","issueId"')).length, 2, seen.join('\n'))
   assert.equal(seen.filter(text => /pg_advisory_xact_lock/.test(text)).length, 2, seen.join('\n'))
+
+  await t.test('each context rereads membership instead of retaining a prior successful authorization', async () => {
+    const before = workerCalls.length
+    await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, userId])
+    try {
+      const denied = await context()
+      assert.equal(denied.status, 503)
+      assert.deepEqual(await denied.json(), { error: 'subscription_unavailable' })
+      assert.equal(workerCalls.length, before, 'an inactive member reaches neither prepare nor nativeContext')
+    } finally {
+      await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, userId])
+    }
+    assert.equal((await context()).status, 200)
+  })
+
+  await t.test('new Organization linkage and current machine, directory and provider policies remain authoritative', async () => {
+    // These are stored policy fixtures, not an OIDC or SCIM protocol mock.
+    // The caller remains the real claimed device bearer used by the budget read.
+    await pool.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,\'Context budget\',$2)', [organizationId, userId])
+    await pool.query('INSERT INTO enterprise_org_policy("organizationId","enforceSso","allowMachineCredentials") VALUES($1,true,false)', [organizationId])
+    await pool.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES($1,$2)', [workspaceId, organizationId])
+    const denied = async (reason: string) => {
+      const before = workerCalls.length
+      const response = await context()
+      assert.equal(response.status, 503, reason)
+      assert.deepEqual(await response.json(), { error: 'subscription_unavailable' })
+      assert.equal(workerCalls.length, before, reason + ': no worker call')
+    }
+    await denied('attaching an Organization cannot reuse the earlier ungoverned read')
+    await pool.query('UPDATE enterprise_org_policy SET "allowMachineCredentials"=true WHERE "organizationId"=$1', [organizationId])
+    assert.equal((await context()).status, 200, 'the actual device proof is accepted by current machine policy')
+    await pool.query('UPDATE enterprise_org_policy SET "allowMachineCredentials"=false WHERE "organizationId"=$1', [organizationId])
+    await denied('changing machine policy revokes the next read')
+    await pool.query('UPDATE enterprise_org_policy SET "allowMachineCredentials"=true WHERE "organizationId"=$1', [organizationId])
+
+    await pool.query(`INSERT INTO enterprise_sso_provider(id,"providerId","organizationScopeId","userId",issuer,domain,"domainVerified","oidcConfig","domainTokenHash")
+      VALUES($1,$1,$2,$3,'https://context.example.invalid',$4,true,'{}',$5)`,
+    [providerId, organizationId, userId, providerId + '.example.invalid', randomBytes(32).toString('hex')])
+    await pool.query('INSERT INTO enterprise_scim_connection(id,"organizationId","providerId","tokenHash") VALUES($1,$2,$3,$4)',
+      [directoryConnectionId, organizationId, providerId, randomBytes(32).toString('hex')])
+    await pool.query(`INSERT INTO enterprise_scim_user(id,"connectionId","organizationId","externalId","userName","userId",active,document)
+      VALUES($1,$2,$3,'context-user','context-user@example.invalid',$4,true,'{}')`, [directoryUserId, directoryConnectionId, organizationId, userId])
+    assert.equal((await context()).status, 200)
+    await pool.query('UPDATE enterprise_scim_user SET active=false WHERE id=$1', [directoryUserId])
+    await denied('SCIM inactive status is checked again after an admitted read')
+    await pool.query('UPDATE enterprise_scim_user SET active=true WHERE id=$1', [directoryUserId])
+    assert.equal((await context()).status, 200)
+
+    await pool.query(`INSERT INTO mikka_organization_resource_policies("organizationId","allowedModelProviders") VALUES($1,'[]')`, [organizationId])
+    await denied('the fresh Organization model provider rule still runs at model admission')
+    await pool.query('DELETE FROM mikka_organization_resource_policies WHERE "organizationId"=$1', [organizationId])
+    assert.equal((await context()).status, 200)
+  })
 
   // Authorization is unchanged: a stopped run gets no context, and no provider call.
   await pool.query('UPDATE agent_runs SET "stopRequestedAt"=clock_timestamp() WHERE id=$1', [queued.runId])

@@ -31,8 +31,12 @@ async function load() {
 before(async () => {
   if (!databaseUrl) return
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: sessionUser } : null } } } })
-  mock.module('@/lib/session', { namedExports: { getSession: async () => sessionUser ? { user: sessionUser } : null } })
+  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  mock.module('@/lib/auth', { namedExports: {
+    auth: { api: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } },
+    authBaseURL: 'https://memory-rpc.example.invalid', googleEnabled: false, githubSignInEnabled: async () => false,
+  } })
+  mock.module('@/lib/session', { namedExports: { getSession: async () => sessionUser ? { user: sessionUser, session: { id: 'preferences-fixture-session' } } : null } })
   mock.module('@/lib/suggestions/sources', { namedExports: { connectedComposioApps: async () => connected } })
   m = await load()
   const { db, drizzle: { sql } } = m
@@ -61,6 +65,65 @@ dbTest('every action needs a session', async () => {
     await preferences.listSuggestionSources(), await preferences.setSuggestionSource('gmail', false), await memory.clearMemory(),
   ]) assert.equal(result.error, 'authRequired')
   await assert.rejects(memory.getMemory(), { code: 'authRequired' })
+})
+
+
+dbTest('preferences read both optional owner rows in one statement without losing defaults or isolation', async t => {
+  const { readPreferences, DEFAULT_PREFERENCES } = await import('@/lib/preferences')
+  const { withDatabaseClient } = await import('@/lib/db')
+  const { db, pool, schema } = m
+  const owner = 'test-preference-read-' + randomUUID(), peer = 'test-preference-peer-' + randomUUID()
+  const client = await pool.connect()
+  const counts: number[] = []
+  const read = async (id: string) => {
+    const observed = mock.method(client, 'query')
+    try {
+      const value = await readPreferences(id)
+      counts.push(observed.mock.callCount())
+      return value
+    } finally { observed.mock.restore() }
+  }
+  const stored = {
+    pushDecide: false, pushReview: false, pushFinished: false, pushBriefing: false,
+    pushWhen: schema.PUSH_WHEN.find(value => value !== 'always')!,
+    memoryEnabled: false, sendKey: 'modEnter' as const, personalInstructions: 'Synthetic owner preference',
+    dailySuggestions: true,
+  }
+  const shown = { ...stored, dailySuggestions: false, proactive: true }
+  try {
+    await withDatabaseClient(client, async () => {
+      await client.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now()),($3,$3,$4,true,now(),now())',
+        [owner, owner + '@example.invalid', peer, peer + '@example.invalid'])
+      await db.insert(schema.userPreferences).values({ userId: peer, ...stored, personalInstructions: 'Synthetic peer preference' })
+      await db.insert(schema.attentionSettings).values({ userId: peer, enabled: false })
+      assert.deepEqual(await read(owner), DEFAULT_PREFERENCES, 'neither owner row must not borrow the peer rows')
+      await db.insert(schema.attentionSettings).values({ userId: owner, enabled: false })
+      assert.deepEqual(await read(owner), { ...DEFAULT_PREFERENCES, proactive: false }, 'attention-only preserves the disabled switch')
+      await db.delete(schema.attentionSettings).where(m.drizzle.eq(schema.attentionSettings.userId, owner))
+      await db.insert(schema.userPreferences).values({ userId: owner, ...stored, suggestionSources: { synthetic: false } })
+      assert.deepEqual(await read(owner), shown, 'preferences-only preserves every flag and the attention default')
+      await db.insert(schema.attentionSettings).values({ userId: owner, enabled: false })
+      assert.deepEqual(await read(owner), { ...shown, proactive: false }, 'both rows preserve independent switches')
+      await db.update(schema.attentionSettings).set({ enabled: true }).where(m.drizzle.eq(schema.attentionSettings.userId, owner))
+      await db.update(schema.userPreferences).set({ memoryEnabled: true }).where(m.drizzle.eq(schema.userPreferences.userId, owner))
+      assert.deepEqual(await read(owner), { ...shown, memoryEnabled: true, dailySuggestions: true }, 'the next read sees both writes without a cache')
+      assert.deepEqual(await read(peer), { ...shown, personalInstructions: 'Synthetic peer preference', proactive: false }, 'another owner stays isolated')
+      assert.deepEqual(await read("missing' OR '1'='1"), DEFAULT_PREFERENCES, 'the owner remains a bound text parameter')
+      t.diagnostic(JSON.stringify({ kind: 'preferences_statement_count', readCases: counts.length, queryCounts: counts }))
+      assert.deepEqual(counts, Array.from({ length: counts.length }, () => 1), 'each complete authorized owner snapshot uses one database statement')
+      const failure = new Error('synthetic_preferences_query_failure')
+      const rejected = mock.method(client, 'query', async () => { throw failure })
+      try {
+        await assert.rejects(readPreferences(owner), error => error === failure || (error as { cause?: unknown }).cause === failure)
+        assert.equal(rejected.mock.callCount(), 1, 'database errors are not retried or converted to defaults')
+      } finally { rejected.mock.restore() }
+    })
+  } finally {
+    try {
+      await client.query('DELETE FROM attention_settings WHERE "userId"=ANY($1::text[])', [[owner, peer]])
+      await client.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
+    } finally { client.release() }
+  }
 })
 
 dbTest('preferences: send key, personal instructions and daily suggestions save with their rules', async () => {
@@ -103,22 +166,22 @@ dbTest('personal instructions reach the next prompt for the Coordinator and Bots
   assert.equal(await personal.withPersonalInstructions(people.alex, 'BASE RULES'), 'BASE RULES')
 })
 
-dbTest('the Coordinator\'s and a Bot\'s turn prompt (preparePrompt) carry the saved instructions and drop them once cleared', async () => {
+dbTest('the Coordinator\'s and a Bot\'s turn prompt (prepareEveInstructions) carry the saved instructions and drop them once cleared', async () => {
   as(people.alex)
   const { preferences } = m
-  const { preparePrompt } = await import('@/workflows/coordinator/steps')
+  const { prepareEveInstructions } = await import('@/workflows/coordinator/steps')
   const botId = randomUUID()
   // The Coordinator is an ordinary bot row; its prompt keeps the Coordinator's rules.
   const coordinator = (await seedCoordinator(people.alex)).botId
   await preferences.updatePreferences({ personalInstructions: 'Sign every reply with 🐧.' })
   for (const bot of [coordinator, botId]) {
-    const { instructions } = await preparePrompt(people.alex, bot)
+    const instructions = await prepareEveInstructions(people.alex, bot)
     assert.match(instructions, /You are the Coordinator in Mikka/, 'the rules come first')
     assert.match(instructions, /<personal_instructions>\nSign every reply with 🐧\.\n<\/personal_instructions>/)
     assert.ok(instructions.indexOf('<personal_instructions>') > instructions.indexOf('You are the Coordinator in Mikka'))
   }
   await preferences.updatePreferences({ personalInstructions: '' })
-  for (const bot of [coordinator, botId]) assert.doesNotMatch((await preparePrompt(people.alex, bot)).instructions, /personal_instructions|Sign every reply/)
+  for (const bot of [coordinator, botId]) assert.doesNotMatch(await prepareEveInstructions(people.alex, bot), /personal_instructions|Sign every reply/)
 })
 
 dbTest('time zone: a picked zone survives browser and IP reports until 自动', async () => {
@@ -186,6 +249,61 @@ dbTest('删除全部记忆 removes only the person\'s facts and getMemory counts
   assert.deepEqual(await memory.clearMemory(), { removed: 0 })
   as(people.dana)
   assert.equal((await memory.getMemory()).total, 1, 'another person\'s memory is untouched')
+})
+
+dbTest('memory browser RPC reaches actual actions for manual facts, scope, review and undo without taking a client owner', async () => {
+  const [{ createBrowserRpc }, { desktopActions }, { decode }] = await Promise.all([
+    import('@/lib/browser-rpc/handler'), import('@/lib/desktop-rpc/registry'), import('@/lib/desktop-rpc/wire'),
+  ])
+  const origin = 'https://memory-rpc.example.invalid'
+  const handle = createBrowserRpc({
+    trustedBaseURL: origin,
+    authenticate: async headers => headers.get('cookie') === 'fixture=memory' && sessionUser ? sessionUser : null,
+    scope: async (_identity, work) => work(),
+    actions: desktopActions,
+  })
+  const send = (action: string, args: unknown[] = []) => handle(new Request(origin + '/mikka/api/rpc', {
+    method: 'POST', headers: { origin, cookie: 'fixture=memory', 'x-mikka-rpc': '1', 'content-type': 'application/json' },
+    body: JSON.stringify({ version: 1, action, args }),
+  }))
+  const call = async (action: string, args: unknown[] = []) => {
+    const response = await send(action, args)
+    assert.equal(response.status, 200, action)
+    const payload = await response.json()
+    assert.equal(payload.ok, true, action)
+    return decode(payload.result)
+  }
+  as(null)
+  assert.equal((await send('memory.getMemory')).status, 401)
+  as(people.alex)
+  const input = { requestId: randomUUID(), kind: 'preference', subject: 'RPC fixture ' + randomUUID() }
+  assert.equal((await send('memory.addFact', [{ ...input, userId: people.dana }])).status, 400)
+  const id = await call('memory.addFact', [input]) as string
+  assert.match(id, /^[a-f0-9-]{36}$/)
+  try {
+    assert.equal(await call('memory.addFact', [input]), id, 'wire replay keeps the same idempotent insert')
+    let view = await call('memory.getMemory') as Awaited<ReturnType<Modules['memory']['getMemory']>>
+    const own = view.facts.find(fact => fact.id === id)!
+    assert.equal(own.source?.kind, 'told')
+    assert.equal(own.usedCount, 0)
+    assert.deepEqual(own.recentUses, [])
+    const personal = view.scopeOptions.workspaces[0].id
+    assert.equal(await call('memory.setFactScope', [id, { kind: 'workspaces', ids: [personal] }]), true)
+    assert.equal(await call('memory.reviewFact', [id, 'approve']), true)
+    assert.equal(await call('memory.removeFact', [id]), true)
+    view = await call('memory.getMemory') as typeof view
+    assert.equal(view.facts.some(fact => fact.id === id), false)
+    assert.deepEqual(view.undoable.find(fact => fact.id === id)?.actions, ['undo'])
+    assert.equal(await call('memory.undoRemoveFact', [id]), true)
+    assert.equal(await call('memory.undoRemoveFact', [id]), true)
+    assert.equal((await call('memory.getMemory') as typeof view).facts.find(fact => fact.id === id)?.source?.kind, 'told')
+    as(people.dana)
+    assert.equal((await call('memory.getMemory') as typeof view).facts.some(fact => fact.id === id), false)
+    assert.equal(await call('memory.removeFact', [id]), false)
+    assert.equal(await call('memory.undoRemoveFact', [id]), false)
+  } finally {
+    await m.db.delete(m.schema.userFacts).where(m.drizzle.eq(m.schema.userFacts.id, id))
+  }
 })
 
 dbTest('数据来源: connected apps are listed with their switch, and a turned-off app is not read', async () => {

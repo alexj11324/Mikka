@@ -19,7 +19,7 @@ import { captureNativeResources } from './native-resources.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { authDiagnosticRoute, nativeDiagnosticFailure, readNativeAuthDiagnostics, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
-import { observeReads, pageReadRequirements, pageReady, readActionIds } from './parity-page-ready.mjs'
+import { observeReads, pageReadRequirements, pageReady, readActionIds, selectParityWorkspace } from './parity-page-ready.mjs'
 import { settingsReadRequirements, settingsReady } from './parity-settings-ready.mjs'
 import { waitForNativeDevice } from './native-device-ready.mjs'
 import { continueInSystemBrowser } from './browser-handoff.mjs'
@@ -128,9 +128,14 @@ async function go(target, suffix = '/') {
 }
 
 async function theme(target, value) {
+  stage = `theme-${target.mode}-${value}`
   // Apply the ordinary persisted appearance preference to each renderer
-  // partition. This changes no application response or business state.
-  await target.page.evaluate(value => localStorage.setItem('theme', value), value)
+  // partition. A hosted auth redirect can replace its document after native
+  // readiness: Playwright retries this idempotent predicate in the new context.
+  await target.page.waitForFunction(value => {
+    localStorage.setItem('theme', value)
+    return localStorage.getItem('theme') === value
+  }, value)
   await target.page.emulateMedia({ colorScheme: value, reducedMotion: 'reduce' })
   await target.page.reload({ waitUntil: 'domcontentloaded' })
   await target.page.waitForFunction(value => document.documentElement.classList.contains(value), value)
@@ -270,10 +275,7 @@ async function authenticateBundled(bundled) {
 
 async function selectFixtureWorkspace(target) {
   await go(target)
-  await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().click()
-  await target.page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: false }).click()
-  await target.page.waitForURL(url => url.pathname === `${environment.basePath}/en` || url.pathname === `${environment.basePath}/en/`)
-  await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
+  await selectParityWorkspace(target.page, { menuName: messages.Nav.workspaceMenu, workspaceName: fixtures.fixture.workspaceName, basePath: environment.basePath })
   await coordinatorReady(target.page)
 }
 
@@ -371,7 +373,9 @@ function screens(fixture) {
     // This parity environment is the cloud edition (desktop.yml). The Mikka
     // cloud connection page exists only for community server administrators;
     // its real component states are captured by self-hosting-ui.yml instead.
-    ...Object.entries(messages.Settings.sections).filter(([id]) => id !== 'developer' && id !== 'cloud').map(([id, section]) => ({
+    // 组织 (organization) is drawn only by a UI layer; the open-source package
+    // under test has no such page (tests/settings-sections.test.mjs LAYER_ONLY).
+    ...Object.entries(messages.Settings.sections).filter(([id]) => id !== 'developer' && id !== 'cloud' && id !== 'organization').map(([id, section]) => ({
       name: `settings-${id}`,
       open: async target => {
         if (id === 'audit') {

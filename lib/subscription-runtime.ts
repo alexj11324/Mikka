@@ -19,16 +19,17 @@ import { infisicalWorkloadToken } from './infisical-workload'
 import { AccessProjectionMissing, authorizedAccessName, subscriptionAccessSnapshot } from './subscription-access-snapshot'
 import { join } from 'node:path'
 
-export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string) {
+export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string, borrowerId?: string) {
   z.uuid().parse(workspaceId)
-  // Pure authorization needs a read lock. An exclusive workspace lock can
-  // wait on one member's lease while blocking another member's validation.
-  // This single read resolves after its implicit transaction has completed.
+  // This authorization contains one read and protects no later operation.
+  // Its implicit transaction retains the same FOR SHARE lock until that read
+  // ends; an existing workspace transaction still owns it through the proxy.
   const [row] = await workspaceDb.select({ id: workspaces.id }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(and(eq(workspaces.id, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .for('share').limit(1)
   if (!row) throw new WorkspaceError('workspaceAccessDenied')
+  if (borrowerId && borrowerId !== userId && !(await othersMayUse(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
 }
 /** A subscription runs its owner's own bots in every workspace the owner belongs to (decision 2026-11-01-2240);
  * another member's bot only while the owner shares it there with 分享给团队成员 and the admin allows it. */

@@ -1,3 +1,6 @@
+import { factoryWorkspaceReader } from '@/lib/factory/workspace-reader';
+import { taskReaderScope } from '@/lib/task-workspace';
+import { factoryMembershipResponse, factoryWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { actAs } from "@/lib/acting-user";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -9,32 +12,29 @@ import { factoryHumanStore } from "@/lib/factory/server";
 import { factoryDispatchEnabled, handleFactoryDispatch } from "@/lib/factory/dispatch-http";
 import { issueMutationsEnabled } from "@/lib/coordinator/issue-tools-enabled";
 import { factoryDispatchSchema } from '@/lib/factory/dispatch';
-import { pool } from '@/lib/db';
-import { workspacePool } from '@/lib/workspace-db';
-import { factoryIssueLiveScope } from '@/lib/live/factory';
 
 export const dynamic = "force-dynamic";
 /** GET /api/factory/tasks?issueId=...: session-owned task discovery, no writes. */
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
-  const scoped = async () => {
+  const scoped = () => factoryMembershipResponse(session?.user?.id, async () => {
     const issueId = new URL(request.url).searchParams.get("issueId");
     const userId = session?.user?.id ?? null;
     // The list holds only this user's own tasks of this issue. Each request checks
     // its own access to the issue, then identical concurrent requests share one read.
-    const readable = userId && issueId && z.uuid().safeParse(issueId).success && Boolean(await issueForUser(userId, issueId, false));
+    const reader = userId ? await factoryWorkspaceReader(userId) : null;
+    const workspaceId = reader ? taskReaderScope(reader).workspaceId : undefined;
+    const readable = reader && workspaceId && issueId && z.uuid().safeParse(issueId).success && Boolean(await issueForUser(reader, issueId, false));
     const list = () => handleFactoryList(factoryHumanStore, { userId, issueId });
-    const result = readable ? await singleFlight(["/api/factory/tasks", userId, issueId], list) : await list();
-    let liveWorkspaceId: string | null = null;
-    if (result.status === 200 && session?.user && issueId) {
-      try { liveWorkspaceId = (await factoryIssueLiveScope(pool, workspacePool, issueId, session.user.id))?.workspaceId ?? null; }
-      catch { console.warn('[live] Factory list scope unavailable'); }
-    }
+    const result = readable ? await singleFlight(["/api/factory/tasks", userId, workspaceId, issueId], list) : await list();
+    // A successful store read reauthorized the bound issue inside this exact
+    // Workspace lease. Its live channel uses that same immutable tenant.
+    const liveWorkspaceId = result.status === 200 ? workspaceId ?? null : null;
     return NextResponse.json(result.status === 200 ? { ...(result.body as Record<string, unknown>), liveWorkspaceId } : result.body, {
       status: result.status,
       headers: { "Cache-Control": "private, no-store" },
     });
-  };
+  });
   return session?.user ? actAs(session.user, scoped) : scoped();
 }
 /**
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
-  const scoped = async () => {
+  const scoped = () => factoryWorkspaceResponse(session?.user?.id, async () => {
     const result = await handleFactoryDispatch(
       async () => {
         const { factoryLifecycleEnabled, factoryRuntimeForBot } = await import("@/lib/factory/runtime");
@@ -69,6 +69,6 @@ export async function POST(request: Request) {
       status: result.status,
       headers: { "Cache-Control": "private, no-store" },
     });
-  };
+  });
   return session?.user ? actAs(session.user, scoped) : scoped();
 }

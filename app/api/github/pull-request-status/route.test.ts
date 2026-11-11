@@ -13,7 +13,7 @@ class GitHubAccessError extends Error {
 }
 const githubResult = () => ({ userId: 'viewer', githubAccountId: '12', repoId: '34', installationId: '56', number: 81, url, state: 'merged', updatedAt: '2026-10-27T12:00:00Z', token: 'never-return-this' })
 const readPr = mock.fn(async (_headers: Headers, _url: string) => githubResult())
-mock.module(new URL('../../../../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId } } : null } } } })
+mock.module(new URL('../../../../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId }, session: { id: 'pull-request-status-fixture-session' } } : null } } } })
 mock.module(new URL('../../../../lib/issue-access.ts', import.meta.url).href, { namedExports: { issueForUser: issueLookup } })
 mock.module(new URL('../../../../lib/github/user-access.ts', import.meta.url).href, { namedExports: { GitHubAccessError, readAuthorizedPullRequest: readPr } })
 const liveWorkspaceId = '00000000-0000-4000-8000-0000000000aa'
@@ -53,7 +53,10 @@ test('rejects invalid, arbitrary and unlinked URLs before GitHub access', async 
 test('issue visibility is checked for the current viewer before GitHub', async () => {
   canReadIssue = false
   assert.equal((await call()).status, 404)
-  assert.deepEqual(issueLookup.mock.calls[0].arguments, [{ id: 'viewer' }, issueId])
+  const [reader, requestedIssue] = issueLookup.mock.calls[0].arguments
+  assert.equal(reader.id, 'viewer'); assert.equal(requestedIssue, issueId)
+  const { enterprisePrincipal } = await import('@/lib/enterprise/principal')
+  assert.deepEqual((reader as { id: string; [enterprisePrincipal]?: unknown })[enterprisePrincipal], { kind: 'session', sessionId: 'pull-request-status-fixture-session' })
   assert.equal(readPr.mock.callCount(), 0)
 })
 

@@ -53,8 +53,8 @@ versions and missing `mobileReady` produce explicit errors. HTTP is allowed
 only for exact loopback addresses, for development on that same device.
 
 The server must explicitly trust `mikka://` in `AUTH_TRUSTED_ORIGINS`.
-Available Google/GitHub/email methods come from discovery; OAuth uses the
-selected server's own clients and the existing Better Auth Expo return flow.
+Available Apple, Google, GitHub and email methods come from discovery. Google
+and GitHub use the selected server's clients and the Better Auth Expo return flow.
 See [server setup](../../docs/self-hosting.md#connect-the-official-ios-app).
 
 **设置 → 账号与服务器** switches saved accounts or adds one. On iOS, the account
@@ -73,6 +73,30 @@ and resets realtime subscriptions. Live tickets may name any operator's secure
 WebSocket gateway; the complete URL, including `/mikka`, is retained. Plain
 `ws:` is limited to loopback. Expo Web uses browser cookies and is a layout
 preview; it does not establish iOS SecureStore or native multi-account acceptance.
+
+## Sign in with Apple
+
+On supported iOS devices, sign-in uses `expo-apple-authentication`'s native
+button and Apple authorization sheet. The app sends the verified identity token,
+a fresh nonce and the first-consent name to the selected server. Better Auth
+checks Apple's signing key, issuer, audience, expiration and nonce before issuing
+the existing Keychain session. The nonce binds the credential to the selected
+server's exact auth URL, preventing another server from relaying it. Verified-email linking follows the same ownership
+rules as Google and GitHub.
+
+Cloud uses the `com.aspectlylabs.mikka` bundle audience. A community server enables
+the native method with `APPLE_APP_BUNDLE_IDENTIFIER=com.aspectlylabs.mikka` and
+trusts `mikka://` as described above. A fork uses its own registered bundle ID.
+`ios.usesAppleSignIn` and the Expo plugin require a compatible native EAS build
+with the Sign in with Apple entitlement. The fingerprint runtime separates that
+binary from earlier OTA runtimes.
+
+Apple revocation and app-foreground events check the saved Apple credential and
+end a revoked session. The identity-token flow obtains an app session without an
+Apple refresh token. After the account-deletion browser handoff ends that session,
+the app clears its local credential and directs the person to Apple Account →
+Sign-In & Security → Sign in with Apple → Mikka to revoke authorization. This
+follows Apple's manual-revocation path. [Apple technical note TN3194](https://developer.apple.com/documentation/technotes/tn3194-handling-account-deletions-and-revoking-tokens-for-sign-in-with-apple)
 
 ## Push
 
@@ -134,6 +158,10 @@ credential is available, so record that layer's revision along with the app
 revision. See [mobile UI slots](../../docs/ui-overlay.md).
 
 ### Native iOS build and TestFlight submission
+
+`existing_build_id` recovery accepts builds from the `production` profile.
+The `hosted-production` path creates and submits a build with its verified private
+UI archive in the same workflow run.
 
 `.github/workflows/mobile-native.yml` uses EAS CLI 27.2.0 with the production
 profiles in `eas.json`. It runs on main changes to `app.json`, `app.config.ts`

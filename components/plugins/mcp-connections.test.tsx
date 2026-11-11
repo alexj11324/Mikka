@@ -127,3 +127,28 @@ test('read failure remains visible and an unexpected workspace response is rejec
   assert.ok(container.textContent?.includes('loadFailed'))
   assert.equal(mutate.mock.callCount(), 0)
 })
+
+test('an empty connections list still offers the native MCP form and clears credentials on close', async () => {
+  page!.servers = []
+  await act(async () => render())
+  assert.ok(container.textContent?.includes('empty'))
+  await act(async () => button('add')!.click())
+  assert.ok(document.querySelector('#mcp-url'))
+  assert.equal(document.querySelector('#mcp-command'), null)
+  const select = document.querySelector<HTMLSelectElement>('#mcp-transport')!
+  await act(async () => {
+    select.value = 'stdio'
+    select.dispatchEvent(new browser.Event('change', { bubbles: true }) as unknown as Event)
+  })
+  assert.equal(document.querySelector('#mcp-url'), null)
+  assert.ok(document.querySelector('#mcp-command'))
+  assert.ok(document.querySelector('#mcp-args'))
+  assert.ok(document.querySelector('#mcp-cwd'))
+  assert.ok(document.body.textContent?.includes('taskReadable'))
+  await act(async () => button('addVariable')!.click())
+  assert.equal(document.querySelector('input[aria-label="variableValue 1"]')?.getAttribute('type'), 'password')
+  await act(async () => button('cancel')!.click())
+  await act(async () => button('add')!.click())
+  assert.equal(document.querySelector('input[type="password"]'), null)
+  assert.equal(requests.length, 0)
+})

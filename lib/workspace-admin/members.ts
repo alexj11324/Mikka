@@ -77,7 +77,8 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
 
 /**
  * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
- * their subscription share, API key shares and credit share leave with them and their bots there pause until an
+ * their subscription share, API key shares, Skill shares and credit share leave
+ * with them and their bots there pause until an
  * admin takes one over. Runs on that subscription are stopped at once, and
  * the machine receives a stop through its control channel. New admissions and
  * background credential renewals check the current share and membership.
@@ -88,6 +89,7 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   await db.transaction(async main => {
     await main.execute(sql`delete from workspace_subscription_shares where "ownerId" = ${userId} and "workspaceId" = ${workspaceId}`)
     await main.execute(sql`delete from personal_mcp_workspace_shares g using personal_mcp_servers s where g.server_id=s.id and s.user_id=${userId} and g.workspace_id=${workspaceId}`)
+    await main.execute(sql`delete from personal_skill_workspace_shares g using personal_skills s where g.skill_id=s.id and s.user_id=${userId} and g.workspace_id=${workspaceId}`)
     // Their credits stop paying for the team at once (lib/credit-shares.ts).
     await main.execute(sql`delete from workspace_credit_shares where "userId" = ${userId} and "workspaceId" = ${workspaceId}`)
     await main.execute(sql`delete from model_api_key_shares s using model_api_keys k where k.id = s."keyId" and k."ownerId" = ${userId} and s."workspaceId" = ${workspaceId}`)
@@ -158,6 +160,7 @@ export interface RemovedMember extends MemberRemoval { label: string }
  * workspace and pending invitations to the same email go with it.
  */
 export async function removeMember(actorId: string, workspaceId: string, targetId: string, transferTo?: string, audit?: AuditRequestContext): Promise<RemovedMember> {
+  const { enqueueMemberLifecycle, drainMemberLifecycleOutbox } = await import('@/lib/governance/member-outbox')
   memberId.parse(targetId)
   if (targetId === actorId) throw new WorkspaceError('workspaceCannotRemoveSelf')
   const removed = await workspaceDb.transaction(async tx => {
@@ -175,11 +178,12 @@ export async function removeMember(actorId: string, workspaceId: string, targetI
     await tx.update(workspaceInvitations).set({ status: 'revoked' })
       .where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.email, target.email.toLowerCase()), eq(workspaceInvitations.status, 'pending')))
     await tx.delete(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, targetId)))
+    await enqueueMemberLifecycle(tx, workspaceId, targetId, 'suspend')
     await workspaceListScopeChanged(tx, workspaceId, before)
     return { removed: true as const, transferred, label: target.name || target.email }
   })
   // After the membership is gone: the membership check already fences them, this removes what stays behind.
-  await releaseDepartingMember(workspaceId, targetId)
+  await drainMemberLifecycleOutbox(workspaceId, targetId)
   return removed
 }
 

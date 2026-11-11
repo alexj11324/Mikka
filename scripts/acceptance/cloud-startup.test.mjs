@@ -1,9 +1,10 @@
+import { eveHeaders, nativeCall, eveResponse } from '../../tests/support/eve-acceptance.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 import { alignServerTimings, cleanupCase, createSessionClient, hasStartupInitialization, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
-  startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from './cloud-startup.mjs'
+  startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, watchRun } from './cloud-startup.mjs'
 import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 import { runSummaryView } from '../../lib/issue-run-conversation.ts'
@@ -183,7 +184,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           assert.equal(input.model, undefined)
           assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
           assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
-          current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
+          current.dispatchInput = input; current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
           assert.equal(chosenModel?.modelId, models[current.harness], 'the coordinator must use the same explicitly chosen small subscription model')
           current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
           assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
@@ -217,14 +218,10 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         profiles.set(profile.id, profile); return json({ profile })
       }
       if (path.startsWith('/api/factory/agent-profiles/')) { assert.equal(init.method, 'DELETE'); return json({ archived: true }) }
-      if (path === '/api/coordinator/stream') {
-        const output = JSON.stringify({ runId: current.runId, arbitraryLongField: 'truncated '.repeat(40), thread: 'new', placement: candidate ? { kind: 'device', deviceId } : { kind: 'cloud' } }).slice(0, 200)
-        const events = [{ type: 'tool', name: 'dispatch_run', call: 'stale', state: 'running', input: JSON.stringify({issueId: id(999)}) },
-          { type: 'tool', name: 'dispatch_run', call: 'stale', state: 'error', errorCode: 'staleDispatch' },
-          { type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'running', quote: `Read README then STARTUP_OK_${current.marker}`, at: 0 },
-          { type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'done', output }]
-        return new Response(events.map(event => JSON.stringify(event)).join('\n') + '\n',
-          { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': current.workflowRunId } })
+      if (path === '/api/agents/eve/v1/session') return json({ ok: true, sessionId: current.workflowRunId })
+      if (/^\/api\/agents\/eve\/v1\/session\/[^/]+\/stream$/.test(path)) {
+        const output = { runId: current.runId, arbitraryLongField: 'full output '.repeat(40), thread: 'new', placement: candidate ? { kind: 'device', deviceId } : { kind: 'cloud' } }
+        return eveResponse([...nativeCall('stale', { issueId: id(999) }, undefined, 'staleDispatch'), ...nativeCall('call_1', current.dispatchInput, output)])
       }
       if (/^\/api\/runs\/.*\/evidence$/.test(path)) return json({ run: { id: current.runId, issueId: current.issueId,
         harness: current.harness, model: models[current.harness], credentialType: badEvidence ? 'api_key' : 'subscription',
@@ -280,12 +277,37 @@ test('startup failure projection is closed, preserves only bounded HTTP status, 
 const oneCodexCandidate = () => parseOptions(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
   '--device-id', deviceId, '--agent-id', agentId, '--timeout-ms', '1000'], {})
 
+test('the selected dispatch refusal retains its code before queueing and still cleans the owned issue', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+  io.fetchImpl = async (url, init) => {
+    const response = await original(url, init)
+    if (!url.pathname.endsWith('/stream')) return response
+    const events = (await response.text()).trim().split('\n').map(line => {
+      const value = JSON.parse(line)
+      return { ...value, facts: value.facts.map(event => event.type === 'call.settled' && event.data.callId === 'call_1'
+        ? { ...event, data: { callId: event.data.callId, outcome: 'failed', error: { code: 'machineUnavailable', message: 'PRIVATE_DISPATCH_DETAIL' } } } : event) }
+    })
+    return new Response(events.map(event => JSON.stringify(event)).join('\n') + '\n', { headers: response.headers })
+  }
+  let queued = 0
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io, onCandidateRunQueued: () => { queued++ } }), sample = report.samples[0]
+  assert.equal(report.status, 'failed')
+  assert.equal(sample.runId, undefined); assert.equal(queued, 0)
+  assert.equal(sample.error, 'startup_dispatch_refused')
+  assert.deepEqual(sample.failure, { phase: 'coordinator_stream', code: 'startup_dispatch_refused' })
+  assert.deepEqual(sample.dispatchRefusal, { code: 'machineUnavailable' })
+  assert.equal(io.calls.some(call => call.action === 'agents.pollIssueThreads'), false)
+  assert.equal(sample.cleanup.status, 'passed')
+  assert.ok(io.samples[0].cancelled && io.samples[0].deleted)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_DISPATCH|PRIVATE_COOKIE|PRIVATE_PASSWORD/)
+})
+
 test('a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue', async () => {
   for (const [name, code] of [['AbortError', 'startup_aborted'], ['TimeoutError', 'startup_timeout']]) {
     const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
-    io.fetchImpl = (url, init) => url.pathname.endsWith('/api/coordinator/stream')
+    io.fetchImpl = (url, init) => url.pathname.endsWith('/stream')
       ? new Response(new ReadableStream({ start(controller) { controller.error(new DOMException('PRIVATE_READER_URL?key=PRIVATE_KEY', name)) } }), {
-        headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': 'wrun_FAULT' },
+        headers: eveHeaders,
       }) : original(url, init)
     const report = await runCloudStartup(oneCodexCandidate(), { env, ...io }), sample = report.samples[0]
     assert.equal(report.status, 'failed')
@@ -344,16 +366,16 @@ test('fixed pre-execution entry phases distinguish HTTP, API, RPC and action ref
   }
 })
 
-test('stream refusal, missing workflow identity and completed stream without dispatch retain distinct closed codes', async () => {
+test('stream refusal, incompatible native protocol and completed stream without dispatch retain distinct closed codes', async () => {
   const cases = [
     { response: () => new Response('PRIVATE_BODY', { status: 503 }), failure: { code: 'startup_http_error', httpStatus: 503 } },
     { response: () => new Response('PRIVATE_BODY', { headers: { 'content-type': 'text/plain' } }), failure: { code: 'startup_coordinator_stream_unavailable' } },
-    { response: () => new Response('', { headers: { 'content-type': 'application/x-ndjson' } }), failure: { code: 'startup_workflow_run_missing' } },
-    { response: () => new Response('', { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': 'wrun_NOEVENT' } }), failure: { code: 'startup_dispatch_not_observed' } },
+    { response: () => new Response('', { headers: { ...eveHeaders, 'x-eve-stream-version': '26' } }), failure: { code: 'startup_coordinator_stream_invalid' } },
+    { response: () => new Response('', { headers: eveHeaders }), failure: { code: 'startup_dispatch_not_observed' } },
   ]
   for (const item of cases) {
     const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
-    io.fetchImpl = (url, init) => url.pathname.endsWith('/api/coordinator/stream') ? item.response() : original(url, init)
+    io.fetchImpl = (url, init) => url.pathname.endsWith('/stream') ? item.response() : original(url, init)
     const report = await runCloudStartup(oneCodexCandidate(), { env, ...io }), sample = report.samples[0]
     assert.equal(sample.status, 'failed')
     assert.deepEqual(sample.failure, { phase: 'coordinator_stream', ...item.failure })
@@ -420,6 +442,62 @@ test('a completed tool followed by the task marker proves reply order', () => {
   assert.equal(record.replyVerifiedAfterTool, true)
   assert.equal(observeChunks(record, detail, epoch + 10), true)
   assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_ordered/)
+})
+
+test('terminal handoff tools do not prove execution before a text reply', () => {
+  for (const name of ['submit', 'request_help', 'ask_human', 'report_blocked']) {
+    const record = { sampleId: 'handoff-only', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    const detail = { chunks: [stage('agent_start', 20),
+      { chunk: { type: 'tool-input-start', toolCallId: 'handoff' } },
+      { chunk: { type: 'tool-input-available', toolCallId: 'handoff', toolName: `mcp__mikka__${name}`, input: { summary: 'No read occurred.' } } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'handoff', output: [] } },
+      delta('STARTUP_OK_handoff-only')] }
+    for (let replay = 0; replay < 2; replay++) {
+      assert.equal(observeChunks(record, detail, epoch + replay), false, name)
+      assert.equal(record.replyVerified, true)
+      assert.equal(record.replyVerifiedAfterTool, false)
+      assert.equal(record.toolCalls.length, 1)
+      assert.equal(record.toolCalls[0].outcome, 'ok', 'the actual successful handoff stays in the audit')
+    }
+    assert.doesNotMatch(JSON.stringify(record), /No read occurred|mcp__mikka__|STARTUP_OK_handoff-only/)
+  }
+})
+
+test('a previous submit cannot provide the independent tool for a submitted report', () => {
+  const { record, detail } = submittedReply()
+  detail.chunks = [detail.chunks[0],
+    { chunk: { type: 'tool-input-available', toolCallId: 'earlier-submit', toolName: 'mcp__mikka__submit', input: { summary: 'No read occurred.' } } },
+    { chunk: { type: 'tool-output-available', toolCallId: 'earlier-submit', output: [] } },
+    ...detail.chunks.slice(4)]
+  for (let replay = 0; replay < 2; replay++) {
+    assert.equal(observeChunks(record, detail, epoch + 7000 + replay), false)
+    assert.notEqual(record.replyVerified, true)
+    assert.equal(record.replyVerifiedAfterTool, false)
+    assert.equal(record.toolCalls.filter(tool => tool.outcome === 'ok').length, 2)
+  }
+})
+
+test('the minimum tool count excludes delivery while keeping the successful read and report', () => {
+  const { record, detail } = submittedReply()
+  record.minToolCalls = 2
+  assert.equal(observeChunks(record, detail, epoch + 7000), false)
+  assert.equal(record.replyVerifiedAfterTool, true, 'the independent read still precedes the report')
+  assert.equal(record.toolCalls.filter(tool => tool.outcome === 'ok').length, 2, 'audit retains the read and submit')
+  record.minToolCalls = 1
+  assert.equal(observeChunks(record, detail, epoch + 8000), true)
+})
+
+test('a tool error replaces its earlier success in the replay execution count', () => {
+  const record = { sampleId: 'error-replay', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+  const detail = { chunks: [stage('agent_start', 20),
+    { chunk: { type: 'tool-input-start', toolCallId: 'read-file' } },
+    { chunk: { type: 'tool-output-available', toolCallId: 'read-file', output: 'PRIVATE_README' } },
+    { chunk: { type: 'tool-output-error', toolCallId: 'read-file', errorText: 'PRIVATE_ERROR' } },
+    delta('STARTUP_OK_error-replay')] }
+  assert.equal(observeChunks(record, detail, epoch + 7000), false)
+  assert.equal(record.replyVerifiedAfterTool, false)
+  assert.equal(record.toolCalls[0].outcome, 'error')
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_error-replay/)
 })
 
 function submittedReply() {
@@ -489,6 +567,25 @@ test('canonical delivery cannot borrow another run, a pending or failed result, 
     assert.equal(record.replyVerifiedAfterTool, false, String(mutate))
     assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted/)
   }
+})
+
+test('the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up', async () => {
+  const io = fixture({ candidate: true, runtime: true })
+  io.onDetail = (_sample, detail) => {
+    for (const { chunk } of detail.chunks) {
+      if (chunk.type === 'tool-input-start') chunk.toolName = 'mcp__mikka__submit'
+    }
+  }
+  const report = await runCloudStartup({ ...oneCodexCandidate(), minToolCalls: 1 }, { env, ...io })
+  assert.equal(report.status, 'failed')
+  const sample = report.samples[0]
+  assert.deepEqual(sample.failure, { phase: 'execution_watch', code: 'startup_ended_before_execution_proof' })
+  assert.equal(sample.replyVerified, true)
+  assert.equal(sample.replyVerifiedAfterTool, false)
+  assert.equal(sample.runtimeEvidence.status, 'passed', 'valid native/runtime evidence does not replace the missing independent tool')
+  assert.equal(sample.cleanup.status, 'passed')
+  assert.ok(io.samples.every(row => row.cancelled && row.deleted))
+  assert.ok(io.sockets.every(socket => socket.closed))
 })
 
 test('the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact', async () => {
@@ -1500,4 +1597,315 @@ test('repository Git receipt stays independent and closed', () => {
   observeChunks(ordinary, { chunks: [stage('repository', 100)] }, epoch + 100)
   assert.equal(Object.hasOwn(ordinary, 'daemonRepositoryTiming'), false)
   assert.equal(Object.hasOwn(ordinary, 'repositoryTimingStatus'), false)
+})
+
+test('Codex native shell proof requires an exact successful exit code', () => {
+  for (const [label, output, expected] of [
+    ['zero', { exitCode: 0, output: 'PRIVATE_NATIVE_OUTPUT' }, true],
+    ['nonzero', { exitCode: 1 }, false],
+    ['negative', { exitCode: -1 }, false],
+    ['unknown', { exitCode: null }, false],
+    ['missing', {}, false],
+    ['string zero', { exitCode: '0' }, false],
+    ['absent output', null, false],
+  ]) {
+    const record = { sampleId: 'native-shell', harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    const detail = { chunks: [stage('agent_start', 20),
+      { chunk: { type: 'tool-input-available', toolCallId: 'native', toolName: 'bash', input: { command: 'PRIVATE_COMMAND' } } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'native', output } },
+      delta('STARTUP_OK_native-shell')] }
+    for (let replay = 0; replay < 2; replay++) assert.equal(observeChunks(record, detail, epoch + replay), expected, label)
+    assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_native-shell|toolName|exitCode/)
+  }
+})
+
+test('Codex patch proof requires the actual completed protocol status', () => {
+  for (const [status, expected] of [['completed', true], ['failed', false], ['declined', false], ['inProgress', false], [null, false], [undefined, false], ['success', false]]) {
+    const record = { sampleId: 'native-patch', harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    const detail = { chunks: [stage('agent_start', 20),
+      { chunk: { type: 'tool-input-available', toolCallId: 'patch', toolName: 'apply_patch', input: { files: ['PRIVATE_FILE'] } } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'patch', output: { status } } },
+      delta('STARTUP_OK_native-patch')] }
+    assert.equal(observeChunks(record, detail, epoch), expected, String(status))
+    assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_native-patch|toolName/)
+  }
+})
+
+test('Codex native names arriving after the result still qualify an admitted call at the 64-call boundary', () => {
+  for (const [toolName, output, expected] of [
+    ['bash', { exitCode: 0 }, true], ['bash', { exitCode: 1 }, false],
+    ['apply_patch', { status: 'completed' }, true], ['apply_patch', { status: 'failed' }, false],
+  ]) {
+    const record = { sampleId: 'late-native', harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    const beforeStart = Array.from({ length: 64 }, (_, i) => ({ chunk: { type: 'tool-input-available', toolCallId: 'earlier-' + i, toolName: 'bash' } }))
+    const starts = Array.from({ length: 64 }, (_, i) => ({ chunk: { type: 'tool-input-start', toolCallId: 'admitted-' + i } }))
+    const overflow = Array.from({ length: 8 }, (_, i) => ({ chunk: { type: 'tool-input-available', toolCallId: 'overflow-' + i, toolName: 'bash' } }))
+    const detail = { chunks: [...beforeStart, stage('agent_start', 20), ...starts, ...overflow,
+      { chunk: { type: 'tool-output-available', toolCallId: 'admitted-63', output } },
+      delta('STARTUP_OK_late-native'),
+      { chunk: { type: 'tool-input-available', toolCallId: 'admitted-63', toolName } }] }
+    for (let replay = 0; replay < 2; replay++) assert.equal(observeChunks(record, detail, epoch + replay), expected, toolName + ':' + expected)
+    assert.equal(record.toolCalls.length, 64)
+  }
+})
+
+test('a later unknown name cannot downgrade a recognized Codex native tool', () => {
+  for (const [toolName, output] of [['bash', { exitCode: 1 }], ['apply_patch', { status: 'failed' }]]) {
+    const record = { sampleId: 'renamed-native', harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    const detail = { chunks: [stage('agent_start', 20),
+      { chunk: { type: 'tool-input-available', toolCallId: 'native', toolName } },
+      { chunk: { type: 'tool-input-available', toolCallId: 'native', toolName: 'mcp__fixture__status' } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'native', output } },
+      delta('STARTUP_OK_renamed-native')] }
+    assert.equal(observeChunks(record, detail, epoch), false, toolName)
+  }
+})
+
+test('a later failed Codex available result removes that call from successful execution proof', () => {
+  for (const [toolName, initial, final] of [
+    ['bash', { exitCode: 0 }, { exitCode: 1 }],
+    ['bash', { exitCode: 0 }, { exitCode: null }],
+    ['apply_patch', { status: 'completed' }, { status: 'failed' }],
+  ]) {
+    const record = { sampleId: 'native-update', harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    const detail = { chunks: [stage('agent_start', 20),
+      { chunk: { type: 'tool-input-available', toolCallId: 'native', toolName } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'native', output: initial } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'native', output: final } },
+      delta('STARTUP_OK_native-update')] }
+    assert.equal(observeChunks(record, detail, epoch), false, toolName)
+    assert.equal(record.toolCalls[0].outcome, 'ok', 'the existing redacted wire audit is unchanged')
+  }
+})
+
+test('canonical Codex submitted reports need a successful native execution outcome', () => {
+  for (const [toolName, output, expected] of [
+    ['bash', { exitCode: 0 }, true], ['bash', { exitCode: 1 }, false], ['bash', { exitCode: null }, false],
+    ['apply_patch', { status: 'completed' }, true], ['apply_patch', { status: 'failed' }, false],
+  ]) {
+    const { record, detail } = submittedReply()
+    detail.chunks[1].chunk.toolName = toolName
+    detail.chunks[2].chunk.output = output
+    for (let replay = 0; replay < 2; replay++) assert.equal(observeChunks(record, detail, epoch + 7000 + replay), expected, toolName + ':' + expected)
+    if (expected) assert.equal(record.replySource, 'submitted_report')
+    else assert.notEqual(record.replyVerifiedAfterTool, true)
+    assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted|toolName|exitCode/)
+  }
+})
+
+test('other harnesses and ordinary MCP tools retain their availability semantics', () => {
+  for (const [harness, toolName, output] of [
+    ['claude_code', 'bash', { exitCode: 1 }],
+    ['claude_code', 'apply_patch', { status: 'failed' }],
+    [undefined, 'bash', { exitCode: null }],
+    ['codex', 'mcp__fixture__bash', { exitCode: 1 }],
+    ['codex', 'mcp__fixture__record_status', { status: 'failed' }],
+    ['codex', 'mcp__mikka__inspect_artifact', 'PRIVATE_README'],
+  ]) {
+    const record = { sampleId: 'other-outcome', harness, requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    const detail = { chunks: [stage('agent_start', 20),
+      { chunk: { type: 'tool-input-available', toolCallId: 'other', toolName } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'other', output } },
+      delta('STARTUP_OK_other-outcome')] }
+    assert.equal(observeChunks(record, detail, epoch), true, String(harness) + ':' + toolName)
+    assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_other-outcome|toolName/)
+  }
+})
+
+test('Codex native outcome checks retain handoff exclusion and explicit error rejection', () => {
+  for (const toolName of ['mcp__mikka__submit', 'mcp__mikka__request_help']) {
+    const record = { sampleId: 'native-handoff', harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    assert.equal(observeChunks(record, { chunks: [stage('agent_start', 20),
+      { chunk: { type: 'tool-input-available', toolCallId: 'handoff', toolName } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'handoff', output: { exitCode: 0, status: 'completed' } } },
+      delta('STARTUP_OK_native-handoff')] }, epoch), false)
+  }
+  const record = { sampleId: 'native-error', harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+  assert.equal(observeChunks(record, { chunks: [stage('agent_start', 20),
+    { chunk: { type: 'tool-input-available', toolCallId: 'native', toolName: 'bash' } },
+    { chunk: { type: 'tool-output-available', toolCallId: 'native', output: { exitCode: 0 } } },
+    { chunk: { type: 'tool-output-error', toolCallId: 'native', errorText: 'PRIVATE_ERROR' } },
+    delta('STARTUP_OK_native-error')] }, epoch), false)
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_native-error/)
+})
+
+function liveObserverFixture({ closeAfterProof = false } = {}) {
+  let clock = epoch, detailReads = 0, ownCloses = 0, complete = false, blocked
+  const connected = Promise.withResolvers(), readStarted = Promise.withResolvers()
+  const record = { runId: id(901), issueId: id(902), harness: 'codex', requireReply: false }
+  const detail = () => ({ thread: { id: record.runId, status: 'running' },
+    chunks: complete ? [stage('agent_start', 10), delta('PRIVATE_PROVIDER_OUTPUT', 20)] : [],
+    live: { runs: [{ id: record.runId, workspaceId: workspace }] } })
+  const client = {
+    async json(path) {
+      assert.equal(path, `/api/live/ticket?workspace=${workspace}`)
+      return { url: 'wss://live.example/PRIVATE_CHANNEL', protocol: 'PRIVATE_TICKET', expiresAt: epoch + 60_000 }
+    },
+    async rpc(action, args) {
+      assert.equal(action, 'agents.getIssueThread'); assert.deepEqual(args, [record.issueId, record.runId])
+      detailReads++
+      if (blocked) { readStarted.resolve(); await blocked.promise }
+      return detail()
+    },
+  }
+  const sockets = []
+  class Socket {
+    constructor() { this.readyState = 0; sockets.push(this); connected.resolve(this) }
+    open() { this.readyState = 1; this.onopen?.() }
+    message(value) { this.onmessage?.({ data: JSON.stringify(value) }) }
+    error() { this.readyState = 3; this.onerror?.({ type: 'error', message: 'PRIVATE_ERROR', code: 1011, wasClean: true }) }
+    remoteClose() {
+      this.remoteCloses = (this.remoteCloses ?? 0) + 1; this.remoteCloseHadListener = typeof this.onclose === 'function'
+      this.readyState = 3; this.onclose?.({ code: 1006, wasClean: false, reason: 'PRIVATE_REASON', url: 'PRIVATE_URL' })
+    }
+    close() { ownCloses++; this.readyState = 3; this.onclose?.({ code: 1000, wasClean: true, reason: 'PRIVATE_SELF_CLOSE' }) }
+    send(value) { assert.equal(value, 'ping') }
+  }
+  const outcome = watchRun(client, record, 1000, Socket, () => clock, undefined, closeAfterProof ? {
+    observe(detail) {
+      const complete = observeChunks(record, detail, clock)
+      // Queue a real close callback after the refresh continuation resolves the
+      // outcome, but before its awaiting finally removes socket listeners.
+      if (complete) queueMicrotask(() => queueMicrotask(() => sockets[0].remoteClose()))
+      return complete
+    },
+  } : undefined).then(() => null, error => error)
+  return { record, connected: connected.promise, outcome, sockets, readStarted: readStarted.promise,
+    at(offset) { clock = epoch + offset },
+    blockRead() { blocked = Promise.withResolvers() },
+    finishRead() { complete = true; blocked.resolve() },
+    complete() { complete = true },
+    counts: () => ({ detailReads, ownCloses }),
+  }
+}
+const observerTurn = () => new Promise(resolve => setImmediate(resolve))
+const observerAt = offset => new Date(epoch + offset).toISOString()
+const observerScope = createHash('sha256').update(workspace).digest('hex').slice(0, 16)
+
+test('live observer preserves the first actual close and its bounded read timeline', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.at(10); socket.open()
+  io.at(20); socket.message({ type: 'live_ready', kinds: ['thread', 'run'] })
+  await observerTurn()
+  io.at(30); socket.message({ kind: 'run', id: io.record.runId })
+  await observerTurn()
+  io.at(40); socket.remoteClose()
+  const error = await io.outcome
+  assert.deepEqual(startupFailure(error, 'execution_watch'), { phase: 'execution_watch', code: 'startup_live_disconnected' })
+  assert.deepEqual(io.record.liveObserver, { version: 1,
+    firstFailure: { event: 'close', at: observerAt(40), scopeHash: observerScope, readyState: 3, code: 1006, wasClean: false },
+    openedAt: observerAt(10), readyAt: observerAt(20), lastNotificationAt: observerAt(30),
+    detailReads: { started: 3, completed: 3, lastCompletedAt: observerAt(30), inFlightAtFailure: false },
+    shutdownAt: observerAt(40) })
+  assert.deepEqual(io.counts(), { detailReads: 3, ownCloses: 1 })
+  assert.equal(io.sockets.length, 1)
+  assert.doesNotMatch(JSON.stringify(io.record.liveObserver), /PRIVATE|00000000-0000|reason|message|stack|url|ticket|nativeSID/)
+})
+
+test('live observer keeps error first without fabricating close metadata from a later close', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.at(10); socket.open()
+  io.at(20); socket.error()
+  io.at(30); socket.remoteClose()
+  const error = await io.outcome
+  assert.equal(error.message, 'startup_live_disconnected')
+  assert.deepEqual(io.record.liveObserver.firstFailure,
+    { event: 'error', at: observerAt(20), scopeHash: observerScope, readyState: 3 })
+  assert.equal(io.record.liveObserver.openedAt, observerAt(10))
+  assert.equal(io.record.liveObserver.readyAt, null)
+  assert.equal(io.record.liveObserver.lastNotificationAt, null)
+  assert.equal(io.record.liveObserver.shutdownAt, observerAt(30))
+  assert.equal(io.record.liveObserver.detailReads.inFlightAtFailure, false)
+  assert.equal(io.sockets.length, 1)
+})
+
+test('live observer keeps close first when an error follows before its own shutdown', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.at(10); socket.remoteClose()
+  io.at(20); socket.error()
+  assert.equal((await io.outcome).message, 'startup_live_disconnected')
+  assert.deepEqual(io.record.liveObserver.firstFailure,
+    { event: 'close', at: observerAt(10), scopeHash: observerScope, readyState: 3, code: 1006, wasClean: false })
+  assert.equal(io.record.liveObserver.shutdownAt, observerAt(20))
+})
+
+test('live observer freezes in-flight evidence and a late detail cannot turn disconnect into success', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.blockRead()
+  io.at(10); socket.message({ kind: 'thread', id: io.record.runId })
+  await io.readStarted
+  io.at(20); socket.error()
+  await observerTurn()
+  io.at(30); io.finishRead()
+  assert.equal((await io.outcome).message, 'startup_live_disconnected')
+  assert.equal(io.record.agentStart, undefined)
+  assert.equal(io.record.firstProviderChunk, undefined)
+  assert.deepEqual(io.record.liveObserver.detailReads,
+    { started: 2, completed: 1, lastCompletedAt: observerAt(0), inFlightAtFailure: true })
+  assert.equal(io.record.liveObserver.lastNotificationAt, observerAt(10))
+  assert.equal(io.record.liveObserver.shutdownAt, observerAt(20))
+  assert.deepEqual(io.counts(), { detailReads: 2, ownCloses: 1 })
+  assert.equal(io.sockets.length, 1)
+})
+
+test('live observer own shutdown after actual execution evidence creates no disconnect evidence', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.complete()
+  socket.message({ kind: 'run', id: io.record.runId })
+  assert.equal(await io.outcome, null)
+  assert.ok(io.record.agentStart)
+  assert.ok(io.record.firstProviderChunk)
+  assert.equal(Object.hasOwn(io.record, 'liveObserver'), false)
+  assert.deepEqual(io.counts(), { detailReads: 2, ownCloses: 1 })
+  assert.equal(io.sockets.length, 1)
+})
+
+test('live observer ignores an asynchronous transport fault after the outcome already settled', async () => {
+  const io = liveObserverFixture({ closeAfterProof: true }), socket = await io.connected
+  io.complete()
+  socket.message({ kind: 'run', id: io.record.runId })
+  assert.equal(await io.outcome, null)
+  assert.equal(socket.remoteCloses, 1)
+  assert.equal(socket.remoteCloseHadListener, true, 'the close really ran before observer shutdown')
+  assert.ok(io.record.agentStart)
+  assert.ok(io.record.firstProviderChunk)
+  assert.equal(Object.hasOwn(io.record, 'liveObserver'), false)
+  assert.deepEqual(io.counts(), { detailReads: 2, ownCloses: 1 })
+})
+
+
+test('native Eve product-host timing requires one exact owned run interval when no Workflow context exists', () => {
+  const runIdHash = 'a'.repeat(16)
+  const make = () => ({ mode: 'baseline', maxStartupMs: 5000, cleanup: { errors: [] }, samples: [{
+    eveSessionId: 'wrun_NATIVE', workflowRunId: 'wrun_NATIVE', runIdHash,
+    execution: { credentialType: 'subscription' }, cleanup: { status: 'passed' },
+    agentStart: { storedAt: new Date(epoch + 3500).toISOString() }, firstProviderChunk: { storedAt: new Date(epoch + 4000).toISOString() },
+  }] })
+  const dispatch = { msg: 'dispatch_timing', workflowRunId: null, boundary: 'dispatch_run_entry', startedAt: epoch, endedAt: epoch + 3000, totalMs: 3000, failed: false }
+  const owned = { msg: 'cloud_startup_timing', stage: 'cloud.thread.ensure', runIdHash, startedAt: epoch + 100, endedAt: epoch + 2900 }
+  assert.equal(alignServerTimings(make(), [dispatch]).samples[0].timing.reason, 'dispatch_log_missing')
+  assert.equal(alignServerTimings(make(), [dispatch, { ...owned, runIdHash: 'b'.repeat(16) }]).samples[0].timing.reason, 'dispatch_log_missing')
+  assert.equal(alignServerTimings(make(), [dispatch, owned]).samples[0].timing.status, 'aligned')
+  assert.equal(alignServerTimings(make(), [dispatch, dispatch, owned]).samples[0].timing.reason, 'ambiguous_dispatch')
+})
+
+
+test('a native completed call carrying a refused business receipt never becomes a dispatched run', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+  io.fetchImpl = async (url, init) => {
+    const response = await original(url, init)
+    if (!url.pathname.endsWith('/stream')) return response
+    const lines = (await response.text()).trim().split('\n').map(line => {
+      const value = JSON.parse(line)
+      return { ...value, facts: value.facts.map(event => event.type === 'call.settled' && event.data.callId === 'call_1'
+        ? { ...event, data: { ...event.data, output: { error: 'subscriptionQuotaExhausted', privateCause: 'PRIVATE_RECEIPT' } } } : event) }
+    })
+    return new Response(lines.map(line => JSON.stringify(line)).join('\n') + '\n', { headers: response.headers })
+  }
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+  assert.equal(report.samples[0].error, 'startup_dispatch_refused')
+  assert.deepEqual(report.samples[0].dispatchRefusal, { code: 'subscriptionQuotaExhausted' })
+  assert.equal(report.samples[0].runId, undefined)
+  assert.equal(io.calls.some(call => call.action === 'agents.pollIssueThreads'), false)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_RECEIPT/)
 })

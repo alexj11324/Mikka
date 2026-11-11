@@ -1,4 +1,5 @@
 export * from "./accounts"
+export * from './task-mcp'
 export * from "./agent-policy"
 export * from "./auth"
 export * from "./bridge"

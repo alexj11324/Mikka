@@ -4,6 +4,7 @@ import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { and, asc, desc, eq, gt, or, sql } from 'drizzle-orm'
+import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { FactoryError } from '@/lib/factory/contract'
 import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
@@ -17,7 +18,7 @@ import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import { editMemory } from '@/lib/coordinator/store'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { db } from '@/lib/db'
-import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, runChunks } from '@/lib/db/schema'
+import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, runChunks, teamIssuePromotions } from '@/lib/db/schema'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -27,17 +28,38 @@ import { updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issu
 import { updateIssueRelation } from '@/app/actions/issue-operations'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { listProjects as readProjects, moveIssueToProject } from '@/app/actions/projects'
+import { taskReaderScope } from '@/lib/task-workspace'
+import { tokenWorkspace } from '@/lib/tokens/principal'
 
 // The MCP tools that change things, and the reads that need more than one
 // table. Writes go through the app's own server actions inside `actAs`, so an
 // agent gets exactly the validation and access checks the person gets in the
 // UI. A failed action comes back as `{ error }` with the action's code.
 
-type Failure = { error: string }
+type Failure = { error: string; params?: Record<string, string | number>; confirmable?: true }
 
-/** Throws a failed action's code so a chain of actions stops at the first failure. */
+function scopedUser(userId: string) {
+  const workspaceId = taskReaderScope(userId).workspaceId
+  return workspaceId ? { id: userId, [tokenWorkspace]: workspaceId } : userId
+}
+
+async function taskActor(userId: string, actor?: ActivityActor) {
+  const current = scopedUser(userId)
+  if (typeof current !== 'string') return current
+  if (actor?.actorType === 'system' && z.uuid().safeParse(actor.actorId).success) {
+    const workspace = await (await import('@/lib/coordinator/issue-team')).coordinatorTaskWorkspace(userId, actor.actorId!)
+    return { id: userId, [tokenWorkspace]: workspace.id }
+  }
+  throw new ActionFailureError('workspaceAccessDenied')
+}
+
+/** Throws a failed action's code so a chain of actions stops at the first failure,
+ * keeping the params and confirmation flag the caller needs to replay it. */
 function unwrap<T extends object>(result: T): Exclude<T, { error: string }> {
-  if ('error' in result && typeof result.error === 'string') throw new ActionFailureError(result.error as never)
+  if ('error' in result && typeof result.error === 'string') {
+    const failure = result as { error: string; params?: Record<string, string | number>; confirmable?: true }
+    throw new ActionFailureError(failure.error as never, failure.params, failure.confirmable)
+  }
   return result as Exclude<T, { error: string }>
 }
 
@@ -45,7 +67,10 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
+    // A confirmation request is an answer the caller replays with confirmAccess,
+    // so it carries that flag rather than reading as a plain failure (ALE-26).
+    if (error instanceof ActionFailureError) return { error: error.code, ...(error.params ? { params: error.params } : {}), ...(error.confirmable ? { confirmable: error.confirmable } : {}) }
+    if (error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
     if (error instanceof AgentProfileAdmissionError) return { error: 'agentProfileUnavailable' }
     throw error
   }
@@ -65,7 +90,7 @@ function textToDoc(text: string) {
 
 /** The labels the person already uses, so a label named by an agent keeps its color. */
 async function knownLabels(userId: string): Promise<Map<string, IssueLabel>> {
-  const rows = await db.select({ content: issueAttrsContent }).from(issues).where(eq(issues.userId, userId))
+  const rows = await db.select({ content: issueAttrsContent }).from(issues).where(and(eq(issues.userId, userId), (await issueVisibility(userId)).predicate))
   return new Map(rows.flatMap(row => readIssueMetadata(row.content).labels).map(label => [label.name.toLowerCase(), label]))
 }
 
@@ -74,6 +99,8 @@ interface IssueChanges {
   status?: string
   priority?: string
   projectId?: string | null
+  /** Replays a project move the server refused as confirmable (ALE-26). */
+  confirmAccess?: boolean
   labels?: string[]
   assigneeUserId?: string | null
   assigneeAgentId?: string | null
@@ -97,34 +124,31 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
     patch.labels = changes.labels.map(name => known.get(name.toLowerCase()) ?? { name, color: 'gray' })
   }
   if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
-  if (changes.assigneeAgentId !== undefined) patch.assignee = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
+  if (changes.assigneeAgentId !== undefined) patch.delegate = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
-  if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId })).issue
+  if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId, confirmAccess: changes.confirmAccess })).issue
   return issue
 }
 
-function issueResult(issue: { id: string; title: string; status: string; priority: string; revision: number; content: Parameters<typeof readIssueMetadata>[0] }) {
-  const metadata = readIssueMetadata(issue.content)
+function issueResult(issue: { id: string; title: string; status: string; priority: string; revision: number; content: Parameters<typeof readIssueMetadata>[0]; metadata?: ReturnType<typeof readIssueMetadata>; projectId?: string | null; identifier?: string | null }) {
+  const metadata = issue.metadata ?? readIssueMetadata(issue.content)
   return {
-    id: issue.id, number: metadata.number ?? null, title: issue.title, status: issue.status, priority: issue.priority,
+    id: issue.id, identifier: issue.identifier ?? null, projectId: issue.projectId ?? null, delegate: metadata.delegate, number: metadata.number ?? null, title: issue.title, status: issue.status, priority: issue.priority,
     project: metadata.project, labels: metadata.labels.map(label => label.name), assignee: metadata.assignee?.name ?? null,
   }
 }
 
-/** `teamId`, chosen by the host (lib/coordinator/issue-team.ts), creates the task in that team instead of as a personal one. */
+/** The host Bot selects the tenant; an optional Team is attached after the
+ * application's idempotent creation commits, with its own durable receipt. */
 export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string; teamId?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }, teamId?: string, chatRequest?: { eventId: string; botId: string | null }) {
-  return attempt(() => actAs(userId, async () => {
-    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
+  return attempt(async () => actAs(await taskActor(userId, actor), async () => {
     // The legacy MCP contract has no human-assignee field. Do not introduce a
     // multi-action write without the durable transaction and access checks.
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     if (teamId && toolCallId === undefined) return { error: 'validationGeneric' }
     const mutate = async () => {
       const fields = { title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' }
-      // One tool call, one team request: a retried call reuses the request instead of creating a second task.
-      const created = teamId
-        ? unwrap(await (await import('@/lib/team-issue-create')).createTeamIssueForUser(userId, { ...fields, teamId, requestId: requestIdFor(userId, toolCallId!) }, actor)).issue
-        : unwrap(await saveIssue(fields)).issue
+      const created = unwrap(await saveIssue(fields)).issue
       return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))
     }
     if (toolCallId === undefined) return mutate()
@@ -132,14 +156,23 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     const parsed = createIssueInput.safeParse(input)
     if (!parsed.success) return { error: 'validationGeneric' }
     const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
-    try { return await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined) }
+    try {
+      const created = await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined)
+      if (!teamId) return created
+      const requestId = requestIdFor(userId, toolCallId)
+      const [prior] = await db.select().from(teamIssuePromotions).where(eq(teamIssuePromotions.requestId, requestId)).limit(1)
+      const issue = unwrap(await getIssue(created.id)).issue
+      const attached = unwrap(await (await import('@/lib/team-issue-promotion')).promoteExistingIssueForUser(userId, {
+        requestId, issueId: created.id, teamId, revision: prior?.expectedRevision ?? issue.revision, expectedTeamId: prior?.expectedTeamId ?? null,
+      }, actor))
+      return issueResult(attached.issue)
+    }
     catch (error) { if (error instanceof IssueToolCallConflict) return { error: error.message }; throw error }
   }, actor))
 }
 
 export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor, toolCallId?: string) {
-  return attempt(() => actAs(userId, async () => {
-    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
+  return attempt(async () => actAs(await taskActor(userId, actor), async () => {
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     const { issueId, ...changes } = input
     const mutate = async () => issueResult(await applyChanges(userId, issueId, changes))
@@ -154,7 +187,7 @@ export async function updateIssue(userId: string, input: IssueChanges & { issueI
 }
 
 export async function linkIssues(userId: string, input: { issueId: string; kind: 'parent' | 'child' | 'related' | 'blockedBy' | 'blocks' | 'duplicate'; targetId: string | null; remove?: boolean }, actor?: ActivityActor) {
-  return attempt(() => actAs(userId, async () => {
+  return attempt(async () => actAs(await taskActor(userId, actor), async () => {
     const issue = unwrap(await getIssue(input.issueId)).issue
     const saved = unwrap(await updateIssueRelation({ id: issue.id, revision: issue.revision, kind: input.kind, targetId: input.targetId, remove: input.remove ?? false })).issue
     return issueResult(saved)
@@ -163,6 +196,7 @@ export async function linkIssues(userId: string, input: { issueId: string; kind:
 
 /** Issues whose title or text contains `query`, most recently updated first. */
 export async function searchIssues(userId: string, input: { query: string; status?: string }) {
+  if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   const pattern = `%${input.query.replace(/[\\%_]/g, char => `\\${char}`)}%`
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
@@ -188,18 +222,23 @@ export async function listAgents(userId: string) {
   }))
 }
 
-/** An MCP client's OAuth grant names no workspace, so its work is the personal workspace's Coordinator's. */
-const MCP_WORKSPACE = null
+function mcpWorkspace(userId: string) {
+  const workspaceId = taskReaderScope(userId).workspaceId
+  if (!workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  return workspaceId
+}
 
 export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string }) {
   // A run an MCP client dispatches is the person's Coordinator's: its bot row is resolved here, where the run is created.
   // One task, one thread (lib/thread-dispatch.ts): a task with a thread gets this as that thread's work. An MCP client
   // has no chat message of the person's to show an explicit request for a new thread, so it never starts one.
   if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' }
+  const issue = await issueForUser(userId, input.issueId)
+  if (!issue?.workspaceId || !taskReaderScope(userId).workspaceId) return { error: 'issueNotFound' }
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, { source: 'mcp', origin: 'api', originRef: { kind: 'api' } })) }),
   }))
 }
 
@@ -215,7 +254,7 @@ async function mcpRunModel(userId: string, input: { issueId: string; agentId: st
   const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, userId))).limit(1)
   if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('agentNoDevice')
   const { executionWorkspace } = await import('@/lib/execution-settings')
-  const botId = await chatBotId(userId, null, MCP_WORKSPACE)
+  const botId = await chatBotId(userId, null, mcpWorkspace(userId))
   const { target, agentProfile, selectionMode } = await (await import('@/lib/factory/agent-profile')).resolveAgentProfileDispatch(pool,
     { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId },
     { issueId: input.issueId, stage: 'execute', location: 'local', agentId: agent.id, deviceId: agent.deviceId, asked: { harness: agent.harness } })
@@ -252,15 +291,16 @@ export async function getRunEvents(userId: string, input: { runId: string; after
 }
 
 export async function listProjects(userId: string) {
-  return actAs(userId, async () => (await readProjects()).map(project => ({
-    id: project.id, name: project.name, summary: project.summary, status: project.status, priority: project.priority,
+  return actAs(scopedUser(userId), async () => (await readProjects()).map(project => ({
+    id: project.id, workspaceId: project.workspaceId, createdBy: project.createdBy, leadUserId: project.leadUserId, memberIds: project.properties.members, name: project.name, summary: project.summary, status: project.status, priority: project.priority,
     startDate: project.startDate || null, targetDate: project.targetDate || null, issueIds: project.issueIds,
   })))
 }
 
 /** Every label on the person's issues, with how many issues carry it. */
 export async function listLabels(userId: string) {
-  const rows = await db.select({ content: issueAttrsContent }).from(issues).where(eq(issues.userId, userId))
+  if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  const rows = await db.select({ content: issueAttrsContent }).from(issues).where((await issueVisibility(userId)).predicate)
   const counts = new Map<string, { name: string; color: string; issues: number }>()
   for (const row of rows) {
     const metadata = readIssueMetadata(row.content)
@@ -274,7 +314,7 @@ export async function listLabels(userId: string) {
 }
 
 export async function readMemory(userId: string) {
-  const botId = await chatBotId(userId, null, MCP_WORKSPACE)
+  const botId = await chatBotId(userId, null, mcpWorkspace(userId))
   const [session] = await db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))).limit(1)
   return { memory: session?.memory ?? '' }
 }
@@ -283,12 +323,12 @@ export async function remember(userId: string, note: string) {
   return editMemory(userId, memory => {
     const next = rememberNote(memory, note)
     return next === null ? { error: 'memoryFull: forget something first' } : { memory: next, result: { remembered: true } }
-  }, await chatBotId(userId, null, MCP_WORKSPACE))
+  }, await chatBotId(userId, null, mcpWorkspace(userId)))
 }
 
 export async function forget(userId: string, text: string) {
   return editMemory(userId, memory => {
     const { memory: next, removed } = forgetNotes(memory, text)
     return { memory: next, result: { removed } }
-  }, await chatBotId(userId, null, MCP_WORKSPACE))
+  }, await chatBotId(userId, null, mcpWorkspace(userId)))
 }

@@ -72,6 +72,7 @@ import { useActionError } from "@/lib/use-action-error";
 import { SettingsDataState } from "@/components/settings/settings-data-state";
 import { cn } from "@/lib/utils";
 import { FieldError } from '@/components/ui/field'
+import { useRevalidateGovernance } from "@/hooks/settings/use-workspace-governance";
 
 type Change = {
   userId: string;
@@ -117,6 +118,12 @@ export function MembersSettings({
     members: [],
     invitations: [],
   };
+  // A member action changes the seats and roles the governance cards count (#1662).
+  const revalidateGovernance = useRevalidateGovernance();
+  async function refreshAfterChange() {
+    await mutate();
+    if (data.workspace.id) void revalidateGovernance(data.workspace.id);
+  }
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);
@@ -196,7 +203,7 @@ export function MembersSettings({
       }
       setChange(null);
       setNotice(t("memberUpdated"));
-      await mutate();
+      await refreshAfterChange();
     } catch {
       setError(t("updateFailed"));
     } finally {
@@ -215,7 +222,7 @@ export function MembersSettings({
         return;
       }
       setNotice(t("invitationRevoked"));
-      await mutate();
+      await refreshAfterChange();
     } catch {
       setError(t("revokeFailed"));
     } finally {
@@ -367,7 +374,6 @@ export function MembersSettings({
               <div className="ml-auto flex items-center gap-2">
                 <Button
                   variant="outline"
-                  className="rounded-full"
                   disabled={!visibleCount || Boolean(fetchError)}
                   onClick={exportCsv}
                 >
@@ -375,7 +381,6 @@ export function MembersSettings({
                   {t("exportCsv")}
                 </Button>
                 <Button
-                  className="rounded-full"
                   disabled={!canManage}
                   onClick={() => setInviteOpen(true)}
                 >
@@ -406,11 +411,12 @@ export function MembersSettings({
                 {notice}
               </p>
             )}
-            {/* Fixed columns: the email cell truncates so role and actions always stay on screen. */}
-            <Table className="min-w-xl table-fixed">
+            {/* Fixed columns: the email cell truncates so role and actions always stay on screen. A phone has no email
+                column: the email goes under the name, so role and the menu fit (UI audit gap-06). */}
+            <Table className="md:min-w-xl md:table-fixed">
               <TableHeader>
                 <TableRow className="border-0 hover:bg-transparent">
-                  <TableHead className="w-[38%]">
+                  <TableHead className="md:w-[38%]">
                     <Button
                       size="sm"
                       variant="ghost"
@@ -428,7 +434,7 @@ export function MembersSettings({
                       )}
                     </Button>
                   </TableHead>
-                  <TableHead>{t("table.email")}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t("table.email")}</TableHead>
                   <TableHead className="w-24">{t("table.statusRole")}</TableHead>
                   <TableHead className="hidden w-28 lg:table-cell">
                     {t("table.joined")}
@@ -443,10 +449,10 @@ export function MembersSettings({
                   (group) =>
                     group.members.length > 0 && (
                       <Fragment key={group.status}>
-                        <TableRow className="border-0 bg-muted/40 hover:bg-muted/40">
+                        <TableRow className="border-0 hover:bg-transparent">
                           <TableCell
                             colSpan={5}
-                            className="rounded-lg py-2 text-xs text-muted-foreground"
+                            className="py-2 text-xs text-muted-foreground"
                           >
                             {group.label}
                             <span className="ml-2 tabular-nums">
@@ -456,22 +462,26 @@ export function MembersSettings({
                         </TableRow>
                         {group.members.map((member) => (
                           <TableRow key={member.userId} className="border-0">
-                            <TableCell className="py-4">
+                            {/* On a phone the table lays out by content; this cell takes what is left and truncates. */}
+                            <TableCell className="py-4 max-md:w-full max-md:max-w-0">
                               <div className="flex items-center gap-3">
                                 <UserAvatar user={member} size="md" />
-                                <div className="flex min-w-0 items-center gap-2">
-                                  <span className="truncate font-medium">
-                                    {member.name || member.email}
-                                  </span>
-                                  {member.userId === data.currentUserId && (
-                                    <span className="shrink-0 text-xs text-muted-foreground">
-                                      {t("you")}
+                                <div className="flex min-w-0 flex-col">
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <span className="truncate font-medium">
+                                      {member.name || member.email}
                                     </span>
-                                  )}
+                                    {member.userId === data.currentUserId && (
+                                      <span className="shrink-0 text-xs text-muted-foreground">
+                                        {t("you")}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="truncate text-xs text-muted-foreground md:hidden">{member.email}</span>
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="truncate text-xs text-muted-foreground" title={member.email}>
+                            <TableCell className="hidden truncate text-xs text-muted-foreground md:table-cell" title={member.email}>
                               {member.email}
                             </TableCell>
                             <TableCell>
@@ -480,10 +490,7 @@ export function MembersSettings({
                                   {t("status.suspended")}
                                 </span>
                               ) : member.role === "admin" ? (
-                                <Badge
-                                  variant="secondary"
-                                  className="bg-workspace-accent/15 text-workspace-accent"
-                                >
+                                <Badge variant="secondary">
                                   {t("role.admin")}
                                 </Badge>
                               ) : (
@@ -560,10 +567,10 @@ export function MembersSettings({
                 )}
                 {visibleInvitations.length > 0 && (
                   <>
-                    <TableRow className="border-0 bg-muted/40 hover:bg-muted/40">
+                    <TableRow className="border-0 hover:bg-transparent">
                       <TableCell
                         colSpan={5}
-                        className="rounded-lg py-2 text-xs text-muted-foreground"
+                        className="py-2 text-xs text-muted-foreground"
                       >
                         {t("status.invited")}
                         <span className="ml-2 tabular-nums">
@@ -573,7 +580,7 @@ export function MembersSettings({
                     </TableRow>
                     {visibleInvitations.map((invite) => (
                       <TableRow key={invite.id} className="border-0">
-                        <TableCell className="py-4">
+                        <TableCell className="py-4 max-md:w-full max-md:max-w-0">
                           <div className="flex items-center gap-3">
                             <UserAvatar user={invite} size="md" />
                             <div className="flex min-w-0 flex-col gap-0.5">
@@ -587,7 +594,7 @@ export function MembersSettings({
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="truncate text-xs text-muted-foreground" title={invite.email}>
+                        <TableCell className="hidden truncate text-xs text-muted-foreground md:table-cell" title={invite.email}>
                           {invite.email}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
@@ -638,7 +645,7 @@ export function MembersSettings({
         onOpenChange={setInviteOpen}
         onCreated={async () => {
           setFilter("invited");
-          await mutate();
+          await refreshAfterChange();
         }}
       />
       <AlertDialog

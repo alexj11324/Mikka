@@ -56,7 +56,7 @@ stub('components/workspace/thread-execution-identity.tsx', { ThreadExecutionIden
 stub('components/workspace/artifact-review.tsx', { ThreadArtifactButton: Empty, ThreadArtifactCards: Empty })
 stub('components/workspace/thread-quota.tsx', { ThreadModelFallbackNotice: Empty, ThreadQuotaPausedCard: Empty, ThreadQuotaSwitchLine: Empty })
 stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
-stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }) })
+stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
 stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
 mock.module('next/dynamic', { defaultExport: () => Empty })
@@ -72,9 +72,11 @@ const groupMessages = await import('../lib/group-messages')
 stub('lib/group-messages.ts', { ...groupMessages, fetchGroupMessages: () => read('group', { messages: [{ id: 'message', conversationId: 'group', position: '1', authorType: 'user', authorId: 'owner', body: 'Retained group message', mentions: [], replyToId: null, createdAt: '2026-11-07T00:00:00Z' }], nextBefore: null }) })
 stub('app/actions/link-preview.ts', { getLinkPreview: async () => null })
 stub('components/nav/conversation-pill.tsx', { ConversationPill: Empty })
-stub('components/nav/group-avatar.tsx', { GroupAvatar: Empty, groupMembersKey: (id: string) => ['group-members', id], useGroupMembers: () => ({ data: [] }) })
+stub('components/nav/group-avatar.tsx', { GroupAvatar: Empty, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) })
 stub('components/nav/letter-avatar.tsx', { LetterAvatar: Empty })
 stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Empty })
+// The task page's layer frame (docs/ui-overlay.md task-detail); this test reads through the open-source layout.
+stub('components/workspace/task-detail-frame.tsx', { FramedTask: Empty })
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
 const Workspace = () => <main data-fixture-workspace="">Retained workspace</main>
@@ -96,7 +98,7 @@ stub('components/workspace/workspace-loading.tsx', { WorkspaceLoading: Empty })
 stub('components/workspace/create-workspace-form.tsx', { CreateWorkspaceForm: Empty })
 stub('components/workspace/invitation-card.tsx', { InvitationCard: Empty })
 stub('components/device-authorization.tsx', { DeviceAuthorization: Empty })
-mock.module(at('app/[locale]/not-found.tsx'), { defaultExport: Empty })
+mock.module(at('components/app-shell/not-found.tsx'), { defaultExport: Empty })
 
 const browser = new Window({ url: 'https://fixture.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']

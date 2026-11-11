@@ -9,6 +9,7 @@ import { createHmac, randomUUID } from 'node:crypto'
 import { after, before, mock, test } from 'node:test'
 import pg from 'pg'
 import { isE2eTarget } from './helpers/e2e-target.mjs'
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 
 const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
@@ -57,6 +58,9 @@ before(async () => {
   process.env.GITHUB_WEBHOOK_SECRET = secret
   ;({ POST } = await import('../app/api/webhooks/github/route'))
   ;({ pool } = await import('../lib/db'))
+  // Factory's GitHub access module initializes auth during a merged-PR delivery.
+  // Finish that same instance's startup before counting per-delivery statements.
+  await (await import('../lib/auth')).auth.$context
 })
 
 /** Runs one signed delivery and its background work; returns the statements it sent. */
@@ -87,10 +91,11 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
   const issueId = randomUUID(), agentId = randomUUID(), runId = randomUUID(), number = 1000 + Math.floor(Math.random() * 100_000)
   const delivered = `https://github.com/o/r/pull/${number}`, unrelated = `https://github.com/o/r/pull/${number + 1}`
   await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'O',$2,true,now(),now())`, [owner, `${owner}@example.invalid`])
+  const workspaceId = await seedFixtureWorkspace(pool, owner)
   await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubId, owner])
   await pool.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,'Coder','codex')`, [agentId, owner])
-  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Delivered',$3,'review','normal')`,
-    [issueId, owner, JSON.stringify({ type: 'doc', attrs: { mikka: { pullRequests: [{ url: delivered, state: 'open' }] } }, content: [] })])
+  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId") VALUES ($1,$2,'Delivered',$3,'review','normal',$4)`,
+    [issueId, owner, JSON.stringify({ type: 'doc', attrs: { mikka: { pullRequests: [{ url: delivered, state: 'open' }] } }, content: [] }), workspaceId])
   await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt) VALUES ($1,$2,$3,$4,'succeeded','Fix it')`, [runId, owner, issueId, agentId])
   await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") VALUES ($1,$2,$3,'https://github.com/o/r','o/r','published',$4)`,
     [runId, owner, issueId, JSON.stringify({ url: delivered, state: 'open' })])
@@ -122,6 +127,18 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
   assert.ok(merged.some(text => text.includes('factory_tasks')), 'the merge still looks for Factory tasks waiting on the PR')
   const { rows: [publication] } = await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [runId])
   assert.equal(publication.pullRequest.state, 'merged', 'the delivery shows the merge')
+  await pool.query('UPDATE run_publications SET "remoteKey"=$2 WHERE "runId"=$1', [runId, 'v2/github.com/o/r'])
+  for (const [event, action] of [['pull_request_review', 'dismissed'], ['pull_request_review_comment', 'edited']]) {
+    const reads = await budget(`${event} ${action}`, event, { action, repository: { full_name: 'o/r' },
+      pull_request: { number, html_url: delivered }, review: { body: 'private review must not be persisted' },
+      comment: { body: 'private comment must not be persisted' } }, 1)
+    assert.equal(reads.length, 1)
+    assert.ok(reads[0].startsWith('SELECT DISTINCT p."issueId"'))
+    assert.ok(!reads[0].includes('private'), 'webhook bodies never become state or query text')
+  }
+  await budget('review with a mismatched URL', 'pull_request_review', {
+    action: 'dismissed', repository: { full_name: 'o/r' }, pull_request: { number, html_url: unrelated },
+  }, 0)
   await budget('issue_comment on an issue by someone without Mikka', 'issue_comment',
     { action: 'created', repository: { full_name: 'o/r' }, sender: { id: 2, login: 'other' }, issue: { number, user: { id: 999_999_999 }, title: 'Bug' }, comment: { id: 1, body: 'hi', created_at: '2026-11-05T00:00:00Z' } }, 1)
   // The person's recent matters, each with the evidence a few notices leave (~10 KB).

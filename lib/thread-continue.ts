@@ -210,6 +210,8 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
     const { dispatchComputerTask } = await import('@/workflows/coordinator/steps')
     return dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId, harness: previous.harness,
       ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), note, ...(request ? { sourceEventId: request.sourceEventId, factoryBotId: request.botId } : {}), withoutBot: run.botId === null,
+      // A person's continuation in an open thread is an app entry.
+      origin: 'web', originRef: null,
       ...runModel, threadRunId: run.id, ...readOnly }, `thread:${run.id}:${request?.sourceEventId ?? crypto.randomUUID()}`)
   }
   if (!previous.remoteUrl) throw new ActionFailureError('agentRepoMissing')
@@ -217,5 +219,5 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
   const { latestThreadRunModel } = await import('@/lib/computer/run-model')
   const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
   if (!runModel) throw new ActionFailureError('threadModelUnavailable')
-  return queueTaskRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...(request ? { requestKey: `thread:${run.id}:${request.sourceEventId}` } : {}), ...readOnly }, request ? request.botId : run.botId, undefined, request?.sourceEventId, run.source === 'mcp' ? 'mcp' : null)
+  return queueTaskRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...(request ? { requestKey: `thread:${run.id}:${request.sourceEventId}` } : {}), ...readOnly }, request ? request.botId : run.botId, undefined, request?.sourceEventId, { source: run.source === 'mcp' ? 'mcp' : null, origin: 'web', originRef: null })
 }

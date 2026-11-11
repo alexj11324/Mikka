@@ -1,3 +1,4 @@
+import { observeEveSession } from '../acceptance/eve-session.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -70,8 +71,9 @@ export function requestAllowed(path, method, body) {
     || isTeamWorkspaceReadPath('/mikka' + path)
     || /^\/api\/settings\/model-order\?workspace=[a-f0-9-]{36}$/.test(path)
     || /^\/api\/(?:bots|factory\/tasks)\/[a-f0-9-]{36}$/.test(path)
-    || /^\/api\/coordinator\/stream\?botId=[a-f0-9-]{36}&wait=1&after=\d{1,7}$/.test(path)
+    || /^\/api\/agents\/eve\/v1\/session\/wrun_[A-Za-z0-9_-]+\/stream\?botId=[a-f0-9-]{36}&startIndex=\d{1,9}$/.test(path)
   if (method !== 'POST') return false
+  if (/^\/api\/agents\/eve\/v1\/session\?botId=[a-f0-9-]{36}$/.test(path)) return body && Object.keys(body).length === 0
   if (['/api/auth/sign-in/email', '/api/auth/sign-out'].includes(path)) return true
   if (/^\/api\/factory\/tasks\/[a-f0-9-]{36}$/.test(path)) return body?.action === 'cancel' && body.binding?.taskId === path.split('/').at(-1)
   if (/^\/api\/threads\/[a-f0-9-]{36}\/machine$/.test(path)) return body?.action === 'end'
@@ -95,14 +97,13 @@ export async function runAcceptance() {
   const jar = new Map()
   let published, ownerId, originalWorkspace, teamScope, baseline, baselineAt, baselineBotIds = []
   const fixtures = new Map(), baselineIssueIds = new Set()
-  const request = async (path, body, timeout = 30000, streamKey) => {
+  const request = async (path, body, timeout = 30000) => {
     const method = body === undefined ? 'GET' : 'POST'
     check(requestAllowed(path, method, body), 'acceptance_request_denied')
     const response = await fetch(ORIGIN + '/mikka' + path, { method, redirect: 'error', signal: AbortSignal.timeout(timeout),
       headers: { origin: ORIGIN, 'cache-control': 'no-store', accept: 'application/json',
         ...(jar.size ? { cookie: [...jar].map(([key, value]) => key + '=' + value).join('; ') } : {}),
-        ...(body ? { 'content-type': 'application/json' } : {}), ...(path === '/api/rpc' ? { 'x-mikka-rpc': '1' } : {}),
-        ...(streamKey ? { 'x-mikka-stream-key': streamKey } : {}) },
+        ...(body ? { 'content-type': 'application/json' } : {}), ...(path === '/api/rpc' ? { 'x-mikka-rpc': '1' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) })
     for (const cookie of response.headers.getSetCookie()) {
       const pair = cookie.split(';', 1)[0], at = pair.indexOf('=')
@@ -271,40 +272,32 @@ export async function runAcceptance() {
   const streamCursors = new Map()
   const streamTurn = async botId => {
     const cursor = streamCursors.get(botId)
-    const start = Date.now(), response = await request('/api/coordinator/stream?botId=' + botId + '&wait=1&after=' + (cursor?.after ?? 0), undefined, 180000, cursor?.key)
-    check(response.status === 200 && response.headers.get('content-type')?.includes('application/x-ndjson'), 'turn_stream_unavailable')
-    const streamKey = response.headers.get('x-mikka-stream-key')
-    check(/^[a-f0-9]{64}$/.test(streamKey ?? ''), 'turn_stream_key_missing')
-    const state = { committed: false, badTool: false, error: false, text: '', tools: new Set(), parts: 0, workflowRunId: response.headers.get('x-mikka-stream-run') }
-    let buffer = '', bytes = 0
-    const accept = line => {
-      if (!line.trim()) return
-      const part = JSON.parse(line); state.parts++
-      check(Number.isInteger(part.sequence) && part.sequence > 0 && part.sequence <= 1000000, 'turn_stream_sequence_invalid')
-      streamCursors.set(botId, { key: streamKey, after: part.sequence })
-      if (part.type === 'text') state.text += part.delta ?? ''
-      if (part.type === 'reset') state.text = part.text ?? ''
-      if (part.type === 'committed') state.committed = true
-      if (part.type === 'error') state.error = true
-      if (part.type === 'tool') { state.tools.add(part.name); if (!part.name || part.name.toLowerCase() === 'none') state.badTool = true }
-      if (/NoSuchToolError|AI_NoSuchToolError/.test(line)) state.badTool = true
-    }
-    const decoder = new TextDecoder()
-    for await (const chunk of response.body) {
-      bytes += chunk.byteLength; check(bytes < 8000000, 'turn_stream_too_large')
-      buffer += decoder.decode(chunk, { stream: true })
-      for (;;) { const at = buffer.indexOf('\n'); if (at < 0) break; accept(buffer.slice(0, at)); buffer = buffer.slice(at + 1) }
-      // The durable Workflow owns the stream beyond this reply. The app's
-      // committed event, not transport EOF, is this turn's completion boundary.
-      if (state.committed) break
-    }
-    if (!state.committed) { buffer += decoder.decode(); accept(buffer) }
+    const start = Date.now()
+    const state = { committed: false, badTool: false, error: false, text: '', tools: new Set(), parts: 0 }
+    const replyParts = new Map()
+    const observed = await observeEveSession({ request: (path, init, timeout) => request(path, init?.body ? JSON.parse(init.body) : undefined, timeout) }, botId, {
+      startIndex: cursor?.nextIndex ?? 0, previousSessionId: cursor?.sessionId, timeoutMs: 180000,
+      fail: () => check(false, 'turn_stream_unavailable'),
+      onEvent: event => {
+        state.parts++
+        if (event.type === 'call.requested') { const name = event.data.capability?.name; state.tools.add(name); if (!name || name.toLowerCase() === 'none' || event.data.inputError) state.badTool = true }
+        if (event.type === 'content.completed' && event.data.kind === 'text' && event.data.phase === 'reply') replyParts.set(event.data.partId, event.data.value)
+        if (event.type === 'turn.paused' || event.type === 'session.ended' && event.data.outcome === 'failed') { state.error = true; return true }
+        if (event.type === 'turn.settled') {
+          state.committed = event.data.outcome === 'completed'; state.error = !state.committed
+          state.text = (event.data.reply ?? []).map(partId => replyParts.get(partId) ?? '').join('')
+          return true
+        }
+        return false
+      },
+    })
+    streamCursors.set(botId, observed)
     const chat = (await rpc('coordinator.syncCoordinatorChat', [botId])).chat
     check(chat && Array.isArray(chat.items), 'chat_response_invalid')
     const storedBad = chat.items.some(item => item.tools?.some(tool => !tool || tool.toLowerCase() === 'none') || /NoSuchToolError|AI_NoSuchToolError/.test(JSON.stringify(item)))
     const evidence = { elapsedMs: Date.now() - start, committed: state.committed, working: chat.working, chatErrorPresent: Boolean(chat.error),
       streamError: state.error, invalidToolSeen: state.badTool || storedBad, toolNames: [...state.tools], textChars: state.text.length,
-      textSha256: hash(state.text), workflowRunId: state.workflowRunId, messages: chat.items.length }
+      textSha256: hash(state.text), eveSessionId: observed.sessionId, messages: chat.items.length }
     return { evidence, text: state.text || chat.items.filter(item => item.from === 'coordinator').at(-1)?.text || '' }
   }
   const passTurn = evidence => check(evidence.committed && !evidence.chatErrorPresent && !evidence.streamError && !evidence.invalidToolSeen && evidence.textChars > 0, 'coordinator_turn_failed')
@@ -517,6 +510,9 @@ if (process.argv.includes('--self-test')) {
   assert.equal(requestAllowed('/api/rpc', 'POST', { version: 1, action: 'agents.removeDevice', args: [] }), false)
   assert.equal(requestAllowed('/api/rpc', 'POST', { version: 1, action: 'coordinator.welcomeCoordinator', args: [] }), true)
   assert.equal(requestAllowed('https://example.com', 'GET'), false)
+  assert.equal(requestAllowed('/api/coordinator/stream?botId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&wait=1&after=0','GET'),false)
+  assert.equal(requestAllowed('/api/agents/eve/v1/session?botId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','POST',{}),true)
+  assert.equal(requestAllowed('/api/agents/eve/v1/session?botId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','POST',{message:'forbidden direct model turn'}),false)
   const text = 'root = Stack([TextContent("Hi"), BeQuestions("Start", [{id:"start", title:"What", options:[{value:"a", label:"A"},{value:"b",label:"B"},{value:"c",label:"C"},{value:"d",label:"D"}], allowCustom:true}])])'
   assert.equal(welcomeOptions(text).get('d').label, 'D')
   assert.equal(welcomeOptions(text.slice(0,-1)).get('b').label,'B','the real web renderer closes a complete card tree with one missing trailing parenthesis')

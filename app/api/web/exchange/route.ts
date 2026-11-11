@@ -10,6 +10,8 @@ import { withRequestLog } from '@/lib/request-log'
 import { officialWebCallback, officialWebOriginAllowed } from '@/lib/web-connection/policy'
 import { webAuthHeaders, webAuthStateHash } from '@/lib/web-connection/auth-server'
 
+import { inheritEnterpriseSession } from '@/lib/enterprise/session-handoff'
+
 export const dynamic = 'force-dynamic'
 async function handlePOST(request: Request) {
   const reject = () => NextResponse.json({ error: 'web_auth_exchange_rejected' }, { status: 400, headers: webAuthHeaders })
@@ -33,7 +35,14 @@ async function handlePOST(request: Request) {
     if (!source || source.user.id !== row.userId || source.session.expiresAt.getTime() <= Date.now()) return reject()
     const session = await internalAdapter.createSession(source.user.id)
     if (!session) return reject()
-    return NextResponse.json({ token: session.token, ...safeDesktopSession({ user: source.user, session }) }, { headers: webAuthHeaders })
+    let admitted = false
+    try {
+      admitted = await inheritEnterpriseSession(source.session.id, session.id, source.user.id)
+      if (!admitted) return reject()
+      return NextResponse.json({ token: session.token, ...safeDesktopSession({ user: source.user, session }) }, { headers: webAuthHeaders })
+    } finally {
+      if (!admitted) await internalAdapter.deleteSession(session.token)
+    }
   } catch { return reject() }
 }
 export const POST = withRequestLog('/api/web/exchange', handlePOST)

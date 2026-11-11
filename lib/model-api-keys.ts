@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { isPrivateAddress } from '@/lib/link-preview-parse'
 import { isLoopbackHost } from '@/lib/loopback'
 import { memberSubscriptionsAllowed } from '@/lib/personal-policy'
+import { organizationResourceAllowed, assertOrganizationResourceShare, assertOrganizationModelProvider } from '@/lib/governance/resource-access'
 import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/crypto'
 import { WorkspaceError } from '@/lib/workspace-error'
@@ -226,6 +227,7 @@ export async function setApiKeyShare(query: Query, ownerId: string, workspace: {
     return
   }
   if (!(await memberSubscriptionsAllowed(query, workspace.id))) throw new WorkspaceError('workspaceAccessDenied')
+  await assertOrganizationResourceShare(workspace.id, 'api_key', id, ownerId)
   await query.query('INSERT INTO model_api_key_shares ("keyId","workspaceId") VALUES ($1,$2) ON CONFLICT DO NOTHING', [id, workspace.id])
 }
 
@@ -260,13 +262,16 @@ export interface UsableApiKey extends ApiKeyView {
 export async function usableApiKeys(query: Query, userId: string, workspaceId: string, selectedKeyId?: string): Promise<UsableApiKey[]> {
   // One after the other: a dispatch reads this on its transaction's client.
   // The person's own keys always (decision 2026-11-01-2240); others' only while the admin allows member credentials.
-  const allowed = await memberSubscriptionsAllowed(query, workspaceId)
   const mine = (await query.query<Row>(`SELECT ${COLUMNS},to_jsonb(model_api_keys)->'modelSettings' AS "modelSettings" FROM model_api_keys WHERE "ownerId"=$1${selectedKeyId ? ' AND id=$2' : ''} ORDER BY "createdAt",id`, [userId, ...(selectedKeyId ? [selectedKeyId] : [])])).rows
-  const others = allowed ? (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')},to_jsonb(k)->'modelSettings' AS "modelSettings" FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
-    WHERE s."workspaceId"=$1 AND k."ownerId"<>$2${selectedKeyId ? ' AND k.id=$3' : ''} ORDER BY s."createdAt",k.id`, [workspaceId, userId, ...(selectedKeyId ? [selectedKeyId] : [])])).rows : []
+  const shared = (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')},to_jsonb(k)->'modelSettings' AS "modelSettings" FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
+    WHERE s."workspaceId"=$1 AND k."ownerId"<>$2${selectedKeyId ? ' AND k.id=$3' : ''} ORDER BY s."createdAt",k.id`, [workspaceId, userId, ...(selectedKeyId ? [selectedKeyId] : [])])).rows
+  // No borrowed key means no shared resource to authorize. Own keys retain
+  // their original policy; every actual borrowed key still gets fresh gates.
+  const others = shared.length && await memberSubscriptionsAllowed(query, workspaceId) ? shared : []
+  const grants = await Promise.all(others.map(row => organizationResourceAllowed(workspaceId, 'api_key', row.id, row.ownerId)))
   const usable = (row: Row, mine: boolean) => ({ ...view(row), ownerId: row.ownerId, mine,
     models: row.models.filter(id => modelEnabled(row.modelSettings, id)) })
-  return [...mine.map(row => usable(row, true)), ...others.map(row => usable(row, false))]
+  return [...mine.map(row => usable(row, true)), ...others.filter((_, index) => grants[index]).map(row => usable(row, false))]
 }
 
 /** What the run's Agent gets: environment variables, plus Codex's model provider when it runs on Codex. */
@@ -322,6 +327,7 @@ export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string;
  * chat instead of switching (§ 2). Throws WorkspaceError('apiKeyNotFound').
  */
 export async function openApiKeyForChat(query: Query, userId: string, workspaceId: string, keyId: string, env: Env = process.env): Promise<{ apiKey: string; baseUrl: string; keyOwnerId: string }> {
+  await assertOrganizationModelProvider(workspaceId, 'api-key')
   const usable = (await usableApiKeys(query, userId, workspaceId)).find(key => key.id === keyId)
   const baseUrl = usable && apiKeyChatBaseUrl(usable)
   if (!usable || !baseUrl) throw new WorkspaceError('apiKeyNotFound')
@@ -348,6 +354,7 @@ export async function apiKeyForRun(query: Query, runId: string, keyId: string, h
   const { rows: [run] } = await query.query<{ userId: string; botId: string | null; deviceId: string | null; agentDefinition: WorkerDefinitionSnapshot | null; workspaceId: string | null; status: string; stopRequestedAt: Date | null }>(
     'SELECT r."userId",r."botId",r."deviceId",r."agentDefinition",b."workspaceId"::text AS "workspaceId",r.status,r."stopRequestedAt" FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" WHERE r.id=$1', [runId])
   if (!run || run.stopRequestedAt || !ACTIVE_RUN.includes(run.status)) throw new WorkspaceError('apiKeyNotFound')
+  if (run.workspaceId) await assertOrganizationModelProvider(run.workspaceId, 'api-key')
   if (run.agentDefinition && run.agentDefinition.apiKey?.keyId !== keyId) throw new WorkspaceError('apiKeyNotFound')
   try { await revalidateExecutionIdentity(query, run) }
   catch (error) { if (error instanceof ExecutionIdentityError) throw new WorkspaceError('apiKeyNotFound'); throw error }

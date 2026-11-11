@@ -10,7 +10,10 @@ import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
 const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target }
-const sample = REQUIRED_SUITES[0]
+// These tiny inventories model one file. Pick a standalone script so a group
+// of required files sharing a package command cannot leak into the fixture.
+const sample = REQUIRED_SUITES.find(candidate => REQUIRED_SUITES.filter(entry => entry.script === candidate.script).length === 1)
+assert.ok(sample, 'fixture uses one independently enrolled script')
 const files = { [sample.marker]: '', [sample.file]: "import { Pool } from 'pg'" }
 const scripts = { [sample.script]: `node --test ${sample.file}` }
 
@@ -483,6 +486,10 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(Object.hasOwn(tree, 'scripts/run-db-tests.test.mjs'), 'script-hosted suites are discovered too')
   const plan = inventory(tree, pkg)
   assert.ok(plan.offlineGuarded.includes('scripts/test-accounts/docker-environment.test.mjs'))
+  assert.ok(!plan.offlineGuarded.includes('lib/db/egress-sample.test.ts'), 'the pure gate must not rely on an exemption absent from the trusted base policy')
+  assert.ok(!plan.scripts.includes('test:lib-units'), 'real-driver queue coverage belongs to the existing mandatory PostgreSQL gate')
+  assert.ok(plan.files.includes('lib/db/transport-sample.db.test.ts'))
+  assert.ok(plan.scripts.includes('test:ops-db'), 'real PostgreSQL attribution and byte-count regressions remain required')
   assert.ok(!plan.scripts.includes('test:test-accounts'), 'mocked Docker adapter stays in the transport-guarded pure gate')
   assert.ok(plan.scripts.includes('test:test-accounts-db'), 'real test-account database suites remain required')
   assert.ok(plan.files.includes('tests/desktop-native-resources.db.test.mjs'))
@@ -492,7 +499,9 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.scripts.includes('test:local-repository-migration-db'))
   assert.ok(plan.scripts.includes('test:relation-cycle'))
   assert.ok(plan.scripts.includes('test:coordinator-native'))
-  assert.ok(plan.files.includes('lib/coordinator/native-relay.db.test.ts'))
+  assert.ok(plan.files.includes('lib/coordinator/native-store.test.ts'))
+  assert.ok(plan.scripts.includes('test:eve-db'))
+  for (const file of ['approval-bridge', 'scheduled-read', 'scope', 'settlement', 'sandbox']) assert.ok(plan.files.includes(`lib/eve/${file}.db.test.ts`))
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   assert.ok(plan.scripts.includes('test:factory'))
   assert.ok(plan.files.includes('lib/self-improvement/wiring-postgres.test.ts'))

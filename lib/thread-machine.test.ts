@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { cloudMachineState, cloudShortId, deviceMachineKind, machineDot, systemLabel } from './thread-machine'
+import { cloudMachineState, cloudShortId, deviceMachineKind, machineDot, machineStateWord, systemLabel } from './thread-machine'
 import { readThreadMachine } from './thread-machine-view'
 import type { Pool } from 'pg'
 
@@ -75,4 +75,11 @@ test('confirmed retirement with cleared resource references displays ended', asy
   const machine = await readThreadMachine(readMachines([machineRow({ sandboxId: null, workerLeaseId: null, workerLeaseUntil: null })]), 'owner', ['run'])
   assert.equal(machine?.state, 'ended')
   assert.equal(machine?.cloud, null)
+})
+
+test('a computer whose daemon never reported in is never online, not offline', () => {
+  assert.equal(machineStateWord({ kind: 'laptop', state: 'offline', lastSeenAt: null }), 'never')
+  assert.equal(machineStateWord({ kind: 'server', state: 'offline', lastSeenAt: '2026-11-08T07:00:00.000Z' }), 'offline')
+  assert.equal(machineStateWord({ kind: 'laptop', state: 'online', lastSeenAt: null }), 'online')
+  assert.equal(machineStateWord({ kind: 'cloud', state: 'ended', lastSeenAt: null }), 'ended')
 })

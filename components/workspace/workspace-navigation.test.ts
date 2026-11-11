@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { canonicalHref, closeThread, goTo, nextMark, openThread, queryMoved, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, tidyAddress, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
+import { canonicalHref, closeThread, goTo, navigate, nextMark, openTask, openThread, setWorkAreaOpener, queryMoved, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, tidyAddress, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
 import type { WorkspaceLocation } from './workspace-navigation'
 
 const BOT = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
@@ -297,4 +297,22 @@ test('a task opened beside the centre stays with its thread and closes when the 
   const withThread = workspaceHref(at(withTask), { thread: run })
   assert.deepEqual([readLocation(at(withThread).searchParams).task, readLocation(at(withThread).searchParams).thread], [task, run])
   assert.equal(readLocation(at(workspaceHref(at(withThread), { section: 'all-issues' })).searchParams).task, null)
+})
+
+// Decision 2026-11-10: while a chat with a work area is on screen, a task or a thread opens as its tab; the address stays.
+test('a chat\'s work area takes tasks and threads opened beside it, and gives them back when it goes', () => {
+  const browser = fakeBrowser(`/?bot=${BOT}`)
+  const opened: string[] = []
+  const release = setWorkAreaOpener({ task: id => opened.push(`task:${id}`), thread: id => opened.push(`thread:${id}`) })
+  openThread(RUN)
+  openTask(ISSUE)
+  navigate({ thread: RUN })
+  navigate({ task: ISSUE, thread: null })
+  navigate({ issue: ISSUE })
+  assert.deepEqual(opened, [`thread:${RUN}`, `task:${ISSUE}`, `thread:${RUN}`, `task:${ISSUE}`])
+  assert.equal(readLocation(at(browser.path()).searchParams).issue, ISSUE, 'the full task page is still a place of its own')
+  release()
+  openThread(RUN)
+  assert.equal(opened.length, 4)
+  assert.equal(readLocation(at(browser.path()).searchParams).thread, RUN)
 })

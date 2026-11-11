@@ -91,4 +91,26 @@ try {
       } finally { client.release() }
     }
   }
+  const application = states.find(state => state.target === 'MIKKA_DATABASE_URL')?.pool
+  const workspace = states.find(state => state.target === 'DATABASE_URL')?.pool
+  if (application && workspace && files.includes('20261109035000_task_workspace_ownership.sql')) {
+    const { backfillTaskWorkspaces } = await import('./task-workspace-backfill.mjs')
+    const ownership = await backfillTaskWorkspaces(application, workspace)
+    console.log(`migrate: task workspace ownership bound=${ownership.bound} pending=${ownership.pending}`)
+    if (files.includes('20261111030001_task_identity.sql') && files.includes('20261111030002_task_identity_aliases.sql')) {
+      const { backfillTaskIdentifiers } = await import('./task-identity-backfill.mjs')
+      const identifiers = await backfillTaskIdentifiers(application, workspace)
+      console.log(`migrate: stable task identifiers issued=${identifiers.issued}`)
+    }
+    if (files.includes('20261111030000_project_v2.sql')) {
+      const { backfillProjectV2 } = await import('./project-v2-backfill.mjs')
+      const projects = await backfillProjectV2(application, workspace)
+      console.log(`migrate: projects bound=${projects.projectsBound} tasks=${projects.projectTasksBound} pending=${projects.projectsPending}`)
+    }
+  }
+  if (application && workspace && files.includes('20261110150005_resource_acl.sql')) {
+    const { backfillProjectResourceAccess } = await import('./resource-acl-backfill.mjs')
+    const access = await backfillProjectResourceAccess(application, workspace)
+    console.log(`migrate: project ACL registered=${access.registered} quarantined=${access.quarantined} tasksBound=${access.tasksBound}`)
+  }
 } finally { await Promise.all(states.map(({ pool }) => pool.end())) }

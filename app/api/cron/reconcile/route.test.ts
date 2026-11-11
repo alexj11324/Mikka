@@ -3,7 +3,7 @@ import { before, beforeEach, mock, test } from 'node:test'
 
 // The single safety-net sweep (#1371): it runs only the jobs the one check says have work due.
 const secret = 'isolated-reconcile-cron-fixture'
-let due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false }
+let due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }
 const ran: string[] = []
 let wakesThrow = false
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
@@ -19,11 +19,12 @@ stub('../../../../lib/workspace-db.ts', { workspacePool: {} })
 stub('../../../../lib/audit/delivery.ts', { deliverWorkspaceAudits: async () => { ran.push('delivery'); return { delivered: 1, failed: 0 } } })
 stub('../../../../lib/audit/retention.ts', { sweepAuditRetention: async () => { ran.push('retention'); return { scanned: 1, deleted: 0, pending: 0 } } })
 stub('../../../../lib/mobile-push-delivery.ts', { recoverPhonePushReceipts: async () => { ran.push('pushReceipts'); return { scanned: 1, pending: 0, failed: 0 } } })
+stub('../../../../lib/coding-workspace/retention.ts', { cleanupWorkspaceEphemera: async () => { ran.push('workspaceEphemera'); return { requests: 1, mentions: 1 } } })
 stub('../../../../lib/due-timer.ts', { armDueTimer: async (kind: string) => { ran.push(`arm:${kind}`) }, replaceStaleDueTimers: async () => {} })
 mock.module('next/server', { namedExports: { after: () => {} } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
-beforeEach(() => { process.env.CRON_SECRET = secret; due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false }; ran.length = 0; wakesThrow = false })
+beforeEach(() => { process.env.CRON_SECRET = secret; due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }; ran.length = 0; wakesThrow = false })
 const call = (token: string | null = secret) => GET(new Request('http://127.0.0.1/mikka/api/cron/reconcile', { headers: token ? { authorization: `Bearer ${token}` } : {} }))
 
 test('only the cron bearer can run it', async () => {
@@ -38,29 +39,33 @@ test('an idle check runs nothing else and arms no timer', async () => {
 })
 
 test('each job with lost work runs, and its due timer is re-armed', async () => {
-  due = { wakes: true, schedules: false, recovery: true, deletions: false, audit: false, pushReceipts: false }
+  due = { wakes: true, schedules: false, recovery: true, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }
   assert.equal((await call()).status, 200)
   assert.deepEqual(ran, ['check', 'wakes', 'recovery', 'arm:run-recovery'])
   ran.length = 0
-  due = { wakes: false, schedules: true, recovery: false, deletions: false, audit: false, pushReceipts: false }
+  due = { wakes: false, schedules: true, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }
   await call()
   assert.deepEqual(ran, ['check', 'schedules', 'arm:schedules'])
   ran.length = 0
-  due = { wakes: false, schedules: false, recovery: false, deletions: true, audit: false, pushReceipts: false }
+  due = { wakes: false, schedules: false, recovery: false, deletions: true, audit: false, pushReceipts: false, workspaceEphemera: false }
   await call()
   assert.deepEqual(ran, ['check', 'deletions', 'files', 'arm:account-deletions'])
   ran.length = 0
-  due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: true, pushReceipts: false }
+  due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: true, pushReceipts: false, workspaceEphemera: false }
   await call()
   assert.deepEqual(ran, ['check', 'delivery', 'retention', 'arm:audit-retention'])
   ran.length = 0
-  due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: true }
+  due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: true, workspaceEphemera: false }
   await call()
   assert.deepEqual(ran, ['check', 'pushReceipts'])
+  ran.length = 0
+  due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: true }
+  await call()
+  assert.deepEqual(ran, ['check', 'workspaceEphemera'])
 })
 
 test('a failure answers a bounded error without its text', async () => {
-  due = { wakes: true, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false }
+  due = { wakes: true, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }
   wakesThrow = true
   const response = await call()
   assert.equal(response.status, 502)

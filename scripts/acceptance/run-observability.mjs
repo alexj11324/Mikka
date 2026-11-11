@@ -47,7 +47,7 @@ const errorCodes = new Set([
   'owner_busy', 'preparation_conflict', 'preparation_restore_failed', 'task_inventory_changed',
   'task_checks_missing', 'task_acceptance',
 ])
-const serverCodes = new Set(['authRequired', 'modelUnavailable', 'factoryStale', 'factoryStopped', 'runChainEnded',
+const serverCodes = new Set(['authRequired', 'modelUnavailable', 'modelChanged', 'factoryStale', 'factoryStopped', 'runChainEnded',
   'agentProfileNotFound', 'agentProfileRequestConflict', 'agentProfileVersionConflict', 'subscriptionConflict',
   'coordinatorUnavailable', 'issueToolsDisabled', 'submissionConflict', 'validationGeneric'])
 export class AcceptanceError extends Error {
@@ -157,7 +157,8 @@ export function preflightCase(item, { ownerId, menu, order, connections, keys, p
   check(keys?.apiKeyAfterQuota === false, 'paid_fallback_enabled')
   check(profiles.profiles.every(profile => profile.enabled === false || profile.archivedAt), 'profiles_active')
   const current = menu.current
-  check(current?.chosen === true && current.available === true && !current.fallback && typeof current.id === 'string'
+  const restoreImplicit = menu.preferenceState === 'absent'
+  check(restoreImplicit ? current?.chosen === false : current?.chosen === true && current.available === true && !current.fallback && typeof current.id === 'string'
     && menu.groups.some(group => group.options?.some(option => option.id === current.id)), 'model_not_restorable')
   const options = menu.groups.filter(group => group.kind === 'subscription').flatMap(group => group.options ?? [])
     .filter(option => option.modelId === item.model && option.provider === item.provider && uuid(option.id))
@@ -172,7 +173,7 @@ export function preflightCase(item, { ownerId, menu, order, connections, keys, p
   check(order.location === 'cloud' && order.cloudReady === true && (!row || order.cloudModels?.[row.id] === 'ready'), 'cloud_unavailable')
   const offered = profiles.catalog?.models?.find(value => sourceKey(value) === sourceKey(source))
   check(offered?.available === true, 'source_blocked')
-  return { option: options[0], source }
+  return { option: options[0], source, ...(restoreImplicit ? { restoreImplicit: true } : {}) }
 }
 export function runProof(found, { item, ownerId, workspaceId, botId, issueId, profileId }) {
   const run = found?.run, identity = run?.executionIdentity
@@ -345,7 +346,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   }
   const pin = async () => check((await read('/api/version')).build === revision, 'build_mismatch')
   const profileRead = (id = '', options = {}) => read(profilePath(workspaceId, id), options)
-  const menuRead = (options = {}) => read('/api/mobile/model?bot=' + botId, options)
+  const menuRead = ({ inspectPreference = false, ...options } = {}) => read('/api/mobile/model?bot=' + botId + (inspectPreference ? '&choiceState=1' : ''), options)
   async function quiet() {
     const [bots, threads, tasks, chat] = await Promise.all([
       read('/api/settings/workspace-bots'), read('/api/mobile/threads'), issueInventory(read, workspaceId), read('/api/coordinator/messages'),
@@ -354,8 +355,22 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     check(bots.bots.every(bot => bot.status === 'idle' && bot.runningThreads === 0)
       && threads.threads.every(thread => ['failed', 'done', 'stopped'].includes(thread.status)), 'workspace_busy')
     for (let index = 0; index < tasks.length; index += 10) {
-      const ledgers = await Promise.all(tasks.slice(index, index + 10).map(task => read('/api/factory/tasks?issueId=' + task.id)))
-      check(ledgers.every(ledger => Array.isArray(ledger.tasks) && ledger.tasks.every(task => settledTask(task))), 'workspace_busy')
+      await Promise.all(tasks.slice(index, index + 10).map(async issue => {
+        const ledger = await read('/api/factory/tasks?issueId=' + issue.id)
+        check(Array.isArray(ledger.tasks), 'workspace_busy')
+        for (const task of ledger.tasks) {
+          if (task && settledTask(task)) continue
+          check(uuid(task?.id) && task.issueId === issue.id && Number.isSafeInteger(task.revision) && task.revision >= 0
+            && taskStages.has(task.stage) && taskStatuses.has(task.status)
+            && (task.attemptId === null || uuid(task.attemptId)) && (task.candidateId === null || uuid(task.candidateId)), 'workspace_busy')
+          // Issue search is visibility-scoped. Only the authenticated task detail
+          // binds its persisted Bot workspace; the list's live scope is the issue's.
+          const detail = await read('/api/factory/tasks/' + task.id)
+          check(detail.task?.userId === ownerId
+            && ['id', 'issueId', 'revision', 'stage', 'status', 'attemptId', 'candidateId'].every(key => detail.task[key] === task[key])
+            && uuid(detail.liveWorkspaceId) && detail.liveWorkspaceId.toLowerCase() !== workspaceId.toLowerCase(), 'workspace_busy')
+        }
+      }))
     }
     check(chat.botId === botId && chat.enabled === true, 'coordinator_disabled')
     check(chat.working === false && !chat.streamRunId && !chat.items.some(item => item.pending), 'coordinator_busy')
@@ -363,7 +378,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   }
   async function inventory() {
     const [menu, order, connections, keys, profiles] = await Promise.all([
-      menuRead(), read('/api/settings/model-order?workspace=' + workspaceId), read('/api/subscriptions?workspace=' + workspaceId),
+      menuRead({ inspectPreference: true }), read('/api/settings/model-order?workspace=' + workspaceId), read('/api/subscriptions?workspace=' + workspaceId),
       read('/api/settings/api-keys?workspace=' + workspaceId), profileRead(),
     ])
     return { ownerId, menu, order, connections, keys, profiles }
@@ -463,7 +478,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     const result = { case: item.id, model: item.model, status: 'running', cleanup: { state: 'not_created' } }
     const fixture = fixtureTask(revision, item)
     const started = now()
-    let baseline, previousModel, selectedModel, profileCreated = false, modelTouched = false, submitted = false, browserWaiting = false, live, task, foreignActivity = false
+    let baseline, previousModel, selectedModel, temporarySelection, restoreImplicit = false, profileCreated = false, modelTouched = false, submitted = false, browserWaiting = false, live, task, foreignActivity = false
     const issueIds = new Set(), runIds = new Set(), proofs = new Map(), workflowIds = new Set()
     const { title, content, input } = fixture
     const expectedMessages = new Map(browserSubmit ? ['en', 'zh-CN'].map(locale => [browserSubmissionText(input, locale), locale]) : [[input, 'api']])
@@ -618,11 +633,27 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       }
       if (cleanup.ownRunsStopped && modelTouched) {
         try {
-          const current = (await menuRead({ cleanup: true })).current
-          if (!sameModel(current, previousModel)) {
-            check(sameModel(current, selectedModel), 'model_changed')
-            const restored = await read('/api/mobile/model', { method: 'PUT', body: { bot: botId, id: previousModel.id }, cleanup: true })
-            check(sameModel(restored.current, previousModel), 'model_changed')
+          if (restoreImplicit) {
+            // No receipt means an uncertain first write: never guess ownership
+            // from equal model values or clear a later human choice.
+            check(temporarySelection, 'cleanup_incomplete')
+            try {
+              const restored = await read('/api/mobile/model', { method: 'PUT',
+                body: { bot: botId, mode: 'restore-implicit', ...temporarySelection }, cleanup: true })
+              check(restored.restored === true && restored.preferenceState === 'absent', 'model_changed')
+            } catch (error) {
+              if (!['request_failed', 'response_invalid'].includes(error?.code)) throw error
+              // An acknowledged selection allows one read after an uncertain
+              // restore response. Absence is the target, not a derived default.
+              check((await menuRead({ cleanup: true, inspectPreference: true })).preferenceState === 'absent', 'model_changed')
+            }
+          } else {
+            const current = (await menuRead({ cleanup: true })).current
+            if (!sameModel(current, previousModel)) {
+              check(sameModel(current, selectedModel), 'model_changed')
+              const restored = await read('/api/mobile/model', { method: 'PUT', body: { bot: botId, id: previousModel.id }, cleanup: true })
+              check(sameModel(restored.current, previousModel), 'model_changed')
+            }
           }
           cleanup.modelRestored = true
         } catch (error) { cleanup.state = 'incomplete'; cleanup.modelError = publicFailure(error) }
@@ -636,7 +667,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       baseline = await quiet()
       check(Number.isSafeInteger(baseline.chat.cursor), 'response_invalid')
       const state = await inventory(), planned = preflightCase(item, state)
-      previousModel = state.menu.current
+      previousModel = state.menu.current; restoreImplicit = planned.restoreImplicit === true
       check(!await profileRead(fixture.profileId, { missing: true }), 'previous_fixture')
       live = await openLiveImpl(read, workspaceId, { now })
       result.preflight = { ownSubscription: true, cloudReady: true, workspaceIdle: true, modelRestorable: true, paidFallbackOff: true, soleFixedProfileAvailable: true, liveReady: true }
@@ -651,7 +682,19 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       result.profileId = fixture.profileId
       selectedModel = { ...planned.option, kind: 'subscription', chosen: true }
       modelTouched = true
-      const selected = await read('/api/mobile/model', { method: 'PUT', body: { bot: botId, id: planned.option.id } })
+      let selected
+      try {
+        selected = await read('/api/mobile/model', { method: 'PUT', body: { bot: botId, id: planned.option.id,
+          ...(restoreImplicit ? { mode: 'temporary-if-absent' } : {}) } })
+      } catch (error) {
+        if (restoreImplicit && error?.httpStatus === 409 && error?.serverCode === 'modelChanged') modelTouched = false
+        throw error
+      }
+      if (restoreImplicit) {
+        const receipt = selected.temporarySelection
+        check(uuid(receipt?.bindingId) && typeof receipt.revision === 'string' && /^[0-9]{1,10}$/.test(receipt.revision), 'response_invalid')
+        temporarySelection = { bindingId: receipt.bindingId, revision: receipt.revision }
+      }
       check(selected.current?.id === planned.option.id && selected.current.kind === 'subscription' && selected.current.available === true && !selected.current.fallback, 'model_selection')
       selectedModel = selected.current
       await pin()

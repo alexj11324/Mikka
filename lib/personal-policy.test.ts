@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mock, test } from 'node:test'
+import { beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
 
 const changed = () => assert.fail('a read cannot emit an execution side effect')
@@ -11,6 +11,31 @@ for (const [path, names] of [
 ] as const) mock.module(new URL(path, import.meta.url).href, {
   namedExports: Object.fromEntries(names.map(name => [name, changed])),
 })
+// Keep the real Organization policy decision in this query-boundary suite.
+const resourcePolicySql = "select w.kind,l.\"organizationId\",p.\"modelCredentialSharing\",p.\"mcpSharing\",p.\"allowedModelProviders\" from mikka_workspaces w left join mikka_organization_workspaces l on l.\"workspaceId\"=w.id left join mikka_organization_resource_policies p on p.\"organizationId\"=l.\"organizationId\" where w.id=$1"
+const resourceApprovalSql = 'select status from mikka_organization_resource_approvals where "organizationId"=$1 and "workspaceId"=$2 and kind=$3 and "resourceId"=$4 and "ownerId"=$5'
+let organizationId: string | null = null
+let sharing: 'allow' | 'approval_required' | 'deny' = 'allow'
+let approval: 'approved' | 'denied' | null = null
+const workspaceReads: string[] = []
+beforeEach(() => { organizationId = null; sharing = 'allow'; approval = null; workspaceReads.length = 0 })
+const unexpectedWorkspace = () => assert.fail('unexpected Workspace operation in share-policy fixture')
+mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: {
+  workspaceDb: { select: unexpectedWorkspace, transaction: unexpectedWorkspace },
+  workspacePool: { query: async (sql: string, values: unknown[]) => {
+    const normalized = sql.replace(/\s+/g, ' ').trim()
+    if (normalized === resourcePolicySql) {
+      assert.deepEqual(values, ['workspace'])
+      workspaceReads.push('policy')
+      return { rows: [{ kind: 'team', organizationId, modelCredentialSharing: sharing, mcpSharing: 'allow', allowedModelProviders: null }], rowCount: 1 }
+    }
+    assert.equal(normalized, resourceApprovalSql, 'only the exact policy and approval reads are admissible')
+    assert.deepEqual(values, [organizationId, 'workspace', 'subscription', 'payor', 'payor'])
+    assert.ok(organizationId)
+    workspaceReads.push('approval')
+    return { rows: approval ? [{ status: approval }] : [], rowCount: approval ? 1 : 0 }
+  } },
+} })
 const { othersMayUse } = await import('./personal-policy')
 
 function reader(results: { allowOthers: boolean }[][], error?: Error) {
@@ -53,4 +78,22 @@ test('a failed authorization read propagates its original cause without another 
   const { query, calls } = reader([], error)
   await assert.rejects(othersMayUse(query, 'payor', 'workspace'), cause => cause === error)
   assert.equal(calls.length, 1)
+})
+
+test('the same local share cannot bypass a fresh Organization deny or approval decision', async () => {
+  organizationId = 'organization'
+  const { query, calls } = reader(Array.from({ length: 6 }, () => [{ allowOthers: true }]))
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
+  sharing = 'deny'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  sharing = 'approval_required'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  approval = 'approved'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), true)
+  approval = 'denied'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  sharing = 'allow'
+  assert.equal(await othersMayUse(query, 'payor', 'workspace'), false)
+  assert.equal(calls.length, 6, 'each local share and admin decision remains one APP read')
+  assert.equal(workspaceReads.filter(kind => kind === 'policy').length, 6, 'Organization policy is fresh on every permission check')
 })

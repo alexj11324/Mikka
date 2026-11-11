@@ -245,14 +245,50 @@ export class ExecutionSettings {
       [scope.ownerId, scope.workspaceId, key, bindingId],
     );
   }
+  /**
+   * An opt-in temporary pick can create only an absent preference. Its receipt
+   * identifies the stored per-bot binding, not a deduplicated menu option.
+   * The clone and insert share a short transaction; a conflict rolls both back.
+   */
+  async setTemporaryBotModel(scope: ExecutionSettingsScope, botId: string, bindingId: string): Promise<{ bindingId: string; revision: string } | null> {
+    if (!z.uuid().safeParse(botId).success) throw new ActionFailureError("botNotFound");
+    if (!z.uuid().safeParse(bindingId).success || bindingId === HOSTED_CHOICE) throw new ActionFailureError("executionModelUnknown");
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const bot = await client.query('SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "archivedAt" IS NULL FOR SHARE',
+        [botId, scope.ownerId, scope.workspaceId]);
+      if (!bot.rowCount) throw new ActionFailureError("botNotFound");
+      // Only this account's usable subscription is eligible. Shared/API/hosted
+      // selections retain the ordinary picker contract, not this temporary one.
+      const storedBinding = await this.bindingForBot(scope, botId, bindingId, client);
+      const { rows: [receipt] } = await client.query<{ bindingId: string; revision: string }>(
+        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO NOTHING RETURNING "bindingId",xmin::text AS revision',
+        [scope.ownerId, scope.workspaceId, botId, storedBinding]);
+      if (!receipt) { await client.query("ROLLBACK"); return null; }
+      await client.query("COMMIT");
+      return receipt;
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  }
+  /** A receipt authorizes no scope: the normal route reauthenticates the bot.
+   * A same-value rewrite has a new xmin and must survive this conditional delete.
+   * A missing selection response cannot be reconstructed from current values. */
+  async restoreTemporaryBotModel(scope: ExecutionSettingsScope, botId: string, receipt: { bindingId: string; revision: string }): Promise<boolean> {
+    const { rowCount } = await this.pool.query(
+      'DELETE FROM bot_model_choices choice WHERE choice."ownerId"=$1 AND choice."workspaceId"=$2 AND choice."botKey"=$3 AND choice."bindingId"=$4 AND choice.xmin::text=$5 AND choice."apiKeyId" IS NULL AND choice."apiKeyModel" IS NULL AND EXISTS (SELECT 1 FROM bots bot WHERE bot.id=$3::uuid AND bot."ownerId"=$1 AND bot."workspaceId"=$2 AND bot."archivedAt" IS NULL)',
+      [scope.ownerId, scope.workspaceId, botId, receipt.bindingId, receipt.revision]);
+    return rowCount === 1;
+  }
   /** Clone only the owner's connected account reference, never a credential. The clone belongs to
    * the run's workspace, so membership, admission and the admin switch are checked there. */
   async bindingForBot(
     scope: ExecutionSettingsScope,
     botId: string | null,
     bindingId: string,
+    query: Pick<PoolClient, "query"> = this.pool,
   ): Promise<string> {
-    const source = (await this.connectedBindings(scope, bindingId)).find(
+    const source = (await this.connectedBindings(scope, bindingId, query)).find(
       (row) => row.bindingId === bindingId,
     );
     if (!source) throw new ActionFailureError("executionModelUnknown");
@@ -263,7 +299,7 @@ export class ExecutionSettings {
       )
       .digest("hex");
     const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
-    const result = await this.pool.query(
+    const result = await query.query(
       `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       SELECT $1,b."ownerId",$4::text,$6::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
       JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false

@@ -14,6 +14,8 @@ import { eventLine, type EventLine } from './event-line'
 import { projectedToolResult, toolCallMetadata, toolResultMetadata, type ProjectedToolMetadata } from './tool-metadata'
 import { quotePreview, toolQuote } from './tool-quote'
 import { invalidToolParts } from './invalid-tool-call'
+import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
+import { messageDisplay } from './message-display'
 
 export { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE, quoteText, quotePreview, toolQuoteText, toolQuote } from './tool-quote'
 
@@ -118,6 +120,11 @@ function movedToText(payload: Record<string, unknown>) {
   return deviceId ? `handed to device ${deviceId}` : 'queued again'
 }
 
+/** A schedule's title, quoted, when its event carries one (events written before it did have none). */
+function scheduleTitle(payload: Record<string, unknown>) {
+  return typeof payload.title === 'string' && payload.title.trim() ? ` "${payload.title.trim().replace(/\s+/g, ' ')}"` : ''
+}
+
 /** The text the Coordinator receives for one inbox event. */
 export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string | null; runId: string | null; payload: Record<string, unknown>; tier?: CoordinatorEventTier | null }, observation?: RunCompletionObservation): string {
   const payload = event.payload
@@ -182,6 +189,13 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         `Structured host handoff: ${payload.handoffEventId}, digest ${payload.handoffDigest}.`,
         'The host already attempted bounded recovery through authorized executors. Inspect the current task and blockers. Do not replay uncertain external actions; use the Decision API to decide whether an actionable owner notification is needed.',
         event.issueId ? `Issue: ${event.issueId}.` : null, note,
+      ].filter(Boolean).join('\n')
+      // A schedule's own events name it (the chat's line shows its title, lib/coordinator/event-line.ts); a result has no text of its own.
+      if (payload.source === 'schedule_result') return [
+        `[Event] Schedule ${payload.scheduleId}${scheduleTitle(payload)} ran with status ${payload.status}${payload.error ? ` (${payload.error})` : ''}. Its result is already in the chat above.`, note,
+      ].filter(Boolean).join('\n')
+      if (payload.source === 'schedule_due') return [
+        `[Event] Schedule ${payload.scheduleId}${scheduleTitle(payload)} is due.`, `An Agent reports coordination data: ${payload.text}`, note,
       ].filter(Boolean).join('\n')
       return [event.runId ? `[Event] The agent in run ${event.runId} reports progress: ${payload.text}` : `[Event] An Agent reports coordination data: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
     case 'run_question':
@@ -277,23 +291,16 @@ export function forgetNotes(memory: string, text: string): { memory: string; rem
   return { memory: kept.join('\n'), removed: lines.length - kept.length }
 }
 
-/** The system prompt with the person's memory after it. */
-export function instructionsWithMemory(instructions: string, memory: string): string {
-  if (!memory) return instructions
-  return `${instructions}\n\n## What the person asked you to remember\n${memory}`
-}
-
-/** The cached context after the rules: the GitHub lines, then the allowed models list; empty parts are left out. */
-export function cachedContextLines(...parts: string[]): string {
-  return parts.filter(Boolean).join('\n')
-}
-
-/** Keep a rules breakpoint before the repository/model context: a repository push or a newly used repository
- * can change that context between turns, while the rules and tool definitions remain reusable. */
-export function promptWithCachedContext(rules: string, github: string, memory: string, tail: string): { instructions: string; stable: number; stableRules: number } {
-  const prefix = github ? `${rules}\n${github}` : rules
-  return { stableRules: rules.length, stable: prefix.length, instructions: instructionsWithMemory(prefix, memory) + tail }
-}
+/**
+ * The system prompt with the person's memory after it. `profile` is what Mikka
+ * has learnt about them (lib/profile/prompt.ts profileSection): a named section
+ * of its own, after their own notes, so the two never read as one thing. The
+ * person's own words come first because they outrank Mikka's deductions.
+ *
+ * Composed in lib/coordinator/prompt-parts.ts so it can be read and tested
+ * without the conversation model; re-exported here, where callers already look.
+ */
+export { cachedContextLines, instructionsWithMemory, promptWithCachedContext } from './prompt-parts'
 
 /**
  * The system prompt with the person's own instructions (Settings, 个人指令)
@@ -363,6 +370,8 @@ export interface ChatItem {
   createdAt: string
   /** Still in the inbox: its position is inferred, not a coordinator_messages row, so it can't be marked read. */
   pending?: true
+  /** The host recorded native Eve admission; only its settlement can fail it. */
+  native?: true
   /** What the person quoted from an artifact, shown above their text. */
   quote?: ArtifactQuote
   /** Notes the person pinned on pages in the browser, shown as chips above their text. */
@@ -424,21 +433,41 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
     items.push({ position: waiting.position, from: 'coordinator', text: '', tools: [], threads: [], createdAt: waiting.createdAt.toISOString(), artifacts: [...new Set(waiting.ids)] })
     waiting.ids = []
   }
-  for (const { id, position, message, createdAt, pending } of rows) {
-    if (message.role === 'user') {
-      const source = message as SourcedMessage
-      // Completion instructions are model context. Trust the host event marker,
-      // not a text prefix a person can also write; its reply starts a new message.
-      if (!source.mikkaUserEvent && source.mikkaEvent?.eventKind === 'run_finished') {
-        briefingBoundary = true
+  for (const { id, position, message: storedMessage, createdAt, pending } of rows) {
+    const display = messageDisplay(storedMessage)
+    const message = display?.kind === 'reply' ? { ...storedMessage, role: 'assistant' as const, content: display.text }
+      : display?.kind === 'person' ? { ...storedMessage, role: 'user' as const, content: Array.isArray(storedMessage.content) ? [{ type: 'text' as const, text: display.text }, ...storedMessage.content.filter(part => part.type === 'file')] : display.text } : storedMessage
+    if (display?.kind === 'hidden') {
+      briefingBoundary = true
+      continue
+    }
+    if (display?.kind === 'reply') {
+      flush()
+      briefingBoundary = true
+    }
+    if (display?.kind === 'event') {
+      const content = typeof message.content === 'string' ? message.content : ''
+      const cited = display.artifacts ? { ids: display.artifacts } : display.line.kind === 'artifact' ? takeArtifacts(content.split('\n')[0]) : { ids: [] }
+      if (cited.ids.length) {
+        Object.assign(waiting, { ids: [...waiting.ids, ...cited.ids], position, createdAt })
         continue
       }
+      flush()
+      const source = message as SourcedMessage
+      items.push({ ...(id ? { id } : {}), position, from: 'event', text: '', tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [],
+        ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : { line: display.line }) })
+      continue
+    }
+    if (message.role === 'user') {
+      const source = message as SourcedMessage
       // 重新发送 retried this failed message in place (store.sendRetryOf): the new attempt stands for it.
       if ((message as { mikkaRetried?: unknown }).mikkaRetried === true) continue
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+      // Compatibility only for rows without an audience. New host formats must
+      // declare display metadata; a marked person's same words are never guessed at.
       // The request for its welcome is for the Coordinator only. When the turn answering it failed (store.failTurn),
       // the Bot's side says why, with 重试, until a reply follows (the welcome request had no other trace in the chat).
-      if (raw.startsWith(COORDINATOR_WELCOME_MARK)) {
+      if (display?.kind === 'welcome' || (!display && raw.startsWith(COORDINATOR_WELCOME_MARK))) {
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
         const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
         if (failure) {
@@ -449,16 +478,16 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         continue
       }
       // Evidence the person has not seen (lib/attention): only what the Coordinator decides to tell them shows, as its own message.
-      if (raw.startsWith(HANDOFF_PREFIX)) {
+      if (!display && raw.startsWith(HANDOFF_PREFIX)) {
         briefingBoundary = true
         continue
       }
       // Briefing instructions belong only in model context; its reply starts a new chat message.
-      if (raw.startsWith('[Event] It is 08:00 for the person: their morning briefing') || raw.startsWith('[Event] The person just connected an app. Their first briefing:')) {
+      if (!display && (raw.startsWith('[Event] It is 08:00 for the person: their morning briefing') || raw.startsWith('[Event] The person just connected an app. Their first briefing:'))) {
         briefingBoundary = true
         continue
       }
-      const event = !source.mikkaUserEvent && raw.startsWith('[Event]')
+      const event = !display && !source.mikkaUserEvent && raw.startsWith('[Event]')
       if (event) {
         const cited = takeArtifacts(raw.split('\n')[0])
         if (cited.ids.length) {
@@ -469,7 +498,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       flush()
       const base = { ...(id ? { id } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
       // The triage line is for the Coordinator, not the person.
-      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'),
+      if (event) items.push({ ...base, from: 'event', text: '',
         ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : { line: eventLine(source.mikkaEvent?.eventKind, raw, source.mikkaEvent?.observedState ?? null) }) })
       else {
         const { quote, text: unquoted } = splitQuote(raw)
@@ -479,9 +508,21 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         // The turn that answered this message failed (store.failTurn): the reason stays under it.
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
         const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
-        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
+        items.push({ ...base, from: 'person', text, ...((message as {mikkaEveAccepted?:unknown}).mikkaEveAccepted===true?{native:true as const}:{}), ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {
+      const schedule = scheduleChatResultSchema.safeParse((message as { mikkaScheduleResult?: unknown }).mikkaScheduleResult)
+      if (schedule.success) {
+        flush()
+        briefingBoundary = true
+        const task = schedule.data.task
+        if (task || !message.content || (Array.isArray(message.content) && !message.content.length)) {
+          items.push({ ...(id ? { id } : {}), position, from: 'event', text: task ? `[[issue:${task.id}]]` : '', tools: [], threads: [], artifacts: [], createdAt: createdAt.toISOString(),
+            line: task ? { kind: 'issueSnapshot', issueId: task.id, runId: null, title: task.title, status: task.status }
+              : { kind: 'scheduleRan', issueId: null, runId: null, title: schedule.data.title, status: schedule.data.status } })
+          continue
+        }
+      }
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) && !invalidParts.has(part) ? [part.toolName] : [])
@@ -519,6 +560,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false
       }
+      if (schedule.success || display?.kind === 'reply') briefingBoundary = true
     } else if (message.role === 'tool') {
       const last = items.at(-1)
       if (last?.from !== 'coordinator') continue

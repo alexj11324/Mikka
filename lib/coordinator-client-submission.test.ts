@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createCoordinatorSubmitter, readActionOutcome, readOutcome } from './coordinator-client-submission'
+import { createCoordinatorSubmitter, readActionOutcome, readOutcome } from '@/tests/support/legacy-coordinator-submission'
 
 test('server-action rejections preserve public error codes and hide unknown errors', () => {
   for (const error of ['issueToolsDisabled', 'deviceNotFound', 'messageRequired', 'messageTooLong', 'validationGeneric']) {
@@ -67,6 +67,25 @@ test('rich submissions freeze all context and keep independent uncertain bodies'
   assert.deepEqual(deliveries.map(item => item.submissionId), ['id-1', 'id-2', 'id-1'])
   assert.deepEqual(deliveries[0].context, original)
   assert.deepEqual(deliveries[2].context, original)
+})
+
+test('a captured workspace stays frozen across uncertain retries and belongs to the submission identity', async () => {
+  const alpha = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', beta = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+  const deliveries: { submissionId: string; context: unknown }[] = []
+  const submitter = createCoordinatorSubmitter({ currentOwner: async () => 'owner', newId: ids(), transport: async submission => {
+    deliveries.push({ submissionId: submission.submissionId, context: structuredClone(submission.context) })
+    return { kind: 'uncertain' }
+  } })
+  const context = { botId: null, expectedWorkspaceId: alpha }
+  await submitter.submit('same task', undefined, context)
+  context.expectedWorkspaceId = beta
+  await submitter.submit('same task', undefined, context)
+  await submitter.submit('same task', undefined, { botId: null, expectedWorkspaceId: alpha })
+  assert.notEqual(deliveries[0].submissionId, deliveries[1].submissionId)
+  assert.equal(deliveries[0].submissionId, deliveries[2].submissionId)
+  assert.deepEqual(deliveries[0].context, { botId: null, expectedWorkspaceId: alpha })
+  assert.deepEqual(deliveries[2].context, deliveries[0].context)
+  assert.deepEqual(readActionOutcome({ error: 'workspaceAccessDenied' }), { kind: 'rejected', error: 'workspaceAccessDenied' })
 })
 
 type Body = { text: string; submissionId: string; questionId?: string }

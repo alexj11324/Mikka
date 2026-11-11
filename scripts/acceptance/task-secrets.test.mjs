@@ -1,3 +1,4 @@
+import { nativeCall, eveResponse } from '../../tests/support/eve-acceptance.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash, randomUUID } from 'node:crypto'
@@ -85,7 +86,8 @@ function goodReceipt() {
 }
 function toolPair(value, command) {
   return { chunks: [{ chunk: { type: 'tool-input-available', toolCallId: `${runId}:tool1`, toolName: 'bash', input: { command } } },
-    { chunk: { type: 'tool-output-available', toolCallId: `${runId}:tool1`, output: `MIKKA_1712_NATIVE ${JSON.stringify(value)}\n` } }] }
+    { chunk: { type: 'tool-output-available', toolCallId: `${runId}:tool1`,
+      output: { exitCode: 0, output: `MIKKA_1712_NATIVE ${JSON.stringify(value)}\n` } } }] }
 }
 
 test('only the exact native tool input/output pair can supply a receipt; model prose and other runs cannot', () => {
@@ -123,7 +125,7 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation, prod
   let profileId = uuid(3), issueId = uuid(4), actualRunId = runId, sequence = 0, active = false, privateSecret
   const email = 'acceptance+mikka-smoke@example.invalid', model = 'gpt-6-luna', digest = '6'.repeat(64)
   const source = { kind: 'subscription', connectionId }, calls = [], createdProfileIds = new Set()
-  let profile, issue, bot, machineEnded = false, observed = false
+  let dispatchInput, profile, issue, bot, machineEnded = false, observed = false
   const workspace = { currentUserId: ownerId, workspace: { id: workspaceId, kind: 'team' }, role: 'member',
     choices: [{ id: workspaceId, kind: 'team' }],
     members: [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] }
@@ -132,10 +134,9 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation, prod
     async request(path) {
       calls.push(path)
       if (path === '/api/auth/sign-in/email' || path === '/api/auth/sign-out') return new Response('{}')
-      assert.equal(path, `/api/coordinator/stream?botId=${botId}&wait=1`)
-      return new Response([{ type: 'tool', name: 'dispatch_run', state: 'running', call: 'dispatch', input: issueId },
-        { type: 'tool', name: 'dispatch_run', state: 'done', call: 'dispatch' }].map(item => JSON.stringify(item)).join('\n') + '\n',
-      { headers: { 'content-type': 'application/x-ndjson' } })
+      if (path === `/api/agents/eve/v1/session?botId=${botId}`) return Response.json({ ok: true, sessionId: 'wrun_secrets' })
+      assert.equal(path, `/api/agents/eve/v1/session/wrun_secrets/stream?botId=${botId}&startIndex=0`)
+      return eveResponse(nativeCall('dispatch', dispatchInput, { runId: actualRunId ?? runId }))
     },
     async json(path, init) {
       calls.push(path)
@@ -185,7 +186,7 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation, prod
       if (name === 'execution-settings.getBotModelMenu') return { groups: [{ kind: 'subscription', provider: 'codex', owner: adminId, options: [selected] }] }
       if (name === 'execution-settings.chooseBotModel') return { current: { ...selected, kind: 'subscription', chosen: true, available: true } }
       if (name === 'issues.saveIssue') { issue = { ...args[0], id: issueId, revision: 1 }; return { issue } }
-      if (name === 'coordinator.sendCoordinatorMessage') { active = true; return {} }
+      if (name === 'coordinator.sendCoordinatorMessage') { dispatchInput = JSON.parse(args[0].match(/参数：(.*)。使用/)[1]); active = true; return {} }
       if (['coordinator.stopCoordinatorTurn', 'issue-operations.setIssueDeleted'].includes(name)) return {}
       if (name === 'user-secrets.createMySecret') {
         privateSecret = { id: privateSecretId, name: args[0].name, note: args[0].note, kind: 'secret', delivery: { mode: 'protected' } }
@@ -193,7 +194,7 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation, prod
       }
       if (name === 'user-secrets.replaceMySecret') { assert.equal(args[0].id, privateSecretId); active = false; return { ok: true, data: structuredClone(privateSecret) } }
       if (name === 'user-secrets.deleteMySecret') { assert.equal(args[0].id, privateSecretId); privateSecret = undefined; return { ok: true, data: { id: privateSecretId } } }
-      if (name === 'agents.pollIssueThreads') return { threads: [{ id: actualRunId, ownedByCurrentUser: true }] }
+      if (name === 'agents.pollIssueThreads') return { threads: [{ id: actualRunId ?? runId, ownedByCurrentUser: true }] }
       if (name === 'agents.getThreadMachine') return { kind: 'cloud', state: machineEnded ? 'ended' : 'running',
         cloud: machineEnded ? null : { template: env.EXPECTED_CODEX_TEMPLATE, sandboxId: 'synthetic-task-vm' } }
       if (name === 'agents.getIssueThread') return { thread: { id: actualRunId, status: 'stopped', attempts: [{ runId: actualRunId, status: 'stopped' }] } }
@@ -302,9 +303,13 @@ test('a protected request plus stopped run cannot replace the exact native comma
   assert.equal(report.productionCanary.cleanup.deleted, true)
 })
 
-test('optional diagnostics cannot replace the native tool, post-tool reply, matching terminal run or external proof', async () => {
+test('optional diagnostics cannot replace a successful native tool, post-tool reply, matching terminal run or external proof', async () => {
   const changes = {
     missingTool: detail => { detail.chunks = detail.chunks.filter(item => !item.chunk.type.startsWith('tool-')) },
+    failedNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = 1 },
+    unknownNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = null },
+    missingNativeExit: detail => { delete detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode },
+    stringNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = '0' },
     missingReply: detail => { detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta') },
     replyBeforeTool: detail => { detail.chunks.splice(1, 0, detail.chunks.pop()) },
     notTerminal: detail => { detail.thread.status = 'running' },
@@ -313,7 +318,7 @@ test('optional diagnostics cannot replace the native tool, post-tool reply, matc
     succeeded: detail => { detail.thread.status = 'succeeded' },
     completed: detail => { detail.thread.status = 'completed' },
     foreignTerminal: detail => { detail.thread.id = caseId },
-    missingNativeProof: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output = 'done' },
+    missingNativeProof: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output = { exitCode: 0, output: 'done' } },
     missingAgentStart: detail => { detail.chunks.shift() },
   }
   for (const [name, change] of Object.entries(changes)) {

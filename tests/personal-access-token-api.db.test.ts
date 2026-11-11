@@ -54,8 +54,8 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   const mobileImage = await import('../app/api/mobile/chat/image/route')
   const pullRequestStatusRoute = await import('../app/api/github/pull-request-status/route')
   const computerRunsRoute = await import('../app/api/bots/[botId]/computer/runs/route')
-  const token = await store.createPersonalAccessToken(owner, ws.id, { name: 'API test' })
-  const memberToken = await store.createPersonalAccessToken(member, ws.id, { name: 'Member API test' })
+  const token = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'API test' })
+  const memberToken = await store.createLegacyPersonalAccessToken(member, ws.id, { name: 'Member API test' })
   const server = createServer(async (req, res) => {
     try {
       const url = `http://127.0.0.1:${(server.address() as { port: number }).port}${req.url}`
@@ -134,7 +134,7 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   await t.test('task lookups by id stay in the token workspace', async () => {
     const ownIssue = randomUUID(), otherIssue = randomUUID()
     for (const [issueId, workspaceId, teamId] of [[ownIssue, ws.id, ownTeam.id], [otherIssue, other.id, otherTeam.id]]) {
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Task','{"type":"doc"}','todo','normal','workspace')`, [issueId, owner])
+      await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$3,'Task','{"type":"doc"}','todo','normal','workspace')`, [issueId, owner, workspaceId])
       await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
     }
     const post = async (path: string, body: unknown) => {
@@ -199,13 +199,28 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     currentHeaders = new Headers({ authorization: `Bearer ${token.token}` })
     assert.equal(await (await import('../lib/session')).getSession(), null)
   })
+  await t.test('audience: legacy tokens cannot enter v1; scoped tokens cannot enter legacy routes', async () => {
+    const { DEFAULT_API_SCOPES } = await import('../lib/tokens/format')
+    const legacy = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'Legacy audience test' })
+    const v1 = await store.createPersonalAccessToken(owner, ws.id, { name: 'v1 audience test', scopes: DEFAULT_API_SCOPES })
+    const legacyHeaders = new Headers({ authorization: `Bearer ${legacy.token}` })
+    const v1Headers = new Headers({ authorization: `Bearer ${v1.token}` })
+    assert.equal(await getApiSession({ headers: legacyHeaders, audience: 'v1' }), null)
+    assert.equal(await getApiSession({ headers: v1Headers }), null)
+    assert.equal((await getApiSession({ headers: legacyHeaders }))?.tokenId, legacy.id)
+    const v1Session = await getApiSession({ headers: v1Headers, audience: 'v1' })
+    assert.equal(v1Session?.tokenId, v1.id)
+    assert.deepEqual(v1Session?.tokenScopes, [...DEFAULT_API_SCOPES])
+    assert.notEqual((await call(v1.token)).status, 200, 'a v1 token cannot use a legacy route')
+  })
+
   await t.test('bad, expired and revoked PATs fail and never fall back to a browser cookie', async () => {
     const before = cookieReads
     for (const invalid of ['mkp_invalid', 'mkp_' + 'A'.repeat(43)]) {
       assert.equal(await getApiSession({ headers: new Headers({ authorization: `Bearer ${invalid}`, cookie: 'valid-browser-cookie' }) }), null)
     }
     assert.equal(cookieReads, before)
-    const expired = await store.createPersonalAccessToken(owner, ws.id, { name: 'Expired API test' })
+    const expired = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'Expired API test' })
     await pool.query('UPDATE personal_access_tokens SET "createdAt"=now()-interval \'2 minutes\', "expiresAt"=now()-interval \'1 minute\' WHERE id=$1', [expired.id])
     assert.equal((await call(expired.token)).status, 403)
     await store.revokePersonalAccessToken(owner, ws.id, { id: token.id })

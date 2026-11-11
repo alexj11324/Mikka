@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { GithubDark } from '@/components/ui/svgs/githubDark'
 import { GithubLight } from '@/components/ui/svgs/githubLight'
 import { Google } from '@/components/ui/svgs/google'
+import { cn } from '@/lib/utils'
 
 type SignInCardProps = {
   registering: boolean
@@ -34,14 +35,19 @@ type SignInCardProps = {
   onGitHubSignIn: () => Promise<void>
   /** Sign-up's Turnstile widget; renders nothing without a site key. */
   turnstile?: ReactNode
+  /** Company SSO entry from a UI layer (slot auth-sso); nothing in the open-source UI. */
+  sso?: ReactNode
 }
 
 type FieldName = 'name' | 'email' | 'password'
 type FieldErrors = Partial<Record<FieldName, string>>
+/** Auth fields and buttons: 40px, 44px on a phone, so they are easy to hit (UI audit states-08). */
+const FIELD = 'h-11 sm:h-10'
+
 const FIELD_ORDER: FieldName[] = ['name', 'email', 'password']
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile, sso }: SignInCardProps) {
   const t = useTranslations('Auth')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const oauthEnabled = googleEnabled || githubEnabled
@@ -98,12 +104,12 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
       </CardHeader>
       <CardContent className="flex flex-col gap-6 px-7 pb-7 sm:px-9 sm:pb-8">
         {(oauthEnabled || notice) && <div className="flex flex-col gap-3">
-          {googleEnabled && <Button type="button" variant="outline" className="w-full justify-center px-4" disabled={pending} onClick={onGoogleSignIn}>
+          {googleEnabled && <Button type="button" variant="outline" className={cn('w-full justify-center px-4', FIELD)} disabled={pending} onClick={onGoogleSignIn}>
             {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <Google className="size-4" />}
             {t('continueGoogle')}
           </Button>}
           {showGoogleLinkHint && <p className="text-muted-foreground text-xs leading-5">{t('googleLinkHint')}</p>}
-          {githubEnabled && <Button type="button" variant="outline" className="w-full justify-center px-4" disabled={pending} onClick={onGitHubSignIn}>
+          {githubEnabled && <Button type="button" variant="outline" className={cn('w-full justify-center px-4', FIELD)} disabled={pending} onClick={onGitHubSignIn}>
             {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <>
               <span aria-hidden="true" className="dark:hidden"><GithubLight className="size-4" /></span>
               <span aria-hidden="true" className="hidden dark:block"><GithubDark className="size-4" /></span>
@@ -112,6 +118,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           </Button>}
           {notice && <p role="status" className="text-xs leading-5">{notice}</p>}
         </div>}
+        {sso}
         {emailEnabled ? <>
         {oauthEnabled && <div className="flex items-center gap-3">
           <Separator className="flex-1" />
@@ -127,7 +134,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           <FieldGroup>
             {registering && <Field data-disabled={pending} data-invalid={Boolean(fieldErrors.name)} className="gap-2">
               <FieldLabel htmlFor="name">{t('name')}</FieldLabel>
-              <InputGroup>
+              <InputGroup className={FIELD}>
                 <InputGroupAddon><UserIcon aria-hidden="true" /></InputGroupAddon>
                 <InputGroupInput id="name" name="name" autoComplete="name" placeholder={t('namePlaceholder')} minLength={1} maxLength={80} required disabled={pending} {...invalidProps('name')} />
               </InputGroup>
@@ -135,7 +142,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             </Field>}
             <Field data-disabled={pending} data-invalid={Boolean(fieldErrors.email)} className="gap-2">
               <FieldLabel htmlFor="email">{t('email')}</FieldLabel>
-              <InputGroup>
+              <InputGroup className={FIELD}>
                 <InputGroupAddon><MailIcon aria-hidden="true" /></InputGroupAddon>
                 <InputGroupInput id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required disabled={pending} {...invalidProps('email')} />
               </InputGroup>
@@ -144,17 +151,17 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             <Field data-disabled={pending} data-invalid={Boolean(fieldErrors.password)} className="gap-2">
               <div className="flex items-center justify-between gap-3">
                 <FieldLabel htmlFor="password">{t('password')}</FieldLabel>
-                {!registering && <Link href="/forgot-password" className="text-muted-foreground text-xs underline-offset-4 hover:underline">{t('forgotPassword')}</Link>}
+                {!registering && <Link href="/forgot-password" className="-my-2.5 py-2.5 text-muted-foreground text-xs underline-offset-4 hover:underline">{t('forgotPassword')}</Link>}
               </div>
-              <InputGroup>
+              <InputGroup className={FIELD}>
                 <InputGroupAddon><LockKeyholeIcon aria-hidden="true" /></InputGroupAddon>
-                <InputGroupInput id="password" name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} placeholder={t('passwordPlaceholder')} minLength={8} maxLength={128} required disabled={pending} {...invalidProps('password')} />
+                <InputGroupInput id="password" name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} placeholder={registering ? t('passwordPlaceholder') : undefined} minLength={8} maxLength={128} required disabled={pending} {...invalidProps('password')} />
               </InputGroup>
               {fieldErrors.password && <FieldError id="password-error">{fieldErrors.password}</FieldError>}
             </Field>
           </FieldGroup>
           {turnstile}
-          <Button type="submit" className="w-full" disabled={pending}>
+          <Button type="submit" className={cn('w-full', FIELD)} disabled={pending}>
             {registering ? t('submitCreate') : t('submitSignIn')}
             {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-end" /> : <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />}
           </Button>
@@ -163,7 +170,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
         {/* The one sign-in / sign-up switch; the page header no longer repeats it (R-32). */}
         <p className="text-muted-foreground text-center text-xs">
           {registering ? t('haveAccount') : t('noAccountShort')}{' '}
-          <Link href={authHref(registering ? '/sign-in' : '/sign-up')} className="text-foreground underline underline-offset-4">{registering ? t('signIn') : t('createAccount')}</Link>
+          <Link href={authHref(registering ? '/sign-in' : '/sign-up')} className="inline-block py-2.5 text-foreground underline underline-offset-4">{registering ? t('signIn') : t('createAccount')}</Link>
         </p>
       </CardContent>
     </Card>

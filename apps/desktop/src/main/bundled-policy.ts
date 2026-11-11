@@ -13,8 +13,14 @@ export const RENDERER_CSP = [
 
 const ID = '[A-Za-z0-9_-]{1,128}'
 const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/flow$/i
+const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
 /** Route families are enumerated; there is deliberately no generic /api/* forwarding. */
 const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
+  [/^\/api\/agents\/eve\/v1\/session$/, ['POST']],
+  [new RegExp(`^/api/agents/eve/v1/session/${ID}$`), ['GET', 'POST']],
+  [new RegExp(`^/api/agents/eve/v1/session/${ID}/(?:cancel|compact|clear|end|reset)$`), ['POST']],
+  [new RegExp(`^/api/agents/eve/v1/session/${ID}/(?:stream|stubs|descendants/stream)$`), ['GET']],
+  [new RegExp(`^/api/agents/eve/v1/session/${ID}/subagents/${ID}/${ID}/stream$`), ['GET']],
   [/^\/api\/desktop\/config$/, ['GET']], [/^\/api\/desktop\/rpc$/, ['POST']],
   [/^\/api\/version$/, ['GET']], [/^\/api\/auth\/device$/, ['GET']],
   [/^\/api\/auth\/device\/(approve|deny)$/, ['POST']],
@@ -22,7 +28,7 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys)$/, ['GET']],
   [/^\/api\/agent-cli-policy$/, ['GET', 'POST']],
   [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
-  [/^\/api\/(coordinator\/(?:runtime|messages|attention|stream))$/, ['GET', 'POST', 'DELETE']],
+  [/^\/api\/(coordinator\/(?:runtime|messages|attention))$/, ['GET', 'POST', 'DELETE']],
   [/^\/api\/(chat\/attachments|integrations\/mcp|integrations\/mcp\/shares|credentials|device-tokens)$/, ['GET', 'POST', 'PATCH', 'DELETE']],
   [/^\/api\/(agent\/images|agent\/sessions|devices\/hosts)$/, ['GET']],
   [/^\/api\/devices\/ssh$/, ['POST']],
@@ -58,6 +64,8 @@ export function allowedApiPath(path: string, method: string): boolean {
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'
+  if (BILLING_MANAGEMENT.test(path)) return method === 'GET' || method === 'POST'
+  if (path === '/api/organizations') return method === 'GET'
   // Viewer grants are capabilities and must be obtained through owner-bound IPC.
   if (/^\/api\/bots\/[^/]+\/(?:computer\/(?:viewer|takeover)|subagents\/[^/]+\/viewer)$/.test(path)) return false
   return ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method === 'HEAD' ? 'GET' : method))

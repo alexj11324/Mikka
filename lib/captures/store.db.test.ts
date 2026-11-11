@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
@@ -57,7 +58,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
     assert.equal(artifactStorage(), 'inline')
     for (const userId of [alice, bob]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
     for (const [id, owner] of [[agentId, alice], [otherAgentId, bob]]) await pool.query(`INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,'codex','Fixture Agent')`, [id, owner])
-    for (const [id, owner] of [[issueId, alice], [otherIssueId, bob]]) await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Version fixture','{}','todo','normal')`, [id, owner])
+    for (const [id, owner] of [[issueId, alice], [otherIssueId, bob]]) await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Version fixture','{}','todo','normal')`, [id, owner, await seedFixtureWorkspace(pool, owner)])
     for (const [id, owner, agent, issue] of [[firstRun, alice, agentId, issueId], [nextRun, alice, agentId, issueId], [otherRun, bob, otherAgentId, otherIssueId]]) {
       await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","issueId",status) VALUES($1,$2,$3,$4,'succeeded')`, [id, owner, agent, issue])
     }
@@ -85,6 +86,26 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       assert.equal(await readArtifactContent(bob, first.artifactId, 2), null)
       const denied = await submit(otherRun, { artifactId: first.artifactId, title: 'Foreign', kind: 'markdown', content: 'must not overwrite' }, bob, otherIssueId)
       assert.ok('error' in denied); assert.equal(denied.error, 'not_found')
+    })
+
+    await t.test('evidence is the owner-only read that exposes opaque entry provenance', async () => {
+      const entryRun = randomUUID()
+      const originRef = { kind: 'slack', teamId: 'T1', channelId: 'C1', threadTs: '1.1' }
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","issueId",status,origin,"originRef") VALUES($1,$2,$3,$4,'succeeded','slack',$5::jsonb)`,
+        [entryRun, alice, agentId, issueId, JSON.stringify(originRef)])
+      try {
+        const evidence = await runEvidence(alice, entryRun)
+        assert.equal(evidence?.run.origin, 'slack')
+        assert.deepEqual(evidence?.run.originRef, originRef)
+        assert.equal(await runEvidence(bob, entryRun), null)
+        // A legacy row stays unknown; it is never reported as 'web'.
+        await pool.query(`UPDATE agent_runs SET origin=NULL,"originRef"=NULL WHERE id=$1`, [entryRun])
+        const legacy = await runEvidence(alice, entryRun)
+        assert.equal(legacy?.run.origin, null)
+        assert.equal(legacy?.run.originRef, null)
+      } finally {
+        await pool.query('DELETE FROM agent_runs WHERE id=$1', [entryRun])
+      }
     })
 
     const seed = async (owner = alice, runId = firstRun, issue = issueId) => {

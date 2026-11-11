@@ -3,6 +3,11 @@ name: Analytics SSR
 # is the build check; repeating this one on main added nothing.
 on:
   workflow_call:
+    inputs:
+      selected:
+        description: The parent CI already selected Analytics using the trusted policy
+        type: boolean
+        default: false
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,12 +22,13 @@ env:
 
 jobs:
   changes:
+    if: ${{ !inputs.selected }}
     uses: ./.github/workflows/ci-selection.yml
 
   analytics-ssr-full:
     name: Analytics SSR (full)
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.analytics == 'true'
+    if: always() && !cancelled() && (inputs.selected || (needs.changes.result == 'success' && needs.changes.outputs.analytics == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -51,14 +57,9 @@ jobs:
       MIGRATE: '0'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: ./.github/actions/pnpm-install
         with:
-          version: 10.34.3
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+          skip-electron: 'true'
       - name: Apply tracked SQL only to the disposable CI database
         run: MIGRATE=1 node scripts/migrate.mjs
       - run: pnpm build
@@ -88,8 +89,8 @@ jobs:
     steps:
       - name: Require classification and full regression unless docs-only
         env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          RUN_ANALYTICS: ${{ needs.changes.outputs.analytics }}
+          CHANGES_RESULT: ${{ inputs.selected && 'success' || needs.changes.result }}
+          RUN_ANALYTICS: ${{ inputs.selected && 'true' || needs.changes.outputs.analytics }}
           FULL_RESULT: ${{ needs.analytics-ssr-full.result }}
         run: |
           if [ "$CHANGES_RESULT" != 'success' ]; then exit 1; fi

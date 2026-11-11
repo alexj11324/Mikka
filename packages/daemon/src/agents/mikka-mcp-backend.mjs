@@ -1,7 +1,7 @@
 // Shared real Mikka MCP catalogue and business handlers. No CLI or provider proxy.
 import { createHash, randomUUID } from "node:crypto"
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
 import { isAbsolute, join, resolve, sep } from "node:path"
@@ -317,6 +317,28 @@ const CAPTURE_TOOL = {
 
 const KINDS = { submit: "submit", request_help: "ask", ask_human: "ask", report_blocked: "blocked" }
 
+// Profile Skills: only names and purposes are in the brief. This tool serves
+// the exact body pinned for this run, from the daemon-written manifest under
+// the run directory. It grants no tool, credential or repository authority.
+const LOAD_SKILL_TOOL = {
+  name: "load_skill",
+  description:
+    "Load the full instructions of one Assigned Skill when this task needs that capability. Pass the exact id listed in your brief. The body is the version pinned for this run; you may call it again with another id. It grants no tools, credentials or permissions.",
+  inputSchema: {
+    type: "object",
+    properties: { id: { type: "string", description: "The exact Assigned Skill id, for example official:systematic-debugging." } },
+    required: ["id"],
+    additionalProperties: false,
+  },
+}
+const PROFILE_SKILL_ID = /^(?:(?:official|personal|workspace):[a-z0-9][a-z0-9-]{0,127}|repository:[a-z0-9][a-z0-9-]{0,63})$/
+const PROFILE_SKILL_UNAVAILABLE = {
+  not_found: "This Skill was declared for the run but was not found in the task repository.",
+  invalid: "This Skill source is unusable or failed its integrity check.",
+  disabled: "This Skill is no longer enabled.",
+  pending: "This repository Skill has not been pinned yet. Continue the current step and try again.",
+}
+
 /**
  * The real Mikka tool implementation, shared by stdio and an in-process host.
  * Context is copied once. Merely constructing it performs no business request
@@ -327,10 +349,20 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
   const lifetime = new AbortController()
   const pending = new Set()
   let closed = false, closing
+  // Profile Skills live only inside the run directory; never follow a link.
+  let profileSkillsDir = null
+  if (typeof config.profileSkillsDir === 'string' && config.profileSkillsDir) {
+    try { profileSkillsDir = realpathSync(config.profileSkillsDir) } catch { profileSkillsDir = null }
+  }
   // Decisions travel directly to the bound Mikka worker endpoint. No decision,
   // conversation or credential is ever written to the handoff or worktree.
   const decisionMcpUrl = config.decisionUrl
   const decisionMcpToken = config.decisionToken
+  // Match protocol/trace-context's W3C validator in this dependency-free child.
+  // Only the host-bound carrier is used; env and tool arguments cannot replace it.
+  const parent = config.decisionTraceparent
+  const decisionTraceparent = typeof parent === 'string' && /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/.test(parent)
+    && parent.slice(3, 35) !== '0'.repeat(32) && parent.slice(36, 52) !== '0'.repeat(16) ? parent : undefined
   const decisionMcpAvailable = Boolean(decisionMcpUrl && /^mkw_[A-Za-z0-9_-]{43}$/.test(decisionMcpToken ?? ''))
   let decisionRpcId = 0
   async function decisionRpc(operation, method, params) {
@@ -345,7 +377,8 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
     try {
       response = await fetch(decisionMcpUrl, {
         method: 'POST', redirect: 'error', signal: AbortSignal.any([lifetime.signal, AbortSignal.timeout(20_000)]),
-        headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18' },
+        headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18',
+          ...(decisionTraceparent ? { traceparent: decisionTraceparent } : {}) },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
       })
       observed.headers(response.status)
@@ -632,6 +665,53 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
 
 
 
+  /**
+   * Serve one pinned Profile Skill body. The manifest is host-written under
+   * the run directory; this tool never reads the worktree or the network. A
+   * write-once receipt is the only evidence that this exact body was loaded.
+   */
+  function loadProfileSkill(args) {
+    if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(key => key !== 'id')) throw new Error('profile_skill_input')
+    if (typeof args.id !== 'string' || !PROFILE_SKILL_ID.test(args.id))
+      return { isError: true, content: [{ type: 'text', text: 'Use the exact Assigned Skill id from your brief.' }] }
+    let skills
+    try {
+      const file = join(profileSkillsDir, 'manifest.json')
+      const fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | constants.O_NONBLOCK)
+      try {
+        const stat = fstatSync(fd)
+        if (!stat.isFile() || stat.size < 2 || stat.size > 512 * 1024) throw new Error('profile_skill_manifest')
+        const manifest = JSON.parse(readFileSync(fd, 'utf8'))
+        if (!manifest || manifest.version !== 1 || !Array.isArray(manifest.skills) || manifest.skills.length > 24) throw new Error('profile_skill_manifest')
+        skills = manifest.skills
+      } finally { closeSync(fd) }
+    } catch {
+      return { isError: true, content: [{ type: 'text', text: 'Assigned Skill data is unavailable for this run.' }] }
+    }
+    const skill = skills.find(entry => entry && typeof entry === 'object' && entry.id === args.id)
+    if (!skill) return { isError: true, content: [{ type: 'text', text: 'No such Assigned Skill id. Use only an id listed in your brief.' }] }
+    const usable = skill.available === true && typeof skill.instructions === 'string' && Boolean(skill.instructions.trim()) &&
+      typeof skill.digest === 'string' && /^[a-f0-9]{64}$/.test(skill.digest) && Buffer.byteLength(skill.instructions, 'utf8') <= 20_000 &&
+      createHash('sha256').update(skill.instructions, 'utf8').digest('hex') === skill.digest
+    if (!usable) {
+      const reason = typeof skill.reason === 'string' && Object.hasOwn(PROFILE_SKILL_UNAVAILABLE, skill.reason) ? skill.reason : 'invalid'
+      return { isError: true, content: [{ type: 'text', text: PROFILE_SKILL_UNAVAILABLE[reason] }] }
+    }
+    try {
+      const dir = join(profileSkillsDir, 'loaded')
+      mkdirSync(dir, { recursive: true, mode: 0o700 })
+      const receipt = join(dir, createHash('sha256').update(args.id, 'utf8').digest('hex').slice(0, 32) + '.json')
+      try {
+        writeFileSync(receipt, JSON.stringify({
+          id: args.id, name: typeof skill.name === 'string' ? skill.name.slice(0, 80) : args.id,
+          source: ['official', 'personal', 'workspace', 'repository'].includes(skill.source) ? skill.source : 'repository',
+          digest: skill.digest, loadedAt: new Date().toISOString(),
+        }), { encoding: 'utf8', flag: 'wx', mode: 0o600 })
+      } catch (error) { if (error?.code !== 'EEXIST') throw error }
+    } catch { /* Serving the pinned body still stands; the run detail shows it as not loaded. */ }
+    return { content: [{ type: 'text', text: JSON.stringify({ id: args.id, name: skill.name, source: skill.source, digest: skill.digest, instructions: skill.instructions }) }] }
+  }
+
   function record(kind, args, toolName) {
     // A planning hand-in carries the spec and the split it proposes. The id is
     // generated here, once, so the cards the daemon puts in the conversation
@@ -752,6 +832,10 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
           try { return reply(id, verifyCommand(params.arguments ?? {})) }
           catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Verification command refused.' }] }) }
         }
+        if (profileSkillsDir && params?.name === LOAD_SKILL_TOOL.name) {
+          try { return reply(id, loadProfileSkill(params.arguments ?? {})) }
+          catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Assigned Skill data is unavailable for this run.' }] }) }
+        }
         if (capturesDir && params?.name === CAPTURE_TOOL.name) {
           try {
             queueCapture(params.arguments ?? {})
@@ -788,6 +872,7 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
   function readTools() {
     return decisionTools().then(decisions => structuredClone([
       ...TOOLS, ...decisions, ...(repositoryRoot ? [REPOSITORY_TOOL] : []),
+      ...(profileSkillsDir ? [LOAD_SKILL_TOOL] : []),
       ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : []),
       ...(artifactRoot ? [ARTIFACT_TOOL, INSPECT_REPOSITORY_TOOL] : []),
     ]))
@@ -828,12 +913,13 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
  * no authorization are introduced by advertising this catalogue. */
 export function mikkaMcpToolCatalogue({
   decisionCatalogue, repositorySelection = false, captures = false,
-  factoryVerify = false, artifactInspection = false,
+  factoryVerify = false, artifactInspection = false, profileSkills = false,
 } = {}) {
   return structuredClone([
     ...TOOLS, ...(decisionCatalogue === undefined ? [] : [readPreparedDecisionCatalogue(decisionCatalogue)]),
     ...(repositorySelection ? [REPOSITORY_TOOL] : []), ...(captures ? [CAPTURE_TOOL] : []),
     ...(factoryVerify ? [VERIFY_TOOL] : []), ...(artifactInspection ? [ARTIFACT_TOOL, INSPECT_REPOSITORY_TOOL] : []),
+    ...(profileSkills ? [LOAD_SKILL_TOOL] : []),
   ])
 }
 

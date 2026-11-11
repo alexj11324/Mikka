@@ -1,6 +1,11 @@
 name: Self-hosted image
 on:
   workflow_call:
+    inputs:
+      selected:
+        description: The parent CI already selected Image using the trusted policy
+        type: boolean
+        default: false
   push:
     branches: [main]
     tags: ['v*']
@@ -12,10 +17,11 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   changes:
+    if: ${{ !inputs.selected }}
     uses: ./.github/workflows/ci-selection.yml
   image:
     needs: changes
-    if: needs.changes.outputs.image == 'true'
+    if: always() && !cancelled() && (inputs.selected || (needs.changes.result == 'success' && needs.changes.outputs.image == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -141,7 +147,7 @@ jobs:
           docker compose restart app
           docker compose up --detach --wait --wait-timeout 120
           node scripts/self-hosted-smoke.mjs
-      - name: Verify the frozen community UI remains opt-in with the same data
+      - name: Verify the older built-in UI remains opt-in with the same data
         run: |
           MIKKA_COMMUNITY_UI=1 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
           MIKKA_EXPECT_COMMUNITY_UI=1 node scripts/self-hosted-smoke.mjs

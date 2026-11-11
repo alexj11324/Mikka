@@ -68,7 +68,7 @@ export function useWorkspaceSwitcher({ user, onSettings, signingOut, onBeforeCha
       try {
         const result = await switchWorkspace({ accountId, workspaceId })
         if (!result.ok) { toast.error(result.error); return }
-        await clearPersistentReadCaches()
+        await clearPersistentReadCaches({ documentNavigation: true })
         window.location.assign(withBasePath(getPathname({ locale, href: '/' })))
       } catch { toast.error(i18nText("FeatureCopy.c_b8e346ef")) }
       finally { setPending(false) }

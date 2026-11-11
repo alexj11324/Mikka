@@ -1,6 +1,6 @@
 import type { LanguageModel } from 'ai'
 import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
-import { hostedModelSelectionSchema, type HostedModelSelection } from './subscription-model-snapshot'
+import { hostedModelSelectionSchema, type HostedModelSelection } from './hosted-model-selection'
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 /** Only non-secret frozen references cross Workflow steps. Custody is resolved
@@ -42,12 +42,14 @@ export class SubscriptionWorkflowModel implements V4Model {
     const { workflowFailureStream } = await import('./workflow-run-failure')
     const { APP_BUILD } = await import('./app-build')
     const identity = await stepIdentity()
-    const result = await workflowFailureStream(async () => {
+    // Model resolution may prepare credentials and probe quota before requestedAt.
+    // Observe those workers too; setup and provider-request timings keep their origins.
+    const result = await workflowFailureStream(() => withSubscriptionTiming(subscriptionTiming, async () => {
       const model = await resolveSubscriptionWorkflowModel(this.selection, options.abortSignal)
       if (typeof model === 'string' || model.specificationVersion !== 'v4') throw new Error('subscription_model_unavailable')
       requestedAt = Date.now()
-      return withSubscriptionTiming(subscriptionTiming, () => model.doStream(request))
-    }, { runId: identity.workflowRunId, appVersion: APP_BUILD, credential: this.selection.type, requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } })
+      return model.doStream(request)
+    }), { runId: identity.workflowRunId, appVersion: APP_BUILD, credential: this.selection.type, requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } })
     return timedModelStream(result, { route: 'subscription', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, prefix, subscriptionTiming, ...(codex ? { codexLayoutApplied: prompt !== options.prompt } : {}), ...identity })
   }
 }

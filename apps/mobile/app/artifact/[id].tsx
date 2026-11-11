@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { ReadNotice } from '@/components/ReadNotice'
 import { useEffect, useState } from 'react'
 import { ScrollView, StyleSheet, View } from 'react-native'
@@ -37,7 +38,7 @@ export default function ArtifactScreen() {
     <View style={styles.screen}>
       <NavBar title={title ?? ''} />
       <ScrollView {...underBar} contentContainerStyle={styles.body}>
-        {text !== null ? <Markdown text={text} /> : failed ? <ReadNotice error label="文档" onRetry={() => setAttempt(current => current + 1)} /> : <View style={styles.center}><Spinner /></View>}
+        {text !== null ? <Markdown text={text} /> : failed ? <ReadNotice error label={mobileMessages.MobileCore.document} onRetry={() => setAttempt(current => current + 1)} /> : <View style={styles.center}><Spinner /></View>}
       </ScrollView>
     </View>
   )

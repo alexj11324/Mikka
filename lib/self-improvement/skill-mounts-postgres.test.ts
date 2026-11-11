@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -23,7 +24,7 @@ test('PG mount ledger accepts current actual session evidence atomically and rej
     for (const name of orderMigrations((await readdir(dir)).filter(n => n.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, dir), 'utf8'))
     const userId = `synthetic-${randomUUID()}`, issueId = randomUUID(), agentId = randomUUID(), deviceId = randomUUID(), repoId = randomUUID()
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Mount boundary fixture','{}','todo','normal')`, [issueId, userId])
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Mount boundary fixture','{}','todo','normal')`, [issueId, userId, await seedFixtureWorkspace(pool, userId)])
     await pool.query(`INSERT INTO devices(id,"ownerId",name,enabled) VALUES($1,$2,'Synthetic device',true)`, [deviceId, userId])
     await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,'Synthetic agent','codex',$3)`, [agentId, userId, deviceId])
     await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/synthetic/mount')`, [repoId, deviceId, userId])

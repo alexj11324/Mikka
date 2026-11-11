@@ -7,6 +7,11 @@ name: Desktop shell
 # CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
   workflow_call:
+    inputs:
+      selected:
+        description: The parent CI already selected Desktop using the trusted policy
+        type: boolean
+        default: false
   workflow_dispatch:
 
 permissions:
@@ -25,10 +30,11 @@ env:
 
 jobs:
   changes:
+    if: ${{ !inputs.selected }}
     uses: ./.github/workflows/ci-selection.yml
   checks:
     needs: changes
-    if: needs.changes.outputs.desktop == 'true'
+    if: always() && !cancelled() && (inputs.selected || (needs.changes.result == 'success' && needs.changes.outputs.desktop == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -39,11 +45,15 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-          cache: pnpm
+      # A literal install step keeps this job auditable under the credential
+      # boundary in tests/mvp/pinned-pnpm.test.mjs, which requires exactly one
+      # `pnpm install --frozen-lockfile` carrying the read-only token. setup-node's
+      # `cache: pnpm` is deliberately absent: it uploads a cache per pull request.
       - name: Install dependencies without the Electron runtime
-        run: pnpm install --frozen-lockfile
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mikka/desktop typecheck
       - run: pnpm --filter @mikka/desktop lint
       - run: pnpm --filter @mikka/desktop test
@@ -55,7 +65,7 @@ jobs:
 
   smoke:
     needs: changes
-    if: needs.changes.outputs.desktop == 'true'
+    if: always() && !cancelled() && (inputs.selected || (needs.changes.result == 'success' && needs.changes.outputs.desktop == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -90,8 +100,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        env:
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm install --frozen-lockfile
       - name: Install Chromium system dependencies
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
@@ -160,9 +172,11 @@ jobs:
           retention-days: 7
 
   native-arm64:
-    if: needs.changes.outputs.desktop == 'true'
+    if: always() && !cancelled() && (inputs.selected || (needs.changes.result == 'success' && needs.changes.outputs.desktop == 'true'))
     name: Apple Silicon packaged acceptance and ad-hoc Mikka Dev
-    needs: [changes, smoke, icon]
+    # Independent runner/database/build; smoke and native conclusions are both
+    # required by the calling workflow's unchanged strict gate.
+    needs: [changes]
     runs-on: macos-26  # Standard ARM64 runner; macOS 26 is required for the shared glass icon.
     timeout-minutes: 150
     env:
@@ -179,15 +193,42 @@ jobs:
       MIKKA_DESKTOP_FLAVOR: dev
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Select Xcode 26 for actool
+        run: |
+          xcode=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
+          test -n "$xcode" || { echo "::error::No Xcode 26 on this runner; build/icon.icon needs actool 26+"; exit 1; }
+          sudo xcode-select -s "$xcode"
+          actool --version
+      - name: Compile build/icon.icon as electron-builder does
+        run: |
+          out="$RUNNER_TEMP/icon"
+          mkdir -p "$out"
+          cp -R apps/desktop/build/icon.icon "$RUNNER_TEMP/Icon.icon"
+          actool "$RUNNER_TEMP/Icon.icon" --compile "$out" \
+            --output-format human-readable-text --notices --warnings \
+            --output-partial-info-plist "$out/assetcatalog_generated_info.plist" \
+            --app-icon Icon --include-all-app-icons --accent-color AccentColor \
+            --enable-on-demand-resources NO --development-region en \
+            --target-device mac --minimum-deployment-target 26.0 --platform macosx
+          test -s "$out/Assets.car"
+          test -s "$out/Icon.icns"
+          iconutil -c iconset "$out/Icon.icns" -o "$out/Icon.iconset"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: desktop-icon
+          path: ${{ runner.temp }}/icon
+          retention-days: 7
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.34.3
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-          cache: pnpm
+      - name: Install dependencies
+        env:
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm install --frozen-lockfile
       - run: test "$(uname -m)" = arm64
-      - run: pnpm install --frozen-lockfile
       - name: Keep setup-node 24 in the native installer login shell
         run: node apps/desktop/test/native-node.mjs
       - name: Prepare the pinned native Electron and builder checksum cache
@@ -223,10 +264,6 @@ jobs:
         run: pnpm generate:agent-ui && pnpm build:app
         env:
           NODE_OPTIONS: --max-old-space-size=6144
-      - name: Select Xcode 26
-        run: |
-          xcode=$(ls -d /Applications/Xcode_26*.app | grep -vi beta | sort -V | tail -1)
-          sudo xcode-select -s "$xcode"
       - name: Package an inspector-enabled harness input
         # The Dev-only packaging script removes inherited signing credentials,
         # explicitly permits PR ad-hoc signing, and verifies the final bundle.
@@ -277,39 +314,4 @@ jobs:
           name: desktop-native-evidence-${{ github.sha }}
           path: .cache/desktop-evidence
           include-hidden-files: true
-          retention-days: 7
-
-  # Desktop release runs only on main; compile the Icon Composer bundle here so a
-  # broken build/icon.icon or a runner without Xcode 26 fails on the pull request.
-  icon:
-    needs: changes
-    if: needs.changes.outputs.desktop == 'true'
-    runs-on: macos-26  # macos-15's Xcode 26.3 crashes compiling the glass layers of build/icon.icon
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Select Xcode 26 for actool
-        run: |
-          xcode=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
-          test -n "$xcode" || { echo "::error::No Xcode 26 on this runner; build/icon.icon needs actool 26+"; exit 1; }
-          sudo xcode-select -s "$xcode"
-          actool --version
-      - name: Compile build/icon.icon as electron-builder does
-        run: |
-          out="$RUNNER_TEMP/icon"
-          mkdir -p "$out"
-          cp -R apps/desktop/build/icon.icon "$RUNNER_TEMP/Icon.icon"
-          actool "$RUNNER_TEMP/Icon.icon" --compile "$out" \
-            --output-format human-readable-text --notices --warnings \
-            --output-partial-info-plist "$out/assetcatalog_generated_info.plist" \
-            --app-icon Icon --include-all-app-icons --accent-color AccentColor \
-            --enable-on-demand-resources NO --development-region en \
-            --target-device mac --minimum-deployment-target 26.0 --platform macosx
-          test -s "$out/Assets.car"
-          test -s "$out/Icon.icns"
-          iconutil -c iconset "$out/Icon.icns" -o "$out/Icon.iconset"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: desktop-icon
-          path: ${{ runner.temp }}/icon
           retention-days: 7

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { observeEveSession } from './eve-session.mjs'
 /** #1505: real, normal-session repository dispatch. No provider tokens or DB access.
  *
  * SMOKE_OWNER_EMAIL / SMOKE_OWNER_PASSWORD come from the existing prod:/ identity.
@@ -20,6 +21,7 @@ const MODELS = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' }
 const ROUTES = { claude_code: 'claude_code_cli', codex: 'codex_cli' }
 const REPOSITORY = 'alexj11324/Mikka-handoff'
 const TERMINAL = new Set(['succeeded', 'completed', 'failed', 'stopped', 'cancelled'])
+const HANDOFF_TOOLS = new Set(['mcp__mikka__submit', 'mcp__mikka__request_help', 'mcp__mikka__ask_human', 'mcp__mikka__report_blocked'])
 // Kept closed like the daemon collector: never copy arbitrary chunk fields.
 const STARTUP_PHASES = new Set(['daemon.adapter.model_report', 'daemon.adapter.auth', 'daemon.adapter.auth.gate',
   'daemon.adapter.auth.context', 'daemon.adapter.auth.access', 'daemon.adapter.auth.token', 'daemon.adapter.auth.native_auth',
@@ -272,22 +274,14 @@ export async function chooseSharedChatModel(client, botId, harness) {
     && (current.available === true || current.availability === 'checking'), 'shared_chat_model_unavailable')
 }
 
-function readDispatchOutput(output) {
-  if (typeof output !== 'string') return null
-  let value
-  try { value = JSON.parse(output) } catch { return null }
-  if (value?.type === 'json') value = value.value
-  return value && UUID.test(value.runId ?? '') ? value : null
-}
-
 /** A bounded NDJSON read, never a polling loop. Only safe identifiers/times leave. */
-async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false }, now) {
+async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false, probe }, now) {
   const marker = `STARTUP_OK_${record.sampleId}`
   const toolInput = { issueId: record.issueId, repo: REPOSITORY, target: deviceId ? { deviceId } : 'cloud', profileId,
     // The owned lease probe executes Python; read-only runs intentionally have
     // no native shell. Ordinary startup checks keep their read-only policy.
-    ...(agentId ? { agentId } : {}), readOnly: !leaseAudit,
-    note: `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
+    ...(agentId ? { agentId } : {}), readOnly: !(leaseAudit || probe),
+    note: probe?.instructions ?? `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
   const text = `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用已固定模型的指定 Profile，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
   const trace = sampledRequestTrace()
   record.requestTraceId = trace.traceId
@@ -298,66 +292,45 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
     deviceId ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId],
   { headers: { traceparent: trace.traceparent } })
   record.phase = 'coordinator_stream'
-  const response = await client.request(`/api/coordinator/stream?botId=${botId}&wait=1`, {}, timeoutMs)
-  if (response.status >= 400 && response.status <= 599) {
-    await response.body?.cancel().catch(() => {})
-    fail(`http_${response.status}`)
-  }
-  assert(response.status === 200 && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'coordinator_stream_unavailable')
-  const workflowRunId = response.headers.get('x-mikka-stream-run')
-  assert(/^wrun_[A-Za-z0-9]+$/.test(workflowRunId ?? ''), 'workflow_run_missing')
-  record.workflowRunId = workflowRunId
-  const reader = response.body.getReader(), decoder = new TextDecoder()
-  let buffer = '', selectedCall
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true })
-      assert(buffer.length < 1000000, 'coordinator_stream_too_large')
-      const lines = buffer.split('\n'); buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        let event
-        try { event = JSON.parse(line) } catch (error) { fail('coordinator_stream_invalid', error) }
-        if (event.type !== 'tool' || event.name !== 'dispatch_run') continue
-        if (event.state === 'running') {
-          // A durable Coordinator workflow can replay earlier chat turns.
-          // Bind the call to this owned issue or its unique read-only marker.
-          if (!event.quote?.includes(marker) && !event.input?.includes(record.issueId)) continue
-          assert(!selectedCall || selectedCall === event.call, 'multiple_dispatches')
-          selectedCall = event.call
-          record.dispatchCallId = event.call
-          record.dispatchObservedAt ??= iso(now())
-          continue
-        }
-        if (!selectedCall || event.call !== selectedCall) continue
-        record.dispatchReturnedAt = iso(now())
-        if (event.state !== 'done') {
-          const code = typeof event.errorCode === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(event.errorCode) ? event.errorCode : 'unavailable'
-          record.dispatchRefusal = { code }
-          fail('dispatch_refused')
-        }
-        const result = readDispatchOutput(event.output)
-        // The public stream intentionally truncates output at 200 characters.
-        // Resolve the one thread of our newly-created issue after its push;
-        // this is one event-triggered read, not a background polling loop.
-        record.phase = 'thread_lookup'
-        const { threads } = await client.rpc('agents.pollIssueThreads', [record.issueId])
-        assert(Array.isArray(threads) && threads.length === 1 && UUID.test(threads[0].id ?? '')
-          && threads[0].ownedByCurrentUser === true, 'dispatch_run_missing')
-        if (result) {
-          assert(result.thread === 'new' && result.runId === threads[0].id, 'dispatch_not_new')
-          assert(deviceId ? result.placement?.kind === 'device' && result.placement.deviceId === deviceId
-            : result.placement?.kind === 'cloud', 'placement_mismatch')
-        }
-        record.runId = threads[0].id
-        record.runIdHash = sha(record.runId).slice(0, 16)
-        record.placement = deviceId ? { kind: 'device', deviceId } : { kind: 'cloud' }
-        return
+  let selectedCall, completed = false
+  await observeEveSession(client, botId, { timeoutMs,
+    fail: (code, status, error) => {
+      if (status) fail(`http_${status}`, error)
+      fail(code === 'identity' ? 'workflow_run_missing' : code === 'too_large' ? 'coordinator_stream_too_large' : code === 'unavailable' ? 'coordinator_stream_unavailable' : 'coordinator_stream_invalid', error)
+    },
+    onEvent: async (event, sessionId) => {
+      record.eveSessionId = sessionId
+      // Session id is the durable Workflow run id, not the model's run_ label.
+      record.workflowRunId = sessionId
+      if (event.type === 'call.requested' && event.data.capability?.name === 'dispatch_run') {
+        const input = event.data.input
+        if (input?.issueId !== record.issueId || !input.note?.includes(marker)) return false
+        assert(input.profileId === profileId, 'placement_mismatch')
+        assert(!selectedCall || selectedCall === event.data.callId, 'multiple_dispatches')
+        selectedCall = event.data.callId; record.dispatchCallId = selectedCall
+        record.dispatchObservedAt ??= iso(now())
       }
-      if (done) fail('dispatch_not_observed')
-    }
-  } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
+      if (event.type !== 'call.settled' || !selectedCall || event.data.callId !== selectedCall) return false
+      record.dispatchReturnedAt = iso(now())
+      const code = event.data.error?.code ?? event.data.output?.error ?? (event.data.output?.ok === false ? event.data.output.code : undefined)
+      if (event.data.outcome !== 'completed' || code) {
+        record.dispatchRefusal = { code: typeof code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(code) ? code : 'unavailable' }
+        fail('dispatch_refused')
+      }
+      const result = event.data.output
+      assert(result && UUID.test(result.runId ?? ''), 'dispatch_run_missing')
+      record.phase = 'thread_lookup'
+      const { threads } = await client.rpc('agents.pollIssueThreads', [record.issueId])
+      assert(Array.isArray(threads) && threads.length === 1 && UUID.test(threads[0].id ?? '') && threads[0].ownedByCurrentUser === true, 'dispatch_run_missing')
+      assert(result.thread === 'new' && result.runId === threads[0].id, 'dispatch_not_new')
+      assert(deviceId ? result.placement?.kind === 'device' && result.placement.deviceId === deviceId : result.placement?.kind === 'cloud', 'placement_mismatch')
+      record.runId = threads[0].id; record.runIdHash = sha(record.runId).slice(0, 16)
+      record.placement = deviceId ? { kind: 'device', deviceId } : { kind: 'cloud' }
+      completed = true
+      return true
+    },
+  })
+  assert(completed, 'dispatch_not_observed')
 }
 
 function readStartupTiming(value, record, names = STARTUP_PHASES) {
@@ -481,6 +454,29 @@ export function observeChunks(record, detail, observedAt) {
   // getIssueThread replays the stream. Derive ordering afresh from this read,
   // never from toolCalls retained by an earlier read of the same chunks.
   const toolInputs = new Set()
+  const successfulExecutionTools = new Set()
+  // A successful handoff is delivery, not evidence that the task was read or
+  // executed. Resolve known handoff identities across this replay first: an
+  // input-start can omit the name that a later input-available supplies.
+  const handoffCalls = new Set()
+  const codexNativeCalls = new Map()
+  const codexInputs = new Set()
+  let codexStarted = false
+  for (const { chunk } of detail.chunks ?? []) {
+    if (chunk?.type === 'data-run-stage' && chunk.data?.stage === 'agent_start'
+      && Number.isFinite(chunk.data.ms) && chunk.data.ok === true) codexStarted = true
+    if (['tool-input-start', 'tool-input-available'].includes(chunk?.type)
+      && typeof chunk.toolCallId === 'string' && chunk.toolCallId.length > 0 && chunk.toolCallId.length <= 512) {
+      const toolCallHash = sha(chunk.toolCallId).slice(0, 16)
+      if (HANDOFF_TOOLS.has(chunk.toolName)) handoffCalls.add(toolCallHash)
+      // Match the execution pass's first 64 inputs, while accepting a later
+      // name for an already admitted call. Never downgrade a known native tool.
+      if (record.harness === 'codex' && codexStarted && (codexInputs.has(toolCallHash) || codexInputs.size < 64)) {
+        codexInputs.add(toolCallHash)
+        if (!codexNativeCalls.has(toolCallHash) && ['bash', 'apply_patch'].includes(chunk.toolName)) codexNativeCalls.set(toolCallHash, chunk.toolName)
+      }
+    }
+  }
   const submittedReplies = new Set()
   let submittedAt = null
   let started = false, reply = '', completedTool = false, replyAfterTool = '', replyVerifiedAfterTool = false
@@ -529,7 +525,15 @@ export function observeChunks(record, detail, observedAt) {
           && typeof chunk.input?.summary === 'string' && chunk.input.summary.includes(`STARTUP_OK_${record.sampleId}`)) submittedReplies.add(toolCallHash)
         if (chunk.type === 'tool-output-available' && submittedReplies.has(toolCallHash) && Number.isFinite(at)) submittedAt = at
         if (chunk.type.startsWith('tool-input-') && toolInputs.size < 64) toolInputs.add(toolCallHash)
-        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash)) completedTool = true
+        if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash) && !handoffCalls.has(toolCallHash)) {
+          const native = codexNativeCalls.get(toolCallHash)
+          const succeeded = native === 'bash' ? chunk.output?.exitCode === 0
+            : native === 'apply_patch' ? chunk.output?.status === 'completed' : true
+          if (succeeded) successfulExecutionTools.add(toolCallHash)
+          else successfulExecutionTools.delete(toolCallHash)
+        }
+        if (chunk.type === 'tool-output-error') successfulExecutionTools.delete(toolCallHash)
+        completedTool = successfulExecutionTools.size > 0
         let tool = toolCalls.find(call => call.toolCallHash === toolCallHash)
         if (!tool && chunk.type.startsWith('tool-input-') && toolCalls.length < 64) {
           tool = { toolCallHash, startedAt: Number.isFinite(at) ? iso(at) : null, outcome: 'pending' }; toolCalls.push(tool)
@@ -574,7 +578,7 @@ export function observeChunks(record, detail, observedAt) {
   record.replyVerifiedAfterTool = replyVerifiedAfterTool
   record.lastStatus = typeof detail.thread?.status === 'string' && /^[a-z_]+$/.test(detail.thread.status) ? detail.thread.status : null
   return Boolean(record.agentStart && record.firstProviderChunk && (!record.requireReply || record.replyVerified)
-    && toolCalls.filter(tool => tool.outcome === 'ok').length >= (record.minToolCalls ?? 0)
+    && successfulExecutionTools.size >= (record.minToolCalls ?? 0)
     && (!record.requireReplyAfterTool || record.replyVerifiedAfterTool)
     && (!record.requireRuntimeReceipt || record.runtimeTimingStatus === 'complete')
     && (!record.requireTerminal || (detail.thread?.id === record.runId && TERMINAL.has(record.lastStatus))))
@@ -598,7 +602,11 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
   const watchedRunIds = new Set([record.runId])
   const extraScopes = new Set()
   let closed = false, reading = false, dirty = false, deadline = false, settle, refreshWork
-  const outcome = new Promise((resolve, reject) => { settle = { resolve, reject } })
+  let readsStarted = 0, readsCompleted = 0, lastCompletedAt = null, readInFlight = false, liveObserver, outcomeSettled = false
+  const outcome = new Promise((resolve, reject) => { settle = {
+    resolve: () => { outcomeSettled = true; resolve() },
+    reject: error => { outcomeSettled = true; reject(error) },
+  } })
   const abort = () => settle.reject(new Error('startup_observation_aborted'))
   if (hooks.signal?.aborted) abort()
   else hooks.signal?.addEventListener('abort', abort, { once: true })
@@ -631,21 +639,42 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
     url.searchParams.set('revisions', '1')
     const socket = new WebSocketImpl(url, ticket.protocol)
     sockets.set(workspaceId, socket)
-    socket.onclose = socket.onerror = () => { if (!closed) failLive('live_disconnected') }
+    const timeline = { openedAt: null, readyAt: null, lastNotificationAt: null }
     const failLive = code => reject(new Error(`startup_${code}`))
+    const disconnected = (event, close) => {
+      if (closed || outcomeSettled) return
+      // Freeze only the first observed transport fault. No event bodies, tickets
+      // or identifiers leave; later callbacks cannot rewrite the failure.
+      if (!liveObserver) {
+        const firstFailure = { event, at: iso(now()), scopeHash: sha(workspaceId).slice(0, 16),
+          readyState: Number.isInteger(socket.readyState) && socket.readyState >= 0 && socket.readyState <= 3 ? socket.readyState : null }
+        if (event === 'close') {
+          if (Number.isInteger(close?.code) && close.code >= 0 && close.code <= 65535) firstFailure.code = close.code
+          if (typeof close?.wasClean === 'boolean') firstFailure.wasClean = close.wasClean
+        }
+        liveObserver = record.liveObserver = { version: 1, firstFailure, ...timeline,
+          detailReads: { started: readsStarted, completed: readsCompleted, lastCompletedAt, inFlightAtFailure: readInFlight },
+          shutdownAt: null }
+      }
+      failLive('live_disconnected')
+    }
+    socket.onclose = event => disconnected('close', event)
+    socket.onerror = () => disconnected('error')
     socket.onmessage = message => {
       if (closed || message.data === 'pong' || typeof message.data !== 'string' || message.data.length > 2048) return
       let value
       try { value = JSON.parse(message.data) } catch { return }
       if (value.type === 'live_ready') {
         if (!Array.isArray(value.kinds) || !value.kinds.includes('thread') || !value.kinds.includes('run')) return failLive('live_capability_missing')
+        timeline.readyAt ??= iso(now())
         kick(); return
       }
       if ((['thread', 'run'].includes(value.kind) && watchedRunIds.has(value.id))
         || (value.kind === 'issue_threads' && value.id === record.issueId)
-        || hooks.matches?.(value)) kick()
+        || hooks.matches?.(value)) { timeline.lastNotificationAt = iso(now()); kick() }
     }
     socket.onopen = () => {
+      timeline.openedAt ??= iso(now())
       const heartbeat = () => { if (closed) return; if (socket.readyState === 1) socket.send('ping'); later(heartbeat, 30000) }
       later(heartbeat, 30000)
     }
@@ -657,7 +686,12 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
       do {
         dirty = false
         const finalRead = deadline
-        const detail = await client.rpc('agents.getIssueThread', [record.issueId, record.runId])
+        readsStarted++; readInFlight = true
+        let detail
+        try {
+          detail = await client.rpc('agents.getIssueThread', [record.issueId, record.runId])
+          readsCompleted++; lastCompletedAt = iso(now())
+        } finally { readInFlight = false }
         if (closed) return
         record.detailReads = (record.detailReads ?? 0) + 1
         record.runCreatedAt ??= detail.thread?.createdAt ?? null
@@ -679,6 +713,7 @@ export async function watchRun(client, record, timeoutMs, WebSocketImpl, now, cl
   try { await outcome }
   finally {
     closed = true
+    if (liveObserver) liveObserver.shutdownAt = iso(now())
     hooks.signal?.removeEventListener('abort', abort)
     for (const timer of timers) clearTimeout(timer)
     for (const socket of sockets.values()) { socket.onclose = socket.onerror = socket.onmessage = socket.onopen = null; socket.close() }
@@ -833,7 +868,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
-  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued }) {
+  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued, createCaseProbe }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
   assert(scope?.ownerId && scope.adminId && scope.ownerId !== scope.adminId && scope.botId === botId
@@ -852,8 +887,14 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     assert(typeof build === 'string' && (!expectedBuild || build === expectedBuild), 'build_mismatch')
     assert(!record.build || build === record.build, 'build_changed'); record.build = build
   })
-  let initialPinPassed = false, finalPinAttempted = false
+  let initialPinPassed = false, finalPinAttempted = false, probe
   try {
+    if (createCaseProbe) {
+      probe = await createCaseProbe({ client, record, scope, now })
+      assert(typeof probe?.instructions === 'string' && probe.instructions.length > 0 && probe.instructions.length <= 10000
+        && ['createIssue', 'observe', 'afterRelease'].every(key => typeof probe[key] === 'function'), 'fixture_scope_invalid')
+      record.requireReplyAfterTool = true
+    }
     await pin()
     initialPinPassed = true
     record.phase = 'session_identity'
@@ -870,11 +911,12 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'issue_create'
     const leaseDriver = leaseAudit ? await import('./cloud-lease-audit.mjs') : null
     const leaseInstructions = leaseDriver ? await leaseDriver.leaseAuditInstructions(sampleId, harness) : ''
-    const created = await client.rpc('issues.saveIssue', [{ title: record.title, status: 'todo', priority: 'low', content: {
+    const issueInput = { title: record.title, status: 'todo', priority: 'low', content: {
       type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.\n${leaseInstructions}` }] }],
-    } }])
+    } }
+    const created = probe ? await probe.createIssue(issueInput) : await client.rpc('issues.saveIssue', [issueInput])
     assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
-    await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit }, now)
+    await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit, probe }, now)
     record.phase = 'coordinator_stop'
     await client.rpc('coordinator.stopCoordinatorTurn', [botId])
     record.coordinatorStopped = true
@@ -891,11 +933,13 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
       } catch (error) { fail('bootstrap_publication_failed', error) }
     }
     record.phase = 'execution_watch'
-    await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver ? {
-      observe: detail => {
+    await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver || probe ? {
+      ...(probe?.signal ? { signal: probe.signal } : {}),
+      observe: async (detail, live) => {
         const complete = observeChunks(record, detail, now())
-        record.leaseAudit = leaseDriver.leaseAuditReceipt(detail.chunks, record.runId, harness)
-        return complete
+        if (leaseDriver) record.leaseAudit = leaseDriver.leaseAuditReceipt(detail.chunks, record.runId, harness)
+        const probeComplete = probe ? await probe.observe(detail, live) : true
+        return complete && probeComplete
       },
     } : undefined)
     record.phase = 'subscription_proof'
@@ -930,7 +974,15 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
         record.failure ??= record.stopFailure; record.error ??= record.failure.code
       }
     }
-    await cleanupCase(client, record, deviceId ? 'device' : 'cloud', { timeoutMs, WebSocketImpl, now })
+    await cleanupCase(client, record, deviceId ? 'device' : 'cloud', { timeoutMs, WebSocketImpl, now, ...(probe ? { preserveIssue: true } : {}) })
+    if (probe) {
+      try { await probe.afterRelease() }
+      catch (error) {
+        record.status = 'failed'
+        record.cleanup.status = 'failed'
+        record.cleanup.errors.push({ step: 'case_probe_after_release', code: safeError(error) })
+      }
+    }
     if (record.cleanup.status !== 'passed' && !record.failure) {
       record.failure = startupFailure(new Error(record.cleanup.errors[0]?.code), 'cleanup'); record.error = record.failure.code
     }
@@ -939,7 +991,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
 }
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
-  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued } = {}) {
+  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued, createCaseProbe, caseProfileInstructions } = {}) {
   const { email, password } = smokeAcceptanceAccount(env)
   assert(typeof WebSocketImpl === 'function', 'node_websocket_required')
   const client = createSessionClient(options.origin, fetchImpl), fixtureId = randomUUID()
@@ -1028,7 +1080,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
           name: `测试1505 ${fixtureId.slice(0, 8)} ${harness}`, description: 'Temporary startup measurement', enabled: true,
           harness, model: { mode: 'fixed', harness, model: MODELS[harness], source: candidate.source }, effort: 'low', roles: [],
-          instructions: 'This is a read-only startup test. Do not modify files, commit, push, create a PR, send external messages, or spawn agents.', skills: [],
+          instructions: caseProfileInstructions ?? 'This is a read-only startup test. Do not modify files, commit, push, create a PR, send external messages, or spawn agents.', skills: [],
         } }))
         phase = 'profile_validation'
         assert(UUID.test(created.profile?.id ?? '') && Number.isInteger(created.profile.version) && created.profile.version > 0, 'profile_create_failed')
@@ -1050,7 +1102,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       }
       report.phase = 'profile_validation'
       const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
-        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued })
+        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued, createCaseProbe })
       report.samples.push(sample)
       const versionFailure = sample.versionPinFailure?.code ?? (['startup_build_mismatch', 'startup_build_changed',
         'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error) ? sample.error : null)
@@ -1099,18 +1151,23 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
  * credentials, request headers or raw application log envelopes are needed. */
 export function alignServerTimings(report, timings) {
   assert(Array.isArray(timings), 'timings_invalid')
-  const clean = timings.filter(item => item?.msg === 'dispatch_timing' && typeof item.workflowRunId === 'string'
+  const clean = timings.filter(item => item?.msg === 'dispatch_timing' && (typeof item.workflowRunId === 'string' || item.workflowRunId === null)
     && Number.isSafeInteger(item.startedAt) && Number.isSafeInteger(item.endedAt) && item.endedAt >= item.startedAt
     && Number.isFinite(item.totalMs) && item.failed === false)
   for (const sample of report.samples) {
     if (!sample.agentStart || !sample.firstProviderChunk) continue
-    let matching = clean.filter(item => item.workflowRunId === sample.workflowRunId)
+    const owned = timings.filter(item => item?.msg === 'cloud_startup_timing' && item.stage === 'cloud.thread.ensure'
+      && item.runIdHash === sample.runIdHash && Number.isSafeInteger(item.startedAt) && Number.isSafeInteger(item.endedAt))
+    const containsOwnedRun = item => owned.some(run => run.startedAt >= item.startedAt && run.endedAt <= item.endedAt)
+    // Native Eve business tools execute on the product API host, outside the
+    // agent Workflow world. A null runtime id requires the owned run's exact
+    // server interval; session names and runner reception clocks cannot replace it.
+    let matching = clean.filter(item => item.workflowRunId === sample.workflowRunId
+      || sample.eveSessionId && item.workflowRunId === null && containsOwnedRun(item))
     // One durable workflow can dispatch several chat turns. Correlate using
     // the owned run's server-side ensure interval, never runner wall clocks.
     if (matching.length > 1) {
-      const owned = timings.filter(item => item?.msg === 'cloud_startup_timing' && item.stage === 'cloud.thread.ensure'
-        && item.runIdHash === sample.runIdHash && Number.isSafeInteger(item.startedAt) && Number.isSafeInteger(item.endedAt))
-      if (owned.length) matching = matching.filter(item => owned.some(run => run.startedAt >= item.startedAt && run.endedAt <= item.endedAt))
+      if (owned.length) matching = matching.filter(containsOwnedRun)
     }
     if (matching.length !== 1) { sample.timing = { status: 'unavailable', reason: matching.length ? 'ambiguous_dispatch' : 'dispatch_log_missing' }; continue }
     const log = matching[0], end = dateValue(sample.agentStart.storedAt), provider = dateValue(sample.firstProviderChunk.storedAt)

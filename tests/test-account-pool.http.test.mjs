@@ -87,6 +87,30 @@ async function noSession(path, init = {}) {
 }
 const post = messageId => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messageId }) })
 
+acceptance('native Coordinator prewarm preserves the sealed account footprint and stable session', async () => {
+  const scope = await acquire('native-prewarm')
+  try {
+    for (const account of [scope.owner, scope.peer]) {
+      const fingerprint = () => pool.transaction(client => pool.fingerprint(client, account.userId), { readOnly: true })
+      const baseline = await fingerprint()
+      let sessionId
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await account.request('/api/agents/eve/v1/session', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+        })
+        assert.equal(response.status, 200)
+        const session = await response.json()
+        assert.equal(typeof session.sessionId, 'string')
+        assert.ok(session.sessionId.length > 0)
+        if (sessionId) assert.equal(session.sessionId, sessionId)
+        sessionId = session.sessionId
+        assert.equal(await fingerprint(), baseline, 'Opening native chat must preserve the sealed clean-account footprint')
+      }
+    }
+    assert.equal((await release(scope)).state, 'released')
+  } finally { if (active.has(scope)) await release(scope, 'dirty') }
+})
+
 acceptance('personal plugin APIs keep MCP and skill settings private across real authenticated sessions', async () => {
   const scope = await acquire('personal-plugins')
   const json = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -247,6 +271,14 @@ acceptance('prepare/acquire/real owner-peer HTTP/clean release safely reuses the
     await database.query('delete from agent_runs where id=$1 and "userId"=$2 and "agentId"=$3', [runRecordId, first.owner.userId, agentId])
     await database.query('delete from agents where id=$1 and "userId"=$2', [agentId, first.owner.userId])
     for (const resource of resources) await first.markResourceCleaned(resource)
+    const retainedAudit = await database.query(`SELECT a.record_id,a.fingerprint,e.id,
+      encode(sha256(convert_to(to_jsonb(e)::text,'UTF8')),'hex') AS observed
+      FROM mikka_test_accounts.retained_audit a JOIN resource_access_events e ON e.id::text=a.record_id
+      WHERE a.lease_id=$1 AND a.table_name='resource_access_events'`,[first.lease.id])
+    assert.ok(retainedAudit.rowCount>0,'synthetic resource audit is retained with an explicit lease receipt')
+    for (const row of retainedAudit.rows) assert.equal(row.fingerprint,row.observed)
+    await assert.rejects(database.query('DELETE FROM resource_access_events WHERE id=$1',[retainedAudit.rows[0].id]),
+      error=>error.code==='23514','test cleanup cannot delete immutable application audit')
     fixturesClean = true
 
     const ids = [first.owner.userId, first.peer.userId]

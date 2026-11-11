@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { observeEveSession } from './eve-session.mjs'
 /** #1712: normal smoke-owner native Git/gh and both official subscriptions.
  * The additional HTTP leg runs the exact data-plane/bridge source against an
  * isolated random key in a disposable E2B fixture. It is not production-store
@@ -179,33 +180,26 @@ async function dispatch(client, record, profileId, botId, now) {
     `执行已有测试任务 ${record.issueId}，只调用一次 dispatch_run，参数：${JSON.stringify(tool)}。使用指定 Profile，不变更模型、订阅或电脑，不创建另一任务。派发后只汇报 runId。`,
     null, botId, randomUUID(), { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId,
   ], { headers: { traceparent: trace.traceparent } })
-  const response = await client.request(`/api/coordinator/stream?botId=${botId}&wait=1`, {}, 120_000)
-  check(response.ok && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'dispatch')
-  const reader = response.body.getReader(), decoder = new TextDecoder()
-  let buffer = '', call
-  try {
-    for (;;) {
-      const item = await reader.read(); buffer += item.done ? decoder.decode() : decoder.decode(item.value, { stream: true })
-      check(buffer.length < 1_000_000, 'dispatch')
-      const lines = buffer.split('\n'); buffer = lines.pop() ?? ''
-      for (const line of lines.filter(line => line.trim())) {
-        const event = JSON.parse(line)
-        if (event.type !== 'tool' || event.name !== 'dispatch_run') continue
-        if (event.state === 'running' && (event.input?.includes(record.issueId) || event.quote?.includes(`STARTUP_OK_${record.sampleId}`))) {
-          check(!call || call === event.call, 'multiple_dispatches'); call = event.call
-          record.dispatchObservedAt ??= new Date(now()).toISOString()
-        } else if (call && call === event.call) {
-          check(event.state === 'done', 'dispatch')
-          const { threads } = await client.rpc('agents.pollIssueThreads', [record.issueId])
-          check(threads?.length === 1 && UUID.test(threads[0].id ?? '') && threads[0].ownedByCurrentUser === true, 'thread')
-          record.runId = threads[0].id; record.runIdHash = hash(record.runId).slice(0, 16); record.placement = { kind: 'cloud' }
-          record.dispatchReturnedAt = new Date(now()).toISOString()
-          return
-        }
+  let call, completed = false
+  await observeEveSession(client, botId, { fail: () => { check(false, 'dispatch') },
+    onEvent: async event => {
+      if (event.type === 'call.requested' && event.data.capability?.name === 'dispatch_run') {
+        const input = event.data.input
+        if (input?.issueId !== record.issueId || !input.note?.includes(`STARTUP_OK_${record.sampleId}`)) return false
+        check(input.profileId === profileId, 'dispatch')
+        check(!call || call === event.data.callId, 'multiple_dispatches'); call = event.data.callId
+        record.dispatchObservedAt ??= new Date(now()).toISOString()
       }
-      if (item.done) check(false, 'dispatch')
-    }
-  } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
+      if (event.type !== 'call.settled' || !call || call !== event.data.callId) return false
+      check(event.data.outcome === 'completed' && UUID.test(event.data.output?.runId ?? ''), 'dispatch')
+      const { threads } = await client.rpc('agents.pollIssueThreads', [record.issueId])
+      check(threads?.length === 1 && UUID.test(threads[0].id ?? '') && threads[0].ownedByCurrentUser === true && event.data.output.runId === threads[0].id, 'thread')
+      record.runId = threads[0].id; record.runIdHash = hash(record.runId).slice(0, 16); record.placement = { kind: 'cloud' }
+      record.dispatchReturnedAt = new Date(now()).toISOString(); completed = true
+      return true
+    },
+  })
+  check(completed, 'dispatch')
 }
 
 export async function runTaskSecretsAcceptance(options, { env = process.env, fetchImpl = fetch, now = Date.now,

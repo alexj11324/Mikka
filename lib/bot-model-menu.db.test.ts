@@ -32,15 +32,17 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY);
+      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL DEFAULT 'team' CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false,"modelSettings" jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
     for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql", "20261102190000_model_api_key_responses_api.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
+    // Resource policy still runs against real non-Org rows in this isolated schema.
+    await pool.query(await readFile(new URL("../drizzle/20261109035020_organization_governance.sql", import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
-    mock.module(new URL("./workspace-db.ts", import.meta.url).href, { namedExports: { workspaceDb: drizzle(pool) } });
+    mock.module(new URL("./workspace-db.ts", import.meta.url).href, { namedExports: { workspaceDb: drizzle(pool), workspacePool: pool } });
     // Points and their fallback have their own tests: here Mikka 默认 has points.
     let hostedPoints = 98;
     let hostedTrial = 0;
@@ -55,7 +57,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
 
     const settings = new ExecutionSettings(pool);
     const workspace = randomUUID(), elsewhere = randomUUID();
-    await pool.query('INSERT INTO mikka_workspaces VALUES ($1),($2)', [workspace, elsewhere]);
+    await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1),($2)', [workspace, elsewhere]);
     const alice = { ownerId: "alice", workspaceId: workspace };
     const [botA, botB, bobBot] = [randomUUID(), randomUUID(), randomUUID()];
     await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active')`, [workspace]);
@@ -102,6 +104,14 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(menu.current.chosen, false);
     assert.equal(menu.current.available, true);
     assert.equal((await pool.query("SELECT count(*)::int AS n FROM bot_model_choices")).rows[0].n, 0, "reading the menu saves nothing");
+    const calls: unknown[][] = [];
+    const countedPool = { query: new Proxy(pool.query, { apply(target, _receiver, args) { calls.push(args); return Reflect.apply(target, pool, args) } }) };
+    await botModelMenu(countedPool, settings, alice, botA);
+    const ordinaryQueryCount = calls.length; calls.length = 0;
+    const inspected = await botModelMenu(countedPool, settings, alice, botA, Date.now(), true);
+    assert.equal(inspected.preferenceState, "absent");
+    assert.equal(calls.length, ordinaryQueryCount, "opt-in presence reuses the existing preference read");
+    assert.deepEqual(Object.keys(menu).sort(), ["current", "groups"], "ordinary menu wire shape stays unchanged");
     // Another person's bot is not this person's to pick for.
     await assert.rejects(settings.setBotModel(alice, bobBot, gpt), { code: "botNotFound" });
     await assert.rejects(settings.setBotModel(alice, botA, bobsModel), { code: "executionModelUnknown" });
@@ -117,6 +127,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.equal(a.groups.flatMap((group) => group.options).filter((option) => option.modelId === "gpt-fixture").length, 1);
     const b = await botModelMenu(pool, settings, alice, botB);
     assert.deepEqual([b.current.provider, b.current.chosen], ["claude", false]);
+    assert.equal((await botModelMenu(pool, settings, alice, botA, Date.now(), true)).preferenceState, "present");
     const coordinator = await botModelMenu(pool, settings, alice, null);
     assert.deepEqual([coordinator.current.id, coordinator.current.kind, coordinator.current.chosen], [HOSTED_CHOICE, "hosted", true]);
 
@@ -403,4 +414,77 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await admin.query(`DROP SCHEMA ${schema} CASCADE`);
     await admin.end();
   }
+});
+
+test("mobile model API keeps normal selection and authenticates every temporary branch", async () => {
+  mock.reset(); // The preceding database fixture has completed; retire its module mocks.
+  const owner = "model-route-fixture-owner", bot = "10000000-0000-4000-8000-000000000001";
+  const workspace = "10000000-0000-4000-8000-000000000002", option = "10000000-0000-4000-8000-000000000003";
+  const stored = "10000000-0000-4000-8000-000000000004";
+  const calls: { method: string; args: unknown[] }[] = [];
+  const normal = { groups: [], current: { id: option } };
+  let authenticated = true, originAllowed = true, conflict = false, restored = true;
+  const tokenWorkspace = Symbol("fixture-token-workspace");
+  const { ActionFailureError } = await import("./action-error");
+  const record = (method: string, args: unknown[]) => { calls.push({ method, args }); };
+  const mocks = [
+    mock.module(new URL("./request-log.ts", import.meta.url).href, { namedExports: { noteLogUser: () => {}, withRequestLog: (_name: string, handler: unknown) => handler } }),
+    mock.module(new URL("./mobile-api.ts", import.meta.url).href, { namedExports: {
+      mobileUser: async () => authenticated ? { id: owner, [tokenWorkspace]: workspace } : null,
+      writeAllowed: () => originAllowed, json: (value: unknown, status = 200) => Response.json(value, { status }),
+      unauthorized: () => Response.json({ error: "authRequired" }, { status: 401 }),
+      forbiddenOrigin: () => Response.json({ error: "forbiddenOrigin" }, { status: 403 }),
+    } }),
+    mock.module(new URL("./tokens/principal.ts", import.meta.url).href, { namedExports: { tokenWorkspace } }),
+    mock.module(new URL("./coordinator/coordinator-bot.ts", import.meta.url).href, { namedExports: { openChatBotId: async (_user: unknown, id: string | null) => id ?? bot } }),
+    mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool: {} } }),
+    mock.module(new URL("./execution-settings.ts", import.meta.url).href, { namedExports: { ExecutionSettings: class {
+      async setTemporaryBotModel(...args: unknown[]) { record("temporary", args); return conflict ? null : { bindingId: stored, revision: "12345" }; }
+      async restoreTemporaryBotModel(...args: unknown[]) { record("restore", args); return restored; }
+    } } }),
+    mock.module(new URL("./bot-model-menu.ts", import.meta.url).href, { namedExports: {
+      botModelScope: async (ownerId: string, botId: string, onlyWorkspace: string) => {
+        assert.deepEqual([ownerId, onlyWorkspace], [owner, workspace]);
+        if (botId !== bot) throw new ActionFailureError("botNotFound");
+        return { ownerId, workspaceId: workspace };
+      },
+      botModelMenu: async (...args: unknown[]) => { record("menu", args); return { ...normal, ...(args[5] === true ? { preferenceState: "absent" } : {}) }; },
+      chooseBotModel: async (...args: unknown[]) => { record("ordinary", args); return normal; },
+      refreshBotModelMenu: async () => normal,
+    } }),
+  ];
+  try {
+    const route = await import("../app/api/mobile/model/route");
+    const request = (body: unknown) => new Request("https://example.test/api/mobile/model", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    assert.deepEqual(await (await route.GET(new Request("https://example.test/api/mobile/model?bot=" + bot))).json(), normal);
+    assert.equal(calls.at(-1)?.args.length, 4, "ordinary GET does not opt into extra fields");
+    assert.equal((await (await route.GET(new Request("https://example.test/api/mobile/model?bot=" + bot + "&choiceState=1"))).json()).preferenceState, "absent");
+    assert.deepEqual(await (await route.PUT(request({ bot, id: option }))).json(), normal);
+    assert.equal(calls.at(-1)?.method, "ordinary");
+    assert.deepEqual(calls.at(-1)?.args.slice(2), [{ ownerId: owner, workspaceId: workspace }, bot, option]);
+
+    const temporary = { bot, id: option, mode: "temporary-if-absent" };
+    const selected = await route.PUT(request(temporary));
+    assert.equal(selected.status, 200);
+    assert.deepEqual((await selected.json()).temporarySelection, { bindingId: stored, revision: "12345" });
+    const restore = { bot, mode: "restore-implicit", bindingId: stored, revision: "12345" };
+    assert.deepEqual(await (await route.PUT(request(restore))).json(), { restored: true, preferenceState: "absent" });
+    conflict = true; assert.equal((await route.PUT(request(temporary))).status, 409); conflict = false;
+    restored = false; assert.equal((await route.PUT(request(restore))).status, 409); restored = true;
+
+    for (const body of [{ ...temporary, workspaceId: workspace }, { ...temporary, bot: null },
+      { ...temporary, id: "apikey:private" }, { ...restore, revision: "PRIVATE_BODY" }, { ...restore, unexpected: true }]) {
+      const before = calls.length;
+      assert.equal((await route.PUT(request(body))).status, 400);
+      assert.equal(calls.length, before, "invalid input never reaches storage");
+    }
+    for (const body of [temporary, restore]) {
+      authenticated = false; const before = calls.length;
+      assert.equal((await route.PUT(request(body))).status, 401); assert.equal(calls.length, before);
+      authenticated = true; originAllowed = false;
+      assert.equal((await route.PUT(request(body))).status, 403); assert.equal(calls.length, before);
+      originAllowed = true;
+      assert.equal((await route.PUT(request({ ...body, bot: stored }))).status, 404); assert.equal(calls.length, before);
+    }
+  } finally { for (const handle of mocks.reverse()) handle.restore(); }
 });

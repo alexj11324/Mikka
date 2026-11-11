@@ -6,6 +6,7 @@ import { promisify } from 'node:util'
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { Pool } from 'pg'
 import { productionApplication } from '../../apps/desktop/test/production-application.mjs'
+import { generatePersonalAccessToken } from '../../lib/tokens/format'
 
 // Real compiled HTTP + Better Auth + PostgreSQL; all records are synthetic and retained.
 const target = process.env.E2E_DATABASE_URL
@@ -88,7 +89,10 @@ async function startIsolatedApplication() {
   }, { timeout: 45000 }).toBe(401)
 }
 const owner = `site-search-${randomUUID()}`, outsider = `site-search-${randomUUID()}`
-const workspace = randomUUID(), otherWorkspace = randomUUID(), sessionId = randomUUID(), token = randomUUID()
+const workspace = randomUUID(), otherWorkspace = randomUUID(), secondWorkspace = randomUUID()
+const sessionId = randomUUID(), foreignSessionId = randomUUID(), token = randomUUID()
+const ownerTask = randomUUID(), secondOwnerTask = randomUUID(), ownedLinkedTask = randomUUID()
+const scopedToken = generatePersonalAccessToken()
 const secret = process.env.BETTER_AUTH_SECRET
 if (!secret) throw new Error('Synthetic auth secret required')
 const cookie = `better-auth.session_token=${encodeURIComponent(`${token}.${createHmac('sha256', secret).update(token).digest('base64')}`)}`
@@ -99,8 +103,12 @@ const boundary = { issue: randomUUID(), run: randomUUID(), agent: randomUUID(), 
 const execute = promisify(execFile)
 const archivedCompletion = 'root = TextContent("synthetic retained archive body")'
 let groupIds: string[] = []
-async function get(request: APIRequestContext, params: Record<string, string>, authenticated = true) {
-  const response = await request.get(`http://127.0.0.1:3210/mikka/api/search?${new URLSearchParams(params)}`, { headers: { cookie: authenticated ? cookie : '' } })
+async function get(request: APIRequestContext, params: Record<string, string>, authenticated = true, authorization?: string) {
+  const response = await request.get(`http://127.0.0.1:3210/mikka/api/search?${new URLSearchParams(params)}`, { headers: {
+    cookie: authenticated ? cookie : '',
+    ...(params.workspaceId ? { 'x-mikka-workspace-id': params.workspaceId } : {}),
+    ...(authorization ? { authorization } : {}),
+  } })
   expect(response.headers()['cache-control']).toBe('private, no-store')
   return { response, body: await response.json() }
 }
@@ -117,11 +125,12 @@ test.beforeAll(async () => {
   await startIsolatedApplication()
   for (const id of [owner, outsider]) await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())', [id, `${id}@example.invalid`])
   await pool.query('insert into session (id,token,"userId","expiresAt","createdAt","updatedAt") values ($1,$2,$3,now()+interval \'1 hour\',now(),now())', [sessionId, token, owner])
-  await pool.query('insert into session (id,token,"userId","expiresAt","createdAt","updatedAt") values ($1,$2,$3,now()+interval \'1 hour\',now(),now())', [randomUUID(), foreignToken, outsider])
-  for (const [id, user] of [[workspace, owner], [otherWorkspace, outsider]]) {
-    await workspacePool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Synthetic search\')', [id, user])
+  await pool.query('insert into session (id,token,"userId","expiresAt","createdAt","updatedAt") values ($1,$2,$3,now()+interval \'1 hour\',now(),now())', [foreignSessionId, foreignToken, outsider])
+  for (const [id, user] of [[workspace, owner], [otherWorkspace, outsider], [secondWorkspace, owner]]) {
+    await workspacePool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Synthetic search\',\'team\')', [id, user])
     await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'admin\',\'active\')', [id, user, `${user}@example.invalid`])
   }
+  await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,\'Synthetic search\',$4,$5,ARRAY[\'legacy:full\']::text[])', [randomUUID(), owner, workspace, scopedToken.tokenHash, scopedToken.hint])
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1999-01-01T00:00:00Z\')', [archivedId, owner, `${prefix}-archive-locator`])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'synthetic archived question\',$4,\'complete\',$5)', [randomUUID(), archivedId, owner, archivedCompletion, randomUUID()])
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1998-01-01T00:00:00Z\')', [emptyArchiveId, owner, `${prefix}-empty-archive`])
@@ -129,10 +138,11 @@ test.beforeAll(async () => {
   const boundaryTeam = randomUUID()
   await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'member\',\'active\')', [workspace, outsider, `${outsider}@example.invalid`])
   await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Search thread boundary\',\'STB\')', [boundaryTeam, workspace, owner])
-  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'normal\',\'workspace\')', [boundary.issue, owner, `${prefix}-thread-boundary`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 133 } } })])
+  await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$3,$4,$5,\'todo\',\'normal\',\'workspace\')', [boundary.issue, owner, workspace, `${prefix}-thread-boundary`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 133 } } })])
   await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [boundary.issue, boundaryTeam, workspace, owner])
   await pool.query('insert into agents (id,"userId",harness,name,instructions) values ($1,$2,\'codex\',\'BOUNDARY_PRIVATE_AGENT\',\'BOUNDARY_PRIVATE_INSTRUCTIONS\')', [boundary.agent, outsider])
-  await pool.query('insert into agent_runs (id,"userId","issueId","agentId",status,prompt,report) values ($1,$2,$3,$4,\'running\',\'BOUNDARY_PRIVATE_PROMPT\',$5)', [boundary.run, outsider, boundary.issue, boundary.agent, JSON.stringify({ summary: 'BOUNDARY_PRIVATE_REPORT' })])
+  await pool.query(`insert into agent_runs (id,"userId","issueId","agentId",status,prompt,"promptTaskStart","promptTaskLength",report,"workspaceId")
+    values ($1,$2,$3,$4,'running','BOUNDARY_PRIVATE_PROMPT',0,char_length('BOUNDARY_PRIVATE_PROMPT'),$5,$6)`, [boundary.run, outsider, boundary.issue, boundary.agent, JSON.stringify({ summary: 'BOUNDARY_PRIVATE_REPORT' }), workspace])
   await pool.query('insert into run_chunks (id,"runId",seq,chunk) values ($1,$2,1,$3)', [randomUUID(), boundary.run, JSON.stringify({ type: 'text-delta', delta: 'BOUNDARY_PRIVATE_CHUNK' })])
   await pool.query('insert into agent_sessions (id,"userId",title) values ($1,$2,$3)', [boundary.history, outsider, `${prefix}-thread-boundary`])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'private archive question\',\'BOUNDARY_PRIVATE_ARCHIVE\',\'complete\',$4)', [randomUUID(), boundary.history, outsider, randomUUID()])
@@ -155,16 +165,25 @@ test.beforeAll(async () => {
     const rows = await pool.query(`insert into conversations (id,"workspaceId",kind,title,"createdBy") select gen_random_uuid(),$1,'group',$2,$3 from generate_series(1,2) returning id`, [workspace, `${prefix}-race-${suffix}`, owner])
     await pool.query('insert into conversation_members ("conversationId","memberType","memberId",role) select unnest($1::uuid[]),\'user\',$2,\'member\'', [rows.rows.map(row => row.id), owner])
   }
-  const foreignTeam = randomUUID(), ownedLinkedTask = randomUUID()
+  const foreignTeam = randomUUID()
+  // This creator had valid membership when the task was bound, then lost access.
+  await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'member\',\'active\')', [otherWorkspace, owner, `${owner}@example.invalid`])
   await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Synthetic foreign team\',\'S131\')', [foreignTeam, otherWorkspace, outsider])
-  await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'normal\',\'workspace\')', [ownedLinkedTask, owner, `${prefix}-owner-policy`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 132 } } })])
+  await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$3,$4,$5,\'todo\',\'normal\',\'workspace\')', [ownedLinkedTask, owner, otherWorkspace, `${prefix}-owner-policy`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 132 } } })])
   await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [ownedLinkedTask, foreignTeam, otherWorkspace, owner])
+  await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [otherWorkspace, owner])
   // Neither body nor prompt is a searchable source, even in an accessible container.
   await pool.query('insert into conversation_messages (id,"conversationId",position,"authorType","authorId",body) values ($1,$2,1,\'user\',$3,$4)', [randomUUID(), groupIds[0], owner, `${prefix}-body-secret`])
   const history = randomUUID()
   await pool.query('insert into agent_sessions (id,"userId",title) values ($1,$2,\'unrelated title\')', [history, owner])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,$4,$4,\'complete\',$5)', [randomUUID(), history, owner, `${prefix}-body-secret`, randomUUID()])
-  for (const user of [owner, outsider]) await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,$3,$4,\'todo\',\'normal\',\'personal\')', [randomUUID(), user, `${prefix}-task`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 131 } } })])
+  // Provider scope is independent of the explicitly chosen tenant.
+  for (const [id, user, workspaceId, number] of [[ownerTask, owner, workspace, 131], [randomUUID(), outsider, otherWorkspace, 131], [secondOwnerTask, owner, secondWorkspace, 134]] as const) {
+    await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$3,$4,$5,\'todo\',\'normal\',\'personal\')', [id, user, workspaceId, `${prefix}-task`, JSON.stringify({ type: 'doc', attrs: { mikka: { number } } })])
+  }
+  const bound = await pool.query('select "workspaceId","ownershipState" from issues where id=$1', [boundary.issue])
+  expect(bound.rows).toEqual([{ workspaceId: workspace, ownershipState: 'bound' }])
+  expect((await pool.query('select "workspaceId" from agent_runs where id=$1', [boundary.run])).rows).toEqual([{ workspaceId: workspace }])
   if (process.env.SITE_SEARCH_REQUIRE_DUAL_PG === '1') {
     expect((await pool.query('select count(*)::int n from mikka_workspace_members where "userId"=$1', [owner])).rows[0].n).toBe(0)
     expect((await workspacePool.query('select count(*)::int n from agent_sessions where "userId"=$1', [owner])).rows[0].n).toBe(0)
@@ -178,7 +197,7 @@ test.afterAll(async () => {
     const groups = await pool.query('select id,"workspaceId",kind,title,"createdBy","createdAt" from conversations where "createdBy"=any($1::text[])', [[owner, outsider]])
     const memberships = await pool.query('select "conversationId","memberType","memberId",role,"leftAt" from conversation_members where "memberId"=$1', [owner])
     const workspaces = await workspacePool.query('select "workspaceId","userId",status from mikka_workspace_members where "userId"=any($1::text[])', [[owner, outsider]])
-    const tasks = await pool.query('select id,"userId",title,status,scope from issues where "userId"=any($1::text[])', [[owner, outsider]])
+    const tasks = await pool.query('select id,"userId","workspaceId","ownershipState",title,status,scope from issues where "userId"=any($1::text[])', [[owner, outsider]])
     const retainedSession = await pool.query('select id from session where id=$1', [sessionId])
     await mkdir('test-results', { recursive: true })
     // Retain only synthetic source rows and IDs; never export auth tokens/cookies.
@@ -306,9 +325,13 @@ test('searchable task grants no colleague thread content, old history or private
     import { actAs } from './lib/acting-user.ts'
     import { pool as applicationPool } from './lib/db/index.ts'
     import { workspaceDb } from './lib/workspace-db.ts'
-    const { owner, outsider, boundary } = JSON.parse(process.env.SEARCH_THREAD_FIXTURE)
+    import { tokenWorkspace } from './lib/tokens/principal.ts'
+    import { enterprisePrincipal } from './lib/enterprise/principal.ts'
+    const { owner, outsider, boundary, workspace, sessionId, foreignSessionId } = JSON.parse(process.env.SEARCH_THREAD_FIXTURE)
+    const ownerReader = { id: owner, [tokenWorkspace]: workspace, [enterprisePrincipal]: { kind: 'session', sessionId } }
+    const outsiderReader = { id: outsider, [tokenWorkspace]: workspace, [enterprisePrincipal]: { kind: 'session', sessionId: foreignSessionId } }
     try {
-      const rows = await actAs(owner, () => listIssueThreads(boundary.issue))
+      const rows = await actAs(ownerReader, () => listIssueThreads(boundary.issue))
       assert.equal(rows.length, 1)
       assert.equal(rows[0].id, boundary.run)
       assert.equal(rows[0].detail, null)
@@ -316,18 +339,18 @@ test('searchable task grants no colleague thread content, old history or private
       assert.ok(rows[0].ownerName)
       assert.ok(!JSON.stringify(rows).includes('BOUNDARY_PRIVATE_'))
       const denied = error => error?.code === 'runNotFound'
-      await assert.rejects(actAs(owner, () => getIssueThread(boundary.issue, boundary.run)), denied)
-      await assert.rejects(actAs(owner, () => sendIssueThreadMessage({ issueId: boundary.issue, runId: boundary.run, text: 'must not be written' })), denied)
+      await assert.rejects(actAs(ownerReader, () => getIssueThread(boundary.issue, boundary.run)), denied)
+      await assert.rejects(actAs(ownerReader, () => sendIssueThreadMessage({ issueId: boundary.issue, runId: boundary.run, text: 'must not be written' })), denied)
       const messages = await applicationPool.query('select count(*)::int n from run_messages where "runId"=$1', [boundary.run])
       assert.equal(messages.rows[0].n, 0)
-      const own = await actAs(outsider, () => getIssueThread(boundary.issue, boundary.run))
+      const own = await actAs(outsiderReader, () => getIssueThread(boundary.issue, boundary.run))
       assert.equal(own.thread.prompt, 'BOUNDARY_PRIVATE_PROMPT')
       assert.ok(JSON.stringify(own.chunks).includes('BOUNDARY_PRIVATE_CHUNK'))
       console.log('search131 merged311 real actions: task owner sees metadata only; colleague read/send runNotFound; zero messages; thread owner reads real chunks')
     } finally { await Promise.all([applicationPool.end(), workspaceDb.$client.end()]) }
   `
   const result = await execute(process.execPath, ['--conditions=react-server', '--import', './tests/support/server-only-loader.mjs', '--import', 'tsx', '--input-type=module', '-e', script], {
-    env: { ...process.env, SEARCH_THREAD_FIXTURE: JSON.stringify({ owner, outsider, boundary }) }, timeout: 45000,
+    env: { ...process.env, SEARCH_THREAD_FIXTURE: JSON.stringify({ owner, outsider, boundary, workspace, sessionId, foreignSessionId }) }, timeout: 45000,
   })
   expect(result.stdout).toContain('zero messages; thread owner reads real chunks')
   console.log(result.stdout.trim())
@@ -356,12 +379,30 @@ test('real query result rechecks group exit including the hidden lookahead befor
   }
 })
 
-test('task source preserves Auth owner-visible policy across workspace selection', async ({ request }) => {
-  const result = await get(request, { source: 'tasks', workspaceId: workspace, q: `${prefix}-owner-policy` })
-  expect(result.response.status()).toBe(200)
-  expect(result.body.items).toHaveLength(1)
-  // Caller has no membership in the task's linked workspace; ownership still grants reads.
-  expect(result.body.items[0].title).toBe(`${prefix}-owner-policy`)
+test('task source isolates the selected workspace and rechecks creator membership and PAT scope', async ({ request }) => {
+  const snapshot = () => pool.query('select id,"workspaceId","ownershipState" from issues where "userId"=any($1::text[]) order by id', [[owner, outsider]])
+  const before = (await snapshot()).rows
+  for (const [workspaceId, id] of [[workspace, ownerTask], [secondWorkspace, secondOwnerTask]]) {
+    const result = await get(request, { source: 'tasks', workspaceId, q: `${prefix}-task` })
+    expect(result.response.status()).toBe(200)
+    expect(result.body.items.map((row: { id: string }) => row.id)).toEqual([id])
+  }
+  const hidden = await get(request, { source: 'tasks', workspaceId: workspace, q: `${prefix}-owner-policy` })
+  expect(hidden.response.status()).toBe(200)
+  expect(hidden.body.items).toEqual([])
+  expect(hidden.body.nextCursor).toBeNull()
+  const revoked = await get(request, { source: 'tasks', workspaceId: otherWorkspace, q: `${prefix}-owner-policy` })
+  expect(revoked.response.status()).toBe(403)
+  expect(revoked.body).toEqual({ error: 'searchAccessDenied' })
+  // The native PAT is bound to A even with a valid owner cookie and membership in B.
+  const authorization = `Bearer ${scopedToken.token}`
+  const scoped = await get(request, { source: 'tasks', workspaceId: workspace, q: `${prefix}-task` }, true, authorization)
+  expect(scoped.response.status()).toBe(200)
+  expect(scoped.body.items.map((row: { id: string }) => row.id)).toEqual([ownerTask])
+  const outsideToken = await get(request, { source: 'tasks', workspaceId: secondWorkspace, q: `${prefix}-task` }, true, authorization)
+  expect(outsideToken.response.status()).toBe(403)
+  expect(outsideToken.body).toEqual({ error: 'searchAccessDenied' })
+  expect((await snapshot()).rows).toEqual(before)
 })
 
 test('continuations recheck group leave, workspace suspension and real auth revocation', async ({ request }) => {

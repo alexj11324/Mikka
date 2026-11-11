@@ -1,7 +1,7 @@
 import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, check, foreignKey, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -9,7 +9,8 @@ import type { RunFailure } from '@mikka/protocol/run-failure'
 import type { DaemonUpdateFailure, SetupRecipe } from '@mikka/protocol/device'
 import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
-import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
+import type { UserFactKind, UserFactState, MemorySourceKind, MemoryReviewStatus, MemoryScopeKind } from '@/lib/profile/kinds'
+import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
 
 export const users = pgTable('user', {
   id: text('id').primaryKey(), name: text('name').notNull(), email: text('email').notNull(), image: text('image'),
@@ -22,6 +23,12 @@ export const userOnboarding = pgTable('user_onboarding', {
 
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
+  /** Who may invite members and change the task's visibility; see issueMemberRole. */
+  role: text('role').$type<'owner' | 'member'>().notNull().default('member'),
+  /** Whether this member hears about the task; false mutes it without leaving. */
+  subscribed: boolean('subscribed').notNull().default(true),
+  /** The account that added this member; null when no inviter was recorded. */
+  invitedBy: text('invitedBy'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.issueId, table.memberId] }), index('issue_members_member_idx').on(table.memberId, table.issueId)])
 export const issueDocuments = pgTable('issue_documents', {
@@ -30,7 +37,14 @@ export const issueDocuments = pgTable('issue_documents', {
 })
 
 export const issues = pgTable('issues', {
+  /** Immutable issued identity; legacy aliases and publication receipts remain separate. */
+  issuedIdentifier: text('issuedIdentifier'),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** Immutable tenant. NULL is reserved for quarantined historical records. */
+  workspaceId: uuid('workspaceId'),
+  ownershipState: text('ownershipState').$type<'bound' | 'pending'>().notNull().default('pending'),
+  /** Provider policy is independent of tenant membership and the legacy scope label. */
+  linearSyncPolicy: text('linearSyncPolicy').$type<'disabled' | 'explicit'>().notNull().default('disabled'),
   title: varchar('title', { length: 200 }).notNull(),
   /**
    * A short title the small model wrote once when the task was created (lib/short-title.ts), and the title it was
@@ -39,17 +53,18 @@ export const issues = pgTable('issues', {
   shortTitle: varchar('shortTitle', { length: 60 }), shortTitleFrom: varchar('shortTitleFrom', { length: 200 }),
   content: jsonb('content').$type<JSONContent>().notNull(),
   status: text('status').notNull(), priority: text('priority').notNull(),
-  // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).
+  // Compatibility label only. workspaceId is the tenant; provider bindings control sync.
   scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
   scopeVersion: integer('scopeVersion').notNull().default(1),
   linearSyncBlocked: boolean('linearSyncBlocked').notNull().default(false),
-  // The agent judges scope at creation; a person's change wins and teaches the next judgment (MIK-47).
+  // Retained for historical receipts. New tasks never infer a tenant from content.
   scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
   scopeConfidence: real('scopeConfidence'),
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc())])
+}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc()),
+  check('issues_short_title_compact', sql`mikka_issue_short_title_valid(${table.shortTitle})`)])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
@@ -188,10 +203,12 @@ export const linearConnections = pgTable('linear_connections', {
 })
 export const linearTeamSyncs = pgTable('linear_team_syncs', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** Explicit provider binding; legacy rows need a verified workspace choice. */
+  workspaceId: uuid('workspaceId'),
   linearTeamId: text('linearTeamId').notNull().unique(), linearTeamKey: text('linearTeamKey').notNull(), linearTeamName: text('linearTeamName').notNull(),
   active: boolean('active').notNull().default(true), lastError: text('lastError'), lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('linear_team_syncs_owner_idx').on(table.ownerId, table.active), uniqueIndex('linear_team_syncs_one_active_per_owner_key').on(table.ownerId).where(sql`${table.active}`)])
+}, table => [index('linear_team_syncs_owner_idx').on(table.ownerId, table.active), uniqueIndex('linear_team_syncs_one_active_per_workspace_key').on(table.ownerId, table.workspaceId).where(sql`${table.active} and ${table.workspaceId} is not null`)])
 /** One immutable remote identity per workspace scope generation. Reservation
  * commits before provider IO, so an ambiguous response is retried with this ID. */
 export const linearIssuePublications = pgTable('linear_issue_publications', {
@@ -356,6 +373,8 @@ export const agentRuns = pgTable('agent_runs', {
   /** Immutable execution provenance; old rows remain unrecorded. */
   agentDefinition: jsonb('agentDefinition').$type<WorkerDefinitionSnapshot | null>(),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** Immutable thread tenant, retained if a Bot/provenance link is removed. */
+  workspaceId: uuid('workspaceId'),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
   /** The bot that started this thread, the Coordinator included; null for an MCP client's run. */
@@ -398,6 +417,10 @@ export const agentRuns = pgTable('agent_runs', {
   outcomeAt: timestamp('outcomeAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),
+  /** Evidence-only entry provenance (lib/run-origin.ts). Null on legacy rows: unknown, never inferred as 'web'. */
+  origin: text('origin').$type<RunOrigin | null>(),
+  /** Opaque entry identifiers for `origin`. Evidence-only (lib/captures/store.ts): never projected into lists, chat, events, logs or analytics. */
+  originRef: jsonb('originRef').$type<RunOriginRef | null>(),
   questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true; requiredSandboxId?:string} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
@@ -414,6 +437,25 @@ export const agentRuns = pgTable('agent_runs', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`), index('agent_runs_continues_run_idx').on(table.continuesRunId).where(sql`${table.continuesRunId} is not null`)])
+
+/** Confirmed VM running intervals; mutable thread-machine custody is separate. */
+export const threadMachineSessions = pgTable('thread_machine_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(), botId: uuid('botId'), sandboxId: text('sandboxId').notNull(),
+  startedAt: timestamp('startedAt', { withTimezone: true }).notNull(),
+  endedAt: timestamp('endedAt', { withTimezone: true }),
+  reason: text('reason').$type<'paused' | 'retired' | 'provider_missing' | 'transferred' | 'replaced' | 'scope_changed'>(),
+  source: text('source').$type<'running_since' | 'observed' | 'running_since_backfill'>().notNull(),
+}, table => [
+  uniqueIndex('thread_machine_sessions_open_run').on(table.runId).where(sql`${table.endedAt} IS NULL`),
+  index('thread_machine_sessions_scope_run').on(table.ownerId, table.workspaceId, table.runId, table.startedAt, table.id),
+  check('thread_machine_sessions_reason_check', sql`${table.reason} IN ('paused','retired','provider_missing','transferred','replaced','scope_changed')`),
+  check('thread_machine_sessions_source_check', sql`${table.source} IN ('running_since','observed','running_since_backfill')`),
+  check('thread_machine_sessions_check', sql`${table.endedAt} IS NULL OR ${table.endedAt}>=${table.startedAt}`),
+  check('thread_machine_sessions_check1', sql`(${table.endedAt} IS NULL)=(${table.reason} IS NULL)`),
+])
 
 /** A verified owner/repository binding. Installation tokens are never stored. */
 /** Plugins → GitHub connection, separate from the login identity; one GitHub account may serve many users. Tokens are sealed like Better Auth's. */
@@ -439,7 +481,8 @@ export const githubRepositoryInstallations = pgTable('github_repository_installa
 /** Server-issued publication assignment and durable completion receipt (ADR 0024). */
 export const runPublications = pgTable('run_publications', {
   runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
-  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** Historical actor, as on agent_runs; deleting an account cannot erase a kept task's publication receipt. */
+  userId: text('userId').notNull(),
   issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   scopeVersion: integer('scopeVersion'), issueTitle: text('issueTitle'),
   remoteUrl: text('remoteUrl').notNull(), remoteKey: text('remoteKey').notNull(),
@@ -448,7 +491,7 @@ export const runPublications = pgTable('run_publications', {
   status: text('status').$type<'assigned' | 'pending' | 'processing' | 'awaiting_approval' | 'published' | 'blocked' | 'skipped'>().notNull().default('assigned'),
   workflowRunId: text('workflowRunId'), leaseToken: uuid('leaseToken'), leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   attempts: integer('attempts').notNull().default(0),
-  pullRequest: jsonb('pullRequest').$type<{ url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed'; additions?: number; deletions?: number } | null>(),
+  pullRequest: jsonb('pullRequest').$type<import('../run-publication-result').PublishedPullRequest | null>(),
   errorCode: text('errorCode'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
@@ -568,6 +611,21 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
 
+/** Historical rows retained for database compatibility; eve owns new session state. */
+export const coordinatorStartupReceipts = pgTable('coordinator_startup_receipts', {
+  userId: text('userId').notNull(), botId: uuid('botId').notNull(), holder: text('holder').notNull(),
+  round: integer('round').notNull(), version: integer('version').notNull().default(1),
+  settings: jsonb('settings').$type<Record<string, unknown>>().notNull(),
+  inbox: jsonb('inbox').$type<Record<string, unknown>>().notNull(),
+}, table => [
+  primaryKey({ columns: [table.userId, table.botId, table.holder, table.round] }),
+  foreignKey({ columns: [table.userId, table.botId], foreignColumns: [coordinatorSessions.userId, coordinatorSessions.botId] }).onDelete('cascade'),
+  check('coordinator_startup_receipts_round_check', sql`${table.round} = 0`),
+  check('coordinator_startup_receipts_version_check', sql`${table.version} = 1`),
+  check('coordinator_startup_receipts_settings_check', sql`jsonb_typeof(${table.settings}) = 'object'`),
+  check('coordinator_startup_receipts_inbox_check', sql`jsonb_typeof(${table.inbox}) = 'object'`),
+])
+
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
 // External notifications from connected apps, rated by fixed rules or the
@@ -681,10 +739,18 @@ export interface UserFactEvidence { source: string; suggestionId?: string; exter
  * One fact in one person's profile (lib/profile), drawn from what reaches them
  * and merged nightly. Facts belong to the person, never to a workspace, and
  * only they see them in 记忆. A fact the person corrected (`userEdited`) is
- * never overwritten by the model. Same fact = same (userId, kind, subjectKey).
+ * never overwritten by the model. Same fact = same
+ * (userId, repository, kind, subjectKey).
  */
 export const userFacts = pgTable('user_facts', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /**
+   * The work context the fact is true of, as the folded `remoteKey` Mikka
+   * already scopes repository settings and secrets by (drizzle/20261111010000).
+   * Null is a fact about the person themselves, true wherever they are; a
+   * repository fact reaches only a chat whose workspace works in it.
+   */
+  repository: text('repository'),
   kind: text('kind').$type<UserFactKind>().notNull(),
   /** One line, e.g. 川菜, or Verizon 套餐. */
   subject: text('subject').notNull(),
@@ -699,9 +765,53 @@ export const userFacts = pgTable('user_facts', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
   state: text('state').$type<UserFactState>().notNull().default('active'),
   userEdited: boolean('userEdited').notNull().default(false),
+  reviewStatus: text('reviewStatus').$type<MemoryReviewStatus>().notNull().default('approved'),
+  sourceKind: text('sourceKind').$type<MemorySourceKind>(),
+  sourceId: text('sourceId'),
+  sourceUrl: text('sourceUrl'),
+  scopeKind: text('scopeKind').$type<MemoryScopeKind>().notNull().default('global'),
+  scopeIds: uuid('scopeIds').array().notNull().default(sql`'{}'::uuid[]`),
+  clientRequestId: uuid('clientRequestId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
+}, table => [unique('user_facts_repository_subject_key').on(table.userId, table.repository, table.kind, table.subjectKey).nullsNotDistinct(), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind), index('user_facts_repository_idx').on(table.userId, table.repository, table.state)])
+
+/** A persisted consolidation answer and the actual facts it derived from. No provider/model attribution is inferred. */
+export const userFactDecisions = pgTable('user_fact_decisions', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull(),
+  factId: uuid('factId').notNull().references(() => userFacts.id, { onDelete: 'cascade' }),
+  sourceFactIds: uuid('sourceFactIds').array().notNull(),
+  method: text('method').$type<'consolidation_answer'>().notNull(),
+  decisionKey: text('decisionKey').notNull(),
+  decidedAt: timestamp('decidedAt', { withTimezone: true }).notNull(),
+}, table => [unique('user_fact_decisions_request_unique').on(table.userId, table.decisionKey), index('user_fact_decisions_fact_idx').on(table.userId, table.factId)])
+
+/** Short-lived, owner-private snapshot. The main fact is scrubbed immediately on delete. */
+export const userFactUndo = pgTable('user_fact_undo', {
+  factId: uuid('factId').primaryKey().references(() => userFacts.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  snapshot: jsonb('snapshot').$type<{
+    value: Record<string, unknown>; evidence: UserFactEvidence[];
+    reviewStatus: MemoryReviewStatus; sourceKind: MemorySourceKind | null;
+    sourceId: string | null; sourceUrl: string | null;
+  }>().notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+}, table => [index('user_fact_undo_expires_idx').on(table.expiresAt)])
+
+/** Only trusted server-side prompt/consumer events can write actual usage. */
+export const userFactUses = pgTable('user_fact_uses', {
+  factId: uuid('factId').notNull().references(() => userFacts.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull(),
+  eventId: uuid('eventId').notNull(),
+  targetKind: text('targetKind').$type<'thread' | 'task'>().notNull(),
+  targetId: uuid('targetId').notNull(),
+  targetUrl: text('targetUrl'),
+  usedAt: timestamp('usedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.factId, table.eventId] }),
+  index('user_fact_uses_recent_idx').on(table.userId, table.factId, table.usedAt.desc()),
+])
 
 /** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person (lib/profile/store.ts). The 记忆 switch is userPreferences.memoryEnabled. */
 export const userFactConsolidations = pgTable('user_fact_consolidations', {
@@ -930,6 +1040,8 @@ export type ArtifactKind = (typeof ARTIFACT_KINDS)[number]
 
 export const artifacts = pgTable('artifacts', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** Immutable tenant; unresolved legacy artifacts remain quarantined. */
+  workspaceId: uuid('workspaceId'),
   kind: text('kind').$type<ArtifactKind>().notNull(),
   title: varchar('title', { length: 200 }).notNull(),
   /** The run that made it; null when an agent outside a run (OAuth) sent it. */
@@ -1005,6 +1117,19 @@ export const runCaptures = pgTable('run_captures', {
   uniqueIndex('run_captures_recording_key').on(table.runId).where(sql`${table.status} = 'recording'`),
 ])
 
+/** A private poster derived from one immutable recording, with the same access boundary. */
+export const runCapturePosters = pgTable('run_capture_posters', {
+  captureId: uuid('captureId').primaryKey().references(() => runCaptures.id, { onDelete: 'cascade' }),
+  captureSha256: text('captureSha256').notNull(),
+  storageKey: text('storageKey').notNull(), inlineContent: bytea('inlineContent'),
+  size: integer('size').notNull(), sha256: text('sha256').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  check('run_capture_posters_captureSha256_check', sql`${table.captureSha256} ~ '^[a-f0-9]{64}$'`),
+  check('run_capture_posters_size_check', sql`${table.size}>0 AND ${table.size}<=256000`),
+  check('run_capture_posters_sha256_check', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
+])
+
 /** A recording's timeline (Figma 13): what the agent did, in its own words, and when. */
 export const runCaptureSteps = pgTable('run_capture_steps', {
   id: uuid('id').primaryKey(),
@@ -1052,6 +1177,7 @@ export const pendingActions = pgTable('pending_actions', {
 // Factory #192 uses existing issues, Coordinator events and Harness runs.
 export const factoryTasks = pgTable('factory_tasks', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  workspaceId: uuid('workspaceId'),
   botId: uuid('botId'),
   issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   scopeVersion: integer('scopeVersion'),
@@ -1119,6 +1245,8 @@ export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
 export const mobilePushTokens = pgTable('mobile_push_tokens', {
   id: uuid('id').primaryKey(),
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // Native session provenance; historical NULL tokens require registration.
+  sessionId: text('sessionId'),
   token: text('token').notNull(),
   platform: text('platform').notNull(),
   deviceName: text('deviceName'),
@@ -1203,12 +1331,38 @@ export const workspaceBilling = pgTable('workspace_billing', {
   plan: text('plan'),
   status: text('status'),
   seats: integer('seats').notNull().default(0),
+  // Historical seat quantities are retained; new checkouts use resource_v1.
+  billingModel: text('billingModel').$type<'legacy_seat' | 'resource_v1'>().notNull().default('legacy_seat'),
+  stripePriceId: text('stripePriceId'),
+  billingPlan: text('billingPlan').$type<'free' | 'pro' | 'enterprise'>().notNull().default('free'),
+  billingExpiresAt: timestamp('billingExpiresAt', { withTimezone: true }),
+  billingRevision: bigint('billingRevision', { mode: 'number' }).notNull().default(0),
+  billingInvoiceId: text('billingInvoiceId'),
   currentPeriodEnd: timestamp('currentPeriodEnd', { withTimezone: true }),
   autoRechargeEnabled: boolean('autoRechargeEnabled').notNull().default(false),
   autoRechargeThreshold: integer('autoRechargeThreshold'),
   autoRechargePacks: integer('autoRechargePacks'),
+  autoRechargeMonthlyCap: integer('autoRechargeMonthlyCap'),
+  autoRechargeAmountPoints: integer('autoRechargeAmountPoints'),
+  autoRechargeConsentBy: text('autoRechargeConsentBy'),
+  autoRechargeConsentAt: timestamp('autoRechargeConsentAt', { withTimezone: true }),
+  autoRechargeRevision: integer('autoRechargeRevision').notNull().default(0),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** One recoverable subscription Checkout per account, with immutable provider parameters. */
+export const billingCheckoutRequests = pgTable('billing_checkout_requests', {
+  id: uuid('id').primaryKey(),
+  workspaceId: uuid('workspaceId').notNull().references(() => workspaceBilling.workspaceId),
+  actorId: text('actorId').notNull(),
+  customerId: text('customerId').notNull(),
+  priceId: text('priceId').notNull(),
+  params: jsonb('params').$type<Record<string, unknown>>().notNull(),
+  sessionId: text('sessionId').unique(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  closedAt: timestamp('closedAt', { withTimezone: true }),
+}, table => [uniqueIndex('billing_checkout_requests_active_idx').on(table.workspaceId).where(sql`${table.closedAt} IS NULL`)])
 
 /** Credit grants: 'plan' per paid invoice (replaces the previous period's), 'purchased' never expires. */
 export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
@@ -1219,10 +1373,15 @@ export const workspaceCreditGrants = pgTable('workspace_credit_grants', {
   reason: text('reason').notNull(),
   externalId: text('externalId').notNull().unique(),
   stripePaymentIntentId: text('stripePaymentIntentId'),
+  parentGrantId: uuid('parentGrantId'),
+  stripeInvoiceId: text('stripeInvoiceId'),
+  paymentAllocations: jsonb('paymentAllocations').$type<Record<string, { paidCents: number; totalCents: number }>>().notNull().default({}),
   amountCents: integer('amountCents'),
   currency: text('currency'),
   receiptUrl: text('receiptUrl'),
   stripeFeeCents: integer('stripeFeeCents'),
+  periodStart: timestamp('periodStart', { withTimezone: true }),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('workspace_credit_grants_workspace_idx').on(table.workspaceId, table.createdAt), index('workspace_credit_grants_payment_intent_idx').on(table.stripePaymentIntentId)])
 
@@ -1231,6 +1390,19 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   type: text('type').notNull(),
   processedAt: timestamp('processedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** APP -> Workspace entitlement delivery. No credentials or payment payloads. */
+export const billingEntitlementOutbox = pgTable('billing_entitlement_outbox', {
+  eventId: text('eventId').primaryKey().references(() => stripeWebhookEvents.id),
+  workspaceId: uuid('workspaceId').notNull(),
+  subscriptionId: text('subscriptionId').notNull(),
+  plan: text('plan').$type<'free' | 'pro' | 'enterprise'>().notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  revision: bigint('revision', { mode: 'number' }).notNull(),
+  billingModel: text('billingModel').$type<'legacy_seat' | 'resource_v1'>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  deliveredAt: timestamp('deliveredAt', { withTimezone: true }),
+}, table => [index('billing_entitlement_pending_idx').on(table.workspaceId, table.deliveredAt, table.revision)])
 
 /** A live key's post-commit revision (lib/live/revisions.ts). No content: kind, ID and a counter. */
 export const liveRevisions = pgTable('live_revisions', {
@@ -1242,3 +1414,100 @@ export const liveRevisions = pgTable('live_revisions', {
 export { projectDecisions, projectDecisionSources } from './project-map-schema.ts'
 
 export { factoryAgentProfiles, factoryAgentProfileVersions } from './agent-profile-schema.ts'
+
+/**
+ * Drive: a person's or a project's file tree, addressed by content
+ * (drizzle/20261111000100_drive_volume.sql, lib/drive/store.ts).
+ *
+ * `driveScope` is deliberately not `workspace`: workspace already means the
+ * tenant, and a volume's scope is a layer of Drive, not a tenant.
+ */
+export const DRIVE_SCOPES = ['user', 'project', 'project-user'] as const
+export type DriveScope = (typeof DRIVE_SCOPES)[number]
+
+export const driveVolumes = pgTable('drive_volumes', {
+  id: text('id').primaryKey(),
+  driveScope: text('driveScope').$type<DriveScope>().notNull(),
+  scopeId: text('scopeId').notNull(),
+  /** The person inside a `project-user` volume; null for every other scope. */
+  scopeUserId: text('scopeUserId'),
+  ownerId: text('ownerId').notNull(),
+  workspaceId: uuid('workspaceId'),
+  name: text('name').notNull(),
+  /** The two head pointers, moved together so a digest always names its version. */
+  headVersionId: text('headVersionId').notNull(),
+  headDigest: text('headDigest').notNull(),
+  entryCount: integer('entryCount').notNull().default(0),
+  totalBytes: bigint('totalBytes', { mode: 'number' }).notNull().default(0),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  uniqueIndex('drive_volumes_scope_name_key').on(table.driveScope, table.scopeId, sql`coalesce(${table.scopeUserId}, '')`, table.name),
+  index('drive_volumes_owner_idx').on(table.ownerId, table.updatedAt.desc()),
+  index('drive_volumes_scope_idx').on(table.driveScope, table.scopeId, table.updatedAt.desc()),
+])
+
+/** Content by digest, deduplicated within one owner and never across owners (lib/drive/blobs.ts). */
+export const driveBlobs = pgTable('drive_blobs', {
+  ownerId: text('ownerId').notNull(),
+  sha256: text('sha256').notNull(),
+  sizeBytes: integer('sizeBytes').notNull(),
+  /** Object key in the bucket, or the bytes themselves where none is configured. */
+  storageKey: text('storageKey'),
+  inlineContent: bytea('inlineContent'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.ownerId, table.sha256] }),
+  uniqueIndex('drive_blobs_storage_key').on(table.storageKey).where(sql`"storageKey" IS NOT NULL`),
+])
+
+/** The head tree, one row per path, for a manifest read that needs no jsonb decode. */
+export const driveVolumeEntries = pgTable('drive_volume_entries', {
+  volumeId: text('volumeId').notNull().references(() => driveVolumes.id, { onDelete: 'cascade' }),
+  /** Repeated from the volume, so a put can prove the blob is this owner's. */
+  ownerId: text('ownerId').notNull(),
+  path: text('path').notNull(),
+  /** 420 = 0o644, 493 = 0o755. */
+  mode: integer('mode').notNull(),
+  sizeBytes: integer('sizeBytes').notNull(),
+  sha256: text('sha256').notNull(),
+}, table => [
+  primaryKey({ columns: [table.volumeId, table.path] }),
+  index('drive_volume_entries_blob_idx').on(table.sha256),
+])
+
+/** An immutable version, with the `threadId` and `authorName` a history reads. */
+export const driveVolumeVersions = pgTable('drive_volume_versions', {
+  id: text('id').primaryKey(),
+  volumeId: text('volumeId').notNull().references(() => driveVolumes.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull(),
+  seq: integer('seq').notNull(),
+  kind: text('kind').$type<'autosave' | 'checkpoint' | 'restore'>().notNull(),
+  fileCount: integer('fileCount').notNull(),
+  totalBytes: bigint('totalBytes', { mode: 'number' }).notNull(),
+  digest: text('digest').notNull(),
+  manifest: jsonb('manifest').$type<import('../drive/contract').DriveManifestEntry[]>().notNull(),
+  threadId: text('threadId'),
+  threadTitle: text('threadTitle'),
+  authorName: text('authorName').notNull(),
+  restoredFromVersionId: text('restoredFromVersionId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  uniqueIndex('drive_volume_versions_seq_key').on(table.volumeId, table.seq),
+  index('drive_volume_versions_volume_created_idx').on(table.volumeId, table.createdAt.desc(), table.id.desc()),
+  index('drive_volume_versions_owner_idx').on(table.ownerId, table.createdAt.desc()),
+])
+
+/** One receipt per applied mutation, so a retry lands once (lib/drive/store.ts). */
+export const driveMutations = pgTable('drive_mutations', {
+  volumeId: text('volumeId').notNull().references(() => driveVolumes.id, { onDelete: 'cascade' }),
+  mutationId: text('mutationId').notNull(),
+  requestDigest: text('requestDigest').notNull(),
+  versionId: text('versionId').notNull(),
+  expectedDigest: text('expectedDigest'),
+  resultDigest: text('resultDigest').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  primaryKey({ columns: [table.volumeId, table.mutationId] }),
+  index('drive_mutations_version_idx').on(table.versionId),
+])

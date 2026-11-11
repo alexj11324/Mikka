@@ -9,11 +9,11 @@ import { MessageAction } from '@/components/ai-elements/message'
 export const HOVER_ACTIONS = 'opacity-0 transition-opacity duration-150 group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none'
 
 /**
- * The actions under a reply in a chat (R-83): shown while the reply is hovered, focused or tapped (a tapped reply takes
- * focus), and while a list they opened is open. The latest reply adds `pointer-coarse:opacity-100`: a touch screen has no hover,
- * so its actions stay; older replies stay quiet there until tapped.
+ * The actions under a reply in a chat (R-83, revised 2026-11-10): always there, like Codex — a copy button that appears
+ * only on hover reads as a stray mark, and a touch screen has no hover at all. They stay quiet through the muted icon
+ * colour and only raise contrast on hover or focus, so nothing appears or disappears as the pointer moves.
  */
-export const REPLY_ACTIONS = 'opacity-0 transition-opacity duration-150 group-hover/message:opacity-100 group-focus-within/message:opacity-100 focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100 motion-reduce:transition-none'
+export const REPLY_ACTIONS = 'transition-opacity duration-150 motion-reduce:transition-none'
 
 /** How long the tick stays after a copy, as under a Claude or ChatGPT reply. */
 export const COPIED_MS = 2000

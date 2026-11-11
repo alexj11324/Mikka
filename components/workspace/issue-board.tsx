@@ -9,6 +9,7 @@ import { setIssueDeleted } from '@/app/actions/issue-operations'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'
 import { clearedBlock, FLAGGED_BLOCK, type BlockFlag, type TaskBlock } from '@/lib/task-blocked'
 import { useActionError } from '@/lib/use-action-error'
+import type { MetadataSavedIssue } from './issue-metadata-controls'
 import { type KanbanCommitMeta } from '@/components/reui/kanban'
 import { KanbanBoard, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { BLOCKED_COLUMN, BOARD_COLUMNS, boardColumnOf, type BoardColumn } from '@/components/blocks/kanban-board-1/components/data'
@@ -25,20 +26,14 @@ function groupIssues(issues: Issue[], blocks: ReadonlyMap<string, TaskBlock>): C
 /** The card fade's length, matching `duration-150` on the card. */
 const CARD_MOTION_MS = 150
 
-export function IssueBoard({ issues, blocks = new Map(), newestRuns = new Map(), columns: visibleColumns, hidden, sidebarOpen, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string;
+/**
+ * The board's columns and every save behind them: status, 受阻, priority, delete, a drop and the metadata editors.
+ * The shared board and a UI layer's own board (the `board` slot's BoardScreen) use the same saves.
+ */
+export function useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBusyChange }: {
   issues: Issue[]
-  /** Each 受阻 task's reason (lib/task-blocked.ts); its card is in the 受阻 column. */
-  blocks?: ReadonlyMap<string, TaskBlock>
-  /** Each task's newest thread: moving a card out of 受阻 sets that thread's reason aside. */
-  newestRuns?: ReadonlyMap<string, string>
-  columns: BoardColumn[]
-  hidden: { status: BoardColumn; count: number }[]
-  sidebarOpen?: boolean
-  context: CardContext
-  onOpen: (id: string) => void
-  onDiscuss: (issue: Issue) => void
-  onHideColumn: (status: BoardColumn) => void
-  onShowColumn: (status: BoardColumn) => void
+  blocks: ReadonlyMap<string, TaskBlock>
+  newestRuns: ReadonlyMap<string, string>
   onUpdated: () => Promise<unknown>
   onBusyChange: (busy: boolean) => void
 }) {
@@ -66,49 +61,6 @@ export function IssueBoard({ issues, blocks = new Map(), newestRuns = new Map(),
     return next
   })
   const saving = useRef(false)
-  const viewportRef = useViewScroll<HTMLDivElement>(`${stateKey}:horizontal`)
-  const [visited, setVisited] = useViewState(`${stateKey}:visited`, false)
-  const viewportId = useId()
-  const instructionsId = useId()
-  const [, setCanScroll] = useState({ left: false, right: false })
-  useEffect(() => {
-    const viewport = viewportRef.current
-    if (!viewport) return
-    function update() {
-      if (!viewport) return
-      const left = viewport.scrollLeft > 1
-      const right = viewport.scrollLeft + viewport.clientWidth < viewport.scrollWidth - 1
-      setCanScroll(current => current.left === left && current.right === right ? current : { left, right })
-    }
-    const observer = new ResizeObserver(update)
-    observer.observe(viewport)
-    if (viewport.firstElementChild) observer.observe(viewport.firstElementChild)
-    viewport.addEventListener('scroll', update, { passive: true })
-    update()
-    return () => { observer.disconnect(); viewport.removeEventListener('scroll', update) }
-  }, [])
-
-  // Open on the first column with a task when the ones before it are empty (N5), once, before the person scrolls.
-  const started = useRef<string | null>(null)
-  useEffect(() => {
-    const viewport = viewportRef.current
-    if (started.current === stateKey || visited || !viewport || !issues.length) return
-    started.current = stateKey
-    setVisited(true)
-    const shown = BOARD_COLUMNS.map(column => column.value).filter(value => visibleColumns.includes(value as IssueStatus))
-    const target = boardStartColumn(shown, Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, items.length])))
-    const element = target && viewport.querySelector<HTMLElement>(`[data-slot="kanban-column"][data-value="${CSS.escape(target)}"]`)
-    if (!element) return
-    const left = boardScrollTo(element.getBoundingClientRect(), viewport.getBoundingClientRect(), viewport.scrollLeft)
-    if (left !== null) viewport.scrollTo({ left, behavior: 'instant' })
-  }, [issues.length, columns, visibleColumns, visited, setVisited, viewportRef, stateKey])
-
-  function scrollBoard(direction: -1 | 1) {
-    const viewport = viewportRef.current
-    if (!viewport) return
-    viewport.scrollBy({ left: direction * Math.min(viewport.clientWidth * 0.8, 340), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
-  }
-
   async function persist(issue: Issue, patch: { status?: string; priority?: string; block?: BlockFlag }, rollback: Columns) {
     if (saving.current) return
     saving.current = true
@@ -197,20 +149,98 @@ export function IssueBoard({ issues, blocks = new Map(), newestRuns = new Map(),
     const issue = meta.previousValue[meta.activeContainer]?.find(item => item.id === String(meta.event.active.id))
     if (!issue) { setColumns(meta.previousValue); return }
     setColumns(next)
-    // Into 受阻: the task keeps its status and is flagged. Out of it: its new status, and what blocked it is set aside.
-    if (meta.overContainer === BLOCKED_COLUMN) void persist(issue, { block: FLAGGED_BLOCK }, meta.previousValue)
-    else if (meta.activeContainer === BLOCKED_COLUMN) void persist(issue, { status: meta.overContainer, block: clearedBlock(runOf(issue)) }, meta.previousValue)
-    else void persist(issue, { status: meta.overContainer }, meta.previousValue)
+    save(issue, meta.activeContainer, meta.overContainer, meta.previousValue)
+  }
+  // Into 受阻: the task keeps its status and is flagged. Out of it: its new status, and what blocked it is set aside.
+  function save(issue: Issue, from: string, to: string, rollback: Columns) {
+    if (to === BLOCKED_COLUMN) void persist(issue, { block: FLAGGED_BLOCK }, rollback)
+    else if (from === BLOCKED_COLUMN) void persist(issue, { status: to, block: clearedBlock(runOf(issue)) }, rollback)
+    else void persist(issue, { status: to }, rollback)
+  }
+  /** A card dropped into another column without dnd-kit (a UI layer's own board): moved at once, then saved. */
+  function moveTo(id: string, to: string) {
+    if (saving.current) return
+    const from = Object.keys(columns).find(key => columns[key]?.some(item => item.id === id))
+    const issue = from ? columns[from]?.find(item => item.id === id) : undefined
+    if (!issue || !from || from === to || !(to in columns)) return
+    setColumns(Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, key === to ? [issue, ...items] : items.filter(item => item.id !== id)])))
+    save(issue, from, to, columns)
+  }
+  function metadataBusy(busy: boolean) { saving.current = busy; setPending(busy); onBusyChange(busy) }
+  function metadataSaved(savedIssue: MetadataSavedIssue) {
+    setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
+    setMessage(t('propertiesSaved'))
+    void onUpdated().catch(() => {})
+  }
+  return { columns, setColumns, pending, dragging, setDragging, message, cardMotion, saving, changeStatus, changeBlock, changePriority, remove, commit, moveTo, metadataBusy, metadataSaved }
+}
+
+export function IssueBoard({ issues, blocks = new Map(), newestRuns = new Map(), columns: visibleColumns, hidden, sidebarOpen, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string;
+  issues: Issue[]
+  /** Each 受阻 task's reason (lib/task-blocked.ts); its card is in the 受阻 column. */
+  blocks?: ReadonlyMap<string, TaskBlock>
+  /** Each task's newest thread: moving a card out of 受阻 sets that thread's reason aside. */
+  newestRuns?: ReadonlyMap<string, string>
+  columns: BoardColumn[]
+  hidden: { status: BoardColumn; count: number }[]
+  sidebarOpen?: boolean
+  context: CardContext
+  onOpen: (id: string) => void
+  onDiscuss: (issue: Issue) => void
+  onHideColumn: (status: BoardColumn) => void
+  onShowColumn: (status: BoardColumn) => void
+  onUpdated: () => Promise<unknown>
+  onBusyChange: (busy: boolean) => void
+}) {
+  const t = useTranslations('Board')
+  const { columns, setColumns, pending, setDragging, message, cardMotion, saving, changeStatus, changeBlock, changePriority, remove, commit, metadataBusy, metadataSaved } = useIssueBoardSaves({ issues, blocks, newestRuns, onUpdated, onBusyChange })
+  const viewportRef = useViewScroll<HTMLDivElement>(`${stateKey}:horizontal`)
+  const [visited, setVisited] = useViewState(`${stateKey}:visited`, false)
+  const viewportId = useId()
+  const instructionsId = useId()
+  const [, setCanScroll] = useState({ left: false, right: false })
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    function update() {
+      if (!viewport) return
+      const left = viewport.scrollLeft > 1
+      const right = viewport.scrollLeft + viewport.clientWidth < viewport.scrollWidth - 1
+      setCanScroll(current => current.left === left && current.right === right ? current : { left, right })
+    }
+    const observer = new ResizeObserver(update)
+    observer.observe(viewport)
+    if (viewport.firstElementChild) observer.observe(viewport.firstElementChild)
+    viewport.addEventListener('scroll', update, { passive: true })
+    update()
+    return () => { observer.disconnect(); viewport.removeEventListener('scroll', update) }
+  }, [])
+
+  // Open on the first column with a task when the ones before it are empty (N5), once, before the person scrolls.
+  const started = useRef<string | null>(null)
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (started.current === stateKey || visited || !viewport || !issues.length) return
+    started.current = stateKey
+    setVisited(true)
+    const shown = BOARD_COLUMNS.map(column => column.value).filter(value => visibleColumns.includes(value as IssueStatus))
+    const target = boardStartColumn(shown, Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, items.length])))
+    const element = target && viewport.querySelector<HTMLElement>(`[data-slot="kanban-column"][data-value="${CSS.escape(target)}"]`)
+    if (!element) return
+    const left = boardScrollTo(element.getBoundingClientRect(), viewport.getBoundingClientRect(), viewport.scrollLeft)
+    if (left !== null) viewport.scrollTo({ left, behavior: 'instant' })
+  }, [issues.length, columns, visibleColumns, visited, setVisited, viewportRef, stateKey])
+
+  function scrollBoard(direction: -1 | 1) {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    viewport.scrollBy({ left: direction * Math.min(viewport.clientWidth * 0.8, 340), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
   }
 
   return <section aria-label={t('label')} className="flex min-h-0 min-w-0 flex-1 flex-col">
     <p role="status" aria-live="polite" className="sr-only">{message}</p>
     <p id={instructionsId} className="sr-only">{t('keyboardHint')}</p>
-    <KanbanBoard stateKey={stateKey} value={columns} columns={visibleColumns} hiddenColumns={hidden} sidebarOpen={sidebarOpen} context={cardMotion.size ? { ...context, motion: cardMotion } : context} onDelete={issue => { void remove(issue) }} onBlockChange={changeBlock} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
-      setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
-      setMessage(t('propertiesSaved'))
-      void onUpdated().catch(() => {})
-    }} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
+    <KanbanBoard stateKey={stateKey} value={columns} columns={visibleColumns} hiddenColumns={hidden} sidebarOpen={sidebarOpen} context={cardMotion.size ? { ...context, motion: cardMotion } : context} onDelete={issue => { void remove(issue) }} onBlockChange={changeBlock} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={metadataBusy} onMetadataSaved={metadataSaved} viewportRef={viewportRef} viewportId={viewportId} instructionsId={instructionsId} onViewportKeyDown={event => {
       if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault()

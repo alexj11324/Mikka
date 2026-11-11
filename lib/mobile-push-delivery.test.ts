@@ -16,7 +16,7 @@ stub('../workflows/phone-push-receipts/workflow.ts', { phonePushReceipts: async 
 let delivery: typeof import('./mobile-push-delivery')
 before(async () => { process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('base64'); delivery = await import('./mobile-push-delivery') })
 beforeEach(() => { hosted = false; content = 'reminder'; startFails = false; queries.length = 0; calls.length = 0; starts.length = 0; reply = {} })
-const notification = { to: ['ExpoPushToken[fixture]'], title: 'Private customer name', body: 'Private message', data: { serverUrl: 'https://self.example/mikka', userId: 'local-owner', botId: 'fixture-bot', message: 'Private extra data' }, collapseId: 'fixture-bot' }
+const notification = { to: ['ExpoPushToken[fixture]'], title: 'Private customer name', body: 'Private message', data: { serverUrl: 'https://self.example/mikka', userId: 'local-owner', botId: 'fixture-bot', workspaceId: '11111111-1111-4111-8111-111111111111', issueId: '22222222-2222-4222-8222-222222222222', runId: '33333333-3333-4333-8333-333333333333', message: 'Private extra data' }, collapseId: 'fixture-bot' }
 const proof = `1900000000.${'a'.repeat(64)}`
 
 test('reminder mode sends only fixed visible text and routing identifiers', () => {

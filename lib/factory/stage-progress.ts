@@ -11,10 +11,12 @@ import { readFactoryFlow } from './public-flow';
 import { factoryFlowVersion } from './contract';
 import { redactFactoryCheckText } from './checks';
 import { syncFactoryAcceptanceArtifact } from './acceptance-report';
+import { syncFactorySpecArtifact } from './spec-artifact';
 import type { FactoryTask } from './store';
 
 /** Same task transaction and existing comment document; no worker, timer or new chat speaker. */
 export async function syncFactoryPresentation(tx: PoolClient, task: FactoryTask) {
+  const specArtifact = await syncFactorySpecArtifact(tx,task);
   if (factoryFlowVersion(task) !== 2) return;
   await syncFactoryAcceptanceArtifact(tx,task);
   if (!task.botId) return; // Legacy tasks have no mentioned Bot to impersonate.
@@ -25,7 +27,10 @@ export async function syncFactoryPresentation(tx: PoolClient, task: FactoryTask)
   const messages = bot.locale === 'en' ? englishMessages : chineseMessages;
   const copy = messages.FactoryFlow;
   let body = flow.stage === 'completed' && flow.completion === 'accepted' ? messages.FactoryAcceptance.state.accepted : copy.stages[flow.stage];
-  if (flow.needsYou?.kind === 'spec_review') body = copy.specReady;
+  if (flow.needsYou?.kind === 'spec_review') {
+    body = copy.specReady;
+    if (specArtifact) body += ` [${copy.stages.spec}](${withBasePath(workspaceLink({ artifact: specArtifact.artifactId }))})`;
+  }
   else if (flow.needsYou?.kind === 'question') body = copy.questionReady;
   else if (flow.needsYou?.kind === 'blocked' || flow.needsYou?.kind === 'failed') body = copy[flow.needsYou.kind].replace('{reason}', () => redactFactoryCheckText(task.reason).slice(0,500));
   else if (flow.stage === 'handoff' && flow.acceptance) {

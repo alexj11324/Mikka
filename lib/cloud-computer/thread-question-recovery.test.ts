@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test, { mock } from 'node:test'
+import { threadResourcePreflight, withThreadProjectResources } from '../../tests/support/thread-project-resources-fixture'
 import { REGISTRATION_COMPLETE } from '../computer/registration-command'
 
 // The real runtime-maintenance orchestration, with storage/receipt and cloud
@@ -27,12 +28,16 @@ const ensureThreadMachine = async (...args: Parameters<typeof import('./thread-m
   (await runtime).ensureThreadMachine(...args)
 
 const id = (n: number) => `41600000-0000-4000-8000-${String(n).padStart(12, '0')}`
+// Keep unexpected SQL rejected while the real registration locks its parent run.
+const sandboxRegistrationSql = `WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
+  UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp())
+  FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`.replace(/\s+/g, ' ').trim()
 function fixture() {
   const actor = { userId: 'fixture-owner', workspaceId: id(2) }
-  const run = { id: id(1), userId: actor.userId, issueId: id(3), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
+  const run = { id: id(1), userId: actor.userId, workspaceId: actor.workspaceId, issueId: id(3), agentId: id(16), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
     status: 'failed', stopReason: 'blocked', startedAt: null, sessionId: null as string | null, stopRequestedAt: null, registrationStopRequestedAt: null,
-    kind: 'plan', repoPath: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git',
-    agentDefinition: { readOnly: true },
+    kind: 'plan', repoPath: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git', baseBranch: null, runHarness: 'codex',
+    agentDefinition: { readOnly: true, harness: 'codex' },
     questionContinuation: { requireSessionResume: true, requiredSandboxId: 'fixture-original', originSessionId: 'private-native-session', originRunId: id(7), questionId: id(8) } }
   const machine = { runId: run.id, ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: run.issueId,
     deviceId: run.deviceId, repoId: run.deviceRepoId, botId: run.runtimeBotId, state: 'paused', sandboxId: 'fixture-original', snapshotId: 'codex',
@@ -51,6 +56,8 @@ function fixture() {
   const query = async (sql: string, values: unknown[] = []) => {
     queries.push(sql)
     const result = (rows: unknown[]) => ({ rows, rowCount: rows.length })
+    const preflight = threadResourcePreflight(sql, values, run)
+    if (preflight) return preflight
     if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
       assert.deepEqual(values, [run.id, actor.userId])
       return result([{ issueId: run.issueId }])
@@ -59,7 +66,14 @@ function fixture() {
       run.sessionId === null && task.stage === 'spec' && task.status === 'blocked' && question.status === 'blocked' && question.continuationRunId === run.id ? [{ ...task }] : [])
     if (sql.startsWith('SELECT revision,"answerFingerprint",id FROM factory_questions')) return result([{ ...question }])
     if (sql.startsWith('SELECT request,result FROM factory_events')) return result([structuredClone(receipt)])
-    if (sql.startsWith('SELECT r.*') || (sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT *,"stopRequestedAt"::text AS "registrationStopRequestedAt" FROM agent_runs')) || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
+    if (sql.startsWith('SELECT r.*')) {
+      assert.match(sql, /r\."baseBranch" AS "runBaseBranch"/)
+      assert.match(sql, /r\."stopRequestedAt"::text AS "registrationStopRequestedAt"/)
+      assert.match(sql, /r\."workspaceId"=b\."workspaceId" FOR UPDATE OF r/)
+      assert.deepEqual(values, [run.id, actor.userId, actor.workspaceId])
+      return result([{ ...run, runBaseBranch: run.baseBranch }])
+    }
+    if (sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT *,"stopRequestedAt"::text AS "registrationStopRequestedAt" FROM agent_runs') || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
     if (sql.startsWith('SELECT * FROM thread_machines')) return result([{ ...machine }])
     if (sql.startsWith('SELECT 1 FROM devices d JOIN agent_runs')) return result(flags.deviceEnabled ? [{}] : [])
     if (/^SELECT 1 FROM (factory_questions|devices|thread_machines|agent_runs)/.test(sql)) return result([{}])
@@ -72,7 +86,7 @@ function fixture() {
       }))
     }
     if (sql.startsWith('INSERT INTO device_tokens')) return result([{ now: new Date() }])
-    if (sql.startsWith('UPDATE thread_machines') || sql.startsWith('WITH locked_run')) {
+    if (sql.startsWith('UPDATE thread_machines') || sql.startsWith('WITH locked_run') || sql.replace(/\s+/g, ' ').trim() === sandboxRegistrationSql) {
       if (sql.startsWith('UPDATE thread_machines SET "workerLeaseId"=$2')) {
         machine.workerLeaseId = values[1] as string; machine.workerLeaseUntil = new Date(Date.now() + 60_000)
       }
@@ -84,7 +98,8 @@ function fixture() {
     if (/^(BEGIN|COMMIT|ROLLBACK|SELECT set_config|SELECT pg_advisory_xact_lock|INSERT INTO (devices|device_repos|device_tokens)|UPDATE (device_tokens|agent_runs|factory_attempts))/.test(sql)) return result([])
     assert.fail(`Unexpected recovery-fixture SQL: ${sql}`)
   }
-  const pool = { query, connect: async () => ({ query, release: () => { released = true } }) } as never
+  const client = { query, release: () => { released = true } }
+  const pool = { query, connect: async () => client } as never
   const box = { sandboxId: machine.sandboxId,
     files: { read: async () => 'b'.repeat(40), write: async () => { state.steps.push('bootstrap') } },
     commands: { run: async () => { state.steps.push('worker'); return { stdout: REGISTRATION_COMPLETE + '\n' } } },
@@ -99,7 +114,7 @@ function fixture() {
     const saved = process.env.MIKKA_CLOUD_WORKER_URL, sha = process.env.MIKKA_CLOUD_WORKER_SHA
     process.env.MIKKA_CLOUD_WORKER_URL = 'https://fixture.invalid/mikka'; process.env.MIKKA_CLOUD_WORKER_SHA = 'b'.repeat(40)
     const warning = mock.method(console, 'warn', (line: string) => { warnings.push(line) })
-    try { return await ensureThreadMachine(pool, actor, run.id, provider, undefined, true) }
+    try { return await withThreadProjectResources({ pool, client, run }, () => ensureThreadMachine(pool, actor, run.id, provider, undefined, true)) }
     finally {
       warning.mock.restore()
       if (saved === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = saved

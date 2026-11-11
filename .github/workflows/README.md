@@ -50,7 +50,9 @@ bindings. Current workflow files define the triggers and selected coverage.
 ## Cloud worker template release
 
 `e2b-official-runtime.yml` is the only production release coordinator. It checks
-the immutable worker digest, then calls `e2b-template.yml` to build unique
+the immutable worker digest and failed runtime input fingerprints before entering
+the publication queue. Its reusable `e2b-runtime-release.yml` holds that queue
+through validation, publication and cleanup, and calls `e2b-template.yml` to build unique
 candidates from the official `desktop`, `claude` and `codex` bases. The builder
 executes the existing additive installer beneath `/opt/mikka`, leaving an
 anonymous worker preloaded at E2B's ready checkpoint. No runtime credential or
@@ -77,9 +79,20 @@ The finalizer always closes instances labelled with this exact source, run and
 attempt. A failed build, obsolete source, failed Web wait or subscription gate
 also removes this run's exact named private candidates and verifies their
 absence. Public images and previous releases remain available. Cleanup receipts
-are artifacts; a cleanup error fails the workflow. After a failed release, rerun
-all jobs to rebuild candidates, since a failed-jobs-only rerun would refer to
-candidates that the finalizer has already removed.
+are artifacts; a cleanup error fails the workflow. After a build or subscription failure on current main, the workflow retains a
+SHA-256 fingerprint of all `runtime_paths` Git entries, including dependency
+locks, in an Actions artifact for 90 days. A subsequent automatic push with the
+same inputs reports `skipped: same inputs as failed run <id>` and succeeds before
+entering the release queue or creating E2B machines. The queue checks again after
+entry to suppress already-queued duplicates. Obsolete sources, cancellations,
+Web failures and cleanup-only failures do not create failure fingerprints.
+
+To retry after an external service recovers, dispatch **E2B additive runtime
+release** on current main and fill in `reason`; the Actions dispatch event records
+it. Manual dispatch always runs validation, even for a matching worker. Changed
+runtime inputs produce a new fingerprint. Missing or expired failure artifacts
+permit the normal worker comparison; history API errors fail the check. Do not
+retry only failed candidate/gate jobs: cleanup has removed their candidates.
 
 After both gates pass, the workflow makes the candidates public and publishes
 all three IDs, their official base kinds, worker digest, source commit and
@@ -126,10 +139,15 @@ CI source changes are not classified as documentation-only.
 
 ## Official UI overlay
 
+There is one UI ([decision](../../docs/design/decisions/2026-11-08-2133-one-ui.md)).
+Public and fork PRs build without the private repository, and that build only
+has to compile; no workflow screenshots it. (`community-settings-ui.yml`,
+which captured that build's settings pages, was removed on 2026-11-08.)
+
 `web-deploy.yml` and `desktop-release.yml` alone read the private UI through
 Infisical OIDC and `HOSTED_UI_READ_KEY` (`prod:/platform`, GitHub read-only deploy key on
 `alexj11324/mikka-hosted-ui` only). They set `MIKKA_UI_OVERLAY_DIR` and record
-`MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build the default public UI
+`MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build with the default slots
 without either variable or any private secret. The production Web job checks
 public main plus private main on each main update, including docs-only pushes. Private main pushes dispatch
 the official Web job again with `overlay-refresh: true`, so docs-only changes
@@ -168,3 +186,13 @@ and [measured results](../../docs/ci/1699-results.md).
 Selected Desktop, Analytics and Docker PR checks now run as reusable jobs of CI;
 their conclusions are included in `UI policy (strict)`. Main image publication
 remains independent, and source-SHA release gates are unchanged.
+
+Selected reusable calls consume CI's trusted decision without running another
+selector. Independent dispatches and Image pushes still classify their changes.
+Desktop Linux and Apple Silicon acceptance run independently; native icon
+compilation shares the Apple Silicon runner. Both acceptance results remain
+required. The shared pnpm action restores exact installed dependencies or runs
+a frozen install on a miss. PRs do not upload dependency caches. See
+[cache boundaries and performance evidence](../../docs/ci/1765-optimizations.md).
+`ci-dependencies.yml` warms Desktop's Linux/macOS dependency keys when install
+inputs change on main; dispatch it to repopulate evicted or changed-image keys.

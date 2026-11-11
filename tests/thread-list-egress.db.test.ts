@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -17,9 +18,12 @@ test('quiet thread polls return only a version; visible changes and online state
   const device = randomUUID(), agent = randomUUID(), ids = Array.from({ length: 119 }, () => randomUUID())
   const poll = (known?: string, positions?: readonly ListPosition[]): ReturnType<typeof actions.pollThreads> => withActivitySession(owner, () => actions.pollThreads(known, positions))
   try {
+    for (const user of [owner, peer]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`])
+    const workspaceId = await seedFixtureWorkspace(pool, owner)
+    await seedFixtureWorkspace(pool, peer)
     await pool.query('INSERT INTO devices(id,"ownerId",name,"lastSeenAt") VALUES($1,$2,$3,now())', [device, owner, 'Fixture machine'])
     await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,$3,$4)', [agent, owner, 'Fixture bot', 'codex'])
-    for (const [index, id] of ids.entries()) await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",prompt,"lastReply",status) VALUES($1,$2,$3,$4,$5,$6,$7)', [id, owner, agent, device, `Fixture ${index} ` + 'p'.repeat(200), 'r'.repeat(240), 'queued'])
+    for (const [index, id] of ids.entries()) await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",prompt,"lastReply",status,"workspaceId","promptTaskStart","promptTaskLength") VALUES($1,$2,$3,$4,$5,$6,$7,$8,0,char_length($5))', [id, owner, agent, device, `Fixture ${index} ` + 'p'.repeat(200), 'r'.repeat(240), 'queued', workspaceId])
     await poll() // Warm pool connections; cold below means no browser snapshot.
     const cold = await measured(() => poll()), first = cold.value, fullBytes = cold.bytes
     assert.equal(first.items?.length, 119)
@@ -45,7 +49,10 @@ test('quiet thread polls return only a version; visible changes and online state
     const detailOnly = await poll(cloud.version, cloud.positions)
     assert.ok('unchanged' in detailOnly && detailOnly.unchanged, 'a detail-only error no longer invalidates or transfers the thread list')
     assert.equal(detailOnly.items, undefined)
-    await pool.query('UPDATE agent_runs SET prompt=$2 WHERE id=$1', [ids[0], 'Visible change without timestamp update'])
+    await pool.query('UPDATE agent_runs SET prompt=prompt || $2 WHERE id=$1', [ids[0], '\nINTERNAL_HOST_GUIDANCE 🔍'])
+    const instructionsOnly = await poll(cloud.version, cloud.positions)
+    assert.ok('unchanged' in instructionsOnly && instructionsOnly.unchanged, 'execution guidance outside the recorded task cannot change its visible name')
+    await pool.query('UPDATE agent_runs SET prompt=$2,"promptTaskStart"=0,"promptTaskLength"=char_length($2) WHERE id=$1', [ids[0], 'Visible change without timestamp update'])
     const delta = await measured(() => poll(cloud.version, cloud.positions))
     assert.equal(delta.value.delta, true)
     assert.deepEqual(delta.value.items?.map(row => row.id), [ids[0]])
@@ -91,6 +98,9 @@ test('quiet thread polls return only a version; visible changes and online state
     await pool.query('DELETE FROM agent_runs WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM agents WHERE id=$1', [agent])
     await pool.query('DELETE FROM devices WHERE id=$1', [device])
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "userId"=ANY($1::text[])', [[owner, peer]])
+    await pool.query('DELETE FROM mikka_workspaces WHERE "userId"=ANY($1::text[])', [[owner, peer]])
+    await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
     await pool.end()
   }
 })

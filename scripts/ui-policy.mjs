@@ -6,6 +6,14 @@ export function isComponentLibrarySource(file, policy) {
   return policy.componentRoots.some(root => file.startsWith(root))
 }
 
+// Paid blocks keep their native colours and type (docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md):
+// files under ui-policy.json asShipped.public drop only these two rules.
+const AS_SHIPPED_RULES = new Set(['style/semantic-colors', 'typography/preset-only'])
+export function exemptAsShipped(file, diagnostics, policy) {
+  const roots = policy.asShipped?.public ?? []
+  return roots.some(root => file === root || (root.endsWith('/') && file.startsWith(root))) ? diagnostics.filter(d => !AS_SHIPPED_RULES.has(d.rule)) : diagnostics
+}
+
 export function splitUtilities(value) {
   const tokens = []
   let token = '', depth = 0, quote = ''
@@ -280,7 +288,8 @@ export function auditSource(file, text, policy) {
     }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const raw = node.tagName.getText(source), name = canonical(node), parents = ancestors(node)
-      const frameworkShell = ['app/layout.tsx', 'app/[locale]/layout.tsx'].includes(file) && ['html', 'body'].includes(raw)
+      // No Next layout renders the document any more: apps/frontend/index.html
+      // owns <html>/<body>, so no source file is exempt as a framework shell.
       // Base UI 的 render prop 指定宿主元素（样式与行为由外层组件提供）：
       // 那里的自闭合标签是组合 API，不是手写的控件。
       const renderHost = ts.isJsxSelfClosingElement(node) && (() => {
@@ -291,7 +300,7 @@ export function auditSource(file, text, policy) {
         return false
       })()
       const replacement = RAW_ELEMENTS[raw]
-      if (!frameworkShell && !renderHost && replacement) add(node, 'components/no-handwritten-ui', `手写 <${raw}>；改用 ${replacement}。`)
+      if (!renderHost && replacement) add(node, 'components/no-handwritten-ui', `手写 <${raw}>；改用 ${replacement}。`)
       if (ts.isIdentifier(node.tagName)) {
         const value = resolve(node.tagName)
         if (value.strings.some(tag => RAW_ELEMENTS[tag])) add(node, 'components/no-handwritten-ui', '不允许用大写变量包装 HTML 标签绕过限制。')
@@ -301,8 +310,8 @@ export function auditSource(file, text, policy) {
       if (classAttr?.initializer) {
         const expression = ts.isJsxExpression(classAttr.initializer) ? classAttr.initializer.expression : classAttr.initializer
         const classes = resolve(expression)
-        if (!frameworkShell && !classes.known) add(classAttr, 'style/static-layout-only', 'className 必须可静态检查，动态组合请使用 cn() 和明确的布局常量。')
-        if (!frameworkShell && expression && (ts.isTemplateExpression(expression) || ts.isConditionalExpression(expression))) add(classAttr, 'style/use-cn', '条件 className 使用 cn()，不拼接模板或直接使用三元表达式。')
+        if (!classes.known) add(classAttr, 'style/static-layout-only', 'className 必须可静态检查，动态组合请使用 cn() 和明确的布局常量。')
+        if (expression && (ts.isTemplateExpression(expression) || ts.isConditionalExpression(expression))) add(classAttr, 'style/use-cn', '条件 className 使用 cn()，不拼接模板或直接使用三元表达式。')
         for (const value of classes.strings) {
           const tokens = splitUtilities(value)
           if (tokens.includes('overflow-hidden') && tokens.includes('text-ellipsis') && tokens.includes('whitespace-nowrap')) add(classAttr, 'style/truncate', '使用 truncate 简写。')

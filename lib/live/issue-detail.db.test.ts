@@ -6,11 +6,13 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { issueMemberTargets, issueRelationTargets } from './issue-detail'
 import type { LiveInvalidation } from './events'
 import { liveChannelId, type LiveScope } from './scope'
+import { tokenWorkspace } from '../tokens/principal'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
@@ -20,6 +22,7 @@ test('issue members and relations keys reach only the task audience, after the a
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
   const nextServer = await import('next/server')
+  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
   mock.module('next/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
   // The same writers refresh lists and documents; lists.db.test.ts and panels.db.test.ts cover those keys.
   for (const file of ['./lists.ts']) {
@@ -71,9 +74,12 @@ test('issue members and relations keys reach only the task audience, after the a
     }
     const issue = async (workspace: string | null, metadata: Record<string, unknown> = {}) => {
       const id = randomUUID()
-      await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES ($1,'owner','Fixture',$2,'todo','normal',$3)`,
-        [id, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] }), workspace ? 'workspace' : 'personal'])
-      if (workspace) await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, randomUUID(), workspace])
+      await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId") VALUES ($1,'owner','Fixture',$2,'todo','normal',$3,$4)`,
+        [id, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] }), workspace ? 'workspace' : 'personal', workspace ?? home])
+      if (workspace) {
+        const grouping = await seedTeam(database, workspace, 'owner')
+        await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, grouping.id, workspace])
+      }
       return id
     }
     const parent = await issue(team), unrelated = await issue(team)
@@ -121,12 +127,12 @@ test('issue members and relations keys reach only the task audience, after the a
       const revision = async (id: string) => (await database.query('SELECT revision FROM issues WHERE id=$1', [id])).rows[0].revision as number
       sent.length = 0
       await assert.rejects(scope.run(() => db.transaction(outer => withDatabaseTransaction(outer, async () => {
-        const result = await actAs('owner', async () => updateIssueRelation({ id: child, revision: await revision(child), targetId: null, kind: 'parent', remove: true }))
+        const result = await actAs({ id: 'owner', [tokenWorkspace]: team }, async () => updateIssueRelation({ id: child, revision: await revision(child), targetId: null, kind: 'parent', remove: true }))
         assert.ok('issue' in result, JSON.stringify(result))
         throw new Error('relation rollback')
       }))), /relation rollback/)
       await drain(); assert.deepEqual(sent, [])
-      const result = await scope.run(async () => actAs('owner', async () => updateIssueRelation({ id: child, revision: await revision(child), targetId: null, kind: 'parent', remove: true })))
+      const result = await scope.run(async () => actAs({ id: 'owner', [tokenWorkspace]: team }, async () => updateIssueRelation({ id: child, revision: await revision(child), targetId: null, kind: 'parent', remove: true })))
       assert.ok('issue' in result, JSON.stringify(result))
       await drain()
       const delivered = keys('issue_relations')
@@ -138,17 +144,17 @@ test('issue members and relations keys reach only the task audience, after the a
       const { actAs } = await import('../acting-user')
       const { inviteMember, removeMember } = await import('../../app/actions/collaboration')
       sent.length = 0
-      const invited = await scope.run(() => actAs('owner', () => inviteMember(parent, 'outsider@detail.example.invalid')))
+      const invited = await scope.run(() => actAs({ id: 'owner', [tokenWorkspace]: team }, () => inviteMember(parent, 'outsider@detail.example.invalid')))
       assert.ok('success' in invited, JSON.stringify(invited))
       await drain()
       assert.deepEqual(keys('issue_members'), [`owner@${team}:${parent}`, `peer@${team}:${parent}`], 'an invite to a team task never opens the team channel to the invitee')
       sent.length = 0
-      assert.ok('success' in await scope.run(() => actAs('owner', () => removeMember(parent, 'outsider'))))
+      assert.ok('success' in await scope.run(() => actAs({ id: 'owner', [tokenWorkspace]: team }, () => removeMember(parent, 'outsider'))))
       await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='peer'`, [team])
       await drain()
       assert.deepEqual(keys('issue_members'), [`owner@${team}:${parent}`], 'a member removed between COMMIT and delivery receives nothing')
       sent.length = 0
-      assert.ok('success' in await scope.run(() => actAs('owner', () => removeMember(parent, 'outsider'))))
+      assert.ok('success' in await scope.run(() => actAs({ id: 'owner', [tokenWorkspace]: team }, () => removeMember(parent, 'outsider'))))
       await drain(); assert.deepEqual(keys('issue_members'), [], 'removing someone who is not a member is not a change')
       assert.deepEqual(unexpected, [])
     })

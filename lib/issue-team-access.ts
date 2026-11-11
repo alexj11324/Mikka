@@ -1,5 +1,6 @@
 import 'server-only'
 import { and, asc, eq, gt, inArray, or, sql, type SQL } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues, teams } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
@@ -118,8 +119,14 @@ export async function issueTeamScope(userId: string, ids: string[] = [], options
   return links.filter(link => ids.includes(link.issueId) || allowed.some(team => team.id === link.teamId && team.workspaceId === link.workspaceId))
 }
 export async function issueTeamAccess(issueId: string, userId: string) {
-  const [link] = await workspaceDb.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).limit(1)
+  // This exact-link gate is read on every detail operation. Short aliases keep
+  // its unchanged membership and tenant checks bounded on the wire.
+  const links = alias(teamIssues, 'l'), members = alias(workspaceMembers, 'm')
+  const [link] = await workspaceDb.select({ teamId: links.teamId, workspaceId: links.workspaceId, memberId: members.userId }).from(links)
+    .leftJoin(members, and(eq(members.workspaceId, links.workspaceId), eq(members.userId, userId), eq(members.status, 'active')))
+    .where(eq(links.issueId, issueId)).limit(1)
   if (!link) return { teamId: null, workspaceId: null, allowed: false, linked: false }
-  const [member] = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(1)
-  return { teamId: link.teamId, workspaceId: link.workspaceId, allowed: !!member, linked: true }
+  // A revoked or foreign link remains visible to the caller's scope check;
+  // the LEFT JOIN reads its current membership in the same statement.
+  return { teamId: link.teamId, workspaceId: link.workspaceId, allowed: link.memberId !== null, linked: true }
 }

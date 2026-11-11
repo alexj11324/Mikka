@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 // #467 follow-up: ensureThreadMachine never starts a machine for a queued run whose stop was
 // requested. Check 1 runs under the first run lock before any provider call; check 2 re-takes
 // the run lock after the sandbox is created and before the worker is started.
@@ -44,15 +45,20 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-stop@example.invalid',true,now(),now())`, [owner]);
+    await seedFixtureWorkspace(pool, owner, 'team', workspaceId);
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'bot','cloud')`, [botDevice, owner]);
     await pool.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,'codex','Fixture',$3)`, [agentId, owner, botDevice]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture/repo')`, [repoId, botDevice, owner]);
     await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Fixture Bot')`, [botId, workspaceId, owner]);
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES ($1,$2,'sandbox-bot',$3,true,'running',$4)`, [workspaceId, owner, randomUUID(), botDevice]);
     const actor = { userId: owner, workspaceId } as Parameters<typeof ensureThreadMachine>[1];
-    const queuedRun = async () => {
+    const queuedRun = async (withTask = true) => {
       const runId = randomUUID();
-      await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","botId","deviceId","deviceRepoId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,'queued','Fixture')`, [runId, owner, agentId, botId, botDevice, repoId]);
+      const issueId = withTask ? randomUUID() : null;
+      if (issueId) await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority)
+        VALUES ($1,$2,$3,'Stop lifecycle fixture','{"type":"doc","content":[]}'::jsonb,'todo','normal')`, [issueId, owner, workspaceId]);
+      await pool.query(`INSERT INTO agent_runs (id,"userId","workspaceId","issueId","agentId","botId","deviceId","deviceRepoId",status,prompt)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued','Fixture')`, [runId, owner, workspaceId, issueId, agentId, botId, botDevice, repoId]);
       await pool.query(`INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [runId, botId, workspaceId, owner]);
       return runId;
     };
@@ -67,18 +73,25 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
     };
     const state = async (runId: string) => ({
       run: (await pool.query('SELECT status,"stopRequestedAt" IS NOT NULL AS stop,"finishedAt" IS NOT NULL AS finished FROM agent_runs WHERE id=$1', [runId])).rows[0],
-      machine: (await pool.query('SELECT state,"sandboxId","workerLeaseId","deviceId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0],
+      machine: (await pool.query('SELECT state,"sandboxId","workerLeaseId","deviceId","repoId","issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0],
       tokens: (await pool.query('SELECT count(*)::int AS n FROM device_tokens t JOIN thread_machines m ON m."deviceId"=t."boundDeviceId" WHERE m."runId"=$1', [runId])).rows[0].n,
     });
 
-    const retainedUnclaimedRun = async () => {
-      const runId = await queuedRun();
+    const retainedUnclaimedRun = async (withTask = true) => {
+      const runId = await queuedRun(withTask);
       const deviceId = randomUUID(), machineRepoId = randomUUID();
       await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'unclaimed task','cloud')`, [deviceId, owner]);
       await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture/task')`, [machineRepoId, deviceId, owner]);
-      await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3 WHERE id=$1`, [runId, deviceId, machineRepoId]);
-      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId","repoId")
-        VALUES ($1,$2,$3,$4,$5,'snapshot-fixture',$6,'error',$7,$8)`, [runId, workspaceId, owner, botId, `sandbox-stop-${runId}`, randomUUID(), deviceId, machineRepoId]);
+      const run = (await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3 WHERE id=$1 RETURNING "issueId"`, [runId, deviceId, machineRepoId])).rows[0];
+      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId","repoId","issueId")
+        VALUES ($1,$2,$3,$4,$5,'snapshot-fixture',$6,'error',$7,$8,$9)`, [runId, workspaceId, owner, botId, `sandbox-stop-${runId}`, randomUUID(), deviceId, machineRepoId, run.issueId]);
+      return runId;
+    };
+    const legacyMachineForBoundRun = async () => {
+      const runId = await retainedUnclaimedRun();
+      // 20261101193000 adds this nullable column without backfilling earlier
+      // machines, even when their existing Run already belongs to a Task.
+      await pool.query('UPDATE thread_machines SET "issueId"=NULL WHERE "runId"=$1', [runId]);
       return runId;
     };
 
@@ -96,6 +109,72 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       assert.deepEqual(kills, [`sandbox-stop-${runId}`]);
     });
 
+    await t.test("normal Owner Stop still cleans a historical Run without Task execution authority", async (t) => {
+      const runId = await retainedUnclaimedRun(false);
+      const original = (await pool.query('SELECT "workspaceId","issueId","agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0];
+      assert.equal(original.workspaceId, workspaceId);
+      assert.equal(original.issueId, null);
+      assert.equal((await pool.query('SELECT "issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0].issueId, null);
+      const kills: string[] = [];
+      t.mock.method(threadMachineProvider, "kill", async (sandboxId: string, userId: string) => {
+        assert.equal(userId, owner); kills.push(sandboxId);
+      });
+      const { requestRunStop } = await import("../agent-runs");
+      assert.deepEqual(await requestRunStop(owner, runId), { stoppedRunIds: [runId] });
+      assert.deepEqual((await state(runId)).run, { status: "stopped", stop: true, finished: true });
+      assert.equal((await state(runId)).machine.state, "ended");
+      assert.deepEqual(kills, [`sandbox-stop-${runId}`]);
+      assert.deepEqual((await pool.query('SELECT "workspaceId","issueId","agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0], original,
+        'cleanup neither assigns a Task nor manufactures execution authority for the old Run');
+    });
+
+    await t.test("normal Owner Stop cleans a verified legacy machine with no Task key for an already bound Run", async (t) => {
+      const runId = await legacyMachineForBoundRun();
+      const original = (await pool.query('SELECT "workspaceId","issueId","deviceId","deviceRepoId","agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0];
+      assert.ok(original.issueId);
+      const kills: string[] = [];
+      t.mock.method(threadMachineProvider, "kill", async (sandboxId: string, userId: string) => {
+        assert.equal(userId, owner); kills.push(sandboxId);
+      });
+      const { requestRunStop } = await import("../agent-runs");
+      assert.deepEqual(await requestRunStop(owner, runId), { stoppedRunIds: [runId] });
+      const current = await state(runId);
+      assert.deepEqual(current.run, { status: "stopped", stop: true, finished: true });
+      assert.equal(current.machine.state, "ended");
+      assert.equal(current.machine.sandboxId, null);
+      assert.equal(current.tokens, 0, 'ending the old machine issues no new credential');
+      assert.deepEqual(kills, [`sandbox-stop-${runId}`]);
+      assert.deepEqual((await pool.query('SELECT "workspaceId","issueId","deviceId","deviceRepoId","agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0], original);
+      assert.equal((await pool.query('SELECT "issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0].issueId, null,
+        'Stop compatibility neither backfills the old machine nor grants it Task execution authority');
+    });
+
+    await t.test("a legacy machine with another Task's native history on its device remains intact", async () => {
+      const runId = await legacyMachineForBoundRun(), source = await queuedRun();
+      const machine = (await pool.query('SELECT "deviceId","repoId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+      await pool.query(`UPDATE agent_runs SET status='failed',"deviceId"=$2,"deviceRepoId"=$3,
+        "sessionId"='fixture-other-task-history',"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [source, machine.deviceId, machine.repoId]);
+      assert.notEqual((await pool.query('SELECT "issueId" FROM agent_runs WHERE id=$1', [source])).rows[0].issueId,
+        (await pool.query('SELECT "issueId" FROM agent_runs WHERE id=$1', [runId])).rows[0].issueId);
+      await stopOwnedRun(db.db, owner, runId);
+      const before = await state(runId), { calls, provider } = fake();
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.deepEqual(await state(runId), before);
+      assert.deepEqual(calls, []);
+    });
+
+    await t.test("a non-null machine Task mismatch cannot use historical Stop compatibility", async () => {
+      const runId = await retainedUnclaimedRun(), other = await queuedRun();
+      await pool.query('UPDATE thread_machines SET "issueId"=(SELECT "issueId" FROM agent_runs WHERE id=$2) WHERE "runId"=$1', [runId, other]);
+      await stopOwnedRun(db.db, owner, runId);
+      const before = await state(runId), { calls, provider } = fake();
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.deepEqual(await state(runId), before);
+      await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), { status: 409, message: "Task runtime is busy" });
+      assert.deepEqual(await state(runId), before);
+      assert.deepEqual(calls, []);
+    });
+
     await t.test("the existing maintenance pass acknowledges a host stop on an unclaimed bound run", async (t) => {
       const runId = await retainedUnclaimedRun();
       assert.equal(await stopOwnedRun(db.db, owner, runId), false);
@@ -109,8 +188,8 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
 
     await t.test("a frozen Profile and ordinary retry lineage do not count as an actual native claim", async (t) => {
       const runId = await retainedUnclaimedRun(), source = await queuedRun();
-      const deviceId = (await state(runId)).machine.deviceId;
-      await pool.query(`UPDATE agent_runs SET status='failed',"deviceId"=$2,"finishedAt"=now() WHERE id=$1`, [source, deviceId]);
+      const { deviceId, repoId: machineRepoId } = (await state(runId)).machine;
+      await pool.query(`UPDATE agent_runs SET status='failed',"deviceId"=$2,"deviceRepoId"=$4,"issueId"=(SELECT "issueId" FROM agent_runs WHERE id=$3),"finishedAt"=now() WHERE id=$1`, [source, deviceId, runId, machineRepoId]);
       const { executionIdentitySchema } = await import("../execution-identity");
       const { parseAgentProfile, agentProfileDigest } = await import("../factory/agent-profile-definition");
       const connectionId = randomUUID(), bindingId = randomUUID();
@@ -205,8 +284,8 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
 
     for (const field of ["retryOf", "continuesRunId"] as const) await t.test(`${field} retains existing native history on the same machine`, async () => {
       const runId = await retainedUnclaimedRun(), source = await queuedRun();
-      const deviceId = (await state(runId)).machine.deviceId;
-      await pool.query(`UPDATE agent_runs SET status='failed',"deviceId"=$2,"sessionId"='fixture-source-session',"finishedAt"=now() WHERE id=$1`, [source, deviceId]);
+      const { deviceId, repoId: machineRepoId } = (await state(runId)).machine;
+      await pool.query(`UPDATE agent_runs SET status='failed',"deviceId"=$2,"deviceRepoId"=$4,"issueId"=(SELECT "issueId" FROM agent_runs WHERE id=$3),"sessionId"='fixture-source-session',"finishedAt"=now() WHERE id=$1`, [source, deviceId, runId, machineRepoId]);
       await pool.query(`UPDATE agent_runs SET "${field}"=$2,"stopRequestedAt"=now() WHERE id=$1`, [runId, source]);
       const before = await state(runId), { calls, provider } = fake();
       assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
@@ -217,7 +296,7 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
     await t.test("an adopted task machine preserves native history without a retry or continuation link", async () => {
       const runId = await retainedUnclaimedRun(), source = await queuedRun(), issueId = randomUUID();
       const machine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Adopted task fixture','{"type":"doc","content":[]}'::jsonb,'todo','normal')`, [issueId, owner]);
+      await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,'Adopted task fixture','{"type":"doc","content":[]}'::jsonb,'todo','normal')`, [issueId, owner, workspaceId]);
       await pool.query(`UPDATE agent_runs SET "issueId"=$2 WHERE id=$1`, [runId, issueId]);
       await pool.query(`UPDATE thread_machines SET "issueId"=$2 WHERE "runId"=$1`, [runId, issueId]);
       await pool.query(`UPDATE agent_runs SET "issueId"=$2,"deviceId"=$3,"deviceRepoId"=$4,status='succeeded',"sessionId"='fixture-adopted-session',"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [source, issueId, machine.deviceId, machine.repoId]);
@@ -276,9 +355,45 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       assert.deepEqual((await state(runId)).run, { status: "queued", stop: true, finished: false });
     });
 
+    await t.test("legacy Stop rechecks the actual device and repository after provider preparation", async () => {
+      const runId = await legacyMachineForBoundRun();
+      await stopOwnedRun(db.db, owner, runId);
+      const before = await state(runId);
+      const machine = (await pool.query('SELECT "repoId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+      let prepared = false, killed = false;
+      const provider = {
+        kill: async () => { killed = true; },
+        prepareKill: async () => {
+          prepared = true;
+          // The Run and machine retain the same IDs, but the actual repo now
+          // points at another device. The preflight cannot authorize its kill.
+          await pool.query('UPDATE device_repos SET "deviceId"=$2 WHERE id=$1', [machine.repoId, botDevice]);
+          return async () => { killed = true; };
+        },
+      };
+      assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
+      assert.equal(prepared, true);
+      assert.equal(killed, false);
+      assert.deepEqual(await state(runId), before);
+      assert.equal((await pool.query('SELECT "issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0].issueId, null);
+    });
+
+    await t.test("queued wake acknowledges Stop on a verified legacy machine without starting a worker", async () => {
+      const runId = await legacyMachineForBoundRun();
+      await stopOwnedRun(db.db, owner, runId);
+      const { calls, provider } = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), { status: 409, message: "Thread stopped" });
+      assert.deepEqual(calls, [`kill:sandbox-stop-${runId}`]);
+      const current = await state(runId);
+      assert.deepEqual(current.run, { status: "stopped", stop: true, finished: true });
+      assert.equal(current.machine.state, "ended");
+      assert.equal(current.tokens, 0);
+      assert.equal((await pool.query('SELECT "issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0].issueId, null);
+    });
+
     await t.test("check 1: a bound queued run stopped before provisioning ends, its old sandbox is killed, nothing is created", async () => {
       const runId = await queuedRun();
-      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'sandbox-old','snapshot-fixture',$5,'paused')`, [runId, workspaceId, owner, botId, randomUUID()]);
+      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"issueId") VALUES ($1,$2,$3,$4,'sandbox-old','snapshot-fixture',$5,'paused',(SELECT "issueId" FROM agent_runs WHERE id=$1))`, [runId, workspaceId, owner, botId, randomUUID()]);
       // The real stop path: a machine-bound queued run only gets stopRequestedAt.
       assert.equal(await stopOwnedRun(db.db, owner, runId), false);
       const { calls, provider } = fake();
@@ -313,12 +428,39 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       assert.equal(s.machine.workerLeaseId, null);
       assert.equal(s.machine.deviceId, null, "no worker device was registered");
       assert.equal(s.tokens, 0, "no worker token was issued");
+      const interval = (await pool.query('SELECT reason,"endedAt" FROM thread_machine_sessions WHERE "runId"=$1', [runId])).rows[0];
+      assert.equal(interval.reason, "retired");
+      assert.ok(interval.endedAt, "the successful kill closes the session before the next reconciliation");
+    });
+
+    for (const killFails of [false, true]) await t.test(`a create that arrives after cancellation records only confirmed kill completion (${killFails ? 'failed' : 'acknowledged'})`, async () => {
+      const runId = await queuedRun();
+      const { calls, provider } = fake(async () => {
+        await pool.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=now(),"finishedAt"=now() WHERE id=$1`, [runId]);
+        await pool.query(`UPDATE thread_machines SET state='ended',"endedAt"=now(),"workerLeaseId"=NULL,"workerLeaseUntil"=now() WHERE "runId"=$1`, [runId]);
+      });
+      const kill = provider.kill;
+      provider.kill = async (sandbox, userId) => {
+        await kill(sandbox,userId);
+        if (killFails) throw new Error('Synthetic kill unacknowledged');
+      };
+      if (killFails) await assert.rejects(ensureThreadMachine(pool,actor,runId,provider), /Synthetic kill unacknowledged/);
+      else await assert.rejects(ensureThreadMachine(pool,actor,runId,provider), { status:409, message:'Thread provisioning cancelled' });
+      assert.equal(calls.filter(call => call.startsWith('kill:')).length,1);
+      const intervals = (await pool.query('SELECT source,reason,"endedAt" FROM thread_machine_sessions WHERE "runId"=$1', [runId])).rows;
+      assert.equal(intervals.length,1);
+      assert.equal(intervals[0].source,'observed');
+      assert.equal(intervals[0].reason,killFails ? null : 'retired');
+      assert.equal(intervals[0].endedAt === null,killFails);
+      const machine = (await state(runId)).machine;
+      assert.equal(machine.state,'ended');
+      assert.ok(machine.sandboxId,'the original cleanup owner and retryable custody row are retained');
     });
 
     await t.test("a paused thread whose sandbox is gone gets a new sandbox for the same thread", async () => {
       const runId = await queuedRun();
       const oldOperation = randomUUID();
-      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'sandbox-gone','snapshot-fixture',$5,'paused')`, [runId, workspaceId, owner, botId, oldOperation]);
+      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"issueId") VALUES ($1,$2,$3,$4,'sandbox-gone','snapshot-fixture',$5,'paused',(SELECT "issueId" FROM agent_runs WHERE id=$1))`, [runId, workspaceId, owner, botId, oldOperation]);
       const { calls, provider } = fake();
       const { SandboxNotFoundError } = await import("e2b");
       provider.connect = async (id) => { calls.push(`connect:${id}`); throw new SandboxNotFoundError("gone"); };

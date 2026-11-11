@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -50,8 +51,8 @@ function conversation(): Record<string, unknown>[] {
 }
 
 dbTest('the chat reads compact parts and shows exactly what the full messages show', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { chatItems, QUOTE_PREVIEW_CHARS }, { compactChatMessage, compactChatToolMetadata, TOOL_PREVIEW_CHARS }, { asc, eq, and, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('./context'), import('./chat-projection'), import('drizzle-orm'),
+  const [{ createRequestDatabaseScope, db, pool }, schema, store, { chatItems, QUOTE_PREVIEW_CHARS }, { compactChatMessage, compactChatToolMetadata, TOOL_PREVIEW_CHARS }, { asc, eq, and, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('./context'), import('./chat-projection'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-chat-projection-${randomUUID()}`, botId = randomUUID()
@@ -65,7 +66,7 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Projection fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Projection bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Projection bot' })
     const stored = conversation()
     await db.insert(schema.coordinatorMessages).values(stored.map((message, index) => ({ id: randomUUID(), userId: owner, botId, position: index + 1, message })))
     const mine = and(eq(schema.coordinatorMessages.userId, owner), eq(schema.coordinatorMessages.botId, botId))
@@ -122,8 +123,8 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
 
 
 dbTest('exhausted recovery saves completed receipts once, keeps evidence and releases the failed lease atomically', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { asc, eq, and, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('drizzle-orm'),
+  const [{ createRequestDatabaseScope, db, pool }, schema, store, { asc, eq, and, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-tool-recovery-${randomUUID()}`, botId = randomUUID(), holder = 'wrun_tool-recovery-fixture'
@@ -138,7 +139,7 @@ dbTest('exhausted recovery saves completed receipts once, keeps evidence and rel
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Recovery fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Recovery bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Recovery bot' })
     await db.insert(schema.coordinatorMessages).values({ id: randomUUID(), userId: owner, botId, position: 1, message: { role: 'user', content: 'Synthetic request' } })
     await db.insert(schema.coordinatorSessions).values({ userId: owner, botId, leaseHolder: holder, leaseUntil: new Date(Date.now() + 60_000) })
     const messages: ModelMessage[] = [
@@ -173,7 +174,7 @@ dbTest('exhausted recovery saves completed receipts once, keeps evidence and rel
 })
 
 dbTest('real tool failures and bounded full-input metadata survive the database projection', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, { createCoordinatorRegistry }, { chatItems }, { compactChatMessage }, { asc, eq, and, sql }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db, pool }, schema, { createCoordinatorRegistry }, { chatItems }, { compactChatMessage }, { asc, eq, and, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('../../workflows/coordinator/tools'), import('./context'), import('./chat-projection'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
@@ -188,7 +189,7 @@ dbTest('real tool failures and bounded full-input metadata survive the database 
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Tool metadata fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Metadata bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Metadata bot' })
     // Execute the actual registered read tool against this isolated PostgreSQL,
     // then pass its receipt through the persisted chat contract. No provider stub.
     const registry = createCoordinatorRegistry(owner, botId, undefined, { switches: { issueTools: true, factoryRouting: true, factoryLifecycle: true } })

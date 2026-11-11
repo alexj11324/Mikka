@@ -17,7 +17,7 @@ const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
-test('bot chat keys reach only the owner home, after the actual writer commits', { skip: !url, timeout: 180_000 }, async t => {
+test('bot chat keys reach only the owner in the bot workspace, after the actual writer commits', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
   const nextServer = await import('next/server')
@@ -66,10 +66,11 @@ test('bot chat keys reach only the owner home, after the actual writer commits',
     for (const [id, owner, kind] of [[home, 'owner', 'personal'], [team, 'owner', 'team'], [foreignHome, 'foreign', 'personal']]) {
       await database.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
-    // The peer shares the owner's home and team; neither makes the owner's chat theirs.
-    for (const [workspace, userId] of [[home, 'owner'], [home, 'peer'], [team, 'owner'], [team, 'peer'], [foreignHome, 'foreign']]) {
+    // Team membership does not make the owner's private chat the peer's.
+    for (const [workspace, userId] of [[home, 'owner'], [team, 'owner'], [team, 'peer'], [foreignHome, 'foreign']]) {
       await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member','active')`, [workspace, userId])
     }
+    await assert.rejects(database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'peer','peer','peer','member','active')`, [home]), { code: '23514' }, 'a Personal workspace cannot admit another owner')
     const bot = randomUUID(), foreignBot = randomUUID(), agent = randomUUID()
     await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Scout'),($3,'foreign',$4,'Other')`, [bot, team, foreignBot, foreignHome])
     await database.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,'owner','Fixture','codex')`, [agent])
@@ -79,22 +80,22 @@ test('bot chat keys reach only the owner home, after the actual writer commits',
       return id
     }
     const botRun = await run(bot), plainRun = await run(null)
-    const keys = (botId: string) => [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'bot_chat_list', id: home }, { kind: 'bot_chat', id: botId }] }]
+    const keys = (botId: string) => [{ scope: { ownerId: 'owner', workspaceId: team }, events: [{ kind: 'bot_chat_list', id: team }, { kind: 'bot_chat', id: botId }] }]
 
-    await t.test('a chat key goes to its owner home only, and only for a bot the owner owns', async () => {
-      assert.deepEqual(await botChatTargets(database, database, 'owner', bot), keys(bot), 'the team the bot lives in and the peer sharing the home get nothing')
-      assert.deepEqual(await botChatTargets(database, database, 'owner', foreignBot), [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'bot_chat_list', id: home }] }],
+    await t.test('a chat key stays in the bot tenant and reaches only its current owner member', async () => {
+      assert.deepEqual(await botChatTargets(database, database, 'owner', bot), keys(bot), 'the personal home and another workspace member receive no private chat key')
+      assert.deepEqual(await botChatTargets(database, database, 'owner', foreignBot), [],
         'a caller cannot route another owner’s bot ID onto this channel')
-      assert.deepEqual(await botChatTargets(database, database, 'peer', bot), [], 'a member of someone else’s home has no home of their own to receive on')
-      assert.deepEqual(await runBotChatTargets(database, database, botRun), [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'bot_chat', id: bot }] }])
+      assert.deepEqual(await botChatTargets(database, database, 'peer', bot), [], 'sharing a workspace does not grant ownership of another member’s chat')
+      assert.deepEqual(await runBotChatTargets(database, database, botRun), [{ scope: { ownerId: 'owner', workspaceId: team }, events: [{ kind: 'bot_chat', id: bot }] }])
       assert.deepEqual(await runBotChatTargets(database, database, plainRun), [])
-      await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [home])
+      await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
       assert.deepEqual(await botChatTargets(database, database, 'owner', bot), [])
-      await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='owner'`, [home])
+      await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
     })
 
     await t.test('the actual turn writers publish once after COMMIT and nothing on rollback', async () => {
-      const store = await import('../coordinator/store')
+      const store = await import('@/tests/support/legacy-coordinator-store')
       await database.query(`INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil") VALUES('owner',$1,'fixture-holder',now()+interval '5 minutes')`, [bot])
       await database.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) VALUES($1,'owner',$2,1,'{"role":"user","content":"Hello"}')`, [randomUUID(), bot])
       sent.length = 0
@@ -126,16 +127,16 @@ test('bot chat keys reach only the owner home, after the actual writer commits',
         await runListChanged(outer, botRun)
       })))
       await drain()
-      assert.ok(sent.some(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === home && value.events.some(event => event.kind === 'bot_chat' && event.id === bot)))
-      assert.ok(sent.every(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === home))
+      assert.ok(sent.some(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === team && value.events.some(event => event.kind === 'bot_chat' && event.id === bot)))
+      assert.ok(sent.every(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === team))
       sent.length = 0
       await scope.run(() => runListChanged(db, botRun, true)); await drain()
       assert.ok(!sent.some(value => value.events.some(event => event.kind === 'bot_chat')), 'a reply preview is not a state change on the card')
       sent.length = 0
       await scope.run(() => recordCoordinatorEvent(db, userMessageEvent('owner', 'Another question', { botId: bot })))
-      await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [home])
-      await drain(); assert.deepEqual(sent, [], 'a home lost between COMMIT and delivery receives nothing')
-      await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='owner'`, [home])
+      await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
+      await drain(); assert.deepEqual(sent, [], 'membership lost between COMMIT and delivery suppresses this tenant’s keys')
+      await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
       assert.deepEqual(unexpected, [])
     })
   } finally {

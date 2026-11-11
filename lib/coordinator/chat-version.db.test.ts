@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -5,7 +6,7 @@ import { mergeChat } from './chat-poll'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { measured, readMetrics } from '../../tests/helpers/read-metrics'
 import { persistentReadData } from '../swr/cache-policy'
-import type { ChatView } from './store'
+import type { ChatView } from '@/tests/support/legacy-coordinator-store'
 import type { PoolClient } from 'pg'
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
@@ -23,7 +24,7 @@ const dbTest = databaseUrl ? test : test.skip
 // database deadline. A timed-out parent runs cleanup while its nested cases
 // are still starting; their later FK/pool errors obscure the original timeout.
 const snapshotRuntime = databaseUrl ? await Promise.all([
-  import('../db'), import('../db/schema'), import('./store'), import('../coordinator-events'), import('../chat-failure'), import('drizzle-orm'),
+  import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-events'), import('../chat-failure'), import('drizzle-orm'),
 ]) : null
 
 /** Commit the real inbox claim after PostgreSQL has answered the first state
@@ -65,7 +66,7 @@ dbTest('full and compact chat reads use one snapshot across a concurrent inbox c
     try {
       for (const kind of ['full', 'compact'] as const) await t.test(kind, async () => {
         const botId = randomUUID(), holder = `wrun_snapshot_${kind}`
-        await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Snapshot bot' })
+        await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: `Snapshot bot ${kind}` })
         // Insert only a durable pending event. The test owns the actual claim;
         // no unrelated background Workflow competes with this interleaving.
         await db.insert(schema.coordinatorEvents).values({ id: randomUUID(), ...userMessageEvent(owner, 'Snapshot request', { botId }) })
@@ -112,7 +113,7 @@ dbTest('a continuation keeps the tail snapshot state after an earlier version re
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Tail snapshot fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Tail snapshot bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Tail snapshot bot' })
     await db.insert(schema.coordinatorMessages).values([
       { id: randomUUID(), userId: owner, botId, position: 1, message: { role: 'user', content: 'Earlier request' } },
       { id: randomUUID(), userId: owner, botId, position: 2, message: { role: 'assistant', content: 'Earlier reply' } },
@@ -139,8 +140,8 @@ dbTest('a continuation keeps the tail snapshot state after an earlier version re
 })
 
 dbTest('the chat version changes exactly when the conversation or its inbox does, and costs a few bytes', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  const [{ createRequestDatabaseScope, db, pool }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-chat-version-${randomUUID()}`, botId = randomUUID(), otherBot = randomUUID()
@@ -155,7 +156,7 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Version fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values([{ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Version bot' }, { id: otherBot, ownerId: owner, workspaceId: randomUUID(), name: 'Other bot' }])
+    await db.insert(schema.bots).values([{ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Version bot' }, { id: otherBot, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Other bot' }])
     const empty = await store.chatVersion(owner, 200, botId)
     assert.deepEqual({ ...empty, version: undefined }, { version: undefined, cursor: 0, working: false, error: null })
 
@@ -262,8 +263,8 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
 })
 
 dbTest('a disk-restored tool chat repairs its proven prefix without returning cached bodies from PostgreSQL', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { and, eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('drizzle-orm'),
+  const [{ createRequestDatabaseScope, db, pool }, schema, store, { and, eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-chat-metadata-${randomUUID()}`, botId = randomUUID(), otherBot = randomUUID()
@@ -279,7 +280,7 @@ dbTest('a disk-restored tool chat repairs its proven prefix without returning ca
   await scope.run(async () => {
     // Disposable setup is outside measured reads. No model work is started.
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Metadata fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values([{ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Metadata bot' }, { id: otherBot, ownerId: owner, workspaceId: randomUUID(), name: 'Other bot' }])
+    await db.insert(schema.bots).values([{ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Metadata bot' }, { id: otherBot, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Other bot' }])
     const body = 'BODY_MUST_NOT_REPLAY_FROM_PREFIX '.repeat(150)
     const messages: Record<string, unknown>[] = Array.from({ length: 40 }, (_, index) => index % 2
       ? { role: 'assistant', content: body + index } : { role: 'user', content: `Question ${index}` })

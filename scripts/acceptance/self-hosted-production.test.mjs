@@ -47,7 +47,8 @@ function metadata(options = {}) {
       status: 'in_progress', conclusion: null, ...options.driver })
     if (path.startsWith('/issues/')) {
       const number = Number(path.slice(8)); assert.ok(CORE_ISSUES.includes(number))
-      return Response.json({ number, url: url.href, repository_url: API, state: options.closed ? 'closed' : 'open', ...options.issue })
+      return Response.json({ number, url: url.href, repository_url: API,
+        state: options.openIssues ? (options.openIssues.includes(number) ? 'open' : 'closed') : options.closed ? 'closed' : 'open', ...options.issue })
     }
     if (path === '/git/ref/heads/main') return Response.json({ ref: 'refs/heads/main', object: { type: 'commit', sha: options.main ?? SHA } })
     if (path === '/actions/runs/51') return Response.json({ ...release, ...options.release })
@@ -88,6 +89,14 @@ test('all related issues closed is an explicit skip before credentials or applic
   const f = metadata({ closed: true }), proof = await f.prove()
   assert.equal(proof.status, 'skipped'); assert.equal(proof.readable, false); assert.equal(proof.code, 'core_issues_closed')
   assert.equal(f.calls.some(url => url.startsWith('https://app.aspectlylabs.com')), false)
+})
+
+test('the cleanup regression issue alone keeps exact-revision Core acceptance enabled', async () => {
+  const f = metadata({ openIssues: [1826] }), proof = await f.prove()
+  assert.equal(proof.status, 'ready')
+  assert.deepEqual(proof.openIssues, [1826])
+  assert.equal(f.calls.filter(url => url.endsWith('/mikka/api/version')).length, 2)
+  await assert.rejects(metadata({ openIssues: [1826], version: 'b'.repeat(40) }).prove(), /core_target_changed/)
 })
 
 test('a proof from another driver/attempt, an expired proof or subsequent target drift cannot authorize owner work', async () => {

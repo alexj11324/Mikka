@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, createElement, useEffect, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+
+// TSX components load Lucide's require export; keep native SVG outside this DOM behavior fixture.
+const require = createRequire(import.meta.url)
 
 const view = ({ children }: { children?: ReactNode }) => createElement('div', null, children)
 const text = ({ children }: { children?: ReactNode }) => createElement('span', null, children)
@@ -17,7 +21,7 @@ mock.module('react-native', { namedExports: {
     return createElement('button', { disabled, onClick: onPress }, children)
   },
 } })
-mock.module('lucide-react-native', { namedExports: { Camera: () => null, FileText: () => null, Image: () => null } })
+mock.module(require.resolve('lucide-react-native'), { namedExports: { Camera: () => null, FileText: () => null, Image: () => null } })
 mock.module('expo-clipboard', { namedExports: { ClipboardPasteButton: () => null, isPasteButtonAvailable: false } })
 mock.module(new URL('../components/Symbol.tsx', import.meta.url).href, { namedExports: { Symbol: () => null } })
 mock.module(new URL('../components/Text.tsx', import.meta.url).href, { namedExports: { Text: text } })

@@ -1,7 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-node_modules/
+# Also a symlink of that name (a link is not a directory, so the slash form misses it).
+node_modules
 
 # next.js
 /.next/
@@ -76,3 +77,14 @@ next-env.d.ts
 
 # Nx Core local graph/task state
 .nx/
+
+# eve compiler, durable local storage and standalone service output.
+/apps/eve/.eve/
+/apps/eve/.output/
+/apps/eve/.vercel/
+
+# Temporary standalone typecheck inputs and compiler artifacts.
+/.cache/typecheck/
+
+# Native Eve session data for the default self-hosted service.
+/.cache/eve-workflow/

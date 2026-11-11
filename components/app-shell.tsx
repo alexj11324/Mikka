@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 
 /** The app window (the app-frame slot; the open-source one is app-frame-view.tsx). */
-export { AppFrame } from '@ui-slot/app-frame'
+export { AppFrame, FRAME_LISTS_CHATS, FRAME_OWNS_HEADER, FRAME_OWNS_PANEL } from '@ui-slot/app-frame'
+import { FRAME_LISTS_CHATS } from '@ui-slot/app-frame'
 
 type NavigationHistory = EventTarget & { canGoBack: boolean; canGoForward: boolean }
 
@@ -75,14 +76,15 @@ export function AppShellContent({ parent, title, heading, actions, children, var
     {/* Desktop has no title bar (MIK-40): the top bar searches and the pill names the conversation. Phones keep it, having no rail. */}
     {!hideHeader && <header className={cn('flex h-12 shrink-0 items-center justify-between gap-3 px-4 md:hidden')}>
       <div className="flex min-w-0 items-center gap-2">
-        <SidebarTrigger className="-ml-1" aria-label={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
-        <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" />
+        {!FRAME_LISTS_CHATS && <><SidebarTrigger className="-ml-1 size-10" aria-label={i18nText("Workspace.toggleSidebar")} aria-expanded={isMobile ? openMobile : open} />
+        <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-auto" /></>}
         {heading ?? <Breadcrumb aria-label={i18nText("Workspace.breadcrumb")}><BreadcrumbList>{parent && <><BreadcrumbItem className="hidden sm:inline-flex"><span>{parent}</span></BreadcrumbItem><BreadcrumbSeparator className="hidden sm:block" /></>}<BreadcrumbItem><BreadcrumbPage>{title}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>}
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {/* The phone header is the only way to these actions: each is a 40px target (UI audit chat-10). */}
+      {actions && <div className="flex shrink-0 items-center gap-1 [&_button]:min-h-10 [&_button]:min-w-10">{actions}</div>}
     </header>}
     {/* With the list collapsed, its panel button waits at the top left (Figma 60:299). */}
-    {variant === 'workspace' && listToggle && !open && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="absolute top-3 left-3 z-20 hidden md:inline-flex" aria-label={i18nText('Shell.openList')} aria-expanded={false} onClick={toggleSidebar} />}><PanelLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="right">{i18nText('Shell.openList')}</TooltipContent></Tooltip>}
+    {variant === 'workspace' && listToggle && !open && !FRAME_LISTS_CHATS && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="absolute top-3 left-3 z-20 hidden md:inline-flex" aria-label={i18nText('Shell.openList')} aria-expanded={false} onClick={toggleSidebar} />}><PanelLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="right">{i18nText('Shell.openList')}</TooltipContent></Tooltip>}
     {children}
   </SidebarInset>
 }

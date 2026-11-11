@@ -1,9 +1,18 @@
 name: Install dependencies with pnpm
 description: >-
-  pnpm, Node 24 and a frozen-lockfile install. The pnpm store cache is
-  read-only everywhere except pushes to main: pull requests and branches
-  restore main's entry and never save their own, so cache entries stop
-  multiplying per branch.
+  Exact installed-dependency reuse, with a pnpm-store fallback on misses.
+  Only main pushes and manual main runs save caches; PRs only restore.
+inputs:
+  profile:
+    description: full, or desktop (all workspaces except the independent mobile app)
+    default: full
+  skip-electron:
+    description: Leave runtime installation to the checksum-verifying desktop installer
+    default: 'false'
+  ffmpeg-github-token:
+    description: Optional API-read-only GitHub token for verified FFmpeg assets.
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -13,20 +22,88 @@ runs:
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: 24
+    - id: modules-key
+      shell: bash
+      env:
+        INSTALL_PROFILE: ${{ inputs.profile }}
+        ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || env.ELECTRON_SKIP_BINARY_DOWNLOAD || '' }}
+      run: node scripts/ci/dependency-cache.mjs
+    - name: Restore exact installed dependencies
+      id: modules
+      if: steps.modules-key.outputs.reusable == 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+        key: ${{ steps.modules-key.outputs.key }}
     - id: store
+      if: steps.modules.outputs.cache-hit != 'true'
       shell: bash
       run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
     - id: restore
+      if: steps.modules.outputs.cache-hit != 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ${{ steps.store.outputs.path }}
         key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
           pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-
-    - shell: bash
+    # Exactly one literal install step. The credential boundary in
+    # tests/mvp/pinned-pnpm.test.mjs requires that the step carrying
+    # FFMPEG_GITHUB_TOKEN be an auditable `pnpm install --frozen-lockfile`, and
+    # that there be exactly one of them, so the desktop profile is selected
+    # through pnpm's own workspace filter rather than a second command:
+    # NPM_CONFIG_FILTER scopes the same root install to the 6 of 7 workspaces
+    # that exclude the independent mobile app (verified: `Scope: 6 of 7`).
+    # Profile and Electron settings reach the install through the job
+    # environment: the credential boundary keeps the install step's own env to
+    # the single FFMPEG_GITHUB_TOKEN key, so they cannot ride on that step.
+    - name: Apply the dependency installation profile
+      id: profile
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        INSTALL_PROFILE: ${{ inputs.profile }}
+        SKIP_ELECTRON: ${{ inputs.skip-electron }}
+      run: |
+        case "$INSTALL_PROFILE" in
+          full) echo 'NPM_CONFIG_FILTER=' >> "$GITHUB_ENV" ;;
+          desktop) echo 'NPM_CONFIG_FILTER=!@mikka/mobile' >> "$GITHUB_ENV" ;;
+          *) echo '::error::Unknown dependency installation profile'; exit 1 ;;
+        esac
+        if [ "$SKIP_ELECTRON" = 'true' ]; then echo 'ELECTRON_SKIP_BINARY_DOWNLOAD=1' >> "$GITHUB_ENV"; fi
+    - name: Install dependencies on a cache miss
+      id: install
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        FFMPEG_GITHUB_TOKEN: ${{ inputs.ffmpeg-github-token }}
       run: pnpm install --frozen-lockfile
-    - name: Save the pnpm store (main only)
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'
+    # Save immediately after installation, before tests/builds/credentials can
+    # mutate node_modules. No fuzzy module restore and no PR cache writers.
+    - name: Save exact installed dependencies (main only)
+      if: >-
+        github.ref == 'refs/heads/main' &&
+        (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+        steps.modules-key.outputs.reusable == 'true' && steps.install.outcome == 'success'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+        key: ${{ steps.modules-key.outputs.key }}
+    # Avoid uploading two near-identical large archives for one installation.
+    # The store remains a fallback for misses; update it only when hooks prevent
+    # saving a reusable installed tree.
+    - name: Save the pnpm store when module reuse is disabled (main only)
+      if: >-
+        github.ref == 'refs/heads/main' &&
+        (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+        steps.modules-key.outputs.reusable != 'true' &&
+        steps.install.outcome == 'success' && steps.restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ${{ steps.store.outputs.path }}

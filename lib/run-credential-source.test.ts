@@ -2,10 +2,40 @@ import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
 import type { UsableApiKey } from './model-api-keys'
+import { ActionFailureError } from './action-error'
+import type { ProjectExecutionSnapshot } from './project-resources/contracts'
+import type { ProjectExecutionInput } from './project-resources/store'
 
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const key = (n: number, models: string[], provider: UsableApiKey['provider'] = 'anthropic'): UsableApiKey => ({ id: id(n), ownerId: 'alice', mine: true, provider, name: null, last4: '1234', baseUrl: null, protocol: 'anthropic', responsesApi: true, models, modelsError: null })
 const subscription = { id: id(9), ownerId: 'alice', connectionId: id(8), connectionRevision: 1, modelId: 'claude-sonnet-fixture' }
+const repository = { repoPath: 'v2/github.com/fixture/credential-source', remoteUrl: 'https://github.com/fixture/credential-source.git', baseBranch: 'main' }
+const projectSnapshot: ProjectExecutionSnapshot = { version: 1, workspaceId: id(2), projectId: null, projectRevision: null, policyRevision: 0, repositoryKey: repository.repoPath, baseBranch: repository.baseBranch, environment: null }
+let projectLeaseActive = false, projectDenied = false
+const requireFixtureProjectLease = (userId: string, workspaceId: string) => {
+  assert.deepEqual([userId, workspaceId], ['alice', id(2)])
+  if (!projectLeaseActive) throw new ActionFailureError('projectEnvironmentUnavailable')
+}
+mock.module(new URL('./project-resources/store.ts', import.meta.url).href, { namedExports: {
+  withProjectExecution: async (input: ProjectExecutionInput, operation: (snapshot: ProjectExecutionSnapshot) => Promise<unknown>, requireExisting: boolean) => {
+    assert.deepEqual(input, { userId: 'alice', workspaceId: id(2), issueId: id(20), repositoryKey: repository.repoPath, baseBranch: repository.baseBranch, runtime: 'cloud', harness: 'claude_code' })
+    assert.equal(requireExisting, false)
+    assert.equal(projectLeaseActive, false)
+    if (projectDenied) throw new ActionFailureError('projectRepositoryDenied')
+    projectLeaseActive = true
+    try { return await operation(structuredClone(projectSnapshot)) } finally { projectLeaseActive = false }
+  },
+  requireProjectResourceLease: requireFixtureProjectLease,
+  assertProjectExecutionTarget: (snapshot: ProjectExecutionSnapshot, target: Omit<ProjectExecutionInput, 'issueId' | 'baseBranch'>) => {
+    requireFixtureProjectLease(target.userId, target.workspaceId)
+    assert.deepEqual(target, { userId: 'alice', workspaceId: id(2), repositoryKey: repository.repoPath, runtime: 'cloud', harness: 'claude_code' })
+    assert.deepEqual(snapshot, projectSnapshot)
+  },
+  assertFrozenProjectExecution: (frozen: ProjectExecutionSnapshot, admitted: ProjectExecutionSnapshot) => {
+    requireFixtureProjectLease('alice', id(2))
+    assert.deepEqual(frozen, projectSnapshot); assert.deepEqual(admitted, projectSnapshot)
+  },
+} })
 let keys: UsableApiKey[], saved: { keyId: string; model: string; harnesses: string[] } | undefined
 let quota: unknown, catalogOffers: boolean, sharedCatalogOffers: boolean, afterQuotaAllowed: boolean
 const catalogReads: unknown[][] = []
@@ -21,7 +51,21 @@ mock.module(new URL('./computer/native-run-binding.ts', import.meta.url).href, {
   nativeRunBinding: async () => ({ ...subscription, workspaceId: id(2), consumerId: id(21), route: 'claude_code_cli' }),
 } })
 mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: {
+  // These source-selection cases have no Profile. Import the full storage
+  // boundary, but fail if they unexpectedly start Workspace authorization.
+  workspaceDb: {
+    select: () => { throw new Error('Unexpected Workspace selection in credential-source fixture') },
+    transaction: async () => { throw new Error('Unexpected Workspace transaction in credential-source fixture') },
+  },
   workspacePool: { query: async (sql: string, args: unknown[]) => {
+    if (sql.includes('from mikka_workspaces w')) {
+      assert.match(sql, /^select w\.kind,l\."organizationId",p\."modelCredentialSharing",p\."mcpSharing",p\."allowedModelProviders"/)
+      assert.match(sql.trim(), /where w\.id=\$1$/)
+      assert.deepEqual(args, [id(2)])
+      // This exact Team Workspace has no Organization. The production
+      // resource-policy reader still runs; no unrelated query is authorized.
+      return { rows: [{ kind: 'team', organizationId: null, modelCredentialSharing: null, mcpSharing: null, allowedModelProviders: null }], rowCount: 1 }
+    }
     assert.match(sql, /FROM mikka_workspace_members/)
     assert.deepEqual(args, [id(2), ['alice']])
     return { rows: [{ userId: 'alice' }], rowCount: 1 }
@@ -43,6 +87,8 @@ beforeEach(() => {
   sharedCatalogOffers = true
   afterQuotaAllowed = true
   catalogReads.length = 0
+  projectLeaseActive = false
+  projectDenied = false
 })
 
 for (const localLogin of [true, false]) {
@@ -103,8 +149,18 @@ function cloudQueueFixture() {
     release() { released = true },
     async query(sql: string, args: unknown[] = []) {
       calls.push({ sql, args })
+      requireFixtureProjectLease(scope.ownerId, id(2))
       if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql.startsWith('SELECT pg_advisory_xact_lock') || sql.startsWith('INSERT INTO ')) return { rows: [], rowCount: 0 }
-      if (sql.startsWith('SELECT m.')) return { rows: [{ deviceId: id(23), instructions: '', harness: 'claude_code', baseBranch: 'main' }], rowCount: 1 }
+      if (sql.startsWith('SELECT m.')) {
+        assert.deepEqual(args, [scope.botId, scope.ownerId, id(2), id(21), id(22)])
+        assert.ok(sql.includes('b."ownerId"=$2 AND b."workspaceId"=$3') && sql.includes('FOR SHARE'))
+        return { rows: [{ deviceId: id(23), instructions: '', harness: 'claude_code', baseBranch: repository.baseBranch }], rowCount: 1 }
+      }
+      if (sql.startsWith('SELECT "repoPath","remoteUrl" FROM device_repos')) {
+        assert.deepEqual(args, [id(22), scope.ownerId, id(23)])
+        assert.ok(sql.endsWith('FOR SHARE'))
+        return { rows: [{ repoPath: repository.repoPath, remoteUrl: repository.remoteUrl }], rowCount: 1 }
+      }
       // Keep real identity freezing in these queue tests: all resources belong
       // to the active requester, and only keys still in the fixture exist.
       if (sql.startsWith('SELECT "ownerId","workspaceId" FROM bots')) {
@@ -130,7 +186,14 @@ function cloudQueueFixture() {
   return {
     calls, released: () => released,
     queue: (selection: { apiKeyId?: string; subscriptionBindingId?: string }) => queueCloudRun(
-      { connect: async () => client } as unknown as Pool,
+      { connect: async () => { requireFixtureProjectLease(scope.ownerId, id(2)); return client }, query: async (sql: string, args: unknown[]) => {
+        calls.push({ sql, args })
+        assert.equal(projectLeaseActive, false)
+        assert.ok(sql.startsWith('SELECT repo."repoPath",repo."remoteUrl",a.harness,'))
+        assert.ok(sql.includes('i."workspaceId"=$5') && sql.includes('i."ownershipState"=\'bound\'') && sql.includes('repo."userId"=$3'))
+        assert.deepEqual(args, [id(22), id(21), scope.ownerId, id(20), id(2), null])
+        return { rows: [{ ...repository, harness: 'claude_code' }], rowCount: 1 }
+      } } as unknown as Pool,
       { userId: scope.ownerId, workspaceId: id(2) },
       { botId: scope.botId, issueId: id(20), agentId: id(21), deviceRepoId: id(22), title: 'Keep selected source', body: '', model: subscription.modelId, readOnly: true, ...selection },
     ),
@@ -163,7 +226,20 @@ test('cloud queue freezes the explicitly selected key when another key also offe
   assert.deepEqual(frozen.apiKey, { keyId: selected.id, model: subscription.modelId })
   assert.equal(frozen.executionIdentity.billingAccount.model.resourceId, selected.id)
   assert.equal(frozen.subscription, undefined)
+  assert.deepEqual(frozen.projectExecution, projectSnapshot)
+  assert.equal(projectLeaseActive, false)
   assert.equal(fixture.calls.at(-1)?.sql, 'COMMIT')
+})
+
+test('cloud queue cannot select credentials or write a Run after Project resource refusal', async () => {
+  const fixture = cloudQueueFixture()
+  projectDenied = true
+  await assert.rejects(fixture.queue({ apiKeyId: id(4) }), { code: 'projectRepositoryDenied' })
+  assert.equal(fixture.calls.length, 1, 'only the exact repository/Task preflight runs before resource admission')
+  assert.equal(fixture.calls.some(call => call.sql === 'BEGIN' || call.sql.startsWith('INSERT INTO ')), false)
+  assert.deepEqual(catalogReads, [])
+  assert.equal(fixture.released(), false, 'a denied resource never checks out the APP write client')
+  assert.equal(projectLeaseActive, false)
 })
 
 test('cloud queue still permits an explicitly selected subscription to use its authorized quota fallback', async () => {

@@ -15,7 +15,7 @@ import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/reposi
 import { taskDestinationSchema } from './task-destination'
 import { readIssueMetadata } from './issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
-import { taskIdentifiers, taskPrefixInput } from './task-identifier-server'
+import { taskIdentifiers } from './task-identifier-server'
 import { publicationBranch } from './run-publication-policy'
 import { admitRepositoryTask, matchesRepositoryAdmission } from './repository-admission'
 import { lockCliAgentPolicy, lockCliTaskScope } from './agent-tool-approval/policy-store'
@@ -25,14 +25,35 @@ import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { notifyDeviceWork } from './device-gateway-notify'
 import type { RunInvalidReason } from './run-invalid-reason'
 import { captureTraceContext } from './tracing/context'
+import { copyRunPrompt } from './run-prompt-copy'
+import type { RunOrigin, RunOriginRef } from './run-origin'
+import type { ProjectExecutionSnapshot } from './project-resources/contracts'
+import { assertFrozenProjectExecution, assertProjectExecutionTarget, requireProjectResourceLease } from './project-resources/store'
 
 /** Existing rows and JSON only: admission, run and publication commit together. */
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
-  source?: 'mcp' | null; botId: string | null; prompt: string; /** The task's length at the start of `prompt` (lib/run-prompt.ts). */ promptTaskLength?: number; definition: WorkerDefinitionSnapshot; requestEventId?: string
+  source?: 'mcp' | null; /** Evidence-only entry provenance; required for every new run (lib/run-origin.ts). */ origin: RunOrigin; originRef?: RunOriginRef | null; botId: string | null; prompt: string; /** Code-point task range; initial briefs start at zero. */ promptTaskStart?: number | null; promptTaskLength?: number | null; definition: WorkerDefinitionSnapshot; requestEventId?: string
   dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string; profileSourceRunId?: string
+  /** A host-authorized device recovery retains config without the same-Agent replay exception. */
+  frozenSourceRunId?: string
   factoryContext?: { sourceEventId: string; attemptId: string }
-}, existing?: PoolClient): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
+}, existing?: PoolClient, projectExecution?: ProjectExecutionSnapshot): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
+  if (!projectExecution) {
+    const sourceId = input.frozenSourceRunId ?? input.sourceRunId ?? input.profileSourceRunId
+    const { rows: [target] } = await (existing ?? pool).query(`SELECT i."workspaceId",repo."repoPath",
+        CASE WHEN source.id IS NULL THEN repo."baseBranch"
+          WHEN source."agentDefinition"->'projectExecution' IS NOT NULL THEN source."agentDefinition"->'projectExecution'->>'baseBranch'
+          ELSE source."baseBranch" END AS "baseBranch"
+      FROM issues i JOIN device_repos repo ON repo.id=$2 AND repo."userId"=$3
+      LEFT JOIN agent_runs source ON source.id=$4 AND source."userId"=$3 AND source."issueId"=i.id AND source."workspaceId"=i."workspaceId"
+      WHERE i.id=$1 AND i."ownershipState"='bound' AND i."workspaceId" IS NOT NULL`, [input.issueId, input.deviceRepoId, input.userId, sourceId ?? null])
+    if (!target) throw new ActionFailureError('runInvalid', { reason: 'issueUnavailable' })
+    const { withProjectExecution } = await import('./project-resources/store')
+    return withProjectExecution({ userId: input.userId, workspaceId: target.workspaceId, issueId: input.issueId, repositoryKey: target.repoPath, baseBranch: target.baseBranch, runtime: 'local', harness: input.definition.harness },
+      snapshot => acceptLocalRun(input, existing, snapshot), Boolean(existing))
+  }
+  requireProjectResourceLease(input.userId, projectExecution.workspaceId)
   const client = existing ?? await pool.connect()
   try {
     if (!existing) await client.query('BEGIN')
@@ -41,6 +62,7 @@ export async function acceptLocalRun(input: {
     // The reason travels with the code so the caller acts on it instead of guessing (RUN_INVALID_REASONS).
     const invalid = (reason: RunInvalidReason) => new ActionFailureError('runInvalid', { reason })
     const readOnly = input.definition.readOnly === true
+    if (input.definition.projectExecution) assertFrozenProjectExecution(input.definition.projectExecution, projectExecution)
     // The setters acquire these locks before reading runs or updating workers.
     // Internal hosts prelock the same policy before taking their domain locks.
     const taskScope = await lockCliTaskScope(client, input.userId, input.issueId)
@@ -58,26 +80,27 @@ export async function acceptLocalRun(input: {
       if (event.issueId === null) {
         const { rows: [binding] } = await client.query(`SELECT t.id FROM factory_tasks t JOIN issues i ON i.id=t."issueId"
           WHERE t."userId"=$1 AND t."issueId"=$2 AND t."sourceEventId"=$3 AND t."botId" IS NOT DISTINCT FROM $4::uuid
-            AND (i."userId"=t."userId" OR (i.scope='workspace' AND t."scopeVersion" IS NOT NULL AND t."scopeVersion"=i."scopeVersion"))`, [input.userId, input.issueId, event.id, input.botId])
+            AND i."ownershipState"='bound' AND t."workspaceId"=i."workspaceId"`, [input.userId, input.issueId, event.id, input.botId])
         if (!binding) throw invalid('taskDestinationMismatch')
       }
     }
-    const [task] = await tx.select({ id: issues.id, userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion, title: issues.title, content: issueAttrsContent, prefixInput: taskPrefixInput(sql`issues."userId"`) }).from(issues).where(eq(issues.id, input.issueId)).for('share')
-    if (!task || !await issueForUser(input.userId, task.id)) throw invalid('issueUnavailable')
+    const [task] = await tx.select({ id: issues.id, userId: issues.userId, workspaceId: issues.workspaceId, ownershipState: issues.ownershipState, scope: issues.scope, scopeVersion: issues.scopeVersion, title: issues.title, issuedIdentifier: issues.issuedIdentifier, content: issueAttrsContent }).from(issues).where(eq(issues.id, input.issueId)).for('update')
+    if (!task || task.ownershipState !== 'bound' || !task.workspaceId || !await issueForUser(input.userId, task.id)) throw invalid('issueUnavailable')
     if (JSON.stringify(await lockCliTaskScope(client,input.userId,task.id)) !== JSON.stringify(taskScope)) throw invalid('issueUnavailable')
     const [agent] = await tx.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, input.userId))).for('share')
     const [device] = await tx.select().from(devices).where(and(eq(devices.id, input.deviceId), eq(devices.ownerId, input.userId), eq(devices.kind, 'local'))).for('share')
     if (!agent || agent.deviceId !== input.deviceId || agent.harness !== input.definition.harness || !device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw invalid('deviceUnavailable')
     const [repo] = await tx.select().from(deviceRepos).where(and(eq(deviceRepos.id, input.deviceRepoId), eq(deviceRepos.userId, input.userId), eq(deviceRepos.deviceId, input.deviceId))).for('share')
     if (!repo?.remoteUrl || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) throw invalid('repositoryMismatch')
+    assertProjectExecutionTarget(projectExecution, { userId: input.userId, workspaceId: task.workspaceId!, repositoryKey: repo.repoPath, runtime: 'local', harness: agent.harness })
     const [bot] = input.botId ? await tx.select().from(bots).where(and(eq(bots.id, input.botId), eq(bots.ownerId, input.userId))).for('share') : []
-    if (input.botId && !bot) throw invalid('botUnavailable')
+    if (input.botId && (!bot || bot.workspaceId !== task.workspaceId)) throw invalid('botUnavailable')
     // Server-selected references, never the Bot owner's personal credentials.
     const authority = { userId: input.userId, botId: input.botId, deviceId: input.deviceId, agentDefinition: input.definition }
     const executionIdentity = await (input.definition.executionIdentity
       ? revalidateExecutionIdentity(client, authority)
-      : freezeExecutionIdentity(client, authority)).catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
-    if (!executionIdentity) throw new ActionFailureError('executionAccountUnavailable')
+      : freezeExecutionIdentity(client, authority, undefined, task.workspaceId)).catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
+    if (!executionIdentity || executionIdentity.workspaceId !== task.workspaceId) throw new ActionFailureError('executionAccountUnavailable')
     const questionSource = input.definition.agentProfile && input.sourceRunId
       ? await (await import('./factory/questions/execution-continuation')).questionExecutionQueueSource(client,
         { userId: input.userId, issueId: task.id, botId: input.botId, sourceRunId: input.sourceRunId }) : null
@@ -85,9 +108,20 @@ export async function acceptLocalRun(input: {
     // A question's host receipt grants the same native execution. Its origin,
     // child and wake receipt must keep the exact original definition digest.
     const traceContext = captureTraceContext({ runId: input.id, threadId: input.sourceRunId ?? input.id, taskId: task.id, posthogDistinctId: input.userId })
-    const definition = { ...input.definition, ...(traceContext ? { traceContext } : {}), executionIdentity, ...(profileOriginRunId && !questionSource ? { profileOriginRunId } : {}) }
-    if (profileOriginRunId && !questionSource) definition.definitionDigest = workerDefinitionDigest(definition)
-    const context = { ...(bot ? { workspaceId: bot.workspaceId } : {}), ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
+    const sourceId = input.frozenSourceRunId ?? input.sourceRunId ?? input.profileSourceRunId
+    const [source] = sourceId ? await tx.select({ definition: agentRuns.agentDefinition, baseBranch: agentRuns.baseBranch }).from(agentRuns)
+      .where(and(eq(agentRuns.id, sourceId), eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), eq(agentRuns.workspaceId, task.workspaceId!))).for('share') : []
+    if (sourceId && !source) throw invalid('sourceRunMismatch')
+    if (source) {
+      const { assertRunProjectExecution } = await import('./project-resources/run-lease')
+      assertRunProjectExecution(source, source.definition?.projectExecution, projectExecution)
+    }
+    const effectiveExecution = input.definition.projectExecution ?? (source ? source.definition?.projectExecution : projectExecution)
+    if (effectiveExecution) assertFrozenProjectExecution(effectiveExecution, projectExecution)
+    const effectiveBaseBranch = effectiveExecution ? effectiveExecution.baseBranch : source ? source.baseBranch : projectExecution.baseBranch
+    const definition = { ...input.definition, ...(effectiveExecution ? { projectExecution: structuredClone(effectiveExecution) } : {}), ...(traceContext ? { traceContext } : {}), executionIdentity, ...(profileOriginRunId && !questionSource ? { profileOriginRunId } : {}) }
+    if (!questionSource) definition.definitionDigest = workerDefinitionDigest(definition)
+    const context = { workspaceId: task.workspaceId!, ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
     const replayMatches = async (prior: typeof agentRuns.$inferSelect) => {
       await revalidateExecutionIdentity(client, prior)
       const accepted = prior.agentDefinition?.repositoryAdmission
@@ -96,7 +130,7 @@ export async function acceptLocalRun(input: {
       if (readOnly || prior.agentDefinition?.readOnly) return readOnly && prior.agentDefinition?.readOnly === true && !accepted && sameRun
       const [publication] = await tx.select().from(runPublications).where(eq(runPublications.runId, prior.id)).limit(1)
       return prior.userId === input.userId && prior.botId === input.botId && prior.issueId === task.id && prior.deviceId === input.deviceId && prior.agentId === input.agentId && prior.deviceRepoId === repo.id &&
-        publication?.userId === input.userId && publication.issueId === task.id && publication.scopeVersion === task.scopeVersion && publication.remoteKey === repo.repoPath &&
+        publication?.userId === input.userId && publication.issueId === task.id && prior.workspaceId === task.workspaceId && publication.remoteKey === repo.repoPath &&
         Boolean(accepted && publication.branch === accepted.targetBranch && matchesRepositoryAdmission(accepted, { ...context, userId: input.userId, issueId: task.id, deviceId: input.deviceId, agentId: input.agentId, remoteKey: repo.repoPath, remoteUrl: repo.remoteUrl!, targetBranch: accepted.targetBranch }))
     }
     if (input.sourceRunId) {
@@ -126,14 +160,15 @@ export async function acceptLocalRun(input: {
     const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     if (readOnly) {
-      await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, ...(input.promptTaskLength ? { promptTaskStart: 0, promptTaskLength: input.promptTaskLength } : {}), agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
+      await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
       await runListChanged(tx, input.id)
       await runChanged(tx, input.id)
       return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + task.id}, 0))`)
     const [previous] = await tx.select().from(runPublications).where(and(eq(runPublications.issueId, task.id), eq(runPublications.remoteKey, repo.repoPath), sql`${runPublications.branch} is not null`)).orderBy(asc(runPublications.createdAt)).limit(1)
-    const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, prefixInput: task.prefixInput }], tx)).get(task.id) ?? null
+    if (previous && effectiveExecution?.projectId && previous.baseBranch !== effectiveBaseBranch) throw new ActionFailureError('projectRepositoryDenied')
+    const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier }], tx)).get(task.id) ?? null
     if (definition.traceContext && identifier) definition.traceContext.taskNumber = identifier
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (!branch) throw invalid('taskIdentifierRequired')
@@ -142,8 +177,8 @@ export async function acceptLocalRun(input: {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)
     const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), ne(runPublications.issueId, task.id))).limit(1)
     if (collision) throw invalid('branchInUse')
-    await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, ...(input.promptTaskLength ? { promptTaskStart: 0, promptTaskLength: input.promptTaskLength } : {}), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
-    await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: repo.baseBranch, pushApproved: true })
+    await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
+    await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: effectiveBaseBranch, pushApproved: true })
     await runListChanged(tx, input.id)
     await runChanged(tx, input.id)
     return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
@@ -159,7 +194,7 @@ export async function acceptLocalRun(input: {
 /** A resumed task retains its original, server-bound device selection. */
 export async function acceptedEventStillMatches(admission: import('./repository-admission').RepositoryAdmission, botId: string | null, executor: Pick<typeof db, 'select'> = db) {
   if (!admission.requestEventId) return true
-  const [event] = await executor.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, admission.requestEventId), eq(coordinatorEvents.userId, admission.userId), sql`(${coordinatorEvents.issueId} = ${admission.issueId} or (${coordinatorEvents.issueId} is null and exists (select 1 from factory_tasks t join issues i on i.id=t."issueId" where t."userId" = ${admission.userId} and t."issueId" = ${admission.issueId} and t."sourceEventId" = ${admission.requestEventId} and t."botId" is not distinct from ${botId}::uuid and (i."userId"=t."userId" or (i.scope='workspace' and t."scopeVersion" is not null and t."scopeVersion"=i."scopeVersion")))))`, eq(coordinatorEvents.kind, 'user_message'), botId ? eq(coordinatorEvents.botId, botId) : isNull(coordinatorEvents.botId))).limit(1)
+  const [event] = await executor.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, admission.requestEventId), eq(coordinatorEvents.userId, admission.userId), sql`(${coordinatorEvents.issueId} = ${admission.issueId} or (${coordinatorEvents.issueId} is null and exists (select 1 from factory_tasks t join issues i on i.id=t."issueId" where t."userId" = ${admission.userId} and t."issueId" = ${admission.issueId} and t."sourceEventId" = ${admission.requestEventId} and t."botId" is not distinct from ${botId}::uuid and (i."ownershipState"='bound' and t."workspaceId"=i."workspaceId"))))`, eq(coordinatorEvents.kind, 'user_message'), botId ? eq(coordinatorEvents.botId, botId) : isNull(coordinatorEvents.botId))).limit(1)
   const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
   return Boolean(event?.deliveredAt && destination.success && destination.data.kind === 'device' && destination.data.deviceId === admission.deviceId)
 }
@@ -180,7 +215,7 @@ export async function admittedRepositoryRetryMatches(client: PoolClient, prior: 
     FROM run_publications p JOIN agent_runs r ON r.id=p."runId" JOIN device_repos repo ON repo.id=r."deviceRepoId"
     WHERE p."runId"=ANY($1::uuid[])`, [[prior.id, retry.id]])
   const before = rows.find(p => p.runId === prior.id), after = rows.find(p => p.runId === retry.id)
-  if (!before || !after || before.scopeVersion !== after.scopeVersion || before.branch !== after.branch || before.remoteKey !== after.remoteKey) return false
+  if (!before || !after || prior.workspaceId !== retry.workspaceId || !prior.workspaceId || before.branch !== after.branch || before.remoteKey !== after.remoteKey) return false
   for (const [run, admission, publication] of [[prior, original, before], [retry, accepted, after]] as const) {
     if (publication.userId !== run.userId || publication.issueId !== run.issueId || publication.repositoryOwnerId !== run.userId ||
       publication.repositoryDeviceId !== run.deviceId || publication.remoteKey !== publication.repoPath ||

@@ -2,6 +2,7 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { ownerListChanged } from '@/lib/live/lists'
 import { botChatChanged } from '@/lib/live/chats'
+import { applyCliFold, applyExternalFold, foldCliRunPolicy, foldExternalWritePermissions } from '@/lib/operations/workspace-policy-fold'
 
 /**
  * The person's Coordinator is an ordinary bot (glossary), one per person per
@@ -135,7 +136,7 @@ export async function backfillCoordinatorChat(pool: Pick<Pool, 'connect'>, owner
     }
     const owned = await client.query('SELECT 1 FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botId"=$3', [ownerId, bot.workspaceId, bot.botId])
     if (!owned.rowCount) throw new Error('coordinatorBotMissing')
-    const movedRuns = await moveExecutionRows(client, ownerId, bot.botId)
+    const movedRuns = await moveExecutionRows(client, ownerId, bot.botId, bot.workspaceId)
     await moveChat(client, ownerId, bot.botId)
     await moveKeyedRows(client, ownerId, bot)
     if (movedRuns) await ownerListChanged(client, ownerId, ['thread_list', 'task_run_list'])
@@ -181,6 +182,8 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
  * A source may start several tasks, so retention follows those shared links.
  * Runs owned by a different computer/group or barred by issue retirement must
  * seed that retention too; merely excluding their UPDATE would split the family.
+ * Work in another workspace or still awaiting attribution also seeds retention.
+ * Moving a personal chat never assigns a workspace or reattributes its tasks.
  *
  * Publication/completion lock issue -> run, and the run's scope trigger takes
  * an issue SHARE lock even when only botId changes. Take that lock first.
@@ -192,17 +195,19 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
  * retained seed, including its family, until the next pass. The final statement
  * reads the newly committed family and updates all three tables in one snapshot.
  */
-async function moveExecutionRows(client: PoolClient, ownerId: string, botId: string): Promise<number> {
+async function moveExecutionRows(client: PoolClient, ownerId: string, botId: string, workspaceId: string): Promise<number> {
   const issues = (await client.query<{ id: string }>(`SELECT i.id FROM issues i WHERE EXISTS (
     SELECT 1 FROM agent_runs r WHERE r."userId"=$1 AND r."botId" IS NULL AND r."issueId"=i.id
   ) ORDER BY i.id FOR SHARE OF i NOWAIT`, [ownerId])).rows.map(row => row.id)
   const tasks = (await client.query<{ id: string }>('SELECT id FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
   const events = (await client.query<{ id: string }>('SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
   const runs = (await client.query<{ id: string }>('SELECT id FROM agent_runs WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
+  // Every write below is restricted to these captured ids; late rows are excluded too.
+  if (!tasks.length && !events.length && !runs.length) return 0
   const moved = await client.query(`WITH RECURSIVE
-    own_tasks AS MATERIALIZED (SELECT id,"sourceEventId" FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL),
-    own_runs AS MATERIALIZED (SELECT id,"botId","agentDefinition","issueId",kind FROM agent_runs WHERE "userId"=$1),
-    own_events AS MATERIALIZED (SELECT id,"botId","runId",payload FROM coordinator_events WHERE "userId"=$1),
+    own_tasks AS MATERIALIZED (SELECT id,"sourceEventId","workspaceId" FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL),
+    own_runs AS MATERIALIZED (SELECT id,"botId","agentDefinition","issueId","workspaceId",kind FROM agent_runs WHERE "userId"=$1),
+    own_events AS MATERIALIZED (SELECT id,"botId","runId","issueId",payload FROM coordinator_events WHERE "userId"=$1),
     task_sources AS (
       SELECT id AS "taskId","sourceEventId"::text AS "eventId" FROM own_tasks
       UNION ALL
@@ -228,13 +233,19 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
     seeds(kind,id) AS (
       SELECT 'run',r.id::text FROM own_runs r WHERE r."agentDefinition" ? 'executionIdentity'
         OR r.kind='group_chat'
+        OR r."workspaceId" IS DISTINCT FROM $7::uuid
+        OR (r."issueId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i."workspaceId"=$7))
         OR EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)
         OR EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i.scope='personal' AND i."userId"<>$1)
         OR (r."botId" IS NULL AND (NOT r.id=ANY($5::uuid[]) OR (r."issueId" IS NOT NULL AND NOT r."issueId"=ANY($6::uuid[]))))
       UNION ALL
-      SELECT 'event',id::text FROM own_events WHERE "botId" IS NULL AND NOT id=ANY($4::uuid[])
+      SELECT 'event',e.id::text FROM own_events e WHERE (e."botId" IS NULL AND NOT e.id=ANY($4::uuid[]))
+        OR (e."issueId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM issues i WHERE i.id=e."issueId" AND i."workspaceId"=$7))
+        OR (e."runId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM agent_runs r WHERE r.id=e."runId" AND r."workspaceId"=$7))
+        OR EXISTS (SELECT 1 FROM factory_tasks t WHERE t."sourceEventId"=e.id AND t."workspaceId" IS DISTINCT FROM $7::uuid)
       UNION ALL
-      SELECT 'task',id::text FROM own_tasks WHERE NOT (id=ANY($3::uuid[]) AND "sourceEventId"=ANY($4::uuid[]))
+      SELECT 'task',id::text FROM own_tasks WHERE "workspaceId" IS DISTINCT FROM $7::uuid
+        OR NOT (id=ANY($3::uuid[]) AND "sourceEventId"=ANY($4::uuid[]))
     ), retained(kind,id) AS (
       SELECT kind,id FROM seeds
       UNION
@@ -249,13 +260,13 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
     UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL AND r.id=ANY($5::uuid[])
       AND r.kind <> 'group_chat'
       AND NOT EXISTS (SELECT 1 FROM retained p WHERE p.kind='run' AND p.id=r.id::text)
-      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId, tasks, events, runs, issues])
+      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId, tasks, events, runs, issues, workspaceId])
   return moved.rowCount ?? 0
 }
 
 /**
  * A compacted summary is signed for its chat ([userId, botId], workflows/coordinator/steps.ts
- * preparePrompt), so the moved one is signed again for the Coordinator's bot row; otherwise
+ * product instruction preparation), so the moved one is signed again for the Coordinator's bot row; otherwise
  * the next turn would drop it as unverified. One that does not verify stays as it was.
  */
 async function movedSummary(ownerId: string, botId: string, summary: string): Promise<string> {
@@ -275,6 +286,8 @@ async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, works
       ON CONFLICT ("userId","chatKey") DO NOTHING`, [ownerId, botId])
   await client.query(`DELETE FROM chat_preferences WHERE "userId"=$1 AND "chatKey"='coordinator'`, [ownerId])
   await client.query(`UPDATE user_schedules s SET bot_id=$2, workspace_id=$3 WHERE s.owner_id=$1 AND s.bot_id IS NULL
+      AND (s.workspace_id=$3 OR (s.workspace_id IS NULL AND EXISTS (
+        SELECT 1 FROM coordinator_events e WHERE e.id=s.source_event_id AND e."userId"=$1 AND e."botId"=$2)))
       AND NOT EXISTS (SELECT 1 FROM user_schedules o WHERE o.owner_id=$1 AND o.bot_id=$2 AND o.request_id=s.request_id)`, [ownerId, botId, workspaceId])
   await client.query('UPDATE suggestions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   await client.query('UPDATE pending_actions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
@@ -282,22 +295,36 @@ async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, works
 }
 
 /**
- * The Coordinator's agent definition and its two run policies (computer use,
- * external writes) were kept on the account's 'coordinator' head. Versions are
- * immutable history, so the active definition is copied as the row's first
- * version and the policies with it (Plugins › GitHub's two writes among
- * them, lib/github/plugin-permissions.ts); the old head stays as history.
+ * The Coordinator's agent definition is kept on the account's 'coordinator'
+ * head; versions are immutable history, so the active definition is copied as
+ * the new row's first version. The two policy columns are not copied: a Bot has
+ * no permission layer. The legacy head's deny/ask choices are folded into the
+ * workspace policy first, so no restriction is lost.
  */
 async function copyAgentHead(client: PoolClient, ownerId: string, botId: string, workspaceId: string) {
-  const old = (await client.query(`SELECT h.cli_run_policy, h.cli_run_policy_version, h.external_write_permissions, h.external_write_policy_version,
+  const old = (await client.query(`SELECT h.cli_run_policy, h.external_write_permissions,
       v.definition, v.digest, v.source
     FROM agent_kit_heads h LEFT JOIN agent_kit_versions v ON v.owner_id=h.owner_id AND v.bot_key=h.bot_key AND v.id=h.active_version
     WHERE h.owner_id=$1 AND h.bot_key='coordinator'`, [ownerId])).rows[0]
   if (!old) return
-  const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy,cli_run_policy_version,external_write_permissions,external_write_policy_version)
-      VALUES ($1,$2,$8,$3,$4,$5,$6,$7) ON CONFLICT (owner_id,bot_key) DO NOTHING`,
-  [ownerId, botId, workspaceId, old.cli_run_policy, old.cli_run_policy_version, old.external_write_permissions, old.external_write_policy_version, botId])
-  if (!created.rowCount || !old.definition) return
+  const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id)
+      VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [ownerId, botId, botId, workspaceId])
+  // Fold only when this head is first created. A later backfill must not
+  // re-apply the legacy ceiling over an admin's newer workspace choice.
+  if (!created.rowCount) return
+  // The same locks the workspace policy writers take, before the row read.
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-external-write:${workspaceId}`])
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-cli-policy:${workspaceId}`])
+  const policy = (await client.query<{ external_write_permissions: unknown; cli_run_policy: unknown }>(
+    'SELECT external_write_permissions,cli_run_policy FROM workspace_computer_policies WHERE "workspaceId"=$1 FOR UPDATE', [workspaceId])).rows[0]
+  const external = applyExternalFold(policy?.external_write_permissions, foldExternalWritePermissions([old.external_write_permissions, policy?.external_write_permissions]))
+  const cli = applyCliFold(policy?.cli_run_policy, foldCliRunPolicy([old.cli_run_policy, policy?.cli_run_policy]))
+  await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,external_write_permissions,external_write_policy_version,cli_run_policy)
+      VALUES ($1,'allow',$2,case when $2::jsonb='{}'::jsonb then 0 else 1 end,$3)
+      ON CONFLICT ("workspaceId") DO UPDATE SET external_write_permissions=excluded.external_write_permissions,cli_run_policy=excluded.cli_run_policy
+      WHERE workspace_computer_policies.external_write_permissions IS DISTINCT FROM excluded.external_write_permissions
+         OR workspace_computer_policies.cli_run_policy IS DISTINCT FROM excluded.cli_run_policy`, [workspaceId, external, cli])
+  if (!old.definition) return
   const versionId = crypto.randomUUID()
   await client.query(`INSERT INTO agent_kit_versions (id,owner_id,bot_key,version,definition,digest,source,request_key,base_version)
       VALUES ($1,$2,$3,1,$4,$5,$6,'coordinator-bot-backfill',NULL)`, [versionId, ownerId, botId, old.definition, old.digest, old.source])

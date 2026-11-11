@@ -47,7 +47,8 @@ import {
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
-import type { RunApps } from "../agents/run-apps"
+import { codexMcpServer, hasRunAppServers, nativeMcpProcess, registeredRunAppServer, type RunApps } from "../agents/run-apps"
+import { taskMcpSecretValues } from '@mikka/protocol'
 import { rawCliShellAvailable, runPolicy } from "../permissions"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
@@ -142,10 +143,19 @@ const CODEX_HISTORY = ["sessions", "archived_sessions", "session_index.jsonl"]
 
 /** One streamable-HTTP MCP entry per connected app, each pointing at the Mikka server. */
 export function codexAppArgs(apps?: RunApps): string[] {
-  return (apps?.apps ?? []).flatMap(app => [
+  return [...(apps?.apps ?? []).flatMap(app => [
     "-c", `mcp_servers.${app.name}.url=${toml(app.url)}`,
     "-c", `mcp_servers.${app.name}.http_headers={ Authorization = ${toml(`Bearer ${apps!.token}`)} }`,
-  ])
+  ]), ...(apps?.servers ?? []).map(codexMcpServer).flatMap(server => {
+    const prefix = `mcp_servers.${server.name}`
+    if (server.transport !== 'stdio') return ['-c', `${prefix}.url=${toml(server.url)}`, '-c', `${prefix}.http_headers=${tomlTable(server.headers)}`]
+    const process = nativeMcpProcess(server)
+    return ['-c', `${prefix}.command=${toml(process.command)}`, '-c', `${prefix}.args=${toml(process.args)}`, '-c', `${prefix}.env=${tomlTable(process.env)}`]
+  })]
+}
+
+function tomlTable(value: Record<string,string>): string {
+  return `{ ${Object.entries(value).map(([key,entry]) => `${JSON.stringify(key)} = ${JSON.stringify(entry)}`).join(', ')} }`
 }
 
 /** TOML value for a `-c key=value` override (JSON strings are TOML strings). */
@@ -316,11 +326,12 @@ export function codexItemChunks(
         ]
       }
       return [
-        call.error
+        // MCP isError results carry a failed status with a null error.
+        call.error || call.status === "failed"
           ? {
               type: "tool-output-error",
               toolCallId: item.id,
-              errorText: call.error.message,
+              errorText: call.error?.message ?? "MCP tool call failed",
             }
           : {
               type: "tool-output-available",
@@ -452,6 +463,8 @@ export class CodexAdapter implements AgentAdapter {
       policyHash: options.policyHash,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
+      profileSkills: options.profileSkills,
+      repositorySkills: options.repositorySkills,
       runDir,
       privateDir: paths.privateDir,
     })
@@ -476,6 +489,8 @@ export class CodexAdapter implements AgentAdapter {
       "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.command=${toml(mcp.command)}`,
+      // Hand-in tools must be ready before the first turn, including native resume.
+      "-c", `mcp_servers.${MCP_SERVER_NAME}.required=true`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.args=${toml(mcp.args)}`,
       ...(options.mcp ? ["-c", `mcp_servers.${MCP_SERVER_NAME}.env_vars=${toml(Object.keys(ctx.decisionMcpEnv()))}`] : []),
@@ -517,7 +532,7 @@ export class CodexAdapter implements AgentAdapter {
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     }
-    const adopted = mode === 'new' && externalAuth && options.machineEnvironment && !computerMcp && !options.apps?.apps.length &&
+    const adopted = mode === 'new' && externalAuth && options.machineEnvironment && !computerMcp && !hasRunAppServers(options.apps) &&
       this.options.anonymousCodexFresh ? await this.options.anonymousCodexCandidate?.adopt({
         fresh: this.options.anonymousCodexFresh, cwd: ctx.worktree, env: spawnOptions.env, binary, mcp, traceContext,
         repositoryRoot: options.gitWritePaths?.length === 1 ? options.gitWritePaths[0] : undefined,
@@ -565,7 +580,7 @@ export class CodexAdapter implements AgentAdapter {
     let pendingTurnStart: Promise<void> | null = null
     let ending = false
     let cancelling = false
-    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.credential?.key ?? "", options.apps?.token ?? ""]
+    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.credential?.key ?? "", options.apps?.token ?? "", ...taskMcpSecretValues(options.apps?.servers)]
     const capture = (error: unknown) => captureCodexRunFailure(error, { runId: options.runId, appVersion: DAEMON_VERSION, provider: "codex", credential: options.credential ? "api_key" : "subscription", sensitiveText })
     let failureDetails: RunFailure | undefined
     let lastError: string | undefined
@@ -595,7 +610,7 @@ export class CodexAdapter implements AgentAdapter {
     const registeredMcpTool = (server: string, tool: string) =>
       (server === MCP_SERVER_NAME && handInTools.has(tool)) ||
       (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool)) ||
-      Boolean(options.apps?.apps.some(app => app.name === server))
+      registeredRunAppServer(options.apps,server)
 
     /** The CLI and everything it started are gone before the exit is told. */
     let ended: Promise<void> | undefined

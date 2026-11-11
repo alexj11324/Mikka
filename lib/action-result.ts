@@ -56,6 +56,9 @@ export const ACTION_ERROR_CODES = [
   'factoryQuestionNeedsAnswerTool',
   'artifactNotFound',
   'suggestionNotFound',
+  'inboxNotFound',
+  'inboxInvalid',
+  'inboxConflict',
   'coordinatorUnavailable',
   'messageRequired',
   'messageTooLong',
@@ -71,6 +74,8 @@ export const ACTION_ERROR_CODES = [
   'issueOutdated',
   'issueTargetUnavailable',
   'issueAccessChanged',
+  /** A relation edit would change who can read the task; replay with confirmAccess. */
+  'accessChangeConfirmationRequired',
   'issueParentCycle',
   'issueDuplicateCycle',
   'issueBlockCycle',
@@ -110,6 +115,15 @@ export const ACTION_ERROR_CODES = [
   'projectCheckFields',
   'projectPropertyInvalid',
   'projectNotFound',
+  'projectRepositoryDenied',
+  'projectEnvironmentUnavailable',
+  'projectArchived',
+  'projectDeleteNotEmpty',
+  'projectResourceConflict',
+  'teamArchived',
+  'teamPersonalWorkspace',
+  'teamDeleteReferenced',
+  'teamLifecycleConflict',
   'projectStale',
   'projectSaveConflict',
   'projectDependencyNotFound',
@@ -122,6 +136,9 @@ export const ACTION_ERROR_CODES = [
   'projectIssueAlreadyLinked',
   'projectIssuesSaveFailed',
   'workspaceAccessDenied',
+  'taskWorkspaceUnresolved',
+  'taskWorkspaceMismatch',
+  'taskWorkspaceTransferDenied',
   'workspaceNotFound',
   'workspaceMemberExists',
   'workspacePaymentTaken',
@@ -152,6 +169,7 @@ export const ACTION_ERROR_CODES = [
   'dataExportRateLimited',
   'accountEmailMismatch',
   'accountSoleAdmin',
+  'accountLastOrganizationOwner',
   'accountDeletionPending',
   'workspaceSlugTaken',
   'workspaceIconInvalid',
@@ -170,6 +188,10 @@ export const ACTION_ERROR_CODES = [
   'billingNoSubscription',
   'billingPlanInvalid',
   'billingProviderFailed',
+  'billingResourcePlanUnavailable',
+  'billingAutoRechargeUnavailable',
+  'billingPolicyChanged',
+  'billingCheckoutPending',
   'savedLoginNotFound',
   'savedLoginSiteInvalid',
   'savedLoginInvalid',
@@ -186,6 +208,8 @@ export interface ActionFailure<E extends string = ActionErrorCode> {
   params?: ActionErrorParams
   /** Stable operation ID for retrying a team action, including unknown outcomes. */
   requestId?: string
+  /** The action changed who can read a resource and did nothing: replay it with `confirmAccess: true`. */
+  confirmable?: true
 }
 
 export type ActionResult<T, E extends string = ActionErrorCode> = (T & { error?: undefined }) | ActionFailure<E>
