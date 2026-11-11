@@ -46,8 +46,9 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
   const t = useTranslations('Shell.newTaskDialog')
   const tStatus = useTranslations('Computer.status')
   const e2b = useTranslations('Settings.secrets.e2b')
-  const { data: state } = useComputer(machine.cloud && machine.usable ? cloudBotId : null)
+  const { data: state } = useComputer(machine.cloud && machine.value!=='cloudflare' && machine.usable ? cloudBotId : null)
   const dot = machineDot(machine, state)
+  if (machine.value==='cloudflare') return <DeviceIcon kind="cloud" state="online" label={t('sponsoredCloud')} />
   if (machine.cloud) return <DeviceIcon kind="cloud" state={dot} label={!machine.usable ? `E2B API Key ${e2b('missing')}` : state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
   return <DeviceIcon kind="personal" state={dot} label={machine.status ?? (machine.usable ? t('online') : t('offline'))} />
 }
@@ -91,7 +92,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const [title, setTitle] = useState('')
   const [sending, setSending] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
-  const profiles = useAgentProfiles(workspaceId, dispatching, picked ? picked === 'cloud' ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
+  const profiles = useAgentProfiles(workspaceId, dispatching, picked ? (picked === 'cloud' || picked === 'cloudflare') ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
   const [profilePick, setProfilePick] = useState<{ workspaceId: string; id: string } | null>(null)
   const profileId = profilePick?.workspaceId === workspaceId ? profilePick?.id : undefined
   const profileAllowed = !profileId || (!profiles.error && taskProfileSelectable(profileId, profiles.data))
@@ -120,7 +121,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const quotaUnchecked = order?.entries.some(entry => entry.block?.reason === 'checking')
   const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, usable: taskMachineUsable(item, order?.readyDeviceIds ?? []),
     status: !item.enabled ? t('notParticipating') : !item.online ? item.lastSeenAt ? t('offline') : tDevices('neverOnline') : !order ? t('loadingPlacement') : !order.readyDeviceIds.includes(item.id) ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('online') }))
-  const machines: Machine[] = [cloud, ...own]
+  const sponsored: Machine[] = order?.sponsoredTasksAvailable ? [{value:'cloudflare',label:t('sponsoredCloud'),cloud:true,usable:true}] : []
+  const machines: Machine[] = [cloud, ...sponsored, ...own]
   const inherited = defaultTaskMachine(machines, order)
   const defaults: Machine = { value: 'auto', label: order ? `${t('workspaceDefault')} · ${inherited?.label ?? locationT(order.location)}` : t('workspaceDefault'),
     cloud: inherited?.cloud === true, usable: inherited?.usable ?? false, status: inherited?.status ?? (inherited?.usable ? t('online') : order ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('loadingPlacement')) }
@@ -226,7 +228,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     {open && <NewTask onClose={() => onOpenChange(false)} project={project} title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
       files={attachments.files.length || attachments.pending.length ? <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} /> : null}
       onAttach={files => { void attach(files) }} accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT}
-      machines={only ? [] : [slotMachine(defaults, 'default'), slotMachine(cloud, 'cloud'), ...own.map(item => slotMachine(item, 'own'))]} machine={picked ?? 'auto'} onMachine={pick}
+      machines={only ? [] : [slotMachine(defaults, 'default'), slotMachine(cloud, 'cloud'), ...sponsored.map(item => slotMachine(item, 'cloud')), ...own.map(item => slotMachine(item, 'own'))]} machine={picked ?? 'auto'} onMachine={pick}
       bots={!only && botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
       bot={handler?.id ?? null} onBot={setBotPick}
       profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
