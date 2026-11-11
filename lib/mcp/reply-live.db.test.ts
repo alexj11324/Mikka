@@ -259,6 +259,8 @@ test('MCP waits use committed PG notifications; independent web observers still 
         // Surface its own exit at once instead. A successful exit may still be
         // a moment ahead of the notification the parent has not read yet.
         const died = new Promise<never>((_resolve, reject) => {
+          // A spawn that cannot start reports only 'error', never 'exit'.
+          child.once('error', (error: Error) => reject(new Error(`the separate writer could not start: ${error.message}`)))
           child.once('exit', (code, signal) => {
             if (code === 0 && signal === null) return
             reject(new Error(`the separate writer exited before the reply arrived (code ${code}, signal ${signal}): ${stderr.trim() || stdout.trim()}`))
