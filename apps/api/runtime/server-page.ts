@@ -1,6 +1,6 @@
 import { isCloudEdition } from '../../../lib/edition'
 import { serverPageKind } from '../../../lib/server-pages'
-import { applySecurityHeaders, isPagePath, pageResponse } from './http-policy.mjs'
+import { applySecurityHeaders, isPagePath, pageResponse, prefersServerHtml } from './http-policy.mjs'
 
 type Environment = Record<string, string | undefined>
 
@@ -17,5 +17,20 @@ export async function serverPageResponse(request: Request, spaHtml: string, serv
     response.headers.set('referrer-policy', 'no-referrer')
     return response
   }
-  return applySecurityHeaders(request, await serverInfo(request))
+  const info = await serverInfo(request)
+  // Existing API clients keep the v1 JSON response. Browsers get the same
+  // bounded public viewmodel, embedded once without a session or another GET.
+  info.headers.append('vary', 'Accept')
+  if (!prefersServerHtml(request)) {
+    return applySecurityHeaders(request, info)
+  }
+  const page = await pageResponse(request, async () => {
+    const data = JSON.stringify(await info.json()).replaceAll('<', '\\u003c')
+    return spaHtml.replace(/(<html\b[^>]*)(>)/, '$1 data-mikka-server-page="status"$2')
+      .replace('</head>', () => `<script type="application/json" id="mikka-server-info">${data}</script></head>`)
+  })
+  page.headers.append('vary', 'Accept')
+  page.headers.set('referrer-policy', 'no-referrer')
+  return page.status === 200 && info.status !== 200
+    ? new Response(page.body, { status: info.status, headers: page.headers }) : page
 }

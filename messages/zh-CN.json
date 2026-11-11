@@ -1,4 +1,19 @@
 {
+  "ServerStatus": {
+    "title": "Mikka 服务器",
+    "address": "服务器地址",
+    "version": "版本",
+    "web": "打开 Mikka 网页版",
+    "desktop": "下载 Mikka 桌面版",
+    "iosUnavailable": "要连接 iOS 客户端，请先在服务器上配置其登录来源。",
+    "ios": "在 Mikka iOS 客户端的登录页选择此服务器地址。",
+    "create": "创建首个账号",
+    "ready": "就绪",
+    "unavailable": "不可用",
+    "configuration": "配置",
+    "database": "数据库",
+    "authentication": "认证"
+  },
   "MobileTaskSchedule": {
     "daily": "每天 {time}",
     "interval": "每 {minutes} 分钟"

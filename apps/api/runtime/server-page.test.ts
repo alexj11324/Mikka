@@ -59,3 +59,29 @@ test('server pages preserve HEAD, refuse writes and never absorb machine endpoin
   }
   assert.equal(serverDocumentKind(), null, 'no document marker means no renderer restriction')
 })
+
+test('a browser gets the public status and client links from one read; machine clients keep JSON', async () => {
+  const shell = '<html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
+  const publicView = { ...view, name: 'A < B & C', version: 'fixture' }
+  let reads = 0
+  const unavailable = async (req: Request) => {
+    reads++
+    return new Response(req.method === 'HEAD' ? null : JSON.stringify(publicView), { status: 503, headers: { 'content-type': 'application/json' } })
+  }
+  const headers = { accept: 'text/html,application/xhtml+xml', 'accept-language': 'en' }
+  const page = await serverPageResponse(request('/mikka/en', { headers }), shell, unavailable, {})
+  assert.equal(page.status, 503)
+  assert.match(page.headers.get('vary') ?? '', /Accept/i)
+  const text = await page.text()
+  assert.match(text, /data-mikka-server-page="status"/)
+  assert.doesNotMatch(text, /A < B/)
+  const data = /id="mikka-server-info">([^<]+)<\/script>/.exec(text)
+  assert.ok(data)
+  assert.deepEqual(JSON.parse(data[1]), publicView)
+  assert.equal(reads, 1)
+  const head = await serverPageResponse(request('/mikka/en', { method: 'HEAD', headers }), shell, unavailable, {})
+  assert.equal(head.status, 503)
+  assert.equal(await head.text(), '')
+  const json = await serverPageResponse(request('/mikka/en', { headers: { accept: 'application/json' } }), shell, unavailable, {})
+  assert.deepEqual(await json.json(), publicView)
+})
