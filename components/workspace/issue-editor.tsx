@@ -185,6 +185,10 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     },
   }
 
+  if (layout === 'description' && disabled) return <section aria-label={t('editorAria', { label })}>
+    <RichTextContent editor={editor} className={cn('min-h-28 px-4 py-2 sm:pl-16', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+  </section>
+
   if (compact || layout === 'description' || layout === 'issue') return <TooltipProvider delay={300}>
     <section aria-label={t('editorAria', { label })} className="flex min-w-0 flex-col gap-2">
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
