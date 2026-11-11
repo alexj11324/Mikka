@@ -178,6 +178,10 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
           "generationId" text,"createdAt" timestamptz default now(),"settledAt" timestamptz);`)
       await pool.query(await readFile(new URL('../drizzle/20261110150010_plan_credit_usage.sql', import.meta.url), 'utf8'))
       await pool.query(await readFile(new URL('../drizzle/20261110150011_resource_budgets.sql', import.meta.url), 'utf8'))
+      // The fixture above hand-lists the columns it needs; this settlement path
+      // also writes the cache breakdown, so the migration that adds those two
+      // columns has to run too rather than being restated by hand.
+      await pool.query(await readFile(new URL('../drizzle/20261111060000_hosted_usage_token_breakdown.sql', import.meta.url), 'utf8'))
       const id = await workspace(1)
       await db.insert(workspaceEntitlements).values({ workspaceId: id, plan: 'pro', source: 'cloud', seatLimit: 20 })
       await pool.query('insert into hosted_verifications values($1)', [id])
