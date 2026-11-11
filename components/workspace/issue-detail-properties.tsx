@@ -22,7 +22,8 @@ import { TaskStateIcon, newestThreadRun, useTaskStateLabel } from './task-state-
 import { localTaskState } from '@/hooks/use-bot-tasks'
 import type { ExplicitTeamChoice } from '@/lib/issue-team-intent'
 
-export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, pending, onStatus, onPriority, request, relations, onDate, onEstimate }: {
+export function IssueDetailProperties({ task, viewerId, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, pending, onStatus, onPriority, request, relations, onDate, onEstimate }: {
+  viewerId: string
   task: { id: string; revision: number; scope: TaskScope; scopeSetBy: 'agent' | 'user'; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
   status: string; priority: string; pending: boolean; onStatus: (value: string) => void; onPriority: (value: string) => void
   request: MetadataRequest | null; relations: ReactNode; onDate: () => void; onEstimate: () => void
@@ -63,7 +64,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
         {task.metadata.estimate !== null && <PropertyRow label={tMetadata('estimate')}><Button variant="ghost" size="sm" className={ROW_VALUE} disabled={metadataDisabled} onClick={onEstimate}><Signal data-icon="inline-start" />{tMetadata('estimatePoints', { count: task.metadata.estimate })}</Button></PropertyRow>}
         {task.metadata.dueDate && <PropertyRow label={tMetadata('dueDate')}><Button variant="ghost" size="sm" className={cn(ROW_VALUE, overdue(task.metadata.dueDate, status, now) && 'text-destructive-foreground')} disabled={metadataDisabled} onClick={onDate}><Calendar data-icon="inline-start" /><time dateTime={task.metadata.dueDate}>{formatDateOnly(format, task.metadata.dueDate, { month: 'short', day: 'numeric' })}</time></Button></PropertyRow>}
         {task.metadata.pullRequests.length > 0 && <PropertyRow label={tMetadata('pullRequests')}><div className="flex min-h-7 flex-wrap items-center gap-1.5"><IssueMetadataControls {...control} section="pullRequests" /></div></PropertyRow>}
-        <IssueTeamControl issueId={task.id} disabled={metadataDisabled} onChosen={(issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null)} />
+        <IssueTeamControl issueId={task.id} viewerId={viewerId} disabled={metadataDisabled} onChosen={(issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null)} />
       </FieldGroup>
     </section>
     {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}

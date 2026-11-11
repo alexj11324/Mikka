@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import { createLinkedIssue } from '@/app/actions/issue-operations'
 import type { IssueView } from '@/app/actions/issues'
+import { TaskAttachments } from './task-attachments'
 import type { TaskActivityItem, TaskDetailFrameProps, TaskDetailRow, TaskMenuItem, TaskSubtask } from '@/components/slots/task-detail-contract'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { useIssueTeam } from '@/components/teams/issue-team-control'
@@ -91,6 +92,7 @@ const REOPENED = 'todo'
 export function FramedTask(props: FramedTaskProps) {
   const { Frame, task, preview, userId, onOpen, getCurrent, adopt } = props
   const t = useTranslations('IssueDetail')
+  const tCommon = useTranslations('Common')
   const tFrame = useTranslations('IssueDetail.frame')
   const tDetail = useTranslations('Workspace.detail')
   const tActivity = useTranslations('Workspace.activity')
@@ -115,12 +117,12 @@ export function FramedTask(props: FramedTaskProps) {
   const metadata = useIssueMetadataSave({ task, disabled: preview, onSaved: adopt, onBusyChange: props.onMetadataBusy })
   const [teamChoice, setTeamChoice] = useState<ExplicitTeamChoice | null>(null)
   const scope = useIssueScope({ task, disabled: preview, onSaved: adopt, teamChoice })
-  const team = useIssueTeam({ issueId: task.id, disabled: preview, onChosen: (issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null) })
+  const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: preview, onChosen: (issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null) })
   const { data: threads } = useIssueThreads(task.id, !preview)
   const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: preview, enabled: !preview })
 
-  const loading = (text: string): TaskMenuItem[] => optionsError
-    ? [{ id: 'reload', label: tAssignee('reload'), onSelect: () => { void reloadOptions() } }]
+  const loading = (text = tCommon('loading')): TaskMenuItem[] => optionsError
+    ? [{ id: 'reload', label: tCommon('retry'), onSelect: () => { void reloadOptions() } }]
     : [{ id: 'loading', label: text }]
   const busy = preview || metadata.pending
   const meta = task.metadata
@@ -132,7 +134,7 @@ export function FramedTask(props: FramedTaskProps) {
     ...options ? options.members.map(person => ({ id: person.id, label: person.name, mark: { kind: 'person', name: person.name } as const, checked: member?.id === person.id, onSelect: () => { if (member?.id !== person.id) void metadata.persist({ assignee: { kind: 'member', id: person.id } }) } })) : loading(tAssignee('loading')),
     ...options?.isOwner ? [{ id: 'invite', label: tAssignee('invite'), mark: { kind: 'icon', icon: 'mail' }, divider: true, onSelect: () => props.requestProperty('invite') } satisfies TaskMenuItem] : [],
   ]
-  const agent = meta.assignee?.kind === 'agent' ? meta.assignee : null
+  const agent = meta.delegate
   const delegateThread = (agent ? threads?.find(item => item.detail?.agentName === agent.name) : threads?.find(item => item.detail?.bot))?.detail
   const delegate = agent?.name ?? delegateThread?.agentName
 
@@ -141,13 +143,13 @@ export function FramedTask(props: FramedTaskProps) {
     ...options ? allLabels.map(label => {
       const on = meta.labels.some(item => item.name === label.name)
       return { id: label.name, label: label.name, mark: { kind: 'icon', icon: 'tag' } as const, checked: on, onSelect: () => { void metadata.persist({ labels: on ? meta.labels.filter(item => item.name !== label.name) : [...meta.labels, label] }) } }
-    }) : loading(tRelations('loading')),
+    }) : loading(),
     ...options && !allLabels.length ? [{ id: 'empty', label: tProperty('noLabelsYet') }] : [],
     { id: 'create', label: `${tProperty('createLabel')}…`, mark: { kind: 'icon', icon: 'plus' }, divider: true, onSelect: () => props.requestProperty('labels') },
   ]
   const projectItems: TaskMenuItem[] = [
     { id: 'none', label: tProperty('noProject'), mark: { kind: 'icon', icon: 'project' }, checked: !meta.project, onSelect: () => { if (meta.project) void metadata.project(null, options?.projectRecords) } },
-    ...options ? options.projects.map(name => ({ id: name, label: name, mark: { kind: 'icon', icon: 'project' } as const, checked: meta.project === name, onSelect: () => { if (meta.project !== name) void metadata.project(name, options.projectRecords) } })) : loading(tRelations('loading')),
+    ...options ? options.projects.map(name => ({ id: name, label: name, mark: { kind: 'icon', icon: 'project' } as const, checked: meta.project === name, onSelect: () => { if (meta.project !== name) void metadata.project(name, options.projectRecords) } })) : loading(),
   ]
 
   const rows: TaskDetailRow[] = [
@@ -160,8 +162,11 @@ export function FramedTask(props: FramedTaskProps) {
     { id: 'project', label: tProperty('project'), disabled: busy, onOpen: loadOptions, value: { text: meta.project ?? tProperty('addToProject'), mark: { kind: 'icon', icon: 'project' }, muted: !meta.project, title: meta.project ?? undefined, aria: tProperty('projectAria', { name: meta.project ?? tProperty('unset') }) }, menu: projectItems },
     { id: 'team', label: team.label, disabled: team.unavailable, value: { text: team.currentLabel, mark: { kind: 'icon', icon: 'team' }, muted: !team.selected, title: team.currentLabel }, menu: team.choices.map(choice => ({ id: choice.value, label: choice.label, mark: { kind: 'icon', icon: 'team' }, checked: choice.value === (team.selected || 'none'), onSelect: () => {
       const value = choice.value === 'none' ? '' : choice.value
-      if (value === (team.data ?? '')) return
-      setTeamChoice(null); team.setNext(value); void team.save(value)
+      // On reopening a personal task, the stored team still needs an explicit
+      // successful selection before it can be used as the sharing destination.
+      if (value === (team.data ?? '') && (!value || task.scope !== 'personal' || teamChoice?.teamId === value)) return
+      setTeamChoice(null)
+      void team.save(value)
     } })) },
     ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: preview, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: preview, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
@@ -224,6 +229,7 @@ export function FramedTask(props: FramedTaskProps) {
   const created = new Date(task.createdAt)
   return <Frame
     taskId={preview ? undefined : task.id}
+    attachments={preview ? undefined : trigger => <TaskAttachments key={task.id} taskId={task.id} trigger={trigger} />}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}

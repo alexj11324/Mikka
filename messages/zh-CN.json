@@ -3,6 +3,17 @@
     "daily": "每天 {time}",
     "interval": "每 {minutes} 分钟"
   },
+  "TaskAttachments": {
+    "title": "附件",
+    "add": "添加文件",
+    "empty": "暂无附件",
+    "remove": "移除 {name}",
+    "failed": "附件修改未保存。",
+    "downloadFailed": "附件下载失败。",
+    "readFailed": "附件加载失败。",
+    "size": "请选择不超过 3 MiB 的非空文件。",
+    "limit": "每个任务最多 10 个文件。"
+  },
   "Common": {
     "privacyPolicy": "隐私政策",
     "appUpdated": "Mikka 已更新",

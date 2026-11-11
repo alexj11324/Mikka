@@ -136,9 +136,10 @@ export function useIssueDetailActions({ task, userId, disabled, request, getCurr
       if (!latest) throw new Error(t('saveCurrentFirst'))
       const result = await operation(latest)
       if (!result.issue) throw new Error(actionError(result.error ?? 'generic'))
-      if (mode === 'current') onSaved(result.issue)
-      // 'current' saves go through onSaved, whose saved() in issue-workspace already refetches the viewer's board.
-      await Promise.all([mutate(issueKeys.connections(task.id)), mode === 'current' ? undefined : mutate(key => isIssueListKey(key, userId))])
+      const updatesCurrent = mode === 'current' || mode === 'favorite' || mode === 'unfavorite'
+      if (updatesCurrent) onSaved(result.issue)
+      // Adopting a task also refreshes its board through issue-workspace.
+      await Promise.all([mutate(issueKeys.connections(task.id)), updatesCurrent ? undefined : mutate(key => isIssueListKey(key, userId))])
       if (mode === 'duplicate') onOpen(result.issue.id)
       if (mode === 'delete') {
         onDeleted()
