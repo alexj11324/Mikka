@@ -11,6 +11,7 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { issueListChanged } from './live/lists'
 import { scheduleShortTitle } from './short-title-schedule'
 import { requireTaskWorkspace } from './task-workspace'
+import { registerTaskResourceAccess } from './task-resource-registration'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -43,6 +44,7 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
     revision: 1,
     linearSyncBlocked: options.linearSyncBlocked ?? true,
   }).returning()
+  await registerTaskResourceAccess(tx, { id, ownerId: userId, workspaceId: workspace.id, workspaceKind: workspace.kind })
   await tx.insert(issueVersions).values({
     id: crypto.randomUUID(),
     issueId: id,
