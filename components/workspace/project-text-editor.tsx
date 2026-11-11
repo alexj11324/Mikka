@@ -13,7 +13,22 @@ const FIELD_OPTIONS = {
   description: { maxLength: 50000 },
 }
 
-export function ProjectTextEditor({ field, value, onSave, onRegisterFlush }: { field: TextField; value: string; onSave: (value: string) => Promise<boolean>; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }) {
+type ProjectTextProps = {
+  field: TextField
+  value: string
+  onSave: (value: string) => Promise<boolean>
+  onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void
+}
+
+export function ProjectTextEditor({ readOnly, ...props }: ProjectTextProps & { readOnly: boolean }) {
+  const t = useTranslations('Projects.textEditor')
+  if (!readOnly) return <EditableProjectText {...props} />
+  if (props.field === 'name') return <h1 className="text-2xl leading-snug font-semibold tracking-tight">{props.value}</h1>
+  return <IssueEditor key={props.value} layout="description" label={t('descriptionLabel')}
+    content={readProjectDescription(props.value)} disabled onChange={() => {}} />
+}
+
+function EditableProjectText({ field, value, onSave, onRegisterFlush }: ProjectTextProps) {
   const t = useTranslations('Projects.textEditor')
   const id = useId()
   const label = field === 'name' ? t('nameLabel') : t('descriptionLabel')
