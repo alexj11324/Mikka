@@ -44,3 +44,23 @@ export function completedCiSuite(event: string, payload: unknown): CompletedCiSu
     numbers: [...new Set(suite.pull_requests.map(pr => pr.number))],
   }
 }
+
+export type LinkedCiSuiteRun = {
+  runId: string
+  userId: string
+  botId: string | null
+  issueId: string | null
+  pullUrl: string
+  headSha: string | null
+  state: string | null
+}
+
+/** A source-bound, existing publication; incoming webhook text cannot select its session. */
+export function linkedCiSuiteRun(suite: CompletedCiSuite, row: LinkedCiSuiteRun): boolean {
+  const prefix = `https://github.com/${suite.repository}/pull/`
+  if (!row.botId || !row.runId || !row.userId || !['open', 'draft'].includes(row.state ?? '')
+    || row.headSha?.toLowerCase() !== suite.headSha || !row.pullUrl.startsWith(prefix)) return false
+  const number = row.pullUrl.slice(prefix.length)
+  if (!/^[1-9]\\d*$/.test(number) || !Number.isSafeInteger(Number(number))) return false
+  return suite.numbers.length === 0 || suite.numbers.includes(Number(number))
+}
