@@ -179,6 +179,9 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
     await withTaskWorkspace(owner, workspaceId, async workspace => db.transaction(async tx => {
       await tx.execute(sql`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope)
         VALUES(${issueId},${owner},${workspaceId},'bound','HTTP Files fixture','{"type":"doc","content":[]}','done','normal',${kind === 'personal' ? 'personal' : 'workspace'})`)
+      const rawPolicy = await tx.execute(sql`SELECT visibility FROM resource_access_policies WHERE kind='task' AND id=${issueId}::uuid`)
+      assert.deepEqual(rawPolicy.rows, [{ visibility: 'shared' }],
+        'the production migration chain still creates raw Task roots as shared before the phase-one writer registers them')
       if (kind === 'shared') await tx.execute(sql`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId")
         VALUES(${issueId},${teamId},${workspaceId},${owner})`)
       await registerTaskResourceAccess(tx, { id: issueId, workspaceId, ownerId: owner, workspaceKind: workspace.kind })
