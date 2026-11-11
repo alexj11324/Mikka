@@ -80,10 +80,10 @@ test('a thread names the Bot that dispatched it, even after that Bot loses its o
   })
 
   await t.test('a historical run with no recorded identity keeps reading Coordinator', async () => {
-    // Historical rows predate the frozen identity. They cannot be told apart from a genuine
-    // local MCP run, so they keep the Coordinator they have always reported: a gap in the
-    // record, not a claim about who dispatched them. Pinned so that closing that gap stays a
-    // deliberate change rather than a side effect of fixing the takeover case.
+    // Historical rows predate the frozen identity, so they cannot be told apart from a genuine
+    // local MCP run. Coordinator here is a gap in the record, not a claim about who dispatched
+    // them. If identity is ever backfilled, this expectation should change with it: the assertion
+    // is pinned so that closing the gap stays deliberate, not so that the gap stays forever.
     assert.equal(await nameOf(unrecorded.id), 'Coordinator')
   })
 
