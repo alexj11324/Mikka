@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {eveRetrySubmission} from './retry'
+import {eveRetryHeaders,eveRetrySubmission} from './retry'
+
+test('authenticated mobile retry supplies only a missing Origin and keeps caller credentials',()=>{
+  assert.deepEqual(eveRetryHeaders(new Headers({cookie:'mobile=session','x-mikka-workspace-id':'workspace','content-length':'42'}),'https://app.test/mikka'),{
+    cookie:'mobile=session','x-mikka-workspace-id':'workspace',origin:'https://app.test',
+  })
+  assert.deepEqual(eveRetryHeaders(new Headers({authorization:'Bearer current',origin:'https://untrusted.test','sec-fetch-site':'cross-site'}),'https://app.test'),{
+    authorization:'Bearer current',origin:'https://untrusted.test','sec-fetch-site':'cross-site',
+  })
+  assert.equal(eveRetryHeaders(new Headers({cookie:'mobile=session',origin:''}),'https://app.test').origin,'')
+  assert.throws(()=>eveRetryHeaders(new Headers(),'https://app.test'),/authRequired/)
+})
 
 test('native resend retains canonical text, images and task choices with one UUID per failed turn',()=>{
   const image={dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==',mediaType:'image/png'}
