@@ -10,6 +10,7 @@ import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { coordinatorBot } from './coordinator-bot'
 import { deliverRunCompletion } from './run-completion-delivery'
+import { verifiedCiSuiteTransport } from './ci-suite-transport'
 
 
 /**
@@ -32,6 +33,10 @@ export async function triageInbox(userId: string, botId: string): Promise<void> 
     claim: event => claimTriageAttempt(event, scope),
     deliverUser: event => setEventTier(event.id, 'attention', scope),
     deliverCompletion: event => deliverRunCompletion(pool, event, scope, workspacePool),
+    // Signed-webhook, source-bound CI result is transport, not another model
+    // decision. The Bot sees it as a new turn after the outbox commits.
+    deliverCiSuite: event => verifiedCiSuiteTransport(event)
+      ? setEventTier(event.id, 'result', scope) : Promise.resolve(false),
     classify: async (event, signal) => {
       const result = await hostedBillingScope.run({workspaceId:await executionWorkspace(userId,botId),ownerId:userId},()=>invokeDecision('triage', triageInput(event), triageQuestions(event), signal))
       return { tier: tierFromDecision(result?.answers.get('tier')), execution: result?.execution ?? null }
