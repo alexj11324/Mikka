@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  chunkText, contextUsage, contextUsageFromCounts, countChars, CONTEXT_SEGMENT_KEYS, CONVERSATION_CHARS_SQL,
+  chunkText, contextUsage, countChars, CONTEXT_SEGMENT_KEYS, CONVERSATION_CHARS_SQL,
   CONVERSATION_CHUNK_KEYS, estimateTextTokens, estimateTokensFromCounts, PROMPT_BUDGET_TOKENS, PROMPT_MAX_CHARS,
 } from './context-usage'
 
@@ -57,13 +57,14 @@ test('the segments are a strict partition of used, so a screen never has to gues
   })
   assert.equal(usage.segments.reduce((total, segment) => total + segment.tokens, 0), usage.used)
   // Largest first, so a bar reads left to right in the same order its legend does.
-  assert.deepEqual(usage.segments.map(segment => segment.tokens), [...usage.segments.map(segment => segment.tokens)].sort((a, b) => b - a))
+  const tokens = usage.segments.map(segment => segment.tokens)
+  assert.deepEqual(tokens, [...tokens].sort((a, b) => b - a))
 })
 
 test('a segment with no text is absent, and every unreadable key is named instead of counted as zero', () => {
   // A run with no brief and nothing said yet: no measured segment at all.
   const empty = contextUsage({ prompt: '', task: '', messages: [], chunks: [] })
-  assert.deepEqual(empty.segments, [])
+  assert.equal(empty.segments.length, 0)
   assert.equal(empty.used, 0)
   // All seven still account for themselves: measured or named, never silently dropped.
   const named = [...empty.segments.map(segment => segment.key), ...empty.unmeasured].sort()
