@@ -6,13 +6,14 @@ const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
 
 /** Narrow only implicit sharing. Workspace is the authority; the APP database
  * never joins a membership mirror or infers kind from a Task's old scope.
+ * This maintenance tool commits policy/audit only, without live invalidations.
  * @param {{dryRun?: boolean, workspaceIds?: string[], actorId?: string}} [options]
  */
 export async function repairPersonalResourcePrivacy(application, workspace, options = {}) {
   const { dryRun = true, workspaceIds = [], actorId } = options
   if (!Array.isArray(workspaceIds) || workspaceIds.some(id => typeof id !== 'string' || !uuid.test(id))) throw new Error('Invalid repair Workspace selection')
   if (!dryRun && (!workspaceIds.length || typeof actorId !== 'string' || !actorId.trim() || actorId.length > 256)) throw new Error('Apply requires explicit Workspaces and an audit actor')
-  const result = { dryRun, workspaces: /** @type {{workspaceId: string, candidates: number, repaired: number}[]} */ ([]), candidates: 0, repaired: 0 }
+  const result = { dryRun, liveInvalidations: 'not_sent', workspaces: /** @type {{workspaceId: string, candidates: number, repaired: number, ownerMismatches: number}[]} */ ([]), candidates: 0, repaired: 0, ownerMismatches: 0 }
   let cursor = null
   for (;;) {
     const { rows: batch } = await workspace.query(`SELECT id FROM mikka_workspaces
@@ -24,13 +25,17 @@ export async function repairPersonalResourcePrivacy(application, workspace, opti
       let app
       try {
         await tenant.query('BEGIN')
-        const { rows: [authority] } = await tenant.query('SELECT id,kind FROM mikka_workspaces WHERE id=$1 FOR SHARE', [id])
+        const { rows: [authority] } = await tenant.query('SELECT id,kind,"userId" AS "ownerId" FROM mikka_workspaces WHERE id=$1 FOR SHARE', [id])
         if (authority?.kind !== 'personal') { await tenant.query('COMMIT'); continue }
-        const item = { workspaceId: id, candidates: 0, repaired: 0 }
+        const item = { workspaceId: id, candidates: 0, repaired: 0, ownerMismatches: 0 }
         app = await application.connect()
+        const { rows: [count] } = await app.query(`SELECT count(*) FILTER (WHERE visibility='shared')::integer AS count,
+          count(*) FILTER (WHERE "ownerId" IS DISTINCT FROM $2)::integer AS mismatches FROM resource_access_policies
+          WHERE "workspaceId"=$1`, [id, authority.ownerId])
+        // Report ownership anomalies even on replay; narrowing visibility does
+        // not establish or transfer their owner, nor does it remove grants.
+        item.ownerMismatches = count.mismatches
         if (dryRun) {
-          const { rows: [count] } = await app.query(`SELECT count(*)::integer AS count FROM resource_access_policies
-            WHERE "workspaceId"=$1 AND visibility='shared'`, [id])
           item.candidates = count.count
         } else {
           // Bounded APP transactions; keep the authoritative Workspace locked
@@ -55,6 +60,7 @@ export async function repairPersonalResourcePrivacy(application, workspace, opti
         result.workspaces.push(item)
         result.candidates += item.candidates
         result.repaired += item.repaired
+        result.ownerMismatches += item.ownerMismatches
       } catch (error) {
         await Promise.allSettled([tenant.query('ROLLBACK'), ...(app ? [app.query('ROLLBACK')] : [])])
         throw error
@@ -99,7 +105,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const usage = 'Usage: node scripts/repair-personal-resource-privacy.mjs [--workspace UUID ...] [--apply --actor ACCOUNT --app-target HOST:PORT/DATABASE --workspace-target HOST:PORT/DATABASE]. Default: dry-run. Deploy the private-default/creation/share fixes before applying; the tool preserves every explicit grant.'
+  const usage = 'Usage: node scripts/repair-personal-resource-privacy.mjs [--workspace UUID ...] [--apply --actor ACCOUNT --app-target HOST:PORT/DATABASE --workspace-target HOST:PORT/DATABASE]. Default: dry-run. Deploy the private-default/creation/share fixes before applying. Explicit grants/owners stay unchanged; mismatches are reported. Policy/audit commits send no live invalidation; clients see the new policy on their next normal read/refresh.'
   if (process.argv.includes('--help')) console.log(usage)
   else main().then(result => console.log(JSON.stringify(result))).catch(error => {
     console.error('Personal resource privacy repair failed', { name: error.name, code: error.code })

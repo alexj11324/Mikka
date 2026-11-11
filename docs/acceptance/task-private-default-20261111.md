@@ -4,7 +4,7 @@
 
 ## 迁移与租约
 
-新文件 `20261112030503_task_acl_private_default.sql` 由仓库 UTC 生成器生成。2026-11-11 16:11:09 UTC 复核时，origin/main 为 `43838a6efd6b66472b0c1f221829125bfb31fe34`，main 最大编号为 `20261112030500`；本地已知 refs 另有 Drive `20261112030502`，候选没有已提交碰撞。发布前仍需协调者核最新远端 refs，不能用固定编号区间代替该检查。
+新文件 `20261112030503_task_acl_private_default.sql` 由仓库 UTC 生成器生成。2026-11-11 16:26:48 UTC 的远端 refs 快照覆盖 2,330 个 heads、267 个 tags、2,594 个唯一目标，查询缺口为 0；候选 `20261112030503` 无占用。该快照的 main 为 `43838a6efd6b66472b0c1f221829125bfb31fe34`，main 迁移水位为 `20261112030500`。合并前仍须重新核对最新 main 水位；远端其他分支的最大编号不能代替 main 水位，也不能按固定编号区间取号。
 
 `requireTaskWorkspaceLease` 只返回当前仍有效的 Workspace lease 中已锁定的 kind；校验 actor、Workspace 和事务身份。登记 helper 还交叉校验 kind，且仅匹配本 APP 事务新建、revision1、无父节点的 private/created Task policy。以后重新进入合法 Team 租约不能将既有 private 根 Task 当作新建重新公开。
 
@@ -29,7 +29,41 @@
 | Team 正常根 Task 创建 | SQL 自动 shared | 权威 kind lease 下新行显式 shared | 保留现有能力 | `lib/task-resource-registration.ts` |
 | 重登记既有 private Team Task | 旧触发器不针对该操作 | helper 拒绝既有行，沿用原 server 共享函数的权限与确认契约 | 否 | revision 与 transaction_timestamp guard |
 | quarantine 历史绑定 | Task 自动 shared | 默认 private，仅锁内 Team kind 显式恢复 | 否，裸绑定收紧 | 回填脚本与新 SQL |
+| personal 的 server 共享函数 | 可将 policy 设为 shared | 权威 personal Workspace 租约内拒绝设为 shared | 否，收紧隐式共享 | `lib/resource-access/store.ts` |
+| 历史 personal shared 修复 | 旧 policy 保持 shared | 显式维护命令将选中个人 Workspace 的 shared policy 收为 private | 否，收紧；明确 grants 保留 | `scripts/repair-personal-resource-privacy.mjs` |
 | account/service 明确授权 | 原 resource grants | 原行、capabilities、expiry 均保留 | 否 | 双库迁移与回填回归 |
+
+这里的共享入口是导出的 server 共享函数；未找到已登记的 HTTP、RPC 或 UI producer。因此本补丁不据此声称存在可从公开分享接口触发的线上泄漏。
+
+## 历史修复操作
+
+SQL 默认值、生产 Team 登记和个人共享守卫必须随同一 PR 部署，并确认服务 READY 后，才开始历史修复。仅应用迁移不能完成旧行清理；先修旧行而仍运行旧 writer，也不能保证后续创建保持 private。构建、迁移和应用启动均不自动对生产执行修复。
+
+维护 CLI 从 `MIKKA_DATABASE_URL` 连接 APP 库，从 `DATABASE_URL` 连接权威 Workspace 库。由操作者在当前维护环境配置这两个连接，不要将带口令的连接串写入命令、工单或报告。先对计划处理的 Workspace 执行默认 dry-run：
+
+```sh
+node scripts/repair-personal-resource-privacy.mjs \
+  --workspace PERSONAL_WORKSPACE_UUID
+```
+
+未传 `--apply` 时不更新 policy；未指定 `--workspace` 的 dry-run 会扫描所有 personal Workspace。核对结果与目标后，apply 必须显式给出每个 Workspace ID、审计 actor 和两个精确的 `host:port/database` 目标；它们必须与当前环境连接一致：
+
+```sh
+node scripts/repair-personal-resource-privacy.mjs \
+  --workspace PERSONAL_WORKSPACE_UUID \
+  --actor MAINTENANCE_ACCOUNT \
+  --app-target APP_HOST:5432/APP_DATABASE \
+  --workspace-target WORKSPACE_HOST:5432/WORKSPACE_DATABASE \
+  --apply
+```
+
+多个 Workspace 使用重复的 `--workspace` 参数。actor 是本次维护审计标识，不能替代数据库运维授权或 Workspace 权威判断。以上是操作格式，本文没有执行任何生产 apply。
+
+工具逐 Workspace 在 WS 库读取并持有真实 `kind='personal'` 行的 `FOR SHARE` 锁，再对 APP 中该 Workspace 的 shared policy 分批处理；每个 APP 事务最多 200 行。更新仅将 visibility 收为 private，原有 policy 触发器在同一事务记录旧值、actor 和来源 `personal_resource_privacy_repair`。已提交的批次无需重做，重试只处理剩余 shared 行；完成后再次 dry-run 应无剩余候选。Team Workspace 不在修复范围内。
+
+修复保留资源 owner、持久 Workspace 归属、父级/祖先约束以及全部 account/service grants，不将 private 等同于撤销明确授权。若 policy 的 ownerId 与个人 Workspace 的权威 owner 不一致，工具仍只收紧该 shared policy，并在 `ownerMismatches` 计数中报告；它不宣称已核实历史 ownership，也不转移 owner、Workspace 或 grants。该类历史异常需要单独核查，不能通过此工具自动归属。
+
+此维护 CLI 的作用范围是数据库更新与审计。结果的 `liveInvalidations: "not_sent"` 明确表示未发送实时失效通知，不能声称所有客户端已立即刷新。下一次正常读取会按新 ACL 判断权限；客户端此前已经显示的内容无法收回。
 
 ## 验证范围
 

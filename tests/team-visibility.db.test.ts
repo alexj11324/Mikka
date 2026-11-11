@@ -26,6 +26,7 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
   const actions = await import('../lib/mcp/actions')
   const { citationSources } = await import('../lib/coordinator/store')
   const { issuePropertyChoices } = await import('../lib/issue-property-choices')
+  const { registeredTask } = await import('./helpers/registered-task')
   const owner = `visibility-owner-${randomUUID()}`, member = `visibility-member-${randomUUID()}`, foreign = `visibility-foreign-${randomUUID()}`
   const workspace = randomUUID(), otherWorkspace = randomUUID(), personalWorkspace = randomUUID(), team = randomUUID(), otherTeam = randomUUID()
   const shared = randomUUID(), personal = randomUUID(), foreignIssue = randomUUID(), unlinked = randomUUID()
@@ -38,7 +39,8 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     for (const [w,u] of [[workspace,owner],[workspace,member],[otherWorkspace,foreign],[personalWorkspace,owner]]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [w,u,`${u}@example.invalid`])
     for (const [id,w,u] of [[team,workspace,owner],[otherTeam,otherWorkspace,foreign]]) await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Visibility\',\'VIS\')', [id,w,u])
     for (const [id,u,scope,label,tenant] of [[shared,owner,'workspace','shared-label',workspace],[personal,owner,'personal','secret-label',personalWorkspace],[foreignIssue,foreign,'workspace','foreign-label',otherWorkspace],[unlinked,owner,'workspace','invite-label',workspace]]) {
-      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,$3,$4,\'doing\',\'normal\',$5,$6)', [id,u,id,doc(label),scope,tenant])
+      await registeredTask(pool, u, tenant, id, client =>
+        client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,$3,$4,\'doing\',\'normal\',$5,$6)', [id,u,id,doc(label),scope,tenant]))
       await pool.query('insert into issue_members ("issueId","userId","memberId") values ($1,$2,$3)', [id,u,member])
     }
     // A stale Team/invitation cannot override a task's stored personal tenant.
