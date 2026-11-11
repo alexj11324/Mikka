@@ -42,7 +42,7 @@ test('foreign builds and materialized local Workflow data are never packaged as 
 
 test('runtime credentials in an environment file are not accepted into a reusable image', async t => {
   const options = await fixture(t)
-  await writeFile(join(options.root, '.output/eve/.env'), 'PRIVATE_FIXTURE=do-not-package')
+  await writeFile(join(options.root, '.output/eve/server/.env'), 'PRIVATE_FIXTURE=do-not-package')
   await assert.rejects(packageCloudflareEveHost(options), /CF_EVE_IMAGE_ENV_FILE_REFUSED/)
 })
 

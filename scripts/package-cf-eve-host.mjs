@@ -5,6 +5,7 @@ import { validateHostBuild } from '../cloudflare/eve-runtime/runtime/config.mjs'
 
 async function assertPortableLinks(root, directory = root) {
   for (const item of await readdir(directory, { withFileTypes: true })) {
+    if (item.name === '.env' || item.name.startsWith('.env.')) throw new Error('CF_EVE_IMAGE_ENV_FILE_REFUSED')
     const path = join(directory, item.name)
     if (item.isSymbolicLink()) {
       const link = await readlink(path)
@@ -27,9 +28,6 @@ export async function packageCloudflareEveHost({
     MIKKA_EVE_HOST: 'cloudflare', MIKKA_EVE_WORKFLOW_WORLD: 'cloudflare',
     MIKKA_BUILD_REVISION: sourceSha, MIKKA_UI_OVERLAY_SHA: uiSha, MIKKA_EVE_RELEASE_ID: releaseId,
   })
-  if ((await readdir(source)).some(name => name === '.env' || name.startsWith('.env.'))) {
-    throw new Error('CF_EVE_IMAGE_ENV_FILE_REFUSED')
-  }
   try {
     await lstat(join(source, '.eve', '.workflow-data'))
     throw new Error('CF_EVE_IMAGE_LOCAL_STATE_REFUSED')
