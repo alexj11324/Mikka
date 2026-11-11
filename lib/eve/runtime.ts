@@ -1,4 +1,5 @@
 import type { DynamicModelContext } from 'eve'
+import {evaluationForSession,evaluationModel} from './evaluation-runtime'
 import { HostedWorkflowModel } from '../abuse/workflow-model'
 import { SubscriptionWorkflowModel } from '../subscription-workflow-model'
 import { assertEveScope, scopeFromAuth } from './scope'
@@ -23,12 +24,16 @@ export async function executionForSession(ctx: DynamicModelContext) {
 }
 
 export async function modelForSession(ctx: DynamicModelContext) {
+  const evaluation=await evaluationForSession(ctx)
+  if(evaluation)return evaluationModel(evaluation)
   const { scope, runtime } = await executionForSession(ctx)
   if (runtime.harness !== 'ai_sdk' || !runtime.model) throw new Error('subscription_model_unavailable')
   return runtime.modelSelection ? streamingModel(new SubscriptionWorkflowModel(runtime.modelSelection)) : new HostedWorkflowModel(scope.ownerId, scope.botId, runtime.model)
 }
 
 export async function instructionsForSession(ctx: DynamicModelContext) {
+  const evaluation=await evaluationForSession(ctx)
+  if(evaluation)return evaluation.instructions
   const { scope, execution, scheduledRead } = await executionForSession(ctx)
   if (scheduledRead) return `This is an authorized scheduled read-only task. Use only the provided read tools. Do not request approval, create schedules or perform writes. Return the result for the original chat.\n${scheduledRead.prompt}`
   // Slack gets product policy but never private web history, memory or profile.

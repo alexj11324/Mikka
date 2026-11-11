@@ -14,8 +14,11 @@ import { useArchivedBots } from '@/hooks/settings/use-workspace-general'
 export function ArchivedBotsSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.archivedBots')
   const commonT = useTranslations('Common')
-  const { bots, pending, failed, takeOver } = useArchivedBots(workspaceId)
+  const { bots, readError, reload, pending, failed, takeOver } = useArchivedBots(workspaceId)
 
+  if (readError) return <SettingsSection id="archived-bots-heading" title={t('heading')}>
+    <SettingsSaveError message={readError} retryLabel={commonT('retry')} onRetry={() => { void reload() }} />
+  </SettingsSection>
   if (!bots.length) return null
   return <>
     <SettingsSection id="archived-bots-heading" title={t('heading')}>

@@ -115,14 +115,22 @@ export type ThreadScreenProps = {
    * (FRAME_OWNS_PANEL): the chat's Overview and the browser. `reveal` counts up each time the page asks for one
    * (`revealId`) to be shown; the work area stays folded until then.
    */
-  panels?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null }
+  panels?: {
+    tabs: ThreadPanelTab[]; reveal: number; revealId: string | null
+    /** The real active work tab's task, or null for another tab. */
+    onActiveTask?: (taskId: string | null) => void
+  }
   /**
    * Tabs the chat opens itself in the same work area (FRAME_OWNS_PANEL, decision 2026-11-10): a task's view
    * (`task:<issueId>`) from a task card or chip, a thread's conversation (`thread:<runId>`) from a thread chip, an
    * Agent's stretch or a subagent. `reveal` counts up each time one is asked for (`revealId`). With `work`, a task card
    * opens through its part's `onOpen` only, never the template's own task tab.
    */
-  work?: { tabs: ThreadPanelTab[]; reveal: number; revealId: string | null; beforeClose?: (tabId: string) => Promise<boolean> }
+  work?: {
+    tabs: ThreadPanelTab[]; reveal: number; revealId: string | null; beforeClose?: (tabId: string) => Promise<boolean>
+    /** Reports the work area's actual active page; null for New or an artifact. */
+    onActiveTab?: (tabId: string | null) => void
+  }
 }
 
 /** The hosted shell waits for a task tab's existing save before removing it. */

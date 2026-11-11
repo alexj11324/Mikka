@@ -189,6 +189,9 @@ jobs:
           secret-name: SMOKE_OWNER_PASSWORD
           recursive: false
           include-imports: false
+      - name: Prepare Ubuntu package mirrors for the readable target
+        if: steps.attest.outputs.readable == 'true'
+        run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
       - name: Install the existing smoke test's Chromium headless shell
         if: steps.attest.outputs.readable == 'true'
         run: pnpm exec playwright install --with-deps --only-shell chromium
