@@ -7036,7 +7036,7 @@
       "noCustom": "No custom providers yet",
       "defaultBadge": "Default",
       "readOnly": "Models can’t be turned off one by one yet",
-      "providerOn": "{on}/{total} on",
+      "providerOn": "{on}/{total} enabled",
       "firstModel": "Tasks start with",
       "keyProvider": "Provider"
     }
