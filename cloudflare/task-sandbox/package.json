@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@cloudflare/sandbox": "1.0.3"
+    "@cloudflare/sandbox": "1.0.3",
+    "capnweb": "0.12.0"
   }
 }

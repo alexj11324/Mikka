@@ -2,6 +2,7 @@ import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 import { Files } from '@cloudflare/sandbox'
 import { machineGrant, sameGrant, workspaceName, liveUntil, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
 import { TaskFiles } from './files.mjs'
+import { processOptions, taskProcess, stopTaskProcesses } from './process.mjs'
 import { TaskWorkspace } from './workspace.mjs'
 
 export { DirectoryBackupGateway } from '@cloudflare/sandbox'
@@ -17,6 +18,8 @@ export default class TaskMachines extends WorkerEntrypoint {
   open(identity) { return this.#endpoint(identity).open(identity) }
   park(identity) { return this.#endpoint(identity).park(identity) }
   status(identity) { return this.#endpoint(identity).status(identity) }
+  spawn(identity, options) { return this.#endpoint(identity).spawn(identity, options) }
+  removePath(identity, path, options) { return this.#endpoint(identity).removePath(identity, path, options) }
   readFile(identity, path) { return this.#endpoint(identity).readFile(identity, path) }
   writeFile(identity, path, bytes) { return this.#endpoint(identity).writeFile(identity, path, bytes) }
 }
@@ -43,6 +46,12 @@ export class TaskMachine extends DurableObject {
     ctx.blockConcurrencyWhile(async () => {
       const run = await ctx.storage.get('run')
       if (!run || run.stoppedAt) return
+      if (await ctx.storage.get('nativeWriter')) {
+        // DO restart lost the live streams. Stop every writer from the same
+        // task, preserve its actual working tree and retire its lease.
+        await this.stop(run, 'interrupted', true)
+        return
+      }
       if (ctx.container?.running) await ctx.container.setInactivityTimeout(this.idleLimit(run))
       await ctx.storage.setAlarm(Math.max(Date.now() + 1, run.settledAt ? Date.now() : run.expiresAt))
     })
@@ -129,16 +138,51 @@ export class TaskMachine extends DurableObject {
       return this.receipt(run)
     })
   }
-  withFiles(identity, operation) {
+  withMachine(identity, operation) {
     const grant = machineGrant(identity)
     return this.exclusive(async () => {
       const run = await this.current(grant)
       liveUntil(grant, Date.now(), Math.min(run.expiresAt, run.hardDeadline))
       if (run.state !== 'running' || !this.ctx.container?.running) throw new Error('Task machine is not running')
-      return operation(new TaskFiles(this.ctx.container))
+      if (await this.ctx.storage.get('nativeWriter')) throw new Error('Task workspace has an active native writer')
+      return operation(this.ctx.container, run)
     })
   }
+  spawn(identity, options) {
+    const checked = processOptions(options)
+    return this.withMachine(identity, async (container, run) => {
+      const nonce = crypto.randomUUID()
+      // Persist the writer before external I/O. Restarting the object fences
+      // this operation even if the provider started it before returning a handle.
+      await this.ctx.storage.put('nativeWriter', nonce)
+      try {
+        return await taskProcess(container, checked, () => this.exclusive(async () => {
+          if (await this.ctx.storage.get('nativeWriter') !== nonce) return
+          await this.saveNativeWorkspace(container)
+          await this.ctx.storage.delete('nativeWriter')
+        }))
+      } catch (error) {
+        await this.stop(run, 'interrupted', true)
+        throw error
+      }
+    })
+  }
+  async saveNativeWorkspace(container) {
+    await stopTaskProcesses(container)
+    const checkpoint = await this.workspace.checkpoint()
+    await this.workspace.prune()
+    return checkpoint
+  }
+  withFiles(identity, operation) { return this.withMachine(identity, c => operation(new TaskFiles(c))) }
   readFile(identity, path) { return this.withFiles(identity, files => files.read(path)) }
+  removePath(identity, path, options) {
+    return this.withFiles(identity, async files => {
+      await files.remove(path, options)
+      const checkpoint = await this.workspace.checkpoint()
+      await this.workspace.prune()
+      return checkpoint
+    })
+  }
   writeFile(identity, path, bytes) {
     return this.withFiles(identity, async files => {
       await files.write(path, bytes)
@@ -165,7 +209,7 @@ export class TaskMachine extends DurableObject {
     }
     await store.setAlarm(Date.now() + 15_000)
     if (save && !run.checkpoint && container?.running) {
-      const checkpoint = await this.workspace.checkpoint()
+      const checkpoint = await store.get('nativeWriter') ? await this.saveNativeWorkspace(container) : await this.workspace.checkpoint()
       run = { ...run, checkpoint }
       await store.put('run', run)
     }
@@ -175,6 +219,7 @@ export class TaskMachine extends DurableObject {
     }
     if (container?.running) await container.destroy()
     if (container?.running) throw new Error('Task machine stop unconfirmed')
+    await store.delete('nativeWriter')
     await this.admission().release(this.ctx.id.toString())
     const stopped = { ...run, state: 'stopped', stoppedAt: Date.now() }
     await store.put({ run: stopped, ['closed:' + run.grant.runId]: true })

@@ -18,7 +18,7 @@ export class TaskFiles {
     try { return await this.files.lstat(path, user) }
     catch (error) { if (SandboxFileError.is(error) && error.code === 'ENOENT') return null; throw error }
   }
-  async target(path, createParents) {
+  async target(path, createParents, allowNonFile = false) {
     const names = parts(path)
     let dir = '/workspace'
     for (const name of names.slice(0, -1)) {
@@ -30,8 +30,18 @@ export class TaskFiles {
       } else if (info.type !== 'directory') throw new Error('Task workspace path is not a directory')
     }
     const info = await this.inspect(path)
-    if (info && info.type !== 'file') throw new Error('Task workspace path is not a regular file')
+    if (!allowNonFile && info && info.type !== 'file') throw new Error('Task workspace path is not a regular file')
     return { path, info }
+  }
+  async remove(path, { force = false, recursive = false } = {}) {
+    if (typeof force !== 'boolean' || typeof recursive !== 'boolean') throw Error('Invalid task file removal')
+    const target = await this.target(path, false, true)
+    if (!target?.info) {
+      if (force) return
+      throw Error('Task workspace path does not exist')
+    }
+    // remove unlinks the leaf itself and does not follow a repository symlink.
+    await this.files.remove(path, { ...user, force, recursive })
   }
   async read(path) {
     const target = await this.target(path, false)
