@@ -333,6 +333,29 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     assert.equal(cleared.policy.readOnly, undefined)
     assert.equal(cleared.policy.permissions.install_dependency, 'allow')
   })
+  await t.test('a permissions-only workspace save keeps the stored approvalMode; only an explicit value replaces it', async () => {
+    // The workspace layer is replaced whole, so a save that names only `permissions`
+    // would drop `approvalMode: 'read_only'` and silently lift the ADR 0046 ceiling
+    // ("whatever the workspace chose"). approvalMode is therefore sticky: unnamed
+    // keeps the stored value, and `ask` is the one explicit way to clear it.
+    const stickyWorkspace = await seedFixtureWorkspace(pool, owner, 'team')
+    const subject = await fixture(stickyWorkspace)
+    const start = await read(subject.run)
+    const readonly = await setCliPolicy(pool, owner, subject.run, 'workspace', start.revision, { approvalMode: 'read_only' })
+    assert.equal(readonly.policy.readOnly, true)
+    // A permissions-only save: no approvalMode in the body, so the stored one survives.
+    const permissionsOnly = await setCliPolicy(pool, owner, subject.run, 'workspace', readonly.revision,
+      { permissions: { install_dependency: 'allow' } })
+    assert.equal(permissionsOnly.layers.workspace.approvalMode, 'read_only', 'an unnamed approvalMode is kept')
+    assert.equal(permissionsOnly.policy.readOnly, true, 'so the ceiling still applies')
+    assert.equal(permissionsOnly.policy.permissions.install_dependency, 'deny', 'and still forces the denials')
+    assert.notEqual(permissionsOnly.revision, readonly.revision, 'permissions still replaced, so the revision moves')
+    // The only way out is naming the mode.
+    const cleared = await setCliPolicy(pool, owner, subject.run, 'workspace', permissionsOnly.revision, { approvalMode: 'ask' })
+    assert.equal(cleared.layers.workspace.approvalMode, 'ask')
+    assert.equal(cleared.policy.readOnly, undefined)
+    assert.equal(cleared.policy.permissions.install_dependency, 'allow')
+  })
   await t.test('team and shared-project ceilings are derived, intersected and live-versioned', async () => {
     const initial = await read(a.run)
     assert.deepEqual(initial.hierarchy, { workspaceId: workspaceA, teamId: a.team, projectId: project })
@@ -341,7 +364,12 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     const lower = await setCliPolicy(pool,owner,a.run,'workspace',scoped.revision,{permissions:{network:'allow',git_push:'allow'}})
     assert.equal(lower.policy.permissions.network,'deny')
     assert.equal(lower.policy.permissions.git_push,'deny')
-    assert.equal(lower.policy.permissions.install_dependency,'deny')
+    // The workspace layer is replaced whole, not merged per key: this save names
+    // network and git_push, so the fixture's own install_dependency deny is gone
+    // and the protocol default applies again. That replace *is* the settings
+    // page's delete-key semantic; what must still bind is the ceiling above,
+    // which the team/project assertions on the lines before this one prove.
+    assert.equal(lower.policy.permissions.install_dependency,'allow')
     assert.equal((await read(b.run)).layers.team?.permissions?.network,undefined)
     assert.equal((await read(personal.run)).hierarchy,undefined)
     assert.deepEqual(await (await checkHTTP(initial.revision)).json(),{live:false,paused:false})
@@ -349,6 +377,11 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     const changed = await setCliPolicy(pool,owner,a.run,'project',lower.revision,{permissions:{git_push:'deny',install_dependency:'deny'}})
     const rolledBack = await setCliPolicy(pool,owner,a.run,'project',changed.revision,lower.layers.project)
     assert.notEqual(rolledBack.revision,lower.revision)
+    // This case now writes the workspace layer itself (the retired worker layer
+    // used to absorb it), and that layer is shared with every later case in this
+    // file. Put back what it replaced, as the neighbouring cases already do, so
+    // the fixture value they read is the one this file set up.
+    await setCliPolicy(pool,owner,a.run,'workspace',rolledBack.revision,initial.layers.workspace)
   })
   await t.test('only a current workspace admin can change team or project ceilings', async () => {
     const before = await read(a.run)
@@ -390,7 +423,13 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
       assert.equal(explicit.policy.permissions.network,'ask');assert.equal(explicit.policy.permissions.git_push,'deny');assert.deepEqual(explicit.policy.networkAllow,['explicit.invalid'])
       await publish(subject.run,'team',{permissions:{network:'deny'},defaults:teamDefaults})
       const constrained=await publish(subject.run,'workspace',{permissions:{network:'allow',git_push:'allow'},networkAllow:['explicit.invalid']})
-      assert.equal(constrained.policy.permissions.network,'deny');assert.equal(constrained.policy.permissions.install_dependency,'deny')
+      // The team ceiling still wins on network. install_dependency is 'allow' because
+      // this write names no value for it and the workspace layer is replaced whole
+      // (see 'team and shared-project ceilings' above): the retired per-Bot layer
+      // used to absorb these writes, so the fixture's own deny was never touched
+      // here. The workspace ceiling is still covered — `inherited` above reads a
+      // workspace that does name it, and the read_only case asserts the forced deny.
+      assert.equal(constrained.policy.permissions.network,'deny');assert.equal(constrained.policy.permissions.install_dependency,'allow')
       // The per-Bot targets are retired: the route rejects them as invalid.
       assert.equal((await settings(subject.run,'agent',{defaults:{permissions:{network:'allow'}}})).status,400)
       assert.equal((await settings(subject.run,'worker',{defaults:{permissions:{network:'allow'}}})).status,400)
