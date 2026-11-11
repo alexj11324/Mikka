@@ -2138,6 +2138,16 @@
       "sourceHash": "b283a00faede7c965072945e12cd2debfe772a4d90bb8c6974bdab1391809e7b"
     },
     {
+      "path": "/mikka/api/tasks/[taskId]/review/resources",
+      "template": "/api/tasks/[taskId]/review/resources",
+      "source": "app/api/tasks/[taskId]/review/resources/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "7919e419507e4ace4352b40543e45812ed5608ece64e7c6254b51e839b724f0a"
+    },
+    {
       "path": "/mikka/api/tasks/[taskId]/review/reviewed",
       "template": "/api/tasks/[taskId]/review/reviewed",
       "source": "app/api/tasks/[taskId]/review/reviewed/route.ts",
