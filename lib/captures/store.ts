@@ -17,6 +17,7 @@ import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignA
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
 import { modelRoutingEvidenceSchema } from '@/lib/thread-execution-identity-view'
+import { runSkillPrompt } from '@mikka/protocol/run'
 import { taskActivityChanged } from '@/lib/factory/activity-live'
 
 // Screenshots and screen recordings in Neon (whose, which run, share links)
@@ -301,6 +302,9 @@ export async function runEvidence(userId: string, runId: string) {
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
     modelRouting: sql<unknown>`${agentRuns.agentDefinition}->'modelDispatch'->'routing'`,
+    // What the prompt carried of the run's skills; a body it only deferred is
+    // shown beside the run so the person knows a skill waited on a file read.
+    skillPrompt: sql<unknown>`${agentRuns.report}->'skillPrompt'`,
     // The mark is presentation, not part of the frozen receipt: the Profile's current one, else derived from the frozen public summary.
     agentProfile: sql<RunAgentProfileMarkRow | null>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
       'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId','name',${agentRuns.agentDefinition}->'agentProfile'->'name',
@@ -330,11 +334,17 @@ export async function runEvidence(userId: string, runId: string) {
   const documents = await runArtifactSubmissions(pool, userId, [runId])
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
-  const { agentSkills, profileSkillReport, ...runView } = run
+  // `skillPrompt` is dropped here and re-added parsed below, so the response
+  // never carries the raw report value.
+  const { agentSkills, profileSkillReport, skillPrompt: rawSkillPrompt, ...runView } = run
+  const skills = runSkillPrompt.safeParse(rawSkillPrompt)
   return {
     run: { ...runView, agentProfile: profileWithMark(run.agentProfile),
       configuredSkills: configuredSkillRefs(agentSkills), loadedSkills: loadedSkillRefs(profileSkillReport),
-      executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null },
+      executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null,
+      // Workspace skills this prompt inlined or deferred, distinct from the
+      // Profile Skills above that the agent loads on demand.
+      skillPrompt: skills.success ? skills.data : null },
     recording: recording.length > 0,
     captures: captures.map(captureView),
     artifacts: documents.map(document => ({ ...document, createdAt: document.createdAt.toISOString() })),
