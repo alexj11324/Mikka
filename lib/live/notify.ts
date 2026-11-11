@@ -77,7 +77,14 @@ export function scheduleLive(work: () => Promise<void>) {
   // after() may invoke this after the request scope has ended. Scope is
   // retained for fresh reads; permissions are still resolved by the work.
   afterJob('after:live-notify', async () => {
-    try { await work() } catch (error) {
+    try {
+      const [{ withoutDatabaseClient }, { withoutWorkspaceTransaction }] = await Promise.all([
+        import('../db/request-scope'), import('../workspace-db'),
+      ])
+      // APP may commit while its outer Workspace lease is still active. A
+      // deferred send can outlive both owners and must acquire its own locks.
+      await withoutDatabaseClient(() => withoutWorkspaceTransaction(work))
+    } catch (error) {
       // By name and code only (decision 2026-11-05-0330): a message can carry database content.
       console.warn('[live] committed invalidation failed', { name: (error as Error | undefined)?.name, code: (error as { code?: unknown } | undefined)?.code })
     }
