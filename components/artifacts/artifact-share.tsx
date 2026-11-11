@@ -9,11 +9,10 @@ import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from '@/components/ui/popover'
 import { Spinner } from '@/components/ui/spinner'
-import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'
-import { publicAppOrigin } from '@/lib/platform/public-origin'
+import { publicServiceLink } from '@/lib/platform/public-origin'
 
-const linkFor = (token: string) => `${publicAppOrigin()}${withBasePath(`/a/${token}`)}`
+const linkFor = (token: string) => publicServiceLink(`/a/${token}`)
 
 async function copy(text: string) {
   try { await navigator.clipboard.writeText(text); return true } catch { return false }

@@ -9,6 +9,7 @@ name: Site search read contract
 # CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths: ['apps/api/**', 'apps/frontend/**', 'lib/browser-rpc/**', 'scripts/start-app*', 'lib/search/**', 'lib/federated-search/**', 'app/api/search/**', 'tests/e2e/site-search.spec.ts', '.github/workflows/site-search.yml']
   workflow_dispatch:
 permissions:
@@ -24,6 +25,8 @@ env:
 
 jobs:
   site-search:
+    # No Runner allocation until a draft becomes review-ready.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:

@@ -2,6 +2,7 @@ import 'server-only'
 import { createHash } from 'node:crypto'
 import type { TurnOutcome } from 'eve/events'
 import { pool } from '../db'
+import { withDirectSession } from '../db/direct-session'
 import { taskSchema, type ScheduledRead } from '../schedules/contract'
 import { assertSessionScope, type EveScope } from './scope'
 import { eveStreamId, projectTurnState } from './projection'
@@ -19,8 +20,7 @@ function canonical(value:unknown):unknown {
 export async function finishEveTurn(scope:EveScope,input:EveTurnSettlement) {
   await assertSessionScope(scope,input.sessionId)
   const lock = `eve-settlement:${input.sessionId}:${input.turnId}`
-  const client = await pool.connect()
-  try {
+  return withDirectSession(pool, async client => {
     // A product receipt may span two independently committed product effects.
     // A session advisory lock serializes retries without nesting their SQL
     // transactions or holding a lock on the original conversation's rows.
@@ -60,9 +60,7 @@ export async function finishEveTurn(scope:EveScope,input:EveTurnSettlement) {
     if (execution) await (await import('../../workflows/coordinator/agent-kit-steps')).finishAgentExecution(scope.ownerId,scope.botId,execution.id,input.outcome === 'failed' ? 'turn_failed' : undefined)
     await client.query('UPDATE eve_turn_settlements SET completed_at=now() WHERE session_id=$1 AND turn_id=$2',[input.sessionId,input.turnId])
     return {status:'accepted'}
-  } finally {
-    await client.query('SELECT pg_advisory_unlock(hashtextextended($1,0))',[lock]).finally(()=>client.release())
-  }
+  })
 }
 
 async function settleSchedule(scope:EveScope,input:EveTurnSettlement,eventId:string,occurrence:ScheduledRead) {
