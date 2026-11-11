@@ -5,7 +5,7 @@ export default {
     const url = new URL(request.url)
     const params = url.searchParams.getAll('dpl')
     const header = request.headers.get('x-deployment-id')
-    const api = /^\/mikka\/api\//.test(url.pathname)
+    const api = url.pathname.startsWith('/mikka/api/')
     const pinnedAsset = url.pathname.startsWith('/mikka/') && /\/[^/]+\.[^/]+$/.test(url.pathname) && !api
     let id = env.CURRENT_RELEASE
     if (url.pathname !== '/mikka/api/version' && (api || pinnedAsset)) {
