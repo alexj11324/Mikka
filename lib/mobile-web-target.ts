@@ -1,3 +1,4 @@
+import { readTaskEvidenceTarget, taskEvidenceHref } from './task-factory-events'
 import { desktopWebTarget } from './desktop-web-target'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -12,10 +13,13 @@ const APP = /^[a-z][a-z0-9_]{0,63}$/
  * Paths are without the base path.
  */
 export function mobileWebTarget(value: string | null): string {
-  const desktop = desktopWebTarget(value)
-  if (desktop) return desktop
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
   const url = new URL(value, 'https://mikka.invalid')
+  const evidence = readTaskEvidenceTarget(url.searchParams)
+  if (evidence && url.pathname === '/' && url.origin === 'https://mikka.invalid' && !url.hash && [...url.searchParams].length === 3)
+    return taskEvidenceHref(evidence.issueId, evidence.factoryTaskId, evidence.receiptId)!
+  const desktop = desktopWebTarget(value)
+  if (desktop) return desktop
   if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.search && !url.hash) return '/settings'
   // Recovery stays within existing settings sections and one validated
   // workspace. The settings APIs still authorize that workspace normally.

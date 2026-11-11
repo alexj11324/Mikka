@@ -1,3 +1,4 @@
+import { presentedFactoryEvents, taskEvidenceHref } from '../../../../../lib/task-factory-events'
 import { mobileMessages } from '@/lib/messages'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
@@ -44,12 +45,13 @@ export function TaskScreen() {
   const bar = useScrolledUnderBar()
   const home = useHome().data
   const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`,
-    detail => taskDetailLive(id, detail?.live?.workspaceId, home?.live?.workspaceId, home?.workspace.id), readPresentedTask)
+    detail => taskDetailLive(id, detail?.live?.workspaceId, home?.live?.workspaceId, home?.workspace.id, detail?.task.factoryTaskId, detail?.live?.factoryActivityVersion), readPresentedTask)
   const task = data?.task
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null
   // 活动 runs oldest first, from the task's creation down (Alex 2026-11-07); the server sends it newest first.
-  const activity = data ? activityEntries(data.activity, data.timeline) : []
+  const receipts = presentedFactoryEvents(data?.factoryEvents, task?.factoryTaskId)
+  const activity = data ? activityEntries(data.activity, [...data.timeline ?? [], ...receipts]) : []
 
   // A push opens the task, then the attempt it was about, once.
   const opened = useRef(false)
@@ -85,7 +87,8 @@ export function TaskScreen() {
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
             {activity.map((item, index) => <ActivityRow key={activityEntryId(item)} item={item} first={index === 0} last={index === activity.length - 1}
 
-              onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId)) : undefined} />)}
+              onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId))
+                : item.kind === 'evidence' ? () => { const href = taskEvidenceHref(task.id, item.factoryTaskId, item.sourceId); if (href) void openOnWeb(href) } : undefined} />)}
           </>
         ) : null}
       </ScrollView>

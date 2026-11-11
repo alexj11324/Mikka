@@ -57,9 +57,13 @@ export function tasksLive(home: string | null | undefined, open: string | null |
 }
 
 /** Only an open, authorized Task listens to its discussion and attempt keys. */
-export function taskDetailLive(id: string, workspaceId: string | null | undefined, home: string | null | undefined, open: string | null | undefined): Spec {
-  const spec = tasksLive(home, open, [id])
+export function taskDetailLive(id: string, workspaceId: string | null | undefined, home: string | null | undefined, open: string | null | undefined, factoryTaskId?: string, factoryActivityVersion?: number): Spec {
+  const spec = tasksLive(home, open)
   if (workspaceId) for (const kind of ['issue_document', 'issue_threads'] as const) spec.refs.push({ kind, id, scope: workspaceId })
+  if (workspaceId && factoryActivityVersion === 1) {
+    spec.refs.push({ kind: 'factory_issue', id, scope: workspaceId })
+    if (factoryTaskId) spec.refs.push({ kind: 'factory_task', id: factoryTaskId, scope: workspaceId })
+  }
   return spec
 }
 
