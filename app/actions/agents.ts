@@ -353,6 +353,13 @@ export interface IssueThreadDetail {
   chunksAppend: boolean
   /** A cursor read: `thread.prompt` is left out; the held read's prompt stands (mergeThreadChunks). */
   promptOmitted?: true
+  /**
+   * What this thread's run holds (lib/context-usage.ts): an estimate from stored
+   * text, never a provider count. Optional because a page open across a deploy
+   * may still be served by a build that predates it, like every other host
+   * projection here.
+   */
+  context?: import('@/lib/context-usage').ContextUsage
 }
 
 /**
@@ -417,6 +424,39 @@ export async function getThreadMachine(issueId: string | null, runId: string): P
     const chain = await readRunChain(pool, row.userId, row.id)
     const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
     return (await import('@/lib/thread-machine-view')).readThreadMachine(pool, user.id, runIds)
+  })
+}
+
+/**
+ * What this thread's run holds (lib/context-usage.ts). Reads the whole run
+ * chain and the whole stored brief whatever the chunk cursor returned, so a
+ * cursor read reports the same usage as a full one. Characters are counted in
+ * SQL: a push must not re-transfer a thread to price it.
+ */
+async function readContextUsage(runIds: string[], rootRunId: string): Promise<import('@/lib/context-usage').ContextUsage> {
+  const { CONVERSATION_CHARS_SQL, contextUsageFromCounts, countChars } = await import('@/lib/context-usage')
+  const [brief, spoken, streamed] = await Promise.all([
+    db.select({ prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength,
+      model: sql<string | null>`${agentRuns.agentDefinition}->>'model'` })
+      .from(agentRuns).where(eq(agentRuns.id, rootRunId)).limit(1),
+    db.select({ ascii: sql<number>`coalesce(sum(length(regexp_replace(${runMessages.text}, '[^[:ascii:]]', '', 'g'))),0)`.mapWith(Number),
+      other: sql<number>`coalesce(sum(length(${runMessages.text}) - length(regexp_replace(${runMessages.text}, '[^[:ascii:]]', '', 'g'))),0)`.mapWith(Number) })
+      .from(runMessages).where(inArray(runMessages.runId, runIds)),
+    pool.query<{ ascii: string; other: string }>(CONVERSATION_CHARS_SQL, [runIds]),
+  ])
+  const stored = brief[0]
+  if (!stored) return contextUsageFromCounts({ prompt: { ascii: 0, other: 0 }, task: { ascii: 0, other: 0 },
+    messages: { ascii: 0, other: 0 }, conversation: { ascii: 0, other: 0 } })
+  // The task sits at the recorded code-point offset, not always at the start:
+  // a Factory check prepends its guidance and shifts `promptTaskStart`
+  // (lib/factory/checks.ts). `threadPromptView` is the one reader of that range.
+  const { task } = threadPromptView(stored.prompt, stored.promptTaskStart, stored.promptTaskLength)
+  return contextUsageFromCounts({
+    prompt: countChars(stored.prompt),
+    task: countChars(task),
+    messages: { ascii: spoken[0]?.ascii ?? 0, other: spoken[0]?.other ?? 0 },
+    conversation: { ascii: Number(streamed.rows[0]?.ascii ?? 0), other: Number(streamed.rows[0]?.other ?? 0) },
+    model: stored.model ?? null,
   })
 }
 
@@ -497,9 +537,12 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     : null
   const { threadLiveReferences, documentLiveWorkspace } = await import('@/lib/live/panels')
   const { workspacePool } = await import('@/lib/workspace-db')
-  const [runs, issueWorkspaceId] = await Promise.all([
+  const chainRunIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
+  const [runs, issueWorkspaceId, context] = await Promise.all([
     threadLiveReferences(pool, workspacePool, runIds, user.id),
     row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
+    // Over the whole chain and the whole brief, so a cursor read reports what a full one does.
+    readContextUsage(chainRunIds, row.id),
   ])
   return {
     live: { runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
@@ -508,6 +551,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
     chunksAppend: read.append,
+    context,
     ...(promptOmitted ? { promptOmitted: true as const } : {}),
   }
 }
