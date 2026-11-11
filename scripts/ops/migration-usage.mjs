@@ -23,8 +23,12 @@ function token(name) {
   return process.env[name]
 }
 
-// The billing API returns FOCUS JSONL. The SubAccount field distinguishes a
-// project from shared team usage. Never include Tags or customer resource IDs.
+// FOCUS commonly puts a team in SubAccountId and a project in Tags.ProjectId.
+// Only the provider's project identifier crosses the billing-data boundary.
+function billedProject(row) {
+  const value = row.Tags?.ProjectId
+  return typeof value === 'string' && /^prj_[a-zA-Z0-9]{6,128}$/.test(value) ? value : null
+}
 export async function vercelTotals(lines) {
   const groups = new Map()
   const totals = new Map()
@@ -39,7 +43,7 @@ export async function vercelTotals(lines) {
     }
     const billed = decimal(row.BilledCost), effective = decimal(row.EffectiveCost)
     const currency = row.BillingCurrency
-    const dimensions = { currency, subAccountType: row.SubAccountType ?? null, subAccountId: row.SubAccountId ?? null,
+    const dimensions = { currency, projectId: billedProject(row), subAccountType: row.SubAccountType ?? null, subAccountId: row.SubAccountId ?? null,
       service: row.ServiceName, skuId: row.SkuId ?? null, category: row.ChargeCategory ?? null, unit: row.ConsumedUnit ?? null }
     const key = JSON.stringify(dimensions)
     const group = groups.get(key) ?? { ...dimensions, records: 0, billed: 0, effective: 0, consumed: null }
@@ -57,7 +61,32 @@ export async function vercelTotals(lines) {
     if (!lastPeriodEnd || end > lastPeriodEnd) lastPeriodEnd = end
     records++
   }
-  return { records, firstPeriodStart, lastPeriodEnd, totalsByCurrency: [...totals.values()], charges: [...groups.values()] }
+  const projects = new Map()
+  const currencies = new Map()
+  for (const row of groups.values()) {
+    const key = JSON.stringify([row.currency, row.projectId])
+    const project = projects.get(key) ?? { projectId: row.projectId, currency: row.currency, records: 0, billed: 0, effective: 0 }
+    project.records += row.records
+    project.billed += row.billed
+    project.effective += row.effective
+    projects.set(key, project)
+  }
+  for (const project of projects.values()) {
+    const sum = currencies.get(project.currency) ?? { records: 0, billed: 0, effective: 0 }
+    sum.records += project.records
+    sum.billed += project.billed
+    sum.effective += project.effective
+    currencies.set(project.currency, sum)
+  }
+  if ([...currencies.values()].reduce((sum, group) => sum + group.records, 0) !== records) throw Error('Project record count mismatch')
+  for (const total of totals.values()) {
+    const sum = currencies.get(total.currency)
+    if (!sum || ['billed','effective'].some(field => Math.abs(total[field] - sum[field]) > 0.000001)) {
+      throw Error('Project charges do not reconcile to provider currency totals')
+    }
+  }
+  return { records, firstPeriodStart, lastPeriodEnd, totalsByCurrency: [...totals.values()],
+    projects: [...projects.values()], charges: [...groups.values()] }
 }
 
 export function cloudflareRequest(account, applicationId, from, to, instances) {

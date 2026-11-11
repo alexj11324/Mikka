@@ -17,6 +17,22 @@ test('FOCUS preserves shared charges, currencies, adjustments and provider day b
   await assert.rejects(vercelTotals([JSON.stringify({ ...row, BilledCost: null })]), /Invalid provider quantity/)
 })
 
+test('same-team project tags, shared adjustments and multi-currency costs reconcile without leaking tags', async () => {
+  const raw = { ServiceName:'Function CPU',SkuId:'cpu',BillingCurrency:'USD',ChargePeriodStart:'2026-11-10T08:00:00Z',
+    ChargePeriodEnd:'2026-11-11T08:00:00Z',SubAccountId:'team_shared',SubAccountType:'Team',BilledCost:'1.01',EffectiveCost:'2.01' }
+  const a = {...raw,Tags:{ProjectId:'prj_projectA',ProjectName:'private-name',Other:'never-publish'}}
+  const b = {...raw,Tags:{ProjectId:'prj_projectB'},BilledCost:'0.02',EffectiveCost:'0.02'}
+  const adjustment = {...raw,ServiceName:'Plan',BilledCost:'-0.50',EffectiveCost:'-0.50'}
+  const invalid = {...raw,Tags:{ProjectId:'unstructured private tag'},BillingCurrency:'EUR'}
+  const result=await vercelTotals([a,b,adjustment,invalid].map(row=>JSON.stringify(row)))
+  assert.deepEqual(result.projects.map(row=>[row.currency,row.projectId,row.records,row.billed,row.effective]),[
+    ['USD','prj_projectA',1,1.01,2.01],['USD','prj_projectB',1,.02,.02],['USD',null,1,-.5,-.5],['EUR',null,1,1.01,2.01],
+  ])
+  assert.equal(result.charges.find(row=>row.projectId==='prj_projectA').skuId,'cpu')
+  assert.deepEqual(result.totalsByCurrency.map(row=>[row.currency,row.billed.toFixed(2),row.effective.toFixed(2)]),[['USD','0.53','1.53'],['EUR','1.01','2.01']])
+  assert.doesNotMatch(JSON.stringify(result),/private-name|never-publish|unstructured private tag/)
+})
+
 test('terminal receipts deduplicate and older receipts are distinct from missing provider samples', () => {
   const from = '2026-11-10T00:00:00Z', to = '2026-11-11T00:00:00Z', start = Date.parse(from)
   const job = { owner: '100/1/startup-timing', workload: 'startup-timing', issue: 1948, sha: 'a'.repeat(40) }
