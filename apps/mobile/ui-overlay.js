@@ -28,7 +28,10 @@ function mobileOverlay(app, env = process.env) {
   const repository = resolve(app, '../..')
   const configured = env.MIKKA_MOBILE_OVERLAY_DIR?.trim()
   const slots = Object.fromEntries(MOBILE_SLOTS.map(name => [name, join(app, 'slots', `${name}.tsx`)]))
-  if (!configured) return { dir: null, slots }
+  if (!configured) {
+    if (env.EAS_BUILD_PROFILE === 'hosted-production') throw new Error('MOBILE_OVERLAY_DIR_REQUIRED_FOR_RELEASE')
+    return { dir: null, slots }
+  }
   const dir = resolve(repository, configured)
   if (!existsSync(dir)) throw new Error(`MOBILE_OVERLAY_DIR_MISSING: ${configured}`)
   if (!inside(realpathSync(repository), realpathSync(dir))) throw new Error(`MOBILE_OVERLAY_DIR_OUTSIDE_REPOSITORY: ${configured}`)
@@ -37,7 +40,29 @@ function mobileOverlay(app, env = process.env) {
     if (!existsSync(file) || !statSync(file).isFile() || !inside(realpathSync(dir), realpathSync(file))) throw new Error(`MOBILE_SLOT_REQUIRED: ${name}`)
     slots[name] = file
   }
+  assertMobileExports(app, dir, slots)
   return { dir, slots }
+}
+
+/** Metro transforms TypeScript to JavaScript without linking its named exports.
+ * Follow real value re-exports once when configuring an official bundle. */
+function assertMobileExports(app, dir, slots) {
+  const ts = require('typescript')
+  const program = ts.createProgram(Object.values(slots), {
+    module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler,
+    jsx: ts.JsxEmit.ReactJSX, noLib: true, types: [], skipLibCheck: true,
+    paths: { '@hosted/*': [join(dir, '*')], '@/*': [join(app, '*')] },
+  })
+  const checker = program.getTypeChecker()
+  for (const [slot, path] of Object.entries(slots)) {
+    const module = checker.getSymbolAtLocation(program.getSourceFile(path))
+    const exported = new Map(module ? checker.getExportsOfModule(module).map(symbol => [symbol.name, symbol]) : [])
+    for (const name of MOBILE_SLOT_EXPORTS[slot]) {
+      const symbol = exported.get(name)
+      const target = symbol && (symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol)
+      if (!target?.valueDeclaration || checker.getTypeOnlyAliasDeclaration(symbol)) throw new Error(`MOBILE_SLOT_EXPORT_REQUIRED: ${slot}.${name}`)
+    }
+  }
 }
 
 /** A Metro `resolveRequest` that applies the layer, then hands on to `next` (or Metro's own resolver). */
