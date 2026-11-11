@@ -6,7 +6,6 @@ import { BoardScreen } from '@ui-slot/board'
 import type { BoardScreenCard, BoardScreenColumn, BoardScreenProps } from '@/components/slots/board-contract'
 import { TaskContextMenu, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { cardStateKind, type BoardColumn, type BoardTask } from '@/components/blocks/kanban-board-1/components/data'
-import { localTaskState } from '@/hooks/use-bot-tasks'
 import { useTaskStateLabel } from '@/components/workspace/task-state-icon'
 import { blockLabel } from '@/components/workspace/block-label'
 import { displayTaskTitle } from '@/lib/short-title'
@@ -53,9 +52,8 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
     for (const task of saves.columns[column] ?? []) {
       byId.set(task.id, task)
       const block = blocks.get(task.id)
-      // The task's own state (localTaskState on its newest run, decision #1864 point 6), never the run's group.
-      const own = context.taskStates?.get(task.id) ?? localTaskState(task, undefined)
-      const kind = cardStateKind(own.state)
+      const own = context.taskStates?.get(task.id)
+      const kind = own && cardStateKind(own.state)
       // A dependency or the person's flag is the task's own 受阻 and names why; what a thread says is the task's state.
       const ownBlock = block && (block.reason === 'dependency' || block.reason === 'flagged') ? block : null
       const subtasks = context.subtasks.get(task.id)
@@ -82,7 +80,7 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
         // A task blocked by a dependency or by hand names why; otherwise the task's own state, shown while 智能体状态 is on,
         // when a thread stops it (受阻), or once it is closed.
         state: ownBlock ? { kind: 'blocked', label: blockLabel(tCard, ownBlock) }
-          : kind && (show('agentState') || block || DONE.includes(task.status)) ? { kind, label: stateLabel(own.state, own.reason) } : null,
+          : own && kind && (show('agentState') || block || DONE.includes(task.status)) ? { kind, label: stateLabel(own.state, own.reason) } : null,
       })
     }
   }

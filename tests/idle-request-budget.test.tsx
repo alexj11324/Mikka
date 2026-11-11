@@ -138,7 +138,7 @@ before(async () => {
   const { Button } = await import('../components/ui/button')
   mock.module('@ui-slot/board', { namedExports: { ...board,
     BoardScreen: ({ cards, tools, wrapCard, onOpen }: BoardScreenProps) => <>{tools}<ul>{cards.map(card =>
-      <li key={card.id}>{wrapCard(card.id, <Button onClick={() => onOpen(card.id)}>{card.title}</Button>)}</li>)}</ul></>,
+      <li key={card.id} data-board-task={card.id} data-task-state={card.state?.kind}>{wrapCard(card.id, <Button onClick={() => onOpen(card.id)}>{card.title}</Button>)}</li>)}</ul></>,
   } })
   // happy-dom has no Web Animations; Base UI asks for running animations before it unmounts a popup.
   const elementPrototype = browser.Element.prototype as unknown as { getAnimations?: () => unknown[] }
@@ -184,10 +184,11 @@ async function measure(page: ReactNode) {
   // Dialogs and sheets render in a portal on the body.
   const text = document.body.textContent ?? ''
   const chatLoadFailure = Boolean(document.querySelector('[data-chat-failure=load]'))
+  const boardStates = new Map(Array.from(document.querySelectorAll<HTMLElement>('[data-board-task]'), item => [item.dataset.boardTask, item.dataset.taskState ?? null] as const))
   await act(async () => { view.unmount() }); container.remove()
   // Nothing a page left scheduled may fire into the next page's count.
   fakeClock(Date.now())
-  return { idle, missing: new Set(missing), sockets: open, text, chatLoadFailure }
+  return { idle, missing: new Set(missing), sockets: open, text, chatLoadFailure, boardStates }
 }
 
 const OWNER = '10000000-0000-4000-8000-000000000001'
@@ -307,7 +308,11 @@ const shows: Record<string, string[]> = {
 const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
     const { BoardPage } = await import('../components/workspace/board-page')
-    return <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
+    const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
+    const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed' }, null, () => false)
+    return <TaskPresentationsContext.Provider value={{ [ISSUE]: failed }}>
+      <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
+    </TaskPresentationsContext.Provider>
   },
   // A task with a running thread open on the right, its relations and its members (the members dialog's body).
   'task-detail': async () => {
@@ -367,6 +372,10 @@ for (const [name, page] of Object.entries(pages)) test(`${name}: an idle, visibl
   assert.deepEqual([...result.missing], [], 'every read the page makes has a fixture, so no failure retries are counted')
   assert.equal(result.chatLoadFailure, false, 'the native chat session must be healthy before its idle budget is accepted')
   for (const words of shows[name]) assert.ok(result.text.includes(words), `${name} shows “${words}”`)
+  if (name === 'board') {
+    assert.equal(result.boardStates.get(ISSUE), 'blocked', 'the Board uses the authorized failed Run projection')
+    assert.equal(result.boardStates.get(boardIssues[2]!.id), null, 'a card with no authorized presentation shows no inferred execution state')
+  }
   assert.equal(result.sockets.open, result.sockets.opened, 'every live channel the page opened is still connected')
   const allowed = budgets.pages[name] ?? {}
   const over = [...result.idle].filter(([call, calls]) => calls > (allowed[call]?.max ?? 0)).map(([call, calls]) => `${call}: ${calls} calls, budget ${allowed[call]?.max ?? 0}`)
