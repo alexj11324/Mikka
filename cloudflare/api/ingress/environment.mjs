@@ -1,0 +1,26 @@
+// These bindings belong to the hosted business API. Deployment credentials,
+// broker decryption authority and managed GitHub App signing stay outside it.
+const applicationBindings = [
+  'BETTER_AUTH_SECRET', 'TURNSTILE_SECRET_KEY', 'DATABASE_URL', 'MIKKA_DATABASE_URL', 'MIN_CLIENT_VERSION',
+  'MIKKA_EVE_ORIGIN', 'WORKFLOW_TARGET_WORLD', 'MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY',
+  'MIKKA_DEPLOYMENT_ID', 'MIKKA_CLOUDFLARE_TASK_WORKSPACES',
+  'MIKKA_CLOUD_URL', 'MIKKA_CLOUD_BACKEND_URL',
+  'R2_ACCOUNT_ID', 'R2_ARTIFACTS_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY',
+  'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET',
+  'GITHUB_SIGN_IN_USE_APP', 'APPLE_APP_BUNDLE_IDENTIFIER', 'AUTH_TRUSTED_ORIGINS',
+  'BETTER_AUTH_OAUTH_PROXY_URL', 'BETTER_AUTH_OAUTH_PROXY_SECRET',
+  'RESEND_API_KEY', 'SMTP_URL', 'MIKKA_EMAIL_FROM',
+  'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_TEAM_PRICE_ID', 'STRIPE_TEAM_RESOURCE_PRICE_ID',
+  'ZEROCAT_BASE_URL', 'ZEROCAT_API_KEY', 'MIKKA_HOSTED_MODEL_FALLBACK',
+  'CLOUDFLARE_WORKERS_AI_ACCOUNT_ID', 'CLOUDFLARE_WORKERS_AI_TOKEN',
+  'DECISIONS_URL', 'DECISIONS_BILLING_PROFILE', 'OPENAI_DECISIONS_API_KEY',
+]
+
+export function applicationEnvironment(bindings) {
+  const environment = { BETTER_AUTH_URL: bindings.PUBLIC_ORIGIN, MIKKA_API_INGRESS: 'cloudflare' }
+  for (const name of applicationBindings) {
+    const value = bindings[name]
+    if (typeof value === 'string' && value.length) environment[name] = value
+  }
+  return environment
+}

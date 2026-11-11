@@ -5,6 +5,22 @@ import { once } from 'node:events'
 import { test } from 'node:test'
 import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactGet, putArtifactObject } from './storage'
 
+test('cloud production requires object storage on an explicit deployment stage', t => {
+  const keys = ['MIKKA_DEPLOYMENT_STAGE', 'VERCEL_ENV', 'MIKKA_EDITION', 'S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_REGION', 'R2_ACCOUNT_ID', 'CLOUDFLARE_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'] as const
+  const saved = keys.map(key => process.env[key])
+  keys.forEach(key => { delete process.env[key] })
+  t.after(() => keys.forEach((key, index) => { if (saved[index] === undefined) delete process.env[key]; else process.env[key] = saved[index] }))
+  process.env.MIKKA_EDITION = 'cloud'
+  process.env.MIKKA_DEPLOYMENT_STAGE = 'production'
+  process.env.VERCEL_ENV = 'preview'
+  assert.throws(() => artifactStorage(), /Object storage is not configured/)
+  process.env.MIKKA_DEPLOYMENT_STAGE = 'preview'
+  process.env.VERCEL_ENV = 'production'
+  assert.equal(artifactStorage(), 'inline')
+  process.env.MIKKA_DEPLOYMENT_STAGE = 'prod'
+  assert.throws(() => artifactStorage(), /MIKKA_DEPLOYMENT_STAGE_INVALID/)
+})
+
 test('signed uploads retain exact byte length when a fetch adapter streams the body', async (t) => {
   const keys = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY'] as const
   const previous = keys.map((key) => process.env[key])

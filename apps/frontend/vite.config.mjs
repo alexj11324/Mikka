@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { applicationPlugin, frontend, repository } from './scripts/application-plugin.mjs'
 import { deploymentPlugin, pinnedUrl } from './scripts/deployment-plugin.mjs'
 import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
+import { deploymentStage } from '../../lib/deployment-stage.mjs'
 import { sharedStylePlugins } from './scripts/shared-styles.mjs'
 
 function applicationBuild() {
@@ -16,6 +17,7 @@ function applicationBuild() {
 export async function frontendConfig({ target = 'web', command = 'build', outdir, clean = true } = {}) {
   if (!['web', 'desktop'].includes(target)) throw new Error('FRONTEND_TARGET_INVALID')
   if (!['build', 'serve'].includes(command)) throw new Error('FRONTEND_COMMAND_INVALID')
+  const stage = deploymentStage()
   const development = command === 'serve'
   const deploymentId = target === 'web' && !development ? configuredDeploymentId() ?? '' : ''
   return {
@@ -40,7 +42,7 @@ export async function frontendConfig({ target = 'web', command = 'build', outdir
       'process.env.NEXT_PUBLIC_POSTHOG_HOST': JSON.stringify(target === 'web' ? process.env.POSTHOG_HOST ?? process.env.NEXT_PUBLIC_POSTHOG_HOST ?? '' : ''),
       'process.env.NEXT_PUBLIC_POSTHOG_KEY': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '' : ''),
       'process.env.NEXT_PUBLIC_COMPUTER_ACCEPTANCE': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_COMPUTER_ACCEPTANCE ?? '' : ''),
-      'process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT': JSON.stringify(target === 'web' ? process.env.VERCEL_ENV ?? '' : ''),
+      'process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT': JSON.stringify(target === 'web' ? stage ?? '' : ''),
       'process.env.NEXT_PUBLIC_COMPUTER_ENABLED': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_COMPUTER_ENABLED ?? '' : ''),
       'process.env.NEXT_PUBLIC_COMPUTER_MOCK': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_COMPUTER_MOCK ?? '' : ''),
       'process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME': JSON.stringify(target === 'web' ? process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka' : ''),
