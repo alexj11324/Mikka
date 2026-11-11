@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { downloadServerFile } from '@/lib/web-connection/assets'
 import { withBasePath } from '@/lib/base-path'
@@ -28,6 +29,8 @@ function FileList({ taskId }: { taskId: string }) {
   const t = useTranslations('TaskAttachments')
   const common = useTranslations('Common')
   const input = useRef<HTMLInputElement>(null)
+  const downloadLink = useRef<HTMLAnchorElement>(null)
+  const [downloadFile, setDownloadFile] = useState<{ url: string; name: string } | null>(null)
   const [list, setList] = useState<TaskFileList | null>(null)
   const [readError, setReadError] = useState(false)
   const [error, setError] = useState('')
@@ -80,25 +83,24 @@ function FileList({ taskId }: { taskId: string }) {
     setError('')
     try {
       const asset = await downloadServerFile(`${endpoint}?id=${id}`)
-      const link = document.createElement('a')
-      link.href = asset.url
-      link.download = name
-      link.click()
+      setDownloadFile({ url: asset.url, name })
       window.setTimeout(asset.revoke, 60_000)
     } catch { setError(t('downloadFailed')) }
   }
+  useEffect(() => { if (downloadFile) downloadLink.current?.click() }, [downloadFile])
   return <div className="grid min-w-0 gap-3">
+    {downloadFile && <a ref={downloadLink} href={downloadFile.url} download={downloadFile.name} hidden />}
     {readError ? <div role="alert">{t('readFailed')} <Button variant="ghost" size="sm" onClick={() => setVersion(n => n + 1)}>{common('retry')}</Button></div>
       : !list ? <span role="status">{common('loading')}</span>
       : <>
         {list.files.length ? <ul className="grid gap-1">
           {list.files.map(file => <li key={file.id} className="flex min-w-0 items-center gap-2">
-            <button type="button" title={file.name} className="min-w-0 flex-1 truncate text-start underline" onClick={() => { void download(file.id, file.name) }}>{file.name}</button>
+            <Button variant="link" size="sm" title={file.name} className="min-w-0 flex-1 justify-start px-0" onClick={() => { void download(file.id, file.name) }}><span className="truncate">{file.name}</span></Button>
             {list.canEdit && <Button size="sm" variant="ghost" disabled={busy} aria-label={t('remove', { name: file.name })} onClick={() => { void change(file.id) }}>{common('remove')}</Button>}
           </li>)}
         </ul> : <p className="text-sm text-muted-foreground">{t('empty')}</p>}
         {list.canEdit && <>
-          <input type="file" hidden ref={input} onChange={event => {
+          <Input type="file" className="hidden" tabIndex={-1} aria-hidden="true" ref={input} onChange={event => {
             const file = event.currentTarget.files?.[0]
             event.currentTarget.value = ''
             if (file) { const id = crypto.randomUUID(); setPending({ file, id }); void change(id, file) }
