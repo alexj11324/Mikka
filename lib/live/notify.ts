@@ -77,7 +77,10 @@ export function scheduleLive(work: () => Promise<void>) {
   // after() may invoke this after the request scope has ended. Scope is
   // retained for fresh reads; permissions are still resolved by the work.
   afterJob('after:live-notify', async () => {
-    try { await work() } catch (error) {
+    try {
+      const { withoutWorkspaceClient } = await import('../workspace-db')
+      await withoutWorkspaceClient(work)
+    } catch (error) {
       // By name and code only (decision 2026-11-05-0330): a message can carry database content.
       console.warn('[live] committed invalidation failed', { name: (error as Error | undefined)?.name, code: (error as { code?: unknown } | undefined)?.code })
     }
