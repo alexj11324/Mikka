@@ -30,14 +30,33 @@ function TabLoading() {
 
 const NO_PAGER = { index: -1, total: 0, onOpen: () => {} }
 const nothing = () => {}
+type Flush = () => Promise<boolean>
+export const EmbeddedTaskLifecycle = createContext<{
+  onSaved: (issueId: string) => void
+  // Each mounted editor registers separately, even when two placements show the same task.
+  register: (owner: symbol, flush: Flush | null) => void
+} | null>(null)
 
 /** A task in the chat's work area: the task page's own view, narrow; expand opens the full page (decision 2026-11-10). */
-function TaskTab({ issueId, origin, onOpenTask, onFlush }: { issueId: string; origin: string; onOpenTask: (id: string) => void; onFlush: (issueId: string, flush: (() => Promise<boolean>) | null) => void }) {
+export function EmbeddedTaskDetail({ issueId, origin, onOpenTask, onFlush, onClose = nothing, onDeleted = onClose }: {
+  issueId: string
+  origin: string
+  onOpenTask: (id: string) => void
+  onFlush?: (issueId: string, flush: Flush | null) => void
+  onClose?: () => void
+  onDeleted?: () => void
+}) {
+  const lifecycle = useContext(EmbeddedTaskLifecycle)
+  const owner = useRef(Symbol('task-editor'))
   const t = useTranslations('Shell.panel.task')
   const { data: session } = authClient.useSession()
   // Expand saves what is still being written first, as leaving the task page does; a save that fails keeps the tab.
   const flush = useRef<(() => Promise<boolean>) | null>(null)
-  const registerFlush = useCallback((next: (() => Promise<boolean>) | null) => { flush.current = next; onFlush(issueId, next) }, [issueId, onFlush])
+  const registerFlush = useCallback((next: Flush | null) => {
+    flush.current = next
+    onFlush?.(issueId, next)
+    lifecycle?.register(owner.current, next)
+  }, [issueId, onFlush, lifecycle])
   const placement = useMemo(() => ({
     onExpand: () => { void (flush.current?.() ?? Promise.resolve(true)).then(saved => { if (saved) navigate({ issue: issueId }) }, () => {}) },
     expandLabel: t('openPage'),
@@ -46,7 +65,7 @@ function TaskTab({ issueId, origin, onOpenTask, onFlush }: { issueId: string; or
   if (!user) return <TabLoading />
   return <TaskDetailPlacementContext value={placement}>
     <TaskDetail id={issueId} thread={null} origin={origin} user={{ id: user.id, name: user.name, email: user.email }} navigation={NO_PAGER}
-      onOpen={onOpenTask} onSaved={nothing} onDirty={nothing} onClose={nothing} onDeleted={nothing} onRegisterFlush={registerFlush} />
+      onOpen={onOpenTask} onSaved={lifecycle?.onSaved ?? nothing} onDirty={nothing} onClose={onClose} onDeleted={onDeleted} onRegisterFlush={registerFlush} />
   </TaskDetailPlacementContext>
 }
 
@@ -138,7 +157,7 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
     return () => { release(); window.removeEventListener('popstate', take); window.removeEventListener(NAVIGATE_EVENT, take) }
   }, [on, openTask, openRun])
   const tabs = opened.map((item): ThreadPanelTab => {
-    if (item.kind === 'task') return { id: `task:${item.id}`, title: names.task(item.id), content: <TaskTab key={item.id} issueId={item.id} origin={origin} onOpenTask={openTask} onFlush={registerFlush} /> }
+    if (item.kind === 'task') return { id: `task:${item.id}`, title: names.task(item.id), content: <EmbeddedTaskDetail key={item.id} issueId={item.id} origin={origin} onOpenTask={openTask} onFlush={registerFlush} onDeleted={() => setOpened(list => list.filter(tab => tab.kind !== 'task' || tab.id !== item.id))} /> }
     const thread = names.thread(item.id)
     // A run the chat has no source for (opened from the Overview, search or another thread) learns its title once read.
     const unknown = thread.issueId === undefined

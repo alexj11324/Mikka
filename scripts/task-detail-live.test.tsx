@@ -188,12 +188,12 @@ function HydrateFixtureCache() {
   }, [cache, mutate])
   return null
 }
-async function renderDetail(visible: boolean) {
+async function renderDetail(visible: boolean, origin = 'Tasks') {
   // Keep the provider mounted when a task closes: SWR retains both completed
   // and pending reads across a quick reopen, with its default dedupe interval.
   await act(async () => root.render(<SWRConfig value={{ ...(cache instanceof PersistentReadCache ? swrDefaults : {}), provider: () => cache, shouldRetryOnError: false }}>
     {cache instanceof PersistentReadCache && <HydrateFixtureCache />}
-    <LiveProvider ownerId={owner} workspaceId={workspaceId}>{visible && <TaskDetail id={issueId} thread={null} origin="Tasks"
+    <LiveProvider ownerId={owner} workspaceId={workspaceId}>{visible && <TaskDetail id={issueId} thread={null} origin={origin}
       user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
       onOpen={noop} onSaved={noop} onDirty={recordDirty} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</LiveProvider>
   </SWRConfig>))
@@ -442,6 +442,23 @@ test('a committed acceptance event refreshes the mounted task status and activit
   assert.equal(properties().getAttribute('data-revision'), '2')
   assert.ok(issueReads > before.issueReads && versionReads > before.versionReads)
   assert.equal(writes.length, 0, 'a committed live read performs no save')
+})
+
+test('a confirmed edit from Tasks reaches the Inbox preview while its authorization read is pending', async () => {
+  await mount()
+  await input(title(), 'Shared title from Tasks')
+  await act(async () => { assert.equal(await flush!(), true) })
+  await renderDetail(false)
+  let allowRead!: () => void
+  const pending = new Promise<void>(resolve => { allowRead = resolve })
+  readOverride = async () => { await pending; return structuredClone(stored) }
+  try {
+    await renderDetail(true, 'Inbox')
+    await until(() => title()?.value === 'Shared title from Tasks', 'the confirmed title is in the shared cache')
+    assert.ok(title().readOnly, 'saved data cannot unlock a new placement')
+  } finally { allowRead() }
+  await until(() => title()?.readOnly === false, 'the server reauthorizes the Inbox editor')
+  assert.equal(writes.length, 1)
 })
 
 test('a background transport failure keeps the authorized editor, unsaved text and selection through retry', { timeout: 10_000 }, async () => {
