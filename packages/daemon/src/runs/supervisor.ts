@@ -1,3 +1,4 @@
+import { taskMcpSecretValues } from '@mikka/protocol'
 import type { RepositoryGitTiming, RepositoryTimingObserver } from '../repository-git-timing'
 import { toolDuration } from '../tool-duration'
 import { captureRunFailure, failureFrom, type RunFailure } from "@mikka/protocol/run-failure"
@@ -624,6 +625,7 @@ export class RunSupervisor {
     }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : []),
       ...(assignment.subscriptionLease ? [{ name: "SUBSCRIPTION_ACCESS_TOKEN", value: assignment.subscriptionLease.accessToken }] : []),
       ...(assignment.github?.token ? [{ name: "GITHUB_TOKEN", value: assignment.github.token }] : []),
+      ...taskMcpSecretValues(assignment.mcp?.servers).map(value => ({name:'MCP_CREDENTIAL',value})),
       ...(assignment.taskSecrets?.grants.map(grant => ({ name: 'TASK_SECRET_CAPABILITY', value: grant.capability })) ?? []),
     ])
     if (masker) this.maskers.set(assignment.runId, masker)

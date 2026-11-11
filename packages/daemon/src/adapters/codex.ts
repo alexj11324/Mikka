@@ -47,7 +47,7 @@ import {
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
-import type { RunApps } from "../agents/run-apps"
+import { nativeMcpProcess, type RunApps } from "../agents/run-apps"
 import { rawCliShellAvailable, runPolicy } from "../permissions"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
@@ -142,10 +142,19 @@ const CODEX_HISTORY = ["sessions", "archived_sessions", "session_index.jsonl"]
 
 /** One streamable-HTTP MCP entry per connected app, each pointing at the Mikka server. */
 export function codexAppArgs(apps?: RunApps): string[] {
-  return (apps?.apps ?? []).flatMap(app => [
+  return [...(apps?.apps ?? []).flatMap(app => [
     "-c", `mcp_servers.${app.name}.url=${toml(app.url)}`,
     "-c", `mcp_servers.${app.name}.http_headers={ Authorization = ${toml(`Bearer ${apps!.token}`)} }`,
-  ])
+  ]), ...(apps?.servers ?? []).flatMap(server => {
+    const prefix = `mcp_servers.${server.name}`
+    if (server.transport !== 'stdio') return ['-c', `${prefix}.url=${toml(server.url)}`, '-c', `${prefix}.http_headers=${tomlTable(server.headers)}`]
+    const process = nativeMcpProcess(server)
+    return ['-c', `${prefix}.command=${toml(process.command)}`, '-c', `${prefix}.args=${toml(process.args)}`, '-c', `${prefix}.env=${tomlTable(process.env)}`]
+  })]
+}
+
+function tomlTable(value: Record<string,string>): string {
+  return `{ ${Object.entries(value).map(([key,entry]) => `${JSON.stringify(key)} = ${JSON.stringify(entry)}`).join(', ')} }`
 }
 
 /** TOML value for a `-c key=value` override (JSON strings are TOML strings). */
