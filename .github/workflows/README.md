@@ -24,6 +24,27 @@ bindings. Current workflow files define the triggers and selected coverage.
   them with a new aggregate check until the GitHub branch-protection settings
   have been migrated and verified.
 
+## Focused governance acceptance and superseded PR runs
+
+- `Workspace governance HTTP (Item 11)` now runs as a reusable job of
+  `ui-policy.yml` for PRs and merge groups that the trusted Nx selector
+  classifies as database-affecting. Global, permission, auth, schema,
+  workflow and unknown inputs expand coverage rather than silently skip it.
+  The required `UI policy (strict)` gate checks the selected job's actual
+  conclusion, and requires an intentional skip when unselected. Unrelated
+  UI PRs do not allocate an extra PostgreSQL-backed governance workflow.
+  On every `main` push, independent postmerge governance acceptance remains.
+- Browser compatibility, E2B PR runtime, E2B BYOS and SSH device workflows
+  cancel obsolete **same-PR** attempts. They never cancel main or manually
+  dispatched production publication or recovery.
+- All protected check names remain stable. In particular,
+  `Browser tests (before merge)` must remain until GitHub branch protection
+  is read and migrated; a read-only connector's 403 is not authorization
+  to remove it.
+
+See [test ownership and CI cost](../../docs/ci/test-ownership.md) before
+adding or duplicating regression suites.
+
 ## Main pushes: postmerge checks
 
 - A push to `main` triggers the required `ui-policy.yml` checks again. Daemon
