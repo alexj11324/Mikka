@@ -27,7 +27,7 @@ function objectStorageConfig(): ObjectStorageConfig | null {
 
 /** Where files go: R2, or the database row when no bucket is configured outside production. */
 export function artifactStorage(): 'r2' | 'inline' {
-  const stage = deploymentStage()
+  const stage = deploymentStage() ?? (process.env.NODE_ENV === 'production' ? 'production' : undefined)
   // Keep the existing persisted 'r2' discriminator for every S3 transport.
   if (objectStorageConfig()) return 'r2'
   if (isCloudEdition() && stage === 'production') throw new Error('Object storage is not configured')
