@@ -15,6 +15,19 @@ const defaultServices:EveRetryServices={async open(scope,headers){
   return (await new Client({baseUrl:base.toString(),headers,redirect:'manual'}).sessions.create()).session
 }}
 
+export function eveRetryHeaders(requestHeaders:Headers,publicOrigin=process.env.BETTER_AUTH_URL) {
+  const headers:Record<string,string>={}
+  for(const key of ['cookie','authorization','origin','sec-fetch-site','x-mikka-workspace-id','x-mikka-locale']) {
+    const value=requestHeaders.get(key);if(value!==null)headers[key]=value
+  }
+  if(!headers.cookie&&!headers.authorization)throw new Error('authRequired')
+  // The product endpoint has authenticated this caller already. Native mobile
+  // requests omit Origin; supply the configured app origin on this server hop.
+  // Preserve an explicitly supplied value so the native CSRF guard can reject it.
+  if(!requestHeaders.has('origin'))headers.origin=new URL(publicOrigin??'http://127.0.0.1:3000').origin
+  return headers
+}
+
 export function eveRetrySubmission(sessionId:string,turnId:string,source:EveRetrySource) {
   const bytes=createHash('sha256').update(JSON.stringify(['mikka-eve-retry',sessionId,turnId,source.id])).digest().subarray(0,16)
   bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128
@@ -33,13 +46,9 @@ export async function retryEveTurn(ownerId:string,botId:string,requestHeaders:He
   const bot=(await pool.query<{workspaceId:string}>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2',[botId,ownerId])).rows[0]
   if(!bot)return {queued:false as const,reason:'nothingToRetry' as const}
   const scope=await assertEveScope({ownerId,botId,workspaceId:bot.workspaceId,surface:'web'})
-  const headers:Record<string,string>={}
-  for(const key of ['cookie','authorization','origin','sec-fetch-site','x-mikka-workspace-id','x-mikka-locale']) {
-    const value=requestHeaders.get(key);if(value!==null)headers[key]=value
-  }
+  const headers=eveRetryHeaders(requestHeaders)
   // Credentials are the current request's. A host service token would lose
   // the human session provenance that product tools still enforce.
-  if(!headers.cookie&&!headers.authorization)throw new Error('authRequired')
   const session=await services.open(scope,headers)
   const view=foldEvents(emptySessionView(),(await session.snapshot()).events)
   if(!idle(view))return {queued:false as const,reason:'working' as const}
