@@ -32,6 +32,11 @@ export async function readAuthentication(isCurrent?: () => boolean): Promise<Aut
 
 async function readPublicConfiguration(): Promise<AuthConfiguration> {
   const response = await fetch(withBasePath('/api/desktop/config'), { cache: 'no-store', credentials: 'omit' })
+  if (response.status === 401 && (await response.json().catch(() => null))?.error === 'web_auth_session_expired') {
+    // The Web directory pins this browser to its revoked installation. The
+    // sign-in screen offers that server's reconnect control without local providers.
+    return { googleEnabled: false, githubEnabled: false, emailEnabled: false }
+  }
   if (!response.ok) throw new DesktopTransportError('desktop_backend_unreachable', { status: response.status })
   return response.json() as Promise<AuthConfiguration>
 }

@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'

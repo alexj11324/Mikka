@@ -53,7 +53,7 @@ test('Task entries import the required frame and joined conversation directly', 
   ]
   for (const [file, component, slot] of files) {
     const source = readFileSync(new URL(`../components/${file}.tsx`, import.meta.url), 'utf8')
-    assert.match(source, new RegExp(`import \{ ${component} \} from '@ui-slot/${slot}'`), file)
+    assert.ok(source.includes(`import { ${component} } from '@ui-slot/${slot}'`), file)
     assert.doesNotMatch(source, /(?:if\s*\(\s*(?:Frame|TaskDetailFrame|TaskConversation)\s*\)|(?:TaskDetailFrame|TaskConversation)\s*(?:&&|\?\?))/, file)
   }
 })

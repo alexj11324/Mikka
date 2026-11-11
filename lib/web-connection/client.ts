@@ -248,7 +248,11 @@ export class WebServerDirectory {
     }
     if (!account) {
       if (!localApi || url.pathname.startsWith(`${localBase}/api/auth/`)) return this.options.fetch(input, init)
-      if (this.expiredServer) return Response.json({ error: 'web_auth_session_expired' }, { status: 401, headers: { 'cache-control': 'no-store' } })
+      if (this.expiredServer) {
+        const refusal = Response.json({ error: 'web_auth_session_expired' }, { status: 401, headers: { 'cache-control': 'no-store' } })
+        this.responseVersions.set(refusal, { account: this.generation, workspace: this.workspaceGeneration })
+        return refusal
+      }
       const source = new Request(input instanceof Request ? input : url, init), version = this.generation, workspace = this.workspaceGeneration
       const response = await this.options.fetch(new Request(source, { signal: AbortSignal.any([source.signal, this.requests.signal]) }))
       if (version !== this.generation) { await response.body?.cancel(); throw new WebConnectionError('web_connection_session_changed') }
