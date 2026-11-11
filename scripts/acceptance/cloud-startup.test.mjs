@@ -77,7 +77,8 @@ test('v3 requires an exact observed claim catalogue before accepting zero physic
 
 function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false,
   wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false,
-  workspaceRole = 'member', timingSecret = false, leaseAudit = false } = {}) {
+  workspaceRole = 'member', timingSecret = false, leaseAudit = false, ownedCodex = false } = {}) {
+  const caseWorkspace = ownedCodex ? personalWorkspace : workspace
   const calls = [], samples = [], profiles = new Map(), sockets = []
   let current, clock = epoch, profileCount = 0
   let chosenModel
@@ -93,7 +94,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         delta('PRIVATE_PROVIDER_OUTPUT STARTUP_'), delta(`OK_${sample.marker}`, 4100), ...(runtime ? [{ at: new Date(epoch + 6000).toISOString(),
           chunk: { type: 'finish', messageMetadata: { mikkaRuntimeTiming: (() => { const value = runtimeTiming(sample)
             if (extraAuth) { value.requests[0].endpoint = 'permission_check'; value.counts[0].endpoint = 'permission_check' }; return value })() } } }] : [])] : [stage('repository', 1000)],
-      live: { runs: [{ id: sample.runId, workspaceId: workspace }] } }
+      live: { runs: [{ id: sample.runId, workspaceId: caseWorkspace }] } }
     detail.thread.latestRunId = sample.runId
     detail.thread.attempts = [{ runId: sample.runId, status: detail.thread.status }]
     io.onDetail?.(sample, detail)
@@ -120,17 +121,19 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       calls.push({ path, init })
       if (path === '/api/version') return json({ build: 'BUILD1' })
       if (path === '/api/auth/sign-in/email') {
-        assert.deepEqual(JSON.parse(init.body), { email: env.SMOKE_OWNER_EMAIL, password: env.SMOKE_OWNER_PASSWORD, rememberMe: false })
+        assert.deepEqual(JSON.parse(init.body), { email: ownedCodex ? 'alexjiang20232024@gmail.com' : env.SMOKE_OWNER_EMAIL,
+          password: ownedCodex ? 'PRIVATE_OWNED_PASSWORD' : env.SMOKE_OWNER_PASSWORD, rememberMe: false })
         return Response.json({}, { headers: { 'set-cookie': 'session=PRIVATE_COOKIE; Path=/; Secure; HttpOnly' } })
       }
       assert.match(init.headers.cookie ?? '', /session=PRIVATE_COOKIE/)
-      if (path === '/api/auth/get-session') return json({ user: { id: ownerId, email: env.SMOKE_OWNER_EMAIL } })
+      if (path === '/api/auth/get-session') return json({ user: { id: ownerId, email: ownedCodex ? 'alexjiang20232024@gmail.com' : env.SMOKE_OWNER_EMAIL } })
       if (path === '/api/auth/sign-out') return Response.json({}, { headers: { 'set-cookie': 'session=; Max-Age=0' } })
       if (path === '/api/workspace') {
         const selected = url.searchParams.get('workspace') ?? (/mikka-workspace=([^;]+)/.exec(init.headers.cookie)?.[1] ?? personalWorkspace)
         return json({ currentUserId: ownerId, workspace: { id: selected, kind: selected === workspace ? 'team' : 'personal' },
           role: selected === workspace ? workspaceRole : 'admin', choices: [{ id: personalWorkspace, kind: 'personal' }, { id: workspace, kind: 'team' }],
-          members: selected === workspace ? [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] : [] })
+          members: selected === workspace ? [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }]
+            : ownedCodex ? [{ userId: ownerId, role: 'admin', status: 'active' }] : [] })
       }
       if (path === `/api/bots/${botId}`) return json({ id: botId, name: badBot ? 'Other real work' : '测试1505 fixture' })
       if (path === '/api/rpc') {
@@ -156,7 +159,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         }
         if (action === 'model-order.getModelOrder') {
           const candidates = Object.entries(models).map(([harness, model], index) => ({ harness, model, provider: harness === 'codex' ? 'codex' : 'claude',
-            credentialOwnerId: wrongSource ? ownerId : adminId, source: { kind: 'subscription', connectionId: id(50 + index) } }))
+            credentialOwnerId: wrongSource ? (ownedCodex ? adminId : ownerId) : (ownedCodex ? ownerId : adminId), source: { kind: 'subscription', connectionId: id(50 + index) } }))
           if (ambiguousSource) candidates.push({ ...candidates[0], source: { kind: 'subscription', connectionId: id(59) } })
           return rpc({ candidates })
         }
@@ -167,7 +170,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
             chosenModel = Object.entries(models).map(([harness, modelId], index) => ({ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' })).find(item => item.id === args[1])
             assert.ok(chosenModel)
           }
-          return rpc({ groups: Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: 'Shared member',
+          return rpc({ groups: Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: ownedCodex ? undefined : 'Shared member',
             options: [{ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] })),
             current: chosenModel ? { ...chosenModel, ...(remapCurrentId ? { id: id(850) } : {}), ...(fallbackMenu ? { fallback: 'quota' } : {}),
               kind: 'subscription', chosen: true, available: !checkingMenu, availability: checkingMenu ? 'checking' : 'available' } : null })
@@ -213,7 +216,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       }
       if (path === '/api/factory/agent-profiles') {
         const body = JSON.parse(init.body), profile = { ...body.profile, id: id(500 + ++profileCount), version: 1, digest: 'e'.repeat(64) }
-        assert.equal(body.workspaceId, workspace)
+        assert.equal(body.workspaceId, caseWorkspace)
         assert.equal(profile.model.source.kind, 'subscription'); assert.equal(profile.model.model, models[profile.harness])
         profiles.set(profile.id, profile); return json({ profile })
       }
@@ -227,9 +230,9 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         harness: current.harness, model: models[current.harness], credentialType: badEvidence ? 'api_key' : 'subscription',
         subscriptionRoute: current.harness === 'codex' ? 'codex_cli' : 'claude_code_cli', agentProfile: { profileId: current.profileId, version: 1, digest: wrongProfile ? 'f'.repeat(64) : profiles.get(current.profileId).digest, source: 'explicit' },
         executionIdentity: { version: 1, requester: ownerId, executionPrincipal: ownerId, botId, botOwner: ownerId, outputOwner: ownerId,
-          workspaceId: wrongScope ? personalWorkspace : workspace, personalResourcePolicy: 'requester_only',
-          billingAccount: { model: { kind: 'subscription', ownerId: wrongPayer ? ownerId : adminId, resourceId: id(800) }, runtime: { kind: candidate ? 'local_device' : 'e2b', ownerId, resourceId: candidate ? deviceId : ownerId } },
-          resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' }, { kind: 'subscription', id: id(800), ownerId: adminId, access: 'workspace_share', revision: '2' }] } } })
+          workspaceId: wrongScope ? (ownedCodex ? workspace : personalWorkspace) : caseWorkspace, personalResourcePolicy: 'requester_only',
+          billingAccount: { model: { kind: 'subscription', ownerId: wrongPayer ? (ownedCodex ? adminId : ownerId) : (ownedCodex ? ownerId : adminId), resourceId: id(800) }, runtime: { kind: candidate ? 'local_device' : 'e2b', ownerId, resourceId: candidate ? deviceId : ownerId } },
+          resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' }, { kind: 'subscription', id: id(800), ownerId: ownedCodex ? ownerId : adminId, access: ownedCodex ? 'owner' : 'workspace_share', revision: '2' }] } } })
       if (path === '/api/live/ticket') return json({ url: 'wss://live.example/v1/live/opaque/socket', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 300000 })
       if (path === '/api/factory/tasks') return json({ contractVersion: 1, issueId: current.issueId, tasks: [{ id: current.taskId, issueId: current.issueId }] })
       if (path === `/api/factory/tasks/${current.taskId}`) {
@@ -276,6 +279,41 @@ test('startup failure projection is closed, preserves only bounded HTTP status, 
 
 const oneCodexCandidate = () => parseOptions(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
   '--device-id', deviceId, '--agent-id', agentId, '--timeout-ms', '1000'], {})
+
+const ownedEnv = { MIKKA_TEST_ACCOUNT_EMAIL: 'alexjiang20232024@gmail.com', MIKKA_TEST_ACCOUNT_PASSWORD: 'PRIVATE_OWNED_PASSWORD' }
+const ownedCase = { ...options(['--harness', 'codex']), workspace: undefined, runs: 1, actor: 'authorized_2023_codex' }
+
+test('the explicitly authorized Codex actor uses its own Luna and personal workspace without claiming a shared SMOKE proof', async () => {
+  const io = fixture({ ownedCodex: true })
+  const fixtures = []
+  const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io, onFixture: async row => fixtures.push(row) })
+  assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
+  assert.equal(report.actor, 'authorized_2023_codex'); assert.equal(report.team, undefined)
+  assert.equal(report.workspace.kind, 'personal')
+  assert.equal(report.samples.length, 1)
+  const sample = report.samples[0]
+  assert.equal(sample.execution.model, 'gpt-6-luna'); assert.equal(sample.execution.harness, 'codex')
+  assert.equal(sample.execution.sharedScope, undefined)
+  assert.equal(sample.execution.ownedScope.access, 'owner'); assert.equal(sample.execution.ownedScope.verified, true)
+  assert.equal(sample.execution.ownedScope.requesterHash, sample.execution.ownedScope.payerHash)
+  assert.equal(sample.cleanup.status, 'passed'); assert.equal(report.cleanup.workspaceRestored, true)
+  assert.equal(io.calls.filter(call => call.path === '/api/factory/agent-profiles' && call.init.method === 'POST').length, 1)
+  assert.deepEqual(fixtures.map(row => row.kind), ['bot', 'profile', 'issue', 'run'])
+  assert.equal(fixtures.at(-1).id, sample.runId); assert.equal(fixtures.at(-1).issueId, sample.issueId)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE|alexjiang|SMOKE_OWNER|workspace_share/)
+})
+
+test('the owned actor never invokes Claude or accepts another credential owner, payer or workspace', async () => {
+  await assert.rejects(runCloudStartup({ ...ownedCase, harness: 'both' }, { env: ownedEnv, fetchImpl: () => assert.fail('must reject before setup') }), /startup_owned_actor_model_invalid/)
+  for (const change of [{ wrongSource: true }, { wrongPayer: true }, { wrongScope: true }, { wrongProfile: true }]) {
+    const io = fixture({ ownedCodex: true, ...change })
+    const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io })
+    assert.equal(report.status, 'failed')
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.filter(call => call.init.body?.includes('coordinator.sendCoordinatorMessage')).length <= 1, true)
+    assert.ok(report.samples.every(sample => sample.execution?.sharedScope === undefined))
+  }
+})
 
 test('the selected dispatch refusal retains its code before queueing and still cleans the owned issue', async () => {
   const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
