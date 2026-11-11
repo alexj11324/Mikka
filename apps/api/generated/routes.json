@@ -10,7 +10,7 @@
         "GET",
         "OPTIONS"
       ],
-      "sourceHash": "ada6dfad26735edfba08872ae321977c36862204de22afcdea5f751c73c45ef0"
+      "sourceHash": "3df05db25c12cc7faf0464cc30b50af6aa4b3360488482d554df4160bce39c1d"
     },
     {
       "path": "/mikka/.well-known/oauth-protected-resource",
@@ -20,7 +20,7 @@
         "GET",
         "OPTIONS"
       ],
-      "sourceHash": "de6070f812d8535742c0cc1dc22c9edd5a38cdfd9dbbbbe42d3da4a97bcd8dfb"
+      "sourceHash": "5ab3dcd550234bdbe962c19453826e1d383be0dcc4a6b485bf0732c91367c1cd"
     },
     {
       "path": "/mikka/api/acceptance",
