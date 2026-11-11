@@ -21,12 +21,36 @@ export const THREAD_ORIGIN = "threads"
 /** A new thread's record; undo reverts it together with its anchor mark. */
 export const THREAD_CREATE_ORIGIN = "thread-create"
 
+/** A file a comment carries: bytes live in the issue's own attachment store, never in the thread record. */
+export interface CommentAttachment {
+  id: string
+  name: string
+  mediaType: string
+  size: number
+}
+
+/** A message in a thread: the first is the comment, the rest are its replies. */
 export interface ThreadMessage {
   id: string
   author: string
   authorUserId?: string
   body: string
   at: string
+  /**
+   * The message this one answers (a nested reply inside the same thread).
+   * Absent on the thread's first message and on flat replies that answer the
+   * thread itself; a reply always lives in the thread it answers.
+   */
+  replyTo?: string
+  /** Last time the author changed `body`; absent while never edited. */
+  editedAt?: string
+  /**
+   * Set when the author deleted the message. The row stays so its replies keep
+   * their anchor and the author's choice remains visible as a tombstone.
+   */
+  deletedAt?: string
+  /** Files posted with this message, in the order the author attached them. */
+  attachments?: CommentAttachment[]
 }
 
 export interface ThreadRecord {
@@ -326,6 +350,62 @@ export function replyToThread(
   // The writer's client id keeps two replies sent apart (offline) distinct.
   const messageId = `${id}-${doc.clientID}-${messages.length + 1}`
   doc.transact(() => messages.push([{ id: messageId, ...message }]), origin)
+  return true
+}
+
+/**
+ * Rewrites one message's body, stamping `editedAt`. The authorship guard in
+ * `bindCommentAuthorship` refuses this for anyone but the message's author, so
+ * the writer only has to name the message; `at` stays the original time.
+ */
+export function editThreadMessage(
+  doc: Y.Doc,
+  threadId: string,
+  messageId: string,
+  body: string,
+  editedAt: string = new Date().toISOString()
+) {
+  const messages = threadMap(doc).get(threadId)?.get("messages")
+  if (!(messages instanceof Y.Array)) return false
+  const list = messages.toArray() as ThreadMessage[]
+  const index = list.findIndex((message) => message?.id === messageId)
+  if (index < 0 || list[index]?.deletedAt) return false
+  const next = { ...list[index], body, editedAt }
+  doc.transact(() => {
+    messages.delete(index, 1)
+    messages.insert(index, [next])
+  }, THREAD_ORIGIN)
+  return true
+}
+
+/**
+ * Deletes one message. A message with replies becomes a tombstone so the
+ * replies keep the message they answer; the last message left in a thread
+ * without replies is removed outright. The authorship guard refuses this for
+ * anyone but the message's author.
+ */
+export function deleteThreadMessage(
+  doc: Y.Doc,
+  threadId: string,
+  messageId: string,
+  deletedAt: string = new Date().toISOString()
+) {
+  const messages = threadMap(doc).get(threadId)?.get("messages")
+  if (!(messages instanceof Y.Array)) return false
+  const list = messages.toArray() as ThreadMessage[]
+  const index = list.findIndex((message) => message?.id === messageId)
+  if (index < 0) return false
+  const answered = list.some((message) => message?.replyTo === messageId && !message?.deletedAt)
+  if (!answered && list.length === 1) {
+    doc.transact(() => messages.delete(0, messages.length), THREAD_ORIGIN)
+    return true
+  }
+  // Replies keep a body-less row to hang from; the body is dropped, not hidden.
+  const next = { ...list[index], body: "", attachments: [], deletedAt }
+  doc.transact(() => {
+    messages.delete(index, 1)
+    messages.insert(index, [next])
+  }, THREAD_ORIGIN)
   return true
 }
 

@@ -66,6 +66,55 @@ test('rejects edits to another writer\'s comment body', () => {
   doc.destroy()
 })
 
+test('rejects a tombstone planted on another writer\'s message even with the body untouched', () => {
+  const doc = new Y.Doc()
+  const thread = new Y.Map<unknown>()
+  const messages = new Y.Array<Record<string, unknown>>()
+  messages.push([{ id: 'reply-1', author: 'Owner', authorUserId: 'owner', body: 'first' }])
+  thread.set('id', 'discussion-1')
+  thread.set('messages', messages)
+  doc.getMap<Y.Map<unknown>>('threads').set('discussion-1', thread)
+  const before = snapshotCommentAuthorship(doc)
+  // The body is byte-identical; only the tombstone is forged, which is exactly
+  // what a body-only guard would let through.
+  messages.delete(0, 1)
+  messages.insert(0, [{ id: 'reply-1', author: 'Owner', authorUserId: 'owner', body: 'first', deletedAt: '2026-01-01T00:00:00.000Z' }])
+  assert.throws(() => bindCommentAuthorship(doc, before, { id: 'member', name: 'Member' }), /cannot edit another user/)
+  doc.destroy()
+})
+
+test('rejects swapping the files on another writer\'s comment', () => {
+  const doc = new Y.Doc()
+  const thread = new Y.Map<unknown>()
+  const messages = new Y.Array<Record<string, unknown>>()
+  messages.push([{ id: 'reply-1', author: 'Owner', authorUserId: 'owner', body: 'first', attachments: [{ id: 'f1', name: 'a.txt', mediaType: 'text/plain', size: 1 }] }])
+  thread.set('id', 'discussion-1')
+  thread.set('messages', messages)
+  doc.getMap<Y.Map<unknown>>('threads').set('discussion-1', thread)
+  const before = snapshotCommentAuthorship(doc)
+  messages.delete(0, 1)
+  messages.insert(0, [{ id: 'reply-1', author: 'Owner', authorUserId: 'owner', body: 'first', attachments: [{ id: 'f2', name: 'b.txt', mediaType: 'text/plain', size: 1 }] }])
+  assert.throws(() => bindCommentAuthorship(doc, before, { id: 'member', name: 'Member' }), /cannot edit another user/)
+  doc.destroy()
+})
+
+test('lets the author edit their own comment and delete it as a tombstone', () => {
+  const doc = new Y.Doc()
+  const thread = new Y.Map<unknown>()
+  const messages = new Y.Array<Record<string, unknown>>()
+  messages.push([{ id: 'reply-1', author: 'Owner', authorUserId: 'owner', body: 'first' }])
+  thread.set('id', 'discussion-1')
+  thread.set('messages', messages)
+  doc.getMap<Y.Map<unknown>>('threads').set('discussion-1', thread)
+  const before = snapshotCommentAuthorship(doc)
+  messages.delete(0, 1)
+  messages.insert(0, [{ id: 'reply-1', author: 'Owner', authorUserId: 'owner', body: 'second', editedAt: '2026-01-01T00:01:00.000Z' }])
+  bindCommentAuthorship(doc, before, { id: 'owner', name: 'Owner' })
+  assert.equal((messages.toArray()[0] as { body: string }).body, 'second')
+  assert.equal((messages.toArray()[0] as { author: string }).author, 'Owner')
+  doc.destroy()
+})
+
 test('rejects deleting another writer\'s comment and thread aliases', () => {
   const doc = new Y.Doc()
   const thread = new Y.Map<unknown>()

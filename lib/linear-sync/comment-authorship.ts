@@ -1,6 +1,6 @@
 import * as Y from 'yjs'
 
-type CommentMessage = { id: string; author: string; authorUserId?: string; body: string }
+type CommentMessage = { id: string; author: string; authorUserId?: string; body: string; editedAt?: string; deletedAt?: string; attachments?: unknown[] }
 type CommentThread = { author: string; authorUserId?: string; messages: Map<string, CommentMessage> }
 export type CommentAuthorshipSnapshot = Map<string, CommentThread>
 
@@ -55,7 +55,13 @@ export function bindCommentAuthorship(doc: Y.Doc, before: CommentAuthorshipSnaps
         if (!message || typeof message.id !== 'string' || typeof message.author !== 'string' || typeof message.body !== 'string') throw new Error('Invalid comment message')
         const saved = previous?.messages.get(message.id)
         if (saved) {
-          if (saved.body !== message.body && saved.authorUserId !== author.id) throw new Error('You cannot edit another user\'s comment')
+          // Editing, deleting or re-attaching a message is its author's alone;
+          // the author check also covers a forged `editedAt`/`deletedAt` that
+          // leaves the body untouched.
+          const changed = saved.body !== message.body
+            || (saved.deletedAt ?? null) !== (message.deletedAt ?? null)
+            || JSON.stringify(saved.attachments ?? []) !== JSON.stringify(message.attachments ?? [])
+          if (changed && saved.authorUserId !== author.id) throw new Error('You cannot edit another user\'s comment')
           const attributed = { ...message, author: saved.author }
           if (saved.authorUserId) attributed.authorUserId = saved.authorUserId
           else delete attributed.authorUserId
