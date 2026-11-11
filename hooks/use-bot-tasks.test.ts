@@ -1,5 +1,6 @@
 import test from 'node:test'
 import { taskPresentation } from '../lib/task-presentation'
+import { ISSUE_STATUS_CODES } from '../lib/issue-meta'
 import { groupPresentedTasks, waitingTasks, type CollectionIssue } from '../lib/task-collection'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -24,7 +25,9 @@ function fixtureGroups(threads: Thread[], issues: CollectionIssue[]) {
   }
   const presentations = Object.fromEntries(issues.map(issue => {
     const run = threads.find(thread => thread.issueId === issue.id)
-    return [issue.id, taskPresentation(issue, run && { ...run, runId: run.id }, null, isOpen,
+    const status = ISSUE_STATUS_CODES.find(code => code === issue.status)
+    assert.ok(status, `invalid fixture Task status: ${issue.status}`)
+    return [issue.id, taskPresentation({ ...issue, status }, run && { ...run, runId: run.id }, null, isOpen,
       { blockerIdentifier: id => byId.get(id)?.identifier ?? null })]
   }))
   return groupPresentedTasks(issues, threads, presentations, 'workspace')
