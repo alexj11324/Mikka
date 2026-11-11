@@ -100,6 +100,10 @@ export type TaskDetailFrameProps = {
   /** The loaded task's identity, for task-specific navigation such as Review. Absent in older callers. */
   taskId?: string
   workspaceId?: string | null
+  /** The same authorized presentation that supplies the status row also identifies its Factory receipts. */
+  factoryTaskId?: string
+  /** The task-bound file dialog; the existing template supplies its toolbar trigger. */
+  attachments?: (trigger: (label: string, open: () => void) => ReactNode) => ReactNode
   rootRef: RefObject<HTMLDivElement | null>
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
   /** The page's accessible name: the title, or the title field's label while it is empty. */

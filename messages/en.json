@@ -3,6 +3,17 @@
     "daily": "Every day at {time}",
     "interval": "Every {minutes, plural, one {1 minute} other {# minutes}}"
   },
+  "TaskAttachments": {
+    "title": "Attachments",
+    "add": "Add file",
+    "empty": "No attachments",
+    "remove": "Remove {name}",
+    "failed": "Could not save the attachment change.",
+    "downloadFailed": "Could not download the attachment.",
+    "readFailed": "Could not load attachments.",
+    "size": "Choose a nonempty file up to 3 MiB.",
+    "limit": "Up to 10 files per task."
+  },
   "Common": {
     "privacyPolicy": "Privacy policy",
     "appUpdated": "Mikka has been updated",

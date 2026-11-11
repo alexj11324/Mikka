@@ -123,6 +123,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
   const solo = randomUUID(), shared = randomUUID(), carolsTeam = randomUUID(), team = randomUUID()
   const bot = randomUUID(), agent = randomUUID(), device = randomUUID(), run = randomUUID()
   const personalIssue = randomUUID(), teamIssue = randomUUID(), bobIssue = randomUUID()
+  const personalFile = `task-files/${personalIssue}/${randomUUID()}`, teamFile = `task-files/${teamIssue}/${randomUUID()}`
   const group = randomUUID(), dm = randomUUID(), connection = randomUUID(), artifact = randomUUID()
   const soloBot = randomUUID(), soloRun = randomUUID(), coordinator = randomUUID(), coordinatorRun = randomUUID(), liveRun = randomUUID()
   t.after(async () => {
@@ -138,6 +139,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
       await pool.query('delete from conversations where id = any($1::uuid[])', [[group, dm]])
       await pool.query('delete from issue_documents where "issueId" = any($1::uuid[])', [[personalIssue, teamIssue, bobIssue]])
       await pool.query('delete from issues where id = any($1::uuid[])', [[personalIssue, teamIssue, bobIssue]])
+      await pool.query('delete from chat_attachment_retirements where "storageKey" = any($1::text[])', [[personalFile, teamFile]])
       await pool.query('delete from user_facts where "userId" = any($1::text[])', [[alice, bob, carol, dave]])
       for (const table of ['workspace_settings', 'workspace_secrets', 'workspace_e2b_keys', 'hosted_allowances']) await pool.query(`delete from ${table} where "workspaceId" = any($1::uuid[])`, [[solo, shared]])
       await pool.query('delete from "user" where id = any($1::text[])', [[alice, bob, carol, dave]])
@@ -170,6 +172,10 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     const bobHome = await seedFixtureWorkspace(pool, bob)
     const issue = (iid: string, owner: string, scope: string, workspaceId: string) => pool.query(`insert into issues (id, "userId", "workspaceId", title, content, status, priority, scope) values ($1, $2, $4, 'T', '{}'::jsonb, 'todo', 'normal', $3)`, [iid, owner, scope, workspaceId])
     await issue(personalIssue, alice, 'personal', solo); await issue(teamIssue, alice, 'workspace', shared); await issue(bobIssue, bob, 'personal', bobHome)
+    for (const [taskId, key] of [[personalIssue, personalFile], [teamIssue, teamFile]]) {
+      await pool.query(`insert into task_attachments ("taskId", id, name, size, sha256, "storageKey", "userId")
+        values ($1,$2,'sample.bin',1,repeat('0',64),$3,$4)`, [taskId, randomUUID(), key, alice])
+    }
     for (const iid of [personalIssue, teamIssue]) await pool.query(`insert into issue_documents ("issueId", "userId", state) values ($1, $2, 'doc')`, [iid, alice])
     await pool.query(`insert into issue_members ("issueId", "userId", "memberId") values ($1, $2, $3)`, [bobIssue, bob, alice])
     await pool.query(`insert into mikka_team_issues ("issueId", "teamId", "workspaceId", "userId") values ($1, $2, $3, $4)`, [teamIssue, team, shared, alice])
@@ -211,7 +217,13 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from "user" where id = $1', [carol])).rowCount, 1)
     assert.equal((await pool.query('select 1 from user_facts where "userId" = $1', [carol])).rowCount, 1)
 
-    assert.deepEqual(await deletion.deleteAccount(alice, `${alice}@example.com`, { externalCleanup: async () => [] }), { ok: true })
+    const removedFiles: string[] = []
+    assert.deepEqual(await deletion.deleteAccount(alice, `${alice}@example.com`, {
+      externalCleanup: async () => [], deleteObject: async key => { removedFiles.push(key) },
+    }), { ok: true })
+    assert.deepEqual(removedFiles, [personalFile], 'deletion retires the personal task object and preserves the shared task object')
+    assert.deepEqual((await pool.query('select "taskId","storageKey" from task_attachments where "userId"=$1', [alice])).rows,
+      [{ taskId: teamIssue, storageKey: teamFile }])
 
     // Nothing with Alice as its owner is left, in any table (bar the append-only skill ledgers),
     // except her bot in the shared workspace and its threads, which stay for the team.
@@ -221,7 +233,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     const left: string[] = []
     for (const { table, column } of columns) {
       // Team issues of the shared workspace keep their owner column; they stay on purpose.
-      if (['issues', 'issue_documents', 'mikka_team_issues', 'mikka_teams', 'mikka_workspaces'].includes(table)) continue
+      if (['issues', 'issue_documents', 'task_attachments', 'mikka_team_issues', 'mikka_teams', 'mikka_workspaces'].includes(table)) continue
       if (['bots', 'agent_runs', 'agents', 'run_messages', 'artifacts'].includes(table)) continue
       if (['task_identifier_aliases', 'mikka_task_identifier_aliases'].includes(table)) {
         const aliases = (await pool.query(`select distinct "issueId" from "${table}" where "ownerId"=$1`, [alice])).rows

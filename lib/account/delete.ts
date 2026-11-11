@@ -53,6 +53,7 @@ const SKIPPED = new Map<string, string>([
     .map(table => [getTableName(table as Table), 'workspace database'] as [string, string]),
   ['mikka_task_identifier_aliases', 'workspace history, removed only with its workspace'],
   // Handled explicitly below: team issues in shared workspaces stay.
+  ['task_attachments', 'files follow the task through its delete cascade'],
   ['issues', 'special'], ['issue_documents', 'special'], ['issue_versions', 'special'], ['issue_members', 'special'],
   ['conversations', 'special'],
   // Taken by the user row's foreign key.
@@ -353,8 +354,12 @@ export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, user
      union all select "storageKey",NULL from user_avatars where "userId"=$1 and "storageKey" is not null
      union all select "storageKey",NULL from chat_attachments where "userId"=$1 and "storageKey" is not null
      union all select "uploadKey","uploadExpiresAt" from chat_attachments where "userId"=$1 and "uploadKey" is not null
+     union all select f."storageKey",NULL from task_attachments f join issues i on i.id=f."taskId"
+       where i."userId"=$1 and not (i.id = any($4::uuid[])) and f."storageKey" is not null
+     union all select r."storageKey",r."notBefore" from chat_attachment_retirements r join issues i on i.id=r."taskId"
+       where i."userId"=$1 and not (i.id = any($4::uuid[]))
      union all select "storageKey","notBefore" from chat_attachment_retirements where "userId"=$1
-     union all select "storageKey",NULL from account_storage_retirements where "userId"=$1`, [userId, runs, artifacts])
+     union all select "storageKey",NULL from account_storage_retirements where "userId"=$1`, [userId, runs, artifacts, plan.keptIssueIds])
   return { keys: [...new Set(rows.map(row => row.key).filter((key): key is string => Boolean(key)))], notBefore: new Date(Math.max(Date.now(), ...rows.map(row => row.expiresAt?.getTime() ?? 0))) }
 }
 
