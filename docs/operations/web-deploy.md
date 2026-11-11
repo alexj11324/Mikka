@@ -61,6 +61,8 @@ See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/do
 
 See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
+Public builds verify the server, protocol and authentication code without private UI or credentials. The official release linker requires every declared workspace provider and named runtime export before either client can be distributed.
+
 ### Public output boundary
 
 See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).

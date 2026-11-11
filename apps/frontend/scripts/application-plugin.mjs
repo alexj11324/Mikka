@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
-import { overlayAliases, resolveOverlaySpecifier } from '../../../lib/ui-overlay.mjs'
+import { overlayAliases, resolveOverlaySpecifier, UI_SLOT_EXPORTS, SLOT_PREFIX } from '../../../lib/ui-overlay.mjs'
 import { actionReferences, actionSignatures, nativeOfflineView, bundledIconCatalogue, bundledSyntaxCatalogue } from '../../desktop/scripts/renderer-transforms.mjs'
 
 export const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -13,6 +13,8 @@ const renderer = resolve(repository, 'apps/desktop/src/renderer')
 const actionDirectory = resolve(repository, 'app/actions')
 const slash = value => value.split(sep).join('/')
 const builtins = new Set(builtinModules.flatMap(name => [name, `node:${name}`]))
+const officialSlot = '\0mikka:official-slot:'
+const officialContract = 'mikka:official-slot-contract'
 const virtualAction = '\0mikka:action:'
 const commonAliases = new Map([
   ['next/navigation', 'next-navigation.ts'], ['next/link', 'next-link.tsx'], ['next/dynamic', 'dynamic.tsx'],
@@ -84,6 +86,7 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
     configResolved(config) { development = config.command === 'serve' },
     async resolveId(source, importer, options) {
       if (source.startsWith('\0mikka:')) return source
+      if (source === officialContract && uiSlots.dir) return '\0' + source
       if (source === 'mikka:platform') return resolve(target === 'desktop' ? renderer : resolve(frontend, 'src/web'), 'platform.tsx')
       if (source === 'mikka:frontend-runtime' || source === 'mikka:native-offline' || source === 'mikka:native-offline.css') return `\0${source}`
       if (source === 'mikka:renderer-build') {
@@ -99,6 +102,11 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
         if (target === 'desktop') throw new Error('FRONTEND_DESKTOP_REMOTE_SCRIPT_FORBIDDEN')
         return resolve(frontend, 'src/web/next-script.tsx')
       }
+      if (uiSlots.dir && source.startsWith(SLOT_PREFIX)) {
+        const name = source.slice(SLOT_PREFIX.length)
+        if (!Object.hasOwn(UI_SLOT_EXPORTS, name)) throw new Error(`UI_SLOT_UNKNOWN: ${source}`)
+        return officialSlot + name
+      }
       const candidate = resolveOverlaySpecifier(source, uiSlots) ?? (source.startsWith('@/') ? resolve(repository, source.slice(2)) : source)
       // Keep require-call/import semantics when resolving conditional package
       // exports; a CommonJS helper must not become an ESM namespace object.
@@ -111,8 +119,22 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
       return resolved
     },
     async load(id) {
+      if (id === '\0' + officialContract) {
+        // Link every mandatory export, including providers for lazy or disabled
+        // surfaces. The validation imports must not initialize unused features.
+        const code = Object.keys(UI_SLOT_EXPORTS).map(name => `import ${JSON.stringify(SLOT_PREFIX + name)}`).join('\n')
+        return { code, moduleSideEffects: false }
+      }
+      if (id.startsWith(officialSlot)) {
+        const name = id.slice(officialSlot.length)
+        const provider = JSON.stringify(uiSlots.absolute[SLOT_PREFIX + name])
+        // Explicit re-exports force the linker to validate exports even when a
+        // consumer uses a namespace import with an optional-property check.
+        return `export * from ${provider}; export { ${UI_SLOT_EXPORTS[name].join(', ')} } from ${provider};`
+      }
       if (id === '\0mikka:frontend-runtime') {
-        return frontendRuntimeSource(target, { development, frontend, renderer })
+        const runtime = frontendRuntimeSource(target, { development, frontend, renderer })
+        return uiSlots.dir && !development ? `import ${JSON.stringify(officialContract)};\n${runtime}` : runtime
       }
       if (id === '\0mikka:renderer-build') return 'export const rendererBuild = "development";'
       if (id === '\0mikka:native-offline' || id === '\0mikka:native-offline.css') return (await offline.load({ path: id.slice(1) })).contents
