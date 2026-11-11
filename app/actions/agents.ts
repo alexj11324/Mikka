@@ -353,6 +353,13 @@ export interface IssueThreadDetail {
   chunksAppend: boolean
   /** A cursor read: `thread.prompt` is left out; the held read's prompt stands (mergeThreadChunks). */
   promptOmitted?: true
+  /**
+   * What this thread's run holds (lib/context-usage.ts): an estimate from stored
+   * text, never a provider count. Optional because a page open across a deploy
+   * may still be served by a build that predates it, like every other host
+   * projection here.
+   */
+  context?: import('@/lib/context-usage').ContextUsage
 }
 
 /**
@@ -417,6 +424,29 @@ export async function getThreadMachine(issueId: string | null, runId: string): P
     const chain = await readRunChain(pool, row.userId, row.id)
     const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
     return (await import('@/lib/thread-machine-view')).readThreadMachine(pool, user.id, runIds)
+  })
+}
+
+/**
+ * What this thread's run holds (lib/context-usage.ts). One query counts every
+ * character in SQL and returns no text: a cursor read must stay small, so the
+ * brief cannot be sent again to be measured (tests/thread-detail-bytes.db.test.ts).
+ * It covers the whole run chain and the whole stored brief whatever the cursor
+ * returned, so a cursor read reports the same usage as a full one.
+ */
+async function readContextUsage(runIds: string[], rootRunId: string): Promise<import('@/lib/context-usage').ContextUsage> {
+  const { CONTEXT_CHARS_SQL, contextUsageFromCounts } = await import('@/lib/context-usage')
+  const { rows: [counted] } = await pool.query<Record<string, string | number | null>>(CONTEXT_CHARS_SQL, [runIds, rootRunId])
+  const count = (value: unknown) => Number(value ?? 0) || 0
+  const counts = (ascii: unknown, other: unknown) => ({ ascii: count(ascii), other: count(other) })
+  return contextUsageFromCounts({
+    prompt: counts(counted?.promptAscii, counted?.promptOther),
+    // The task range is sliced in SQL by the recorded code points, and is empty
+    // when the range does not hold (lib/thread-prompt.ts rejects it there).
+    task: counts(counted?.taskAscii, counted?.taskOther),
+    messages: counts(counted?.messageAscii, counted?.messageOther),
+    conversation: counts(counted?.conversationAscii, counted?.conversationOther),
+    model: typeof counted?.model === 'string' ? counted.model : null,
   })
 }
 
@@ -497,9 +527,12 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     : null
   const { threadLiveReferences, documentLiveWorkspace } = await import('@/lib/live/panels')
   const { workspacePool } = await import('@/lib/workspace-db')
-  const [runs, issueWorkspaceId] = await Promise.all([
+  const chainRunIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
+  const [runs, issueWorkspaceId, context] = await Promise.all([
     threadLiveReferences(pool, workspacePool, runIds, user.id),
     row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
+    // Over the whole chain and the whole brief, so a cursor read reports what a full one does.
+    readContextUsage(chainRunIds, row.id),
   ])
   return {
     live: { runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
@@ -508,6 +541,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
     chunksAppend: read.append,
+    context,
     ...(promptOmitted ? { promptOmitted: true as const } : {}),
   }
 }

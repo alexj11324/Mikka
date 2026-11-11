@@ -7,6 +7,7 @@
 // the daemon builds `RunReport`s with it, the server validates them with it,
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
+import { profileSkillRunReportSchema } from "./skill"
 import { providerFailureSchema } from "./provider-failure"
 import { runFailureSchema } from "./run-failure"
 
@@ -193,8 +194,15 @@ export const runReport = z.object({
    * The daemon sets this from the same plan it built the prompt with; the app
    * shows the deferred ones, so a body the agent had to go read is visible
    * rather than silently missing.
+   *
+   * Distinct from `profileSkills` below: that reports Profile Skills the agent
+   * loads on demand through `load_skill`, this reports the workspace skills
+   * this prompt inlined or deferred.
    */
   skillPrompt: runSkillPrompt.optional(),
+  /** Profile Skills the run selected and the ones its agent actually loaded
+   * through `load_skill`. Daemon-authored; assigned is never loaded. */
+  profileSkills: profileSkillRunReportSchema.optional(),
   execution: runExecution.optional(),
   runtime: runRuntime.optional(),
   /** What was done, in a few sentences. Empty when the run crashed early. */
