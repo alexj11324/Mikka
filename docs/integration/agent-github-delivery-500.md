@@ -67,7 +67,11 @@ checkouts) are matched by their exact head SHA and repository within already
 published PRs, never by a broad GitHub search.
 
 A successful match creates a `run_report` in the existing deduplicated
-Coordinator outbox, bound to the run's user, bot and task. The webhook does
+Coordinator outbox, bound to the run's user, bot and task. The Coordinator
+rechecks the stored source key and the visible, finished run, then marks it a
+`result` transport event without an extra model-tier classification call.
+This lets the existing Eve conversation receive the new event even after the
+original coding run ends. The webhook does
 not trust its reported success as the final status: the next Agent decision
 must fetch current GitHub checks, required check names, head SHA, reviews and
 merge policy under the normal owner credentials. Neither success nor failure
