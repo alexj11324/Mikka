@@ -15,7 +15,7 @@ mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (op
 test('billing management HTTP preserves independent tenants, owners and immutable receipts', { skip: !dbUrl, timeout: 120_000 }, async t => {
   const priorEdition = process.env.MIKKA_EDITION
   process.env.MIKKA_EDITION = 'cloud'
-  const [{ pool }, { workspacePool }, workspace, organization, { withBillingAuthority }, { createPersonalAccessToken, createLegacyPersonalAccessToken }] = await Promise.all([
+  const [{ pool }, { workspacePool }, workspace, organization, { withBillingAuthority }, { createLegacyPersonalAccessToken }] = await Promise.all([
     import('../lib/db'), import('../lib/workspace-db'), import('../app/api/workspaces/[workspaceId]/billing/route'),
     import('../app/api/organizations/[organizationId]/billing/route'), import('../lib/billing/authority'), import('../lib/tokens/store'),
   ])
