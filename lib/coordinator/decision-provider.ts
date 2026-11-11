@@ -1,14 +1,15 @@
 import { gatewayCost, gatewayGenerationId } from '../abuse/policy'
 import { gatewayAuth } from '../ai-gateway-auth'
+import { STANDARD_DECISION_MODEL } from './decision'
 
 export const gatewayEndpoint = 'https://ai-gateway.vercel.sh/v1/decisions'
 export const nativeEndpoint = 'https://api.openai.com/v1/decisions'
-const nativeModel = 'gpt-6-luna'
+const nativeModel = STANDARD_DECISION_MODEL.slice('openai/'.length, -'-decisions'.length)
 
 /** The application authorizes the logical model; only the provider's wire spelling differs. */
 export async function decisionTransport(endpoint: string, model: string, env: Record<string, string | undefined> = process.env) {
   if (endpoint === nativeEndpoint) {
-    if (![nativeModel, 'openai/gpt-6-luna-decisions'].includes(model)
+    if (![nativeModel, STANDARD_DECISION_MODEL].includes(model)
         || env.DECISIONS_BILLING_PROFILE !== 'openai-global-standard' || !env.OPENAI_DECISIONS_API_KEY) return null
     return { native: true, model: nativeModel, key: env.OPENAI_DECISIONS_API_KEY }
   }
