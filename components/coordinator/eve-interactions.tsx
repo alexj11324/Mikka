@@ -7,6 +7,7 @@ import { parseAnswers } from 'eve/client'
 import type { Interaction, UseEveAgentReturn } from 'eve/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Field, FieldGroup } from '@/components/ui/field'
 import { Item, ItemActions, ItemContent, ItemTitle } from '@/components/ui/item'
 import { useActionError } from '@/lib/use-action-error'
 
@@ -32,8 +33,10 @@ function EveInteraction({ interaction, respond, resuming }: { interaction: Inter
     <ItemContent>
       <ItemTitle>{request.prompt}</ItemTitle>
       {request.allowFreeform && <form onSubmit={event => { event.preventDefault(); if (text.trim()) void answer({ text: text.trim() }) }} className="flex gap-2">
-        <Input value={text} onChange={event => setText(event.target.value)} aria-label={request.prompt} disabled={pending || resuming || Boolean(interaction.answer)} />
-        <Button type="submit" size="sm" disabled={pending || resuming || !text.trim() || Boolean(interaction.answer)}>{t('submit')}</Button>
+        <FieldGroup><Field orientation="horizontal">
+          <Input value={text} onChange={event => setText(event.target.value)} aria-label={request.prompt} disabled={pending || resuming || Boolean(interaction.answer)} />
+          <Button type="submit" size="sm" disabled={pending || resuming || !text.trim() || Boolean(interaction.answer)}>{t('submit')}</Button>
+        </Field></FieldGroup>
       </form>}
       {error && <span role="alert">{actionError()}</span>}
     </ItemContent>

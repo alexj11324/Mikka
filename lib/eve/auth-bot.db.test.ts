@@ -31,14 +31,15 @@ test('native default Bot uses the authenticated active Workspace and rejects sup
     assert.ok(selected);assert.equal(selected.workspaceId,team);assert.notEqual(selected.botId,home.botId)
     assert.deepEqual(await resolveEveRequestBot(request({cookie:'mikka-workspace='+team}),session),selected)
     assert.deepEqual(await resolveEveRequestBot(request({'x-mikka-workspace-id':personal}),session),home)
-    const denied:HeadersInit[]=[{'x-mikka-workspace-id':'bad'},{'x-mikka-workspace-id':foreign},{cookie:'mikka-workspace=bad'},{cookie:'mikka-workspace='+foreign}]
+    const denied:HeadersInit[]=[{'x-mikka-workspace-id':'bad'},{'x-mikka-workspace-id':foreign}]
     for(const headers of denied)assert.equal(await resolveEveRequestBot(request(headers),session),null)
+    for(const cookie of ['mikka-workspace=bad','mikka-workspace='+foreign])assert.deepEqual(await resolveEveRequestBot(request({cookie}),session),home)
     for(const query of ['?botId=','?botId=invalid','?botId='+randomUUID()])assert.equal(await resolveEveRequestBot(request({},query),session),null)
     assert.equal(await resolveEveRequestBot(request({'x-mikka-workspace-id':personal},'?botId='+selected.botId),session),null)
     const pat={...session,user:{...user,[tokenWorkspace]:team},tokenWorkspaceId:team}
     assert.deepEqual(await resolveEveRequestBot(request(),pat),selected)
     assert.equal(await resolveEveRequestBot(request({'x-mikka-workspace-id':personal}),pat),null)
-    assert.equal(await resolveEveRequestBot(request({cookie:'mikka-workspace='+personal}),pat),null)
+    assert.deepEqual(await resolveEveRequestBot(request({cookie:'mikka-workspace='+personal}),pat),selected)
     await pool.query('UPDATE mikka_workspace_members SET status=\'inactive\' WHERE "workspaceId"=$1 AND "userId"=$2',[team,owner])
     assert.equal(await resolveEveRequestBot(request({'x-mikka-workspace-id':team}),session),null)
   }finally{

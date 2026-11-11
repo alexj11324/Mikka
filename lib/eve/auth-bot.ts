@@ -9,12 +9,8 @@ export async function resolveEveRequestBot(request:Request,session:ApiSession) {
   const parsed=supplied===null?null:z.uuid().safeParse(supplied)
   if(parsed&&!parsed.success)return null
   const context=createRequestScope(request)
-  // Cookie-less native clients use the Workspace header. Browser cookies are
-  // the same exact preference here; stale/foreign cookies must not fall home.
-  if(!context.headers.has('x-mikka-workspace-id')) {
-    const cookie=context.cookies.get('mikka-workspace')
-    if(cookie)context.headers.set('x-mikka-workspace-id',cookie.value)
-  }
+  // Reuse the app's selection policy: an explicit header is exact, while a
+  // stale browser preference falls back to the person's own Workspace.
   return runRequestScope(context,async()=>{
     const {loadWorkspaceContext,WorkspaceError}=await import('../workspace-access')
     try {

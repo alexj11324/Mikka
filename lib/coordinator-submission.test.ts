@@ -735,13 +735,15 @@ test('an explicit Profile keeps workspace-default placement and the normal task 
   } finally { enabled = true; profileRows.clear(); overrideDeploymentSwitch('issueTools', undefined) }
 })
 
-test('the composer transport carries an explicit expectation and preserves legacy argument length', async () => {
+test('the composer carries its captured Workspace expectation through the native transport', async () => {
   const { createElement } = await import('react')
   const { renderToStaticMarkup } = await import('react-dom/server')
-  const actions = await import('../app/actions/coordinator')
-  const sent: unknown[][] = []
-  const action = mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
-    ...actions, sendCoordinatorMessage: async (...args: Parameters<typeof sendCoordinatorMessage>) => { sent.push(args); return { queued: true as const } },
+  const native = await import('./eve/client')
+  const sent: { botId: string | null; text: string; options: import('eve/client').SendTurnOptions }[] = []
+  const transport = mock.module(new URL('./eve/client.ts', import.meta.url).href, { namedExports: {
+    ...native, coordinatorAgentClient: (botId: string | null) => ({ sessions: { create: async () => ({ session: {
+      send: async (text: string, options: import('eve/client').SendTurnOptions) => { sent.push({ botId, text, options }) },
+    } }) } }),
   } })
   const client = mock.module(new URL('./auth-client.ts', import.meta.url).href, { namedExports: {
     authClient: { getSession: async () => ({ data: { user: { id: 'owner' } }, error: null }) },
@@ -754,9 +756,12 @@ test('the composer transport carries an explicit expectation and preserves legac
     renderToStaticMarkup(createElement(Probe))
     assert.ok(held.composer)
     assert.equal((await held.composer.submit('legacy message', { botId: COORDINATOR_BOT })).kind, 'accepted')
-    assert.equal(sent[0].length, 9, 'omission remains compatible with an older nine-argument transport schema')
+    assert.equal(sent[0].botId, COORDINATOR_BOT)
+    assert.deepEqual(sent[0].options.clientContext, { botId: COORDINATOR_BOT })
+    assert.match(new Headers(sent[0].options.headers).get('x-mikka-submission-id')!, /^[0-9a-f-]{36}$/)
     assert.equal((await held.composer.submit('captured message', { botId: COORDINATOR_BOT, expectedWorkspaceId: PROFILE_WORKSPACE })).kind, 'accepted')
-    assert.equal(sent[1].length, 10); assert.equal(sent[1][9], PROFILE_WORKSPACE)
-    assert.equal(sent[1][2], COORDINATOR_BOT)
-  } finally { translations.restore(); client.restore(); action.restore() }
+    assert.equal(sent[1].botId, COORDINATOR_BOT)
+    assert.deepEqual(sent[1].options.clientContext, { botId: COORDINATOR_BOT, expectedWorkspaceId: PROFILE_WORKSPACE })
+    assert.equal(sent[1].text, 'captured message')
+  } finally { translations.restore(); client.restore(); transport.restore() }
 })

@@ -6,7 +6,7 @@ import { runCompletionObservations } from '@/lib/coordinator/run-completion-obse
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
 import 'server-only'
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
 import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
@@ -15,7 +15,9 @@ import { wakeCoordinatorSoon } from '@/lib/coordinator/wake-after-commit'
 import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
 import { coordinatorEvents, coordinatorMessages, coordinatorSessions } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from '@/lib/coordinator/telegram-pending'
-import { eventPrompt } from '@/lib/coordinator/context'
+import { eventPrompt, type StoredMessage } from '@/lib/coordinator/context'
+import { readCoordinatorPromptPreferences } from '@/lib/preferences'
+import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { attentionQuestionsFromEvents, type AttentionQuestion } from '@/lib/coordinator/question-attention'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
@@ -33,6 +35,45 @@ type Executor = Pick<typeof db, 'select' | 'insert' | 'execute'>
 const sessionOf = (userId: string, botId: string) => and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))
 const messagesOf = (userId: string, botId: string) => and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId))
 const eventsOf = (userId: string, botId: string) => and(eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.botId, botId))
+
+type LoadedConversation = { summary: string | null; memory: string; messages: StoredMessage[] }
+
+async function readConversationRows(userId: string, botId: string) {
+  const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+  const through = session?.summaryThrough ?? 0
+  const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message })
+    .from(coordinatorMessages)
+    .where(and(messagesOf(userId, botId), gt(coordinatorMessages.position, through)))
+    .orderBy(asc(coordinatorMessages.position))
+  return { session, rows }
+}
+
+function conversationWithMemory({ session, rows }: Awaited<ReturnType<typeof readConversationRows>>, memoryEnabled: boolean): LoadedConversation {
+  const memory = memoryEnabled ? session?.memory ?? '' : ''
+  return { summary: session?.summary ?? null, memory, messages: rows.filter(row => (row.message as { mikkaRetried?: unknown }).mikkaRetried !== true).map(row => {
+    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retried, mikkaScheduleResult: _schedule, mikkaDisplay: _display, ...message } = row.message
+    const schedule = scheduleChatResultSchema.safeParse(_schedule)
+    if (message.role === 'assistant' && !message.content && schedule.success) {
+      const task = schedule.data.task
+      message.content = `Schedule ${JSON.stringify(schedule.data.title)} ${schedule.data.status}.${task ? ` Task ${JSON.stringify(task.title)} has status ${task.status}.` : ''}`
+    }
+    return { position: row.position, message: message as unknown as ModelMessage }
+  }) }
+}
+
+/** Preserve the combined historical SQL read measured by the startup receipt fixtures. */
+export async function loadConversationForPrompt(userId: string, botId: string): Promise<LoadedConversation & { personalInstructions: string }> {
+  const [conversation, preferences] = await Promise.allSettled([
+    readConversationRows(userId, botId),
+    readCoordinatorPromptPreferences(userId),
+  ])
+  if (conversation.status === 'rejected') throw conversation.reason
+  if (preferences.status === 'rejected') throw preferences.reason
+  return {
+    ...conversationWithMemory(conversation.value, preferences.value.memoryEnabled),
+    personalInstructions: preferences.value.personalInstructions,
+  }
+}
 
 async function nextPosition(executor: Executor, userId: string, botId: string): Promise<number> {
   await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId}`},0))`)
