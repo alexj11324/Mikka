@@ -7,6 +7,7 @@ on:
     # The cheap check compares canonical installed-worker/template inputs
     # across the complete push. Unrelated app edits never acquire the release queue.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths: &runtime_paths
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -69,6 +70,8 @@ concurrency:
 
 jobs:
   test:
+    # Skip expensive PR proof while drafting; main/manual runs are unaffected.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
