@@ -2315,7 +2315,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "a442da7db3ad144a94c7fb93a4100f27846137ce86b699f48eb1c3564275a7ce"
+      "sourceHash": "caa390a789f43529092d96d3e40adb3c41225bb9f4bb015ed88564c71885adb4"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/model-admission",
