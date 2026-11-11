@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import {
-  assessUpgrade, assertPinnedImage, ensureRegularEnvFile, migrationsFingerprint,
+  assessUpgrade, assertPinnedImage, compareStableTags, ensureRegularEnvFile, migrationsFingerprint,
   parseStableRelease, releaseFromWebhook, STABLE_TAG, verifySignature
 } from './self-hosted-update-policy.mjs'
-import { replaceImage } from './self-hosted-update.mjs'
+import { hashProgram, replaceImage } from './self-hosted-update.mjs'
 
 const previous = '1'.repeat(40)
 const next = '2'.repeat(40)
@@ -27,6 +28,10 @@ test('only explicit stable semver with trusted release metadata activates an ima
   assert.throws(() => parseStableRelease({ ...release, body: '' }), /RELEASE_UNVERIFIED/)
   assert.throws(() => parseStableRelease({ ...release, prerelease: true }), /RELEASE_NOT_STABLE/)
   assert.throws(() => parseStableRelease({ ...release, draft: true }), /RELEASE_NOT_STABLE/)
+  assert.equal(compareStableTags('v1.2.3', 'v1.2.2'), 1)
+  assert.equal(compareStableTags('v2.0.0', 'v1.999.999'), 1)
+  assert.equal(compareStableTags('v1.2.3', 'v1.2.3'), 0)
+  assert.equal(compareStableTags('v1.2.2', 'v1.2.3'), -1)
 })
 
 test('webhook requires raw-body HMAC and exact repository, action, and release type', () => {
@@ -86,6 +91,7 @@ test('migration inventory changes when a SQL or metadata file changes', () => {
     const first = migrationsFingerprint(dir)
     assert.match(first, /^[a-f0-9]{64}$/)
     assert.equal(migrationsFingerprint(dir), first)
+    assert.equal(execFileSync(process.execPath, ['-e', hashProgram], { cwd: temp, encoding: 'utf8' }).trim(), first)
     writeFileSync(join(dir, 'meta', 'journal.json'), '{"entries":[]}\n')
     assert.notEqual(migrationsFingerprint(dir), first)
   } finally { rmSync(temp, { recursive: true, force: true }) }
