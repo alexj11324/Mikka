@@ -7,7 +7,6 @@ import { audienceChange, readableAccounts, rechain, type AccessLink } from './au
 
 const OWNER = 'owner'
 const MEMBER = 'member'
-const STRANGER = 'stranger'
 const GRANTEE = 'grantee'
 const MEMBERS = [OWNER, MEMBER]
 
