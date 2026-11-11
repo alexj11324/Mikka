@@ -21,14 +21,16 @@ mock.module(u('../app/actions/issue-operations.ts'), { namedExports: { getDelete
 mock.module(u('../lib/document-sync.ts'), { namedExports: { DocumentSync: class { constructor() { throw new Error('read-only must not construct DocumentSync') } } } })
 const stub = (name: string) => () => <div data-stub={name} />
 for (const [file, names] of [
-  ['issue-detail-actions', ['IssueDetailActions']], ['issue-description-history', ['IssueDescriptionHistory']], ['issue-relations', ['IssueRelations']],
-  ['issue-members', ['IssueMembers']], ['issue-detail-properties', ['IssueDetailProperties']],
+  ['issue-description-history', ['IssueDescriptionHistory']], ['issue-relations', ['IssueRelations']],
+  ['issue-members', ['IssueMembers']],
   ['issue-thread-panel', ['IssueThreadPanel']], ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']], ['issue-activity-feed', ['IssueActivityFeed']],
 ] as const) mock.module(u(`../components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, stub(name)])) })
 mock.module(u('../components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: stub('IssueThreads'), useAgentActivity: () => ({ rows: [], error: null }) } })
-// The layer-drawn page (task-detail slot) is not under test here; its hooks read actions these mocks leave out.
-mock.module(u('../components/workspace/task-detail-frame.tsx'), { namedExports: { FramedTask: () => null } })
-mock.module(u('../components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ saveLabel }: { saveLabel: string }) => <header data-save-label={saveLabel}>{saveLabel}</header> } })
+mock.module(u('../components/workspace/task-detail-frame.tsx'), { namedExports: {
+  FramedTask: (props: import('../components/workspace/task-detail-frame').FramedTaskProps) =>
+    <><header data-save-label={props.saveLabel} />{props.editor(null, discussions =>
+      <textarea id="issue-comment" disabled={discussions.readOnly} />)}</>,
+} })
 
 const browser = new Window({ url: 'https://mikka.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']

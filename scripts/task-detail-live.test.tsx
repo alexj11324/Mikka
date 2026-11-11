@@ -84,19 +84,30 @@ for (const [file, names] of [
   ['issue-relations', ['IssueRelations']], ['issue-members', ['IssueMembers']], ['issue-thread-panel', ['IssueThreadPanel']],
   ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']],
 ] as const) mock.module(at(`components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, none])) })
-mock.module(at('components/workspace/issue-detail-actions.tsx'), { namedExports: { IssueDetailActions: ({ onHistory, disabled }: { onHistory: () => void; disabled: boolean }) => <button disabled={disabled} data-history="" onClick={onHistory}>History</button> } })
 const emptyThreads = { data: [] }
 mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useAgentActivity: () => ({ rows: [], error: null }) } })
-// The layer-drawn page (task-detail slot) is not under test here; its hooks read actions these mocks leave out.
-mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: { FramedTask: () => null } })
-mock.module(at('components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ actions }: { actions: ReactNode }) => <header>Task{actions}</header> } })
-mock.module(at('components/workspace/issue-detail-properties.tsx'), { namedExports: { IssueDetailProperties: ({ status, priority, task }: { status: string; priority: string; task: IssueView }) =>
-  <output data-properties="" data-revision={task.revision}>{status}:{priority}</output> } })
+// The controller is mounted with a minimal renderer for the official frame contract.
+const { IssueActivityFeed } = await import('../components/workspace/issue-activity-feed')
+mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
+  FramedTask: (props: import('../components/workspace/task-detail-frame').FramedTaskProps) => {
+    const { rootRef, onKeyDown, preview, locked, status, priority, titleField, onHistory, task } = props
+    return <div ref={rootRef} onKeyDown={onKeyDown} role="region" aria-busy={preview}>
+      <textarea id="task-title" value={titleField.value} readOnly={titleField.readOnly}
+        onChange={event => titleField.onChange(event.currentTarget.value)} onBlur={titleField.onBlur}
+        onCompositionStart={titleField.onCompositionStart} onCompositionEnd={titleField.onCompositionEnd} onKeyDown={titleField.onKeyDown} />
+      <button data-history="" disabled={locked} onClick={onHistory}>History</button>
+      <output data-properties="" data-revision={task.revision}>{status}:{priority}</output>
+      {props.editor(null, () => null)}
+      <section data-activity="">{!preview && <IssueActivityFeed versions={props.versions} children={[]} agents={props.agentActivity.rows} />}</section>
+      {props.panel}{props.dialogs}
+    </div>
+  },
+} })
 mock.module(at('components/workspace/issue-editor.tsx'), { namedExports: {
   // An empty valid Yjs seed keeps the real DocumentSync lifecycle in this test.
   createDocumentSeed: () => new Uint8Array([0, 0]),
   IssueEditor: ({ content, sharedDoc, disabled, onChange, activity, afterDescription }: { sharedDoc?: import('yjs').Doc; content: JSONContent; disabled: boolean; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
-    <><button data-discussion-write="" disabled={disabled} onClick={() => sharedDoc?.getMap('threads').set('fixture-comment', 'Only a discussion changed')}>Comment</button><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}<section data-activity="">{activity}</section></>,
+    <><button data-discussion-write="" disabled={disabled} onClick={() => sharedDoc?.getMap('threads').set('fixture-comment', 'Only a discussion changed')}>Comment</button><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}{activity}</>,
 } })
 
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })
