@@ -40,7 +40,9 @@ const database = drizzle(async (query, params) => {
   if (query.includes('"chat_messages"')) {
     const after = query.match(/"coordinator_messages"\."position" > \$(\d+)/)
     const rows = messages.filter(row => !after || row.position > Number(params[Number(after[1]) - 1])).toReversed()
-    return { rows: [[null, null, null, null, null, rows, []]] }
+    // Column order follows the store's select: five session lease fields, then
+    // the fold summary and its cursor, then the rows and the waiting inbox.
+    return { rows: [[null, null, null, null, null, null, null, rows, []]] }
   }
   if (query.includes('"latest"')) {
     return { rows: [[null, null, null, null, null, 4, storedHash, 'assistant', 'latest:0', createdAt, []]] }

@@ -1,4 +1,5 @@
 import { chatProjectionHash } from './chat-projection-version'
+import { conversationUsage, type ConversationUsage } from './context-usage'
 import { captureRunFailure, readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { APP_BUILD } from '@/lib/app-build'
 import { sourcedEventMessage } from './message-safety'
@@ -673,6 +674,13 @@ export interface ChatView {
   /** Response-only, consumed before the snapshot enters SWR or persistence. */
   toolMetadata?: ChatToolMetadata
   historyBefore?: number
+  /**
+   * How full this conversation is, in the same estimate the fold uses
+   * (lib/coordinator/context-usage.ts). An estimate from stored text, never a
+   * provider count; it shows how near the next fold is, not a share of a
+   * window Mikka does not store.
+   */
+  context?: ConversationUsage
 }
 
 /** The reasoning text of this person's stored messages at `positions` in one chat, in order; stored messages are already masked (appendMessages). */
@@ -796,7 +804,9 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
 /** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
 export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
   const reader = await chatReader(userId, botId)
-  const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, lastFailure: coordinatorSessions.lastFailure })
+  const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, lastFailure: coordinatorSessions.lastFailure,
+    // Read alongside the session so the context figure measures the same fold boundary the prompt uses.
+    summary: coordinatorSessions.summary, summaryThrough: coordinatorSessions.summaryThrough })
     .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
   const messagesRead = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage.as('message'), createdAt: coordinatorMessages.createdAt })
@@ -814,7 +824,8 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   // Claiming an inbox atomically changes all three tables. A session read from
   // before that commit with messages/inbox from after it invents a failed turn.
   // One bounded statement keeps their snapshot together without a held lock.
-  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, lastFailure: sessionRead.lastFailure, rows: storedRead.rows,
+  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, lastFailure: sessionRead.lastFailure,
+    summary: sessionRead.summary, summaryThrough: sessionRead.summaryThrough, rows: storedRead.rows,
     waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
   }).from(storedRead).leftJoin(sessionRead, sql`true`)
   const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt, lastFailure: snapshot.lastFailure }
@@ -847,6 +858,12 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
     artifacts: await artifactSummaries(reader, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
     continuation: { after, prefix: await chatPrefix(userId, botId, after), cursor: last },
     ...(hasMore && rows[0] ? { historyBefore: rows[0].position } : {}),
+    // How full this conversation is, in the same estimate the fold uses. Measured
+    // over the turns after the last fold, which is what the next prompt carries.
+    context: conversationUsage(
+      typeof snapshot.summary === 'string' ? snapshot.summary : null,
+      rows.filter(row => row.position > (snapshot.summaryThrough ?? 0)).map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })),
+    ),
   }
   return { chat, ...chatReadObservation(session, waiting, now) }
 }
