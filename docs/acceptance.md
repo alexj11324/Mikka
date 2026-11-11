@@ -140,8 +140,8 @@ default. A personal request never falls back to a team or borrows its subscripti
 Use the existing `SMOKE_OWNER_EMAIL` / `SMOKE_OWNER_PASSWORD` binding for an
 authorized ordinary test account; do not copy the execution host's CLI identity.
 The existing account-pool runner can also supply its own generated credentials
-in process for an attested loopback environment. That path requires the signed
-descriptor, matching compiled deployment SHA and database attestation; it does
+in process for an attested loopback environment. That path requires the private
+bound descriptor, matching compiled deployment SHA and database attestation; it does
 not admit ordinary account credentials on a production origin.
 
 Start with metadata readiness against the isolated local application:

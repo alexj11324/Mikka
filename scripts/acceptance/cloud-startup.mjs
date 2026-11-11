@@ -1042,7 +1042,8 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
   const report = { schemaVersion: 1, issue: 1505, fixtureId, startedAt: iso(now()), mode: options.mode,
     origin: options.origin, repository: REPOSITORY, requestedStrategy: options.strategy,
     strategyEvidence: 'operator_label_requires_template_or_pool_log_evidence', revision: options.revision ?? null,
-    target: options.deviceId ? 'candidate_device' : 'cloud', maxStartupMs: options.maxStartupMs,
+    target: options.workspaceKind === 'personal' && options.operation === 'readiness' ? 'personal_readiness'
+      : options.deviceId ? 'candidate_device' : 'cloud', maxStartupMs: options.maxStartupMs,
     timingMethod: 'dispatch_run_entry to later of agent_start database receipt and actual official task acceptance; missing entry boundary is legacy lower-bound evidence only',
     executionGate: options.runtimeEvidence === 'required' ? 'later_of_agent_start_and_actual_official_cli_acceptance' : 'legacy_agent_start_actual_ack_unavailable',
     samples: [], cleanup: { errors: [] }, status: 'running', phase: 'build_pin' }

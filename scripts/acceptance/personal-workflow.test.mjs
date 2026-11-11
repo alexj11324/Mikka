@@ -91,6 +91,7 @@ test('metadata readiness restores the original Workspace and never creates work 
   const io = fixture()
   const report = await runCloudStartup(options(['--harness', 'codex', '--device-id', deviceId, '--agent-id', agentId]), { ...io, env })
   assert.equal(report.status, 'ready_for_attempt')
+  assert.equal(report.target, 'personal_readiness')
   assert.equal(report.executionVerified, false)
   assert.equal(report.cleanup.workspaceRestored, true)
   assert.deepEqual(report.samples, [])
