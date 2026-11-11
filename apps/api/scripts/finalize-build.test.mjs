@@ -26,7 +26,7 @@ test('final packaging retains every route but does not duplicate equivalent API 
     await writeFile(join(directory, 'index.mjs'), 'export default null\n')
     await writeFile(join(directory, '.vc-config.json'), JSON.stringify(configuration))
   }
-  const result = await finalizeBuild({ root, output, preset: 'vercel', revision: 'a'.repeat(40) })
+  const result = await finalizeBuild({ root, output, preset: 'vercel', revision: process.env.MIKKA_TEST_DEPLOYMENT_SHA || 'a'.repeat(40) })
   assert.equal(result.functions.length, 1)
   assert.ok((await lstat(join(output, 'functions/b.func'))).isSymbolicLink())
   assert.equal((JSON.parse(await readFile(join(output, 'config.json')))).routes.length, 2)
