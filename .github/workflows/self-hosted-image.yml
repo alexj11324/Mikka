@@ -32,15 +32,23 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Validate backend and migration dependencies for self-hosted installations
+        run: |
+          node --test scripts/ci/self-hosted-requirements.test.mjs scripts/release/self-hosted-stable.test.mjs
+          node scripts/ci/self-hosted-requirements.mjs
       - name: Verify disposable acceptance target guards and model fixture
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
       - name: Verify stable release webhook and safe self-hosted update policy
-        run: node --test scripts/self-hosted-update.test.mjs scripts/self-hosted-update-smoke.test.mjs
+        run: node --test scripts/self-hosted-update.test.mjs scripts/self-hosted-update-smoke.test.mjs scripts/self-hosted-update-events.test.mjs
       - name: Verify managed PostgreSQL Compose contract (offline)
         run: node --test scripts/acceptance/self-hosted-neon-compose.test.mjs
+      - name: Restore backup from the host updater into a fresh PostgreSQL database
+        run: node --test scripts/acceptance/self-hosted-update-backup.test.mjs
       - name: Build the public standalone application
         run: |
           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
@@ -70,6 +78,8 @@ jobs:
         run: node scripts/self-hosted-smoke.mjs
         env:
           MIKKA_EXPECTED_REVISION: ${{ github.sha }}
+      - name: Exercise the host updater's post-activation API checks on this image
+        run: docker compose exec -T -e "MIKKA_EXPECTED_REVISION=$GITHUB_SHA" app node scripts/self-hosted-update-smoke.mjs
       - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 app node scripts/acceptance/self-hosted-services.mjs
@@ -172,10 +182,10 @@ jobs:
           image=ghcr.io/alexj11324/mikka
           docker tag mikka-self-hosted:check "$image:$GITHUB_SHA"
           docker push "$image:$GITHUB_SHA"
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            docker tag mikka-self-hosted:check "$image:$GITHUB_REF_NAME"
-            docker push "$image:$GITHUB_REF_NAME"
-          elif [ "$GITHUB_REF" = refs/heads/main ]; then
+          receipt="$image:ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker tag mikka-self-hosted:check "$receipt"
+          docker push "$receipt"
+          if [ "$GITHUB_REF" = refs/heads/main ]; then
             docker tag mikka-self-hosted:check "$image:latest"
             docker push "$image:latest"
           fi

@@ -15,16 +15,17 @@ const previous = '1'.repeat(40)
 const next = '2'.repeat(40)
 const before = 'a'.repeat(64)
 const after = 'b'.repeat(64)
-const marker = '<!-- mikka-self-hosted-release-v1 sha=' + next + ' migrations=' + after + ' protocol=0-1 -->'
+const marker = '<!-- mikka-self-hosted-release-v2 sha=' + next + ' digest=sha256:' + before + ' migrations=' + after + ' protocol=0-1 -->'
 const release = { tag_name: 'v1.2.3', draft: false, prerelease: false, body: marker }
 
 test('only explicit stable semver with trusted release metadata activates an image', () => {
   const target = parseStableRelease(release)
-  assert.deepEqual(target, { tag: 'v1.2.3', revision: next, migrations: after, image: 'ghcr.io/alexj11324/mikka:v1.2.3' })
+  assert.deepEqual(target, { tag: 'v1.2.3', revision: next, migrations: after, image: 'ghcr.io/alexj11324/mikka@sha256:' + before })
   for (const tag of ['latest', 'main', 'v1.2.3-rc.1', 'v01.2.3', 'desktop-2026.1.1', 'v1.2.3;touch /tmp/unsafe', 'v1.2']) {
     assert.equal(STABLE_TAG.test(tag), false)
     assert.throws(() => parseStableRelease({ ...release, tag_name: tag }), /SELF_HOSTED_UPDATE_RELEASE_NOT_STABLE/)
   }
+  assert.throws(() => parseStableRelease({ ...release, body: marker.replace('sha256:', 'sha1:') }), /RELEASE_UNVERIFIED/)
   assert.throws(() => parseStableRelease({ ...release, body: '' }), /RELEASE_UNVERIFIED/)
   assert.throws(() => parseStableRelease({ ...release, prerelease: true }), /RELEASE_NOT_STABLE/)
   assert.throws(() => parseStableRelease({ ...release, draft: true }), /RELEASE_NOT_STABLE/)

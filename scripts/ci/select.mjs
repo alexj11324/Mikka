@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { filterAffected } from 'nx/src/project-graph/affected/affected-project-graph.js'
 import { buildGraph, dbId, taskId } from './graph.mjs'
+import { isSelfHostedBackendInput } from './self-hosted-requirements.mjs'
 import { isDocsOnly } from '../ci-docs-only.mjs'
 import tasks from './tasks.json' with { type: 'json' }
 
@@ -68,7 +69,7 @@ export async function select(plan, changes, { force = false } = {}) {
     source: !docs, daemon: !docs && (full || selected.has('@mikka/daemon') || areas.includes('daemon')),
     mobile: !docs && (full || selected.has('@mikka/mobile') || areas.includes('mobile')),
     desktop: !docs && (full || selected.has('@mikka/desktop') || areas.includes('desktop')),
-    image: !docs && (full || areas.includes('self-hosted/image') || areas.includes('database/migrations') || files.some(f => area(f) === 'api/factory/coordinator' && !/\.(?:test|spec)\.[^.]+$/.test(f))),
+    image: !docs && (full || areas.includes('self-hosted/image') || files.some(isSelfHostedBackendInput) || files.some(f => area(f) === 'api/factory/coordinator' && !/\.(?:test|spec)\.[^.]+$/.test(f))),
     analytics: !docs && (full || files.some(f => /analytics|posthog|instrumentation|^apps\/frontend\/|^app\/\[locale\]\/layout/.test(f))),
   }
   return { version: 1, full, docs_only: docs, areas, reasons, affected, units,

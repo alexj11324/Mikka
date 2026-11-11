@@ -1,0 +1,8 @@
+{
+  "lib/db/direct-session.ts": {
+    "mode": "built-in",
+    "environment": ["MIKKA_DATABASE_URL", "MIKKA_DATABASE_URL_UNPOOLED"],
+    "behavior": "Dedicated connections preserve session locks and use the external installation's direct URL or its bundled PostgreSQL connection.",
+    "test": "scripts/postgres-connection.test.mjs"
+  }
+}

@@ -5,7 +5,7 @@ import { join, relative } from 'node:path'
 export const UPSTREAM_REPOSITORY = 'alexj11324/Mikka'
 export const IMAGE_REPOSITORY = 'ghcr.io/alexj11324/mikka'
 export const STABLE_TAG = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/
-const RELEASE_MARKER = /<!-- mikka-self-hosted-release-v1 sha=([0-9a-f]{40}) migrations=([0-9a-f]{64}) protocol=0-1 -->/
+const RELEASE_MARKER = /<!-- mikka-self-hosted-release-v2 sha=([0-9a-f]{40}) digest=(sha256:[0-9a-f]{64}) migrations=([0-9a-f]{64}) protocol=0-1 -->/
 
 export function parseStableRelease(release) {
   if (!release || typeof release !== 'object' || release.draft || release.prerelease ||
@@ -14,7 +14,7 @@ export function parseStableRelease(release) {
   }
   const match = typeof release.body === 'string' ? release.body.match(RELEASE_MARKER) : null
   if (!match) throw new Error('SELF_HOSTED_UPDATE_RELEASE_UNVERIFIED')
-  return { tag: release.tag_name, revision: match[1], migrations: match[2], image: IMAGE_REPOSITORY + ':' + release.tag_name }
+  return { tag: release.tag_name, revision: match[1], migrations: match[3], image: assertPinnedImage(IMAGE_REPOSITORY + '@' + match[2]) }
 }
 
 /** A signed old webhook must not downgrade a server after a newer release. */
