@@ -101,9 +101,6 @@ function restoreOldApp(envText, oldImage) {
   compose(['exec', '-T', 'app', 'node', 'scripts/self-hosted-health.mjs'], { ...process.env, MIKKA_IMAGE: oldImage })
 }
 function assertOption(value) { if (!value) fail('SELF_HOSTED_UPDATE_EXPLICIT_IDLE_ACK_REQUIRED') }
-function executeRelease(tag, opts) {
-  return githubRelease(tag).then(release => performUpgrade(release, opts))
-}
 async function performUpgrade(release, opts) {
   mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
   const state = lstatSync(stateDirectory)
@@ -115,6 +112,7 @@ async function performUpgrade(release, opts) {
   try { lock = openSync(lockPath, 'wx', 0o600) }
   catch { fail('SELF_HOSTED_UPDATE_ALREADY_RUNNING') }
   let drained = false
+  let recoveryRequired = false
   try {
     ensureRegularEnvFile(environmentFile)
     if (opts.auto && (!process.env.MIKKA_UPDATE_IDLE_GUARD || !process.env.MIKKA_UPDATE_DRAIN_HOOK)) fail('SELF_HOSTED_UPDATE_DRAIN_REQUIRED')
@@ -158,11 +156,9 @@ async function performUpgrade(release, opts) {
     else runHook('MIKKA_EXTERNAL_DB_BACKUP_HOOK', backupDirectory)
     // Closing traffic and proving no active task are operator-supplied gates.
     // Stop before copying app-data so the snapshot is not racing its writer.
-    let stopped = false
     let activated = false
     try {
       compose(['stop', '-t', '60', 'app'])
-      stopped = true
       mkdirSync(join(backupDirectory, 'app-data'), { mode: 0o700 })
       docker(['cp', original.id + ':/data/.', join(backupDirectory, 'app-data')])
       saveAtomic(environmentFile, replaceImage(originalEnvironment, digest))
@@ -181,23 +177,22 @@ async function performUpgrade(release, opts) {
         try { restoreOldApp(originalEnvironment, original.image); restored = true }
         catch { /* Preserve backup for manual recovery. */ }
         if (restored) fail('SELF_HOSTED_UPDATE_REVERTED_TO_PREVIOUS_IMAGE')
+        recoveryRequired = true
         fail('SELF_HOSTED_UPDATE_MANUAL_RECOVERY_REQUIRED')
       }
-      // New startup may have executed DDL. Never silently run old binaries
-      // against a potentially advanced schema or restore a live database.
+      // DDL may already have run. Keep traffic drained and preserve the
+      // candidate plus the private backups for explicit forward recovery.
+      recoveryRequired = true
       fail('SELF_HOSTED_UPDATE_MIGRATION_RECOVERY_REQUIRED')
-    } finally {
-      if (stopped && !activated) {
-        try { restoreOldApp(originalEnvironment, original.image) } catch { /* fail-closed recovery required */ }
-      }
     }
   } finally {
-    if (drained) {
-      try { runHook('MIKKA_UPDATE_DRAIN_HOOK', 'disable') }
-      catch { console.error('SELF_HOSTED_UPDATE_DRAIN_RELEASE_FAILED') }
+    try {
+      if (drained && !recoveryRequired) runHook('MIKKA_UPDATE_DRAIN_HOOK', 'disable')
+      else if (drained) console.error('SELF_HOSTED_UPDATE_TRAFFIC_REMAINS_DRAINED')
+    } finally {
+      closeSync(lock)
+      unlinkSync(lockPath)
     }
-    closeSync(lock)
-    unlinkSync(lockPath)
   }
 }
 
