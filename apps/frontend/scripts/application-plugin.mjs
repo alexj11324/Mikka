@@ -14,6 +14,7 @@ const actionDirectory = resolve(repository, 'app/actions')
 const slash = value => value.split(sep).join('/')
 const builtins = new Set(builtinModules.flatMap(name => [name, `node:${name}`]))
 const officialSlot = '\0mikka:official-slot:'
+const officialContract = 'mikka:official-slot-contract'
 const virtualAction = '\0mikka:action:'
 const commonAliases = new Map([
   ['next/navigation', 'next-navigation.ts'], ['next/link', 'next-link.tsx'], ['next/dynamic', 'dynamic.tsx'],
@@ -85,6 +86,7 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
     configResolved(config) { development = config.command === 'serve' },
     async resolveId(source, importer, options) {
       if (source.startsWith('\0mikka:')) return source
+      if (source === officialContract && uiSlots.dir) return '\0' + source
       if (source === 'mikka:platform') return resolve(target === 'desktop' ? renderer : resolve(frontend, 'src/web'), 'platform.tsx')
       if (source === 'mikka:frontend-runtime' || source === 'mikka:native-offline' || source === 'mikka:native-offline.css') return `\0${source}`
       if (source === 'mikka:renderer-build') {
@@ -117,6 +119,12 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
       return resolved
     },
     async load(id) {
+      if (id === '\0' + officialContract) {
+        // Link every mandatory export, including providers for lazy or disabled
+        // surfaces. The validation imports must not initialize unused features.
+        const code = Object.keys(UI_SLOT_EXPORTS).map(name => `import ${JSON.stringify(SLOT_PREFIX + name)}`).join('\n')
+        return { code, moduleSideEffects: false }
+      }
       if (id.startsWith(officialSlot)) {
         const name = id.slice(officialSlot.length)
         const provider = JSON.stringify(uiSlots.absolute[SLOT_PREFIX + name])
@@ -125,7 +133,8 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
         return `export * from ${provider}; export { ${UI_SLOT_EXPORTS[name].join(', ')} } from ${provider};`
       }
       if (id === '\0mikka:frontend-runtime') {
-        return frontendRuntimeSource(target, { development, frontend, renderer })
+        const runtime = frontendRuntimeSource(target, { development, frontend, renderer })
+        return uiSlots.dir && !development ? `import ${JSON.stringify(officialContract)};\n${runtime}` : runtime
       }
       if (id === '\0mikka:renderer-build') return 'export const rendererBuild = "development";'
       if (id === '\0mikka:native-offline' || id === '\0mikka:native-offline.css') return (await offline.load({ path: id.slice(1) })).contents
