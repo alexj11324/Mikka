@@ -40,14 +40,22 @@ export function createEveApprovalBridge(deps:{store:ApprovalStore;run(call:Appro
       const key=keyOf(call), prior=await deps.store.read(key)
       if(prior) {sameCall(prior,call);return {status:prior.decision==='ask'?'user-approval':prior.decision==='deny'?'denied':'not-applicable'}}
       let decision:NativeWriteDecision='deny', planDigest=digest(['unavailable'])
+      let reviewed=false
       signal?.throwIfAborted()
-      await deps.run(call,async(value,binding)=>{
+      const output=await deps.run(call,async(value,binding)=>{
         signal?.throwIfAborted()
         if(binding.ownerId!==call.ownerId||binding.botId!==call.botId)throw new Error('operationBindingConflict')
+        reviewed=true
         decision=value;planDigest=digest([value,binding])
         return 'deny' // Stop before any proposal INSERT or provider dispatch.
       },signal)
-      const record=await deps.store.prepare(key,{callDigest:digest(call),planDigest,decision,status:'prepared'})
+      if(!reviewed) {
+        // Account selection, disconnected apps and policy refusals stop before
+        // the dispatch gate. Keep their useful business output for execution.
+        if(!output||typeof output!=='object'||!('error'in output)||typeof output.error!=='string')throw new Error('operationBindingConflict')
+        decision='allow';planDigest=digest(['preflight-result',output])
+      }
+      const record=await deps.store.prepare(key,{callDigest:digest(call),planDigest,decision,status:reviewed?'prepared':'done',...reviewed?{}:{output}})
       sameCall(record,call)
       if(record.planDigest!==planDigest)throw new Error('writePolicyChanged')
       return {status:record.decision==='ask'?'user-approval':record.decision==='deny'?'denied':'not-applicable'}

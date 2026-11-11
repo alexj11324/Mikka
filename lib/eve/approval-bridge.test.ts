@@ -4,7 +4,7 @@ import { createEveApprovalBridge, type ApprovalCall, type ApprovalRecord } from 
 
 const call: ApprovalCall = { ownerId:'owner',botId:'bot',workspaceId:'workspace',surface:'web',sessionId:'session',turnId:'turn',callId:'call',name:'send_email',input:{to:['person@example.invalid'],body:'Final text'},sourceEventId:'event' }
 const responder = {authenticator:'mikka',principalType:'user',principalId:'owner',attributes:{botId:'bot',workspaceId:'workspace',surface:'web'}}
-function fixture(decision:'allow'|'ask'|'deny'='ask') {
+function fixture(decision:'allow'|'ask'|'deny'='ask',early?:unknown) {
   const records = new Map<string,ApprovalRecord>()
   let sends = 0
   const audits:string[]=[]
@@ -19,6 +19,7 @@ function fixture(decision:'allow'|'ask'|'deny'='ask') {
       async finish(key,output) { Object.assign(records.get(key)!,{status:'done',output}) },
     },
     async run(_call,review) {
+      if(early!==undefined)return early
       const result=await review(decision,{ownerId:call.ownerId,botId:call.botId,action:call.name,input:call.input,accountId:'account',version})
       if(result!=='allow') return {error:result==='deny'?'integrationActionDenied':'integrationApprovalRequired'}
       sends++
@@ -104,4 +105,13 @@ test('an aborted native response cannot claim or dispatch the write',async()=>{
   assert.equal(f.sends(),0);assert.deepEqual(f.audits,[])
   await f.bridge.execute(call,responder)
   assert.equal(f.sends(),1)
+})
+
+test('account selection and connection errors survive native preflight without a prompt or send',async()=>{
+  for(const output of [{error:'integrationAccountSelectionRequired',accounts:[{id:'account-a',alias:'Work'},{id:'account-b',alias:'Personal'}]},{error:'integrationNotConnected'}]) {
+    const f=fixture('ask',output)
+    assert.equal((await f.bridge.review(call))?.status,'not-applicable')
+    assert.deepEqual(await f.bridge.execute(call),output)
+    assert.equal(f.sends(),0);assert.deepEqual(f.audits,[])
+  }
 })
