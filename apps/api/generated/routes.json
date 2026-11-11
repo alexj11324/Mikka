@@ -2107,6 +2107,17 @@
       "sourceHash": "4bbd05f3ec67d39a691094ce7e2bc2b8558d37d1fa5c9ecb80237c33f728814a"
     },
     {
+      "path": "/mikka/api/tasks/[taskId]/attachments",
+      "template": "/api/tasks/[taskId]/attachments",
+      "source": "app/api/tasks/[taskId]/attachments/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "79f9d760e1f9c920238ab98e0813ba727b4ec2a3cf78388663e8e15d2ac305f6"
+    },
+    {
       "path": "/mikka/api/tasks/[taskId]/review",
       "template": "/api/tasks/[taskId]/review",
       "source": "app/api/tasks/[taskId]/review/route.ts",

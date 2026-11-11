@@ -95,7 +95,12 @@ export function useIssueConnections({ liveWorkspaceId = null, viewerId, task, ge
   async function status(id: string, revision: number, status: string) {
     if (busy.current || disabled) return
     busy.current = true; setPending(true)
-    try { const result = await moveIssue({ id, revision, status }); if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error)); await mutate(); toast.success(t('childStatusUpdated')) }
+    try {
+      const result = await moveIssue({ id, revision, status })
+      if (!('issue' in result) || !result.issue) throw new Error(actionError(result.error))
+      await Promise.all([mutate(), refresh(key => isIssueListKey(key, viewerId))])
+      toast.success(t('childStatusUpdated'))
+    }
     catch (error) { toast.error(error instanceof Error ? error.message : t('statusSaveFailed')) }
     finally { busy.current = false; setPending(false) }
   }

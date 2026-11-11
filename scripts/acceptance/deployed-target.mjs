@@ -96,7 +96,7 @@ async function driverAndIssue(read, guard) {
   check(issue.state === 'open', 'target_issue', 'issue_closed')
 }
 
-async function webPublication(read, guard) {
+export async function webPublication(read, guard) {
   const run = await read.github('/actions/runs/' + guard.webDeployRunId)
   check(run?.id === guard.webDeployRunId && positive(run.run_attempt) && run.event === 'push'
     && run.repository?.full_name === REPOSITORY && run.repository.owner?.login === OWNER
