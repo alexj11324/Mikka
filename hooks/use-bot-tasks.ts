@@ -11,7 +11,13 @@ export type { TaskGroup, TaskReason } from '@/lib/task-state'
 export type TaskState = CanonicalTaskState | 'idle'
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export const TASK_GROUPS: readonly TaskGroup[] = ['pending', 'running', 'todo', 'done']
-export type TaskRow = { issue: Issue; current: Thread; attempts: number } & TaskStateView
+export type TaskRow = {
+  issue: Issue
+  /** The task's newest attempt; null for a task the Factory has never run (it is still a task). */
+  current: Thread | null
+  /** How many attempts the task has had; 0 for one never run. */
+  attempts: number
+} & TaskStateView
 
 type LegacySlotRun = Omit<TaskStateRun, 'runId' | 'outcome'> & { runId?: string; outcome?: string | null }
 
@@ -38,7 +44,15 @@ export function localTaskState(issue: BlockIssue, run?: LegacySlotRun | null): {
   return { state, reason }
 }
 
-/** Join the web's existing live lists once. No per-task requests. */
+/**
+ * Join the web's existing live lists once. No per-task requests.
+ *
+ * The task is the business entity and a thread is how one of its attempts ran (decision 2026-11-11: 看板 and its list
+ * are the task's views, there is no separate 任务 page). So the issues drive the rows: a task the Factory has never run
+ * has no thread and is still a task — 待办, or 已完成 once closed. Threads only enrich a row: `current` is that task's
+ * newest one, and `attempts` how many it has had. Threads with no task of this list (another workspace's, or none) are
+ * not rows. Rows keep the issues' order, so the list's own sort shows through.
+ */
 export function tasksOf(threads: readonly Thread[], issues: readonly Issue[]): Record<TaskGroup, TaskRow[]> {
   const byId = new Map(issues.map(issue => [issue.id, issue]))
   const newest = new Map<string, Thread>()
@@ -50,17 +64,17 @@ export function tasksOf(threads: readonly Thread[], issues: readonly Issue[]): R
     if (!current || thread.createdAt > current.createdAt || (thread.createdAt === current.createdAt && thread.id > current.id)) newest.set(thread.issueId, thread)
   }
   const groups: Record<TaskGroup, TaskRow[]> = { pending: [], running: [], todo: [], done: [] }
-  for (const thread of threads) {
-    if (!thread.issueId || newest.get(thread.issueId) !== thread) continue
-    const issue = byId.get(thread.issueId)!
-    const run = { ...thread, runId: thread.id }
-    const block = taskBlock(issue, run, id => {
-      const blocker = byId.get(id)
-      return Boolean(blocker && !['done', 'canceled', 'duplicate'].includes(blocker.status))
-    })
+  const isOpen = (id: string) => {
+    const blocker = byId.get(id)
+    return Boolean(blocker && !['done', 'canceled', 'duplicate'].includes(blocker.status))
+  }
+  for (const issue of issues) {
+    const thread = newest.get(issue.id)
+    const run = thread ? { ...thread, runId: thread.id } : undefined
+    const block = taskBlock(issue, run, isOpen)
     if (block?.blockerId) block.blockerIdentifier = byId.get(block.blockerId)?.identifier ?? null
     const state = taskStateOf(issue, run, { block })
-    groups[state.group].push({ issue, current: thread, attempts: attempts.get(thread.issueId)!, ...state })
+    groups[state.group].push({ issue, current: thread ?? null, attempts: attempts.get(issue.id) ?? 0, ...state })
   }
   return groups
 }
