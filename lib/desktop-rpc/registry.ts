@@ -104,6 +104,8 @@ const functions = {
   'collaboration.listMembers': actions7.listMembers,
   'collaboration.inviteMember': actions7.inviteMember,
   'collaboration.removeMember': actions7.removeMember,
+  'collaboration.setMemberRole': actions7.setMemberRole,
+  'collaboration.setMemberSubscribed': actions7.setMemberSubscribed,
   'coordinator.pollCoordinatorChat': actions8.pollCoordinatorChat,
   'coordinator.syncCoordinatorChat': actions8.syncCoordinatorChat,
   'coordinator.coordinatorHistory': actions8.coordinatorHistory,
