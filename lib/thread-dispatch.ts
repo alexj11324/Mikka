@@ -29,6 +29,7 @@ export { continuationNote } from '@/lib/thread-continuation'
 /** What a dispatch did to the task's thread. */
 export type ThreadDispatch<R extends { runId: string }> =
   | (R & { thread: 'new'; threadId: string; replacedThreadId?: string })
+  | { thread: 'existing'; runId: string; threadId: string }
   | { thread: 'message'; runId: string; threadId: string; status: 'messageSent' | 'alreadyWorking' }
   | (R & { thread: 'continued'; threadId: string; continuesRunId: string })
 
@@ -106,6 +107,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   note?: string
   /** Host-bound raw owner turn, never a model-generated dispatch note. */
   sourceEventId?: string
+  /** A host receipt bound this exact Task to the explicit creation command. */
+  creation?: { eventId: string; botId: string; workspaceId: string }
   /** A browser submission already bound its original target before taking the task lock. */
   expectedRunId?: string
   /** The caller asked for a new thread; it is granted only when `explicit()` says the person asked for it. */
@@ -119,6 +122,22 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   // An error the caller can act on (no machine, say) queued nothing; it goes back as it is.
   const queued = (result: R | E): result is R => 'runId' in result && typeof result.runId === 'string'
   return withTaskLock(userId, issueId, async () => {
+    if (input.creation) {
+      const { eventId, botId, workspaceId } = input.creation
+      // The Factory event and its physical Run commit together. Replaying the
+      // human turn after completion must not start a continuation or send a note.
+      const prior = await pool.query<{ id: string }>(`SELECT r.id FROM factory_tasks t
+        JOIN factory_events e ON e."taskId"=t.id AND e.request->>'sourceEventId'=$4
+        JOIN agent_runs r ON r.id::text=e.result->>'runId' AND r."userId"=t."userId"
+          AND r."issueId"=t."issueId" AND r."workspaceId"=$5
+        WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId"=$3
+        ORDER BY r."createdAt",r.id LIMIT 1`, [userId, issueId, botId, eventId, workspaceId])
+      if (prior.rows[0]) {
+        const runId = prior.rows[0].id
+        const chain = await readRunChain(pool, userId, runId)
+        return { thread: 'existing' as const, runId, threadId: chain?.rootRunId ?? runId }
+      }
+    }
     const previous = await latestTaskRun(pool, userId, issueId)
     if (input.expectedRunId && previous?.id !== input.expectedRunId) throw new ActionFailureError('threadReplaced')
     if (!previous) {

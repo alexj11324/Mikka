@@ -69,13 +69,15 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
     }
   }else recorded=await record(db)
   const {eventId}=recorded
+  let createdTaskId: string | undefined
   if (product.taskCommand) {
     const { createIssueFromRequest } = await import('../coordinator/issue-create')
     const title = product.taskTitle ?? product.taskCommand.description.split(/\r?\n/, 1)[0]!.slice(0, 200)
-    await createIssueFromRequest(scope.ownerId, { sourceEventId: retry?.taskRequestSourceEventId ?? eventId, title })
+    createdTaskId = (await createIssueFromRequest(scope.ownerId, { sourceEventId: retry?.taskRequestSourceEventId ?? eventId, title })).issueId
   }
   ingress.set(request,{scope,eventId})
   const contextual = text === input.text ? [] : [withQuote(withBrowserNotes('',product.notes) ?? '',product.quote)]
+  if (createdTaskId) contextual.push(`The person selected Create and dispatch. The host has created Task ${createdTaskId} for this request. Dispatch that Task with the existing Machine, Profile, approval and resource checks. Reuse any execution receipt for this request.`)
   if(retry)contextual.push('The person explicitly retried this failed request. Continue from the conversation and its completed tool receipts. Do not repeat actions that already succeeded. Keep the original task identity and selected destination, profile and title.')
   return {eventId,context:contextual}
 }

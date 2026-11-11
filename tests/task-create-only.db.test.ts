@@ -98,6 +98,22 @@ test('an explicit automatic-destination dispatch is bound before execution and c
     for (const result of factory) assert.ok(result && !('error' in result), JSON.stringify(result))
     assert.equal((await pool.query('select count(*)::int n from issues where "userId"=$1', [user])).rows[0].n, 1)
     assert.deepEqual((await pool.query('select "issueId" from factory_tasks where "userId"=$1', [user])).rows, [{ issueId: receipt.taskId }])
+    const { requestedTaskSelection } = await import('../lib/factory/profile-request')
+    const selection = await requestedTaskSelection(pool, { ownerId: user, workspaceId, botId }, eventId, undefined)
+    assert.equal(selection.commandIssueId, receipt.taskId)
+    const { seedAgent, seedRun } = await import('./support/workspace-admin-db')
+    const agentId = await seedAgent(pool, user)
+    const runId = await seedRun(pool, { userId: user, agentId, workspaceId, botId, issueId: receipt.taskId, status: 'done' })
+    const { rows: [boundFactory] } = await pool.query('select id from factory_tasks where "userId"=$1 and "issueId"=$2', [user, receipt.taskId])
+    await pool.query('insert into factory_events ("taskId","eventId",request,result) values ($1,$2,$3,$4)', [boundFactory.id, randomUUID(),
+      JSON.stringify({ key: 'fixture-physical-queue', digest: 'fixture', sourceEventId: eventId }), JSON.stringify({ runId })])
+    const { dispatchToTask } = await import('../lib/thread-dispatch')
+    const again = () => dispatchToTask(user, receipt.taskId, { creation: { eventId, botId, workspaceId }, note: 'Regenerated tool note',
+      start: async () => { throw new Error('must not run again') } })
+    const replays = await Promise.all([again(), again()])
+    for (const replay of replays) assert.deepEqual(replay, { thread: 'existing', runId, threadId: runId })
+    assert.equal((await pool.query('select 1 from agent_runs where "issueId"=$1', [receipt.taskId])).rowCount, 1)
+    await pool.query('delete from agent_runs where "userId"=$1', [user])
     await pool.query('delete from factory_tasks where "userId"=$1', [user])
     // Deletion retains the command tombstone even if the owning user event cascades.
     await pool.query('delete from issues where id=$1', [receipt.taskId])
