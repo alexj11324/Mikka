@@ -74,6 +74,39 @@ function transportTiming(value: unknown): WorkerTransportTiming | undefined {
   } catch { return undefined }
 }
 
+type RequestedServiceTier = 'priority' | 'omitted'
+type ActualServiceTier = 'missing' | 'priority' | 'default' | 'auto' | 'flex' | 'unrecognized'
+export type WorkerServiceTier = {
+  version: 1; inputRequested: RequestedServiceTier; requested: RequestedServiceTier
+  created: ActualServiceTier; completed: ActualServiceTier; incomplete: ActualServiceTier
+}
+const SERVICE_TIER_KEYS = ['version', 'inputRequested', 'requested', 'created', 'completed', 'incomplete'] as const
+const ACTUAL_SERVICE_TIERS: readonly string[] = ['missing', 'priority', 'default', 'auto', 'flex', 'unrecognized']
+
+/** A closed receipt, independent of timing. Never retain provider strings or infer actual from requested. */
+function serviceTier(value: unknown): WorkerServiceTier | undefined {
+  try {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return
+    const keys = Reflect.ownKeys(value)
+    if (keys.length !== SERVICE_TIER_KEYS.length || keys.some(key => typeof key !== 'string' || !SERVICE_TIER_KEYS.includes(key as typeof SERVICE_TIER_KEYS[number]))) return
+    const fields: Record<string, unknown> = {}
+    for (const key of SERVICE_TIER_KEYS) {
+      const field = Object.getOwnPropertyDescriptor(value, key)
+      if (!field || !Object.hasOwn(field, 'value')) return
+      fields[key] = field.value
+    }
+    if (fields.version !== 1) return
+    for (const key of ['inputRequested', 'requested'] as const) {
+      if (fields[key] !== 'priority' && fields[key] !== 'omitted') return
+    }
+    for (const key of ['created', 'completed', 'incomplete'] as const) {
+      if (typeof fields[key] !== 'string' || !ACTUAL_SERVICE_TIERS.includes(fields[key])) return
+    }
+    return { version: 1, inputRequested: fields.inputRequested as RequestedServiceTier, requested: fields.requested as RequestedServiceTier,
+      created: fields.created as ActualServiceTier, completed: fields.completed as ActualServiceTier, incomplete: fields.incomplete as ActualServiceTier }
+  } catch { return undefined }
+}
+
 type WorkerRow = {
   ordinal: number; method: Method; startedMs: number | null; settledMs: number | null
   outcome: 'pending' | 'result' | 'error' | 'cancelled'
@@ -123,6 +156,8 @@ export class SubscriptionCallTiming {
   }
   /** Separate from the legacy stages: adding HTTP evidence never grows its log. */
   transportSnapshot() { return this.workers.filter(worker => worker.snapshot().method === 'executeStream').map(worker => worker.transportSnapshot()) }
+  /** Tier receipts never change the legacy stages or HTTP timing schema. */
+  serviceTierSnapshot() { return this.workers.filter(worker => worker.snapshot().method === 'executeStream').map(worker => worker.serviceTierSnapshot()) }
   snapshot(): SubscriptionStages {
     const row = this.preRead?.worker.snapshot()
     const streamPreRead: StreamPreRead | undefined = row && this.preRead ? {
@@ -139,6 +174,8 @@ export class SubscriptionWorkerTiming {
   private readonly row: WorkerRow
   private transportState: 'reported' | 'missing' | 'invalid' = 'missing'
   private transport?: WorkerTransportTiming
+  private serviceTierState: 'reported' | 'unavailable' | 'invalid' = 'unavailable'
+  private serviceTier?: WorkerServiceTier
   constructor(private readonly call: SubscriptionCallTiming, ordinal: number, method: Method) {
     this.row = { ordinal, method, startedMs: call.offset(), settledMs: null, outcome: 'pending', identityMode: 'unobserved', spawnToConfigWriteMs: null, identityMs: null, identityLoginCalls: null, identityLoginMs: null, parentAccessAuthorityCalls: null, parentAccessAuthorityMs: null, parentProjectionReadCalls: null, parentProjectionReadMs: null, goState: 'missing' }
   }
@@ -178,6 +215,12 @@ export class SubscriptionWorkerTiming {
     if (timing) this.transport = timing
   }
   transportSnapshot() { return { ordinal: this.row.ordinal, outcome: this.row.outcome, state: this.transportState, ...(this.transport ? { timing: { ...this.transport } } : {}) } }
+  terminalServiceTier(value: unknown, present: boolean) {
+    if (this.row.outcome !== 'pending' || !present) return
+    this.serviceTier = serviceTier(value)
+    this.serviceTierState = this.serviceTier ? 'reported' : 'invalid'
+  }
+  serviceTierSnapshot() { return { ordinal: this.row.ordinal, outcome: this.row.outcome, state: this.serviceTierState, ...(this.serviceTier ? { serviceTier: { ...this.serviceTier } } : {}) } }
   settle(outcome: Exclude<WorkerRow['outcome'], 'pending'>) {
     if (this.row.outcome !== 'pending') return
     this.row.settledMs = this.call.offset()

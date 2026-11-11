@@ -13,7 +13,7 @@ import { SubscriptionCallTiming, withSubscriptionTiming } from '../packages/daem
 type Part = { type: string; [key: string]: unknown }
 
 // A real child/line transport, with in-memory provider SSE and no network/DB.
-function timingWorker(t: TestContext, mode: 'valid' | 'missing' | 'invalid' | 'wrong_id' | 'oversize' | 'refused' = 'valid', resolveIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[2], streamIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[3], transportTiming?: unknown) {
+function timingWorker(t: TestContext, mode: 'valid' | 'missing' | 'invalid' | 'wrong_id' | 'oversize' | 'refused' | 'execute_refused' = 'valid', resolveIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[2], streamIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[3], transportTiming?: unknown, serviceTier?: unknown) {
   const dir = mkdtempSync(join(tmpdir(), 'mikka-stage-timing-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
   const script = join(dir, 'worker.mjs')
@@ -24,8 +24,9 @@ const mode=${JSON.stringify(mode)};const id=mode==='wrong_id'?'different-id':fra
 const timing=mode==='invalid'?{version:1,token:'fixture-private-token'}:{version:1,rpcBodyMs:7,authorizeMs:2,readCalls:1,readMs:1,accessReadBackend:'snapshot'};
 const diagnostic=mode==='missing'?{}:{timing};
 if(frame.method==='executeStream'&&${JSON.stringify(transportTiming)}!==undefined)diagnostic.transportTiming=${JSON.stringify(transportTiming)};
+if(frame.method==='executeStream'&&${JSON.stringify(serviceTier)}!==undefined)diagnostic.serviceTier=${JSON.stringify(serviceTier)};
 if(mode==='oversize'){console.log(JSON.stringify({id,result:'x'.repeat(262145),...diagnostic}));return}
-if(mode==='refused'){console.log(JSON.stringify({id,error:'reconnect_required',result:{mustNotWin:true},...diagnostic}));return}
+if(mode==='refused'||(mode==='execute_refused'&&frame.method==='executeStream')){console.log(JSON.stringify({id,error:'reconnect_required',result:{mustNotWin:true},...diagnostic}));return}
 if(frame.method==='executeStream'){
 const chunk={id:'synthetic',object:'chat.completion.chunk',created:1,model:'fixture-model',choices:[{index:0,delta:{content:'fixture-private-text'},finish_reason:null}]};
 console.log(JSON.stringify({id,chunk:'data: '+JSON.stringify(chunk)+'\\n\\n'}));
@@ -322,4 +323,60 @@ test('the complete HTTP log is below one KiB and neither log sink can change the
   assert.equal(rows[0].firstByteMs, 3_599_999.999)
   const seen = await drain(timedModelStream({ stream: streamOf([{ type: 'text-delta', delta: 'kept' }, { type: 'finish' }]) }, start, () => 1, () => {}, () => { throw new Error('transport sink failed') }).stream)
   assert.equal(seen[0].delta, 'kept')
+})
+
+test('service-tier logs consume the real terminal IPC projection independently from requested intent and old timing', async t => {
+  const tier = { version: 1, inputRequested: 'priority', requested: 'priority', created: 'auto', completed: 'default', incomplete: 'missing' }
+  for (const mode of ['valid', 'execute_refused'] as const) {
+    const call = new SubscriptionCallTiming(() => 0)
+    const client = timingWorker(t, mode, undefined, undefined, undefined, tier)
+    const read = withSubscriptionTiming(call, () => new Response(client.stream(1, 'fixture-model', { stream: true, messages: [] })).text())
+    if (mode === 'execute_refused') await assert.rejects(read)
+    else await read
+    const stages = call.snapshot(), transport = call.transportSnapshot()
+    const rows: Record<string, unknown>[] = []
+    await drain(timedModelStream({ stream: streamOf([{ type: 'finish' }]) }, {
+      route: 'subscription', model: 'fixture-model', tools: 0, startedAt: 0, requestedAt: 0,
+      workflowRunId: 'wrun_tier', stepId: 'step_tier', attempt: 1, subscriptionTiming: call, observeServiceTier: true,
+    }, () => 1, () => {}, () => {}, row => rows.push(row)).stream)
+    assert.deepEqual(rows, [{ msg: 'subscription_service_tier', workflowRunId: 'wrun_tier', stepId: 'step_tier', attempt: 1,
+      workerOrdinal: 2, outcome: mode === 'execute_refused' ? 'error' : 'result', state: 'reported', ...tier }])
+    assert.deepEqual(call.snapshot(), stages)
+    assert.deepEqual(call.transportSnapshot(), transport)
+    assert.ok(!JSON.stringify(rows).includes('fixture-private'))
+  }
+})
+
+test('service-tier logging keeps old-worker absence and invalid receipts distinct and never changes a result', async t => {
+  for (const [value, state] of [[undefined, 'unavailable'], [{ version: 1, token: 'fixture-private-tier' }, 'invalid']] as const) {
+    const call = new SubscriptionCallTiming(() => 0), client = timingWorker(t, 'valid', undefined, undefined, undefined, value)
+    await withSubscriptionTiming(call, () => new Response(client.stream(1, 'fixture-model', { stream: true, messages: [] })).text())
+    const rows: Record<string, unknown>[] = []
+    const parts: Part[] = [{ type: 'text-delta', delta: 'kept' }, { type: 'finish' }]
+    const start = { route: 'subscription' as const, model: 'fixture', tools: 0, startedAt: 0, requestedAt: 0,
+      workflowRunId: 'fixture-private-wrun', stepId: 'fixture-private-step', attempt: -1, subscriptionTiming: call, observeServiceTier: true as const }
+    assert.deepEqual(await drain(timedModelStream({ stream: streamOf(parts) }, start, () => 1, () => {}, () => {}, row => rows.push(row)).stream), parts)
+    assert.deepEqual(rows, [{ msg: 'subscription_service_tier', workflowRunId: null, stepId: null, attempt: null, workerOrdinal: 2, outcome: 'result', state }])
+    assert.ok(!JSON.stringify(rows).includes('fixture-private'))
+    assert.deepEqual(await drain(timedModelStream({ stream: streamOf(parts) }, start, () => 1, () => {}, () => {}, () => { throw new Error('tier sink failed') }).stream), parts)
+  }
+})
+
+test('service-tier logs cover cancellation without inventing a completed event and are opt-in for the Codex path', async () => {
+  const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+  worker.terminalServiceTier({ version: 1, inputRequested: 'priority', requested: 'priority', created: 'priority', completed: 'missing', incomplete: 'missing' }, true)
+  worker.settle('cancelled')
+  const rows: Record<string, unknown>[] = []
+  const start = { route: 'subscription' as const, model: 'fixture', tools: 0, startedAt: 0, requestedAt: 0, subscriptionTiming: call, observeServiceTier: true as const }
+  const timed = timedModelStream({ stream: new ReadableStream<Part>() }, start, () => 1, () => {}, () => {}, row => rows.push(row))
+  await timed.stream.cancel()
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].completed, 'missing')
+  assert.equal(rows[0].outcome, 'cancelled')
+  assert.ok(Buffer.byteLength(JSON.stringify(rows[0])) < 1024)
+  await drain(timedModelStream({ stream: streamOf([{ type: 'finish' }]) }, { ...start, observeServiceTier: undefined }, () => 1, () => {}, () => {}, row => rows.push(row)).stream)
+  assert.equal(rows.length, 1)
+  const unavailable: Record<string, unknown>[] = []
+  await drain(timedModelStream({ stream: streamOf([{ type: 'finish' }]) }, { ...start, subscriptionTiming: new SubscriptionCallTiming(() => 0) }, () => 1, () => {}, () => {}, row => unavailable.push(row)).stream)
+  assert.deepEqual(unavailable, [{ msg: 'subscription_service_tier', workflowRunId: null, stepId: null, attempt: null, workerOrdinal: null, outcome: null, state: 'unavailable' }])
 })

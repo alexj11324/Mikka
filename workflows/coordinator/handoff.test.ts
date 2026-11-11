@@ -53,6 +53,7 @@ let pendingEscalationGate: Promise<void> | null = null
 let notifyPendingEscalation: (() => void) | null = null
 let stopMarkerReached = false
 
+const hostedPolicyCalls: Array<{ scope: unknown; policy: unknown }> = []
 const handoffOrder: string[] = []
 const escalations: unknown[] = []
 const permissionMessages = () => [
@@ -97,7 +98,8 @@ mock.module('workflow', { namedExports: {
 } })
 stub('../../lib/coordinator/store.ts', { releaseLease })
 stub('../../lib/coordinator/wake.ts', { wakeCoordinator })
-stub('../../lib/subscription-workflow-turn.ts', { runHostedWorkflowTurn: async () => {
+stub('../../lib/subscription-workflow-turn.ts', { runHostedWorkflowTurn: async (...args: unknown[]) => {
+  hostedPolicyCalls.push({ scope: args[3], policy: args[4] })
   if (permissionCase) {
     if (stopAt === 'model') { sendStop(); await stopDelivered }
     if (closeExecutionDuringModel) executionState = 'completed'
@@ -182,7 +184,7 @@ stub('./steps.ts', {
 before(async () => { workflow = await import('./workflow') })
 beforeEach(() => {
   queue.splice(0, queue.length, 1); replies.length = 0; rounds.length = 0; starts.length = 0; spawned.length = 0; active.clear()
-  permissionCase = false; handoffOrder.length = 0; escalations.length = 0
+  permissionCase = false; handoffOrder.length = 0; escalations.length = 0; hostedPolicyCalls.length = 0
   escalationEnabled = true; scheduledRead = false; questionView = structuredClone(permissionQuestion)
   extraMessages = []; escalationError = null; stopAt = null; failures.length = 0
   executionState='running';closeExecutionDuringModel=false;auditCallIds.length=0;toolRegistryBuilds=0
@@ -425,4 +427,33 @@ test('stop marker precedes settlement of the new in-flight permission escalation
   console.log(JSON.stringify({ event:'post_completion_stop_boundary', stage:'after_gate_release',
     markerObserved:stopMarkerReached, escalations:escalations.length, replies:replies.length }))
   assert.equal(markerBeforeRelease, true, 'Stop must mark the turn without waiting for its already running tool body')
+})
+
+
+// The settings fixture above returns coordinator:false for this ordinary named
+// bot. Exercise the production workflow call site, not a directly built model.
+test('a named bot hosted chat receives priority through the real Coordinator workflow', async () => {
+  requests = 1
+  await context.run({ workflowRunId: 'wrun_named_bot_priority' }, () => workflow.coordinatorTurn(owner, bot))
+  assert.deepEqual(hostedPolicyCalls, [{
+    scope: { ownerId: owner, botId: bot },
+    policy: { codexServiceTier: 'priority' },
+  }])
+  assert.equal(replies.length, 1)
+  assert.deepEqual(failures, [])
+  assert.equal(lease, null)
+})
+
+test('a scheduled hosted chat omits priority through the real Coordinator workflow', async () => {
+  requests = 1
+  scheduledRead = true
+  await context.run({ workflowRunId: 'wrun_scheduled_no_priority' }, () => workflow.coordinatorTurn(owner, bot))
+  assert.deepEqual(hostedPolicyCalls, [{
+    scope: { ownerId: owner, botId: bot },
+    policy: undefined,
+  }])
+  assert.deepEqual(handoffOrder, ['scheduled-result'])
+  assert.deepEqual(replies, [])
+  assert.deepEqual(failures, [])
+  assert.equal(lease, null)
 })

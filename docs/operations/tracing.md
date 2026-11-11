@@ -686,6 +686,49 @@ Batching, bounded queues, exporter timeouts and an outage circuit breaker keep
 telemetry off the business response path. No log export adds a database query
 or an application polling loop. See the official [Node.js Logs guide](https://posthog.com/docs/logs/installation/nodejs).
 
+#### Codex priority evidence
+
+Inspect the application runtime JSON records for hosted Codex subscription
+calls. Correlate them with `model_call_timing` and
+`subscription_transport_timing` by `workflowRunId`, `stepId`, and `attempt`;
+worker receipts also carry `workerOrdinal` and `outcome`.
+
+The priority policy covers non-scheduled hosted chats handled by
+`coordinatorTurn`, including built-in Coordinator and named Bot chats and the
+function's `sourceEventId` and `taskEventId` turns. Scheduled reads and dispatched
+Agent executions receive no such policy.
+
+The records distinguish three evidence boundaries:
+
+| Record and fields | Meaning |
+| --- | --- |
+| `subscription_service_tier_policy`: `intent`, `capability`, `requested` | Internal hosted-chat policy, the current-epoch catalogue's supported/unsupported/unknown result, and the field selected for the same request. |
+| `subscription_service_tier`: `inputRequested`, `requested` | Worker input intent and the value after CPA conversion and request filtering, immediately before the single HTTP attempt. Values are `priority` or `omitted`. |
+| `subscription_service_tier`: `created`, `completed`, `incomplete` | The native `response.service_tier` in the corresponding response events, observed before CPA conversion. Each value is `priority`, `default`, `auto`, `flex`, `missing`, or `unrecognized`. |
+
+A receipt's `state` is `reported`, `unavailable`, or `invalid`.
+An older worker, a missing terminal frame, or cancellation can leave no receipt;
+absent native response fields remain `missing`. A requested tier or HTTP
+success does not establish the provider's actual tier. Retain differing event
+values and unknown states when assessing a run. The receipt contains only
+versioned fixed enums, with no prompt, tool arguments, credential, or raw
+provider field.
+
+The catalogue and request gates are described in the
+[subscription worker guide](../../packages/subscription-worker/README.md#model-catalogue-and-codex-priority).
+Only authenticated `getBotModelMenu` requests the optional upgrade of an
+otherwise current catalogue for priority metadata. Default `ensureCatalogues`,
+`getModelOrder`, and dispatch do not request that upgrade. Missing catalogues
+and epoch mismatches retain the existing refresh; manual refresh also collects
+capability within the same owner and shared-subscription boundaries.
+
+Unknown or unsupported capability omits priority on the original request
+without retry. Fast can increase subscription allowance or credit use; consult
+the official [pricing guide](https://learn.chatgpt.com/docs/pricing).
+Neither a capability nor a tier receipt establishes a first-text latency
+improvement; compare the existing timing and client evidence for the tested
+revision.
+
 ### Browser context and masked Replay
 
 `instrumentation-client.ts` restricts `tracing_headers` to Mikka's frontend/API
