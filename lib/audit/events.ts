@@ -3,8 +3,8 @@
 import { isIP } from 'node:net'
 import { z } from 'zod'
 
-export const AUDIT_CATEGORIES = ['security', 'secret', 'permission', 'member', 'billing'] as const
-export type AuditCategory = (typeof AUDIT_CATEGORIES)[number]
+import { AUDIT_CATEGORIES, type AuditCategory } from './categories'
+export { AUDIT_CATEGORIES, type AuditCategory }
 
 export const AUDIT_ACTOR_TYPES = ['user', 'bot', 'token', 'system'] as const
 export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number]
@@ -54,6 +54,7 @@ export const AUDIT_ACTIONS = {
   'workspace.slug_changed': 'security',
   'workspace.deleted': 'security',
   'workspace.ownership_transferred': 'security',
+  'workspace.entitlements_changed': 'security',
   // 计费
   'billing.card_verified': 'billing',
   'billing.checkout_started': 'billing',
@@ -61,6 +62,7 @@ export const AUDIT_ACTIONS = {
   'billing.auto_recharge_changed': 'billing',
   'billing.limits_changed': 'billing',
   'billing.payment_method_changed': 'billing',
+  'billing.credit_share_changed': 'billing',
 } as const satisfies Record<string, AuditCategory>
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS
@@ -120,13 +122,15 @@ export const AUDIT_METADATA = {
   'workspace.slug_changed': z.object({ from: label, to: label }).strict(),
   'workspace.deleted': none,
   'workspace.ownership_transferred': none,
+  'workspace.entitlements_changed': z.object({ fromPlan: z.enum(['free', 'pro', 'enterprise']), toPlan: z.enum(['free', 'pro', 'enterprise']), source: z.enum(['cloud', 'license']), seatLimit: z.number().int().min(1).max(100_000).nullable(), expiresAt: z.iso.datetime({ offset: true }).nullable(), reason: z.enum(['evaluation', 'licensed', 'downgrade', 'correction']) }).strict(),
   'billing.card_verified': z.object({ allowanceGranted:z.boolean() }).strict(),
   'billing.checkout_started': z.object({ amountCents: cents, currency }).partial().strict(),
   'billing.credits_purchased': z.object({ amountCents: cents, currency, credits: z.number().int().min(0) }).partial().strict(),
-  'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable() }).partial().strict(),
+  'billing.auto_recharge_changed': z.object({ enabled: z.boolean(), thresholdCents: cents.nullable(), amountCents: cents.nullable(), monthlyCapCents: cents.nullable(), revision: z.number().int().nonnegative() }).partial().strict(),
   'billing.limits_changed': z.object({ fromCents: cents.nullable(), toCents: cents.nullable() }).partial().strict(),
   // 由我的卡支付这个团队: a member's card designated, or released (they stopped it or left) with a grace period.
   'billing.payment_method_changed': z.object({ change: z.enum(['designated', 'released']), graceDays: z.number().int().min(0).max(30).optional() }).strict(),
+  'billing.credit_share_changed': z.object({ enabled: z.boolean() }).strict(),
 } as const satisfies Record<AuditAction, z.ZodType>
 
 /** Allowlisted metadata for one action (named params for that action's ICU template). */

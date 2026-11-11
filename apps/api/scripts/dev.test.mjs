@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { Agent } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { getEventListeners } from 'node:events'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady } from './dev.mjs'
+import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, staleRouteFiles, staleRoutesRefusal } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
@@ -20,11 +24,31 @@ test('development shutdown waits for the real close and preserves failure as a n
 })
 
 test('development keeps one explicit browser origin and accepts existing port/host switches', () => {
-  assert.deepEqual(developmentOptions([], {}), { host: 'localhost', port: 3000, origin: 'http://localhost:3000' })
-  assert.deepEqual(developmentOptions(['-p', '3100', '--hostname', '0.0.0.0'], {}), { host: '0.0.0.0', port: 3100, origin: 'http://localhost:3100' })
-  assert.deepEqual(developmentOptions(['--port=3102', '--host=::1'], {}), { host: '::1', port: 3102, origin: 'http://[::1]:3102' })
+  assert.deepEqual(developmentOptions([], {}), { host: 'localhost', port: 3000, allowStaleRoutes: false, origin: 'http://localhost:3000' })
+  assert.deepEqual(developmentOptions(['-p', '3100', '--hostname', '0.0.0.0'], {}), { host: '0.0.0.0', port: 3100, allowStaleRoutes: false, origin: 'http://localhost:3100' })
+  assert.deepEqual(developmentOptions(['--port=3102', '--host=::1'], {}), { host: '::1', port: 3102, allowStaleRoutes: false, origin: 'http://[::1]:3102' })
   assert.equal(developmentOptions([], { MIKKA_DEV_PORT: '3103' }).port, 3103)
-  for (const args of [['--port', '0'], ['-p', '65536'], ['-p', '1x'], ['--host', 'https://example.invalid'], ['--port'], ['--webpack']]) assert.throws(() => developmentOptions(args, {}))
+  // The stale-route guard's escape hatch is explicit and composes with the existing switches.
+  assert.equal(developmentOptions(['--allow-stale-routes'], {}).allowStaleRoutes, true)
+  assert.equal(developmentOptions(['--allow-stale-routes', '-p', '3104'], {}).port, 3104)
+  for (const args of [['--port', '0'], ['-p', '65536'], ['-p', '1x'], ['--host', 'https://example.invalid'], ['--port'], ['--webpack'], ['--allow-stale-route']]) assert.throws(() => developmentOptions(args, {}))
+})
+
+test('a dev start refuses a route manifest the checkout does not contain', () => {
+  const expected = new Map([['routes.json', '{"version":1}\n'], ['routes.ts', 'export const routes = []\n']])
+  // Identical bytes: the generator rewrites unconditionally, but git compares
+  // content, so a same-bytes rewrite leaves the tree clean and must not block.
+  assert.deepEqual(staleRouteFiles(expected, new Map(expected)), [])
+  // Real content difference: serving would run a route table nobody committed.
+  const changed = staleRouteFiles(new Map([['routes.json', '{"version":1,"routes":[]}\n'], ['routes.ts', expected.get('routes.ts')]]), new Map(expected))
+  assert.deepEqual(changed, [{ path: 'apps/api/generated/routes.json', missing: false }])
+  // A generated file the checkout never had is a missing commit, not a change.
+  const added = staleRouteFiles(expected, new Map([['routes.json', expected.get('routes.json')]]))
+  assert.deepEqual(added, [{ path: 'apps/api/generated/routes.ts', missing: true }])
+  const refusal = staleRoutesRefusal([...changed, ...added])
+  assert.equal(refusal.code, 'API_DEV_ROUTES_STALE')
+  for (const text of ['apps/api/generated/routes.json', 'apps/api/generated/routes.ts', 'Changed:', 'Not in this checkout:',
+    'node apps/api/scripts/generate-routes.mjs', 'git add apps/api/generated && git commit', '--allow-stale-routes']) assert.ok(refusal.message.includes(text), text)
 })
 
 test('only machine paths proxy, retaining the browser Host and exact encoded path', t => {
@@ -136,6 +160,78 @@ test('a real worker init error fails immediately without an HTTP retry or raw er
   await assert.rejects(pending, { code: 'API_DEV_WORKER_INIT_FAILED', message: 'API_DEV_WORKER_INIT_FAILED' })
   assert.equal(calls, 0)
   assert.equal(api.listenerCount, 0)
+})
+
+test('worker initialization preserves only a closed diagnosis from the actual env-runner message format', async () => {
+  // env-runner 0.3.11 sends Error.message, without its name/code. The worker
+  // can terminate before stderr flushes, so this IPC message is the evidence.
+  const privateDetail = 'private-worker-location-and-credential'
+  const cases = [
+    [`Cannot find package 'pg' imported from /${privateDetail}/entry.mjs`, 'module-missing', 'pg'],
+    [`Cannot find module '/${privateDetail}/mikka-tracing.mjs' imported from /${privateDetail}/index.mjs`, 'module-missing', 'tracing-entry'],
+    [`Cannot find package '${privateDetail}' imported from /private/entry.mjs`, 'module-missing', null],
+    [`The requested module '${privateDetail}' does not provide an export named 'default'`, 'export-missing', null],
+    [`Unexpected token '${privateDetail}' (at /private/entry.mjs:1:2)`, 'module-syntax', null],
+    [`listen EADDRINUSE: address already in use /${privateDetail}`, 'listen-address-in-use', null],
+    [`listen EACCES: permission denied /${privateDetail}`, 'listen-access-denied', null],
+    [`[env-runner] Entry module "/${privateDetail}" must export a \`fetch\` handler (export default { fetch(req) { ... } }).`, 'entry-handler-missing', null],
+    [privateDetail, 'unavailable', null],
+    [{ message: privateDetail, code: 'EADDRINUSE' }, 'unavailable', null],
+  ]
+  for (const [raw, reason, dependency] of cases) {
+    const api = workerMessages(), worker = developmentWorkerReady(api, { phase: 'hot-replacement' })
+    const pending = worker.wait(new AbortController().signal)
+    api.emit({ event: 'init-error', error: raw })
+    await assert.rejects(pending, error => {
+      assert.equal(error.code, 'API_DEV_WORKER_INIT_FAILED')
+      assert.equal(error.message, 'API_DEV_WORKER_INIT_FAILED')
+      assert.deepEqual(error.cause, { phase: 'hot-replacement', reason, dependency })
+      assert.equal(JSON.stringify(error.cause).includes(privateDetail), false)
+      return true
+    })
+    assert.equal(api.listenerCount, 0)
+  }
+})
+
+test('startup diagnostics distinguish initial workers and never forward an untrusted phase', async () => {
+  for (const [options, phase] of [[undefined, 'initial-start'], [{ phase: 'private-phase' }, 'unavailable']]) {
+    const api = workerMessages(), worker = developmentWorkerReady(api, options)
+    const pending = worker.wait(new AbortController().signal)
+    api.emit({ event: 'init-error', error: 'private initialization detail' })
+    await assert.rejects(pending, error => {
+      assert.deepEqual(error.cause, { phase, reason: 'unavailable', dependency: null })
+      return true
+    })
+  }
+})
+
+test('the CI TAP reporter retains the closed worker cause without disclosing the original IPC message', async t => {
+  const privateDetail = 'private-initialization-sentinel'
+  const program = `import test from 'node:test';
+import { developmentWorkerReady } from ${JSON.stringify(new URL('./dev.mjs', import.meta.url).href)};
+test('controlled initialization refusal', async () => {
+  let emit;
+  const api = { onMessage(listener) { emit = listener }, offMessage() {} };
+  const worker = developmentWorkerReady(api, { phase: 'hot-replacement' });
+  const pending = worker.wait(new AbortController().signal);
+  emit({ event: 'init-error', error: ${JSON.stringify(`Cannot find package 'pg' imported from /${privateDetail}/entry.mjs`)} });
+  await pending;
+});`
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-worker-report-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const fixture = join(directory, 'worker.test.mjs')
+  await writeFile(fixture, program, { mode: 0o600 })
+  const result = spawnSync(process.execPath, ['--test', '--test-reporter=tap', fixture], {
+    encoding: 'utf8', timeout: 5_000, env: { PATH: process.env.PATH, NODE_OPTIONS: '' },
+  })
+  assert.equal(result.error, undefined)
+  assert.equal(result.status, 1, 'the child must still fail at its first initialization refusal')
+  const output = result.stdout + result.stderr
+  assert.ok(output.includes('API_DEV_WORKER_INIT_FAILED'))
+  const diagnosis = /^# \[dev\] Worker initialization failed (\{.*\})$/m.exec(output)
+  assert.ok(diagnosis, 'the same TAP reporter used by CI must expose the closed cause')
+  assert.deepEqual(JSON.parse(diagnosis[1]), { phase: 'hot-replacement', reason: 'module-missing', dependency: 'pg' })
+  assert.equal(output.includes(privateDetail), false)
 })
 
 test('worker initialization and HTTP share one deadline and always release listeners', async () => {

@@ -2,6 +2,8 @@ import { tool } from 'ai'
 import { z } from 'zod'
 import { OWN_INTEGRATIONS, TOOLKIT_SLUG } from '@/lib/composio-accounts'
 import type { ComposioAccountChoice } from '@/lib/composio-actions'
+import { appCallSettingKeys } from '@/lib/operations/app-permission-keys'
+import { permissionDecision } from '@/lib/operations/permission-precedence'
 import type { WriteJudge } from '@/lib/operations/write-judgment'
 
 // Any app a person connected from the 插件 store, through the tools Composio
@@ -52,14 +54,14 @@ export const appToolCallSchema = z.object({
 export type AppToolExecution = { successful: boolean; data?: Record<string, unknown>; error?: string | null; logId?: string }
 
 export type AppToolDeps = {
-  /** 团队权限 › 允许使用的应用 for a named Bot; the person's own Coordinator is always allowed. */
+  /** 团队权限 › 允许使用的应用 for the workspace; checked for this Bot's call. The person's own Coordinator is always allowed. */
   appAllowed: (toolkit: string) => Promise<boolean>
   resolveAccount: (toolkit: string, selected?: string) => Promise<{ accountId: string | null; accounts: ComposioAccountChoice[] }>
   listTools: (toolkit: string, query?: string) => Promise<AppTool[]>
   getTool: (slug: string) => Promise<AppTool>
   /** `accountId` is null only for an app that needs no connection (its tools run on the person's id alone). */
   execute: (call: AppToolCall, accountId: string | null) => Promise<AppToolExecution>
-  /** The person's or admin's explicit setting for this tool or app, or null when none names it. */
+  /** The workspace's explicit setting for this tool or app, or null when none names it, including when the layer cannot be read. */
   setting: (tool: string, toolkit: string) => Promise<AppToolDecision | null>
   /** The shared R-77 judge: `ask` for a destructive, unjudged or refused call. */
   judge: WriteJudge
@@ -75,16 +77,22 @@ export type AppToolDeps = {
 const decision = z.enum(['allow', 'ask', 'deny'])
 const layer = z.record(z.string(), decision).nullable().optional()
 /**
- * An explicit setting for any of `keys` (the tool, then its app). The person's
- * own settings may ask, deny or allow; a workspace setting only narrows (ask
- * or deny). Deny wins, then ask. Null when nothing names the call; settings
- * that cannot be read throw, and the caller treats that as ask.
+ * An explicit setting for any of `keys` (the tool, then its app key and legacy
+ * action), from the workspace's layer only. A deny in the workspace, then an
+ * ask; only when the workspace does not restrict does an allow run the call
+ * without the judge. There is no Bot layer to narrow it. Null when nothing
+ * names the call; settings that cannot be read throw, and the caller decides
+ * how to fail.
  */
-export function explicitSetting(row: { agent: unknown; workspace: unknown } | null, keys: readonly string[]): AppToolDecision | null {
+export function explicitSetting(row: { workspace: unknown } | null, keys: readonly string[]): AppToolDecision | null {
   if (!row) return null
-  const agent = layer.parse(row.agent) ?? {}, workspace = layer.parse(row.workspace) ?? {}
-  const found = keys.flatMap(key => [Object.hasOwn(agent, key) ? agent[key] : null, Object.hasOwn(workspace, key) && workspace[key] !== 'allow' ? workspace[key] : null]).filter(Boolean)
-  return found.includes('deny') ? 'deny' : found.includes('ask') ? 'ask' : found.includes('allow') ? 'allow' : null
+  const workspace = layer.parse(row.workspace) ?? {}
+  return permissionDecision(keys.flatMap(key => Object.hasOwn(workspace, key) ? [workspace[key]] : []))
+}
+
+/** One app tool call's explicit setting: its own slug, then its app key and legacy write action. */
+export function appCallSetting(row: { workspace: unknown } | null, tool: string, toolkit: string): AppToolDecision | null {
+  return explicitSetting(row, appCallSettingKeys(tool, toolkit))
 }
 
 export const isReadOnlyTool =(tool: Pick<AppTool, 'tags'>) => Array.isArray(tool.tags) && tool.tags.includes('readOnlyHint')
@@ -158,6 +166,9 @@ export async function callAppTool(deps: AppToolDeps, raw: unknown) {
   const call: AppToolCall = { toolkit, tool: tool.slug, name: tool.name.slice(0, 200), version: tool.version, arguments: args }
 
   // The person's explicit setting wins; otherwise the Decisions API judges every call, reads included (readOnlyHint is one of its inputs).
+  // A layer that cannot be read names nothing, so the call goes to the judge
+  // exactly as an unset key does (decision 2026-11-01-1330); `deps.setting`
+  // logs the failure by name and returns null rather than refusing.
   const setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
   if (setting === 'deny') return { error: 'integrationActionDenied' }
   const card = setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask')

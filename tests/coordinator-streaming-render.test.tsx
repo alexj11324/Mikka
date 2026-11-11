@@ -6,6 +6,8 @@ import { NextIntlClientProvider } from 'next-intl'
 import messages from '../messages/en.json'
 import { withoutPartialCitation, type CitationSource } from '../lib/coordinator/citations'
 import type { AgentCitations } from '../components/workspace/agent-citations'
+import { ReplyBubbles } from '../components/workspace/agent-text-bubble'
+import { AgentInteractionContext } from '../components/workspace/agent-interaction'
 
 // Streaming a Coordinator reply: a token redraws only the reply that is arriving, and a task or thread chip never
 // shows its marker or id on the way, however the tokens are cut.
@@ -352,37 +354,40 @@ test('a quote cut at three lines is a button that opens the rest; one that fits 
   }
 })
 
-test('a task and its thread in one reply: only the thread is a chip, the task is its number or nothing (R-15)', async () => {
+test('a task and its thread in one reply: the task is its state icon and code, the thread its title, said once (2026-11-10)', async () => {
   const view = await mount()
   const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]
   const text = () => view.container.textContent ?? ''
   const ownThread: CitationSource = { ...thread, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: 'Release checklist' } }
   try {
     await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: { ...known, [THREAD]: ownThread } }} />)
-    assert.equal(chips().length, 1, 'one chip: the thread')
-    assert.match(chips()[0].getAttribute('aria-label') ?? '', /thread/i)
-    assert.match(text(), /^MIK-1 的线程/, 'the task reads as its number')
-    assert.equal(text().match(/Release checklist/g)?.length, 1, 'the title is said once, in the thread chip')
-    // A task with no number reads as 「the task」: the thread chip carries its title, and the sentence never starts at 「的线程」.
+    assert.equal(chips().length, 2, 'the task and the thread each stay their own object')
+    assert.equal(text(), 'MIK-1 的线程 Release checklist 在等你。', 'the code once, the title once: never 「MIK-1 MIK-1 …」')
+    assert.equal(view.container.querySelector('[data-citation-covered]'), null)
+    assert.ok(chips()[0].querySelector('[data-task-state]'), 'the task leads with its state icon')
+    assert.equal(chips()[1].querySelector('svg'), null, 'the thread has no icon')
+    // A task with no code is its title; the thread still names its task's title.
     const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }
     await view.render(<CoordinatorReply text={`[[issue:${TASK}]]的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
-    assert.equal(chips().length, 1)
-    assert.equal(text().match(/Release checklist/g)?.length, 1)
-    assert.doesNotMatch(text(), /^\s*的线程/, 'the sentence keeps its subject')
-    assert.match(text(), /^the task的线程/)
+    assert.equal(chips().length, 2)
+    assert.equal(text(), 'Release checklist的线程 Release checklist 在等你。')
     assert.doesNotMatch(text(), MARKUP)
   } finally { await view.unmount() }
 })
 
-test('a thread whose card sits under the same reply is named in the words without a chip (R-66)', async () => {
+test('a thread keeps its current text-link renderer when a dispatch card sits under the same saved reply', async () => {
   const view = await mount()
   try {
     const citations = { ...base, sources: { ...known, [THREAD]: thread } }
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} carded={THREAD} />)
-    assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 0)
-    assert.equal(view.container.querySelector('[data-citation-carded]')?.textContent, 'Fix sign-in redirect')
+    assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1)
+    assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Fix sign-in redirect')
+    assert.equal(view.container.querySelector('[data-citation-carded]'), null)
+    // A thread of a task is named by the task's title, without its code.
+    await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={{ ...citations, sources: { ...known, [THREAD]: { ...thread, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: 'Release checklist' } } } }} carded={THREAD} />)
+    assert.equal(view.container.querySelector('[data-thread-link]')?.textContent, 'Release checklist')
     await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} />)
-    assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 1, 'without its card here, it is a chip')
+    assert.equal(view.container.querySelectorAll('[data-thread-link]').length, 1, 'with or without a card it is the same thread link')
   } finally { await view.unmount() }
 })
 
@@ -407,5 +412,31 @@ test('全部展开 opens every tool group, a group clicked alone keeps its own s
     assert.deepEqual(opened(), ['false', 'true'], 'the reader\'s own click wins for that group')
     await act(async () => { expandAll().click() })
     assert.deepEqual(opened(), ['false', 'false'], '全部收起 closes every group, the one set alone included')
+  } finally { await view.unmount() }
+})
+
+test('a reply draws its words in bubbles on its own, and plain in a frame that sets ReplyBubbles off (hosted thread): Markdown, OpenUI text and a choice card agree (2026-11-10)', async () => {
+  const welcome = 'root = Stack([intro, choice])\nintro = TextContent("I can dispatch work to Agents.")\nchoice = BeQuestions("New bot", [{id:"next", title:"What first?", options:[{value:"task", label:"Create a task"}, {value:"list", label:"See running tasks"}]}])'
+  const sent: string[] = []
+  const interaction = { busy: false, continueFromAnswer: async (prompt: string) => { sent.push(prompt); return true } }
+  const view = await mount()
+  try {
+    // On its own (the open-source chat): every text part in the grey bubble, the question in the reply's bubble.
+    await view.render(<AgentInteractionContext value={interaction}><CoordinatorReply text={welcome} citations={base} /></AgentInteractionContext>)
+    assert.equal(view.container.querySelectorAll('[data-agent-text]').length, 1)
+    assert.match(view.container.querySelector('[data-choice-title]')?.className ?? '', /bg-muted/)
+    // Inside a frame that draws reply text plain: nothing is bubbled, Markdown included.
+    for (const text of [welcome, 'Plain **Markdown** reply.']) {
+      await view.render(<AgentInteractionContext value={interaction}><ReplyBubbles value={false}><CoordinatorReply text={text} citations={base} /></ReplyBubbles></AgentInteractionContext>)
+      assert.equal(view.container.querySelectorAll('[data-agent-text]').length, 0, text)
+    }
+    await view.render(<AgentInteractionContext value={interaction}><ReplyBubbles value={false}><CoordinatorReply text={welcome} citations={base} /></ReplyBubbles></AgentInteractionContext>)
+    assert.doesNotMatch(view.container.querySelector('[data-choice-title]')?.className ?? '', /bg-muted/, 'the question is not a pill')
+    // The options are rows that answer with their words.
+    const rows = [...view.container.querySelectorAll<HTMLButtonElement>('[data-choice-rows] button[data-choice="open"]')]
+    assert.deepEqual(rows.map(row => row.textContent), ['ACreate a task', 'BSee running tasks'])
+    assert.ok(rows.every(row => !row.disabled))
+    await act(async () => { rows[1].click() })
+    assert.deepEqual(sent, ['See running tasks'])
   } finally { await view.unmount() }
 })

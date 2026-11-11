@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -38,18 +39,19 @@ test('an open thread\'s later reads leave its prompt and report in the database 
   const agent = randomUUID(), issue = randomUUID(), run = randomUUID()
   // A long prompt whose name is on its third line, and a report with large fields beside its summary.
   const prompt = `\n\n\`\`\`\n**Fix** the checkout rounding\n${'Context line with details. '.repeat(1_500)}`
+  const instructions = '\n\nINTERNAL_HOST_GUIDANCE 🔍 must stay out of the user message.'
   const report = { summary: '  Fixed the rounding.  ', files: 'diff '.repeat(8_000), notes: 'note '.repeat(4_000) }
   const as = <T>(work: () => Promise<T>) => withActivitySession(owner, work) as Promise<T>
   const chunk = (seq: number) => pool.query('insert into run_chunks(id,"runId",seq,chunk) values($1,$2,$3,$4)', [randomUUID(), run, seq, JSON.stringify({ type: 'text-delta', id: 't1', delta: `part ${seq} ` })])
   try {
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [owner, `${owner}@example.invalid`])
     await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [agent, owner, 'Fixture agent', 'codex'])
-    await pool.query('insert into issues(id,"userId",title,content,status,priority) values($1,$2,$3,$4,$5,$6)', [issue, owner, 'Checkout task', JSON.stringify({ type: 'doc', content: [] }), 'doing', 'normal'])
-    await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report) values($1,$2,$3,$4,$5,$6,$7)', [run, owner, issue, agent, 'running', prompt, JSON.stringify(report)])
+    await pool.query('insert into issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,\'bound\')', [issue, owner, 'Checkout task', JSON.stringify({ type: 'doc', content: [] }), 'doing', 'normal', await seedFixtureWorkspace(pool, owner)])
+    await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,"promptTaskStart","promptTaskLength") values($1,$2,$3,$4,$5,$6,$7,0,$8)', [run, owner, issue, agent, 'running', prompt + instructions, JSON.stringify(report), Array.from(prompt).length])
     for (let seq = 1; seq <= 3; seq++) await chunk(seq)
 
     const first = await measured(() => as(() => getIssueThread(issue, run)))
-    assert.equal(first.value.thread.prompt, prompt, 'the first read shows the whole prompt')
+    assert.equal(first.value.thread.prompt, prompt, 'the first read shows the entire recorded user task')
     assert.equal(first.value.thread.detail?.name, 'Fix the checkout rounding')
     assert.equal(first.value.thread.detail?.summary, 'Fixed the rounding.')
     assert.equal(first.value.promptOmitted, undefined)
@@ -78,6 +80,8 @@ test('an open thread\'s later reads leave its prompt and report in the database 
     await pool.query('delete from agent_runs where id=$1', [run])
     await pool.query('delete from issues where id=$1', [issue])
     await pool.query('delete from agents where id=$1', [agent])
+    await pool.query('delete from mikka_workspace_members where "userId"=$1', [owner])
+    await pool.query('delete from mikka_workspaces where "userId"=$1', [owner])
     await pool.query('delete from "user" where id=$1', [owner])
   }
 })

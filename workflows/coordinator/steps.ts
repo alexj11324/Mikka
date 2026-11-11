@@ -32,10 +32,14 @@ import type { ModelMessage } from 'ai'
 import { summarizeConversation } from '@/lib/coordinator/summary-model'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
+import { actAs } from '@/lib/acting-user'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { coordinatorTaskWorkspace } from '@/lib/coordinator/issue-team'
 import { addRunMessage,  readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, cachedContextLines, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
-import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
+import { withPersonalInstructionText } from '@/lib/coordinator/personal-instructions'
+import { grantReadsPersonalSkill } from '@/lib/plugins/skill-prompt'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import * as store from '@/lib/coordinator/store'
@@ -187,6 +191,16 @@ export async function turnSettings(userId: string, botId: string) {
   return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), agentKitEnabled: agentKitEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), coordinator, runtime: selected }
 }
 
+/** Node-only candidate, frozen by takeStartupInbox's first successful COMMIT.
+ * Current runtime() is the pure ai_sdk selection; native keeps its old path. */
+export async function hostedStartupSettings(userId: string): Promise<import('@/lib/coordinator/startup-receipt').CoordinatorStartupSettingsCandidate | null> {
+  const { runtime } = await import('./native-steps')
+  const selected = await runtime(userId)
+  if (selected.harness !== 'ai_sdk') return null
+  const { personalWritesEnabled } = await import('@/lib/operations/write-feature')
+  return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), agentKitEnabled: agentKitEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), runtime: selected }
+}
+
 /**
  * Everything a round needs between starting its execution and its first model
  * call, in one step: the mailbox catalogue, the model-switch notice and the
@@ -211,8 +225,8 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
   if (once && await store.lastEventKind(userId, botId) === kind) return
   const { quotaSwitchMessage, pointsSwitchMessage } = await import('@/lib/coordinator/message-safety')
   // 点数不足时改用 (decision 2026-11-02-1450): Mikka 默认 had no points, this turn runs on the next allowed model.
-  if (selection.data.afterPoints) await store.appendMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], null, botId)
-  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+  if (selection.data.afterPoints) await store.appendHostMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], botId)
+  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendHostMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], botId)
 }
 
 /**
@@ -221,7 +235,7 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
  * and duration. Durations and counts only. Each model call logs its own line
  * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
  */
-export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; storeTimingOrigin?: 'startup_checkpoint' | 'inbox_checkpoint'; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { startup?: number; settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number; profile?: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
   'use step'
   try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
@@ -284,11 +298,39 @@ noticeTurnFailure.maxRetries = 0
  */
 export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; stable: number; messages: ModelMessage[] }> {
   'use step'
-  return (await preparePromptDetails(userId, botId, snapshot, mailboxTools)).prompt
+  // ALE-75: the skills section keys on whether this snapshot's frozen tools can
+  // fetch a body. Deliberately does NOT pass a full prompt scope here — that
+  // would also change what the GitHub reader is asked for, which is not this
+  // entry's concern and not this change's business.
+  return (await preparePromptDetails(userId, botId, snapshot, mailboxTools, undefined, snapshot?.effectiveTools)).prompt
 }
 
 /** Context timings stay beside the prompt, never in its instructions or model options. */
-async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope) {
+/**
+ * Whether this round's tools can fetch a skill body, which decides whether the
+ * skills section carries metadata only or the bodies themselves (ALE-75).
+ *
+ * Both halves matter and both come from the same frozen execution:
+ * `effectiveTools` is the grant, and `readOnly` is the narrower scheduled-read
+ * allowlist that replaces the grant outright (workflows/coordinator/tools.ts
+ * keeps only SCHEDULE_READ_TOOL_IDS when readOnly). A scheduled read is
+ * therefore told to carry its bodies: it lists skills it cannot fetch
+ * otherwise, and it runs on a person's schedule with nobody watching to
+ * notice the round quietly had no instructions.
+ */
+function canReadPersonalSkill(scope: import('@/lib/coordinator/github-context').GitHubPromptScope | undefined, grant: readonly string[] | undefined) {
+  // The kill switch, read here rather than in a workflow body: a replay must
+  // see the same value, and a workflow body has no network to ask PostHog.
+  // Off restores the pre-ALE-75 prompt, bodies inline under ALE-72's budget.
+  if (!deploymentSwitch('personalSkillOnDemand')) return false
+  // Enumerating the tools this round will actually offer is the narrowest
+  // statement of the fact, so callers that have them pass them here.
+  if (grant) return grantReadsPersonalSkill(grant)
+  if (!scope || scope.readOnly) return false
+  return grantReadsPersonalSkill(scope.effectiveTools)
+}
+
+async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope, skillGrant?: readonly string[]) {
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
@@ -296,7 +338,8 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
     await factoryRuntimeForBot(botId).reconcile(userId)
   }
 
-  let { summary, memory, messages } = await store.loadConversation(userId, botId)
+  const conversation = await store.loadConversationForPrompt(userId, botId)
+  let { summary, memory, messages } = conversation
   if (messages.some(row => 'mikkaUserEvent' in row.message && typeof row.message.content === 'string' && row.message.content.includes('[mikka-file:'))) {
     const { chatFileContent } = await import('@/lib/chat-attachments/store')
     messages = await Promise.all(messages.map(async row => {
@@ -329,20 +372,32 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubPromptContext } = await import('@/lib/coordinator/github-context')
   const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const contextMs = { execution: 0, personal: 0, github: 0 }
+  const contextMs = { execution: 0, personal: 0, github: 0, profile: 0 }
   const timed = async <T>(part: keyof typeof contextMs, work: () => Promise<T>): Promise<T> => {
     const started = Date.now()
     try { return await work() } finally { contextMs[part] = Math.max(0, Date.now() - started) }
   }
   const [execution, rules, github] = await Promise.all([
     timed('execution', () => executionContextParts(userId, botId)),
-    timed('personal', () => withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
+    timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, { canReadPersonalSkill: canReadPersonalSkill(githubScope, skillGrant) })),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
   ])
+  // What Mikka has learnt about the person (R-73). It reaches only the chat's own
+  // repositories' facts, so one project's habits never surface in another's
+  // conversation. A profile read that fails leaves the section out; it never
+  // fails the turn. The `memory` switch governs it exactly as it governs the
+  // person's own notes: with 记忆 off, conversationWithMemory already emptied
+  // `memory`, and nothing learnt is stated either.
+  const profile = memory ? await timed('profile', async () => {
+    const [{ profilePromptSection }, { usedRepositoriesForBot }] = await Promise.all([
+      import('@/lib/profile/store'), import('@/lib/coordinator/github-context'),
+    ])
+    return profilePromptSection(userId, await usedRepositoriesForBot(userId, botId))
+  }).catch(() => '') : ''
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
   // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
-  // Memory and live model availability remain in the later prompt parts.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
+  // The person's memory and what Mikka knows about them ride together just after it, then live model availability.
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
   return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
 }
 
@@ -443,6 +498,13 @@ export async function personalMcp(userId: string, botId: string, executionId: st
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
+/** GitHub's workspace app policy for github_call, read in a step: a workflow body never does DB I/O. */
+export async function githubCallAllowedStep(userId: string, botId: string | null) {
+  'use step'
+  const { githubCallDecision } = await import('@/lib/operations/github-call-policy')
+  return githubCallDecision(userId, botId)
+}
+
 /** GitHub's hosted MCP server as the caller, with the caller's own token only (decision 2026-11-02-1730). */
 export async function githubMcp(userId: string, input: import('@/lib/github/mcp').GitHubMcpCommand, scope?: NativeToolScope) {
   'use step'
@@ -469,18 +531,25 @@ appTools.maxRetries = 0
 export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  // Two app surfaces, both checked before anything is sent: 团队权限 › 允许使用的应用
+  // blocks the app outright for a named Bot, and the workspace's own app setting
+  // (deny / ask / allow, 设置 › 应用与运行权限) decides inside writeAccountAction
+  // through lib/operations/account-write-setting.ts. Reading only the first let the
+  // Coordinator send mail while the same app's call_app_tool was denied (ALE-8).
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return writeAccountAction(userId, action, input, accountId, botId ?? null)
 }
 // A send has no idempotency key: a replayed step could send it twice.
 accountWrite.maxRetries = 0
 
-export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {
+export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+  const workspace = await coordinatorTaskWorkspace(userId, botId)
   const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
+    .where(and((await issueVisibility(userId, false, workspace.id)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
   return rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50).map(({ content, updatedAt, ...row }) => ({
     ...row, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
@@ -490,6 +559,8 @@ export async function listIssues(userId: string, input: { status?: string }, sco
 export async function getIssue(userId: string, input: { issueId: string }, scope: NativeToolScope | undefined, botId: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  const workspace = await coordinatorTaskWorkspace(userId, botId)
+  return actAs({ id: userId, [tokenWorkspace]: workspace.id }, async () => {
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
@@ -502,6 +573,7 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     thread: latest ? { runId: latest.id, status: latest.status, repository: latest.remoteUrl } : null,
     ...(deploymentSwitch('factoryRouting') ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listPublicForIssue(userId,issue.id) } : {}),
   }
+  })
 }
 
 export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string, taskEventId?: string, sourceEventId?: string) {
@@ -981,17 +1053,21 @@ export async function bindComputerSubscription(userId: string, input: { botId: s
   } catch { return { error: 'subscriptionUnavailable' } }
 }
 
-export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope) {
+export async function listRuns(userId: string, input: { issueId?: string; activeOnly?: boolean }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  const rows = await visibleRuns(userId, input)
+  if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+  const workspace = await coordinatorTaskWorkspace(userId, botId)
+  const rows = await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => visibleRuns(userId, input))
   return rows.map(run => ({ id: run.id, issueId: run.issueId, agent: run.agentName, status: run.status, stopReason: run.stopReason, createdAt: run.createdAt.toISOString() }))
 }
 
-export async function getRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
+export async function getRun(userId: string, input: { runId: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  const detail = await readRun(userId, input.runId)
+  if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+  const workspace = await coordinatorTaskWorkspace(userId, botId)
+  const detail = await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => readRun(userId, input.runId))
   if (!detail) return { error: 'runNotFound' }
   const { run } = detail
   return {
@@ -1008,16 +1084,26 @@ export async function getRun(userId: string, input: { runId: string }, scope?: N
   }
 }
 
-export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope) {
+export async function sendToRun(userId: string, input: { runId: string; text: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => { await addRunMessage(userId, input, 'peer'); return { sent: true } })
+  return asToolResult(async () => {
+    if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+    const workspace = await coordinatorTaskWorkspace(userId, botId)
+    await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => addRunMessage(userId, input, 'peer'))
+    return { sent: true }
+  })
 }
 
-export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope) {
+export async function stopRun(userId: string, input: { runId: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => { await requestRunStop(userId, input.runId); return { stopRequested: true } })
+  return asToolResult(async () => {
+    if (!botId) throw new ActionFailureError('workspaceAccessDenied')
+    const workspace = await coordinatorTaskWorkspace(userId, botId)
+    await actAs({ id: userId, [tokenWorkspace]: workspace.id }, () => requestRunStop(userId, input.runId))
+    return { stopRequested: true }
+  })
 }
 
 /** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */

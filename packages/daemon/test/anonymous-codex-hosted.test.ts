@@ -1,5 +1,5 @@
 // Real hosted adapter + real IPC processes; all OAuth values and RPC responses are synthetic.
-// Native initialize/config semantics are separately verified with fixed 0.166 bytes.
+// Native initialize/config contracts are compared separately at fixed upstream commits.
 import { afterEach, expect, it } from 'vitest'
 import { chmodSync, existsSync, lstatSync, mkdirSync, renameSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -13,12 +13,13 @@ import { MemoryServer } from '../src/server-link'
 import { createLogger } from '../src/log'
 import { buildChildEnv } from '../src/env'
 import { runRuntimeTimings } from '../src/run-runtime-timing'
+import { daemonTracer, runIdHash, type DaemonStartupTiming } from '../src/tracing'
 import { WorktreeManager } from '../src/worktrees'
 import { worktreeGitWritePaths } from '../src/agents/publish'
 import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
 const closing: Array<() => Promise<unknown>> = []
 afterEach(async () => { for (const close of closing.splice(0).reverse()) await close(); cleanupTempDirs() })
-async function fixture(diagnostics = false, hostOnly = false) {
+async function fixture(diagnostics = false, hostOnly = false, version = '0.166.0') {
   const root = tempDir('codex-bootstrap-hosted-'), home = join(root, 'home'), stateDir = join(home, '.mikka', 'worker', 'adapters')
   mkdirSync(home); mkdirSync(stateDir, { recursive: true })
   const repositoryRoot = join(home, '.mikka', 'repos', 'repo'); mkdirSync(join(home, '.mikka', 'repos'), { recursive: true }); renameSync(await makeRepo(), repositoryRoot)
@@ -29,10 +30,10 @@ async function fixture(diagnostics = false, hostOnly = false) {
   const binary = join(root, 'codex')
   let fake = readFileSync(resolve(import.meta.dirname, 'fakes/fake-codex-subscription.mjs'), 'utf8')
   fake = fake.replace('existsSync, mkdirSync,', 'appendFileSync, existsSync, mkdirSync,')
-    .replace('  if (!method) {', "  appendFileSync(process.env.FIXTURE_WIRE, JSON.stringify({ method, pid: process.pid, cwd: params?.cwd, config: params?.config }) + '\\n')\n  if (!method) {")
+    .replace('  if (!method) {', "  appendFileSync(process.env.FIXTURE_WIRE, JSON.stringify({ method, pid: process.pid, cwd: params?.cwd, config: params?.config, argv: process.argv }) + '\\n')\n  if (!method) {")
   writeFileSync(binary, fake); chmodSync(binary, 0o700)
   const env = Object.fromEntries(Object.entries({ ...process.env, HOME: home,
-    FAKE_CODEX_USER_AGENT: 'mikka/0.166.0 (offline fixture)', FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+    FAKE_CODEX_USER_AGENT: `mikka/${version} (offline fixture)`, FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
   const policy = defaultRunPolicy(), policyHash = policySnapshotHash(policy), decisionCatalogue = {
     version: 1 as const, tool: { name: 'record_decision' as const, title: 'Decision', description: 'Offline catalogue',
       inputSchema: { type: 'object' as const }, annotations: { idempotentHint: true as const } } }
@@ -80,6 +81,7 @@ it.each([false, true, 'host'] as const)('adopts one initialized child, retains o
     expect(threads).toHaveLength(1); expect(threads[0].cwd).toBe(f.cwd)
     expect(JSON.stringify(threads[0].config)).not.toContain('synthetic-mcp-token')
     const mcp = threads[0].config.mcp_servers.mikka
+    expect(mcp.required).toBe(true)
     expect(mcp.args[0]).toContain('mikka-mcp-context.mjs'); expect(existsSync(mcp.args[1])).toBe(false)
     const ledger = JSON.parse(readFileSync(join(f.stateDir, 'native-ledgers', f.assignment.runId + '.json'), 'utf8'))
     expect(ledger.scope.accountId).toBe('fixture-account'); expect(ledger.sessionId).toBe(session.sessionId)
@@ -90,6 +92,46 @@ it.each([false, true, 'host'] as const)('adopts one initialized child, retains o
     } else expect(prepared.preparationTiming).toBeUndefined()
   } finally { observation?.close(); await prepared.cancel() }
 })
+it.each(['0.166.0', '0.167.0'])('records the adopted %s child\'s asynchronous login in the late startup scope without repeating initialize', async version => {
+  const f = await fixture(true, true, version); await f.candidate.ready
+  const prepared = f.runner.prepare(f.assignment, { ...f.options, cwd: join(f.root, 'not-yet-checked-out') }, new AbortController().signal)
+  const timings: DaemonStartupTiming[] = []
+  try {
+    await prepared.ready
+    expect(f.wire().every(frame => ['initialize', 'initialized'].includes(frame.method))).toBe(true)
+    const rejected: DaemonStartupTiming[] = []
+    const session = await daemonTracer.span('daemon.adapter.start', {
+      'mikka.run.id_hash': runIdHash(f.assignment.runId), 'mikka.harness': 'codex',
+    }, async () => {
+      const starting = prepared.start(f.options)
+      await expect(daemonTracer.span('daemon.adapter.start', {
+        'mikka.run.id_hash': runIdHash('duplicate-caller'), 'mikka.harness': 'codex',
+      }, () => prepared.start(f.options), { onStartupTiming: timing => rejected.push(timing) })).rejects.toThrow('consumed')
+      return starting
+    }, { onStartupTiming: timing => timings.push(timing) })
+    expect(rejected).toMatchObject([{ runIdHash: runIdHash('duplicate-caller'), outcome: 'error', phases: [] }])
+    expect((await collect(session)).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+    expect(timings).toHaveLength(1)
+    const timing = timings[0]
+    expect(timing).toMatchObject({ version: 1, runIdHash: runIdHash(f.assignment.runId), harness: 'codex',
+      outcome: 'ok', truncated: false })
+    expect(timing.phases.map(phase => phase.name)).toEqual(['daemon.adapter.auth.token', 'daemon.adapter.account_check.login'])
+    const login = timing.phases.find(phase => phase.name === 'daemon.adapter.account_check.login')!
+    expect(login.ms).toBeGreaterThan(0)
+    expect(timing.phases.every(phase => phase.outcome === 'ok' && phase.startMs >= 0
+      && phase.endMs >= phase.startMs && phase.endMs <= timing.ms + 0.01)).toBe(true)
+    const early = prepared.preparationTiming!
+    expect(early).toMatchObject({ source: 'bootstrap_codex_initialize', runIdHash: timing.runIdHash, harness: 'codex', outcome: 'ok' })
+    expect(early.startedAt).toBeLessThanOrEqual(timing.startedAt)
+    expect(early.phases.map(phase => phase.name)).toContain('daemon.adapter.cli_init')
+    const wire = f.wire()
+    expect(wire.filter(frame => frame.method === 'initialize')).toHaveLength(1)
+    expect(wire.filter(frame => frame.method === 'account/login/start')).toHaveLength(1)
+    expect(wire.filter(frame => frame.method === 'turn/start')).toHaveLength(1)
+    expect(new Set(wire.map(frame => frame.pid)).size).toBe(1)
+    expect(f.candidate.nativeExitObserved).toBe(true)
+  } finally { await prepared.cancel() }
+})
 it('drains an incompatible project before the original cold child receives any login', async () => {
   const f = await fixture(); await f.candidate.ready
   mkdirSync(join(f.cwd, '.codex')); writeFileSync(join(f.cwd, '.codex', 'config.toml'), 'model = "project-owned-model"\n')
@@ -98,6 +140,7 @@ it('drains an incompatible project before the original cold child receives any l
   const wire = f.wire(), starts = wire.filter(frame => frame.method === 'initialize'), login = wire.find(frame => frame.method === 'account/login/start')
   expect(starts).toHaveLength(2); expect(starts[0].pid).not.toBe(starts[1].pid)
   expect(login.pid).toBe(starts[1].pid); expect(f.candidate.nativeExitObserved).toBe(true)
+  expect(login.argv).toContain('mcp_servers.mikka.required=true')
   expect(f.candidate.preparationTiming).toBeUndefined()
 })
 it('keeps a real login refusal on the adopted child as failure with no cold retry or task input', async () => {

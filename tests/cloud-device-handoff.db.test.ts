@@ -9,6 +9,7 @@ import { isE2eTarget, E2E_DB_RULE } from './helpers/e2e-target.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
+import { seedRunProjectResources } from './helpers/run-project-resources'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) assert.ok(isE2eTarget(url), E2E_DB_RULE)
@@ -49,13 +50,13 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
     } })
     const { reclaimLostRuns, latestCheckpoint } = await import('../lib/run-leases')
 
-    async function fixture(destination?: 'cloud', automatic = true) {
+    async function fixture(destination?: 'cloud', automatic = true, projectResources = false) {
       const id = randomUUID(), userId = `cloud-handoff-${id}`, workspaceId = randomUUID(), botId = randomUUID(), issueId = randomUUID()
       const parentDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), keyId = randomUUID(), deviceB = randomUUID(), agentB = randomUUID()
       const remoteKey = `v2/github.com/mikka-ci/cloud-handoff-${id}`, remoteUrl = `https://github.com/mikka-ci/cloud-handoff-${id}.git`
       await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
       await pool.query('INSERT INTO issue_prefixes("userId",prefix) VALUES($1,\'CHOF\')', [userId])
-      await pool.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,\'Cloud handoff fixture\')', [workspaceId, userId])
+      await pool.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Cloud handoff fixture\',\'team\')', [workspaceId, userId])
       await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [workspaceId, userId, `${userId}@example.invalid`])
       await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Cloud handoff Bot\')', [botId, userId, workspaceId])
       for (const [device, agent, kind] of [[parentDevice, agentId, 'cloud'], [deviceB, agentB, 'local']]) {
@@ -70,7 +71,9 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\')', [userId, e2b.ciphertext, e2b.iv, e2b.keyVersion])
       const key = sealSecret('synthetic-model-fixture', ['model_api_key', keyId, userId].join('\0'))
       await pool.query('INSERT INTO model_api_keys(id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) VALUES($1,$2,\'openai\',\'openai\',$3,$4,$5,\'test\',\'["gpt-5"]\')', [keyId, userId, key.ciphertext, key.iv, key.keyVersion])
-      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Cloud handoff task\',\'{"type":"doc","attrs":{"mikka":{"number":1}},"content":[]}\',\'todo\',\'normal\',\'personal\')', [issueId, userId])
+      await pool.query('INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES($1,$2,$3,\'bound\',\'Cloud handoff task\',\'{"type":"doc","attrs":{"mikka":{"number":1}},"content":[]}\',\'todo\',\'normal\',\'workspace\')', [issueId, userId, workspaceId])
+      const resources = projectResources ? await seedRunProjectResources(pool, { ownerId: userId, workspaceId, issueId,
+        repositoryKey: remoteKey, runtime: 'cloud', harness: 'codex' }) : undefined
       const sourceEventId = randomUUID()
       await pool.query('INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,"deliveredAt") VALUES($1::uuid,$2,$3,$4,\'user_message\',$1::text,$5,now())', [sourceEventId, userId, botId, issueId,
         JSON.stringify({ text: 'Keep the current goal and receipts.', ...(destination ? { taskDestination: { kind: destination } } : {}) })])
@@ -87,8 +90,38 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       const { token } = await issueRunToken({ id: runId, userId })
       assert.equal(source.agentDefinition.repositoryAdmission.deviceId, physical.deviceId, 'normal cloud provisioning relocated the admitted receipt')
       assert.notEqual(physical.deviceId, parentDevice)
-      return { userId, workspaceId, botId, issueId, runId, deviceB, agentB, keyId, agentId, repoId, source, task, machine, now, token }
+      return { userId, workspaceId, botId, issueId, runId, deviceB, agentB, keyId, agentId, repoId, source, task, machine, now, token, resources, remoteKey }
     }
+
+    for (const mutation of ['repository', 'environment-revision', 'environment-archive', 'project-archive', 'legacy-environment', 'legacy-branch'] as const)
+      await t.test(`lost cloud Run refuses ${mutation} before a child or any VM handoff`, async () => {
+        const legacy = mutation.startsWith('legacy-')
+        const f = await fixture(undefined, true, !legacy)
+        let resources = f.resources
+        if (legacy) {
+          const definition = structuredClone(f.source.agentDefinition)
+          delete definition.projectExecution
+          const { workerDefinitionDigest } = await import('../lib/agent-kit/worker-digest')
+          definition.definitionDigest = workerDefinitionDigest(definition)
+          await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.runId, JSON.stringify(definition)])
+          resources = await seedRunProjectResources(pool, { ownerId: f.userId, workspaceId: f.workspaceId, issueId: f.issueId,
+            repositoryKey: f.remoteKey, runtime: 'cloud', harness: 'codex', environment: mutation !== 'legacy-branch' })
+        }
+        if (mutation === 'legacy-branch') await resources!.refuse('branch')
+        else if (mutation !== 'legacy-environment') await resources!.refuse(mutation)
+        const before = (await pool.query('SELECT "agentDefinition",report,"sessionId" FROM agent_runs WHERE id=$1', [f.runId])).rows[0]
+        const checkpoint = await latestCheckpoint(f.runId), beforeWorkflows = cloudWorkflows
+        let pauses = 0
+        pause = async () => { pauses++ }
+        await reclaimLostRuns(f.userId, f.now)
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [f.runId])).rows[0].n, 0)
+        assert.equal(pauses, 0); assert.equal(cloudWorkflows, beforeWorkflows)
+        assert.deepEqual((await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [f.runId])).rows[0], f.machine)
+        assert.deepEqual((await pool.query('SELECT "agentDefinition",report,"sessionId" FROM agent_runs WHERE id=$1', [f.runId])).rows[0], before)
+        assert.deepEqual(await latestCheckpoint(f.runId), checkpoint)
+        assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [f.runId])).rows[0].status, 'failed',
+          'the expired source may record its legal terminal fact without authorizing another execution')
+      })
 
     await t.test('Cloud→B confirms one provider pause before exposing one fresh local receipt, then adopts the same current epoch', async () => {
       const f = await fixture()

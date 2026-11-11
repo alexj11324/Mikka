@@ -45,6 +45,6 @@ export function createReadBatch(registry: () => DesktopActions) {
       // batch-only memo are released, including when a reader rejects auth.
       if (authFailure) throw authFailure
       return items
-    })
+    }, prepared.map(item => item.name))
   }
 }

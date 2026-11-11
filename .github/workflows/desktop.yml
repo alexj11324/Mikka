@@ -43,6 +43,7 @@ jobs:
         with:
           profile: desktop
           skip-electron: 'true'
+          ffmpeg-github-token: ${{ github.token }}
       - run: pnpm --filter @mikka/desktop typecheck
       - run: pnpm --filter @mikka/desktop lint
       - run: pnpm --filter @mikka/desktop test
@@ -87,6 +88,7 @@ jobs:
         with:
           profile: desktop
           skip-electron: 'true'
+          ffmpeg-github-token: ${{ github.token }}
       - name: Install Chromium system dependencies
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
@@ -205,6 +207,7 @@ jobs:
         with:
           profile: desktop
           skip-electron: 'true'
+          ffmpeg-github-token: ${{ github.token }}
       - run: test "$(uname -m)" = arm64
       - name: Keep setup-node 24 in the native installer login shell
         run: node apps/desktop/test/native-node.mjs

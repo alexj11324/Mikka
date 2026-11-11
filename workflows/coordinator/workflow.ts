@@ -12,6 +12,7 @@ import { QUIET_REPLY } from '@/lib/attention/handoff'
 import * as steps from './steps'
 import * as kit from './agent-kit-steps'
 import { prepareHostedAgentRound } from './round-preparation'
+import { prepareCoordinatorStartup, recoverCoordinatorStartup } from './startup-preparation'
 import { nativeCoordinatorTurn } from './native-turn'
 import { coordinatorTools } from './tools'
 import { coordinatorStopToken, lastAssistantText, stoppedMessages, untilStopped } from '@/lib/coordinator/stop'
@@ -25,7 +26,7 @@ export { coordinatorTools } from './tools'
 /** Rounds of inbox per run; later events wait for the next wake. */
 const MAX_ROUNDS = 10
 
-type PreparationPhase = 'settings' | 'inbox' | 'begin' | 'prepare' | 'agentPreparation'
+type PreparationPhase = 'startup' | 'settings' | 'inbox' | 'begin' | 'prepare' | 'agentPreparation'
 type PreparationTimings = Partial<Record<PreparationPhase, number>>
 /** Workflow event-clock elapsed time, including each existing durable wait. */
 async function timedPreparation<T>(phases: PreparationTimings, phase: PreparationPhase, work: () => Promise<T>): Promise<T> {
@@ -34,7 +35,7 @@ async function timedPreparation<T>(phases: PreparationTimings, phase: Preparatio
 }
 
 /** Durable host orchestration; native harnesses still own their only model/tool loop. */
-export async function coordinatorTurn(userId: string, botId: string) {
+export async function coordinatorTurn(userId: string, botId: string, startupReceiptVersion?: 1) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
   const writable = getWritable<CoordinatorWorkflowStreamPart>()
@@ -43,12 +44,52 @@ export async function coordinatorTurn(userId: string, botId: string) {
   let controller = new AbortController()
   const stop = createHook<Record<string, never>>({ token: coordinatorStopToken(holder) })
   void (async () => { for await (const _ of stop) controller.abort() })()
-  // What the run reads once and its first inbox, side by side: each step is a durable round trip, and they are independent.
   const initialMs: PreparationTimings = {}
-  const [{ computerEnabled, mailboxEnabled, writeEnabled, agentKitEnabled, switches, coordinator, runtime: selected }, firstInbox] = await Promise.all([
+  let startup: Awaited<ReturnType<typeof prepareCoordinatorStartup>> | undefined
+  // New wakes opt in explicitly. An already-recorded two-argument workflow
+  // keeps its original settings/inbox/preparation durable event graph.
+  if (startupReceiptVersion === 1) {
+    try {
+      startup = await timedPreparation(initialMs, 'startup', () => prepareCoordinatorStartup(userId,botId,holder,writable))
+    } catch (error) {
+      // The inbox may have COMMITted before preparation failed. Recover only
+      // that immutable context; a fresh take here would consume later E2.
+      let receipt: Awaited<ReturnType<typeof recoverCoordinatorStartup>> = null
+      try { receipt = await recoverCoordinatorStartup(userId,botId,holder) }
+      catch (cleanupError) { console.error('Coordinator startup context unavailable', { workflowRunId:holder,name:cleanupError instanceof Error ? cleanupError.name : typeof cleanupError }) }
+      const inbox = receipt?.inbox
+      if (inbox?.scheduledRead) {
+        const denied = error instanceof Error && ['scheduleReadAuthorityLost','scheduleWorkspaceAccessDenied','scheduleConversationUnavailable'].includes(error.message)
+        try { await steps.failScheduleRead(inbox.scheduledRead,denied) } catch { /* retain the original failure */ }
+      } else if (inbox) {
+        try { await steps.noticeTurnFailure(userId,botId,holder,error instanceof Error ? error.message : String(error),inbox.telegramTargets,inbox.pushEvents ?? []) } catch { /* notice retains its own no-retry boundary */ }
+      }
+      // Separate checkpoints retain receipt context even if this fresh scope
+      // or execution cleanup fails. It can only close this holder's round 0.
+      try { await kit.failAgentPreparation(userId,botId,holder,0) }
+      catch (cleanupError) { console.error('Coordinator startup execution cleanup failed', { workflowRunId:holder,name:cleanupError instanceof Error ? cleanupError.name : typeof cleanupError }) }
+      const failureDetails = captureRunFailure(error,{runId:holder})
+      try { await steps.failTurn(userId,holder,error instanceof Error ? error.message : String(error),botId,undefined,failureDetails) }
+      catch (cleanupError) { console.error('Coordinator startup turn cleanup failed', { workflowRunId:holder,name:cleanupError instanceof Error ? cleanupError.name : typeof cleanupError }) }
+      // In particular, do not wrap a FatalError/refusal in a retryable error.
+      throw error
+    }
+    if (startup.kind === 'not-held') return
+    if (startup.kind === 'lost') {
+      // A receipt may outlive Stop/release. Finish only its old execution;
+      // never fail/release the current holder or touch its pending inbox.
+      await kit.failAgentPreparation(userId,botId,holder,0)
+      return
+    }
+  }
+  // Both new hosted paths have already taken this inbox. Inbox-only returns
+  // at the original durable boundary; it must never fall through to a new take.
+  // Native and historical runs retain their independent original steps.
+  const [settings, firstInbox] = startup?.kind === 'ready' || startup?.kind === 'inbox-only' ? [startup.settings,startup.inbox] as const : await Promise.all([
     timedPreparation(initialMs, 'settings', () => steps.turnSettings(userId,botId)),
     timedPreparation(initialMs, 'inbox', () => steps.takeInbox(userId,holder,botId)),
   ])
+  const { computerEnabled, mailboxEnabled, writeEnabled, agentKitEnabled, switches, coordinator, runtime: selected } = settings
   for (let round = 0; round < MAX_ROUNDS; round++) {
     // A stop while the first steps were running belongs to the first inbox.
     // Only a later inbox, after that stopped round, gets a fresh signal.
@@ -56,8 +97,11 @@ export async function coordinatorTurn(userId: string, botId: string) {
     const signal = controller.signal
     const phaseMs: PreparationTimings = round === 0 ? { ...initialMs } : {}
     const inbox = round === 0 ? firstInbox : await timedPreparation(phaseMs, 'inbox', () => steps.takeInbox(userId,holder,botId))
-    // The Workflow clock is the durable event time: this is when the inbox was taken.
+    // Workflow event time at the returned checkpoint. A ready startup includes
+    // preparation there; inbox-only does not. Log the origin rather than compare it
+    // with a Node clock or label it as the old inbox-only boundary.
     const takenAt = Date.now()
+    const storeTimingOrigin = round === 0 && startup?.kind === 'ready' ? 'startup_checkpoint' as const : 'inbox_checkpoint' as const
     if (!inbox.held) return
     if (!inbox.added) {
       if (await steps.releaseLease(userId,holder,botId)) continue
@@ -81,10 +125,13 @@ export async function coordinatorTurn(userId: string, botId: string) {
       let hosted: AgentExecution['snapshot']['runtime'] | Awaited<ReturnType<typeof kit.botRuntime>> | null = null
       let prepared: Awaited<ReturnType<typeof steps.prepareTurn>> | { mailboxTools: Awaited<ReturnType<typeof steps.mailboxCatalogue>>; prompt: null; contextMs: null }
       if (selected.harness === 'ai_sdk' && typeof agentKitEnabled === 'boolean') {
-        // This is a single Workflow event-clock span, not the old two step timings.
-        preparing = timedPreparation(phaseMs, 'agentPreparation', () => prepareHostedAgentRound(userId,botId,holder,round,selected,mailboxEnabled,Boolean(inbox.scheduledRead),agentKitEnabled))
-        starting = steps.writeStreamPart(writable,streamStart)
-        const [preparation] = await Promise.all([preparing,starting])
+        let preparation = round === 0 && startup?.kind === 'ready' ? startup.preparation : null
+        if (!preparation) {
+          // Later rounds, schedules and disabled kit keep their boundaries.
+          preparing = timedPreparation(phaseMs, 'agentPreparation', () => prepareHostedAgentRound(userId,botId,holder,round,selected,mailboxEnabled,Boolean(inbox.scheduledRead),agentKitEnabled))
+          starting = steps.writeStreamPart(writable,streamStart)
+          ;[preparation] = await Promise.all([preparing,starting])
+        }
         if (preparation.kind === 'ready') {
           execution = preparation.execution
           hosted = preparation.hosted
@@ -175,9 +222,9 @@ export async function coordinatorTurn(userId: string, botId: string) {
       }
       await steps.writeStreamPart(writable,{type:'coordinator-turn-committed',id:streamId,through,quiet})
       // After the reply is stored and committed, so it never delays what the person sees.
-      await steps.logTurnTiming({ workflowRunId:holder,round,route:selected.harness !== 'ai_sdk' ? 'native' : hosted?.modelSelection ? 'subscription' : 'hosted',untilStoredMs:storedAt - takenAt,modelCalls:(result as { modelCalls?: number }).modelCalls ?? null,tools:(result as { toolTimings?: ToolTiming[] }).toolTimings ?? [],
+      await steps.logTurnTiming({ workflowRunId:holder,round,route:selected.harness !== 'ai_sdk' ? 'native' : hosted?.modelSelection ? 'subscription' : 'hosted',untilStoredMs:storedAt - takenAt,...(startupReceiptVersion === 1 ? {storeTimingOrigin} : {}),modelCalls:(result as { modelCalls?: number }).modelCalls ?? null,tools:(result as { toolTimings?: ToolTiming[] }).toolTimings ?? [],
         // Context reads overlap inside prepare: their durations are not additive.
-        phaseMs: { ...phaseMs, execution:prepared.contextMs?.execution ?? 0,personal:prepared.contextMs?.personal ?? 0,github:prepared.contextMs?.github ?? 0 },...(preparationBodyMs ? {preparationBodyMs} : {}) })
+        phaseMs: { ...phaseMs, execution:prepared.contextMs?.execution ?? 0,personal:prepared.contextMs?.personal ?? 0,github:prepared.contextMs?.github ?? 0,profile:prepared.contextMs?.profile ?? 0 },...(preparationBodyMs ? {preparationBodyMs} : {}) })
     } catch (error) {
       // Either branch can fail first: wait for a possible late execution commit
       // and for the already-started writer before terminal cleanup/publication.

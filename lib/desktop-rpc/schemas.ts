@@ -1,9 +1,12 @@
+import { saveEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { taskPresentationsInput } from '@/lib/task-presentation-input'
 import { z } from 'zod'
 import { projectInput, projectPatch } from '@/lib/project-input'
-import { assigneeSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
+import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
 import { ISSUE_STATUS_CODES, ISSUE_PRIORITY_CODES } from '@/lib/issue-meta'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
+import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { setAppPolicyInput } from '@/lib/app-policy/apps'
@@ -33,6 +36,7 @@ const document = z.object({ type: z.literal('doc'), content: z.array(json).optio
   .refine(value => JSON.stringify(value).length <= 250_000)
 const metadata = object({
   assignee: assigneeSchema.pick({ kind: true, id: true }).strict().nullable().optional(),
+  delegate: delegateSchema.pick({ kind: true, id: true }).strict().nullable().optional(),
   project: text(100).trim().min(1).nullable().optional(), labels: z.array(labelSchema.strict()).max(12).optional(),
   pullRequests: z.array(pullRequestSchema.strict()).max(10).optional(), dueDate: z.iso.date().nullable().optional(),
   estimate: z.number().int().min(0).max(100).nullable().optional(),
@@ -86,6 +90,17 @@ const readBatch: z.ZodType = tuple(z.array(object({ action: z.enum(READ_BATCH_AC
  * checked here before the original action performs its ownership checks. */
 export const desktopActionSchemas = {
   'desktop.readBatch': readBatch,
+  'task-domain.getTaskPresentation': oneId,
+  'task-domain.getTaskPresentations': tuple(taskPresentationsInput),
+  'teams.getTeamLifecycleImpact': oneId,
+  'teams.getTeamLifecycleAudit': tuple(uuid, uuid),
+  'teams.archiveTeam': oneId,
+  'teams.restoreTeam': oneId,
+  'teams.removeTeamGrouping': tuple(uuid, text(120)),
+  'project-resources.listProjectResources': tuple(uuid, uuid.optional()),
+  'project-resources.saveEnvironment': tuple(saveEnvironmentInput),
+  'project-resources.saveProjectResources': tuple(projectResourcesInput),
+  'project-resources.saveWorkspaceRepositoryPolicy': tuple(workspaceRepositoryPolicyInput),
   'desktop.bootstrap': inWorkspace,
   'desktop.session': none,
   'desktop.accounts': none,
@@ -142,17 +157,20 @@ export const desktopActionSchemas = {
   'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish() })),
   'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() })),
   'bots.listWorkspaceBots': none,
+  'bots.listBotsForWorkspace': oneId,
   'collaboration.exchangeDocument': tuple(object({ id: uuid, vector: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), update: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), seed: text(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/).optional(), known: version.optional() })),
   'collaboration.listMembers': oneId,
   'collaboration.inviteMember': tuple(uuid, z.email().max(254)),
   'collaboration.removeMember': tuple(uuid, id),
+  'collaboration.setMemberRole': tuple(uuid, id, z.enum(['owner', 'member'])),
+  'collaboration.setMemberSubscribed': tuple(uuid, id, bool),
   'coordinator.pollCoordinatorChat': coordinatorRead,
   'coordinator.syncCoordinatorChat': coordinatorRead,
   'coordinator.coordinatorHistory': tuple(bot, count, z.number().int().min(1).max(200).optional()),
   'coordinator.coordinatorCitationSources': tuple(z.array(uuid).min(1).max(50)),
   'coordinator.coordinatorReasoning': tuple(bot, z.array(positive).min(1).max(50)),
   'coordinator.pollBotChatSummaries': none,
-  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional()),
+  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional(), workspace, taskTitleInputSchema.optional()),
   'coordinator.welcomeCoordinator': tuple(bot.optional()),
   'coordinator.stopCoordinatorTurn': tuple(bot.optional()),
   'coordinator.retryCoordinatorTurn': tuple(bot.optional()),
@@ -227,12 +245,17 @@ export const desktopActionSchemas = {
   'personal-policy.updatePaymentDesignation': tuple(bool, workspace),
   'preferences.getPreferences': none,
   'preferences.updatePreferences': tuple(preferences),
-  'projects.listProjects': none,
+  'projects.listProjects': tuple(),
+  'projects.listWorkspaceProjects': tuple(uuid),
   'projects.saveProject': tuple(projectInput),
-  'projects.updateProjectProperties': tuple(projectPatch),
-  'projects.moveIssueToProject': tuple(object({ issueId: uuid, revision: positive, projectId: uuid.nullable() })),
-  'projects.listProjectEvents': oneId,
-  'projects.setProjectIssues': tuple(object({ id: uuid, revision: positive, issueIds: z.array(uuid).max(100) })),
+  'projects.updateProjectProperties': tuple(projectPatch.extend({ workspaceId: uuid.optional() })),
+  'projects.moveIssueToProject': tuple(object({ issueId: uuid, revision: positive, projectId: uuid.nullable(), workspaceId: uuid.optional(), confirmAccess: bool.optional() })),
+  'projects.listProjectEvents': tuple(uuid, uuid.optional()),
+  'projects.setProjectIssues': tuple(object({ id: uuid, revision: positive, issueIds: z.array(uuid), workspaceId: uuid.optional(), confirmAccess: bool.optional() })),
+  'projects.getProjectLifecycleImpact': tuple(object({ id: uuid, workspaceId: uuid.optional() })),
+  'projects.archiveProject': tuple(object({ id: uuid, revision: positive.optional(), workspaceId: uuid.optional() })),
+  'projects.restoreProject': tuple(object({ id: uuid, revision: positive.optional(), workspaceId: uuid.optional() })),
+  'projects.deleteProject': tuple(object({ id: uuid, revision: positive, confirmation: text(200), workspaceId: uuid.optional() })),
   'settings-activity.listSavedLogins': none,
   'settings-activity.deleteSavedLogin': oneId,
   'settings-activity.saveSavedLogin': tuple(object({ site: text(2048).min(1), account: text(4096).min(1).regex(/^[^\r\n\0]+$/), password: text(4096).min(1).regex(/^[^\r\n\0]+$/) })),
@@ -250,6 +273,9 @@ export const desktopActionSchemas = {
   'teams.saveTeam': tuple(object({ id: uuid.optional(), workspaceId: uuid, name: text(120).trim().min(1), identifier: text(20).min(1), description: text(2000) })),
   'teams.listTeamMembers': tuple(uuid, workspace),
   'teams.changeTeamMember': tuple(object({ teamId: uuid, userId: id.optional(), action: z.enum(['join', 'leave', 'add', 'remove', 'owner', 'member']) })),
+  // 删除团队: the server checks the workspace admin and that the typed name equals the team's (app/actions/teams.ts).
+  'teams.getTeamDeletionImpact': tuple(uuid),
+  'teams.deleteTeam': tuple(uuid, text(120)),
   'telegram.getTelegramIntegrationStatus': none,
   'telegram.createTelegramConnectLink': none,
   'telegram.disconnectTelegram': none,

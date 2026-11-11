@@ -6,6 +6,7 @@ import { coordinatorEvents, devices, issueToolCalls } from '@/lib/db/schema'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { collectIssueEffects, runIssueEffect, type IssueEffect } from '@/lib/issue-effects'
+import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 
 export class IssueToolCallConflict extends Error {
   constructor() { super('issueToolCallConflict') }
@@ -37,8 +38,12 @@ export async function idempotentIssueMutation<T extends { id: string } & Record<
     toolCallId = `chat-create:${createHash('sha256').update(JSON.stringify(canonical(identity))).digest('hex')}`
   }
   const inputHash = createHash('sha256').update(JSON.stringify(canonical(identity))).digest('hex')
+  const workspaceId = taskReaderScope(userId).workspaceId
+  if (!workspaceId) throw new IssueToolCallConflict()
   let key = and(eq(issueToolCalls.userId, userId), eq(issueToolCalls.toolCallId, toolCallId))
-  const committed = await db.transaction(async tx => withDatabaseTransaction(tx, async () => {
+  // Nested actions use savepoints. Keep membership pinned until this outer
+  // transaction, which commits the mutation and its replay receipt, finishes.
+  const committed = await withTaskWorkspace(userId, workspaceId, () => db.transaction(async tx => withDatabaseTransaction(tx, async () => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-tool:' + JSON.stringify([userId, toolCallId])}, 0))`)
     if (chatRequest) {
       const [source] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, chatRequest.eventId),
@@ -78,7 +83,7 @@ export async function idempotentIssueMutation<T extends { id: string } & Record<
     if (event) await tx.update(coordinatorEvents).set({ issueId: result.id }).where(eq(coordinatorEvents.id, event.id))
     await tx.insert(issueToolCalls).values({ userId, operation, toolCallId, inputHash, issueId: result.id, result, effects })
     return { result, effects }
-  }))
+  })))
   // These effects are already safe to retry (outbox delivery, scope judgment and
   // a lease-guarded wake). A crash before clearing the receipt reruns only them.
   for (const effect of committed.effects) await runIssueEffect(effect)

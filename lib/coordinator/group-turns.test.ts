@@ -317,7 +317,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await scoped.query(await readFile(new URL('../../drizzle/20261103220300_group_decision_quality.sql', import.meta.url), 'utf8'))
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
-    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid, "failureDetails" jsonb)`)
+    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid, "failureDetails" jsonb, "agentDefinition" jsonb)`)
     await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz); CREATE TABLE coordinator_bots ("ownerId" text, "workspaceId" uuid, "botId" uuid)` )
     // The current active-agent reader resolves public Bot names before its
     // legacy execution-name fallback. Keep those real SQL dependencies present.
@@ -378,9 +378,10 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     releasePending = unblock
     const running = processGroupTurn(scoped,id,blocked); await waiting
     // Match #79 9760e912's existing owner + working + live lease predicate.
-    const activeRuns = async (owner = 'owner', now = new Date()) => (await scoped.query(`SELECT id,"agentId","userId",kind FROM agent_runs WHERE "userId"=$1 AND status IN ('preparing','running','waiting_input','finishing') AND "leaseExpiresAt">$2`, [owner,now])).rows
+    const activeRuns = async (owner = 'owner', now = new Date()) => (await scoped.query(`SELECT id,"agentId","userId","workspaceId",kind FROM agent_runs WHERE "userId"=$1 AND status IN ('preparing','running','waiting_input','finishing') AND "leaseExpiresAt">$2`, [owner,now])).rows
     const active = await activeRuns()
     assert.equal(active.length,1); assert.equal(active[0].agentId,a); assert.equal(active[0].kind,'group_chat')
+    assert.equal(active[0].workspaceId, workspaceId, 'task-free status rows inherit the persisted conversation tenant')
     // Exercise the current main reader and HTTP response against the actual bridge row.
     const [{ drizzle }, schema, { listActiveAgents, activeAgentsResponse }] = await Promise.all([import('drizzle-orm/node-postgres'), import('../db/schema'), import('../active-agents')])
     const db = drizzle(scoped, { schema })
@@ -811,6 +812,40 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
         await assertGroupTerminal(scoped, group, root, terminals, { started: 1, settled: 1, aborted: 0 }, startedAt)
       } finally { barrier.release(); await work.catch(() => {}); barrier.restore() }
     })
+
+    await t.test('two conversations owned by the same person persist distinct task-free Run tenants', async () => {
+      const otherWorkspaceId = randomUUID()
+      const otherDirectory: typeof directory = async (w,u,selected=[]) => w === otherWorkspaceId && u === 'owner'
+        && selected.every(member => member.memberType === 'user' ? member.memberId === 'owner' : members.some(agent => agent.id === member.memberId))
+      const created = await handleGroup(scoped,otherDirectory,{...base,body:JSON.stringify({
+        workspaceId:otherWorkspaceId,title:'Other tenant',members:[{memberType:'agent',memberId:a}],
+      })},true)
+      assert.equal(created.status,201)
+      const groupId = (created.body as {id:string}).id
+      const sent = await handleGroup(scoped,otherDirectory,{...base,resource:'messages',id:groupId,body:JSON.stringify({
+        body:'same owner, another persisted tenant',mentions:[{memberType:'agent',memberId:a}],
+      })},true)
+      assert.equal(sent.status,201)
+      const messageId = (sent.body as {id:string}).id
+      let seenRunId: string | undefined
+      assert.equal(await processGroupTurn(scoped,groupId,{...runtime,
+        authorized:(w,u)=>otherDirectory(w,u),
+        async generate(agent,input) {
+          const {rows:[run]}=await scoped.query(`SELECT r.id,r."workspaceId",r."issueId",r."botId" FROM group_turns t
+            JOIN agent_runs r ON r.id=t."activeRunId" WHERE t."messageId"=$1`,[messageId])
+          assert.ok(run)
+          assert.equal(run.workspaceId,otherWorkspaceId)
+          assert.equal(run.issueId,null); assert.equal(run.botId,null)
+          seenRunId=run.id
+          return runtime.generate(agent,input)
+        },
+      }),true)
+      assert.ok(seenRunId)
+      assert.deepEqual((await scoped.query('SELECT "workspaceId",status FROM agent_runs WHERE id=$1',[seenRunId])).rows,
+        [{workspaceId:otherWorkspaceId,status:'succeeded'}])
+      assert.equal((await scoped.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1',[active[0].id])).rows[0].workspaceId,workspaceId)
+    })
+
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
 })

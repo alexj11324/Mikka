@@ -2,7 +2,7 @@
 // as the backend reports them (#531, #558, #559), and the UI's helpers for them.
 
 /** Every state `getHostedUsage` reports; a refused model call carries the same code. */
-export const HOSTED_STATES = ['ready', 'verification_required', 'free_allowance_used', 'points_exhausted', 'platform_paused', 'usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable'] as const
+export const HOSTED_STATES = ['ready', 'verification_required', 'free_allowance_used', 'points_exhausted', 'platform_paused', 'usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable', 'usage_budget_exhausted', 'billing_authorization_revoked'] as const
 export type HostedState = (typeof HOSTED_STATES)[number]
 export type HostedRefusal = Exclude<HostedState, 'ready'>
 
@@ -13,6 +13,8 @@ export interface HostedBalance {
   free: number
   /** Remaining purchased points, converted to microdollars. */
   purchased: number
+  /** Remaining paid-period credits. Optional while older clients are in use. */
+  plan?: number
 }
 
 export interface HostedUsage {
@@ -40,7 +42,7 @@ export interface CardVerificationStatus {
 export interface CreditTransaction {
   id: string
   date: string
-  type: 'topup' | 'verification' | 'refund'
+  type: 'topup' | 'verification' | 'refund' | 'subscription'
   points: number
   amountCents: number | null
   currency: string | null
@@ -65,7 +67,7 @@ const MICRO_USD_PER_POINT = 10_000
  */
 export function hostedRefusal(message: string | null | undefined): HostedRefusal | null {
   if (!message) return null
-  const match = /\b(verification_required|free_allowance_used|points_exhausted|platform_paused|usage_in_progress|usage_concurrency_limit|usage_cost_unavailable)\b/.exec(message)
+  const match = /\b(verification_required|free_allowance_used|points_exhausted|platform_paused|usage_in_progress|usage_concurrency_limit|usage_cost_unavailable|usage_budget_exhausted|billing_authorization_revoked)\b/.exec(message)
   return match ? match[1] as HostedRefusal : null
 }
 
@@ -80,13 +82,14 @@ export function hostedRefusal(message: string | null | undefined): HostedRefusal
 export function refusalOffer(code: HostedRefusal, usage: HostedUsage | null) {
   const busy = code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable'
   // A team with no points of its own: retrying never helps, even with a subscription connected. Its 计费 page buys points or turns on a member's shared credits.
-  const billing = !busy && usage?.personal === false && (code === 'verification_required' || code === 'free_allowance_used' || code === 'points_exhausted')
+  const restricted = code === 'usage_budget_exhausted' || code === 'billing_authorization_revoked'
+  const billing = restricted || (!busy && usage?.personal === false && (code === 'verification_required' || code === 'free_allowance_used' || code === 'points_exhausted'))
   const transient = busy || (Boolean(usage?.subscribed) && !billing)
   return {
     transient,
     billing,
     card: !transient && Boolean(usage?.personal) && (code === 'verification_required' || (usage?.balance.verified === false && (code === 'free_allowance_used' || code === 'points_exhausted'))),
-    connect: !transient && usage?.subscribed === false,
+    connect: !transient && !restricted && usage?.subscribed === false,
     // A personal workspace with a verified card that ran out: 充值 right there (decision 2026-11-02-1450).
     topUp: !transient && Boolean(usage?.personal) && usage?.balance.verified === true && (code === 'free_allowance_used' || code === 'points_exhausted'),
   }
@@ -94,5 +97,5 @@ export function refusalOffer(code: HostedRefusal, usage: HostedUsage | null) {
 
 /** Allowance and purchased points as one balance, rounded down so the screen never shows more than is left. */
 export function balancePoints(balance: HostedBalance): number {
-  return Math.floor(Math.max(0, balance.free + balance.purchased) / MICRO_USD_PER_POINT)
+  return Math.floor(Math.max(0, balance.free + (balance.plan ?? 0) + balance.purchased) / MICRO_USD_PER_POINT)
 }

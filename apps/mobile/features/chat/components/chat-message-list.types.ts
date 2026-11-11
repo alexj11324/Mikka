@@ -1,3 +1,4 @@
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 import type { ReactElement, ReactNode } from 'react'
 
 /**
@@ -27,6 +28,8 @@ export type ChatListProps<T> = {
   onStartReached?: () => void
   /** Whether the latest message is in view, for the jump-to-latest button. */
   onAtLatestChange: (atLatest: boolean) => void
+  /** Each scroll, for the bar's backdrop (useScrolledUnderBar). */
+  onScrollUnderBar?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void
   scrollEnabled: boolean
   testID: string
 }

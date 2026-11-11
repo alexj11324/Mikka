@@ -15,20 +15,29 @@ const conversation: { summary: string | null; memory: string; messages: StoredMe
 const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []
 let modelCalls = 0, finishReason = 'stop'
 stub('../abuse/resolve.ts',{resolveDefaultHostedModel:async(_scope:unknown,model:string)=>model})
-stub('./store.ts', { loadConversation: async () => conversation, saveSummary: async (...args: unknown[]) => { saved.push(args) } })
+stub('./store.ts', { loadConversation: async () => conversation, loadConversationForPrompt: async () => ({ ...conversation, personalInstructions: '' }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
 stub('./native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('./bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
-stub('./personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base })
+stub('./personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base, withPersonalInstructionText: async (_owner: string, base: string) => base })
+stub('./issue-team.ts', {
+  coordinatorTaskWorkspace: async (owner: string, bot: string) => {
+    assert.equal(owner, 'owner'); assert.equal(bot, 'private-bot')
+    return { id: '28700000-0000-4000-8000-0000000000b1', kind: 'team' }
+  },
+  coordinatorIssueTeam: () => { throw Error('No task creation in prompt fixture') },
+})
 stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: () => { throw Error('No database transaction in prompt fixture') } })
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('No database in pure test') } })
 stub('../agent-runs.ts', { addRunMessage: async (...args: unknown[]) => { forwarded.push(args) }, queueRun: () => {}, queueFactoryRun: () => { throw Error('No Factory dispatch in prompt fixture') }, readRun: () => {}, requestRunStop: () => {}, visibleRuns: () => {} })
 stub('../search/index.ts', { webSearch: () => {} })
-stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused' })
+const unexpectedAuth = () => { throw new Error('Unexpected authentication or OAuth effect in pure prompt fixture') }
+stub('../auth.ts', { auth: new Proxy({}, { get: unexpectedAuth }), authBaseURL: 'https://auth-fixture.example.invalid' })
+stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synthetic-unused', issueDeviceToken: unexpectedAuth })
 stub('../composio.ts', { runComposioAction: () => {} })
 // Factory issue-link registration is imported by the tool graph; prompt tests never authorize GitHub reads.
 stub('../github/user-access.ts', { readAuthorizedIssue: () => { throw Error('No GitHub authorization or provider I/O in prompt fixture') } })
 stub('../pending-action-store.ts', { proposeAction: () => {}, writeAccountAction: () => {}, proposeRepositoryPush: () => {} })
-stub('../issue-access.ts', { issueForUser: () => {} })
+stub('../issue-access.ts', { issueForUser: () => {}, requireUser: unexpectedAuth })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })
@@ -68,7 +77,7 @@ test('actual SDK preparePrompt and native enqueue preserve real user input and d
     assert.ok(input.instructions.includes(PERSONAL_MESSAGE_INSTRUCTIONS))
     assert.ok(!input.context.includes(secret) && !prompt.instructions.includes(secret))
     assert.equal(modelCalls, 0)
-    await sdk.sendToRun('owner', { runId: 'existing-run', text: 'Agent forward' })
+    assert.deepEqual(await sdk.sendToRun('owner', { runId: 'existing-run', text: 'Agent forward' }, undefined, 'private-bot'), { sent: true })
     assert.deepEqual(forwarded.at(-1), ['owner', { runId: 'existing-run', text: 'Agent forward' }, 'peer'])
   } finally { if (old === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = old }
 })

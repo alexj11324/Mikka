@@ -1,3 +1,4 @@
+import { resourceBoundDispatchConstructor, resourceBoundReconcilerConstructor } from './helpers/factory-resource-boundary'
 // Real PostgreSQL, model preference admission, completion and claim. Only the
 // provider catalogue and Next's request-scoped `after` are replaced; Coordinator
 // wakes are observed without running a separate inbox consumer. Provider
@@ -7,21 +8,25 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { MODEL_CREDENTIAL_HEADER, RECOVERY_WORKTREE_HEADER, REPO_ORIGIN_HEADER, MIN_DAEMON_VERSION } from '@mikka/protocol/device'
+import { MODEL_CREDENTIAL_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, REPO_ORIGIN_HEADER, MIN_DAEMON_VERSION } from '@mikka/protocol/device'
+import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import type { ProviderFailure } from '@mikka/protocol/provider-failure'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { emptyRunReport } from '@mikka/protocol/run'
-import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
 import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allowed-model'
 import type { DecisionAnswer } from '../lib/coordinator/decision'
 import { MODEL_ROUTING_TIERS, modelTier } from '../lib/model-routing'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
+import { threadPromptView } from '../lib/thread-prompt'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
-  const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
+  const names = ['WORKSPACE_SECRETS_KEY', 'BETTER_AUTH_SECRET', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
   const saved = new Map(names.map(name => [name, process.env[name]]))
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+  // Policy snapshots sign with this secret; CI provides one, local runs get a test-only value.
+  process.env.BETTER_AUTH_SECRET ??= randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
@@ -118,8 +123,8 @@ test('provider failure continues the same task through its authorized preferred 
     const stored = (await order.readOrder(pool, scope(p))).entries
     await order.changeOrder(pool, scope(p), { kind: 'reorder', ids: entries.map(item => stored.find(candidate => entryKey(candidate) === entryKey(item))!.id) })
   }
-  const task = async (ownerId: string) => {
-    const issueId = await seedIssue(pool, ownerId)
+  const task = async (person: Person) => {
+    const issueId = await seedIssue(pool, person.id, person.workspaceId)
     await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: Math.floor(Math.random() * 1e6) + 1 } } })])
     return issueId
   }
@@ -129,7 +134,7 @@ test('provider failure continues the same task through its authorized preferred 
     const selected = await chooseLocalRunModel(pool, scope(p), { id: p.agents[harness], deviceId: p.deviceId, harness }, options.asked)
     assert.ok(!('error' in selected), JSON.stringify(selected))
     const { runId } = await queueRun(p.id, {
-      issueId: await task(p.id), agentId: p.agents[harness], repo: p.remote, ...selected,
+      issueId: await task(p), agentId: p.agents[harness], repo: p.remote, ...selected,
       ...(options.pinned ? { pinnedDeviceId: p.deviceId } : {}),
     }, p.botId)
     // Device lifecycle fields are the only run fields seeded after admission.
@@ -160,7 +165,7 @@ test('provider failure continues the same task through its authorized preferred 
       modelDispatch: { mode: 'preference' as const, location: 'local' as const, entry: target.entry, routing: target.routing } }
   }
   const routedRunning = async (p: Person, model: string) => {
-    const issueId = await task(p.id)
+    const issueId = await task(p)
     const selected = await routedSelection(p, model, issueId)
     const { runId } = await queueRun(p.id, { issueId, agentId: p.agents.claude_code, repo: p.remote, ...selected }, p.botId)
     await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"worktreePath"=$3,
@@ -173,10 +178,11 @@ test('provider failure continues the same task through its authorized preferred 
   const end = (p: Person, runId: string, failure: ProviderFailure) => persistRunCompletion(p.id, runId, {
     stopReason: 'provider_failure', report: { ...emptyRunReport('The model provider could not serve the request.'), providerFailure: failure },
   })
-  const claim = async (p: Person, runId: string) => {
+  const claim = async (p: Person, runId: string, options: { snapshot?: boolean } = {}) => {
     const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
       method: 'POST', headers: { 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${p.token}`,
-        [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
+        [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [PROJECT_ENVIRONMENT_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1',
+        ...(options.snapshot ? { [POLICY_SNAPSHOT_HEADER]: POLICY_SNAPSHOT_VERSION } : {}) },
     }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
     const body = await response.text()
     assert.equal(response.status, 200, body)
@@ -194,15 +200,90 @@ test('provider failure continues the same task through its authorized preferred 
     return { p, first, second, entries }
   }
 
+  await t.test('a real Factory review keeps its candidate checkout SHA and frozen Project Environment across provider fallback', async () => {
+    const { p, second } = await twoModels('provider-candidate-checkout')
+    const [{ createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun },
+      { factoryCheckGates }, { factoryCheckIndependent }, { ensureDeviceRepository }, resources,
+      { providerContinuationLaunchMatches }] = await Promise.all([
+      import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
+      import('../lib/factory/checks'), import('../lib/factory/check-independence'), import('../lib/device-repositories'),
+      import('../lib/project-resources/store'), import('../lib/run-provider-fallback'),
+    ])
+    const issueId = await task(p), projectId = randomUUID(), epoch = randomUUID(), sha = 'c'.repeat(40)
+    const environment = await resources.saveEnvironment(p.id, { workspaceId: p.workspaceId, name: 'Frozen candidate environment',
+      configuration: { runtime: 'local', variables: { REVIEW_MODE: 'frozen' } } })
+    try {
+      await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+        VALUES($1,$2,$3,'Candidate checkout','','','planned','none','','','','','[]',1)`, [projectId, p.id, p.workspaceId])
+      await seedProjectTasks(pool, projectId, [issueId])
+      await resources.saveProjectResources(p.id, { workspaceId: p.workspaceId, projectId, revision: 1,
+        repositories: [{ repositoryKey: normalizeRepository(p.remote).key, baseBranch: 'environment-base', environmentId: environment.id, isPrimary: true }],
+        environmentIds: [environment.id], defaultEnvironmentId: environment.id })
+      await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+        VALUES($1,$2,$3,$4,'user_message',$5,'{"text":"Review this exact candidate with the admitted environment"}')`, [epoch, p.id, p.botId, issueId, `candidate-fallback:${epoch}`])
+      const repo = await ensureDeviceRepository(p.id, p.deviceId, p.remote)
+      const factory = createFactoryStore(pool, async (owner, id, tx) =>
+        (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [id, owner])).rowCount === 1, p.botId,
+      { independent: factoryCheckIndependent, gates: factoryCheckGates })
+      const routed = await factory.route(p.id, { issueId, sourceEventId: epoch, eventId: randomUUID(), rationale: 'Provider candidate checkout fixture' })
+      const selected = await chooseLocalRunModel(pool, scope(p), { id: p.agents.claude_code, deviceId: p.deviceId, harness: 'claude_code' })
+      assert.ok(!('error' in selected))
+      const dispatch = resourceBoundDispatchConstructor(rawDispatch)(pool, factory, (tx, owner, input, bot, context) =>
+        queueFactoryRun(tx, owner, input, bot, context, undefined, { ...selected, readOnly: true }))
+      const first = await dispatch(p.id, { binding: factoryBinding(routed.task), agentId: p.agents.claude_code, deviceRepoId: repo.id })
+      const sessionId = `candidate-implementation-${first.runId}`
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"startedAt"=now()-interval '1 second',"finishedAt"=now(),"sessionId"=$2,report=$3 WHERE id=$1`,
+        [first.runId, sessionId, JSON.stringify({ ...emptyRunReport('Completed fixture candidate'), sourceCommit: sha, publish: { commit: sha }, verify: { status: 'passed' } })])
+      let state = await factory.apply(p.id, first.binding, randomUUID(), { action: 'candidate', runId: first.runId,
+        candidate: { sha, repository: p.remote, environment: `device:${p.deviceId}`, scope: `issue:${issueId}` } })
+      state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'The implementation yielded the fixed candidate',
+        evidence: [{ artifact: `run-report:${first.runId}`, kind: 'report', runId: first.runId, sessionId, candidateId: state.task.candidateId,
+          sha, environment: `device:${p.deviceId}`, recordedAt: new Date().toISOString() }], output: {} })
+      state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'advance', stage: 'review', reason: 'Independent candidate review' })
+      const check = await dispatch(p.id, { binding: factoryBinding(state.task), agentId: p.agents.claude_code, deviceRepoId: repo.id })
+      await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [check.runId, `independent-review-${check.runId}`])
+      const admitted = await row(check.runId)
+      assert.equal(admitted.baseBranch, sha, 'real Factory dispatch selects the verified candidate, not the Project target branch')
+      assert.equal(admitted.agentDefinition.projectExecution.baseBranch, 'environment-base')
+      assert.equal(admitted.agentDefinition.projectExecution.environment.id, environment.id)
+      await end(p, check.runId, balance)
+      const original = await row(check.runId)
+      assert.equal(original.status, 'failed'); assert.equal(original.report.modelFallback.state, 'switched')
+      const continued = await row(original.report.modelFallback.retryRunId)
+      assert.equal(continued.agentDefinition.apiKey.keyId, second.id)
+      assert.equal(continued.baseBranch, sha)
+      assert.deepEqual(continued.agentDefinition.projectExecution, admitted.agentDefinition.projectExecution)
+      assert.deepEqual(original.agentDefinition, admitted.agentDefinition)
+      assert.equal(continued.retryOf, null, 'the real Factory adoption starts an independent check')
+      assert.equal(continued.sessionId, null)
+      assert.equal(await providerContinuationLaunchMatches(pool, original, continued), true)
+      const assignment = await claim(p, continued.id)
+      assert.equal(assignment.baseBranch, sha)
+      assert.equal(assignment.projectEnvironment.id, environment.id)
+      assert.equal(assignment.projectEnvironment.revision, environment.revision)
+      assert.deepEqual(assignment.taskEnv, { REVIEW_MODE: 'frozen' })
+      assert.equal(assignment.resumeSessionId, undefined)
+      await recoverProviderFailure(pool, p.id, check.runId)
+      assert.deepEqual((await row(check.runId)).report.modelFallback, original.report.modelFallback)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\'', [routed.task.id])).rows[0].n, 2)
+    } finally {
+      await workspacePool.query('DELETE FROM workspace_project_repositories WHERE "projectId"=$1', [projectId])
+      await workspacePool.query('DELETE FROM workspace_projects WHERE id=$1', [projectId])
+      await workspacePool.query('DELETE FROM workspace_environments WHERE id=$1', [environment.id])
+    }
+  })
+
   const automaticFailure = async (label: string, options: { subscription?: boolean; onlyLight?: boolean } = {}) => {
-    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
-      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler: rawReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
       { ensureDeviceRepository }] = await Promise.all([
       import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
       import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'),
       import('../lib/factory/check-independence'), import('../lib/device-repositories'),
     ])
-    const p = await person(label), issueId = await task(p.id), epoch = randomUUID()
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
+    const createFactoryReconciler = resourceBoundReconcilerConstructor(rawReconciler)
+    const p = await person(label), issueId = await task(p), epoch = randomUUID()
     const harness = options.subscription ? 'codex' : 'claude_code'
     const light = options.subscription ? 'gpt-6-luna' : 'claude-haiku-5-5'
     const standard = options.subscription ? 'gpt-6-sol' : 'claude-sonnet-5-5'
@@ -283,14 +364,16 @@ test('provider failure continues the same task through its authorized preferred 
   })
 
   for (const failure of ['execute', 'review'] as const) await t.test(`automatic ${failure} repair raises the inherited Profile one tier through real Factory admission`, async () => {
-    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
-      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler: rawReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
       { admitProfileSelection }, { profileNativeSessionMatches }, { ensureDeviceRepository }, { workerDefinitionDigest }] = await Promise.all([
       import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
       import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'), import('../lib/factory/check-independence'),
       import('../lib/factory/profile-admission'), import('../lib/factory/profile-native-session'), import('../lib/device-repositories'), import('../lib/agent-kit/worker-digest'),
     ])
-    const p = await person(`automatic-routing-${failure}`), issueId = await task(p.id), epoch = randomUUID()
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
+    const createFactoryReconciler = resourceBoundReconcilerConstructor(rawReconciler)
+    const p = await person(`automatic-routing-${failure}`), issueId = await task(p), epoch = randomUUID()
     const credential = await addKey(p.id, 'anthropic', ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'])
     await preferences(p, ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map(model => entry('claude_code', model, credential.id)))
     const profile = await new AgentProfileStore(pool).create(scope(p), { name: `Frozen ${failure} role`, roles: ['implementation'],
@@ -499,6 +582,9 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(original.report.modelFallback.state, 'switched')
     assert.equal(original.report.modelFallback.retryRunId, continuation.id)
     assert.equal(continuation.status, 'queued')
+    assert.ok(original.promptTaskLength > 0)
+    assert.deepEqual(threadPromptView(continuation.prompt, continuation.promptTaskStart, continuation.promptTaskLength),
+      threadPromptView(original.prompt, original.promptTaskStart, original.promptTaskLength))
     for (const field of ['userId', 'botId', 'issueId', 'deviceId', 'deviceRepoId', 'attempt', 'kind', 'baseBranch'])
       assert.equal(continuation[field], original[field], field)
     assert.equal(continuation.agentDefinition.harness, 'codex')
@@ -583,23 +669,26 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(await recoverProviderFailure(pool, p.id, runId), null)
   })
 
-  await t.test('switching harnesses preserves the original worker permission ceiling through claim', async () => {
+  await t.test('switching harnesses preserves the original workspace permission ceiling through claim', async () => {
     const { p } = await twoModels('provider-policy-ceiling')
-    await pool.query('UPDATE agents SET cli_run_policy=$2 WHERE id=$1', [p.agents.claude_code,
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy) VALUES ($1,'allow',$2)
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [p.workspaceId,
       { approvalMode: 'read_only', permissions: { git_push: 'deny' }, networkAllow: ['api.example.invalid'] }])
     const runId = await running(p)
-    assert.equal((await row(runId)).agentDefinition.readOnly, undefined, 'the constraint originates in worker policy, not a readOnly run argument')
+    assert.equal((await row(runId)).agentDefinition.readOnly, undefined, 'the constraint originates in workspace policy, not a readOnly run argument')
     await end(p, runId, balance)
     const [continuation] = await children(runId)
     assert.ok(continuation)
     assert.equal(continuation.agentDefinition.harness, 'codex')
     assert.equal(continuation.agentDefinition.policyCeiling.readOnly, true)
-    // Even a later relaxation of the new worker cannot remove the inherited cap.
+    // Even a later relaxation of the workspace cannot remove the inherited cap.
     // Open network is network=allow without a domain ceiling; bare '*' is not
     // a valid stored networkAllow domain and would reject the policy itself.
-    await pool.query('UPDATE agents SET cli_run_policy=$2 WHERE id=$1', [p.agents.codex,
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy) VALUES ($1,'allow',$2)
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [p.workspaceId,
       { approvalMode: 'ask', permissions: { git_push: 'allow', network: 'allow' } }])
-    const assignment = await claim(p, continuation.id)
+    // A non-empty workspace layer requires a signed-policy consumer at claim.
+    const assignment = await claim(p, continuation.id, { snapshot: true })
     assert.equal(assignment.policy.readOnly, true)
     assert.equal(assignment.policy.permissions.git_push, 'deny')
     assert.equal(assignment.policy.permissions.computer_use, 'deny')
@@ -787,8 +876,7 @@ test('provider failure continues the same task through its authorized preferred 
     // before recoverProviderFailure. No provider call or worker success is faked.
     const interrupted = async (label: string, kind: 'preference' | 'picked' = 'preference') => {
       const setup = await twoModels(label)
-      const home = await seedWorkspace(pool, setup.p.id, [{ userId: setup.p.id, role: 'admin' }])
-      await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [home.id])
+      const home = await seedPersonalWorkspace(pool, setup.p.id)
       const runId = await running(setup.p, 'claude_code', kind === 'picked' ? { asked: 'fixture-claude-a' } : {})
       const source = await row(runId)
       await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='provider_failure',"finishedAt"=now(),report=$2 WHERE id=$1`,
@@ -796,9 +884,10 @@ test('provider failure continues the same task through its authorized preferred 
       await drain(); sent.length = 0
       const { runLiveTargets } = await import('../lib/live/panels')
       assert.deepEqual(await runLiveTargets(appPool, workspacePool, runId, 'run'), [{
-        scope: { ownerId: setup.p.id, workspaceId: home.id }, events: [{ kind: 'run', id: runId }],
-      }], 'the personal issue has the same authorized home channel as a normally registered owner')
-      return { ...setup, runId, homeId: home.id }
+        scope: { ownerId: setup.p.id, workspaceId: setup.p.workspaceId }, events: [{ kind: 'run', id: runId }],
+      }], 'the run keeps the task workspace channel even when its owner also has a personal home')
+      assert.notEqual(setup.p.workspaceId, home)
+      return { ...setup, runId, homeId: setup.p.workspaceId }
     }
     const assertSent = async (p: Person, homeId: string, runId: string, state: string) => {
       assert.equal((await row(runId)).report.modelFallback.state, state, 'independent connection sees the committed receipt')
@@ -807,7 +896,7 @@ test('provider failure continues the same task through its authorized preferred 
       await drain()
       // The continuation's own writer also wakes its new run, whose key names its parent.
       const delivered = sent.splice(0), path = `/v1/live/${liveChannelId({ ownerId: p.id, workspaceId: homeId })}/push`
-      assert.ok(delivered.every(value => value.path === path && value.events.every(event => event.kind === 'run')), 'only the owner’s home receives run keys')
+      assert.ok(delivered.every(value => value.path === path && value.events.every(event => event.kind === 'run')), 'only the task workspace receives run keys')
       assert.ok(delivered.some(value => value.events.some(event => event.id === runId)), 'the existing thread is woken')
       await recoverProviderFailure(pool, p.id, runId)
       assert.equal(scheduled.length, 0, 'a replay cannot notify an unchanged receipt')

@@ -96,10 +96,11 @@ export async function resolveBotModelChoice(
   }
   if (preference.selected === HOSTED_CHOICE && !preference.key && await hostedAllowed()) return hosted({ chosen: true })
 
-  const rows = cached.rows ?? await settings.chatModels(scope)
   const selected = preference.selected && !preference.key ? await settings.chatBinding(scope, preference.selected) : undefined
   const shared = !selected && botId && preference.selected && !preference.key && settings.sharedChatBinding
     ? await settings.sharedChatBinding(scope, botId, preference.selected) : undefined
+  // A valid saved binding is already route-checked; only fallback needs the full catalogue.
+  const rows = selected || shared ? [] : cached.rows ?? await settings.chatModels(scope)
   const binding = selected ?? rows.find(row => row.provider === 'claude') ?? rows[0]
   const state: ChoiceState = {
     chosen: Boolean(selected || shared),

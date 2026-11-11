@@ -147,7 +147,7 @@ jobs:
           docker compose restart app
           docker compose up --detach --wait --wait-timeout 120
           node scripts/self-hosted-smoke.mjs
-      - name: Verify the frozen community UI remains opt-in with the same data
+      - name: Verify the older built-in UI remains opt-in with the same data
         run: |
           MIKKA_COMMUNITY_UI=1 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
           MIKKA_EXPECT_COMMUNITY_UI=1 node scripts/self-hosted-smoke.mjs

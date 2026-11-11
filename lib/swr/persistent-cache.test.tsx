@@ -356,3 +356,135 @@ test('a server-denied workspace clears durable data without hydrating or refresh
     else Reflect.deleteProperty(globalThis, 'indexedDB')
   }
 })
+
+test('a document workspace departure retires readers instead of reading again before navigation', async t => {
+  let reads = 0, departed: PersistentReadCache | undefined, latest: PersistentReadCache | undefined
+  function Read() {
+    const { cache } = swr.useSWRConfig()
+    if (cache instanceof PersistentReadCache) { departed ??= cache; latest = cache }
+    const { data } = swr.default('preferences', async () => { reads++; return { theme: `read ${reads}` } })
+    return <output>{data?.theme ?? 'loading'}</output>
+  }
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement
+  let root = createRoot(container)
+  const beforeRefresh = refreshes
+  const content = () => <swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>
+  try {
+    await act(async () => root.render(content()))
+    assert.equal(reads, 1)
+    assert.equal(container.textContent, 'read 1')
+    await act(async () => { await clearPersistentReadCaches({ documentNavigation: true }) })
+    t.diagnostic(JSON.stringify({ initialReads: 1, readsBeforeAssign: reads, refreshesBeforeAssign: refreshes - beforeRefresh,
+      departedEnabled: departed?.isEnabled, departedEntries: departed?.size, oldDocumentText: container.textContent }))
+    assert.equal(reads, 1, 'the departing Document must not remount a fresh reader before its full navigation')
+    assert.equal(refreshes, beforeRefresh)
+    assert.equal(departed?.isEnabled, false)
+    assert.equal(departed?.size, 0)
+    assert.equal(container.textContent, '')
+    await act(async () => { await clearPersistentReadCaches(); root.render(content()) })
+    assert.equal(reads, 1, 'a later ordinary clear or parent render cannot revive the retired boundary')
+    assert.equal(container.textContent, '')
+    await act(async () => root.unmount())
+    root = createRoot(container)
+    await act(async () => root.render(content()))
+    assert.equal(reads, 2, 'a fresh document boundary performs its ordinary first read')
+    assert.equal(container.textContent, 'read 2')
+    assert.notEqual(latest, departed)
+    assert.equal(latest?.isEnabled, true)
+  } finally { await act(async () => root.unmount()); await departed?.flushed(); await latest?.flushed() }
+})
+
+test('document retirement disables and clears synchronously but still waits for pending disk erasure', async () => {
+  const { IndexedReadStorage } = await import('./indexed-db')
+  const entered = deferred<void>(), erase = deferred<void>()
+  const cleared: (string | undefined)[] = []
+  const clear = mock.method(IndexedReadStorage.prototype, 'clear', async (namespace?: string) => {
+    cleared.push(namespace); entered.resolve(); await erase.promise
+  })
+  let cache: PersistentReadCache | undefined, reads = 0, finished = false
+  let clearing: Promise<void> | undefined
+  function Read() {
+    const value = swr.useSWRConfig().cache
+    if (value instanceof PersistentReadCache) cache = value
+    const { data } = swr.default('preferences', async () => { reads++; return { theme: 'authorized view' } })
+    return <output>{data?.theme ?? 'loading'}</output>
+  }
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  try {
+    await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
+    assert.equal(reads, 1)
+    await act(async () => {
+      clearing = clearPersistentReadCaches({ documentNavigation: true }).then(() => { finished = true })
+      assert.equal(cache?.isEnabled, false)
+      assert.equal(cache?.size, 0)
+      cache?.set('preferences', { _k: 'preferences', data: { theme: 'late response' } })
+      assert.equal(cache?.size, 0)
+      await entered.promise
+    })
+    assert.equal(finished, false, 'the caller cannot assign before the captured old provider finishes erasure')
+    assert.equal(container.textContent, '')
+    assert.equal(reads, 1)
+    assert.ok(cleared.includes(readCacheNamespace(scope)))
+    await act(async () => { erase.resolve(); await clearing })
+    assert.equal(finished, true)
+  } finally { erase.resolve(); await clearing; await act(async () => root.unmount()); await cache?.flushed(); clear.mock.restore() }
+})
+
+test('document departure still broadcasts clear while remote and denied scopes keep ordinary remounts', async t => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel')
+  const messages: unknown[] = []
+  const channels: Channel[] = []
+  class Channel {
+    onmessage: ((event: MessageEvent) => void) | null = null
+    closed = false
+    constructor(readonly name: string) { channels.push(this) }
+    postMessage(value: unknown) { messages.push(value) }
+    close() { this.closed = true }
+  }
+  Object.defineProperty(globalThis, 'BroadcastChannel', { configurable: true, value: Channel })
+  try {
+    for (const mode of ['document', 'ordinary', 'remote', 'denied'] as const) {
+      let reads = 0, cache: PersistentReadCache | undefined
+      function Read() {
+        const current = swr.useSWRConfig().cache
+        if (current instanceof PersistentReadCache) cache = current
+        const { data } = swr.default('preferences', async () => { reads++; return { theme: `read ${reads}` } })
+        return <output>{data?.theme ?? 'loading'}</output>
+      }
+      const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+      const beforeRefresh = refreshes, firstMessage = messages.length
+      try {
+        await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
+        assert.equal(reads, 1)
+        const receiver = channels.find(channel => !channel.closed && channel.onmessage)
+        assert.ok(receiver)
+        await act(async () => {
+          if (mode === 'document') await clearPersistentReadCaches({ documentNavigation: true })
+          else if (mode === 'ordinary') await clearPersistentReadCaches()
+          else if (mode === 'remote') receiver.onmessage!({ data: { type: 'clear' } } as MessageEvent)
+          else cache!.set('preferences', { _k: 'preferences', error: { status: 403 } })
+        })
+        assert.equal(cache?.isEnabled, false)
+        assert.equal(cache?.size, 0)
+        assert.equal(reads, mode === 'document' ? 1 : 2)
+        assert.equal(refreshes - beforeRefresh, mode === 'document' ? 0 : 1)
+        if (mode === 'document') {
+          assert.ok(messages.slice(firstMessage).some(message => JSON.stringify(message) === '{"type":"clear"}'))
+          await act(async () => {
+            // Even a callback already queued before close cannot reopen this boundary.
+            receiver.onmessage!({ data: { type: 'clear' } } as MessageEvent)
+            receiver.onmessage!({ data: { type: 'scope', scope: 'another-document' } } as MessageEvent)
+          })
+          assert.equal(reads, 1)
+          assert.equal(refreshes, beforeRefresh)
+          assert.equal(container.textContent, '')
+        }
+        assert.ok(messages.every(message => !JSON.stringify(message).includes('documentNavigation')), 'local retirement does not propagate to another document')
+        t.diagnostic(JSON.stringify({ mode, reads, refreshes: refreshes - beforeRefresh, cacheEnabled: cache?.isEnabled, cacheEntries: cache?.size }))
+      } finally { await act(async () => root.unmount()); await cache?.flushed() }
+    }
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'BroadcastChannel', original)
+    else Reflect.deleteProperty(globalThis, 'BroadcastChannel')
+  }
+})

@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import { mock,test } from 'node:test';
 let enabled=true,owner:string|null='owner',sessionId:string|null='session',queries=0,calls=0;
-mock.module('@/lib/api-auth',{namedExports:{auth:{api:{getSession:async()=>owner?{user:{id:owner},session:sessionId?{id:sessionId}:null}:null}}}});
+const verifiedUsers = new WeakSet<object>();
+mock.module('@/lib/api-auth',{namedExports:{auth:{api:{getSession:async()=>{if(!owner)return null;const user={id:owner};verifiedUsers.add(user);return {user,session:sessionId?{id:sessionId}:null};}}}}});
+// This unit preserves the actual credential, origin and Factory adapters.
+// Workspace authorization and transaction ownership are covered by the real PG suite.
+mock.module("@/lib/factory/workspace-http", { namedExports: {
+  factoryHumanWorkspaceResponse: async (user: object | null | undefined, work: () => Promise<Response>) => {
+    assert.ok(user && verifiedUsers.has(user), "the adapter must retain the complete verified user");
+    return work();
+  },
+} });
+
 mock.module('@/lib/db',{namedExports:{pool:{query:async()=>{queries++;return {rows:[{botId:null}]};}}}});
 mock.module('@/lib/factory/runtime',{namedExports:{factoryLifecycleEnabled:()=>enabled,factoryRuntimeForBot:()=>({questions:{recover:async(actor:unknown,body:unknown)=>{calls++;return {actor,body};}}})}});
 const id='00000000-0000-4000-8000-000000000001';

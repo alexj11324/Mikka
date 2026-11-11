@@ -28,6 +28,7 @@ import { createRequestDatabaseScope } from "../db";
 import { hostedBillingScope } from "../abuse/context";
 import { HostedUsageStore } from "../abuse/store";
 import { exerciseFactoryRecoveryEntry } from "../../tests/support/factory-recovery-entry-fixture";
+import { bindFixtureWorkspaceDatabase } from "../../tests/helpers/workspace-database";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import { claimLocalRun } from "../computer/claim";
@@ -37,19 +38,21 @@ import { createFactoryApprovalGates } from './approval';
 import { createFactoryMerges } from './merge';
 import { createFactoryStore, type FactoryTask } from "./store";
 import {
-  createFactoryDispatch,
+  createFactoryDispatch as rawDispatch,
   defaultFactoryDispatchAdapters,
   factoryBinding,
   type FactoryQueue,
 } from "./dispatch";
 import { createFactoryClaim } from "./claim";
-import { createFactoryQuestions, questionReference } from "./questions/store";
+import { createFactoryQuestions as rawQuestions, questionReference } from "./questions/store";
+import { bindFactoryQuestionsWorkspace } from './background-workspace';
 import { queueCloudQuestionContinuation } from "./questions/queue-continuation";
 import { cloudTaskTarget, ownedCloudTaskTarget } from "../computer/cloud-task-target";
 import { humanQuestionAnswerSchema, questionFingerprint } from './questions/contract';
 import { factoryEventId } from './event-id';
 import { handleFactoryQuestion } from "./questions/http";
-import { createFactoryReconciler } from "./reconcile";
+import { createFactoryReconciler as rawReconciler } from "./reconcile";
+import { resourceBoundFactoryDispatch, factoryResourceWorkspace } from '../../tests/helpers/factory-resource-boundary';
 import { factoryCheckIndependent } from "./check-independence";
 import { observeFactoryCheckDispatch } from "./check-dispatch";
 import {
@@ -67,6 +70,10 @@ import {
   createFactoryCheckRecovery,
   type FactoryCheckRecoveryDependencies,
 } from "./check-recovery";
+
+const createFactoryDispatch: typeof rawDispatch = (...args) => resourceBoundFactoryDispatch(args[0], rawDispatch(...args));
+const createFactoryReconciler: typeof rawReconciler = (source, store, questions, consumers, botId, automatic, boundary) =>
+  rawReconciler(source, store, questions, consumers, botId, automatic, boundary ?? factoryResourceWorkspace(source));
 
 test(
   "actual migrated PG/HTTP: review/verify receipt consumers and bounded repair",
@@ -92,6 +99,7 @@ test(
     const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}_e2e`;
     let pool: Pool | undefined;
     let modelDatabase: ReturnType<typeof createRequestDatabaseScope> | undefined;
+    let closeWorkspaceDatabase: (() => Promise<void>) | undefined;
     let installedGatewayFixture = false;
     try {
       assert.equal(
@@ -116,6 +124,7 @@ test(
       });
       const db = pool;
       modelDatabase = createRequestDatabaseScope(isolated.toString());
+      closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(db);
       const directory = new URL("../../drizzle/", import.meta.url);
       for (const file of orderMigrations(
         (await readdir(directory)).filter((f) => f.endsWith(".sql")),
@@ -132,6 +141,8 @@ test(
       // The person's Coordinator is an ordinary bot row; its chat, runs and
       // factory tasks carry that bot's id from the entry point on.
       const coordinatorBot = randomUUID();
+      const createFactoryQuestions: typeof rawQuestions = (...args) =>
+        bindFactoryQuestionsWorkspace(args[0], rawQuestions(...args), coordinatorBot);
       await db.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Coordinator')`,[coordinatorBot,billingWorkspaceId]);
       await db.query(`INSERT INTO coordinator_bots("ownerId","workspaceId","botId") VALUES('owner',$1,$2)`,[billingWorkspaceId,coordinatorBot]);
       const usage = new HostedUsageStore(db);
@@ -369,8 +380,8 @@ test(
         const issueId = randomUUID(),
           sourceEventId = randomUUID();
         await db.query(
-          `INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Check fixture',$2,'todo','normal')`,
-          [issueId,emitPresentation ? JSON.stringify({type:'doc',content:[]}) : '{}'],
+          `INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Check fixture',$2,'todo','normal',$3,'bound','workspace')`,
+          [issueId,emitPresentation ? JSON.stringify({type:'doc',content:[]}) : '{}',billingWorkspaceId],
         );
         await db.query(
           `INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,'owner',$3,'user_message',$2,'{"text":"Check original request"}')`,
@@ -1112,7 +1123,7 @@ test(
 
       for (const exists of [false,true]) await t.test(`two tasks on one issue keep both comments without upgrading issue SHARE locks (document exists: ${exists})`, async () => {
         const issueId=randomUUID();
-        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Concurrent stages','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,'owner','Concurrent stages','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`,[issueId,billingWorkspaceId]);
         const tasks:FactoryTask[]=[];
         for (let i=0;i<2;i++) {
           const sourceEventId=randomUUID();
@@ -1144,7 +1155,7 @@ test(
 
       await t.test('completed specifications wait for a real browser approval receipt; stale and replayed requests cannot bypass it', async () => {
         const issueId=randomUUID(),sourceEventId=randomUUID();
-        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Spec fixture','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+        await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,'owner','Spec fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`,[issueId,billingWorkspaceId]);
         await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'user_message',$1::uuid::text,'{"text":"Plan first"}')`,[sourceEventId,coordinatorBot]);
         const routed = await store.route('owner',{issueId,sourceEventId,eventId:randomUUID(),rationale:'Plan first',missingInformation:[],missingPermissions:[],needsSpec:true});
         const specDispatch = createFactoryDispatch(db,store,queue,defaultFactoryDispatchAdapters);
@@ -1362,18 +1373,20 @@ test(
         });
       await t.test("question/caller transaction failure is left to its caller, with no committed blocked state or orphan", async () => {
         const pending = await state((await pendingReview()).task.id);
-        const tx = await db.connect();
         const beforeRuns=(await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id',[pending.task.issueId])).rows;
         await db.query("UPDATE devices SET harnesses='[]' WHERE id=$1",[deviceId]);
         try {
-          await tx.query("BEGIN");
-          await assert.rejects(observeFactoryCheckDispatch(store,dispatch)("owner",{
-            binding:factoryBinding(pending.task),agentId,deviceRepoId:repoId,
-          },tx),(error:unknown)=>error instanceof FactoryError && error.code === "factoryCheckHarnessUnavailable");
-          assert.equal((await tx.query('SELECT status FROM factory_tasks WHERE id=$1',[pending.task.id])).rows[0].status,"pending");
+          await factoryResourceWorkspace(db)('owner', pending.task.id, async () => {
+            const tx = await db.connect();
+            try {
+              await tx.query("BEGIN");
+              await assert.rejects(observeFactoryCheckDispatch(store,dispatch)("owner",{
+                binding:factoryBinding(pending.task),agentId,deviceRepoId:repoId,
+              },tx),(error:unknown)=>error instanceof FactoryError && error.code === "factoryCheckHarnessUnavailable");
+              assert.equal((await tx.query('SELECT status FROM factory_tasks WHERE id=$1',[pending.task.id])).rows[0].status,"pending");
+            } finally { await tx.query("ROLLBACK"); tx.release(); }
+          });
         } finally {
-          await tx.query("ROLLBACK");
-          tx.release();
           await db.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,JSON.stringify([{harness:"codex",installed:true}])]);
         }
         assert.deepEqual(await state(pending.task.id),pending);
@@ -1690,68 +1703,70 @@ test(
           assert.deepEqual((await db.query('SELECT to_jsonb(c) AS candidate FROM factory_candidates c WHERE id=$1', [pending.task.candidateId])).rows, beforeCandidate);
           assert.deepEqual((await db.query('SELECT state,"sandboxId" FROM thread_machines WHERE "runId"=$1', [origin.runId])).rows[0], { state: 'ended', sandboxId: null });
           assert.deepEqual((await db.query('SELECT state,"sandboxId","deviceId","repoId" FROM thread_machines WHERE "runId"=$1', [run.id])).rows[0], { state: machineState, sandboxId, deviceId: childDevice, repoId: childRepo });
-          const tx = await db.connect();
-          try {
-            await tx.query('BEGIN');
-            const actor = { userId: 'owner', workspaceId: billingWorkspaceId };
-            const input = { botId: coordinatorBot, agentId, deviceRepoId: childRepo, runId: run.id, issueId: run.issueId };
-            assert.equal(await cloudTaskTarget(tx, actor, input), null, 'A task VM cannot be used as a fresh parent runtime');
-            assert.equal((await ownedCloudTaskTarget(tx, actor, input))?.deviceId, childDevice);
-            for (const bad of [{ ...input, botId: randomUUID() }, { ...input, runId: origin.runId }, { ...input, runId: randomUUID() }, { ...input, agentId: randomUUID() }, { ...input, deviceRepoId: repoId }, { ...input, issueId: randomUUID() }])
-              assert.equal(await ownedCloudTaskTarget(tx, actor, bad), null);
-            assert.equal(await ownedCloudTaskTarget(tx, { ...actor, userId: 'other' }, input), null);
-            assert.equal(await ownedCloudTaskTarget(tx, { ...actor, workspaceId: randomUUID() }, input), null);
-            const otherBot = randomUUID();
-            await tx.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,\'owner\',\'Other fixture bot\')', [otherBot, billingWorkspaceId]);
-            for (const [sql, params] of [
-              ['UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [run.id, otherBot]],
-              ['UPDATE thread_machines SET "botId"=$2 WHERE "runId"=$1', [run.id, otherBot]],
-              ['UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [run.id, otherBot]],
-              ['UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [run.id, deviceId]],
-              ['UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [run.id, repoId]],
-              ['UPDATE thread_machines SET "deviceId"=$2 WHERE "runId"=$1', [run.id, deviceId]],
-              ['UPDATE thread_machines SET "repoId"=$2 WHERE "runId"=$1', [run.id, repoId]],
-              ['UPDATE devices SET enabled=false WHERE id=$1', [childDevice]],
-              ["UPDATE thread_machines SET state='ended',\"sandboxId\"=NULL WHERE \"runId\"=$1", [run.id]],
-            ] as const) {
-              await tx.query('SAVEPOINT custody');
-              await tx.query(sql, [...params]);
-              assert.equal(await ownedCloudTaskTarget(tx, actor, input), null, sql);
-              await tx.query('ROLLBACK TO SAVEPOINT custody');
-            }
-            // Admission preserves a paused/stale task VM. Its worker still has
-            // to reconnect before claim; this is independent of parent state.
-            const cloudClaim = createFactoryClaim(store, cloudQuestions, assignment);
-            await tx.query('SAVEPOINT worker_not_ready');
-            await assert.rejects(cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString()),
-              (error: unknown) => error instanceof FactoryError && error.code === 'factoryQuestionContinuationUnavailable');
-            await tx.query('ROLLBACK TO SAVEPOINT worker_not_ready');
-            await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
-            await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [run.id]);
-            const extras = await cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString());
-            assert.equal(extras.requireSessionResume, true);
-            assert.equal(extras.resumeSessionId, nativeSession);
-            assert.equal(extras.baseBranch, sha);
-            assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: kind === 'deliverable' });
-            assert.equal(extras.verifyCommand, kind === 'deliverable' ? undefined : command);
-            assert.equal((extras.policy as RunPolicy).readOnly, true);
-            assert.equal(extras.followUp, run.questionContinuation.followUp, 'the actual native message receives the fresh host evidence');
-            if (outputChunkId) {
-              for (const drift of [
-                { userId: 'other' }, { issueId: randomUUID() }, { candidateId: randomUUID() },
-                { attemptId: randomUUID() }, { sourceEventId: randomUUID() },
-              ]) await assert.rejects(appendFactoryCheckContinuationContext(tx, { ...resumed.task, ...drift }, run.id, 'Original answer'),
-                { code: 'factoryCheckBindingMismatch' });
-              for (const sources of [null, {}, [{ outputChunkId: randomUUID() }]]) {
-                await tx.query('SAVEPOINT evidence_binding');
-                await tx.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{check,questionCommandSources}',$2::jsonb) WHERE id=$1`,
-                  [resumed.task.attemptId, JSON.stringify(sources)]);
-                await assert.rejects(appendFactoryCheckContinuationContext(tx, resumed.task, run.id, 'Original answer'),
-                  { code: 'factoryCheckBindingMismatch' }, 'malformed or mismatched citation sources must not be delivered');
-                await tx.query('ROLLBACK TO SAVEPOINT evidence_binding');
+          await factoryResourceWorkspace(db)('owner', pending.task.id, async () => {
+            const tx = await db.connect();
+            try {
+              await tx.query('BEGIN');
+              const actor = { userId: 'owner', workspaceId: billingWorkspaceId };
+              const input = { botId: coordinatorBot, agentId, deviceRepoId: childRepo, runId: run.id, issueId: run.issueId };
+              assert.equal(await cloudTaskTarget(tx, actor, input), null, 'A task VM cannot be used as a fresh parent runtime');
+              assert.equal((await ownedCloudTaskTarget(tx, actor, input))?.deviceId, childDevice);
+              for (const bad of [{ ...input, botId: randomUUID() }, { ...input, runId: origin.runId }, { ...input, runId: randomUUID() }, { ...input, agentId: randomUUID() }, { ...input, deviceRepoId: repoId }, { ...input, issueId: randomUUID() }])
+                assert.equal(await ownedCloudTaskTarget(tx, actor, bad), null);
+              assert.equal(await ownedCloudTaskTarget(tx, { ...actor, userId: 'other' }, input), null);
+              assert.equal(await ownedCloudTaskTarget(tx, { ...actor, workspaceId: randomUUID() }, input), null);
+              const otherBot = randomUUID();
+              await tx.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,\'owner\',\'Other fixture bot\')', [otherBot, billingWorkspaceId]);
+              for (const [sql, params] of [
+                ['UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [run.id, otherBot]],
+                ['UPDATE thread_machines SET "botId"=$2 WHERE "runId"=$1', [run.id, otherBot]],
+                ['UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [run.id, otherBot]],
+                ['UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [run.id, deviceId]],
+                ['UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [run.id, repoId]],
+                ['UPDATE thread_machines SET "deviceId"=$2 WHERE "runId"=$1', [run.id, deviceId]],
+                ['UPDATE thread_machines SET "repoId"=$2 WHERE "runId"=$1', [run.id, repoId]],
+                ['UPDATE devices SET enabled=false WHERE id=$1', [childDevice]],
+                ["UPDATE thread_machines SET state='ended',\"sandboxId\"=NULL WHERE \"runId\"=$1", [run.id]],
+              ] as const) {
+                await tx.query('SAVEPOINT custody');
+                await tx.query(sql, [...params]);
+                assert.equal(await ownedCloudTaskTarget(tx, actor, input), null, sql);
+                await tx.query('ROLLBACK TO SAVEPOINT custody');
               }
-            }
-          } finally { await tx.query('ROLLBACK'); tx.release(); }
+              // Admission preserves a paused/stale task VM. Its worker still has
+              // to reconnect before claim; this is independent of parent state.
+              const cloudClaim = createFactoryClaim(store, cloudQuestions, assignment);
+              await tx.query('SAVEPOINT worker_not_ready');
+              await assert.rejects(cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString()),
+                (error: unknown) => error instanceof FactoryError && error.code === 'factoryQuestionContinuationUnavailable');
+              await tx.query('ROLLBACK TO SAVEPOINT worker_not_ready');
+              await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
+              await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [run.id]);
+              const extras = await cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString());
+              assert.equal(extras.requireSessionResume, true);
+              assert.equal(extras.resumeSessionId, nativeSession);
+              assert.equal(extras.baseBranch, sha);
+              assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: kind === 'deliverable' });
+              assert.equal(extras.verifyCommand, kind === 'deliverable' ? undefined : command);
+              assert.equal((extras.policy as RunPolicy).readOnly, true);
+              assert.equal(extras.followUp, run.questionContinuation.followUp, 'the actual native message receives the fresh host evidence');
+              if (outputChunkId) {
+                for (const drift of [
+                  { userId: 'other' }, { issueId: randomUUID() }, { candidateId: randomUUID() },
+                  { attemptId: randomUUID() }, { sourceEventId: randomUUID() },
+                ]) await assert.rejects(appendFactoryCheckContinuationContext(tx, { ...resumed.task, ...drift }, run.id, 'Original answer'),
+                  { code: 'factoryCheckBindingMismatch' });
+                for (const sources of [null, {}, [{ outputChunkId: randomUUID() }]]) {
+                  await tx.query('SAVEPOINT evidence_binding');
+                  await tx.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{check,questionCommandSources}',$2::jsonb) WHERE id=$1`,
+                    [resumed.task.attemptId, JSON.stringify(sources)]);
+                  await assert.rejects(appendFactoryCheckContinuationContext(tx, resumed.task, run.id, 'Original answer'),
+                    { code: 'factoryCheckBindingMismatch' }, 'malformed or mismatched citation sources must not be delivered');
+                  await tx.query('ROLLBACK TO SAVEPOINT evidence_binding');
+                }
+              }
+            } finally { await tx.query('ROLLBACK'); tx.release(); }
+          });
           const replayed = await cloudQuestions.answer({ source: 'human', userId: 'owner', sessionId: browserSessionId }, answer);
           assert.equal(replayed.continuationRunId, run.id);
           assert.equal(replayed.replayed, true);
@@ -1777,20 +1792,22 @@ test(
             assert.equal(recovered.task.candidateId, pending.task.candidateId);
             assert.deepEqual((await db.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=$1', [run.id])).rows, failedBefore);
             assert.deepEqual((await db.query('SELECT answer,"answerFingerprint",result FROM factory_questions WHERE id=$1', [q.id])).rows, answerBefore);
-            const tx = await db.connect();
-            try {
-              await tx.query('BEGIN');
-              await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
-              await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [recoveryRun.id]);
-              const extras = await createFactoryClaim(store, cloudQuestions, assignment)(tx, 'owner', childDevice, recoveryRun.id, new Date(Date.now() + 60000).toISOString());
-              assert.equal(extras.followUp, recoveryRun.questionContinuation.followUp);
-              assert.equal(extras.continuesRunId, run.id);
-              assert.equal(extras.resumeSessionId, nativeSession);
-              assert.equal(extras.requireSessionResume, true);
-              assert.equal(extras.baseBranch, sha);
-              assert.equal((extras.policy as RunPolicy).readOnly, true);
-              assert.equal(extras.verifyCommand, undefined);
-            } finally { await tx.query('ROLLBACK'); tx.release(); }
+            await factoryResourceWorkspace(db)('owner', pending.task.id, async () => {
+              const tx = await db.connect();
+              try {
+                await tx.query('BEGIN');
+                await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
+                await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [recoveryRun.id]);
+                const extras = await createFactoryClaim(store, cloudQuestions, assignment)(tx, 'owner', childDevice, recoveryRun.id, new Date(Date.now() + 60000).toISOString());
+                assert.equal(extras.followUp, recoveryRun.questionContinuation.followUp);
+                assert.equal(extras.continuesRunId, run.id);
+                assert.equal(extras.resumeSessionId, nativeSession);
+                assert.equal(extras.requireSessionResume, true);
+                assert.equal(extras.baseBranch, sha);
+                assert.equal((extras.policy as RunPolicy).readOnly, true);
+                assert.equal(extras.verifyCommand, undefined);
+              } finally { await tx.query('ROLLBACK'); tx.release(); }
+            });
             const replay = await cloudQuestions.recover({ source: 'human', userId: 'owner', sessionId: browserSessionId }, recovery);
             assert.equal(replay.continuationRunId, recoveryRun.id);
             assert.equal(replay.replayed, true);
@@ -1876,11 +1893,10 @@ test(
               const otherWorkspaceId = randomUUID(), otherBotId = randomUUID();
               await db.query(`INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,'owner','Another owned workspace',$2)`, [otherWorkspaceId, otherWorkspaceId]);
               await db.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Other scope')`, [otherBotId, otherWorkspaceId]);
-              await db.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [running.runId, otherBotId]);
-              try {
-                assert.equal((await post()).status, 409, 'same owner, different workspace runtime must not pass the new reader');
-                assert.deepEqual(await snapshot(), before);
-              } finally { await db.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [running.runId, origin.botId]); }
+              await assert.rejects(db.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [running.runId, otherBotId]),
+                { code: '23514', message: 'taskWorkspaceMismatch' }, 'same owner cannot bind the runtime to another workspace');
+              assert.equal((await db.query('SELECT "botId" FROM agent_runs WHERE id=$1', [running.runId])).rows[0].botId, origin.botId);
+              assert.deepEqual(await snapshot(), before, 'a rejected runtime transfer records no answer or command');
               await db.query("UPDATE factory_tasks SET status='running' WHERE id=$1", [running.task.id]);
               try { assert.equal((await post()).status, 409, 'not a waiting question'); }
               finally { await db.query("UPDATE factory_tasks SET status='waiting' WHERE id=$1", [running.task.id]); }
@@ -1906,16 +1922,18 @@ test(
             assert.equal((replay.body as typeof resumed).continuationRunId, resumed.continuationRunId);
             assert.equal((replay.body as typeof resumed).replayed, true);
             assert.deepEqual(await snapshot(), after, 'same answer replay does not make a second run or update settings');
-            const tx = await db.connect();
-            try {
-              await tx.query('BEGIN');
-              const extras = await claim(tx, 'owner', deviceId, resumed.continuationRunId, new Date(Date.now()+60_000).toISOString());
-              assert.equal(extras.requireSessionResume, true);
-              assert.equal(extras.resumeSessionId, sessionId);
-              assert.equal(extras.verifyCommand, undefined);
-              assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: true });
-              await tx.query('ROLLBACK');
-            } finally { await tx.query('ROLLBACK'); tx.release(); }
+            await factoryResourceWorkspace(db)('owner', running.task.id, async () => {
+              const tx = await db.connect();
+              try {
+                await tx.query('BEGIN');
+                const extras = await claim(tx, 'owner', deviceId, resumed.continuationRunId, new Date(Date.now()+60_000).toISOString());
+                assert.equal(extras.requireSessionResume, true);
+                assert.equal(extras.resumeSessionId, sessionId);
+                assert.equal(extras.verifyCommand, undefined);
+                assert.deepEqual(extras.factoryCheck, { stage: phase, inferCommand: false, reportOnly: true });
+                await tx.query('ROLLBACK');
+              } finally { await tx.query('ROLLBACK'); tx.release(); }
+            });
             await terminal(resumed.continuationRunId, sessionId);
             await reconcile('owner');
             assert.equal((await questions.read('owner', questionId)).status, 'resolved');
@@ -2013,25 +2031,27 @@ test(
                 server.close();
                 await once(server, "close");
               }
-              const tx = await db.connect();
-              try {
-                await tx.query("BEGIN");
-                const extras = await claim(
-                  tx,
-                  "owner",
-                  deviceId,
-                  resumed.continuationRunId,
-                  new Date(Date.now() + 60000).toISOString(),
-                );
-                assert.equal(extras.requireSessionResume, true);
-                assert.equal(extras.resumeSessionId, session);
-                assert.equal(extras.verifyCommand, command);
-                assert.equal(Object.hasOwn(extras, 'factoryExecuteKind'), false);
-                await tx.query("ROLLBACK");
-              } finally {
-                await tx.query("ROLLBACK");
-                tx.release();
-              }
+              await factoryResourceWorkspace(db)('owner', r.task.id, async () => {
+                const tx = await db.connect();
+                try {
+                  await tx.query("BEGIN");
+                  const extras = await claim(
+                    tx,
+                    "owner",
+                    deviceId,
+                    resumed.continuationRunId,
+                    new Date(Date.now() + 60000).toISOString(),
+                  );
+                  assert.equal(extras.requireSessionResume, true);
+                  assert.equal(extras.resumeSessionId, session);
+                  assert.equal(extras.verifyCommand, command);
+                  assert.equal(Object.hasOwn(extras, 'factoryExecuteKind'), false);
+                  await tx.query("ROLLBACK");
+                } finally {
+                  await tx.query("ROLLBACK");
+                  tx.release();
+                }
+              });
               await terminal(resumed.continuationRunId, session, failed);
               if (phase === "verify")
                 await toolChunks(resumed.continuationRunId, failed);
@@ -2406,7 +2426,7 @@ test(
         const { automaticFactoryDispatch } = await import("./automatic-dispatch");
         await t.test('approved spec starts a fresh executor role without planner read-only or continuation grants', async () => {
           const issueId=randomUUID(),sourceEventId=randomUUID(),specRepoId=randomUUID();
-          await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,'owner','Approved specification','{"type":"doc","content":[]}','todo','normal')`,[issueId]);
+          await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,'owner','Approved specification','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`,[issueId,billingWorkspaceId]);
           await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'user_message',$1::uuid::text,'{"text":"Plan before implementation"}')`,[sourceEventId,coordinatorBot]);
           await db.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,'owner','v2/github.com/example/spec','https://github.com/example/spec.git')`,[specRepoId,deviceId]);
           const routed=await store.route('owner',{issueId,sourceEventId,eventId:randomUUID(),rationale:'Plan first',missingInformation:[],missingPermissions:[],needsSpec:true});
@@ -3054,12 +3074,12 @@ test(
         assert.deepEqual([receipt.reservedFree,receipt.reservedPurchased,receipt.reservedUnpaid].map(Number),[0,0,0]);
         assert.equal((await usage.balance(billingWorkspaceId)).free,Number(allowance.remaining)-1);
       });
-      await exerciseFactoryRecoveryEntry(t, {
+      await modelDatabase!.run(() => exerciseFactoryRecoveryEntry(t, {
         db, botId: coordinatorBot, failedReview, png, sha, modelInvoke,
         callCount: () => modelCalls,
         chooseRetry: () => { chosenAction = "retry_check"; },
         latestRequest: () => networkRequests.at(-1),
-      });
+      }));
       await t.test(
         "unavailable model calls exhaust only their invocation budget, with no fixed recovery",
         async () => {
@@ -3099,8 +3119,7 @@ test(
         const { addApiKey } = await import('../model-api-keys');
         const { changeOrder } = await import('../model-order');
         const { workspacePool } = await import('../workspace-db');
-        assert.equal(workspacePool.options.connectionString, url, 'membership uses the same validated loopback service');
-        let membershipFixture: { userId: string; workspaceId: string } | undefined;
+        assert.equal(workspacePool.options.connectionString, isolated.toString(), 'membership uses this suite\'s isolated loopback database');
         const taskCreate = threadMachineProvider.create;
         const createdTaskRuns: string[] = [];
         threadMachineProvider.create = async (...args) => {
@@ -3118,14 +3137,11 @@ test(
           await modelDatabase!.run(async () => {
             const userId = `fresh-check-${randomUUID()}`, workspaceId = randomUUID(), botId = randomUUID();
             const actor = { userId, workspaceId }, scope = { ownerId: userId, workspaceId, botId };
-            membershipFixture = { userId, workspaceId };
-            // App scope is this suite's fresh database; the normal workspace
-            // adapter has its own real loopback PG pool, not the app ALS scope.
-            for (const target of [db, workspacePool]) {
-              await target.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fresh check',$2,true,now(),now())`, [userId, `${userId}@example.invalid`]);
-              await target.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,\'Fresh check\',$3)', [workspaceId, userId, `fresh-${workspaceId}`]);
-              await target.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,'Fresh check',$3,'admin','active')`, [workspaceId, userId, `${userId}@example.invalid`]);
-            }
+            // APP and Workspace use independent real pools against this one
+            // isolated database, so authority rows are inserted exactly once.
+            await db.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fresh check',$2,true,now(),now())`, [userId, `${userId}@example.invalid`]);
+            await db.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,\'Fresh check\',$3)', [workspaceId, userId, `fresh-${workspaceId}`]);
+            await db.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,'Fresh check',$3,'admin','active')`, [workspaceId, userId, `${userId}@example.invalid`]);
             await db.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Fresh task Bot\')', [botId, workspaceId, userId]);
             await setE2BKey(userId, workspaceId, { apiKey: `e2b-offline-fixture-${randomUUID()}` }, { verify: async () => ({ ok: true }) });
             const key = await addApiKey(db, userId, { provider: 'deepseek', apiKey: `sk-offline-fixture-${randomUUID()}` },
@@ -3153,7 +3169,7 @@ test(
               title: 'Fresh cloud check', body: 'Offline real admission fixture', readOnly: true, ...selected,
             }, tx, context));
             const issueId = randomUUID(), sourceEventId = randomUUID();
-            await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Fresh check','{}','todo','normal')`, [issueId, userId]);
+            await db.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES($1,$2,'Fresh check','{}','todo','normal',$3,'bound','workspace')`, [issueId, userId, workspaceId]);
             await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,$2,$3,'user_message',$1::text,'{"text":"Fresh cloud check"}')`, [sourceEventId, userId, botId]);
             let current = await cloudStore.route(userId, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Fresh task fixture', missingInformation: [], missingPermissions: [], needsSpec: false });
             const execute = await initialDispatch(userId, { binding: factoryBinding(current.task), agentId: runtime.agentId, deviceRepoId: repository.id });
@@ -3171,7 +3187,7 @@ test(
             current = await cloudStore.apply(userId, factoryBinding(current.task), randomUUID(), { action: 'advance', stage: 'review', reason: 'Independent check' });
             const candidateBefore = (await db.query('SELECT to_jsonb(c) AS value FROM factory_candidates c WHERE id=$1', [current.task.candidateId])).rows[0].value;
             const automatic = automaticFactoryDispatch(db);
-            const cloudQuestions = createFactoryQuestions(db, authorize, cloudStore, initialDispatch, assignment);
+            const cloudQuestions = bindFactoryQuestionsWorkspace(db, rawQuestions(db, authorize, cloudStore, initialDispatch, assignment), botId);
             const cloudReconcile = createFactoryReconciler(db, cloudStore, cloudQuestions, { review: reconcileFactoryCheck, verify: reconcileFactoryCheck }, botId);
             for (const stage of ['review'] as const) {
               assert.equal(current.task.stage, stage);
@@ -3185,46 +3201,50 @@ test(
                 ['UPDATE agents SET harness=\'claude_code\' WHERE id=$1', [runtime.agentId], 'factoryCheckHarnessUnavailable'],
                 ['UPDATE factory_candidates SET repository=\'/wrong/repository\' WHERE id=$1', [current.task.candidateId], 'factoryEvidenceMismatch'],
               ] as const) {
-                const tx = await db.connect();
-                try {
-                  await beginFactoryTransaction(tx);
-                  await tx.query('UPDATE factory_tasks SET reason=\'Uncommitted caller change\' WHERE id=$1', [current.task.id]);
-                  await tx.query(sql, [...params]);
-                  await assert.rejects(automatic(tx, cloudStore, current.task, producer),
-                    (error: unknown) => error instanceof FactoryError ? error.code === code : error instanceof Error && error.message === code, sql);
-                } finally { await rollbackFactoryTransaction(tx); tx.release(); }
+                await factoryResourceWorkspace(db)(userId, current.task.id, async () => {
+                  const tx = await db.connect();
+                  try {
+                    await beginFactoryTransaction(tx);
+                    await tx.query('UPDATE factory_tasks SET reason=\'Uncommitted caller change\' WHERE id=$1', [current.task.id]);
+                    await tx.query(sql, [...params]);
+                    await assert.rejects(automatic(tx, cloudStore, current.task, producer),
+                      (error: unknown) => error instanceof FactoryError ? error.code === code : error instanceof Error && error.message === code, sql);
+                  } finally { await rollbackFactoryTransaction(tx); tx.release(); }
+                });
                 assert.deepEqual(await parent(), beforeParent, 'automatic dispatch must not commit the caller\'s disabled parent before rejecting');
                 assert.deepEqual(await cloudStore.read(userId, current.task.id), before);
                 assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [issueId])).rows, beforeRuns);
               }
-              const tx = await db.connect();
               let afterCommit: (() => Promise<void>) | void;
-              try {
-                await beginFactoryTransaction(tx);
-                afterCommit = await automatic(tx, cloudStore, current.task, producer);
-                assert.equal(typeof afterCommit, 'function', 'the real automatic dispatcher must reach the independent fresh task');
-                const runId = (await tx.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [current.task.attemptId])).rows[0].runId;
-                const freshTargetInput: Parameters<typeof cloudTaskTarget>[2] = { botId, agentId: runtime.agentId, deviceRepoId: repository.id };
-                assert.equal(await cloudTaskTarget(tx, { ...actor, workspaceId: billingWorkspaceId }, freshTargetInput), null);
-                assert.equal(await cloudTaskTarget(tx, { ...actor, userId: 'owner' }, freshTargetInput), null);
-                await assert.rejects(configureFactoryCheck(tx, { ...before.task, userId: 'owner' }, runId),
-                  (error: unknown) => error instanceof FactoryError && error.code === 'factoryEvidenceMismatch');
-                // The fresh-template exception grants no other Bot, Agent,
-                // workspace, owner or repository authority to this queue.
-                for (const [sql, params, code] of [
-                  ['UPDATE agents SET harness=\'claude_code\' WHERE id=$1', [runtime.agentId], 'factoryCheckHarnessUnavailable'],
-                  ['UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [runId, otherBot], 'factoryCheckHarnessUnavailable'],
-                  ['UPDATE agent_runs SET "questionContinuation"=jsonb_build_object(\'originRunId\',$2::text,\'originSessionId\',$3::text,\'requireSessionResume\',true) WHERE id=$1', [runId, execute.runId, `producer-${issueId}`], 'factoryCheckHarnessUnavailable'],
-                  ['UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [runId, repoId], 'factoryEvidenceMismatch'],
-                ] as const) {
-                  await tx.query('SAVEPOINT capability_fence');
-                  await tx.query(sql, [...params]);
-                  await assert.rejects(configureFactoryCheck(tx, before.task, runId),
-                    (error: unknown) => error instanceof FactoryError && error.code === code, sql);
-                  await tx.query('ROLLBACK TO SAVEPOINT capability_fence');
-                }
-                await commitFactoryTransaction(tx);
-              } catch (error) { await rollbackFactoryTransaction(tx); throw error; } finally { tx.release(); }
+              await factoryResourceWorkspace(db)(userId, current.task.id, async () => {
+                const tx = await db.connect();
+                try {
+                  await beginFactoryTransaction(tx);
+                  afterCommit = await automatic(tx, cloudStore, current.task, producer);
+                  assert.equal(typeof afterCommit, 'function', 'the real automatic dispatcher must reach the independent fresh task');
+                  const runId = (await tx.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [current.task.attemptId])).rows[0].runId;
+                  const freshTargetInput: Parameters<typeof cloudTaskTarget>[2] = { botId, agentId: runtime.agentId, deviceRepoId: repository.id };
+                  assert.equal(await cloudTaskTarget(tx, { ...actor, workspaceId: billingWorkspaceId }, freshTargetInput), null);
+                  assert.equal(await cloudTaskTarget(tx, { ...actor, userId: 'owner' }, freshTargetInput), null);
+                  await assert.rejects(configureFactoryCheck(tx, { ...before.task, userId: 'owner' }, runId),
+                    (error: unknown) => error instanceof FactoryError && error.code === 'factoryEvidenceMismatch');
+                  // The fresh-template exception grants no other Bot, Agent,
+                  // workspace, owner or repository authority to this queue.
+                  for (const [sql, params, code] of [
+                    ['UPDATE agents SET harness=\'claude_code\' WHERE id=$1', [runtime.agentId], 'factoryCheckHarnessUnavailable'],
+                    ['UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [runId, otherBot], 'factoryCheckHarnessUnavailable'],
+                    ['UPDATE agent_runs SET "questionContinuation"=jsonb_build_object(\'originRunId\',$2::text,\'originSessionId\',$3::text,\'requireSessionResume\',true) WHERE id=$1', [runId, execute.runId, `producer-${issueId}`], 'factoryCheckHarnessUnavailable'],
+                    ['UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [runId, repoId], 'factoryEvidenceMismatch'],
+                  ] as const) {
+                    await tx.query('SAVEPOINT capability_fence');
+                    await tx.query(sql, [...params]);
+                    await assert.rejects(configureFactoryCheck(tx, before.task, runId),
+                      (error: unknown) => error instanceof FactoryError && error.code === code, sql);
+                    await tx.query('ROLLBACK TO SAVEPOINT capability_fence');
+                  }
+                  await commitFactoryTransaction(tx);
+                } catch (error) { await rollbackFactoryTransaction(tx); throw error; } finally { tx.release(); }
+              });
               await afterCommit!();
               current = await cloudStore.read(userId, current.task.id);
               const attempt = current.attempts.find(item => item.id === current.task.attemptId)!;
@@ -3263,12 +3283,9 @@ test(
           });
         } finally {
           machines.restore();
-          if (membershipFixture) {
-            await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [membershipFixture.workspaceId]);
-            await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1', [membershipFixture.workspaceId]);
-            await workspacePool.query('DELETE FROM "user" WHERE id=$1', [membershipFixture.userId]);
-          }
-          await workspacePool.end();
+          // This suite retains its isolated database, including the actual
+          // computer bindings. Do not delete their owner as if Workspace rows
+          // still lived alone in a second shared database.
           for (const name of names) { const value = saved.get(name); if (value === undefined) delete process.env[name]; else process.env[name] = value; }
         }
       });
@@ -3279,17 +3296,24 @@ test(
         // cache the real consumers before their test fixtures are installed.
         const { readArtifact } = await import('../artifacts/store');
         const { taskId, artifactId, captureId } = acceptanceReaderFixture;
-        const [ownedArtifact, foreignArtifact] = await modelDatabase!.run(() => Promise.all([
-          readArtifact('owner',artifactId),readArtifact('other',artifactId),
-        ]));
-        assert.equal(ownedArtifact?.id,artifactId,'the corresponding real Artifact remains present');
-        assert.equal(ownedArtifact?.acceptanceTaskId,taskId,'the owner can find the report task independently of its initial run');
-        assert.equal(ownedArtifact?.media?.[0].captureId,captureId);
-        assert.equal(foreignArtifact,null,'the task hint is not available to another artifact reader');
+        // Membership lives in this suite's isolated database, just like the
+        // artifact. Keep the real membership SQL on that same fixture adapter.
+        const fixtureWorkspace=(await import('drizzle-orm/node-postgres')).drizzle(db,{schema:await import('../db/workspace-schema')});
+        const workspaceRead=t.mock.method((await import('../workspace-db')).workspaceDb,'select',fixtureWorkspace.select.bind(fixtureWorkspace));
+        try {
+          const [ownedArtifact, foreignArtifact] = await modelDatabase!.run(() => Promise.all([
+            readArtifact('owner',artifactId),readArtifact('other',artifactId),
+          ]));
+          assert.equal(ownedArtifact?.id,artifactId,'the corresponding real Artifact remains present');
+          assert.equal(ownedArtifact?.acceptanceTaskId,taskId,'the owner can find the report task independently of its initial run');
+          assert.equal(ownedArtifact?.media?.[0].captureId,captureId);
+          assert.equal(foreignArtifact,null,'the task hint is not available to another artifact reader');
+        } finally { workspaceRead.mock.restore(); }
       });
     } finally {
       if (installedGatewayFixture) delete process.env.AI_GATEWAY_API_KEY;
       await modelDatabase?.close();
+      await closeWorkspaceDatabase?.();
       await pool?.end();
       await (await import("../db")).pool.end();
       // Retain this database. Closing clients does not delete the database.

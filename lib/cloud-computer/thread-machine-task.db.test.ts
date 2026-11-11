@@ -1,3 +1,5 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database'
 import { REGISTRATION_COMPLETE, REGISTRATION_WAITING } from '../computer/registration-command';
 // One task, one cloud sandbox (Alex, 2026-11-01). A task's next run resumes the
 // sandbox its last run left paused; no other task, bot or repository can take
@@ -41,11 +43,13 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
   const saved = { m: process.env.MIKKA_DATABASE_URL, d: process.env.DATABASE_URL, template: process.env.E2B_CODEX_TEMPLATE };
   const pool = new Pool({ connectionString: target.toString(), max: 4 });
   let appPool: { end: () => Promise<void> } | null = null;
+  let closeWorkspace: (() => Promise<void>) | undefined;
   try {
     const dir = new URL("../../drizzle/", import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
       await pool.query(await readFile(new URL(f, dir), "utf8"));
     process.env.MIKKA_DATABASE_URL = process.env.DATABASE_URL = target.toString();
+    closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
     process.env.E2B_CODEX_TEMPLATE = 'codex'; // The fixture agent runs Codex (decision 2026-11-01-2335).
     const db = await import("../db");
     appPool = db.pool;
@@ -53,6 +57,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), otherBot = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), otherRepo = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-task@example.invalid',true,now(),now())`, [owner]);
+    await seedFixtureWorkspace(pool, owner, 'team', workspaceId);
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'bot','cloud')`, [botDevice, owner]);
     await pool.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,'codex','Fixture',$3)`, [agentId, owner, botDevice]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,'v2/github.com/acme/app','https://github.com/acme/app.git')`, [repoId, botDevice, owner]);
@@ -63,7 +68,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     let number = 0;
     const task = async (status = "doing") => {
       const id = randomUUID();
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Fixture task',jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',jsonb_build_object('number',$4::int)),'content','[]'::jsonb),$3,'normal','personal')`, [id, owner, status, ++number]);
+      await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$5,'Fixture task',jsonb_build_object('type','doc','attrs',jsonb_build_object('mikka',jsonb_build_object('number',$4::int)),'content','[]'::jsonb),$3,'normal','personal')`, [id, owner, status, ++number, workspaceId]);
       return id;
     };
     const run = async (issueId: string | null, opts: { bot?: string; repo?: string; status?: string } = {}) => {
@@ -322,9 +327,11 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     });
     await t.test('runtime refresh rejects active native work before any provider call', async () => {
       const previous = await parked(await task());
-      await pool.query(`UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1`, [previous.runId, previous.device]);
+      await pool.query(`UPDATE agent_runs r SET "deviceId"=m."deviceId","deviceRepoId"=m."repoId"
+        FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`, [previous.runId]);
       const active = await run(await task());
-      await pool.query(`UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1`, [active, previous.device]);
+      await pool.query(`UPDATE agent_runs r SET "deviceId"=m."deviceId","deviceRepoId"=m."repoId"
+        FROM thread_machines m WHERE r.id=$1 AND m."runId"=$2`, [active, previous.runId]);
       const fixture = fake();
       await assert.rejects(ensureThreadMachine(pool, actor, previous.runId, fixture.provider, undefined, true), /runtime is busy/);
       assert.deepEqual(fixture.calls, []);
@@ -534,9 +541,11 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.notEqual(f.taskBot, botId);
       assert.equal(before.task[0].botId, f.taskBot); assert.equal(before.runs.find(row => row.id === f.next).botId, botId);
       const [{ createFactoryQuestions }, { prepareCloudQuestionRecovery, queueCloudQuestionContinuation },
-        { createFactoryStore }, { createFactoryDispatch }, { createFactoryClaim }, { claimCloudRun }, { factoryTestLifecycle }] = await Promise.all([
+        { createFactoryStore }, { createFactoryDispatch }, { createFactoryClaim }, { claimCloudRun }, { factoryTestLifecycle },
+        { bindFactoryQuestionsWorkspace, withFactoryBackgroundWorkspace }] = await Promise.all([
         import('../factory/questions/store'), import('../factory/questions/queue-continuation'), import('../factory/store'),
         import('../factory/dispatch'), import('../factory/claim'), import('../computer/claim'), import('../../tests/helpers/factory-test-authority'),
+        import('../factory/background-workspace'),
       ]);
       const authorize = async (userId: string, issueId: string) => userId === owner && issueId === f.issueId;
       const store = createFactoryStore(pool, authorize, f.taskBot, factoryTestLifecycle);
@@ -545,12 +554,12 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         assert.ok(result, 'recovery must use the real original-session queue'); return result;
       });
       let preparations = 0;
-      const questions = createFactoryQuestions(pool, authorize, store, dispatch, undefined, undefined, undefined, async (userId, scope) => {
+      const questions = bindFactoryQuestionsWorkspace(pool, createFactoryQuestions(pool, authorize, store, dispatch, undefined, undefined, undefined, async (userId, scope) => {
         assert.deepEqual({ userId, ...scope }, { userId: owner, runId: f.next, workspaceId });
         preparations++;
         await prepareCloudQuestionRecovery(pool, userId, scope);
         assert.deepEqual(await unclaimedHistory(f), before, 'the actual runtime preparation leaves native and answer history untouched');
-      });
+      }), f.taskBot);
       fixture.provider.state = async () => {
         fixture.calls.push('state');
         const probe = await pool.connect();
@@ -576,8 +585,9 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         assert.equal(preparations, 1, 'recovery replay cannot refresh the VM or queue again');
         const factoryClaim = createFactoryClaim(store, questions), lease = new Date(Date.now() + 60_000);
         let metadata: Record<string, unknown> = {};
-        const claimed = await claimCloudRun(pool, actor, recovered.continuationRunId, f.prior.device, lease, f.bindingId,
-          async tx => { metadata = await factoryClaim(tx, owner, f.prior.device, recovered.continuationRunId, lease.toISOString()); }, undefined, false);
+        const claimed = await withFactoryBackgroundWorkspace(pool, owner, { kind: 'task', id: f.taskId, botId: f.taskBot }, () =>
+          claimCloudRun(pool, actor, recovered.continuationRunId, f.prior.device, lease, f.bindingId,
+            async tx => { metadata = await factoryClaim(tx, owner, f.prior.device, recovered.continuationRunId, lease.toISOString()); }, undefined, false));
         assert.equal(claimed?.ownerId, owner);
         assert.equal(metadata.resumeSessionId, f.continuation.originSessionId);
         assert.equal(metadata.continuesRunId, f.prior.runId, 'native resume uses the actual original history');
@@ -1455,7 +1465,6 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     for (const [label, other] of [
       ["another task", async (_issueId: string) => run(await task())],
       ["another repository on the same task", async (issueId: string) => run(issueId, { repo: otherRepo })],
-      ["a run with no task", async () => run(null)],
     ] as const) {
       await t.test(`${label} never gets the task's sandbox: it starts its own from the ready template`, async () => {
         const issueId = await task();
@@ -1469,6 +1478,22 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         assert.equal((await machine(before.runId)).state, "paused", "the task's sandbox stays parked for the task");
       });
     }
+
+    await t.test('a run without a Task cannot acquire Project execution authority or touch a retained task machine', async () => {
+      const before = await parked(await task()), next = await run(null);
+      const { calls, sources, provider } = fake();
+      const snapshot = async () => ({
+        runs: (await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[before.runId, next]])).rows,
+        machines: (await pool.query('SELECT * FROM thread_machines WHERE "runId"=ANY($1::uuid[]) ORDER BY "runId"', [[before.runId, next]])).rows,
+        tokens: (await pool.query('SELECT * FROM device_tokens WHERE "userId"=$1 ORDER BY id', [owner])).rows,
+      });
+      const original = await snapshot();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, provider), { code: 'projectEnvironmentUnavailable' });
+      assert.deepEqual(calls, []);
+      assert.deepEqual(sources, []);
+      assert.equal(await machine(next), undefined);
+      assert.deepEqual(await snapshot(), original, 'refusal preserves Run history, task VM custody, timers and credentials');
+    });
 
     await t.test("the same task sent to another bot still resumes the task's sandbox (it belongs to the task, not the bot)", async () => {
       const issueId = await task();
@@ -1967,6 +1992,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(result, { ended: 4, pending: 0 });
     });
   } finally {
+    await closeWorkspace?.();
     if (saved.m === undefined) delete process.env.MIKKA_DATABASE_URL; else process.env.MIKKA_DATABASE_URL = saved.m;
     if (saved.d === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved.d;
     if (saved.template === undefined) delete process.env.E2B_CODEX_TEMPLATE; else process.env.E2B_CODEX_TEMPLATE = saved.template;

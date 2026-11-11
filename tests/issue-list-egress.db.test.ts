@@ -1,3 +1,5 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
+import { withActivitySession } from './fixtures/activity-runtime.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -20,7 +22,8 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
   const { issueChecklist } = await import('../lib/issue-checklist')
   const owner = `issue-list-${randomUUID()}`
   const peer = `issue-list-peer-${randomUUID()}`
-  const workspaceId = randomUUID(), teamId = randomUUID(), requestId = randomUUID()
+  const workspaceId = randomUUID(), personalWorkspace = randomUUID(), teamId = randomUUID(), requestId = randomUUID()
+  const read = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), personalWorkspace) as Promise<T>
   // 30 tasks of about 10 KB each, with a nested checklist (2 of 3 checked).
   const item = (checked: boolean, nested?: JSONContent[]): JSONContent => ({ type: 'taskItem', attrs: { checked }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'taskItem step' }] }, ...(nested ?? [])] })
   const content = (index: number): JSONContent => ({ type: 'doc', content: [
@@ -29,19 +32,20 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
   ] })
   try {
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
+    await seedFixtureWorkspace(pool, owner, 'personal', personalWorkspace)
     const ids: string[] = []
     for (let index = 0; index < 30; index++) {
-      const saved = await actAs(owner, () => saveIssue({ title: `Task ${index}`, content: content(index), status: 'todo', priority: 'normal' }))
+      const saved = await read(() => saveIssue({ title: `Task ${index}`, content: content(index), status: 'todo', priority: 'normal' }))
       assert.ok('issue' in saved && saved.issue, JSON.stringify(saved))
       ids.push(saved.issue.id)
     }
     const first = (await pool.query('select revision from issues where id=$1', [ids[0]])).rows[0].revision
-    const estimated = await actAs(owner, () => updateIssueMetadata({ id: ids[0], revision: first, patch: { estimate: 5 } }))
+    const estimated = await read(() => updateIssueMetadata({ id: ids[0], revision: first, patch: { estimate: 5 } }))
     assert.ok('issue' in estimated && estimated.issue, JSON.stringify(estimated))
 
     // Initialize the personal workspace and warm its connections outside measurement.
-    await actAs(owner, () => listIssues())
-    const list = await measured(() => actAs(owner, () => listIssues()))
+    await read(() => listIssues())
+    const list = await measured(() => read(() => listIssues()))
     assert.equal(list.value.length, 30)
     const expected = issueChecklist(content(0))
     assert.deepEqual(expected, { total: 3, checked: 2, percentage: 67 })
@@ -49,25 +53,25 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     assert.equal(list.value.find(row => row.id === ids[0])?.metadata.estimate, 5)
     assert.equal('content' in list.value[0], false)
 
-    const cold = await measured(() => actAs(owner, () => pollIssues()))
+    const cold = await measured(() => read(() => pollIssues()))
     const snapshot = cold.value
     assert.ok(snapshot.items)
-    const quiet = await measured(() => actAs(owner, () => pollIssues(snapshot.version)))
+    const quiet = await measured(() => read(() => pollIssues(snapshot.version)))
     assert.ok('unchanged' in quiet.value && quiet.value.unchanged)
     assert.equal(quiet.value.items, undefined)
     assert.ok(quiet.bytes < list.bytes / 2, `unchanged ${quiet.bytes} B vs full ${list.bytes} B`)
-    const restored = await measured(() => actAs(owner, () => pollIssues(snapshot.version, snapshot.positions)))
+    const restored = await measured(() => read(() => pollIssues(snapshot.version, snapshot.positions)))
     assert.ok('unchanged' in restored.value && restored.value.unchanged)
     await pool.query('update issues set title=$2 where id=$1', [ids[0], 'Renamed without a clock change'])
-    const delta = await measured(() => actAs(owner, () => pollIssues(snapshot.version, snapshot.positions)))
+    const delta = await measured(() => read(() => pollIssues(snapshot.version, snapshot.positions)))
     assert.equal(delta.value.delta, true)
     assert.deepEqual(delta.value.items?.map(row => row.id), [ids[0]], 'only the changed projection is read')
-    const changed = await actAs(owner, () => pollIssues(snapshot.version))
+    const changed = await read(() => pollIssues(snapshot.version))
     assert.ok(changed.items?.some(row => row.title === 'Renamed without a clock change'))
     assert.deepEqual(mergeList(snapshot.items!, delta.value), changed.items)
     assert.notEqual(changed.version, snapshot.version)
     await pool.query('update "user" set image=$2 where id=$1', [owner, 'https://example.invalid/changed-avatar.png'])
-    assert.notEqual((await actAs(owner, () => pollIssues(changed.version))).version, changed.version, 'profile changes invalidate the list too')
+    assert.notEqual((await read(() => pollIssues(changed.version))).version, changed.version, 'profile changes invalidate the list too')
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [peer, `${peer}@example.invalid`])
     const foreign = await actAs(peer, () => pollIssues(changed.version, changed.positions))
     assert.deepEqual(foreign.items, [], 'another identity cannot reuse an owner snapshot to obtain private tasks')
@@ -76,7 +80,7 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     // ids[10]: parent ids[0], blocked by ids[12], related to ids[13], duplicate of ids[16]; ids[14] is its child, it blocks ids[15].
     const relate = async (id: string, targetId: string, kind: 'parent' | 'blockedBy' | 'related' | 'duplicate') => {
       const revision = (await pool.query('select revision from issues where id=$1', [id])).rows[0].revision
-      const result = await actAs(owner, () => updateIssueRelation({ id, revision, targetId, kind }))
+      const result = await read(() => updateIssueRelation({ id, revision, targetId, kind }))
       assert.ok('issue' in result, JSON.stringify(result))
     }
     await relate(ids[10], ids[0], 'parent')
@@ -86,9 +90,9 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     await relate(ids[14], ids[10], 'parent')
     await relate(ids[15], ids[10], 'blockedBy')
     await relate(ids[17], ids[18], 'related')
-    const relations = await measured(() => actAs(owner, () => listIssueConnections(ids[10])))
+    const relations = await measured(() => read(() => listIssueConnections(ids[10])))
     // The rows the relations panel and subtasks use, picked from every task the owner has (listIssues reads them all).
-    const everything = await actAs(owner, () => listIssues())
+    const everything = await read(() => listIssues())
     const current = everything.find(row => row.id === ids[10])!.metadata
     const linked = everything.filter(row => row.id === ids[10] || row.id === current.parentId || row.id === current.duplicateOfId || current.blockedByIds.includes(row.id) || current.relatedIds.includes(row.id)
       || row.metadata.parentId === ids[10] || row.metadata.blockedByIds.includes(ids[10]) || row.metadata.relatedIds.includes(ids[10]))
@@ -99,7 +103,7 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
       assert.deepEqual({ metadata: row.metadata, identifier: row.identifier, title: row.title, status: row.status }, { metadata: listed.metadata, identifier: listed.identifier, title: listed.title, status: listed.status })
     }
     assert.equal(relations.value.find(row => row.id === ids[0])?.metadata.estimate, 5)
-    const unrelated = await actAs(owner, () => listIssueConnections(ids[19]))
+    const unrelated = await read(() => listIssueConnections(ids[19]))
     assert.deepEqual(unrelated.map(row => row.id), [ids[19]], 'a task with no links reads only itself')
 
     const bodies = (await pool.query('select sum(length(content::text))::int n from issues where "userId"=$1', [owner])).rows[0].n
@@ -109,26 +113,31 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     assert.ok(relations.bytes < bodies / 5, `listIssueConnections read ${relations.bytes} B for ${bodies} B of bodies`)
     // 7 of the owner's 30 tasks: well under the whole list's metadata.
     assert.ok(relations.bytes < list.bytes, `listIssueConnections read ${relations.bytes} B, the whole list ${list.bytes} B`)
-    const { withActivitySession } = await import('./fixtures/activity-runtime.mjs')
     const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
     await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,$3)', [workspaceId, owner, 'Egress visibility fixture'])
     await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,$4)', [workspaceId, peer, `${peer}@example.invalid`, 'member'])
     await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,$4)', [workspaceId, owner, `${owner}@example.invalid`, 'admin'])
     await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [teamId, workspaceId, owner, 'Fixture team', 'EGRESS'])
     const promotion = await promoteExistingIssueForUser(owner, { requestId, issueId: ids[1], revision: 1, teamId, expectedTeamId: null })
-    assert.ok('issue' in promotion, JSON.stringify(promotion))
+    assert.ok('error' in promotion)
+    assert.equal(promotion.error, 'teamIssueAccessDenied', 'team promotion cannot move a task to another workspace')
+    assert.equal((await pool.query('select "workspaceId" from issues where id=$1', [ids[1]])).rows[0].workspaceId, personalWorkspace)
+    assert.equal((await pool.query('select count(*)::int n from team_issue_promotion_receipts where "requestId"=$1', [requestId])).rows[0].n, 0)
+    const createdShared = await withActivitySession(owner, () => saveIssue({ title: 'Shared list task', content: content(30), status: 'todo', priority: 'normal' }), workspaceId)
+    assert.ok('issue' in createdShared && createdShared.issue)
     const shared = await withActivitySession(peer, () => actAs(peer, () => pollIssues()), workspaceId)
+    assert.deepEqual(shared.items?.map(row => row.id), [createdShared.issue.id])
     assert.equal(shared.items?.length, 1)
     await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, peer, 'suspended'])
     const revoked = await withActivitySession(peer, () => actAs(peer, () => pollIssues(shared.version, shared.positions)), workspaceId)
-    assert.deepEqual(revoked.items, [], 'revocation falls back to the personal workspace and clears the formerly shared row')
+    assert.deepEqual(revoked.items, [], 'revocation clears the formerly shared row')
     assert.deepEqual(mergeList(shared.items!, revoked), [], 'the authoritative manifest removes the revoked cached task')
     assert.notEqual(revoked.version, shared.version, 'revocation cannot return an unchanged snapshot')
-    const beforeDelete = await actAs(owner, () => pollIssues())
+    const beforeDelete = await read(() => pollIssues())
     await pool.query('delete from issue_versions where "issueId"=$1', [ids[0]])
     await pool.query('delete from issue_documents where "issueId"=$1', [ids[0]])
     await pool.query('delete from issues where id=$1', [ids[0]])
-    const deletion = await measured(() => actAs(owner, () => pollIssues(beforeDelete.version, beforeDelete.positions)))
+    const deletion = await measured(() => read(() => pollIssues(beforeDelete.version, beforeDelete.positions)))
     assert.equal(deletion.value.items?.length, 0, 'deletion needs no unchanged task payloads')
     assert.equal(mergeList(beforeDelete.items!, deletion.value).length, beforeDelete.items!.length - 1, 'deletion invalidates the snapshot even without updating another task')
     t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'task-list', scope: 'data-read-path_not_page_http', fixtureRows: 30,
@@ -165,6 +174,7 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     withActivitySession(peer, () => actAs(peer, work), workspace) as Promise<T>
   try {
     for (const person of people) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [person, person + '@example.invalid'])
+    const personalWorkspace = await seedFixtureWorkspace(pool, peer)
     for (const [index, workspace] of workspaces.entries()) {
       const userId = index === 2 ? outsider : owner
       await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,$3)', [workspace, userId, 'List scope ' + index])
@@ -179,15 +189,15 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     for (let index = 0; index < 80; index++) {
       const id = randomUUID(), group = index < 60 ? 0 : 1
       ids.push(id); (group === 0 ? firstWorkspace : secondWorkspace).push(id)
-      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)',
-        [id, owner, 'Task ' + index, content, 'todo', 'normal', 'workspace'])
+      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')',
+        [id, owner, 'Task ' + index, content, 'todo', 'normal', 'workspace', workspaces[group]])
       await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)',
         [id, group === 0 ? teams[index % 2] : teams[2], workspaces[group], owner])
     }
     for (const [id, scope] of [[personal, 'personal'], [unlinked, 'workspace'], [outside, 'workspace']]) {
       ids.push(id)
-      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)',
-        [id, peer, id, content, 'todo', 'normal', scope])
+      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')',
+        [id, peer, id, content, 'todo', 'normal', scope, id === personal ? personalWorkspace : id === unlinked ? workspaces[0] : workspaces[2]])
     }
     // An owned task can retain a link after the owner's membership is gone.
     // It must not reappear as an unlinked task in another workspace.
@@ -196,42 +206,43 @@ test('workspace task polls keep permission reads bounded and recheck the next re
 
     await inWorkspace(workspaces[0], () => pollIssues()) // warm connections, outside the byte budget
     const full = await measured(() => inWorkspace(workspaces[0], () => pollIssues()))
-    assert.deepEqual(full.value.items?.map(row => row.id).sort(), [...firstWorkspace, personal, unlinked].sort())
+    assert.deepEqual(full.value.items?.map(row => row.id).sort(), [...firstWorkspace, unlinked].sort())
     assert.ok(full.value.items?.filter(row => firstWorkspace.includes(row.id)).every(row => teams.slice(0, 2).includes(row.teamId!)))
-    assert.match(full.value.items?.find(row => row.id === unlinked)?.identifier ?? '', /^SCOP-[1-9][0-9]*$/, 'an unlinked workspace task keeps its owner number')
+    const issuedUnlinked = (await pool.query('select "issuedIdentifier" from issues where id=$1', [unlinked])).rows[0].issuedIdentifier
+    assert.match(issuedUnlinked, /^W[0-9A-F]{12}-[1-9][0-9]*$/, 'an ungrouped shared Task has a Workspace-issued identity')
+    assert.equal(full.value.items?.find(row => row.id === unlinked)?.identifier, issuedUnlinked)
     const quiet = await measured(() => inWorkspace(workspaces[0], () => pollIssues(full.value.version)))
     assert.ok('unchanged' in quiet.value && quiet.value.unchanged)
     assert.equal(quiet.value.items, undefined)
     t.diagnostic(JSON.stringify({ linkedTasks: 80, fullWorkspaceListBytes: full.bytes, unchangedWorkspaceListBytes: quiet.bytes }))
 
-    // The task documents stay unchanged when a team key changes. Both the
-    // overall cursor and each affected row must depend on the current key.
+    // Team keys are aliases. Renaming a grouping cannot change already issued
+    // Task identities or resend otherwise unchanged list rows.
     await pool.query('update mikka_teams set identifier=$2 where id=$1', [teams[0], 'RENAMED'])
     const renamed = await measured(() => inWorkspace(workspaces[0], () => pollIssues(full.value.version, full.value.positions)))
-    assert.notEqual(renamed.value.version, full.value.version)
-    assert.deepEqual(renamed.value.items?.map(row => row.id).sort(), firstWorkspace.filter((_, index) => index % 2 === 0).sort(), 'only the renamed team\'s task projections are sent')
-    assert.ok(renamed.value.items?.every(row => /^RENAMED-[1-9][0-9]*$/.test(row.identifier ?? '')))
-    assert.deepEqual(mergeList(full.value.items!, renamed.value), (await inWorkspace(workspaces[0], () => pollIssues())).items)
+    assert.equal(renamed.value.version, full.value.version)
+    assert.ok('unchanged' in renamed.value && renamed.value.unchanged)
+    assert.deepEqual((await inWorkspace(workspaces[0], () => pollIssues())).items, full.value.items)
     await pool.query('update mikka_teams set identifier=$2 where id=$1', [teams[0], 'EG0'])
 
-    // A removed and re-added team link gets a new number, even for the same
-    // team. Its row cursor cannot depend on teamId alone.
+    // A re-created Team relation gets a new historical alias number. The
+    // canonical Task identity and current grouping remain the same.
     const changedNumberId = firstWorkspace[0]
     const oldNumber = (await pool.query('select number from mikka_team_issues where "issueId"=$1', [changedNumberId])).rows[0].number
     await pool.query('delete from mikka_team_issues where "issueId"=$1', [changedNumberId])
     await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [changedNumberId, teams[0], workspaces[0], owner])
+    assert.notEqual((await pool.query('select number from mikka_team_issues where "issueId"=$1', [changedNumberId])).rows[0].number, oldNumber)
     const renumbered = await inWorkspace(workspaces[0], () => pollIssues(full.value.version, full.value.positions))
-    assert.deepEqual(renumbered.items?.map(row => row.id), [changedNumberId])
-    assert.notEqual(renumbered.items?.[0].identifier, full.value.items?.find(row => row.id === changedNumberId)?.identifier)
-    await pool.query('update mikka_team_issues set number=$2 where "issueId"=$1', [changedNumberId, oldNumber])
+    assert.ok('unchanged' in renumbered && renumbered.unchanged)
+    assert.equal((await inWorkspace(workspaces[0], () => pollIssues())).items?.find(row => row.id === changedNumberId)?.identifier, full.value.items?.find(row => row.id === changedNumberId)?.identifier)
     t.diagnostic(JSON.stringify({ event: 'task_number_list_measurement', cold: readMetrics(full), unchanged: readMetrics(quiet), teamRename: readMetrics(renamed) }))
 
     const switched = await inWorkspace(workspaces[1], () => pollIssues(full.value.version))
-    assert.deepEqual(switched.items?.map(row => row.id).sort(), [...secondWorkspace, personal, unlinked].sort())
+    assert.deepEqual(switched.items?.map(row => row.id).sort(), secondWorkspace.slice().sort())
     assert.notEqual(switched.version, full.value.version)
     const tokenRows = await withActivitySession(peer, () => actAs({ id: peer, [tokenWorkspace]: workspaces[0] },
       () => listWorkspaceIssues(workspaces[0])), workspaces[0]) as Awaited<ReturnType<typeof listWorkspaceIssues>>
-    assert.deepEqual(tokenRows.map(row => row.id).sort(), firstWorkspace.slice().sort(), 'workspace tokens retain their tenant boundary')
+    assert.deepEqual(tokenRows.map(row => row.id).sort(), [...firstWorkspace, unlinked].sort(), 'workspace tokens include only tasks bound to their tenant, including tasks without a Team')
 
     // Move one relation after its rows are read, before the action continues.
     // A reused link must never be acknowledged with a later relation version.
@@ -266,8 +277,8 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     const { issueTeamScope } = await import('../lib/issue-team-access')
     const extraIds = Array.from({ length: 70 }, () => randomUUID())
     ids.push(...extraIds)
-    await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) select id,$2,$3,$4,$5,$6,$7 from unnest($1::uuid[]) id',
-      [extraIds, owner, 'Paging fixture', content, 'todo', 'normal', 'workspace'])
+    await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") select id,$2,$3,$4,$5,$6,$7,$8,\'bound\' from unnest($1::uuid[]) id',
+      [extraIds, owner, 'Paging fixture', content, 'todo', 'normal', 'workspace', workspaces[0]])
     await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") select id,$2,$3,$4 from unnest($1::uuid[]) id',
       [extraIds, teams[0], workspaces[0], owner])
     const plainLinks = await issueTeamScope(peer)
@@ -288,7 +299,7 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     assert.ok(revoked.items?.every(row => !firstWorkspace.includes(row.id)), 'the next request drops access immediately')
     assert.notEqual(revoked.version, moved.version)
     await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaces[0], peer, 'active'])
-    assert.deepEqual((await inWorkspace(workspaces[0], () => pollIssues())).items?.map(row => row.id).sort(), [...firstWorkspace, personal, unlinked].sort())
+    assert.deepEqual((await inWorkspace(workspaces[0], () => pollIssues())).items?.map(row => row.id).sort(), [...firstWorkspace, unlinked].sort())
 
     // The list needs team identity and links, never long team descriptions.
     // Budgets include both PostgreSQL pools and every returned protocol byte.
@@ -321,7 +332,7 @@ test('singleton teams with long keys retain their task-list traffic budget', { s
     for (const [index, team] of teams.entries()) {
       const key = 'TEAM' + String(index).padStart(8, '0')
       await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [team, workspace, owner, key, key])
-      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)', [ids[index], owner, 'Task ' + index, '{"type":"doc","content":[]}', 'todo', 'normal', 'workspace'])
+      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')', [ids[index], owner, 'Task ' + index, '{"type":"doc","content":[]}', 'todo', 'normal', 'workspace', workspace])
       await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [ids[index], team, workspace, owner])
     }
     await read()

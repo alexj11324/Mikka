@@ -9,6 +9,10 @@ inputs:
   skip-electron:
     description: Leave runtime installation to the checksum-verifying desktop installer
     default: 'false'
+  ffmpeg-github-token:
+    description: Optional API-read-only GitHub token for verified FFmpeg assets.
+    required: false
+    default: ''
 runs:
   using: composite
   steps:
@@ -53,6 +57,7 @@ runs:
       env:
         INSTALL_PROFILE: ${{ inputs.profile }}
         ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || env.ELECTRON_SKIP_BINARY_DOWNLOAD || '' }}
+        FFMPEG_GITHUB_TOKEN: ${{ inputs.ffmpeg-github-token }}
       run: |
         case "$INSTALL_PROFILE" in
           full) pnpm install --frozen-lockfile ;;

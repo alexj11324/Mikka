@@ -15,6 +15,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { EMPTY_LABELS, rolesByPerson } from '@/lib/execution-identity-label-view'
 import { currentThreadExecutionEvidence, readThreadExecutionEvidence, type ThreadExecutionEvidence } from '@/lib/thread-execution-identity-view'
 import { DECISION_REASONS, type DecisionReason } from '@/lib/factory/agent-profile-decision'
+import { ProfileAgentMark, ProfileMark } from '@/components/labels/profile-mark'
+import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
 
 export function ThreadExecutionIdentity({ runId }: { runId: string }) {
   // A different actual run closes the previous dialog and starts with no data.
@@ -78,6 +80,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
   async function copyDiagnostics() {
     const text = JSON.stringify({ run: evidence.id, harness: evidence.harness, model: evidence.model, credentialType: evidence.credentialType,
       subscriptionRoute: evidence.subscriptionRoute, executionIdentity: evidence.executionIdentity, modelRouting: evidence.modelRouting ?? null,
+      skillPrompt: evidence.skillPrompt ?? null,
       agentProfile: profile ? { profileId: profile.profileId, version: profile.version, source: profile.source } : null }, null, 2)
     try { await navigator.clipboard.writeText(text); toast.success(t('diagnosticsCopied')) }
     catch { toast.error(t('diagnosticsCopyFailed')) }
@@ -132,11 +135,28 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
       {routing.previousModel && <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-muted-foreground">{t('previousModel')}<span className="text-foreground" title={routing.previousModel}><ModelLabel model={routing.previousModel} /></span></p>}
     </section>}
     {profile && <dl className="flex flex-col gap-3"><ValueRow label={profileT('frozenProfile')}><Line>
+      {/* Who did the work: the Profile's mark first, the Agent that ran it smaller beside the name. */}
+      <ProfileMark {...(profile.profileId === 'default' ? DEFAULT_PROFILE_MARK : resolveProfileMark({ name: profile.name }, profile))} />
       {profile.source === 'default' && profile.profileId === 'default' ? profileT('defaultName') : profile.name}
+      {evidence.harness && <ProfileAgentMark harness={evidence.harness} />}
       <Quiet>· {profileT('version', { version: profile.version })} · {profileT(`selectionSources.${profile.source}`)}</Quiet>
       {/* A run frozen before reasons were codes holds an English sentence: the source already says how it was chosen. */}
       {profile.source === 'decision' && (DECISION_REASONS as readonly string[]).includes(profile.reason) && <Quiet>· {profileT(`selectionReasons.${profile.reason as DecisionReason}`)}</Quiet>}
-    </Line></ValueRow></dl>}
+    </Line></ValueRow>
+      {/* Configured is not used: only the daemon's own load receipts say loaded. */}
+      <ValueRow label={profileT('skills')}>
+        {evidence.configuredSkills?.length ? <div className="flex flex-col gap-1">
+          {evidence.configuredSkills.map(skill => {
+            const loaded = new Set((evidence.loadedSkills ?? []).map(item => item.id)).has((skill.id.includes(':') ? skill.id : `official:${skill.id}`).toLowerCase())
+            return <Line key={skill.id}>
+              <span className="min-w-0 truncate" title={skill.name}>{skill.name}</span>
+              <Quiet>· {profileT(`skillSources.${skill.source}`)}</Quiet>
+              <Quiet>· {profileT(loaded ? 'skillLoaded' : 'skillNotLoaded')}</Quiet>
+            </Line>
+          })}
+        </div> : <Quiet>{profileT('skillsNone')}</Quiet>}
+      </ValueRow>
+    </dl>}
     {!identity ? <p className="text-muted-foreground">{t('snapshotMissing')}</p> : <>
       <dl className="flex flex-col gap-3">
         {rolesByPerson(identity).map(row => <ValueRow key={row.personId} label={row.roles.length === 1 ? t(`roles.${row.roles[0]}`) : t('rolesTogether', { first: t(`roles.${row.roles[0]}`), last: t(`roles.${row.roles.at(-1)!}`) })}>
@@ -149,6 +169,18 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
         <ValueRow label={t('billing')}><span>{cost()}</span></ValueRow>
       </dl>
     </>}
+    {evidence.skillPrompt && <dl className="flex flex-col gap-3"><ValueRow label={t('skills')}>
+      <Line>
+        <span>{t('skillsInlined')}</span>
+        <Quiet>· {evidence.skillPrompt.inlined.length === 0 ? t('unknown') : evidence.skillPrompt.inlined.join(t('roleSeparator'))}</Quiet>
+      </Line>
+      {/* A body the prompt could not hold is a real difference in what ran; name every skill it left out. */}
+      {evidence.skillPrompt.deferred.length > 0 && <Line>
+        <span>{t('skillsDeferred')}</span>
+        <Quiet>· {evidence.skillPrompt.deferred.join(t('roleSeparator'))}</Quiet>
+      </Line>}
+      <Quiet>{t('skillsBudget', { used: evidence.skillPrompt.usedChars, budget: evidence.skillPrompt.budgetChars })}</Quiet>
+    </ValueRow></dl>}
     <div><Button variant="ghost" size="sm" onClick={() => { void copyDiagnostics() }}><Copy data-icon="inline-start" />{t('copyDiagnostics')}</Button></div>
   </div>
 }

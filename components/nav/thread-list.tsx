@@ -87,9 +87,9 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
       </span>
       {waiting
         ? <WaitingChip waiting={waiting} />
-        : (all || thread.lastReply || thread.attempts > 1) && <span className="flex w-full min-w-0 items-center gap-1 text-xs text-muted-foreground">
+        : (all || thread.lastReply) && <span className="flex w-full min-w-0 items-center gap-1 text-xs text-muted-foreground">
           {all && <span data-slot="thread-agent" className="flex shrink-0 items-center opacity-80 [&_svg]:size-3">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
-          <span className="min-w-0 flex-1 truncate">{[all ? <span key="bot" data-slot="thread-bot" className="text-foreground/80">{t('dispatchedBy', { bot: thread.agentName })}</span> : null, thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).flatMap((part, index) => index ? [' · ', part] : [part])}</span>
+          <span className="min-w-0 flex-1 truncate">{[all ? <span key="bot" data-slot="thread-bot" className="text-foreground/80">{t('dispatchedBy', { bot: thread.agentName })}</span> : null, thread.lastReply].filter(Boolean).flatMap((part, index) => index ? [' · ', part] : [part])}</span>
         </span>}
       {/* In 等待你, a coding task's summary line and 审阅 (R0); the default slot draws nothing. */}
       {group === 'waiting' && thread.issueId && <ReviewSummaryLine taskId={thread.issueId} placement="waiting" onOpenReview={openReview} />}

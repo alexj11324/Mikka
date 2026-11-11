@@ -69,7 +69,7 @@ export async function ingestNotifications(incoming: readonly ExternalNotificatio
   }
 }
 
-const visible = (userId: string, since: Date) => and(eq(suggestions.userId, userId), eq(suggestions.shown, true), isNull(suggestions.dismissedAt), gte(suggestions.createdAt, since))
+const visible = (userId: string, since: Date) => and(eq(suggestions.userId, userId), eq(suggestions.shown, true), isNull(suggestions.dismissedAt), sql`not exists (select 1 from inbox_snoozes z where z."userId"=${userId} and z."itemType"='suggestion' and z."itemId"=${suggestions.id})`, gte(suggestions.createdAt, since))
 
 /** What the person sees: shown, not dismissed, from the last week, newest first. */
 export async function listSuggestions(userId: string) {
@@ -267,6 +267,6 @@ export async function writeFirstBriefing(userId: string, timeZoneName: string | 
 /** The suggestions a briefing names, in its order, skipping any since dismissed. */
 export async function briefingHighlights(userId: string, ids: readonly string[]) {
   if (!ids.length) return []
-  const rows = await db.select().from(suggestions).where(and(eq(suggestions.userId, userId), inArray(suggestions.id, [...ids]), isNull(suggestions.dismissedAt)))
+  const rows = await db.select().from(suggestions).where(and(eq(suggestions.userId, userId), inArray(suggestions.id, [...ids]), isNull(suggestions.dismissedAt), sql`not exists (select 1 from inbox_snoozes z where z."userId"=${userId} and z."itemType"='suggestion' and z."itemId"=${suggestions.id})`))
   return ids.flatMap(id => rows.filter(row => row.id === id))
 }

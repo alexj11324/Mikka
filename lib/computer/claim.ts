@@ -1,4 +1,5 @@
 import 'server-only'
+import { withRunWorkspace } from '@/lib/run-completion'
 import { assertLockedRunProfileClaim, assertRunProfileClaim, refreshCloudRunProfileClaim } from '@/lib/factory/profile-admission'
 import { executionIdentityForRun, ExecutionIdentityError } from '../execution-identity'
 import type { Pool, PoolClient } from 'pg'
@@ -6,17 +7,23 @@ import { computerPermission, type ComputerPermission } from './permission'
 import { runMayUseCredentialSql } from '@/lib/personal-policy'
 import { runListChanged } from '@/lib/live/lists'
 import { armDueTimerAfterCommit } from '@/lib/due-timer'
+import { taskActivityChanged } from '@/lib/factory/activity-live'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
  * claim serialized with Bot binding and fail closed until a cloud worker with
  * the computer tool can claim the run. */
 export async function claimLocalRun(pool: Pool, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId?: string, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>): Promise<'claimed' | 'unavailable' | 'cloud-required'> {
+  const { rows: [stored] } = await pool.query<{ userId: string; workspaceId: string | null }>(
+    `SELECT r."userId",r."workspaceId" FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
+      WHERE r.id=$1 AND r."deviceId"=$2`, [runId, deviceId])
+  if (!stored?.workspaceId) return 'unavailable'
+  return await withRunWorkspace<'claimed' | 'unavailable' | 'cloud-required'>(stored.userId, stored.workspaceId, async () => {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
     await executionIdentityForRun(client, runId)
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return 'unavailable' }
-    const run = (await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND status=$3 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, 'queued'])).rows[0]
+    const run = (await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND status=$3 AND "stopRequestedAt" IS NULL AND "workspaceId"=$4 AND "userId"=$5 FOR UPDATE', [runId, deviceId, 'queued', stored.workspaceId, stored.userId])).rows[0]
     if (!run) { await client.query('COMMIT'); return 'unavailable' }
     await assertRunProfileClaim(client, runId)
     if(await prepareLocalClaimBinding(client,runId,subscriptionBindingId)==='cloud-required'){await client.query('COMMIT');return 'cloud-required'}
@@ -25,6 +32,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)
+    taskActivityChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return 'claimed'
@@ -33,6 +41,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     if (error instanceof ExecutionIdentityError) return 'unavailable'
     throw error
   } finally { client.release() }
+  }) ?? 'unavailable'
 }
 
 /** The scoped cloud device may claim only a run bound to its owner's Bot
@@ -40,6 +49,11 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
  * A run frozen on an API key has no subscription binding (null): its key
  * was checked and recorded for it by `apiKeyForRun` before the claim. */
 export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: ComputerPermission } | null> {
+  const { rows: [stored] } = await pool.query<{ workspaceId: string | null }>(
+    'SELECT "workspaceId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3',
+    [runId, actor.userId, deviceId])
+  if (!stored?.workspaceId || stored.workspaceId !== actor.workspaceId) return null
+  return withRunWorkspace(actor.userId, stored.workspaceId, async () => {
   await refreshCloudRunProfileClaim(pool, actor, runId, deviceId, subscriptionBindingId)
   const client = await pool.connect()
   try {
@@ -54,7 +68,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     const permission: ComputerPermission = desktop ? 'allow' : 'deny'
     await executionIdentityForRun(client, runId)
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
-    const run = (await client.query<typeof import('@/lib/db/schema').agentRuns.$inferSelect>('SELECT * FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, actor.userId, 'queued'])).rows[0]
+    const run = (await client.query<typeof import('@/lib/db/schema').agentRuns.$inferSelect>('SELECT * FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL AND "workspaceId"=$5 FOR UPDATE', [runId, deviceId, actor.userId, 'queued', stored.workspaceId])).rows[0]
     if (!run) { await client.query('COMMIT'); return null }
     await assertLockedRunProfileClaim(client, run)
     // Every cloud thread runs on its own thread machine; the Bot's computer serves only the Bot.
@@ -75,10 +89,12 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)
+    taskActivityChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return { botId: binding.botId, ownerId: actor.userId, display: `:${binding.display}`, policyVersion: policy?.version ?? 0, permission }
   } catch (error) { await client.query('ROLLBACK'); if (error instanceof ExecutionIdentityError) return null; throw error } finally { client.release() }
+  })
 }
 
 /** Existing local binding checks shared with Factory's already-fenced CAS. */

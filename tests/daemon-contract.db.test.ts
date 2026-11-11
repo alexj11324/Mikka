@@ -57,7 +57,7 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
   })
   const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   const botId = await seedBot(pool, ws.id, owner)
-  const issueId = await seedIssue(pool, owner)
+  const issueId = await seedIssue(pool, owner, ws.id)
   await pool.query(`UPDATE issues SET content=$2 WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: Math.floor(Math.random() * 1e6) + 1 } } })])
   const remote = `https://github.com/mikka-ci/daemon-contract-${randomUUID()}.git`
   await recordPushGrant(pool, owner, normalizeRepository(remote).key)

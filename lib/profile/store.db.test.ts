@@ -125,3 +125,79 @@ dbTest('facts stay with their person, merge on repeat, and keep the person\'s co
     assert.equal(await store.memoryEnabled(alex), true)
   })
 })
+
+// ALE-68: one subject can hold a different answer in each repository, and a
+// chat is only told the facts of the repositories it works in.
+dbTest('facts are scoped to a repository, so one project\'s habits stay out of another\'s chat', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { and, eq, inArray, sql }, { profileSection, promptFacts }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('drizzle-orm'), import('./prompt'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-facts-scope-${randomUUID()}`
+  t.after(async () => {
+    await scope.run(async () => {
+      await db.delete(schema.userFacts).where(eq(schema.userFacts.userId, owner))
+      await db.delete(schema.users).where(eq(schema.users.id, owner))
+    })
+    await scope.close()
+  })
+  const fact = (repository: string | null, subject: string) => ({
+    kind: 'tool' as const, subject, value: {}, evidence: [], confidence: 0.7,
+    seenAt: new Date('2026-10-01T01:00:00Z'), expiresAt: null, repository,
+  })
+
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, ${owner}, ${`${owner}@example.com`}, false, now(), now())`)
+    // The same subject with a different answer in each repository, plus one fact about the person.
+    assert.equal(await store.recordFacts(owner, [fact('acme/widget', 'Test command: pnpm test')]), 1)
+    assert.equal(await store.recordFacts(owner, [fact('acme/gadget', 'Test command: npm test')]), 1)
+    assert.equal(await store.recordFacts(owner, [fact(null, 'Prefers terse replies')]), 1)
+    // All three are the person's own profile: 记忆 shows every one of them.
+    assert.equal((await store.listFacts(owner)).length, 3)
+
+    // A chat working in one repository is told that repository's facts and the person's, never the other's.
+    const inWidget = await store.profilePromptSection(owner, ['acme/widget'])
+    const inGadget = await store.profilePromptSection(owner, ['acme/gadget'])
+    // Match whole list lines: "pnpm test" contains "npm test", so a bare substring
+    // would make the absence checks meaningless.
+    assert.match(inWidget, /^ {2}- Test command: pnpm test$/m)
+    assert.match(inWidget, /^ {2}- Prefers terse replies$/m)
+    assert.doesNotMatch(inWidget, /^ {2}- Test command: npm test$/m)
+    assert.match(inGadget, /^ {2}- Test command: npm test$/m)
+    assert.doesNotMatch(inGadget, /^ {2}- Test command: pnpm test$/m)
+    // A chat that names no repository gets only what is true of the person everywhere.
+    const bare = await store.profilePromptSection(owner, [])
+    assert.match(bare, /Prefers terse replies/)
+    assert.doesNotMatch(bare, /^ {2}- Test command:/m)
+
+    // The remote's spelling does not matter: every form of one repository reaches the same facts.
+    const spelled = await store.profilePromptSection(owner, ['https://github.com/Acme/Widget.git'])
+    assert.match(spelled, /^ {2}- Test command: pnpm test$/m)
+    assert.doesNotMatch(spelled, /^ {2}- Test command: npm test$/m)
+
+    // A repeat merges into its own repository's row instead of colliding or duplicating.
+    assert.equal(await store.recordFacts(owner, [fact('acme/widget', 'Test command: pnpm test')]), 1)
+    const widget = await db.select().from(schema.userFacts)
+      .where(and(eq(schema.userFacts.userId, owner), eq(schema.userFacts.repository, 'acme/widget')))
+    assert.equal(widget.length, 1, 'one row per repository and subject')
+    assert.ok(widget[0].confidence > 0.7, 'the repeat raised its confidence')
+
+    // Correcting a fact in one repository never deletes the same subject's row in another.
+    assert.equal(await store.correctFact(owner, widget[0].id, 'Test command: pnpm test --watch'), true)
+    const gadget = await db.select().from(schema.userFacts)
+      .where(and(eq(schema.userFacts.userId, owner), eq(schema.userFacts.repository, 'acme/gadget')))
+    assert.equal(gadget.length, 1, 'the other repository\'s fact survives a correction')
+    assert.equal(gadget[0].state, 'active')
+
+    // A chat working nowhere keeps the person-level facts and nothing else, and its
+    // text is the composed section rather than a second copy built here.
+    await db.delete(schema.userFacts).where(and(eq(schema.userFacts.userId, owner), inArray(schema.userFacts.repository, ['acme/widget', 'acme/gadget'])))
+    const personOnly = await store.profilePromptSection(owner, ['acme/widget'])
+    assert.match(personOnly, /^## What Mikka knows about the person\n/)
+    assert.match(personOnly, /^ {2}- Prefers terse replies$/m)
+    assert.doesNotMatch(personOnly, /Test command/, 'a deleted repository fact is gone')
+    assert.equal(personOnly, profileSection(promptFacts([{ kind: 'tool', subject: 'Prefers terse replies', repository: null, confidence: 0.7,
+      lastSeenAt: new Date('2026-10-01T01:00:00Z'), userEdited: false }], [])),
+      'the store returns exactly what the composer builds for the same rows')
+  })
+})

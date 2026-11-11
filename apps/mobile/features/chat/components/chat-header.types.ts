@@ -13,4 +13,6 @@ export type ChatHeaderProps = {
   onTask: (id: string) => void
   onAllTasks: () => void
   onInfo: () => void
+  /** Content is under the bar: its backdrop shows (BarBackdrop). */
+  scrolled?: boolean
 }

@@ -30,7 +30,7 @@ before(async () => {
   }
   if (!pool && process.env.CONVERSATION_READS_REQUIRE_DB === '1') throw new Error('Required ephemeral read-route database unavailable')
   mock.module(new URL('./auth.ts', import.meta.url).href, {
-    namedExports: { auth: { api: { getSession: async () => (sessionUser ? { user: { id: sessionUser } } : null) } } },
+    namedExports: { auth: { api: { getSession: async () => (sessionUser ? { user: { id: sessionUser }, session: { id: 'conversation-fixture-session' } } : null) } } },
   })
   mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { pool: pool ?? stubPool, db: null } })
   // The route names the signed-in person's Coordinator bot; these people have none, so their chat is bot-less.

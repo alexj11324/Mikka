@@ -48,7 +48,7 @@ test('email delivery and effective OAuth availability are separate from existing
   assert.equal(missing!.setup.state, 'required'); assert.equal(missing!.setup.signIn.email, true)
   assert.equal(missing!.setup.emailDeliveryConfigured, false); assert.equal(missing!.setup.signUpUrl, null)
   const managed = await readServerInfo({ env: { ...env, GITHUB_SIGN_IN_USE_APP: 'true' }, query,
-    signIn: async () => ({ email: true, google: false, github: true }) })
+    signIn: async () => ({ email: true, google: false, github: true, apple: false }) })
   assert.equal(managed!.setup.signIn.github, true); assert.equal(managed!.setup.signUpUrl, 'https://server.example/mikka/sign-up')
   const failed = await serverInfoResponse(request(), { env, query, signIn: async () => { throw new Error('private-client-secret') } })
   assert.equal(failed.status, 503); assert.doesNotMatch(await failed.text(), /private-client-secret/)

@@ -1,4 +1,5 @@
 import { chatProjectionHash } from './chat-projection-version'
+import { conversationUsage, type ConversationUsage } from './context-usage'
 import { captureRunFailure, readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { APP_BUILD } from '@/lib/app-build'
 import { sourcedEventMessage } from './message-safety'
@@ -8,7 +9,7 @@ import { threadNamePrompt } from '@/lib/run-bot-name'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
 import { issuesForUser } from '@/lib/issues-for-user'
-import { issueVisibility } from '@/lib/issue-visibility'
+import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import 'server-only'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
@@ -18,14 +19,14 @@ import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
 import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { wakeCoordinatorSoon } from './wake-after-commit'
 import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
-import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { attentionQuestionsFromEvents, type AttentionQuestion } from './question-attention'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { issueAttrsContent } from '@/lib/issue-summary-columns'
+import { issueAttrsContent, issueLatestRun } from '@/lib/issue-summary-columns'
 import { threadGroup, type ThreadOutcome } from '@/lib/thread-groups'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
@@ -33,16 +34,24 @@ import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
 import { compactChatMessage, compactChatToolMetadata, summaryChatMessage } from './chat-projection'
+import { projectMessageDisplays } from './display-projection'
 import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
-import { readPreferences } from '@/lib/preferences'
+import { readCoordinatorPromptPreferences, readPreferences } from '@/lib/preferences'
 import type { InboxEvent } from '@/lib/push-reasons'
 import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
 import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
+import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
 import { botChatChanged } from '../live/chats'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { activeTaskWorkspaces, requireTaskWorkspace } from '@/lib/task-workspace'
+import { ActionFailureError } from '@/lib/action-error'
+import type { CoordinatorStartupReceipt, CoordinatorStartupSettingsCandidate, CoordinatorStartupSettings, CoordinatorStartupTake } from './startup-receipt'
+import type { TaskReviewSummary } from '../coding-workspace/task-review/projection'
+import { taskReviewSourceHint } from '../coding-workspace/task-review/summary-selection'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -61,6 +70,13 @@ type Executor = Pick<typeof db, 'select' | 'insert' | 'execute'>
 const sessionOf = (userId: string, botId: string) => and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))
 const messagesOf = (userId: string, botId: string) => and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId))
 const eventsOf = (userId: string, botId: string) => and(eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.botId, botId))
+
+async function chatReader(userId: string, botId: string): Promise<IssueReader> {
+  const [bot] = await db.select({ workspaceId: bots.workspaceId }).from(bots).where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1)
+  if (!bot) throw new ActionFailureError('botNotFound')
+  await requireTaskWorkspace(userId, bot.workspaceId)
+  return { id: userId, [tokenWorkspace]: bot.workspaceId }
+}
 
 async function nextPosition(executor: Executor, userId: string, botId: string): Promise<number> {
   await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId}`},0))`)
@@ -122,16 +138,117 @@ export interface InboxTake {
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushEvents: [], pushHidesText: false }
 
 export async function takeInbox(userId: string, holder: string, botId: string): Promise<InboxTake> {
-  return db.transaction(async tx => {
+  return (await takeInboxTransaction(userId, holder, botId)).inbox
+}
+
+/** A bounded ordinary round zero commits a receipt before combined preparation.
+ * Other new takes retain the inbox-only durable boundary. Existing receipts
+ * always replay first; every attempt checks the lease and gains no authority. */
+export async function takeStartupInbox(userId: string, holder: string, botId: string, candidate: CoordinatorStartupSettingsCandidate): Promise<CoordinatorStartupTake> {
+  const codec = await import('./startup-receipt')
+  // Reject a missing or malformed candidate before any session/lease write;
+  // an unchecked JS caller must never fall through to a legacy take.
+  const result = await takeInboxTransaction(userId, holder, botId, codec.startupSettingsCandidate(candidate))
+  if (!result.startup) throw codec.startupReceiptConflict(new Error('coordinatorStartupReceiptMissing'))
+  return result.startup
+}
+
+type InboxTransactionResult = { inbox: InboxTake; startup?: CoordinatorStartupTake }
+/** SQL-only transport tuple: version and the two compact stored objects.
+ * The storage codec restores and checks the strict canonical receipt. */
+type StoredStartupReceipt = [unknown, unknown, unknown]
+type StartupEventRow = Omit<typeof coordinatorEvents.$inferSelect, 'id' | 'createdAt' | 'deliveredAt' | 'lastTriageAttemptAt' | 'nextWakeAt' | 'wakeLeaseUntil'> & {
+  id: string | null; createdAt: string | Date; deliveredAt: string | Date | null;
+  lastTriageAttemptAt: string | Date | null; nextWakeAt: string | Date; wakeLeaseUntil: string | Date | null;
+  r: StoredStartupReceipt | null;
+}
+type TimestampDecoder = Pick<typeof coordinatorSessions.leaseUntil, 'mapFromDriverValue'>
+function startupTimestamp(column: TimestampDecoder, value: string | Date): Date
+function startupTimestamp(column: TimestampDecoder, value: string | Date | null): Date | null
+function startupTimestamp(column: TimestampDecoder, value: string | Date | null): Date | null {
+  // Drizzle's raw node-postgres execute path retains timestamp strings. Use
+  // the same column decoder as select(), including its timezone semantics.
+  return value === null || value instanceof Date ? value : column.mapFromDriverValue(value) as Date
+}
+async function takeInboxTransaction(userId: string, holder: string, botId: string, candidate?: CoordinatorStartupSettingsCandidate): Promise<InboxTransactionResult> {
+  // Legacy takes do not load the new receipt decoder or change their SQL graph.
+  const codec = candidate ? await import('./startup-receipt') : null
+  const frozenCandidate = candidate ?? null
+  const rollbackLost = new Error('coordinatorStartupLeaseLost')
+  let lost: InboxTransactionResult | undefined
+  try { return await db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId, botId }).onConflictDoNothing()
-    const [previousLease] = await tx.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil })
-      .from(coordinatorSessions).where(sessionOf(userId, botId)).for('update')
-    const [taken] = await tx.update(coordinatorSessions)
-      .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
-      .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
-      .returning({ userId: coordinatorSessions.userId })
-    if (!taken) return { held: false, ...NO_TAKE }
+    let previousLease: { leaseHolder: string | null; leaseUntil: Date | null } | undefined
+    let taken: boolean
+    let settings: CoordinatorStartupSettings | undefined
+    let startupRows: StartupEventRow[] | undefined
+    if (codec && frozenCandidate) {
+      // The locked row, including an EPQ-updated tuple after a concurrent
+      // holder commits, supplies the acquisition predicate and old holder.
+      // A single result column avoids four RowDescription fields. Tuple order
+      // is previous holder, previous expiry, acquired, Coordinator marker.
+      const lease = (await tx.execute(sql`WITH previous AS MATERIALIZED(SELECT "userId" u,"botId" b,"leaseHolder" h,"leaseUntil" t FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE),acquired AS(UPDATE coordinator_sessions s SET "leaseHolder"=v.h,"leaseUntil"=v.e,"updatedAt"=v.n FROM previous p,(VALUES(${holder}::text,${new Date(now.getTime() + LEASE_MS)}::timestamptz,${now}::timestamptz))v(h,e,n) WHERE (s."userId",s."botId")=(p.u,p.b) AND(p.t IS NULL OR p.t<v.n OR p.h=v.h) RETURNING 1) SELECT jsonb_build_array(p.h,p.t,EXISTS(SELECT 1 FROM acquired),EXISTS(SELECT 1 FROM coordinator_bots c WHERE(c."ownerId",c."botId")=(p.u,p.b))) l FROM previous p`)).rows[0]?.l as [string | null, string | Date | null, boolean, boolean] | undefined
+      previousLease = lease && { leaseHolder: lease[0], leaseUntil: startupTimestamp(coordinatorSessions.leaseUntil, lease[1]) }
+      taken = lease?.[2] === true
+      settings = { ...frozenCandidate, coordinator: lease?.[3] === true }
+      // This MUST be a new statement after the lock. A same-key waiter must
+      // see the winner's committed receipt, not its pre-lock snapshot.
+      let stored: StoredStartupReceipt | null | undefined
+      if (!taken) {
+        // A competing lease cannot take events. Still check the old key after
+        // the lock, without returning seventeen unused event column headers.
+        stored = (await tx.execute(sql`SELECT jsonb_build_array(version,settings,inbox) r FROM coordinator_startup_receipts WHERE("userId","botId",holder,round)=(${userId},${botId}::uuid,${holder},0)`)).rows[0]?.r as StoredStartupReceipt | undefined
+      } else {
+        startupRows = (await tx.execute(sql`SELECT CASE WHEN r.holder IS NOT NULL THEN jsonb_build_array(r.version,r.settings,r.inbox) END r,e.* FROM(VALUES(${userId}::text,${botId}::uuid,${holder}::text))k(u,b,h) LEFT JOIN coordinator_startup_receipts r ON(r."userId",r."botId",r.holder,r.round)=(k.u,k.b,k.h,0) LEFT JOIN coordinator_events e ON r.holder IS NULL AND(e."userId",e."botId")=(k.u,k.b) AND e."deliveredAt" IS NULL AND(e.kind='user_message' OR(e.tier IS NOT NULL AND e.tier<>'background')) WHERE r.holder IS NOT NULL OR e.id IS NOT NULL ORDER BY e."createdAt" LIMIT ${INBOX_BATCH}`)).rows as typeof startupRows
+        stored = startupRows?.[0]?.r
+      }
+      if (stored !== null && stored !== undefined) {
+        // Presence comes from the row key, never the stored inbox's truthiness.
+        const receipt = codec.decodeStoredStartupReceipt(stored[0], stored[1], stored[2])
+        if (!taken || previousLease?.leaseHolder !== holder) {
+          // Stop/release/new holder is terminal for this old key. Roll back
+          // even an otherwise eligible temporary claim, before any callbacks.
+          lost = { inbox: receipt.inbox, startup: { kind: 'lost', ...receipt, replayed: true } }
+          throw rollbackLost
+        }
+        if (!coordinatorLeaseActive(previousLease, now)) {
+          await botChatChanged(tx, userId, botId)
+          await tx.execute(sql`SELECT pg_notify(${COORDINATOR_LEASE_CHANNEL}, ${botId})`)
+        }
+        await coordinatorSessionChanged(tx, userId, botId)
+        return { inbox: receipt.inbox, startup: { kind: 'ready', ...receipt, replayed: true } }
+      }
+    } else {
+      ;[previousLease] = await tx.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil })
+        .from(coordinatorSessions).where(sessionOf(userId, botId)).for('update')
+      const rows = await tx.update(coordinatorSessions)
+        .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
+        .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
+        .returning({ userId: coordinatorSessions.userId })
+      taken = rows.length > 0
+    }
+    if (!taken) {
+      const inbox = { held: false, ...NO_TAKE }
+      return { inbox, ...(codec ? { startup: { kind: 'not-held' as const, inbox } } : {}) }
+    }
+    const finish = async (inbox: InboxTake): Promise<InboxTransactionResult> => {
+      if (!codec || !settings) return { inbox }
+      const receipt = codec.readStartupReceipt(1, settings, inbox)
+      const stored = codec.encodeStoredStartupReceipt(receipt)
+      const storedSettings = JSON.stringify(stored.settings), storedInbox = JSON.stringify(stored.inbox)
+      // Only a small ordinary inbox needs a receipt for preparation inside
+      // this step. Larger/new non-combined takes return their complete inbox
+      // directly at the original durable boundary, with no fallible work
+      // after COMMIT. Existing receipts were replayed above before this choice.
+      if (inbox.added > 0 && (inbox.scheduledRead || !settings.agentKitEnabled ||
+        Buffer.byteLength(storedSettings, 'utf8') + Buffer.byteLength(storedInbox, 'utf8') > 256)) {
+        return { inbox: receipt.inbox, startup: { kind: 'inbox-only', ...receipt } }
+      }
+      const inserted = await tx.execute(sql`INSERT INTO coordinator_startup_receipts("userId","botId",holder,round,version,settings,inbox) VALUES(${userId},${botId}::uuid,${holder},0,1,${storedSettings}::jsonb,${storedInbox}::jsonb) ON CONFLICT("userId","botId",holder,round) DO NOTHING`)
+      if (inserted.rowCount !== 1) throw codec.startupReceiptConflict(new Error('coordinatorStartupReceiptConflict'))
+      return { inbox: receipt.inbox, startup: { kind: 'ready', ...receipt, replayed: false } }
+    }
     // Ordinary renewal is not a broad list update. Only a new/changed turn
     // or actual message delivery changes the summary that the sidebar shows.
     if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) {
@@ -140,23 +257,39 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       await tx.execute(sql`SELECT pg_notify(${COORDINATOR_LEASE_CHANNEL}, ${botId})`)
     }
     await coordinatorSessionChanged(tx, userId, botId)
-    const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
+    // A receipt-only LEFT JOIN row has no event. It must never reach
+    // payload/source handling; empty seed rows are filtered in SQL already.
+    const candidates = startupRows ? startupRows.flatMap(row => {
+      if (row.id === null) return []
+      const { r: _receipt, ...event } = row
+      return [{ ...event, id: row.id,
+        createdAt: startupTimestamp(coordinatorEvents.createdAt, row.createdAt),
+        deliveredAt: startupTimestamp(coordinatorEvents.deliveredAt, row.deliveredAt),
+        lastTriageAttemptAt: startupTimestamp(coordinatorEvents.lastTriageAttemptAt, row.lastTriageAttemptAt),
+        nextWakeAt: startupTimestamp(coordinatorEvents.nextWakeAt, row.nextWakeAt),
+        wakeLeaseUntil: startupTimestamp(coordinatorEvents.wakeLeaseUntil, row.wakeLeaseUntil),
+      }]
+    }) : await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
     // A schedule is a separate read-only turn. Hydrate its authority through
     // the stored event link, never from notification/model payload fields.
     const scheduledCandidate = candidates[0]?.payload.source === 'schedule_due' ? candidates[0] : undefined
-    const scheduledRow=scheduledCandidate?(await tx.execute(sql`SELECT o.* FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.event_id=${scheduledCandidate.id} AND s.owner_id=${userId} AND s.bot_id=${botId}::uuid LIMIT 1`)).rows[0] as Occurrence|undefined:undefined
-    const scheduled=scheduledInbox(scheduledRow,now)
+    const scheduledRow=scheduledCandidate?(await tx.execute(sql`SELECT o.* FROM schedule_occurrences o JOIN user_schedules s ON s.id=o.schedule_id WHERE o.event_id=${scheduledCandidate.id} AND s.owner_id=${userId} AND s.bot_id=${botId}::uuid LIMIT 1`)).rows[0] as (Omit<Occurrence,'lease_until'> & {lease_until:string|Date|null})|undefined:undefined
+    // This shared legacy/startup read is raw Drizzle too. Decode its expiry
+    // before the schedule guard; a missing/non-finite lease grants no scope.
+    const scheduledUntil=scheduledRow?startupTimestamp(coordinatorSessions.leaseUntil,scheduledRow.lease_until):null
+    const scheduled=!scheduledRow?.event_id?null:!scheduledUntil||!Number.isFinite(scheduledUntil.getTime())
+      ?{eventId:scheduledRow.event_id,scope:null}:scheduledInbox({...scheduledRow,lease_until:scheduledUntil},now)
     if(scheduled && !scheduled.scope){
       await tx.update(coordinatorEvents).set({deliveredAt:now,tier:'background'}).where(eq(coordinatorEvents.id,scheduled.eventId))
-      return {held:true,...NO_TAKE}
+      return finish({held:true,...NO_TAKE})
     }
     const scheduledRead=scheduled?.scope??undefined
     const eligible = candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id)
     // Keep pending human corrections together, without runtime notifications in their turn.
     const direct = eligible.filter(event => event.kind === 'user_message')
     let due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(direct.length ? direct : eligible)
-    if (!due.length) return { held: true, ...NO_TAKE }
+    if (!due.length) return finish({ held: true, ...NO_TAKE })
     let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
     const source = due.findLast(event => event.kind === 'user_message' && event.payload.postedToChat !== true)
       ?? due.findLast(event => event.kind === 'user_message')
@@ -179,7 +312,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
     const events = eventsForInbox(due, background, INBOX_BATCH)
-    if (!events.length) return { held: true, ...NO_TAKE }
+    if (!events.length) return finish({ held: true, ...NO_TAKE })
     const chatEvents = events.filter(event => !(event.kind === 'user_message' && event.payload.postedToChat === true))
     const completionObservations = await runCompletionObservations(tx, { userId, botId }, chatEvents)
     const first = await nextPosition(tx, userId, botId)
@@ -201,7 +334,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       .orderBy(asc(coordinatorEvents.createdAt), asc(coordinatorEvents.id)).limit(100)
     const handoffs = events.filter(event => isHandoff(event.kind))
     const attentionQuestions = scheduledRead ? [] : attentionQuestionsFromEvents(events)
-    return {
+    return finish({
       held: true, added: events.length,
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
@@ -213,12 +346,26 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       handoffOnly: handoffs.length === events.length,
       pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier, runId: event.runId, issueId: event.issueId })),
       pushHidesText: handoffs.some(carriesCode),
-    }
-  })
+    })
+  }) } catch (error) {
+    if (error === rollbackLost && lost) return lost
+    throw error
+  }
 }
 
 function isHandoff(kind: string): boolean {
   return kind === 'matter_handoff'
+}
+
+/** Terminal-failure context only: no take, lease renewal or authorization
+ * snapshot. The execution cleanup separately rechecks current membership. */
+export async function recoverStartupInbox(userId: string, holder: string, botId: string): Promise<CoordinatorStartupReceipt | null> {
+  const row = (await db.execute(sql`SELECT r.version, r.settings, r.inbox FROM coordinator_startup_receipts r
+    JOIN bots b ON b.id=r."botId" AND b."ownerId"=${userId}
+    WHERE r."userId"=${userId} AND r."botId"=${botId}::uuid AND r.holder=${holder} AND r.round=0`)).rows[0]
+  if (!row) return null
+  const { decodeStoredStartupReceipt } = await import('./startup-receipt')
+  return decodeStoredStartupReceipt(row.version, row.settings, row.inbox)
 }
 
 function carriesCode(event: { payload: Record<string, unknown> }): boolean {
@@ -246,6 +393,7 @@ export async function releaseLease(userId: string, holder: string, botId: string
  * back to original creation time. Trying a slow event advances the durable
  * cursor instead of repeatedly hiding all events after the oldest batch. */
 export async function untriagedEvents(userId: string, botId: string) {
+  const reader = await chatReader(userId, botId)
   const retryBefore = new Date(Date.now() - TRIAGE_RETRY_COOLDOWN_MS)
   const events = await db.select().from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier),
@@ -253,7 +401,7 @@ export async function untriagedEvents(userId: string, botId: string) {
     .orderBy(desc(eq(coordinatorEvents.kind, 'user_message')), asc(sql`coalesce(${coordinatorEvents.lastTriageAttemptAt}, ${coordinatorEvents.createdAt})`), asc(coordinatorEvents.id)).limit(INBOX_BATCH)
   const runIds = [...new Set(events.flatMap(event => event.runId ? [event.runId] : []))]
   // Reuse the existing visibility gate; teammate projections stay restricted.
-  const observed = new Map((runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true }) : [])
+  const observed = new Map((runIds.length ? await visibleRuns(reader, { runIds, limit: runIds.length, brief: true }) : [])
     .map(run => [run.id, { id: run.id, status: run.status, finishedAt: run.finishedAt }]))
   return events.map(event => ({ ...event, observedRun: event.runId ? observed.get(event.runId) ?? null : null }))
 }
@@ -308,6 +456,15 @@ export async function lastEventKind(userId: string, botId: string): Promise<stri
 }
 
 export async function appendMessages(userId: string, holder: string, unmasked: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false): Promise<number> {
+  return appendStoredMessages(userId, holder, unmasked, warning, botId, streamId, stopped, false)
+}
+
+/** Only a trusted host producer may persist display/source envelopes. */
+export async function appendHostMessages(userId: string, holder: string, messages: import('./message-safety').SourcedMessage[], botId: string): Promise<number> {
+  return appendStoredMessages(userId, holder, messages, null, botId, undefined, false, true)
+}
+
+async function appendStoredMessages(userId: string, holder: string, unmasked: ModelMessage[], warning: string | null, botId: string, streamId: string | undefined, stopped: boolean, hostPresentation: boolean): Promise<number> {
   // Safety floor (decision 2026-11-02-1600): a GitHub token or other credential
   // never persists in chat, a tool result included.
   const messages = maskDeep(unmasked, credentialMasker)
@@ -317,11 +474,11 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
     const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, mikkaScheduleResult: _unscheduled, mikkaDisplay, mikkaEvent, mikkaUserEvent, ...plain } = message as unknown as Record<string, unknown>
         // 停止: the turn's last message carries the mark; the chat shows 已停止 under the reply.
         const stop = stopped && index === messages.length - 1 && message.role === 'assistant'
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
-          message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
+          message: { ...plain, ...(hostPresentation ? { mikkaDisplay, mikkaEvent, mikkaUserEvent } : {}), ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
       }))
       await botChatChanged(tx, userId, botId)
     }
@@ -393,7 +550,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     if (messages.length) {
       const first = await nextPosition(tx, userId, botId)
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaFailureDetails: _details, mikkaRetried: _unretried, mikkaScheduleResult: _unscheduled, mikkaDisplay: _display, mikkaEvent: _event, mikkaUserEvent: _user, ...plain } = message as unknown as Record<string, unknown>
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
           message: { ...plain, ...(message.role === 'assistant' && completed?.streamId ? { mikkaStreamId: completed.streamId } : {}) } }
       }))
@@ -422,20 +579,53 @@ export async function sendRetryOf<T>(userId: string, botId: string, position: nu
 }
 
 /** The summary so far, the memory, and every message after the summary, oldest first. */
-export async function loadConversation(userId: string, botId: string): Promise<{ summary: string | null; memory: string; messages: StoredMessage[] }> {
+type LoadedConversation = { summary: string | null; memory: string; messages: StoredMessage[] }
+
+async function readConversationRows(userId: string, botId: string) {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   const through = session?.summaryThrough ?? 0
   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message })
     .from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), gt(coordinatorMessages.position, through)))
     .orderBy(asc(coordinatorMessages.position))
+  return { session, rows }
+}
+
+function conversationWithMemory({ session, rows }: Awaited<ReturnType<typeof readConversationRows>>, memoryEnabled: boolean): LoadedConversation {
   // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
-  const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
+  const memory = memoryEnabled ? session?.memory ?? '' : ''
   // A failed message retried with 重新发送 is not said twice: the new attempt stands for it.
   return { summary: session?.summary ?? null, memory, messages: rows.filter(row => (row.message as { mikkaRetried?: unknown }).mikkaRetried !== true).map(row => {
-    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retried, ...message } = row.message
+    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaFailureDetails: _details, mikkaRetried: _retried, mikkaScheduleResult: _schedule, mikkaDisplay: _display, ...message } = row.message
+    const schedule = scheduleChatResultSchema.safeParse(_schedule)
+    // Status-only receipts have a localized display line, not an empty model reply.
+    if (message.role === 'assistant' && !message.content && schedule.success) {
+      const task = schedule.data.task
+      message.content = `Schedule ${JSON.stringify(schedule.data.title)} ${schedule.data.status}.${task ? ` Task ${JSON.stringify(task.title)} has status ${task.status}.` : ''}`
+    }
     return { position: row.position, message: message as unknown as ModelMessage }
   }) }
+}
+
+export async function loadConversation(userId: string, botId: string): Promise<LoadedConversation> {
+  const conversation = await readConversationRows(userId, botId)
+  return conversationWithMemory(conversation, (await readPreferences(userId)).memoryEnabled)
+}
+
+/** One fresh owner-scoped preference row supplies this prompt's memory switch and personal instructions. */
+export async function loadConversationForPrompt(userId: string, botId: string): Promise<LoadedConversation & { personalInstructions: string }> {
+  const [conversation, preferences] = await Promise.allSettled([
+    readConversationRows(userId, botId),
+    readCoordinatorPromptPreferences(userId),
+  ])
+  // Observe both reads before returning to turn cleanup. Keep the original
+  // conversation-first failure precedence and the original error objects.
+  if (conversation.status === 'rejected') throw conversation.reason
+  if (preferences.status === 'rejected') throw preferences.reason
+  return {
+    ...conversationWithMemory(conversation.value, preferences.value.memoryEnabled),
+    personalInstructions: preferences.value.personalInstructions,
+  }
 }
 
 /** Replaces every message at or before `through` with `summary`. The messages stay stored. */
@@ -484,10 +674,18 @@ export interface ChatView {
   /** Response-only, consumed before the snapshot enters SWR or persistence. */
   toolMetadata?: ChatToolMetadata
   historyBefore?: number
+  /**
+   * How full this conversation is, in the same estimate the fold uses
+   * (lib/coordinator/context-usage.ts). An estimate from stored text, never a
+   * provider count; it shows how near the next fold is, not a share of a
+   * window Mikka does not store.
+   */
+  context?: ConversationUsage
 }
 
 /** The reasoning text of this person's stored messages at `positions` in one chat, in order; stored messages are already masked (appendMessages). */
 export async function storedReasoning(userId: string, botId: string, positions: readonly number[]): Promise<string[]> {
+  await chatReader(userId, botId)
   if (!positions.length) return []
   const rows = await db.select({ message: coordinatorMessages.message }).from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), inArray(coordinatorMessages.position, [...positions]))).orderBy(asc(coordinatorMessages.position))
@@ -497,51 +695,64 @@ export async function storedReasoning(userId: string, botId: string, positions: 
 }
 
 /** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
-export async function citationSources(userId: string, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
+export async function citationSources(reader: IssueReader, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
+  const userId = typeof reader === 'string' ? reader : reader.id
   const cited = citedIds(texts)
   const issueIds = cited.issueIds
   const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
   if (!issueIds.length && !runIds.length) return sources
-  // Runs reuse one membership read. A direct task-only citation folds its
-  // membership check into the bounded identifier visibility query.
-  const teams = runIds.length ? await (await import('@/lib/team-access')).accessibleTeamScopes(userId) : undefined
+  // Authorization reads keep the complete principal and fresh workspace gate.
+  // Numbering is a separate bounded read after the visible tasks are known.
   const visibility = issueIds.length
-    ? await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams, withIdentifierTeams: true }) : null
-  const identifierTeams = new Map<string, { key: string; number: number }>(visibility?.taskTeams)
-  const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
-    .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
+    ? await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, withTeamLinks: false }) : null
+  const issueRows = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, run: issueLatestRun, codingReview: taskReviewSourceHint, issuedIdentifier: issues.issuedIdentifier })
+    .from(issues)
     .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
-  const runs = runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true, teams }) : []
+  const runs = runIds.length ? await visibleRuns(reader, { runIds, limit: runIds.length, brief: true }) : []
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
   const ownIds = runs.filter(row => row.agentId).map(row => row.id)
   const runIssueIds = [...new Set(runs.flatMap(row => row.issueId ? [row.issueId] : []))]
-  const [prompts, steps, tasks] = await Promise.all([
-    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt }).from(agentRuns)
-      .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))).then(rows => new Map(rows.map(row => [row.id, row.prompt]))) : new Map<string, string>(),
-    ownIds.length ? db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
-      .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId)
-      .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
-    issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams, identifierTeams }),
+  // The prompt and tool count belong to the same authorized owner runs. One
+  // bounded projection avoids opening a third APP connection beside tasks.
+  const [ownedRuns, tasks] = await Promise.all([
+    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt,
+      steps: sql<number>`(select count(*) from ${runChunks} c where c."runId" = agent_runs.id
+        and c.chunk->>'type' = 'tool-input-available')`.mapWith(Number),
+    }).from(agentRuns).where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : [],
+    issuesForUser(reader, runIssueIds, false, db, { projection: 'citation', withTeamLinks: false }),
   ])
+  const prompts = new Map(ownedRuns.map(row => [row.id, row.prompt]))
+  const steps = new Map(ownedRuns.map(row => [row.id, row.steps]))
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
-    ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
-    ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number })),
-  ], db, identifierTeams)
-  for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
+    ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })),
+    ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier })),
+  ])
+  // The hint keeps the Review loader off reads whose tasks have no source.
+  const reviewIds = [...new Set([
+    ...issueRows.filter(row => row.codingReview).map(row => row.id),
+    ...[...tasks.values()].filter(task => task.codingReview).map(task => task.id),
+  ])]
+  const reviews = reviewIds.length
+    ? await (await import('../coding-workspace/task-review/summaries')).taskReviewSummaries(reader, reviewIds)
+    : new Map<string, TaskReviewSummary>()
+  for (const { content, ownerId: _owner, scope: _scope, issuedIdentifier: _issued, codingReview: _codingReview, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)
-    if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }
+    const review = reviews.get(row.id)
+    if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null,
+      pullRequests: metadata.pullRequests, ...(review ? { review } : {}) }
   }
   for (const row of runs) {
     const task = row.issueId ? tasks.get(row.issueId) ?? null : null
     // The short title travels only when there is one, so a citation carries nothing new otherwise.
     const shortTitle = task && task.shortTitleFrom === task.title ? task.shortTitle : null
-    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null } : null
+    const review = task ? reviews.get(task.id) : undefined
+    const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun, ...(review ? { review } : {}) } : null
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
-    sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,
+    sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, stopReason: row.stopReason ?? null, group, issue,
       pullRequests,
       name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
       createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
@@ -555,7 +766,8 @@ export async function citationSources(userId: string, texts: readonly string[], 
  * nothing more (no identifiers, reports, steps or pull requests). The bot
  * list's preview line reads this on every poll.
  */
-export async function citationNames(userId: string, texts: readonly string[]): Promise<Record<string, CitationName>> {
+export async function citationNames(reader: IssueReader, texts: readonly string[]): Promise<Record<string, CitationName>> {
+  const userId = typeof reader === 'string' ? reader : reader.id
   const { issueIds, runIds } = citedIds(texts)
   const names: Record<string, CitationName> = {}
   if (!issueIds.length && !runIds.length) return names
@@ -563,21 +775,15 @@ export async function citationNames(userId: string, texts: readonly string[]): P
   const [tasks, runs] = await Promise.all([
     issueIds.length ? (async () => db.selectDistinct({ id: issues.id, title: issues.title }).from(issues)
       .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate,
+      .where(and(inArray(issues.id, issueIds), (await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate,
         sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)))() : [],
     // Loaded here: unit tests stub agent-runs with the names the store's other callers use.
-    runIds.length ? import('@/lib/agent-runs').then(runs => runs.visibleRunNames(userId, [...new Set(runIds)], teams)) : [],
+    runIds.length ? import('@/lib/agent-runs').then(runs => runs.visibleRunNames(reader, [...new Set(runIds)], teams)) : [],
   ])
   for (const task of tasks) names[task.id] = { kind: 'issue', title: task.title }
   // A teammate's thread is named by its harness, as its bare projection (workspaceRunView) is.
   for (const run of runs) names[run.id] = { kind: 'run', name: run.own ? threadName(run.promptHead ?? '', run.agentName) : threadName('', run.harness) }
   return names
-}
-
-/** A waiting message as the chat shows it: its words, and a stand-in per photo so the chat can count them. */
-function withImages(text: string, images: unknown): ModelMessage['content'] {
-  if (!Array.isArray(images) || !images.length) return text
-  return [{ type: 'text', text }, ...images.map(() => ({ type: 'file' as const, data: '', mediaType: 'image/jpeg' }))]
 }
 
 type ChatReadObservation = { expiries: Date[]; observedAt: number }
@@ -597,7 +803,10 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
 
 /** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
 export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
-  const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, lastFailure: coordinatorSessions.lastFailure })
+  const reader = await chatReader(userId, botId)
+  const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, lastFailure: coordinatorSessions.lastFailure,
+    // Read alongside the session so the context figure measures the same fold boundary the prompt uses.
+    summary: coordinatorSessions.summary, summaryThrough: coordinatorSessions.summaryThrough })
     .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
   const messagesRead = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage.as('message'), createdAt: coordinatorMessages.createdAt })
@@ -615,11 +824,12 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   // Claiming an inbox atomically changes all three tables. A session read from
   // before that commit with messages/inbox from after it invents a failed turn.
   // One bounded statement keeps their snapshot together without a held lock.
-  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, lastFailure: sessionRead.lastFailure, rows: storedRead.rows,
+  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, lastFailure: sessionRead.lastFailure,
+    summary: sessionRead.summary, summaryThrough: sessionRead.summaryThrough, rows: storedRead.rows,
     waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
   }).from(storedRead).leftJoin(sessionRead, sql`true`)
   const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt, lastFailure: snapshot.lastFailure }
-  const rows = snapshot.rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) }))
+  const rows = await projectMessageDisplays(db, userId, snapshot.rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) })))
   const hasMore = rows.length > limit
   rows.splice(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
@@ -627,8 +837,9 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   const last = rows[0]?.position ?? window.after ?? 0
   const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}), createdAt: rows[0].createdAt }
   // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
-  const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
-    position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
+  const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && event.payload.source !== 'coordinator_welcome'
+    && (event.payload.source === 'person' || !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK))).map((event, index) => ({
+    position: last + index + 1, createdAt: event.createdAt, message: maskDeep(sourcedEventMessage(event, eventPrompt(event)),credentialMasker), pending: true as const,
   }))
   const read = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
   // An older page (history): a welcome failure there was answered by what came after it, so it is not shown.
@@ -642,11 +853,17 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting, now, lastMessage),
     // An event line names its thread or task as a chip (C1); its stored text is the model's, never shown.
-    sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
+    sources: await citationSources(reader, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
       ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
-    artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
+    artifacts: await artifactSummaries(reader, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
     continuation: { after, prefix: await chatPrefix(userId, botId, after), cursor: last },
     ...(hasMore && rows[0] ? { historyBefore: rows[0].position } : {}),
+    // How full this conversation is, in the same estimate the fold uses. Measured
+    // over the turns after the last fold, which is what the next prompt carries.
+    context: conversationUsage(
+      typeof snapshot.summary === 'string' ? snapshot.summary : null,
+      rows.filter(row => row.position > (snapshot.summaryThrough ?? 0)).map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })),
+    ),
   }
   return { chat, ...chatReadObservation(session, waiting, now) }
 }
@@ -722,6 +939,7 @@ export async function chatVersion(userId: string, limit = 200, botId: string): P
 }
 
 export async function chatVersionState(userId: string, limit = 200, botId: string): Promise<ChatVersionState> {
+  await chatReader(userId, botId)
   const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, failureVersion: sql<string>`md5(coalesce(${coordinatorSessions.lastFailure}::text, ''))`.as('failureVersion') })
     .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
   const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
@@ -763,19 +981,24 @@ export interface BotChatSummary {
 }
 
 /** Each of the person's own bots' latest line and state, for the bot list (the Coordinator's comes with its chat). */
-export async function botChats(userId: string): Promise<Record<string, BotChatSummary>> {
-  return (await botChatSnapshot(userId)).items
+export async function botChats(reader: IssueReader): Promise<Record<string, BotChatSummary>> {
+  return (await botChatSnapshot(reader)).items
 }
 
 /** The same summaries plus actual lease expiries that can change working
  * without another persistent write. This never renews a turn or wake lease. */
-export async function botChatSnapshot(userId: string) {
-  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNotNull(coordinatorMessages.botId), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
+export async function botChatSnapshot(reader: IssueReader) {
+  const userId = typeof reader === 'string' ? reader : reader.id
+  const workspaces = await activeTaskWorkspaces(reader)
+  const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
+  if (!readableBots.length) return { items: {} as Record<string, BotChatSummary>, expiries: [] as Date[], observedAt: Date.now() }
+  const botIds = readableBots.map(bot => bot.id)
+  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { id: coordinatorMessages.id, botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
-  const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNotNull(coordinatorSessions.botId)))
+  const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), inArray(coordinatorSessions.botId, botIds)))
   const waiting = await db.select({ botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError })
-    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNotNull(coordinatorEvents.botId), isNull(coordinatorEvents.deliveredAt)))
+    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), inArray(coordinatorEvents.botId, botIds), isNull(coordinatorEvents.deliveredAt)))
   const now = new Date()
   const expiries = [
     ...sessions.flatMap(session => coordinatorLeaseActive(session, now) && session.leaseUntil ? [session.leaseUntil] : []),
@@ -789,7 +1012,8 @@ export async function botChatSnapshot(userId: string) {
     if (!session.botId) continue
     result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId), now).working }
   }
-  const lines = latest.flatMap(row => {
+  const projected = await projectMessageDisplays(db, userId, latest)
+  const lines = projected.flatMap(row => {
     if (!row.botId) return []
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
     // A failed welcome is no message from the Bot: no preview line and no time to count as unread.
@@ -798,7 +1022,7 @@ export async function botChatSnapshot(userId: string) {
     return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
-  const sources = await citationNames(userId, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
+  const sources = await citationNames(reader, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
   for (const line of lines) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
     result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
@@ -808,8 +1032,8 @@ export async function botChatSnapshot(userId: string) {
 
 /** The whole conversation for display, newest last. */
 export async function conversationForDisplay(userId: string, limit = 200, botId: string) {
-  const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
-  return rows.reverse()
+  return (await projectMessageDisplays(db, userId, rows)).reverse().map(({ id: _id, ...row }) => row)
 }

@@ -143,6 +143,31 @@ async function beginDecision() {
 }
 async function approve(choice: Choice) { await act(async () => { choice.result.resolve({ show: choice.ids }); await choice.result.promise }) }
 
+test('desktop startup and unchanged snapshots never read a notification preference they cannot use', async () => {
+  snapshot = runs('succeeded')
+  await render(); await settled()
+  assert.equal(taskReads, 1)
+  assert.equal(preferenceReads, 0, 'the launch baseline only needs the run list for its Dock badge')
+  assert.deepEqual(choices, [], 'a historical completion must not ask for a notification decision')
+  assert.deepEqual(shown, [])
+  await transition('succeeded')
+  assert.equal(preferenceReads, 0, 'an unchanged list never needs a notification preference either')
+  assert.deepEqual(choices, [])
+})
+
+test('a real completion asks the server to enforce current preferences before showing its decision', async () => {
+  await render(); await settled()
+  await transition('succeeded')
+  assert.equal(choices.length, 1)
+  assert.match(choices[0].ids[0], /:finished:/)
+  assert.equal(preferenceReads, 0, 'only the server decision reads the current completion preference')
+  assert.equal(shown.length, 0)
+  await approve(choices[0])
+  assert.deepEqual(shown.map(notification => notification.id), choices[0].ids)
+  await transition('succeeded')
+  assert.equal(choices.length, 1, 'a later unchanged snapshot never replays the completion')
+})
+
 test('a decision that returns after the integration unmounts cannot raise an OS notification', async () => {
   const choice = await beginDecision()
   await render('owner', false)
@@ -171,7 +196,7 @@ test('an ordinary list refresh does not discard a valid pending decision from th
   assert.equal(shown.length, 1, 'a list rerender is not the end of the desktop session')
   assert.equal(shown[0].id, choice.ids[0])
   assert.equal(taskReads, reads)
-  assert.equal(preferenceReads, 1)
+  assert.equal(preferenceReads, 0)
 })
 
 test('changing from the desktop runtime invalidates an outstanding notification decision', async () => {

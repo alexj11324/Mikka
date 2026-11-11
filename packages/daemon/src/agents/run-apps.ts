@@ -3,6 +3,7 @@
 // never Composio: the server holds the credentials and owns allow/ask/deny.
 // The bearer is the run's own token, which stops working when the run ends.
 import type { RunAssignment } from '@mikka/protocol'
+import { runTraceHeaders, type RunTraceContext } from '@mikka/protocol/trace-context'
 import { trustedServerEndpoint } from '../trusted-endpoint'
 
 export interface RunApps {
@@ -12,13 +13,15 @@ export interface RunApps {
 }
 
 /** The host-issued task MCP authority is independent of connected apps. */
-export interface RunMcp { url: string; token: string; decisionCatalogue?: NonNullable<RunAssignment['mcp']>['decisionCatalogue'] }
-export function runMcp(mcp: RunAssignment['mcp']): RunMcp | undefined {
+export interface RunMcp { url: string; token: string; decisionCatalogue?: NonNullable<RunAssignment['mcp']>['decisionCatalogue']; traceparent?: string }
+export function runMcp(mcp: RunAssignment['mcp'], traceContext?: RunTraceContext): RunMcp | undefined {
   if (!mcp) return undefined
   let url: URL
   try { url = new URL(mcp.url) } catch { return undefined }
   if (!/\/api\/mcp\/?$/.test(url.pathname) || !trustedServerEndpoint(url) || !/^mkw_[A-Za-z0-9_-]{43}$/.test(mcp.token)) return undefined
-  return { url: url.toString(), token: mcp.token, ...(mcp.decisionCatalogue ? { decisionCatalogue: mcp.decisionCatalogue } : {}) }
+  const traceparent = runTraceHeaders(traceContext).traceparent
+  return { url: url.toString(), token: mcp.token, ...(mcp.decisionCatalogue ? { decisionCatalogue: mcp.decisionCatalogue } : {}),
+    ...(traceparent ? { traceparent } : {}) }
 }
 
 const TOOLKIT = /^[a-z][a-z0-9_]{0,63}$/

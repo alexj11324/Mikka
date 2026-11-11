@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
-import { before, beforeEach, mock, test } from 'node:test'
+import { afterEach, before, beforeEach, mock, test } from 'node:test'
 import { z } from 'zod'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import type { SQL } from 'drizzle-orm'
+import { workspaceMembers } from '../lib/db/workspace-schema'
 import { ActionFailureError } from '../lib/action-error'
 import { FactoryError } from '../lib/factory/contract'
 import { threadQuestionView } from '../lib/issue-threads'
@@ -10,14 +13,18 @@ import { threadQuestionView } from '../lib/issue-threads'
 const OWNER = 'fixture-owner', ISSUE = '41500000-0000-4000-8000-000000000001'
 const ORIGIN = '41500000-0000-4000-8000-000000000002', CHILD = '41500000-0000-4000-8000-000000000003'
 const GENERATION = '41500000-0000-4000-8000-000000000004'
+const WORKSPACE = '41500000-0000-4000-8000-000000000005'
+const dialect = new PgDialect()
 const failure = { generation: GENERATION, error: 'Original task machine unavailable' }
 let viewer = OWNER, requestHeaders = new Headers({ cookie: 'fixture-session' })
 let currentStatus = 'queued', selectedRun = CHILD, hostError: Error | null = null
 let memberIds: string[] = [], factoryEnabled = true
 let questionState: 'resuming' | 'waiting' | null = 'resuming', wakeFailure: typeof failure | null = failure
 const wakes: unknown[][] = [], reads: unknown[][] = [], ordinary: unknown[][] = []
+const revisionFailures: unknown[] = []
+afterEach(() => assert.deepEqual(revisionFailures.splice(0), [], 'Live revision SQL cannot fail silently in the wake fixture'))
 const pool = { query: async () => ({ rows: [], rowCount: 0 }) }
-const fixtureRun = () => ({ id: selectedRun, issueId: ISSUE, userId: OWNER,
+const fixtureRun = () => ({ id: selectedRun, issueId: ISSUE, userId: OWNER, workspaceId: WORKSPACE,
   status: selectedRun === ORIGIN ? 'stopped' : currentStatus, prompt: 'Fixture task', sessionId: null,
   deviceRepoId: null, report: null, error: null, createdAt: new Date(0), finishedAt: null,
   agentName: 'Fixture Bot', harness: 'codex', ownerName: null, stopRequestedAt: null, outcome: null })
@@ -42,9 +49,30 @@ before(async () => {
     }
     return selection('id' in fields ? memberIds.map(id => ({ id })) : [])
   } } })
-  stub('../lib/workspace-db.ts', { workspaceDb: { select: () => selection([]) }, workspacePool: pool })
+  stub('../lib/db/request-scope.ts', {
+    inDatabaseTransaction: () => false,
+    withoutDatabaseClient: (work: () => unknown) => work(),
+    pool: { async query(sql: string, params: [string[], string[]]) {
+      try {
+        assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT r.kind, r.id::text AS id, r.revision FROM live_revisions r JOIN unnest($1::text[], $2::uuid[]) AS t(k, i) ON r.kind = t.k AND r.id = t.i')
+        assert.deepEqual(params[0], ['run', 'thread'])
+        assert.equal(params[1].length, 2); assert.equal(params[1][0], params[1][1])
+        return { rows: params[0].flatMap((kind, index) => [ORIGIN, CHILD].includes(params[1][index])
+          ? [{ kind, id: params[1][index], revision: '7' }] : []) }
+      } catch (error) { revisionFailures.push(error); throw error }
+    } },
+  })
+  stub('../lib/workspace-db.ts', { workspaceDb: { select: () => ({ from: (table: unknown) => {
+    assert.equal(table, workspaceMembers)
+    return { where: (condition: SQL) => {
+      const query = dialect.sqlToQuery(condition)
+      assert.ok(query.params.includes(WORKSPACE)); assert.ok(query.params.includes('active'))
+      return selection([OWNER, ...memberIds].map(id => ({ id })))
+    } }
+  } }) }, workspacePool: pool })
+  stub('../lib/workspace-access.ts', { loadWorkspaceContext: () => assert.fail('workspace selection outside task-bound wake fixture') })
   stub('../lib/deployment-switches.ts', { deploymentSwitch: () => factoryEnabled })
-  stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER }, user: { id: viewer } }) })
+  stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
   stub('../lib/device-link.ts', { issueDeviceToken: () => assert.fail('no device token') })
   stub('../lib/device-presence.ts', { deviceOnlineStates: () => assert.fail('no device selection') })
   stub('../lib/device-removal.ts', { removeOwnedDevice: () => assert.fail('no device removal'), renameOwnedDevice: () => assert.fail('no rename') })
@@ -60,7 +88,7 @@ before(async () => {
     // #1236: the thread actions read the state together with its next answer deadline.
     readThreadQuestionState: async () => ({ states: questionStates(), deadline: null }),
   })
-  stub('../lib/run-chain.ts', { listIssueRunChains: async () => [fixtureChain()], readRunChain: async () => fixtureChain() })
+  stub('../lib/run-chain.ts', { listIssueRunChains: async () => [fixtureChain()], readRunChain: async () => fixtureChain(), readRunChainCheckpoint: () => assert.fail('checkpoint reads outside wake fixture') })
   stub('../lib/run-quota-view.ts', { threadQuotaView: async () => null, threadModelFallbackState: async () => null })
   stub('../lib/factory/questions/wake.ts', {
     questionWakeFailure: async (...args: unknown[]) => { reads.push(args); return wakeFailure },
@@ -110,6 +138,7 @@ test('a stale generation refused by the host never falls through to ordinary dis
 test('the owner detail reads only the current queued question child failure, preserving its queued state', async () => {
   selectedRun = ORIGIN
   const detail = await actions.getIssueThread(ISSUE, ORIGIN)
+  assert.deepEqual(detail.live?.revisions, { [`run:${ORIGIN}`]: 7, [`thread:${ORIGIN}`]: 7 })
   assert.deepEqual(reads, [[pool, OWNER, CHILD]])
   assert.deepEqual(detail.thread.questionWake, failure)
   assert.equal(detail.thread.retryAvailable, true, 'the host-confirmed queued wake keeps its explicit Retry')

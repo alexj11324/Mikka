@@ -8,7 +8,7 @@ import { AppWindow, FileText } from 'lucide-react'
 import { listArtifacts } from '@/app/actions/artifacts'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { Button } from '@/components/ui/button'
-import { Empty, EmptyDescription, EmptyHeader } from '@/components/ui/empty'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ArtifactKind } from '@/lib/db/schema'
 import type { ArtifactListItem } from '@/lib/artifacts/types'
@@ -82,7 +82,7 @@ export function ArtifactLibrary() {
     <section ref={scroll} aria-label={t(`category.${current.label}`)} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-6 pb-6 md:px-12">
       {error && !visible ? <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
         : !visible ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-12 w-full" />)}</div>
-        : !rows.length ? <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader></Empty>
+        : !rows.length ? <Empty className="flex-1 justify-start pt-[12vh]"><EmptyHeader><EmptyMedia variant="icon"><FileText /></EmptyMedia><EmptyTitle>{t('empty')}</EmptyTitle></EmptyHeader></Empty>
         : <div className="flex flex-col">
           <div aria-hidden="true" className={cn(COLUMNS, 'h-10 px-2 text-xs text-muted-foreground')}>
             <span>{t('columns.name')}</span>

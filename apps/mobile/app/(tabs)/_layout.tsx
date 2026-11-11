@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { Platform } from 'react-native'
 import { Tabs } from 'expo-router/js-tabs'
 import { NativeTabs } from 'expo-router/native-tabs'
@@ -20,18 +21,18 @@ export default function TabsLayout() {
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="tasks">
         <NativeTabs.Trigger.Icon sf="checklist" />
-        <NativeTabs.Trigger.Label>任务</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{mobileMessages.Nav.tasks}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="suggestions">
         <NativeTabs.Trigger.Icon sf={{ default: 'lightbulb', selected: 'lightbulb.fill' }} />
-        <NativeTabs.Trigger.Label>建议</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{mobileMessages.Nav.suggestions}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} />
-        <NativeTabs.Trigger.Label>设置</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{mobileMessages.Nav.settings}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="search" role="search">
-        <NativeTabs.Trigger.Label>搜索</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>{mobileMessages.Common.search}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   )
@@ -44,10 +45,10 @@ function WebTabs() {
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.accent, tabBarInactiveTintColor: colors.secondary,
       tabBarStyle: { backgroundColor: colors.page, borderTopColor: colors.separator } }}>
       <Tabs.Screen name="(chats)" options={{ title: 'Bot', tabBarIcon: icon(Bot) }} />
-      <Tabs.Screen name="tasks" options={{ title: '任务', tabBarIcon: icon(ListChecks) }} />
-      <Tabs.Screen name="suggestions" options={{ title: '建议', tabBarIcon: icon(Lightbulb) }} />
-      <Tabs.Screen name="settings" options={{ title: '设置', tabBarIcon: icon(UserCircle) }} />
-      <Tabs.Screen name="search" options={{ title: '搜索', tabBarIcon: icon(Search) }} />
+      <Tabs.Screen name="tasks" options={{ title: mobileMessages.Nav.tasks, tabBarIcon: icon(ListChecks) }} />
+      <Tabs.Screen name="suggestions" options={{ title: mobileMessages.Nav.suggestions, tabBarIcon: icon(Lightbulb) }} />
+      <Tabs.Screen name="settings" options={{ title: mobileMessages.Nav.settings, tabBarIcon: icon(UserCircle) }} />
+      <Tabs.Screen name="search" options={{ title: mobileMessages.Common.search, tabBarIcon: icon(Search) }} />
     </Tabs>
   )
 }

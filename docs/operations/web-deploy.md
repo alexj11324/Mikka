@@ -107,26 +107,39 @@ requires it.
 
 The official runtime workflow keeps its existing disposable-instance validation,
 worker hash, measured model catalogue and unchanged-file proofs. After validation,
-a read-only job waits up to 40 minutes for the same source's latest Web run to
+a read-only job waits up to 90 minutes for the same source's latest Web run to
 succeed, including its actual build/upload/version steps, and for the public
-version to match. A docs-only skipped build cannot satisfy this gate. If `main`
-advances, the old release stops. This wait is outside the shared deployment queue
-so it cannot block the Web job it is waiting for.
+version to match. The job has a 95-minute limit. This budget allows for an active
+Web build followed by a queued build; each Web deploy job has a 45-minute limit.
+The latest matching run must succeed even when an older run already succeeded.
+A failed, cancelled or skipped run cannot satisfy this gate. If `main` advances,
+the old release stops. This wait is outside the shared deployment queue so it
+cannot block the Web job it is waiting for. Desktop's Web wait and direct callers
+keep their existing 40-minute default.
 
-Changes to the two release workflows, `scripts/release/web-deploy.mjs` or
+Changes to release-control paths in `RUNTIME_RELEASE_PATHS`, including the release
+workflows, `scripts/release/web-deploy.mjs` and
 `scripts/e2b/publish-template-env.mjs` also require the full runtime validation
 and reusable publication, even when the worker hash is unchanged. The check
 compares the actual complete push (`github.event.before` to `github.sha`) with
 full history; missing or invalid endpoints fail instead of counting as unchanged.
-These four paths are all in the runtime workflow's push filter. Documentation
+These paths are included in the runtime workflow's `runtime_paths` list. Documentation
 and test-only changes do not force paid instance validation.
 
-The E2B caller itself also uses a distinct `queue: max` group, so an old rerun
-cannot discard a newer main's pending validation before it reaches Web deploy.
-The check rejects obsolete main jobs before reading release credentials or
-starting instance validation. PRs keep their separate group and only run offline
-tests; retaining their pending runs replaces the previous cancellation behavior
-at the cost of possibly running an obsolete, short offline test job.
+The E2B caller checks failed runtime input fingerprints before taking the distinct
+`e2b-official-runtime-release` queue. A matching failed build or subscription gate
+makes an automatic push succeed with `skipped: same inputs as failed run <id>`;
+it creates no E2B machine and takes no publication queue. The fingerprint covers
+the workflow's `runtime_paths` Git entries, including the dependency lock. Failure
+artifacts last 90 days; a missing or expired artifact allows the ordinary worker
+comparison, while an Actions API error fails the check.
+
+Only `e2b-runtime-release.yml` runs under that non-cancelling `queue: max` lock,
+through candidate validation, Web wait, subscriptions, publication and cleanup.
+It checks failure history again after entering the queue. A failure is remembered
+only if its source is still current main after cleanup; supersession, cancellation,
+Web and cleanup-only failures do not suppress a later attempt. PRs run only the
+offline tests outside the publication queue. Existing exact-source fences remain.
 
 The runtime workflow then calls `web-deploy.yml` at its own commit with
 `runtime-refresh: true`. Inside the shared deploy job, the original Infisical
@@ -141,15 +154,12 @@ failed jobs** on that runtime run while its source is still current `main`. It
 reuses the successful validation outputs. The explicit runtime refresh builds
 even when the env values already match; it also bypasses the docs-only skip.
 An uncertain environment POST is never automatically retried. A failed-job rerun
-reads back before deciding whether one new upsert is needed. Re-running the
-entire runtime workflow with the default inputs is different: its initial
-worker-hash comparison can skip validation/publication when the env hash already
-matches. For a full refresh or a release-pipeline acceptance, manually dispatch
-**E2B official instance runtime** on current `main` with `runtime-refresh: true`
-after its Web run and public version match. That explicit option only bypasses
-the unchanged-hash optimization; it runs the official-instance validation again
-and preserves all source, measured-model, queue and readback checks. It defaults
-to false, so ordinary unchanged pushes keep their existing skip behavior.
+reads back before deciding whether one new upsert is needed. For a full refresh or a retry after an external service recovers, dispatch
+**E2B additive runtime release** on current `main` and supply `reason`. The dispatch
+event retains that reason. Manual dispatch bypasses both the failed-input and
+matching-worker skips and runs the original validation and publication gates.
+Changed runtime inputs naturally get a new fingerprint; an unrelated push does
+not retry a recorded failure.
 
 The source fences and queue protect application upload order; they do not make
 the Git ref and Vercel environment one atomic transaction. A newer push during
@@ -170,7 +180,7 @@ as a recovery step.
 
 ## Official private UI overlay
 
-Open-source builds, including every public/fork PR check, leave
+Builds without `mikka-hosted-ui`, including every public/fork PR check, leave
 `MIKKA_UI_OVERLAY_DIR` unset and use the public slot implementations. Only the
 trusted `main` official release jobs check out `alexj11324/mikka-hosted-ui`.
 They read `HOSTED_UI_READ_KEY` from Infisical `prod:/platform` with the existing
@@ -256,10 +266,10 @@ alone: their recorded overlay SHAs may differ.
   filenames, source or error messages. The fixed `migrate: starting` marker
   observes entry into a requested migration command before its guards; it does
   not prove any SQL ran. An explicit `MIGRATE=0` skip does not emit that marker.
-- The live Web builder is Vite + Nitro, both with `sourcemap: false`;
-  `next.config.mjs` is a legacy path, not the production compiler. Before
-  upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI
-  source, `.map`, inline source-map directives and `sourcesContent`.
+- The live Web builder is Vite + Nitro, both with `sourcemap: false`; there is
+  no Next compiler in the build path. Before upload, `hosted-ui.mjs audit`
+  checks Vercel's public static tree for raw UI source, `.map`, inline
+  source-map directives and `sourcesContent`.
 - The desktop production renderer and main/preload emit no source maps.
   Installers include their bundled `dist/` and package metadata, explicitly
   excluding hoisted workspace `node_modules/` and its development source/maps.

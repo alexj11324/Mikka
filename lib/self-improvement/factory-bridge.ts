@@ -1,3 +1,4 @@
+import type { FactoryWorkspaceBoundary } from '../factory/background-workspace'
 import type { Pool } from 'pg'
 import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import type { createFactoryStore } from '../factory/store'
@@ -10,13 +11,18 @@ import type { createSkillAssignments } from './assignments'
 import { createGenerationRequest, generationNote, failureQuality, type FailureQualityProvider } from './regression'
 
 export function createImprovementFactoryBridge(pool: Pool, factory: ReturnType<typeof createFactoryStore>,
-  dispatch: ReturnType<typeof createFactoryDispatch>, assignments:ReturnType<typeof createSkillAssignments>, qualityProvider?: FailureQualityProvider) {
+  dispatch: ReturnType<typeof createFactoryDispatch>, assignments:ReturnType<typeof createSkillAssignments>, qualityProvider?: FailureQualityProvider,
+  // Host/test dependency only; request input never supplies a tenant or bypass.
+  withWorkspace: FactoryWorkspaceBoundary = async (userId, taskId, work) =>
+    (await import('../factory/background-workspace')).withFactoryBackgroundWorkspace(pool,userId,{kind:'task',id:taskId,botId:null},work)) {
   return {
     async rehearse(userId:string,input:ImprovementRehearsal) {
       const parsed=commandSchema.safeParse(input)
       if (!parsed.success || parsed.data.action!=='rehearse') throw new ImprovementError('invalid')
       const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../factory/transaction')
-      const tx=await pool.connect(), req=parsed.data
+      const req=parsed.data
+      return withWorkspace(userId,req.binding.taskId,async()=>{
+      const tx=await pool.connect()
       try {
         await beginFactoryTransaction(tx)
         const task=await factory.lockForDispatch(userId,req.binding,req.binding.attemptId,tx)
@@ -27,12 +33,18 @@ export function createImprovementFactoryBridge(pool: Pool, factory: ReturnType<t
         if (!result.replayed) await notifyQueuedLocalRun(tx, userId, result.runId)
         return {...result,selection,productionEligible:false}
       } catch(error) {await rollbackFactoryTransaction(tx);throw error} finally {forgetFactoryTransaction(tx);tx.release()}
+      })
     },
     async handoff(userId: string, input: ImprovementHandoff) {
       const parsed = commandSchema.safeParse(input)
       if (!parsed.success || parsed.data.action !== 'handoff') throw new ImprovementError('invalid')
       const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('../factory/transaction')
-      const req = parsed.data, tx = await pool.connect()
+      const req = parsed.data
+      const { rows: [hint] } = await pool.query<{ issueId: string }>(
+        'SELECT "issueId" FROM improvement_proposals WHERE id=$1 AND "userId"=$2', [req.proposalId,userId])
+      if (!hint || hint.issueId !== req.binding.issueId) throw new ImprovementError('notFound')
+      return withWorkspace(userId,req.binding.taskId,async()=>{
+      const tx = await pool.connect()
       try {
         await beginFactoryTransaction(tx)
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`improvement-handoff:${userId}:${req.proposalId}`])
@@ -79,6 +91,7 @@ export function createImprovementFactoryBridge(pool: Pool, factory: ReturnType<t
         if (!result.replayed) await notifyQueuedLocalRun(tx, userId, result.runId)
         return { ...result, proposalId:req.proposalId, productionEligible:false }
       } catch (error) { await rollbackFactoryTransaction(tx); throw error } finally { forgetFactoryTransaction(tx); tx.release() }
+      })
     },
     async status(userId: string, proposalId: string) {
       const { rows:[link] } = await pool.query('SELECT * FROM improvement_factory_links WHERE "proposalId"=$1 AND "userId"=$2',[proposalId,userId])

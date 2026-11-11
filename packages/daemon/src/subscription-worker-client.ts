@@ -131,11 +131,16 @@ export class SubscriptionWorkerClient {
           else if (typeof frame.chunk === "string" && chunk) { timing?.chunk(); chunk(frame.chunk) }
           else if (frame.error) {
             timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing'))
+            timing?.terminalTransport(frame.transportTiming, Object.hasOwn(frame, 'transportTiming'))
             const diagnostic = providerDiagnostic(frame.providerFailure, this.config.scope.provider)
             const failure = diagnostic ? captureRunFailure({ ...diagnostic, requestBodyValues: request.payload }, { runId: this.config.use?.runId, provider: this.config.scope.provider, credential: 'subscription' }) : undefined
             finish(new WorkerRefusal(safeCode(frame.error), failure))
           }
-          else if (Object.hasOwn(frame, "result")) { timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing')); finish(undefined, frame.result) }
+          else if (Object.hasOwn(frame, "result")) {
+            timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing'))
+            timing?.terminalTransport(frame.transportTiming, Object.hasOwn(frame, 'transportTiming'))
+            finish(undefined, frame.result)
+          }
           else finish(new WorkerRefusal())
         } catch { finish(new WorkerRefusal()) }
       })

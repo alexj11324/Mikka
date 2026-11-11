@@ -83,7 +83,7 @@ async function processStopped(pid) {
       // A reparented zombie has finished all work and only awaits reaping.
       const state = (await readFile(`/proc/${pid}/stat`, 'utf8')).split(') ').at(-1)?.split(' ')[0]
       if (state === 'Z') return true
-    } catch (error) { if (error.code === 'ENOENT') return true; throw error }
+    } catch (error) { if (error.code === 'ENOENT' || error.code === 'ESRCH') return true; throw error }
   }
   return false
 }

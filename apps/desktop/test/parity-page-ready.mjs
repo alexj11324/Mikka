@@ -1,29 +1,34 @@
 import assert from 'node:assert/strict'
-import { lstat, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
+
+export async function selectWorkspaceMenuItem(page, item) {
+  // A switch assigns the locale home URL after its action finishes. The old URL
+  // and ready DOM are not proof that the new document has loaded. An already
+  // selected item is a product no-op and only closes its menu.
+  const moved = await item.getAttribute('aria-current') === 'true' ? undefined : page.waitForEvent('domcontentloaded')
+  void moved?.catch(() => {})
+  await item.click()
+  await moved
+}
+
+export async function selectParityWorkspace(page, { menuName, workspaceName, basePath }) {
+  await page.getByRole('button', { name: menuName, exact: true }).first().click()
+  await selectWorkspaceMenuItem(page, page.getByRole('menuitem', { name: workspaceName, exact: false }))
+  await page.waitForURL(url => url.pathname === `${basePath}/en` || url.pathname === `${basePath}/en/`)
+  await page.getByRole('button', { name: menuName, exact: true }).first().waitFor()
+}
 
 // The build publishes the exact action name beside its ID. Observe that real
 // transport only for reads whose successful empty state has no DOM of its own.
 // No requests, React internals, application state or response routes are added.
 export async function readActionIds(applicationDirectory) {
-  const nitro = await lstat(join(applicationDirectory, '.output/mikka-build.json')).then(() => true, error => {
-    if (error.code === 'ENOENT') return false
-    throw error
-  })
-  if (nitro) {
-    const manifest = JSON.parse(await readFile(join(applicationDirectory, '.output/public/mikka/renderer-manifest.json'), 'utf8'))
-    return new Map([...publishedActions(manifest)].map(name => [name, name]))
-  }
-  const manifest = JSON.parse(await readFile(join(applicationDirectory, '.next/server/server-reference-manifest.json'), 'utf8'))
-  const names = new Map()
-  for (const [id, action] of Object.entries(manifest.node ?? {})) {
-    const module = /^app\/actions\/(.+)\.tsx?$/.exec(action.filename ?? '')?.[1]
-    if (module && action.exportedName) names.set(id, `${module}.${action.exportedName}`)
-  }
-  assert.ok(names.size, 'The tested production build must identify its real actions')
-  return names
+  // Only the Nitro application is a tested production build; a directory
+  // without its manifest has no real actions to identify.
+  const manifest = JSON.parse(await readFile(join(applicationDirectory, '.output/public/mikka/renderer-manifest.json'), 'utf8'))
+  return new Map([...publishedActions(manifest)].map(name => [name, name]))
 }
 
 export function observeReads(page, requirements, actionIds, basePath) {
@@ -98,7 +103,7 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     await expect(resolved).toHaveAttribute('aria-expanded', /^(?:true|false)$/, { timeout: 45_000 })
     if (await resolved.getAttribute('aria-expanded') === 'false') await resolved.click()
     await expect(resolved).toHaveAttribute('aria-expanded', 'true')
-    // A thread row is named by its task: the team number the database gave it, then its title.
+    // A thread row is named by its task: the immutable identifier issued by APP, then its title.
     await root.getByRole('button', { name: `${fixture.issueIdentifier} ${fixture.issueTitle}`, exact: true }).waitFor()
     await root.getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: false }).waitFor()
   }
@@ -113,6 +118,14 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     const overview = page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
     await overview.getByRole('heading', { name: messages.Nav.coordinator, exact: true }).waitFor()
     await overview.getByRole('tab', { name: messages.Shell.panel.computer, exact: true }).waitFor()
+    // A restored chat conservatively retains a history cursor. Complete this
+    // two-message fixture through the ordinary UI before comparing its layout.
+    const conversation = page.getByRole('region', { name: messages.Coordinator.conversation, exact: true })
+    const earlier = conversation.getByRole('button', { name: messages.Common.loadMore, exact: true })
+    if (await earlier.isVisible()) await earlier.click()
+    await earlier.waitFor({ state: 'hidden' })
+    await conversation.getByText('What should we review today?', { exact: true }).waitFor()
+    await conversation.getByText('Review the desktop workspace, including conversations, tasks, artifacts and settings.', { exact: true }).waitFor()
   } else if (name === 'all-threads' || name === 'bot-thread-list') {
     await threadRows(page.getByRole('region', { name: messages.Shell.panel.allThreads, exact: true }))
   } else if (name === 'projects' || name === 'team-projects') {
@@ -154,9 +167,10 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     // The fixture's creation event must finish rendering before comparison.
     await task.getByText(messages.Workspace.detail.createdTask, { exact: true }).waitFor()
     if (name === 'task-thread') {
-      // The task's thread list has no loading placeholder. The selected row
-      // proves that read is rendered; the scoped reply proves the right pane.
-      await task.getByRole('button', { name: messages.IssueThreads.open.replace('{name}', fixture.issueTitle), exact: true, pressed: true }).waitFor()
+      // 活动's Agent rows have no loading placeholder. The selected row, named
+      // after its Agent (one row per Agent stretch), proves that read is
+      // rendered; the scoped reply proves the right pane.
+      await task.getByRole('button', { name: messages.IssueThreads.open.replace('{name}', fixture.agentLabel), exact: true, pressed: true }).waitFor()
       await task.getByRole('list', { name: messages.IssueThreads.conversation, exact: true }).getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: true }).waitFor()
     }
   } else if (name === 'new-task') {

@@ -11,7 +11,7 @@ import { IPC, BUNDLED_IPC } from '@mikka/protocol/ipc'
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
 import { connectForUpdate, updateLocalDaemon } from './daemon-update'
-import { readLocalDeviceAccount } from './local-setup'
+import { readLocalDeviceAccount, readLocalDeviceOwner } from './local-setup'
 import { AppLoadState, offlineReason, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { startReturnListener, type ReturnListener } from './return-listener'
@@ -631,6 +631,7 @@ async function start(): Promise<void> {
     localDevice: localDeviceStatus,
     pickRepo,
     localAccount: () => readLocalDeviceAccount((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
+    localOwner: () => readLocalDeviceOwner((url, init) => bundledAuth ? bundledAuth.request('/api/devices/enrollment?view=owner', init) : session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     quota: localQuota,
     notifications,
     consumePendingClick: () => {

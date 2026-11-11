@@ -76,7 +76,7 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
     await assert.rejects(admit(team.id), { code: 'free_allowance_used' })
   })
 
-  await t.test('fallback: a team left with one person (nobody else in it or invited) spends their credits without the switch', async () => {
+  await t.test('solo teams never spend a personal balance without explicit consent', async () => {
     const { workspaceSoloMember } = await import('../lib/workspace-solo')
     const founder = await seedUser(pool, 'share-founder'), joiner = await seedUser(pool, 'share-joiner')
     const founderOwn = await personal(founder)
@@ -86,10 +86,10 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
     assert.equal(await workspaceSoloMember(alone.id), founder)
     assert.equal(await workspaceSoloMember(founderOwn), founder, 'a personal workspace is one person')
     assert.equal(await workspaceSoloMember(team.id), null)
-    assert.deepEqual(await shares.sharedCreditWorkspaces(alone.id), [founderOwn], 'no share row needed')
-    assert.equal(await admit(alone.id), founderOwn)
+    assert.deepEqual(await shares.sharedCreditWorkspaces(alone.id), [], 'membership is not payment consent')
+    await assert.rejects(admit(alone.id), { code: 'verification_required' })
     assert.deepEqual(await shares.creditShareView(founder, alone.id), { mine: false, canShare: true, sharers: [], admin: true }, 'the switch shows in every team')
-    // An invitation makes it a team of people: the switch decides, off by default.
+    // Inviting, expiring, or suspending peers never changes who pays.
     const invitation = randomUUID()
     await pool.query(`INSERT INTO mikka_workspace_invitations (id,"workspaceId","userId",email,role,"tokenHash","expiresAt") VALUES ($1,$2,$3,'invitee@example.invalid','member',$4,now()+interval '1 day')`, [invitation, alone.id, founder, randomUUID().replaceAll('-', '')])
     assert.equal(await workspaceSoloMember(alone.id), null, 'a pending invitation counts')
@@ -104,7 +104,8 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
     assert.equal(await admit(alone.id), founderOwn)
     await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [alone.id, joiner])
     await shares.setOwnCreditShare(founder, alone.id, false)
-    assert.equal(await admit(alone.id), founderOwn, 'everyone else gone: alone again')
+    await assert.rejects(admit(alone.id), { code: 'verification_required' })
+    assert.equal((await hostedUsage.balance(founderOwn)).free, 1_000_000, 'personal balance stays owned and untouched')
   })
 
   await t.test('a personal workspace takes no shares; an outsider sees nothing', async () => {

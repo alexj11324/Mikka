@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { SETTINGS_SECTIONS, isSettingsSectionParam, resolveSettingsSection, settingsHref, visibleSettingsSections } from '../lib/settings-sections.ts'
 
-test('every v4 nav item has exactly one section, in Figma order', () => {
+test('every v4 nav item has exactly one section, in Figma order (app permissions in the workspace group, 2026-11-10)', () => {
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal').map(s => s.id), ['account', 'security', 'preferences', 'notifications', 'memory', 'connections', 'models', 'logins', 'privacy', 'computers', 'developer'])
-  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace').map(s => s.id), ['general', 'members', 'teams', 'permissions', 'secrets', 'audit', 'usage', 'billing', 'cloud'])
+  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace').map(s => s.id), ['general', 'bot-permissions', 'members', 'teams', 'permissions', 'secrets', 'audit', 'usage', 'billing', 'cloud'])
 })
 
 test('old links keep landing on the page that now holds their content', () => {
@@ -72,7 +72,7 @@ test('a personal workspace has every setting of the workspace itself; only what 
   // Decision 2026-11-02-0203: the two kinds differ only in 成员, 团队, 团队权限 and 审计日志.
   const personal = visibleSettingsSections({ admin: true, personal: true }).map(s => s.id)
   const account = SETTINGS_SECTIONS.filter(s => s.group === 'personal' && !UNBUILT.includes(s.id)).map(s => s.id)
-  assert.deepEqual(personal, [...account, 'general', 'secrets', 'usage', 'billing'])
+  assert.deepEqual(personal, [...account, 'general', 'bot-permissions', 'secrets', 'usage', 'billing'])
   const team = visibleSettingsSections({ admin: true }).map(s => s.id)
   for (const id of ['general', 'members', 'teams', 'permissions', 'secrets', 'audit', 'usage', 'billing']) assert.ok(team.includes(id), id)
 })

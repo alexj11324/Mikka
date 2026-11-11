@@ -1,3 +1,5 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database'
 import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import { factoryTestLifecycle } from '../../tests/helpers/factory-test-authority'
 import assert from 'node:assert/strict'
@@ -40,12 +42,13 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
   const admin=new Pool({connectionString:target.toString(),max:1}),schema=`skill_wiring_${randomUUID().replaceAll('-','')}`
   await admin.query(`CREATE SCHEMA "${schema}"`);target.searchParams.set('options',`-c search_path=${schema}`)
   const pool=new Pool({connectionString:target.toString(),max:12})
-  t.after(async()=>{await pool.end();await admin.end()})
+  const closeWorkspace=await bindFixtureWorkspaceDatabase(pool)
+  t.after(async()=>{await closeWorkspace();await pool.end();await admin.end()})
   const dir=new URL('../../drizzle/',import.meta.url)
   for(const name of orderMigrations((await readdir(dir)).filter(n=>n.endsWith('.sql')))) await pool.query(await readFile(new URL(name,dir),'utf8'))
   await pool.query(await readFile(new URL('20261029044008_improvement_skill_assignments.sql',dir),'utf8'))
   const userId=`synthetic-${randomUUID()}`,issueId=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID()
-  await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Synthetic rehearsal','{}','todo','normal')`,[issueId,userId])
+  await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Synthetic rehearsal','{}','todo','normal')`,[issueId,userId,await seedFixtureWorkspace(pool,userId)])
   await pool.query(`INSERT INTO devices(id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES($1,$2,'Synthetic device',true,now(),'[{"harness":"codex","installed":true}]')`,[deviceId,userId])
   await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,'Synthetic agent','codex',$3)`,[agentId,userId,deviceId])
   await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","verifyCommand") VALUES($1,$2,$3,'/synthetic/mikka','node acceptance.mjs')`,[repoId,deviceId,userId])
@@ -102,10 +105,10 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
   // A hosted question hit this on every answer (occurrence 10/10, impact 8/10):
   // the real task device differs from its stable Agent/subscription consumer.
   await t.test('cloud skill ownership follows exact recorded placement without rebinding the frozen Agent',async()=>{
-    const userId=`synthetic-cloud-${randomUUID()}`,issueId=randomUUID()
+    const userId=`synthetic-cloud-${randomUUID()}`,issueId=randomUUID(),workspace=await seedFixtureWorkspace(pool,userId)
     const assignments=createSkillAssignments(pool,async(owner,issue)=>owner===userId&&issue===issueId)
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Synthetic cloud','{}','todo','normal')`,[issueId,userId])
-    const parent=randomUUID(),child=randomUUID(),otherDevice=randomUUID(),parentRepo=randomUUID(),childRepo=randomUUID(),cloudAgent=randomUUID(),cloudRun=randomUUID(),workspace=randomUUID(),bot=randomUUID(),otherBot=randomUUID(),foreign=`synthetic-${randomUUID()}`
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Synthetic cloud','{}','todo','normal')`,[issueId,userId,workspace])
+    const parent=randomUUID(),child=randomUUID(),otherDevice=randomUUID(),parentRepo=randomUUID(),childRepo=randomUUID(),cloudAgent=randomUUID(),cloudRun=randomUUID(),bot=randomUUID(),otherBot=randomUUID(),foreign=`synthetic-${randomUUID()}`
     for(const id of [userId,foreign])await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Synthetic',$2,true,now(),now()) ON CONFLICT DO NOTHING`,[id,`${id}@example.invalid`])
     for(const id of [parent,child,otherDevice])await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled) VALUES($1,$2,'Synthetic cloud','cloud',true)`,[id,userId])
     await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,$3,'codex',$4)`,[cloudAgent,userId,cloudAgent,parent])

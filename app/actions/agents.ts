@@ -18,7 +18,7 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, devices, issueMembers, runMessages, users,
+  agents, agentRuns, deviceRepos, devices, runMessages, users,
   type SupportedHarness,
 } from '@/lib/db/schema'
 import { issueDeviceToken } from '@/lib/device-link'
@@ -39,21 +39,39 @@ import { readThreadChunks, threadChunkCursor, type ThreadChunkCursor } from '@/l
 import { executionBotName, runBotId, runBotName, threadNameLines } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
-import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
+import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, threadQuestionRunId, withRunChain, type IssueThread } from '@/lib/issue-threads'
 import { readThreadQuestionState, type ThreadQuestionDeadline } from '@/lib/issue-thread-questions'
 import { runIsActive } from '@/lib/issue-run-conversation'
 import { issueThreadListText } from '@/lib/issue-thread-list-projection'
-import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
+import { listIssueRunChains, readRunChain, readRunChainCheckpoint } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
 import { threadPromptView } from '@/lib/thread-prompt'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
+import { actAs } from '@/lib/acting-user'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
   return session.user.id
+}
+
+async function getWorkspaceReader() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) throw new ActionFailureError('authRequired')
+  const context = await loadWorkspaceContext(undefined, session.user)
+  return { id: session.user.id, [tokenWorkspace]: context.workspace.id, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
+}
+
+async function withOwnWorkspaceRun<T>(runId: string, work: (userId: string) => Promise<T>): Promise<T> {
+  const reader = await getWorkspaceReader()
+  if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
+  const [run] = await db.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, reader.id), eq(agentRuns.workspaceId, reader[tokenWorkspace]))).limit(1)
+  if (!run) throw new ActionFailureError('runNotFound')
+  return actAs(reader, () => work(reader.id))
 }
 
 export interface DeviceRepoView {
@@ -205,28 +223,24 @@ export async function listAgents(): Promise<AgentView[]> {
 /** Who currently collaborates on the issue (R-26): they see that its threads exist. */
 async function issueThreadAccess(issueId: string) {
   const { issue, user } = await requireIssueAccess(issueId)
-  // A team-linked issue follows the same active-workspace membership rule as requireIssueAccess.
-  // Direct issue membership must not resurrect access after removal from its workspace.
-  const [link] = await workspaceDb.select({ workspaceId: teamIssues.workspaceId }).from(teamIssues)
-    .where(eq(teamIssues.issueId, issue.id)).limit(1)
-  let memberIds: string[]
-  if (link) {
-    const members = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
-      .where(and(eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.status, 'active')))
-    memberIds = members.map(member => member.id)
-  } else {
-    const members = await db.select({ id: issueMembers.memberId }).from(issueMembers).where(eq(issueMembers.issueId, issue.id))
-    memberIds = [issue.userId, ...members.map(member => member.id)]
-  }
-  return { issue, user, memberIds: new Set(memberIds) }
+  if (!issue.workspaceId) throw new ActionFailureError('issueNotFound')
+  const members = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, issue.workspaceId), eq(workspaceMembers.status, 'active')))
+  return { issue, user, memberIds: new Set(members.map(member => member.id)) }
 }
 
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength,
   // Only the report's summary: runSummaryText reads nothing else of it.
   sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, failureDetails: agentRuns.failureDetails, report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
-  agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome,
+  agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome, kind: agentRuns.kind,
   botColor: sql<string | null>`(select b.color from bots b where b.id = ${runBotId})`, botShape: sql<string | null>`(select b.shape from bots b where b.id = ${runBotId})`,
+  // Who did the stretch (lib/issue-threads.ts threadProfile): the frozen Profile's public summary and its current mark.
+  profile: sql<unknown>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
+    'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId','name',${agentRuns.agentDefinition}->'agentProfile'->'name',
+    'roles',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'roles','description',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'description',
+    'icon',(select p.icon from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId}),
+    'color',(select p.color from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId})) end`,
 }
 
 // A read after a cursor: the client holds the run's prompt (immutable), so only what names the thread is read.
@@ -261,7 +275,7 @@ async function readIssueThreads(issueId: string) {
   const chains = await listIssueRunChains(pool, issue.id, [...memberIds], ISSUE_THREAD_LIMIT)
   if (!chains.length) return result([])
   const rows = await db.select({ ...threadListColumns, ...issueThreadListText(user.id) }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-    .where(and(eq(agentRuns.issueId, issue.id), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
+    .where(and(eq(agentRuns.issueId, issue.id), eq(agentRuns.workspaceId, issue.workspaceId!), inArray(agentRuns.userId, [...memberIds]), inArray(agentRuns.id, chains.map(chain => chain.rootRunId))))
     .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(ISSUE_THREAD_LIMIT)
   const byRoot = new Map(chains.map(chain => [chain.rootRunId, chain]))
   return result((await threadQuestions(projectIssueThreads(rows, issue.id, user.id, memberIds).map(thread => withRunChain(thread, byRoot.get(thread.id))), user.id)).threads)
@@ -287,21 +301,16 @@ async function readableThread(issueId: string | null, runId: string, columns: Th
     const access = await issueThreadAccess(issueId)
     if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
     const [row] = await db.select(columns).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.issueId, access.issue.id))).limit(1)
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.issueId, access.issue.id), eq(agentRuns.workspaceId, access.issue.workspaceId!))).limit(1)
     if (!row || !canReadThread(row.userId, access.user.id, access.memberIds)) throw new ActionFailureError('runNotFound')
     return { row, user: access.user }
   }
-  const user = { id: await getUserId() }
+  const user = await getWorkspaceReader()
   if (!z.uuid().safeParse(runId).success) throw new ActionFailureError('runNotFound')
-  const [row] = await db.select({ ...columns, botWorkspaceId: sql<string | null>`(select b."workspaceId" from bots b where b.id = ${runBotId})`, hasBot: sql<boolean>`${runBotId} is not null` })
+  const [row] = await db.select(columns)
     .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(users, eq(users.id, agentRuns.userId))
-    .where(and(eq(agentRuns.id, runId), isNull(agentRuns.issueId))).limit(1)
+    .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, user.id), eq(agentRuns.workspaceId, user[tokenWorkspace]), isNull(agentRuns.issueId))).limit(1)
   if (!row) throw new ActionFailureError('runNotFound')
-  const workspaceMemberIds = row.botWorkspaceId
-    ? (await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
-      .where(and(eq(workspaceMembers.workspaceId, row.botWorkspaceId), eq(workspaceMembers.status, 'active')))).map(member => member.id)
-    : null
-  if (!canReadThread(row.userId, user.id, taskFreeThreadMembers(row.userId, row.hasBot ? { workspaceMemberIds } : null))) throw new ActionFailureError('runNotFound')
   return { row, user }
 }
 
@@ -316,9 +325,16 @@ export async function findThreadIssue(runId: string): Promise<{ issueId: string 
 
 async function readThreadIssue(runId: string): Promise<{ issueId: string | null } | null> {
   if (!z.uuid().safeParse(runId).success) return null
-  const [run] = await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(eq(agentRuns.id, runId)).limit(1)
+  const [run] = await db.select({ ...threadIdentityColumns, issueId: agentRuns.issueId, workspaceId: agentRuns.workspaceId })
+    .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, runId)).limit(1)
   if (!run) return null
   try {
+    if (run.issueId === null) {
+      const user = await getWorkspaceReader()
+      // The first read already has the task-free identity. Authorization still
+      // selects the current workspace and checks active membership on every call.
+      return run.userId === user.id && run.workspaceId === user[tokenWorkspace] ? { issueId: null } : null
+    }
     await readableThread(run.issueId, runId, threadIdentityColumns)
     return { issueId: run.issueId }
   } catch { return null }
@@ -337,6 +353,13 @@ export interface IssueThreadDetail {
   chunksAppend: boolean
   /** A cursor read: `thread.prompt` is left out; the held read's prompt stands (mergeThreadChunks). */
   promptOmitted?: true
+  /**
+   * What this thread's run holds (lib/context-usage.ts): an estimate from stored
+   * text, never a provider count. Optional because a page open across a deploy
+   * may still be served by a build that predates it, like every other host
+   * projection here.
+   */
+  context?: import('@/lib/context-usage').ContextUsage
 }
 
 /**
@@ -401,6 +424,29 @@ export async function getThreadMachine(issueId: string | null, runId: string): P
     const chain = await readRunChain(pool, row.userId, row.id)
     const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
     return (await import('@/lib/thread-machine-view')).readThreadMachine(pool, user.id, runIds)
+  })
+}
+
+/**
+ * What this thread's run holds (lib/context-usage.ts). One query counts every
+ * character in SQL and returns no text: a cursor read must stay small, so the
+ * brief cannot be sent again to be measured (tests/thread-detail-bytes.db.test.ts).
+ * It covers the whole run chain and the whole stored brief whatever the cursor
+ * returned, so a cursor read reports the same usage as a full one.
+ */
+async function readContextUsage(runIds: string[], rootRunId: string): Promise<import('@/lib/context-usage').ContextUsage> {
+  const { CONTEXT_CHARS_SQL, contextUsageFromCounts } = await import('@/lib/context-usage')
+  const { rows: [counted] } = await pool.query<Record<string, string | number | null>>(CONTEXT_CHARS_SQL, [runIds, rootRunId])
+  const count = (value: unknown) => Number(value ?? 0) || 0
+  const counts = (ascii: unknown, other: unknown) => ({ ascii: count(ascii), other: count(other) })
+  return contextUsageFromCounts({
+    prompt: counts(counted?.promptAscii, counted?.promptOther),
+    // The task range is sliced in SQL by the recorded code points, and is empty
+    // when the range does not hold (lib/thread-prompt.ts rejects it there).
+    task: counts(counted?.taskAscii, counted?.taskOther),
+    messages: counts(counted?.messageAscii, counted?.messageOther),
+    conversation: counts(counted?.conversationAscii, counted?.conversationOther),
+    model: typeof counted?.model === 'string' ? counted.model : null,
   })
 }
 
@@ -481,9 +527,12 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     : null
   const { threadLiveReferences, documentLiveWorkspace } = await import('@/lib/live/panels')
   const { workspacePool } = await import('@/lib/workspace-db')
-  const [runs, issueWorkspaceId] = await Promise.all([
+  const chainRunIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
+  const [runs, issueWorkspaceId, context] = await Promise.all([
     threadLiveReferences(pool, workspacePool, runIds, user.id),
     row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
+    // Over the whole chain and the whole brief, so a cursor read reports what a full one does.
+    readContextUsage(chainRunIds, row.id),
   ])
   return {
     live: { runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
@@ -492,6 +541,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
     chunksAppend: read.append,
+    context,
     ...(promptOmitted ? { promptOmitted: true as const } : {}),
   }
 }
@@ -515,10 +565,7 @@ export async function getThreadChanges(issueId: string | null, runId: string): P
 
 async function readThreadChanges(issueId: string | null, runId: string): Promise<ThreadChangesResult> {
   const { row } = await readableThread(issueId, runId, threadIdentityColumns)
-  const chain = await readRunChain(pool, row.userId, row.id)
-  const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
-  const { rows: [checkpoint] } = await pool.query<{ patch: Buffer; unavailableReason: string | null }>(
-    'SELECT patch,"unavailableReason" FROM run_checkpoints WHERE "runId"=ANY($1::uuid[]) ORDER BY "updatedAt" DESC LIMIT 1', [runIds])
+  const { runIds, checkpoint } = await readRunChainCheckpoint(pool, row.userId, row.id)
   if (!checkpoint) return { state: 'none' }
   if (checkpoint.unavailableReason) return { state: 'tooLarge' }
   let text: string
@@ -602,10 +649,10 @@ export async function sendIssueThreadReply(input: { issueId: string | null; runI
  * run is not this person's or works on no task.
  */
 export async function getThreadName(runId: string): Promise<string | null> {
-  const userId = await getUserId()
+  const reader = await getWorkspaceReader()
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) return null
-  const source = (await citationSources(userId, [`[[run:${parsed.data}]]`]))[parsed.data]
+  const source = (await citationSources(reader, [`[[run:${parsed.data}]]`]))[parsed.data]
   if (source?.kind !== 'run' || !source.issue) return null
   const key = source.issue.identifier ?? (source.issue.number === null ? null : `#${source.issue.number}`)
   return key ? `${key} ${source.issue.title}` : source.issue.title
@@ -613,17 +660,17 @@ export async function getThreadName(runId: string): Promise<string | null> {
 
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
 export async function stopRun(runId: string): Promise<{ stoppedRunIds: string[] }> {
-  return requestRunStop(await getUserId(), runId)
+  return withOwnWorkspaceRun(runId, userId => requestRunStop(userId, runId))
 }
 
 /** A run paused because its subscription's quota ran out goes on with the person's API key. Owner only; a repeat returns the same run. */
 export async function resumeQuotaPausedRunOnApiKey(runId: string): Promise<{ runId: string }> {
-  return (await import('@/lib/run-quota')).resumeQuotaPausedRunOnApiKey(await getUserId(), runId)
+  return withOwnWorkspaceRun(runId, async userId => (await import('@/lib/run-quota')).resumeQuotaPausedRunOnApiKey(userId, runId))
 }
 
 /** A run paused because its subscription's quota ran out is tried again with its original credential. Owner only; a repeat returns the same run. */
 export async function retryQuotaPausedRun(runId: string): Promise<{ runId: string }> {
-  return (await import('@/lib/run-quota')).retryQuotaPausedRun(await getUserId(), runId)
+  return withOwnWorkspaceRun(runId, async userId => (await import('@/lib/run-quota')).retryQuotaPausedRun(userId, runId))
 }
 
 /** Settings #504 queues maintenance through the same owner-scoped backend as HTTP. */

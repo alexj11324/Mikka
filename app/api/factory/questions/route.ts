@@ -1,3 +1,4 @@
+import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/api-auth';
@@ -11,7 +12,10 @@ export async function GET(request: Request) {
   if (!sessionHeaders) return NextResponse.json({error:'authRequired'},{status:401});
   const session=await auth.api.getSession({headers:sessionHeaders,query:{disableCookieCache:true}});
   if (!session?.user) return NextResponse.json({error:'authRequired'},{status:401});
-  // Question reads are scoped by user only; the bot runtime choice does not filter them.
-  const result=await handleFactoryQuestionList(factoryRuntimeForBot(null).questions,{actor:{userId:session.user.id},authorization:null,method:'GET',url:request.url});
-  return NextResponse.json(result.body,{status:result.status,headers:{'Cache-Control':'private, no-store'}});
+  return factoryHumanWorkspaceResponse(session?.user, async () => {
+    // The selected workspace bounds the human question collection.
+    const result=await handleFactoryQuestionList(factoryRuntimeForBot(null).questions,{actor:{userId:session.user.id},authorization:null,method:'GET',url:request.url});
+    return NextResponse.json(result.body,{status:result.status,headers:{'Cache-Control':'private, no-store'}});
+  });
+
 }

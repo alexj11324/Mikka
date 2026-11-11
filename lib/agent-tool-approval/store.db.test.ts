@@ -8,37 +8,49 @@ import { AgentToolApprovalStore, ApprovalUnavailable } from './store'
 import { readCliRunPolicy, readCliAgentPolicy } from './policy-store'
 import { acquireWorkspaceMembership } from '../workspace-membership-guard'
 import { setCliPolicy } from './policy-settings'
+import { workspacePool } from '../workspace-db'
+import { ActionFailureError } from '../action-error'
 
 const url = process.env.APPROVAL_TEST_DATABASE_URL
-if (!url) throw new Error('An isolated local approval_e2e database is required')
+if (!url || process.env.MIKKA_DATABASE_URL !== url || process.env.DATABASE_URL !== url) throw new Error('All approval store connections must use its isolated approval_e2e database')
 const target = new URL(url)
 if (!['localhost','127.0.0.1','[::1]'].includes(target.hostname) || !/^\/approval_e2e(?:_[a-f0-9]{24})?$/.test(target.pathname)) throw new Error('Refusing non-isolated database')
 const pool = new Pool({ connectionString: url })
 observePoolCommits(pool)
 const store = new AgentToolApprovalStore(pool)
 const runId = randomUUID(), deviceId = randomUUID(), actor = { userId: 'synthetic-owner', deviceId }
+const personalWorkspaceId = randomUUID()
 let initialRevision = ''
+async function seedWorkspace(userId: string, workspaceId = randomUUID(), kind: 'personal' | 'team' = 'personal', role: 'admin' | 'member' = 'admin') {
+  await pool.query(`INSERT INTO mikka_workspaces (id,"userId",name,kind) VALUES ($1,$2,'Approval fixture',$3)`, [workspaceId,userId,kind])
+  await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,status,role) VALUES ($1,$2,'Approval fixture',$3,'active',$4)`, [workspaceId,userId,`${userId}@example.invalid`,role])
+  return workspaceId
+}
 before(async () => {
   await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid NOT NULL, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "agentId" uuid NOT NULL, "agentDefinition" jsonb, "botId" uuid)`)
-  await pool.query(`ALTER TABLE agent_runs ADD COLUMN "issueId" uuid`)
+  await pool.query(`ALTER TABLE agent_runs ADD COLUMN "issueId" uuid, ADD COLUMN "workspaceId" uuid`)
+  await pool.query(`CREATE TABLE issues (id uuid PRIMARY KEY, "workspaceId" uuid, "ownershipState" text NOT NULL DEFAULT 'pending', "scopeVersion" integer NOT NULL DEFAULT 0, content jsonb)`)
   await pool.query(`ALTER TABLE agent_runs ADD COLUMN "machineAuthority" boolean NOT NULL DEFAULT false,
     ADD COLUMN cli_policy_hierarchy jsonb, ADD COLUMN "updatedAt" timestamptz NOT NULL DEFAULT now()`)
   await pool.query(`CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text NOT NULL,"sourceEventId" uuid NOT NULL,status text NOT NULL);
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid NOT NULL,"runId" uuid NOT NULL,output jsonb NOT NULL);
     CREATE TABLE factory_events (id uuid PRIMARY KEY,"taskId" uuid NOT NULL,request jsonb NOT NULL,result jsonb NOT NULL)`)
-  await pool.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, harness text NOT NULL, "deviceId" uuid); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, enabled boolean NOT NULL, kind text NOT NULL DEFAULT 'local'); CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid, "ownerId" text NOT NULL); CREATE TABLE mikka_workspace_members ("workspaceId" uuid, "userId" text, status text, role text, PRIMARY KEY ("workspaceId", "userId")); CREATE TABLE agent_kit_heads (owner_id text, bot_key text, bot_id uuid, workspace_id uuid, PRIMARY KEY (owner_id, bot_key)); CREATE TABLE workspace_computer_policies ("workspaceId" uuid PRIMARY KEY, permission text NOT NULL DEFAULT 'ask')` )
+  await pool.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, harness text NOT NULL, "deviceId" uuid); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, enabled boolean NOT NULL, kind text NOT NULL DEFAULT 'local'); CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid, "ownerId" text NOT NULL); CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY, "userId" text NOT NULL, name varchar(120) NOT NULL, slug varchar(64) UNIQUE, icon text, kind text NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE mikka_workspace_members ("workspaceId" uuid NOT NULL REFERENCES mikka_workspaces(id), "userId" text NOT NULL, name text NOT NULL, email text NOT NULL, status text NOT NULL, role text NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now(), PRIMARY KEY ("workspaceId", "userId")); CREATE TABLE agent_kit_heads (owner_id text, bot_key text, bot_id uuid, workspace_id uuid, PRIMARY KEY (owner_id, bot_key)); CREATE TABLE workspace_computer_policies ("workspaceId" uuid PRIMARY KEY, permission text NOT NULL DEFAULT 'ask')` )
+  // The isolated store retains the actual Organization link schema; these Workspaces are deliberately unattached.
+  await pool.query(await readFile('drizzle/20261109035020_organization_governance.sql', 'utf8'))
   await pool.query(await readFile('drizzle/20261029011700_agent_tool_approvals.sql', 'utf8'))
   await pool.query(await readFile('drizzle/20261029011701_cli_run_policy.sql', 'utf8'))
   await pool.query(await readFile('drizzle/20261030204836_agent_tool_approval_input_digest.sql', 'utf8'))
   await pool.query(await readFile('drizzle/20261030204833_workspace_audit_events.sql', 'utf8'))
+  await seedWorkspace(actor.userId, personalWorkspaceId)
   const agentId = randomUUID()
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [agentId,actor.userId,deviceId])
   await pool.query(`INSERT INTO devices (id,"ownerId",enabled) VALUES ($1,$2,true)`, [deviceId,actor.userId])
   await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id) VALUES ($1,'coordinator',NULL)`, [actor.userId])
-  await pool.query(`INSERT INTO agent_runs VALUES ($1,$2,$3,'running',NULL,now()+interval '5 minutes',$4,NULL,NULL,NULL)`, [runId,actor.userId,deviceId,agentId])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"leaseExpiresAt","agentId","workspaceId") VALUES ($1,$2,$3,'running',now()+interval '5 minutes',$4,$5)`, [runId,actor.userId,deviceId,agentId,personalWorkspaceId])
   initialRevision = (await readCliRunPolicy(pool, runId, actor.userId)).revision
 })
-after(async () => { await pool.end() })
+after(async () => { await Promise.all([pool.end(), workspacePool.end()]) })
 test('checkState rejects another device', async () => {
   await assert.rejects(store.checkState({ ...actor, deviceId: randomUUID() }, runId, initialRevision))
 })
@@ -50,9 +62,12 @@ test('a stopped run is never live', async () => {
 
 async function watchdogFixture(receipt = true) {
   const stoppedRun = randomUUID(), taskId = randomUUID(), attemptId = randomUUID(), epoch = randomUUID(), workerId = randomUUID()
+  // The workspace policy is the only policy now, so each fixture owns one: a
+  // second write in the same workspace would be a no-op and keep the revision.
+  const workspaceId = await seedWorkspace(actor.userId)
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [workerId,actor.userId,deviceId])
-  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"stopRequestedAt","leaseExpiresAt","agentId")
-    SELECT $1,"userId","deviceId",'running',now(),now()+interval '5 minutes',$3 FROM agent_runs WHERE id=$2`, [stoppedRun,runId,workerId])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"stopRequestedAt","leaseExpiresAt","agentId","workspaceId")
+    VALUES ($1,$2,$3,'running',now(),now()+interval '5 minutes',$4,$5)`, [stoppedRun,actor.userId,deviceId,workerId,workspaceId])
   const revision = (await readCliRunPolicy(pool,stoppedRun,actor.userId)).revision
   await pool.query(`INSERT INTO factory_tasks VALUES($1,$2,$3,'blocked')`, [taskId,actor.userId,epoch])
   await pool.query('INSERT INTO factory_attempts VALUES($1,$2,$3,$4)', [attemptId,taskId,stoppedRun,{
@@ -95,7 +110,7 @@ test('a changed policy revision cannot be hidden by an expired lease or watchdog
   for (const expired of [false,true]) {
     const current = await watchdogFixture()
     if (expired) await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [current.runId])
-    await setCliPolicy(pool,actor.userId,current.runId,'worker',current.revision,{permissions:{install_dependency:'deny'}})
+    await setCliPolicy(pool,actor.userId,current.runId,'workspace',current.revision,{permissions:{install_dependency:'deny'}})
     await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
     const updated = await readCliRunPolicy(pool,current.runId,actor.userId)
     assert.notEqual(updated.revision,current.revision)
@@ -103,30 +118,31 @@ test('a changed policy revision cannot be hidden by an expired lease or watchdog
   }
 })
 
-test('a changed worker policy ends the live check for the old revision', async () => {
+test('a changed workspace policy ends the live check for the old revision', async () => {
   await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [runId])
-  await setCliPolicy(pool, actor.userId, runId, 'worker', initialRevision, { permissions: { install_dependency:'deny' } })
+  await setCliPolicy(pool, actor.userId, runId, 'workspace', initialRevision, { permissions: { install_dependency:'deny' } })
   assert.equal(await store.check(actor, runId, initialRevision), false)
   const current = await readCliRunPolicy(pool,runId,actor.userId)
   assert.equal(current.policy.permissions.install_dependency, 'deny')
   assert.equal(await store.check(actor, runId, current.revision), true)
 })
 
-test('workspace may narrow agent policy, rejects forged generations, and invalidates a recreated fixture', async () => {
+test('the workspace is the only run-policy layer; a Bot head does not narrow it', async () => {
   const wid=randomUUID(), botId=randomUUID(), workerId=randomUUID(), scopedRun=randomUUID()
   await pool.query(`INSERT INTO bots VALUES ($1,$2,$3)`, [botId,wid,actor.userId])
-  await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,$2,'active','admin')`, [wid,actor.userId])
+  await seedWorkspace(actor.userId,wid,'team')
   const guard = (workspaceId: string, userId: string, signal: AbortSignal) => acquireWorkspaceMembership(pool, {workspaceId,userId},signal)
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [workerId,actor.userId,deviceId])
-  await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,$2,$3,$4)`, [actor.userId,botId,wid,{permissions:{install_dependency:'allow'}}])
-  await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",cli_run_policy) VALUES ($1,$2)`, [wid,{permissions:{install_dependency:'deny'}}])
-  await pool.query(`INSERT INTO agent_runs VALUES ($1,$2,$3,'running',NULL,now()+interval '5 minutes',$4,NULL,$5,NULL)`, [scopedRun,actor.userId,deviceId,workerId,botId])
-  const denied = await readCliRunPolicy(pool,scopedRun,actor.userId,guard)
-  assert.equal(denied.policy.permissions.install_dependency,'deny')
-  const asking = await setCliPolicy(pool,actor.userId,scopedRun,'workspace',denied.revision,{permissions:{install_dependency:'ask'}},guard)
-  await assert.rejects(setCliPolicy(pool,actor.userId,scopedRun,'workspace',denied.revision,{permissions:{install_dependency:'allow'}},guard))
+  // A Bot head deny is ignored: the workspace's allow is the whole decision.
+  await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,$2,$3,$4)`, [actor.userId,botId,wid,{permissions:{install_dependency:'deny'}}])
+  await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",cli_run_policy) VALUES ($1,$2)`, [wid,{permissions:{install_dependency:'allow'}}])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"leaseExpiresAt","agentId","botId","workspaceId") VALUES ($1,$2,$3,'running',now()+interval '5 minutes',$4,$5,$6)`, [scopedRun,actor.userId,deviceId,workerId,botId,wid])
+  const allowed = await readCliRunPolicy(pool,scopedRun,actor.userId,guard)
+  assert.equal(allowed.policy.permissions.install_dependency,'allow')
+  const asking = await setCliPolicy(pool,actor.userId,scopedRun,'workspace',allowed.revision,{permissions:{install_dependency:'ask'}},guard)
+  await assert.rejects(setCliPolicy(pool,actor.userId,scopedRun,'workspace',allowed.revision,{permissions:{install_dependency:'allow'}},guard))
   assert.equal(asking.policy.permissions.install_dependency,'ask')
-  assert.notEqual(asking.revision, denied.revision)
+  assert.notEqual(asking.revision, allowed.revision)
   await assert.rejects(pool.query(`UPDATE workspace_computer_policies SET cli_run_policy_generation=$2 WHERE "workspaceId"=$1`, [wid,randomUUID()]))
   const regenerated = await readCliRunPolicy(pool,scopedRun,actor.userId,guard)
   assert.equal(regenerated.policy.permissions.install_dependency, 'ask')
@@ -146,11 +162,44 @@ test('workspace may narrow agent policy, rejects forged generations, and invalid
   await assert.rejects(scopedStore.checkState(actor,scopedRun,recreated.revision), error => !(error instanceof ApprovalUnavailable) || error.revokeReason === undefined)
 })
 
+test('workspace policy changes immediately stop botless machine runs only in the persisted tenant', async () => {
+  const userId = `workspace-stop-${randomUUID()}`, workerId = randomUUID(), device = randomUUID(), botId = randomUUID()
+  const workspaceId = await seedWorkspace(userId,randomUUID(),'team')
+  const otherWorkspaceId = await seedWorkspace(userId,randomUUID(),'team')
+  await pool.query(`INSERT INTO devices (id,"ownerId",enabled) VALUES ($1,$2,true)`, [device,userId])
+  await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [workerId,userId,device])
+  await pool.query(`INSERT INTO bots VALUES ($1,$2,$3)`, [botId,workspaceId,userId])
+  const own = randomUUID(), other = randomUUID(), staleBot = randomUUID(), staleHierarchy = randomUUID(), legacy = randomUUID()
+  // Retained legacy hints cannot override a non-null tenant. This isolated
+  // schema deliberately preserves such historical rows for the stop reader.
+  for (const [id, tenant, bot, hierarchy] of [
+    [own,workspaceId,null,null], [other,otherWorkspaceId,null,null],
+    [staleBot,otherWorkspaceId,botId,null],
+    [staleHierarchy,otherWorkspaceId,null,{ workspaceId,teamId:randomUUID(),projectId:null }],
+    [legacy,null,botId,null],
+  ] as const) {
+    await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"leaseExpiresAt","agentId","workspaceId","botId",cli_policy_hierarchy,"machineAuthority")
+      VALUES ($1,$2,$3,'running',now()+interval '5 minutes',$4,$5,$6,$7,true)`, [id,userId,device,workerId,tenant,bot,hierarchy])
+  }
+  const initial = await readCliRunPolicy(pool,own,userId)
+  const changed = await setCliPolicy(pool,userId,own,'workspace',initial.revision,{permissions:{install_dependency:'deny'}})
+  assert.equal(changed.policy.permissions.install_dependency,'deny')
+  const { rows } = await pool.query<{ id: string; stopped: boolean; expired: boolean }>(`SELECT id,"stopRequestedAt" IS NOT NULL AS stopped,"leaseExpiresAt"<=clock_timestamp() AS expired
+    FROM agent_runs WHERE id=ANY($1::uuid[])`, [[own,other,staleBot,staleHierarchy,legacy]])
+  assert.equal(rows.length,5)
+  for (const row of rows) {
+    const expected = row.id === own || row.id === legacy
+    assert.equal(row.stopped,expected,'only the persisted tenant or an unbound legacy tenant is stopped')
+    assert.equal(row.expired,expected,'revocation expires the machine lease in the policy transaction')
+  }
+})
+
 test('legacy local runs materialize stable sandbox defaults without changing explicit choices', async () => {
   const user=`legacy-${randomUUID()}`, workerId=randomUUID(), legacyRun=randomUUID(), legacyDevice=randomUUID()
   await pool.query('INSERT INTO devices (id,"ownerId",enabled) VALUES ($1,$2,true)',[legacyDevice,user])
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`,[workerId,user,legacyDevice])
-  await pool.query(`INSERT INTO agent_runs VALUES ($1,$2,$3,'running',NULL,now()+interval '5 minutes',$4,NULL,NULL,NULL)`,[legacyRun,user,legacyDevice,workerId])
+  const workspaceId = await seedWorkspace(user)
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"leaseExpiresAt","agentId","workspaceId") VALUES ($1,$2,$3,'running',now()+interval '5 minutes',$4,$5)`,[legacyRun,user,legacyDevice,workerId,workspaceId])
   const first=await readCliRunPolicy(pool,legacyRun,user)
   const second=await readCliRunPolicy(pool,legacyRun,user)
   assert.equal(first.policy.permissions.install_dependency,'allow')
@@ -158,10 +207,10 @@ test('legacy local runs materialize stable sandbox defaults without changing exp
   assert.equal(first.policy.permissions.network,'allow')
   assert.equal(first.policy.permissions.git_push,'allow','push is the GitHub App grant, never ask')
   assert.equal(first.revision,second.revision)
-  assert.deepEqual(first.layers.agent,{})
+  assert.deepEqual(first.layers, { workspace: {} })
   const results = await Promise.allSettled([
-    setCliPolicy(pool,user,legacyRun,'worker',first.revision,{permissions:{install_dependency:'allow'}}),
-    setCliPolicy(pool,user,legacyRun,'worker',first.revision,{permissions:{install_dependency:'deny'}}),
+    setCliPolicy(pool,user,legacyRun,'workspace',first.revision,{permissions:{install_dependency:'allow'}}),
+    setCliPolicy(pool,user,legacyRun,'workspace',first.revision,{permissions:{install_dependency:'deny'}}),
   ])
   assert.equal(results.filter(result => result.status === 'fulfilled').length,1)
   assert.equal(results.filter(result => result.status === 'rejected').length,1)
@@ -169,20 +218,20 @@ test('legacy local runs materialize stable sandbox defaults without changing exp
 
 test('unbound workers get open network defaults and only owned cloud devices are read',async()=>{
  const user=`device-defaults-${randomUUID()}`,worker=randomUUID(),device=randomUUID()
- const guard=async()=>({async check(){},async close(){}})
  await pool.query(`INSERT INTO agents(id,"userId",harness) VALUES($1,$2,'codex')`,[worker,user])
- const unbound=await readCliAgentPolicy(pool,user,worker,null,guard)
+ const unbound=await readCliAgentPolicy(pool,user,worker,null)
  // Network is open by default everywhere (decision 2026-11-01-1230).
  assert.equal(unbound.policy.permissions.network,'allow')
  await pool.query(`INSERT INTO devices(id,"ownerId",enabled,kind) VALUES($1,$2,true,'cloud')`,[device,user])
  await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1',[worker,device])
- const cloud=await readCliAgentPolicy(pool,user,worker,null,guard)
+ const cloud=await readCliAgentPolicy(pool,user,worker,null)
  assert.equal(cloud.policy.permissions.network,'allow')
  assert.notEqual(cloud.revision,unbound.revision)
  await pool.query(`UPDATE agents SET cli_run_policy='{"permissions":{"network":"deny"}}' WHERE id=$1`,[worker])
- assert.equal((await readCliAgentPolicy(pool,user,worker,null,guard)).policy.permissions.network,'deny')
+ // A worker policy is retired: it does not narrow the workspace decision.
+ assert.equal((await readCliAgentPolicy(pool,user,worker,null)).policy.permissions.network,'allow')
  await pool.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1',[device,'someone-else'])
- await assert.rejects(readCliAgentPolicy(pool,user,worker,null,guard),/agentPolicyUnavailable/)
+ await assert.rejects(readCliAgentPolicy(pool,user,worker,null),/agentPolicyUnavailable/)
 })
 
 
@@ -213,7 +262,7 @@ test('policy changes and live tool checks share run-before-policy lock order', {
   })
   const checking = new AgentToolApprovalStore({...checks,query:pool.query.bind(pool)}).checkState(actor,runId,current.revision)
   await held
-  const changing = setCliPolicy(settings,actor.userId,runId,'worker',current.revision,current.layers.worker)
+  const changing = setCliPolicy(settings,actor.userId,runId,'workspace',current.revision,current.layers.workspace)
   const results = await Promise.allSettled([checking,changing])
   assert.deepEqual(results.map(result => result.status === 'fulfilled' ? 'ok' : (result.reason as {code?:string}).code),['ok','ok'])
 })
@@ -222,7 +271,7 @@ test('human control preserves the existing lease, then expires through the exist
   await pool.query(`ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "resumeStatus" text`)
   await pool.query(`CREATE TABLE computer_run_bindings ("runId" uuid, "botId" uuid, "ownerId" text, "workspaceId" uuid);
     CREATE TABLE bot_desktops ("botId" uuid, "ownerId" text, "workspaceId" uuid, control text, "controlUntil" timestamptz)`)
-  const bot = randomUUID(), workspace = randomUUID()
+  const bot = randomUUID(), workspace = personalWorkspaceId
   await pool.query(`INSERT INTO computer_run_bindings VALUES ($1,$2,$3,$4)`, [runId,bot,actor.userId,workspace])
   await pool.query(`INSERT INTO bot_desktops VALUES ($1,$2,$3,'user',now()+interval '5 minutes')`, [bot,actor.userId,workspace])
   await pool.query(`UPDATE agent_runs SET status='running',"stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [runId])
@@ -260,15 +309,12 @@ test('human control preserves the existing lease, then expires through the exist
 
 async function distributionFixture(workspace = false) {
   const userId = `distribution-${randomUUID()}`, deviceId = randomUUID(), agentId = randomUUID(), runId = randomUUID()
-  const workspaceId = workspace ? randomUUID() : null, botId = workspace ? randomUUID() : null
+  const workspaceId = await seedWorkspace(userId,randomUUID(),workspace ? 'team' : 'personal',workspace ? 'member' : 'admin'), botId = workspace ? randomUUID() : null
   await pool.query('INSERT INTO devices (id,"ownerId",enabled) VALUES ($1,$2,true)', [deviceId,userId])
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [agentId,userId,deviceId])
-  if (workspaceId) {
-    await pool.query('INSERT INTO bots VALUES ($1,$2,$3)', [botId,workspaceId,userId])
-    await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,$2,'active','member')`, [workspaceId,userId])
-  }
-  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"leaseExpiresAt","agentId","botId")
-    VALUES ($1,$2,$3,'preparing',now()+interval '5 minutes',$4,$5)`, [runId,userId,deviceId,agentId,botId])
+  if (botId) await pool.query('INSERT INTO bots VALUES ($1,$2,$3)', [botId,workspaceId,userId])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"leaseExpiresAt","agentId","botId","workspaceId")
+    VALUES ($1,$2,$3,'preparing',now()+interval '5 minutes',$4,$5,$6)`, [runId,userId,deviceId,agentId,botId,workspaceId])
   const membership = (workspaceId: string, userId: string, signal: AbortSignal) => acquireWorkspaceMembership(pool, {workspaceId,userId}, signal)
   const current = await readCliRunPolicy(pool,runId,userId,membership)
   return { actor: {userId,deviceId}, runId, agentId, workspaceId, current, membership }
@@ -376,5 +422,6 @@ test('policy distribution holds run, policy and membership locks through its gua
   assert.deepEqual(await pending,fixture.current)
   assert.equal(closed,1)
   await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [fixture.workspaceId,fixture.actor.userId])
-  await assert.rejects(new AgentToolApprovalStore(pool,fixture.membership).policyDistribution(fixture.actor,fixture.runId), /Workspace membership lease unavailable/)
+  await assert.rejects(new AgentToolApprovalStore(pool,fixture.membership).policyDistribution(fixture.actor,fixture.runId), error =>
+    error instanceof Error && error.message === 'agentPolicyUnavailable' && error.cause instanceof ActionFailureError && error.cause.code === 'workspaceAccessDenied')
 })

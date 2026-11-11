@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { assertDatabaseIdentity, validateEnvironment, EnvironmentError } from './environment.mjs'
 import { retainedSessionUpdate, assertOneRetainedSessionUpdated } from './retained-session-plan.mjs'
+import { retainDeletedResourceAudit, retainedAuditFingerprints, retainedAuditMatches } from './retained-resource-audit.mjs'
 
 const LABEL = /^[a-zA-Z0-9][a-zA-Z0-9_.:/-]{0,199}$/
 const UUID = /^[a-f0-9-]{36}$/
@@ -89,6 +90,14 @@ export class TestAccountPool {
         id text NOT NULL, owner_id text NOT NULL,
         state text NOT NULL CHECK(state IN ('created','retained','cleaned')),
         PRIMARY KEY(lease_id,type,id)
+      )`)
+      await client.query('ALTER TABLE mikka_test_accounts.resources ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT clock_timestamp()')
+      await client.query(`CREATE TABLE IF NOT EXISTS mikka_test_accounts.retained_audit (
+        lease_id uuid NOT NULL REFERENCES mikka_test_accounts.leases(id),source_type text NOT NULL,source_id text NOT NULL,
+        owner_id text NOT NULL,table_name text NOT NULL CHECK(table_name IN ('resource_access_events','run_resource_disclosures')),
+        record_id text NOT NULL,workspace_id uuid,fingerprint text NOT NULL CHECK(length(fingerprint)=64),
+        created_at timestamptz NOT NULL DEFAULT clock_timestamp(),PRIMARY KEY(table_name,record_id),
+        FOREIGN KEY(lease_id,source_type,source_id) REFERENCES mikka_test_accounts.resources(lease_id,type,id)
       )`)
       for (let i = 0; i < pairs; i++) {
         const id = `pair-${String(i).padStart(3, '0')}`
@@ -318,7 +327,9 @@ export class TestAccountPool {
   async fingerprint(client, userId) {
     const hash = createHash('sha256')
     const owned = await this.ownedRows(client, userId)
-    for (const [table, rows] of [...owned].sort(([a], [b]) => a.localeCompare(b))) hash.update(JSON.stringify([table, rows.map(row => row.text)]))
+    const receipts = await retainedAuditFingerprints(client,userId)
+    for (const [table, rows] of [...owned].sort(([a], [b]) => a.localeCompare(b)))
+      hash.update(JSON.stringify([table, rows.filter(row => !retainedAuditMatches(table,row,receipts)).map(row => row.text)]))
     return hash.digest('hex')
   }
 
@@ -372,10 +383,12 @@ export class TestAccountPool {
       await this.current(client, lease)
       const resource = (await client.query('SELECT * FROM mikka_test_accounts.resources WHERE lease_id=$1 AND type=$2 AND id=$3', [lease.id, type, id])).rows[0]
       if (!resource || resource.state === 'retained') fail('RESOURCE_NOT_OWNED')
+      if (resource.state === 'cleaned') return
       const [table, column] = TABLES[type]
       const owner = type === 'conversation_reads' ? ' AND "userId"=$2' : ''
       const args = type === 'conversation_reads' ? [id, resource.owner_id] : [id]
       if ((await client.query(`SELECT 1 FROM public.${quote(table)} WHERE ${quote(column)}::text=$1${owner} LIMIT 1`, args)).rowCount) fail('RESOURCE_STILL_PRESENT')
+      await retainDeletedResourceAudit(client,lease,resource,fail)
       await client.query("UPDATE mikka_test_accounts.resources SET state='cleaned' WHERE lease_id=$1 AND type=$2 AND id=$3", [lease.id, type, id])
       await this.current(client, lease)
     })

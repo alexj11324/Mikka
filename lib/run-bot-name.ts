@@ -11,10 +11,26 @@ export const executionBotName = sql<string>`coalesce(
   case when ${agents.name} ~ '^(claude_code|codex|mock) [0-9a-f-]{36}$' then 'Coordinator' else ${agents.name} end
 )`
 
+/**
+ * A Bot that dispatched a run and still exists, even though it carried no owner for the two
+ * tiers above to match. That is a Bot kept for an admin to take over: `lib/account/delete.ts:421`
+ * leaves the row with `ownerId` null and archives it (「待接管」), and its threads used to read
+ * "Coordinator" — an attribution to a Bot that never dispatched them.
+ *
+ * Read from the identity frozen at dispatch (lib/execution-identity.ts:96) rather than from
+ * `agent_runs.botId`, which `agent_runs_bot_fk` (ON DELETE SET NULL) clears when a Bot is deleted.
+ * A deleted Bot leaves no row here, so its runs still fall through to `executionBotName`'s
+ * Coordinator, which is the Bot that ran them. A run with no recorded identity has nothing to
+ * read, so it too falls through: a gap in the record, not a claim about who dispatched it.
+ */
+const dispatchedBotName = sql<string | null>`(select ${shownName} from bots b
+  where b.id::text = ${agentRuns.agentDefinition}->'executionIdentity'->>'botId')`
+
 /** The dispatching Bot wins; hidden execution identities never become conversation names. */
 export const runBotName = sql<string>`coalesce(
   (select ${shownName} from computer_run_bindings crb join bots b on b.id=crb."botId" and b."ownerId"=crb."ownerId" where crb."runId"=${agentRuns.id}),
   (select ${shownName} from bots b where b.id=${agentRuns.botId} and b."ownerId"=${agentRuns.userId}),
+  ${dispatchedBotName},
   ${executionBotName}
 )`
 
@@ -38,8 +54,11 @@ export const runAgentName = sql<string>`case ${agents.harness} when 'claude_code
  * at 60 characters): leading blank space dropped, then 400 characters. A list
  * names a thread from this instead of reading whole prompts.
  */
-/** A run's prompt from its task on (`promptTaskStart`): Factory guidance prepended at dispatch never names the thread. */
-export const runTaskPrompt = sql<string>`substr(${agentRuns.prompt}, coalesce(${agentRuns.promptTaskStart}, 0) + 1)`
+/** Only the recorded task range may name a thread; missing/invalid provenance never falls back to execution instructions. */
+// These columns belong only to the current agent_runs row in every caller.
+// Keep the repeated projection compact for citation wire budgets; int8 subtraction
+// makes even invalid int32 extrema safe before CASE decides whether to slice.
+export const runTaskPrompt = sql<string>`case when "promptTaskStart">=0 and "promptTaskLength" between 0 and length(prompt)-"promptTaskStart"::int8 then substr(prompt,"promptTaskStart"+1,"promptTaskLength") else '' end`
 export const threadNamePrompt = sql<string>`left(ltrim(${runTaskPrompt}, E' \\t\\r\\n'), 400)`
 /**
  * A run's prompt up to the end of its first line with a letter, in a query
@@ -48,6 +67,6 @@ export const threadNamePrompt = sql<string>`left(ltrim(${runTaskPrompt}, E' \\t\
  * emphasis, so a line with a letter is never empty and no later line is read.
  * The lines before it are kept, so the name equals the whole prompt's name.
  */
-export const threadNameLines = sql<string | null>`substring(ltrim(substr(agent_runs.prompt, coalesce(agent_runs."promptTaskStart", 0) + 1), E' \\t\\r\\n') from E'^(?:[^[:alpha:]\\n]*\\n)*[^\\n]*')`
+export const threadNameLines = sql<string | null>`substring(ltrim(${runTaskPrompt}, E' \\t\\r\\n') from E'^(?:[^[:alpha:]\\n]*\\n)*[^\\n]*')`
 /** `threadNameLines` within `threadNamePrompt`'s 400 characters: the same name as `threadNamePrompt` gives. */
 export const threadNameHead = sql<string | null>`left(${threadNameLines}, 400)`

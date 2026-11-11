@@ -31,3 +31,30 @@ test('an event kind the chat does not know is a plain line, never its text', () 
   assert.deepEqual(eventLine('something_new', '[Event] Internal detail with ids'), { kind: 'other', runId: null, issueId: null, status: null, title: null })
   assert.equal(eventLine(undefined, '[Event] legacy').kind, 'other')
 })
+
+test("a schedule's events name the schedule, never 'a thread'; its result is no longer read as empty Agent data", () => {
+  const scheduleId = '21b0c996-0249-450a-9cf1-0063dec7b44d'
+  const ran = eventPrompt({ kind: 'run_report', issueId: null, runId: null, payload: { source: 'schedule_result', scheduleId, title: 'm1415 "nightly" check', occurrenceId: 'o', operationId: 'op', status: 'succeeded', error: null } })
+  assert.doesNotMatch(ran, /undefined|coordination data/)
+  assert.deepEqual(eventLine('run_report', ran), { kind: 'scheduleRan', runId: null, issueId: null, status: 'succeeded', title: 'm1415 "nightly" check' })
+  const skipped = eventPrompt({ kind: 'run_report', issueId: null, runId: null, payload: { source: 'schedule_result', scheduleId, title: 'Daily', status: 'skipped', error: 'misfireSkipped' } })
+  assert.match(skipped, /ran with status skipped \(misfireSkipped\)/)
+  assert.equal(eventLine('run_report', skipped).status, 'skipped')
+
+  const due = eventPrompt({ kind: 'run_report', issueId: null, runId: null, payload: { source: 'schedule_due', scheduleId, title: 'Morning read', text: 'Read my open PRs' } })
+  assert.match(due, /An Agent reports coordination data: Read my open PRs/, 'the instructions still reach the model as before')
+  assert.deepEqual(eventLine('run_report', due), { kind: 'scheduleDue', runId: null, issueId: null, status: null, title: 'Morning read' })
+
+  // Events written before they carried a title: the schedule, unnamed.
+  const untitled = eventPrompt({ kind: 'run_report', issueId: null, runId: null, payload: { source: 'schedule_result', scheduleId, status: 'failed', error: 'x' } })
+  assert.deepEqual(eventLine('run_report', untitled), { kind: 'scheduleRan', runId: null, issueId: null, status: 'failed', title: null })
+  // Rows already in the chat from before: the result read as Agent data with no text.
+  assert.deepEqual(eventLine('run_report', '[Event] An Agent reports coordination data: undefined'), { kind: 'scheduleRan', runId: null, issueId: null, status: null, title: null })
+})
+
+test("an Agent's report outside a thread stays a report, with no run to name", () => {
+  const peer = eventPrompt({ kind: 'run_report', issueId: null, runId: null, payload: { source: 'oauth_agent_mcp', text: 'Deployed the preview' } })
+  assert.deepEqual(eventLine('run_report', peer), { kind: 'runReport', runId: null, issueId: null, status: null, title: null })
+  const inRun = eventPrompt({ kind: 'run_report', issueId, runId, payload: { text: 'Half way' } })
+  assert.deepEqual(eventLine('run_report', inRun), { kind: 'runReport', runId, issueId, status: null, title: null })
+})

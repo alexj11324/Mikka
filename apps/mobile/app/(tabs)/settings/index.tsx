@@ -3,7 +3,7 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { ActionSheetIOS, Linking, Platform, ScrollView, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info } from 'lucide-react-native'
+import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Hand, Info } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -20,6 +20,8 @@ import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
 import { currentAccount, servers } from '@/lib/config'
 import { serverCopy } from '@/lib/server-copy'
+import { openPrivacyPolicy } from '@/lib/web'
+import { mobileMessages as messages } from '@/lib/messages'
 
 /** A row's icon (Comma design 18): a white glyph on a colored rounded square, as in the system Settings app. */
 const icon = (name: SymbolName, Icon: typeof Bell, background: string) => (
@@ -77,6 +79,7 @@ export default function SettingsScreen() {
           </Group>
           <Group>
             <Row icon={icon('briefcase.fill', BriefcaseBusiness, '#8E8E93')} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspaces')} />
+            {data.billingScope && <Row label={messages.Billing.management.billingEntry} onPress={() => router.push('/settings/billing')} />}
           </Group>
           <Group>
             <Row icon={icon('bell.fill', Bell, '#FF3B30')} label="通知" value={data.preferences.proactive ? '开' : '关'} onPress={() => router.push('/settings/notifications')} />
@@ -87,6 +90,7 @@ export default function SettingsScreen() {
             <Row icon={icon('globe', Globe, '#5856D6')} label="语言" value="简体中文" trailing={Platform.OS === 'web' ? null : <Symbol name="arrow.up.right" size={13} color={colors.tertiary} web={<ArrowUpRight size={16} color={colors.tertiary} strokeWidth={2} />} />}
               onPress={Platform.OS === 'web' ? undefined : () => { void Linking.openSettings() }} />
             <Row icon={icon('info.circle.fill', Info, '#8E8E93')} label="版本" value={versionLabel()} trailing={null} />
+            <Row icon={icon('hand.raised.fill', Hand, '#5856D6')} label={messages.Common.privacyPolicy} onPress={() => void openPrivacyPolicy()} />
           </Group>
           <Group>
             <Row label={signingOut ? "正在退出登录" : "退出登录"} disabled={signingOut} destructive onPress={confirmSignOut} />

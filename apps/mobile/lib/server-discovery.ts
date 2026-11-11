@@ -4,8 +4,9 @@ const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]'])
 const PATH = /^(?:\/[A-Za-z0-9._~-]{1,100}){0,5}$/
 const MAX_BODY = 64 * 1024
 export const MOBILE_SERVER_PROTOCOL = 1
+export const CLOUD_API_URL = 'https://app.aspectlylabs.com/mikka'
 
-export type ServerSignIn = { google: boolean; github: boolean; email: boolean }
+export type ServerSignIn = { google: boolean; github: boolean; apple: boolean; email: boolean }
 export type MobileServer = {
   url: string; name: string; version: string | null; edition: 'cloud' | 'community'
   signIn: ServerSignIn; mobileReady: boolean
@@ -47,7 +48,7 @@ function discovery(value: unknown) {
   if (!range || !Number.isSafeInteger(range.min) || !Number.isSafeInteger(range.max) || range.min! < 0 || range.min! > range.max!) return null
   const methods = body.signIn as Partial<ServerSignIn> | undefined
   if (!methods || ['google', 'github', 'email'].some(key => typeof methods[key as keyof ServerSignIn] !== 'boolean')) return null
-  return { name, version, edition: edition as MobileServer['edition'], basePath, min: range.min!, max: range.max!, signIn: methods as ServerSignIn,
+  return { name, version, edition: edition as MobileServer['edition'], basePath, min: range.min!, max: range.max!, signIn: { ...methods, apple: methods.apple === true } as ServerSignIn,
     minimum: text(body.minDesktopVersion, 100), mobileReady: body.mobileReady === true }
 }
 

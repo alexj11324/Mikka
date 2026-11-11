@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
@@ -7,6 +8,7 @@ import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { remoteKey } from '@mikka/protocol/repository'
 import { assertE2eTarget } from './helpers/e2e-target.mjs'
+import { createRequestScope, runRequestScope } from '../apps/api/src/context'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) {
@@ -53,13 +55,10 @@ test('Factory task denials preserve public errors before policy and execution si
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   async function fixture(question = false, workspace = false) {
     const issueId = randomUUID(), eventId = randomUUID(), runId = randomUUID(), questionId = randomUUID()
-    let workspaceId: string | undefined
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Factory policy fixture\',\'{"type":"doc","content":[]}\',\'todo\',\'normal\',$3)', [issueId, workspace ? other : owner, workspace ? 'workspace' : 'personal'])
+    const workspaceId = await seedFixtureWorkspace(pool, owner, workspace ? 'team' : 'personal')
+    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") VALUES ($1,$2,\'Factory policy fixture\',\'{"type":"doc","content":[]}\',\'todo\',\'normal\',$3,$4,\'bound\')', [issueId, workspace ? other : owner, workspace ? 'workspace' : 'personal', workspaceId])
     if (workspace) {
-      workspaceId = randomUUID()
       const team = randomUUID()
-      await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,\'Factory policy fixture\')', [workspaceId, owner])
-      await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'admin\',\'active\')', [workspaceId, owner, `${owner}@example.invalid`])
       await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [workspaceId, other, `${other}@example.invalid`])
       await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,\'Factory policy fixture\',\'FP576\')', [team, workspaceId, owner])
       await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issueId, team, workspaceId, other])
@@ -74,7 +73,10 @@ test('Factory task denials preserve public errors before policy and execution si
   }
   const answer = async (f: Awaited<ReturnType<typeof fixture>>, origin = 'http://127.0.0.1') => {
     const id = f.q!.id
-    return questionRoute.POST(new Request(`http://127.0.0.1/api/factory/questions/${id}`, { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify({ reference: questionReference(f.q!), answerId: randomUUID(), text: 'Continue' }) }), { params: Promise.resolve({ questionId: id }) })
+    const request = new Request(`http://127.0.0.1/api/factory/questions/${id}`, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'x-mikka-workspace-id': f.workspaceId }, body: JSON.stringify({ reference: questionReference(f.q!), answerId: randomUUID(), text: 'Continue' }) })
+    // The real HTTP adapter supplies both request context and the selected
+    // workspace; the canonical guard still checks this membership in PG.
+    return runRequestScope(createRequestScope(request), () => questionRoute.POST(request, { params: Promise.resolve({ questionId: id }) }))
   }
   await t.test('deleted questions return factoryNotFound and cannot create a continuation', async () => {
     const f = await fixture(true)
@@ -102,11 +104,10 @@ test('Factory task denials preserve public errors before policy and execution si
   await t.test('revoked personal/workspace claims keep issue_unavailable with zero issuance and queued state', async () => {
     for (const workspace of [false, true]) {
       const f = await fixture(false, workspace)
-      if (workspace) await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [f.workspaceId, owner])
-      else await pool.query('UPDATE issues SET "userId"=$2 WHERE id=$1', [f.issueId, other])
+      await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [f.workspaceId, owner])
       const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${f.runId}/claim`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', [SKILL_ARTIFACT_HEADER]: '1' } }), { params: Promise.resolve({ deviceId, runId: f.runId }) })
       assert.equal(response.status, 409)
-      assert.deepEqual(await response.json(), { error: 'The task is no longer available to this thread.', code: 'issue_unavailable' }, workspace ? 'workspace membership revoked' : 'personal owner changed')
+      assert.deepEqual(await response.json(), { error: 'The task is no longer available to this thread.', code: 'issue_unavailable' }, workspace ? 'shared workspace membership revoked' : 'personal workspace membership revoked')
       assert.deepEqual((await pool.query('SELECT status,"leaseExpiresAt" FROM agent_runs WHERE id=$1', [f.runId])).rows[0], { status: 'queued', leaseExpiresAt: null })
       for (const table of ['run_tokens', 'improvement_skill_receipts', 'run_publications']) assert.equal((await pool.query(`SELECT count(*)::int AS n FROM ${table} WHERE "runId"=$1`, [f.runId])).rows[0].n, 0)
     }

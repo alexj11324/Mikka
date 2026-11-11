@@ -6,17 +6,18 @@ import { Globe } from 'lucide-react'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
-import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName } from '@/lib/coordinator/citations'
+import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runTitle } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
-import { cn } from 'cn'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
 import { Claude } from '@/components/ui/svgs/claude'
 import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
-import { statusIconTints } from '@/lib/status-appearance'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES } from '@/components/workspace/issue-properties'
-import { ThreadStatus, ThreadStatusIcon, threadGroupOfRun } from '@/components/workspace/thread-status-icon'
+import { localTaskState } from '@/hooks/use-bot-tasks'
+import { taskStateOf } from '@/lib/task-state'
+import { ISSUE_PRIORITIES } from '@/components/workspace/issue-properties'
+import { TaskStateIcon, useTaskStateLabel } from '@/components/workspace/task-state-icon'
+import { ThreadStatus } from '@/components/workspace/thread-status-icon'
 import { openThread } from '@/components/workspace/workspace-navigation'
 
 export type LinkPreviews = Record<string, LinkPreview | null>
@@ -33,11 +34,11 @@ export interface AgentCitations {
   /** A reply still arriving, or its cited issues and runs still being looked up: a chip not known yet holds its place. */
   pending?: boolean
   /**
-   * Tasks whose thread the same reply cites: a task and its thread are one piece of work (R-81), so only the thread
-   * is a chip and the task is its number in the sentence, or 「这个任务」 without one (R-15).
+   * Tasks whose thread the same reply cites. No longer read when rendering (decision 2026-11-10): the task is always
+   * its own compact chip (state icon and code) and the thread its title, so neither repeats the other.
    */
   covered?: ReadonlySet<string>
-  /** Threads whose card sits under this same reply: the card is the object, so the words name it without a second chip (R-66). */
+  /** Legacy reply metadata; references use the same compact task chip / thread link even beside a dispatch card. */
   carded?: ReadonlySet<string>
 }
 
@@ -65,7 +66,8 @@ export function useAgentCitations() {
 function ChipHead({ icon, title }: { icon: ReactNode; title: string }) {
   const [first = '', ...rest] = Array.from(title)
   return <InlineCitationLabel>
-    <span data-slot="chip-head" className="whitespace-nowrap [&>[role=img]]:mr-1 [&>[role=img]]:inline-flex [&>[role=img]]:align-[-0.125em] [&>svg]:mr-1 [&>svg]:inline [&>svg]:align-[-0.125em]">{icon}{first}</span>{rest.join('')}
+    {/* The icon sits in an inline box: a reset that makes `svg` a block cannot drop it onto its own line. */}
+    <span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{first}</span>{rest.join('')}
   </InlineCitationLabel>
 }
 
@@ -85,16 +87,11 @@ export function useLinkPreviews(texts: readonly string[]): LinkPreviews {
 /** Markdown `a`: a citation or web link as a source chip when the conversation provides citations. */
 export function CitationAnchor({ href, children, className: _className, ...props }: ComponentProps<'a'>) {
   const citations = useAgentCitations()
-  const t = useTranslations('Coordinator.citation')
   if (citations && href?.startsWith(CITATION_HREF)) {
     const [kind, id] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string]
     const source = citations.sources[id]
     if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
-    // The thread chip already carries the task's title: the task is its number, or 「这个任务」 when it has none, so the
-    // sentence still reads (「这个任务的线程 …」, never 「的线程 …」).
-    if (source.kind === 'issue' && citations.covered?.has(id)) return <span data-citation-covered="">{source.identifier ?? t('thisTask')}</span>
-    if (source.kind === 'run' && citations.carded?.has(id)) return <span data-citation-carded="">{runThreadName(source)}</span>
     return <CitationChip id={id} kind={source.kind} />
   }
   if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />
@@ -124,23 +121,40 @@ export function PendingCitation() {
   return <span aria-hidden="true" data-citation-pending="" className="mx-0.5 inline-block h-5 w-16 translate-y-[-1px] animate-pulse rounded-[5px] bg-object-chip align-middle motion-reduce:animate-none" />
 }
 
-/** A task mentioned in a reply: a boxed chip with its status icon and title; the number is in the hover card. */
+/**
+ * A task mentioned in a reply (decision 2026-11-10): a compact chip with the task's own state icon (taskStateOf for a
+ * run, localTaskState without one; never a run's result or a thread group) and its code, as 「◐ ALEX-45」; its
+ * title when it has no code. The title, state and priority are in the hover card.
+ */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
-  const status = ISSUE_STATUSES.find(item => item.value === issue.status) ?? ISSUE_STATUSES[1]
+  const stateLabel = useTaskStateLabel()
+  const issueState = { status: issue.status, metadata: { pullRequests: issue.pullRequests ?? [] } }
+  // The canonical task state also knows that an open PR waits for review; the
+  // legacy attempt-only slot is used only when there is no run to project.
+  const outcome = issue.run && (issue.run.outcome === 'done' || issue.run.outcome === 'blocked'
+    || issue.run.outcome === 'needs_input' || issue.run.outcome === 'failed' || issue.run.outcome === 'idle')
+    ? issue.run.outcome : null
+  const { state, reason } = issue.run
+    ? taskStateOf(issueState, { runId: '', status: issue.run.status, outcome })
+    : localTaskState(issueState)
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
+  const icon = <TaskStateIcon state={state} />
   return <InlineCitation>
-    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} onClick={() => onOpen(issue.id)}>
-      <ChipHead icon={<status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />} title={issue.title} />
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={state} onClick={() => onOpen(issue.id)}>
+      {identifier
+        // A code never breaks: the icon and the code are one unit.
+        ? <InlineCitationLabel><span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{identifier}</span></InlineCitationLabel>
+        : <ChipHead icon={icon} title={issue.title} />}
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
         <InlineCitationSource><Mikka />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
         <InlineCitationTitle>{issue.title}</InlineCitationTitle>
         <InlineCitationMeta>
-          <span><status.icon className={cn(statusIconTints[status.tone])} />{tIssue(`status.${status.value}`)}</span>
+          <span data-task-state-label={state}><TaskStateIcon state={state} />{stateLabel(state, reason)}</span>
           {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
       </InlineCitationBody>
@@ -166,27 +180,33 @@ export function WebCitation({ url, label }: { url: string; label: string | null 
   return <LinkCitation url={url} label={label} preview={citations.previews[url]} />
 }
 
-/** A thread mentioned in a reply: a boxed chip with its status icon and name; it opens the thread's conversation, never the task. */
+/**
+ * The look of a thread named in a sentence (decision 2026-11-10): its title in the link colour, with no box, icon,
+ * accent or state badge. Still the object chip's inline `span` button, so a long title wraps and the focus ring shows.
+ */
+const runLinkClassName = 'mx-0 rounded-sm bg-transparent px-0 text-object-chip-foreground underline-offset-4 hover:bg-transparent hover:underline data-popup-open:bg-transparent data-popup-open:underline'
+
+/**
+ * A thread mentioned in a reply: its title alone, as a link (its task's title without the code, since the task has
+ * its own chip; else what it was asked). It opens the thread's conversation, never the task. The Agent, its coding
+ * agent's mark, its state and time are in the hover card.
+ */
 export function RunCitation({ run }: { run: RunSource }) {
   const t = useTranslations('Coordinator.citation')
   const format = useFormatter()
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
-  // A thread is a bubble in the chip's accent, its state a dot on it, as on the thread card and the Threads list; the coding agent's mark is in the hover card (R-78).
   const issue = run.issue
-  const name = runThreadName(run)
-  const group = threadGroupOfRun(run.status, run.outcome)
-  const attention = group === 'waiting' || group === 'blocked'
+  const title = runTitle(run)
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
-      aria-label={issue ? t('openThread', { name }) : t('runOf', { bot: run.agentName })}
-      onClick={issue ? () => openThread(run.id) : undefined}
+      className={runLinkClassName}
+      data-thread-link=""
+      aria-label={t('openThread', { name: title })}
+      onClick={() => openThread(run.id)}
     >
-      <ChipHead icon={<ThreadStatusIcon status={run.status} outcome={run.outcome} small accent dot={attention} />} title={name} />
-      {/* Waiting for you or blocked: the dot, its colour and its word together (R-87); other states are in the hover card. */}
-      {/* The same state badge as the thread card and an open thread (R-90), its word on its tint. */}
-      {attention && <span data-thread-attention={group} className="ml-1 inline-flex align-[-0.125em] whitespace-nowrap"><ThreadStatus status={run.status} outcome={run.outcome} icon={false} /></span>}
+      <InlineCitationLabel>{title}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>

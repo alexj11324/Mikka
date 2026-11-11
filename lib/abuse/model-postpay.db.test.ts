@@ -48,8 +48,8 @@ test('hosted calls check positive balance, debit only after receipts, and resume
     releaseFirst()
     server.closeAllConnections()
     await new Promise<void>(resolve => server.close(() => resolve()))
-    await pool.end()
-    await (await import('../db')).pool.end()
+    const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
+    await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address() as { port: number }
@@ -65,7 +65,10 @@ test('hosted calls check positive balance, debit only after receipts, and resume
       } }) }
     },
   }
-  const workspace = randomUUID()
+  // Model admission resolves the real tenant policy before any provider call.
+  const { seedUser, seedWorkspace } = await import('../../tests/support/workspace-admin-db')
+  const userId = await seedUser(pool, 'model-postpay')
+  const workspace = (await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])).id
   await store.verify(workspace, 'cus_synthetic_postpay', `synthetic-${workspace}`)
   await pool.query('UPDATE hosted_allowances SET remaining=1 WHERE "workspaceId"=$1', [workspace])
   const { hostedModel } = await import('./model')
@@ -74,11 +77,11 @@ test('hosted calls check positive balance, debit only after receipts, and resume
   await Promise.race([arrived, firstCall.then(() => { throw Error('Provider responded before the held receipt') })])
   try {
     assert.equal(providerCalls, 1, 'a positive balance is sufficient even below the old estimated maximum')
-    assert.deepEqual(await store.balance(workspace), { verified: true, free: 1, purchased: 0 })
+    assert.deepEqual(await store.balance(workspace), { verified: true, free: 1, plan: 0, purchased: 0 })
     const row = (await pool.query('SELECT "reservedFree","reservedPurchased","reservedUnpaid","costMicroUsd" FROM hosted_usage WHERE "workspaceId"=$1', [workspace])).rows[0]
     assert.deepEqual(Object.values(row).map(value => value === null ? null : Number(value)), [0, 0, 0, null])
   } finally { releaseFirst(); await firstCall }
-  assert.deepEqual(await store.balance(workspace), { verified: true, free: 0, purchased: 0 })
+  assert.deepEqual(await store.balance(workspace), { verified: true, free: 0, plan: 0, purchased: 0 })
   const receipt = (await store.recent(workspace))[0]
   assert.equal(Number(receipt.costMicroUsd), 2)
   assert.equal(Number(receipt.freeMicroUsd), 1)
