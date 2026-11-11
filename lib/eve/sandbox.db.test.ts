@@ -25,7 +25,7 @@ test('portable public provider prepares skills and persists attachments across r
   const pool=makePool(),replica=makePool()
   try {
     await pool.query('CREATE TABLE "user"(id text PRIMARY KEY);CREATE TABLE bots(id uuid PRIMARY KEY,owner_id text,workspace_id uuid)')
-    await pool.query(await readFile(new URL('../../drizzle/20261112000400_eve_sandbox_sessions.sql',import.meta.url),'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261112030400_eve_sandbox_sessions.sql',import.meta.url),'utf8'))
     const scope:EveScope={ownerId:'owner',botId:randomUUID(),workspaceId:randomUUID(),surface:'web'}
     await pool.query('INSERT INTO "user" VALUES($1)',[scope.ownerId]);await pool.query('INSERT INTO bots VALUES($1,$2,$3)',[scope.botId,scope.ownerId,scope.workspaceId])
     const store=(db:Pool)=>scratchStore(db,async(actual,tx)=>{

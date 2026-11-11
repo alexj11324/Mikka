@@ -186,3 +186,13 @@ and [measured results](../../docs/ci/1699-results.md).
 Selected Desktop, Analytics and Docker PR checks now run as reusable jobs of CI;
 their conclusions are included in `UI policy (strict)`. Main image publication
 remains independent, and source-SHA release gates are unchanged.
+
+Selected reusable calls consume CI's trusted decision without running another
+selector. Independent dispatches and Image pushes still classify their changes.
+Desktop Linux and Apple Silicon acceptance run independently; native icon
+compilation shares the Apple Silicon runner. Both acceptance results remain
+required. The shared pnpm action restores exact installed dependencies or runs
+a frozen install on a miss. PRs do not upload dependency caches. See
+[cache boundaries and performance evidence](../../docs/ci/1765-optimizations.md).
+`ci-dependencies.yml` warms Desktop's Linux/macOS dependency keys when install
+inputs change on main; dispatch it to repopulate evicted or changed-image keys.

@@ -1,12 +1,13 @@
 import 'server-only'
-import { and, asc, desc, eq, isNull, lt, ne, sql } from 'drizzle-orm'
-import { randomUUID } from 'node:crypto'
+import { and, asc, desc, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm'
+import { createHash, randomUUID } from 'node:crypto'
+import { z } from 'zod'
 import { db } from '@/lib/db'
-import { proactiveUsage, userFactConsolidations, userFacts, userPreferences, userTimeZones } from '@/lib/db/schema'
+import { proactiveUsage, userFactConsolidations, userFactDecisions, userFactUndo, userFacts, userPreferences, userTimeZones } from '@/lib/db/schema'
 import { personLocale } from '@/lib/suggestions/action-title-server'
 import { localClock, safeTimeZone } from '@/lib/suggestions/briefing'
 import type { UserFactKind } from './kinds'
-import { clampSubject, mergedEvidence, mergedValue, planConsolidation, raisedConfidence, subjectKey, type ConsolidationDecider, type FactInput } from './facts'
+import { clampSubject, EVIDENCE_MAX, mergedEvidence, mergedValue, planConsolidation, raisedConfidence, subjectKey, type ConsolidationDecider, type FactInput } from './facts'
 import { foldRepository } from './repository'
 import { profileSection, promptFacts, type PromptFact } from './prompt'
 
@@ -64,15 +65,49 @@ export async function recordFacts(userId: string, facts: readonly FactInput[], {
     if (!key) continue
     const subject = clampSubject(fact.subject)
     const repository = foldRepository(fact.repository)
-    const [inserted] = await db.insert(userFacts).values({
-      id: randomUUID(), userId, kind: fact.kind, subject, subjectKey: key, value: fact.value, evidence: fact.evidence,
-      confidence: fact.confidence, firstSeenAt: fact.seenAt, lastSeenAt: fact.seenAt, expiresAt: fact.expiresAt, repository,
-    }).onConflictDoNothing().returning({ id: userFacts.id })
-    if (inserted) { written++; continue }
     written += await db.transaction(async tx => {
+      const parents = [...new Set(fact.evidence.filter(item => item.source === 'consolidation').flatMap(item => item.factIds ?? []))].sort()
+      if (pattern) {
+        if (parents.length < 1 || parents.length > EVIDENCE_MAX || parents.some(id => !z.uuid().safeParse(id).success)) return 0
+        // Consolidation has only a global contract. Never widen restricted or
+        // changed parents; hold their scope until the derived write commits.
+        const allowed = await tx.select({ id: userFacts.id }).from(userFacts).where(and(
+          inArray(userFacts.id, parents), eq(userFacts.userId, userId), eq(userFacts.state, 'active'), eq(userFacts.scopeKind, 'global'),
+        )).orderBy(asc(userFacts.id)).for('share')
+        if (allowed.length !== parents.length) return 0
+      }
+      const persistDecision = async (factId: string) => {
+        const decisionKey = createHash('sha256').update(JSON.stringify([factId, fact.seenAt.toISOString(), parents, fact.value])).digest('hex')
+        const [inserted] = await tx.insert(userFactDecisions).values({ id: randomUUID(), userId, factId, sourceFactIds: parents,
+          method: 'consolidation_answer', decisionKey, decidedAt: fact.seenAt,
+        }).onConflictDoNothing().returning({ id: userFactDecisions.id })
+        if (inserted) return inserted.id
+        const [existing] = await tx.select({ id: userFactDecisions.id }).from(userFactDecisions).where(and(
+          eq(userFactDecisions.userId, userId), eq(userFactDecisions.decisionKey, decisionKey), eq(userFactDecisions.factId, factId),
+        )).limit(1)
+        if (!existing) throw new Error('memory_decision_record_missing')
+        return existing.id
+      }
+      const [inserted] = await tx.insert(userFacts).values({
+        id: randomUUID(), userId, kind: fact.kind, subject, subjectKey: key, value: fact.value, evidence: fact.evidence,
+        confidence: fact.confidence, firstSeenAt: fact.seenAt, lastSeenAt: fact.seenAt, expiresAt: fact.expiresAt, repository,
+        reviewStatus: 'pending', sourceKind: pattern ? null : fact.source?.kind ?? null,
+        sourceId: pattern ? null : fact.source?.id ?? null, sourceUrl: pattern ? null : fact.source?.url ?? null,
+      }).onConflictDoNothing().returning({ id: userFacts.id })
+      if (inserted) {
+        if (pattern) await tx.update(userFacts).set({ sourceKind: 'decision', sourceId: await persistDecision(inserted.id), sourceUrl: null }).where(eq(userFacts.id, inserted.id))
+        // Facts in the same semantic slot may contradict an earlier approval.
+        if (typeof fact.value.slot === 'string') await tx.update(userFacts).set({ reviewStatus: 'pending', updatedAt: new Date() }).where(and(
+          eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.state, 'active'), sql`${userFacts.value} ->> 'slot' = ${fact.value.slot}`,
+        ))
+        return 1
+      }
+      // A fact is identified by its subject inside one repository, so a write for
+      // one repository never touches the person-level row (ALE-68).
       const [current] = await tx.select().from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.subjectKey, key),
         ...(repository === null ? [isNull(userFacts.repository)] : [eq(userFacts.repository, repository)]))).for('update').limit(1)
       if (!current || current.state === 'deleted' || current.state === 'dismissed') return 0
+      if (pattern && (current.scopeKind !== 'global' || parents.includes(current.id))) return 0
       const lastSeenAt = current.lastSeenAt > fact.seenAt ? current.lastSeenAt : fact.seenAt
       if (current.userEdited) {
         await tx.update(userFacts).set({ lastSeenAt, updatedAt: new Date() }).where(eq(userFacts.id, current.id))
@@ -82,6 +117,8 @@ export async function recordFacts(userId: string, facts: readonly FactInput[], {
         value: mergedValue(current.value, fact.value), evidence: mergedEvidence(current.evidence, fact.evidence),
         confidence: pattern ? fact.confidence : raisedConfidence(current.confidence, fact.confidence),
         lastSeenAt, expiresAt: fact.expiresAt ?? current.expiresAt, state: 'active', updatedAt: new Date(),
+        ...(pattern ? { sourceKind: 'decision' as const, sourceId: await persistDecision(current.id), sourceUrl: null }
+          : !current.sourceKind && fact.source ? { sourceKind: fact.source.kind, sourceId: fact.source.id, sourceUrl: fact.source.url } : {}),
       }).where(eq(userFacts.id, current.id))
       return 1
     })
@@ -128,9 +165,12 @@ export async function profilePromptSection(userId: string, used: readonly string
  * not the person's.
  */
 export async function deleteFact(userId: string, id: string): Promise<boolean> {
-  const rows = await db.update(userFacts).set({ state: 'deleted', value: {}, evidence: [], updatedAt: new Date() })
-    .where(and(eq(userFacts.id, id), eq(userFacts.userId, userId), ne(userFacts.state, 'deleted'))).returning({ id: userFacts.id })
-  return rows.length > 0
+  return db.transaction(async tx => {
+    const rows = await tx.update(userFacts).set({ state: 'deleted', value: {}, evidence: [], sourceKind: null, sourceId: null, sourceUrl: null, updatedAt: new Date() })
+      .where(and(eq(userFacts.id, id), eq(userFacts.userId, userId), ne(userFacts.state, 'deleted'))).returning({ id: userFacts.id })
+    if (rows.length) await tx.delete(userFactDecisions).where(and(eq(userFactDecisions.userId, userId), eq(userFactDecisions.factId, id)))
+    return rows.length > 0
+  })
 }
 
 /** How many active facts the person has (listFacts shows at most 500). */
@@ -148,8 +188,10 @@ export async function countFacts(userId: string): Promise<number> {
 export async function clearFacts(userId: string): Promise<number> {
   return db.transaction(async tx => {
     const active = await tx.select({ id: userFacts.id }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'))).for('update')
-    await tx.update(userFacts).set({ state: 'deleted', value: {}, evidence: [], updatedAt: new Date() })
-      .where(and(eq(userFacts.userId, userId), ne(userFacts.state, 'deleted')))
+    await tx.delete(userFactUndo).where(eq(userFactUndo.userId, userId))
+    await tx.delete(userFactDecisions).where(eq(userFactDecisions.userId, userId))
+    await tx.update(userFacts).set({ state: 'deleted', value: {}, evidence: [], sourceKind: null, sourceId: null, sourceUrl: null, updatedAt: new Date() })
+      .where(eq(userFacts.userId, userId))
     return active.length
   })
 }
@@ -171,7 +213,7 @@ export async function correctFact(userId: string, id: string, subjectText: strin
       .where(and(eq(userFacts.id, id), eq(userFacts.userId, userId), ne(userFacts.state, 'deleted'))).for('update').limit(1)
     if (!fact) return false
     const now = new Date()
-    const corrected = { subject, subjectKey: key, state: 'active' as const, userEdited: true, confidence: 1, lastSeenAt: now, updatedAt: now }
+    const corrected = { subject, subjectKey: key, state: 'active' as const, reviewStatus: 'approved' as const, userEdited: true, confidence: 1, lastSeenAt: now, updatedAt: now }
     const [other] = await tx.select({ id: userFacts.id }).from(userFacts)
       .where(and(eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.subjectKey, key), ne(userFacts.id, id),
         ...(fact.repository === null ? [isNull(userFacts.repository)] : [eq(userFacts.repository, fact.repository)]))).for('update').limit(1)
@@ -179,7 +221,8 @@ export async function correctFact(userId: string, id: string, subjectText: strin
       await tx.update(userFacts).set(corrected).where(eq(userFacts.id, id))
       return true
     }
-    await tx.update(userFacts).set({ state: 'deleted', value: {}, evidence: [], updatedAt: now }).where(eq(userFacts.id, id))
+    await tx.update(userFacts).set({ state: 'deleted', value: {}, evidence: [], sourceKind: null, sourceId: null, sourceUrl: null, updatedAt: now }).where(eq(userFacts.id, id))
+    await tx.delete(userFactDecisions).where(and(eq(userFactDecisions.userId, userId), eq(userFactDecisions.factId, id)))
     await tx.update(userFacts).set(corrected).where(eq(userFacts.id, other.id))
     return true
   })
@@ -210,12 +253,12 @@ export async function consolidateFacts(userId: string, timeZone: string, now = n
   const facts = await db.select({
     id: userFacts.id, kind: userFacts.kind, subject: userFacts.subject, subjectKey: userFacts.subjectKey, repository: userFacts.repository, value: userFacts.value, confidence: userFacts.confidence,
     lastSeenAt: userFacts.lastSeenAt, expiresAt: userFacts.expiresAt, state: userFacts.state, userEdited: userFacts.userEdited,
-  }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active')))
+  }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'), eq(userFacts.scopeKind, 'global')))
   const { updates, patterns } = await planConsolidation(facts, { now, timeZone: safeTimeZone(timeZone), locale: await personLocale(userId) }, decide)
   let changed = 0
   for (const { id, unchangedSince, ...change } of updates) {
     const rows = await db.update(userFacts).set({ ...change, updatedAt: now }).where(and(
-      eq(userFacts.id, id), eq(userFacts.userId, userId), eq(userFacts.state, 'active'),
+      eq(userFacts.id, id), eq(userFacts.userId, userId), eq(userFacts.state, 'active'), eq(userFacts.scopeKind, 'global'),
       // Timestamps are stored to the microsecond and read to the millisecond.
       ...(unchangedSince ? [eq(userFacts.userEdited, false), lt(userFacts.lastSeenAt, new Date(unchangedSince.getTime() + 1))] : []),
     )).returning({ id: userFacts.id })

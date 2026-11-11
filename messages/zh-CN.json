@@ -248,6 +248,19 @@
     "connectionStatusFailed": "无法读取 {names} 的连接状态"
   },
   "Auth": {
+    "sso": {
+      "open": "使用企业 SSO 登录",
+      "label": "工作邮箱或公司域名",
+      "placeholder": "you@company.com",
+      "hint": "会跳转到你们组织的身份提供方登录。",
+      "invalid": "请输入工作邮箱或域名，例如 acme.com。",
+      "notFound": "没有找到这个邮箱或域名的企业登录方式。请确认组织已完成域名验证，或改用其他方式登录。",
+      "tooMany": "尝试次数过多，请稍后再试。",
+      "failed": "无法开始企业 SSO 登录，请重试。",
+      "returnedFailed": "企业 SSO 登录没有完成。请重试，或联系你们组织的管理员。",
+      "cancel": "返回",
+      "continue": "继续"
+    },
     "haveAccount": "已经有账号？",
     "noAccountShort": "还没有账号？",
     "signIn": "去登录",
@@ -1854,6 +1867,10 @@
       },
       "audit": {
         "title": "审计日志"
+      },
+      "organization": {
+        "title": "组织",
+        "keywords": "Organization SSO SAML OIDC SCIM 单点登录 企业 身份 目录 策略 审批 法律保留"
       },
       "usage": {
         "title": "用量"
@@ -6152,6 +6169,467 @@
     "checkUpdate": "检查更新",
     "renderFailed": "此页面未能打开",
     "renderHint": "请重试打开页面。"
+  },
+  "Organization": {
+    "title": "组织",
+    "intro": "组织是共享工作区之上的管理层：统一登录方式、目录同步、资源策略与组织审计。组织角色只用于管理组织，不会授予任何工作区、任务或内容的访问；工作区成员仍在「成员」中管理。",
+    "loadFailed": "组织信息没有加载出来",
+    "retry": "重试",
+    "loading": "正在加载…",
+    "cancel": "取消",
+    "save": "保存",
+    "saved": "已保存。",
+    "copy": "复制",
+    "copied": "已复制",
+    "roles": {
+      "owner": "所有者",
+      "admin": "管理员",
+      "member": "成员"
+    },
+    "unbound": {
+      "title": "此工作区未绑定组织",
+      "memberNote": "只有工作区管理员能把此工作区绑定到组织。",
+      "body": "绑定后，组织的登录要求和资源策略会作用于此工作区；席位按组织内全部工作区的活跃成员去重计算。工作区的成员、任务和资源仍各自独立。",
+      "bodyTitle": "绑定后会发生什么",
+        "bindLabel": "绑定到已有组织",
+      "bindNote": "需要你同时是该组织的所有者或管理员，以及此工作区的管理员。",
+      "bind": "绑定",
+      "createLabel": "新建组织",
+      "createNote": "你会成为它的所有者，然后此工作区绑定到它。",
+      "namePlaceholder": "组织名称",
+      "create": "创建并绑定"
+    },
+    "bound": {
+      "notAdmin": "此工作区属于一个组织",
+      "notAdminNote": "只有组织的所有者和管理员能查看组织设置。工作区的成员和内容仍按「成员」中的设置访问。"
+    },
+    "tabs": {
+      "label": "组织设置",
+      "overview": "概览",
+      "identity": "登录与目录",
+      "policy": "资源策略",
+      "audit": "组织审计"
+    },
+    "overview": {
+      "title": "基本信息",
+      "created": "创建于 {date}",
+      "rename": "改名",
+      "renamed": "组织已改名。",
+      "nameLabel": "组织名称",
+      "planEnterprise": "Enterprise",
+      "planFree": "组织（未开通 Enterprise）",
+      "seats": "{count} / {limit} 人",
+      "seatsUnlimited": "{count} 人 · 不限席位",
+      "seatsNote": "活跃成员按组织内全部工作区去重计算；Agent、Bot、设备和未接受的邀请不占席位。",
+      "planFreeNote": "单点登录、SCIM、资源策略和组织审计导出需要 Enterprise。目前由 Mikka 人工开通，请把下面的组织 ID 发给我们。",
+      "overLimit": "活跃成员已超过 {limit} 人的上限。已有成员和数据都会保留，但在减少到上限内之前不能再加入新成员。",
+      "organizationId": "组织 ID"
+    },
+    "workspaces": {
+      "title": "绑定的工作区",
+      "description": "每个工作区保留自己的成员、任务和资源权限；组织管理员不会因此看到工作区内容。",
+      "unbindTitle": "从组织解绑「{name}」？",
+      "unbindBody": "组织的登录要求和资源策略不再作用于此工作区，席位改回单独计算。工作区的成员和内容不变，组织审计记录保留。",
+      "unbind": "解绑",
+      "notMember": "你不是其成员的工作区",
+      "current": "此工作区",
+      "ownMembers": "成员与内容由该工作区自己管理",
+      "notMemberNote": "组织角色不授予访问"
+    },
+    "members": {
+      "title": "组织管理员与成员",
+      "description": "组织角色只决定谁能管理组织：所有者可以改所有者和归档组织，管理员管理其余设置，成员没有管理权限。",
+      "removeTitle": "把 {name} 移出组织？",
+      "removeBody": "会暂停 TA 在此组织所有工作区中的成员身份，并撤回 TA 在这些工作区的令牌、运行和共享。TA 的个人账户、个人工作区和其他组织不受影响；以后重新加入不会自动恢复原来的角色。",
+      "removed": "已移出组织。",
+      "remove": "移出",
+      "suspended": "已暂停",
+      "roleLabel": "{name} 的组织角色",
+      "roleChanged": "组织角色已更新。",
+      "added": "已加入组织。",
+      "addLabel": "添加组织成员",
+      "addNote": "从此工作区的成员中选择已有账户；只凭邮箱不能添加。加入组织不会给 TA 任何工作区的访问。",
+      "choose": "选择成员",
+      "roleNew": "组织角色",
+      "add": "添加",
+      "noCandidates": "此工作区的成员都已在组织中。"
+    },
+    "archive": {
+      "title": "危险操作",
+      "label": "归档组织",
+      "body": "需要先解绑所有工作区（包括此工作区），并停用全部登录方式和 SCIM 连接。归档后组织审计记录按保留期限和法律保留继续保存。",
+      "action": "归档组织"
+    },
+    "identity": {
+      "title": "登录与目录",
+      "needsEnterprise": "单点登录和 SCIM 需要 Enterprise",
+      "needsEnterpriseNote": "未开通时仍可以停用已有的登录方式、撤销 SCIM、关闭强制 SSO 和使用所有者恢复访问。",
+      "providers": {
+        "title": "单点登录",
+        "description": "用你们的身份提供方（OIDC 或 SAML 2.0）登录。每种登录方式都要验证域名后才能使用；同邮箱的已有账户不会被自动合并。",
+        "empty": "还没有登录方式",
+        "emptyNote": "添加后，先在 DNS 发布验证记录，再在身份提供方登记回调地址。",
+        "disableTitle": "停用 {id}？",
+        "disableBody": "用它登录的会话会失去 SSO 状态，对应的 SCIM 连接会被撤销。如果组织强制 SSO，这些成员要改用其他登录方式或所有者恢复访问。",
+        "disabled": "登录方式已停用。",
+        "disable": "停用",
+        "add": "添加登录方式",
+        "addNote": "OIDC 或 SAML 2.0。",
+        "verified": "域名已验证",
+        "unverified": "域名未验证",
+        "updated": "更新于 {date}",
+        "unverifiedNote": "在 DNS 发布下方的 TXT 记录后验证。",
+        "unverifiedLost": "验证值只在配置时显示一次。需要新的验证值时，请重新保存这个登录方式。",
+        "verify": "验证域名",
+        "signIn": "用 SSO 登录",
+        "signInNote": "用此登录方式重新登录。开启强制 SSO 前需要这样做。",
+        "link": "关联我的账户",
+        "linkNote": "把你现有的 Mikka 账户与身份提供方中的同一个人关联。需要在 5 分钟内登录过。",
+        "rotate": "生成 SCIM 凭证"
+      },
+      "setup": {
+        "title": "完成登录方式的设置",
+        "description": "以下值只在这次保存后显示。请在 DNS 和身份提供方中登记，然后验证域名。",
+        "dnsName": "DNS TXT 记录名",
+        "dnsValue": "DNS TXT 记录值",
+        "dnsOnce": "只显示这一次；离开后需要重新保存登录方式才能取得新值。",
+        "callback": "登录回调地址",
+        "postLogout": "退出后的回跳地址",
+        "postLogoutNote": "在身份提供方的退出回跳白名单里单独登记这个地址，和登录回调分开。",
+        "samlLogout": "单点退出",
+        "samlLogoutNote": "SAML 单点退出使用身份提供方的退出地址；退出时只结束这次 SAML 登录的会话。",
+        "verifyLabel": "验证域名",
+        "verifyNote": "DNS 记录生效可能需要几分钟。",
+        "dismiss": "稍后",
+        "verify": "验证",
+        "verified": "域名已验证，登录方式可以使用了。"
+      },
+      "scim": {
+        "title": "SCIM 目录同步",
+        "description": "身份提供方通过 SCIM 2.0 同步用户和群组。停用或删除目录用户会立即阻止 TA 登录，并撤回 TA 在此组织工作区中的访问；群组只同步目录信息，不授予工作区访问。",
+        "onceTitle": "复制并保存 SCIM 凭证",
+        "onceNote": "凭证只显示这一次，Mikka 不会再展示它。",
+        "baseURL": "SCIM 基础地址",
+        "token": "Bearer 凭证",
+        "saved": "保存到身份提供方后，关闭这里会从页面中清除它。",
+        "done": "已保存",
+        "empty": "没有 SCIM 连接",
+        "emptyNote": "在已验证的登录方式上生成 SCIM 凭证。",
+        "needsVerified": "先验证一个登录方式的域名。",
+        "revokeTitle": "撤销这个 SCIM 连接？",
+        "revokeBody": "身份提供方将不能再同步。已同步的用户会失去组织身份，并撤回其在此组织工作区中的访问；个人账户不受影响。",
+        "revoked": "SCIM 连接已撤销。",
+        "revoke": "撤销",
+        "revokedTag": "已撤销",
+        "active": "同步中",
+        "connectionNote": "建立于 {date}。再次生成凭证会替换旧凭证。"
+      },
+      "policy": {
+        "title": "登录要求",
+        "description": "作用于此组织全部工作区。",
+        "enforce": "强制 SSO 登录",
+        "enforceNote": "开启后，访问组织工作区必须使用此组织的 SSO 登录。开启前请先「用 SSO 登录」，否则会被拒绝。",
+        "enforced": "已强制 SSO 登录。",
+        "relaxed": "已关闭强制 SSO。",
+        "machine": "允许机器凭证",
+        "machineNote": "允许个人访问令牌和设备在强制 SSO 时继续访问组织工作区。",
+        "retry": "撤权重试",
+        "retryNote": "停用、撤销或收紧策略后，撤权会在后台自动重试。需要马上再试一次时使用。",
+        "retryAction": "立即重试",
+        "retried": "已重试待完成的撤权。"
+      },
+      "breakGlass": {
+        "title": "所有者恢复访问",
+        "description": "身份提供方不可用时，所有者可以临时绕过强制 SSO，用于关闭强制、修复配置。只对当前会话有效，每次使用都会记入组织审计。",
+        "active": "恢复访问有效至 {time}",
+        "activeNote": "只对当前会话有效，到期后自动失效。",
+        "reason": "原因",
+        "placeholder": "例如：身份提供方证书过期，需要关闭强制 SSO",
+        "hint": "至少 10 个字。需要在最近 5 分钟内登录过；有效 15 分钟。",
+        "start": "开始恢复访问"
+      },
+      "form": {
+        "protocol": "协议",
+        "slug": "登录方式 ID",
+        "slugHint": "保存为 {id}；用于回调地址，保存后不能修改。",
+        "slugInvalid": "ID 只能用小写字母、数字和连字符，至少 2 个字符。",
+        "domain": "邮箱域名",
+        "domainHint": "成员邮箱的域名；需要在 DNS 验证所有权。",
+        "domainInvalid": "请输入有效的域名，例如 acme.com。",
+        "httpsOnly": "地址必须是公网可访问的 https 地址。",
+        "missing": "请填写全部必填项。",
+        "issuer": "Issuer",
+        "issuerHint": "Mikka 会读取它的 OpenID 配置。",
+        "clientId": "Client ID",
+        "clientSecret": "Client Secret",
+        "secretHint": "加密保存，之后不会再显示。",
+        "tokenAuth": "令牌端点认证",
+        "spEntityId": "SP Entity ID",
+        "spEntityIdHint": "在身份提供方登记的本服务标识。",
+        "idpEntityId": "IdP Entity ID",
+        "entryPoint": "单点登录地址",
+        "cert": "IdP 签名证书",
+        "certHint": "PEM 格式，需在有效期内。",
+        "logoutRedirect": "单点退出地址（Redirect）",
+        "logoutHint": "可选；分别对应 Redirect 和 POST 绑定。",
+        "logoutPost": "单点退出地址（POST）",
+        "replaceNote": "保存会替换同 ID 的现有配置：已有的 SSO 登录状态失效，需要重新验证域名。",
+        "submit": "保存"
+      }
+    },
+    "policy": {
+      "title": "资源共享策略",
+      "description": "决定成员能否把自己的模型凭证、订阅和 MCP 共享到组织工作区。共享仍需要资源原有的授权；策略只能进一步收紧。",
+      "needsEnterprise": "资源策略需要 Enterprise。",
+      "modelCredentialSharing": {
+        "label": "模型凭证与订阅",
+        "note": "成员共享 API 密钥或模型订阅。"
+      },
+      "mcpSharing": {
+        "label": "MCP 服务",
+        "note": "成员共享个人 MCP 服务。"
+      },
+      "rules": {
+        "allow": "允许",
+        "approval_required": "需审批",
+        "deny": "禁止"
+      },
+      "providers": {
+        "label": "允许的模型来源",
+        "note": "组织工作区里的运行只能使用勾选的来源。",
+        "any": "不限制",
+        "none": "至少选择一个来源，否则组织工作区将不能运行模型。",
+        "names": {
+          "vercel-gateway": "Mikka 托管模型（Gateway）",
+          "zerocat": "Mikka 托管模型（ZeroCat）",
+          "openai-subscription": "OpenAI 订阅",
+          "anthropic-subscription": "Anthropic 订阅",
+          "api-key": "自带 API 密钥"
+        }
+      },
+      "retention": {
+        "label": "组织审计保留期限",
+        "note": "到期的组织审计记录会被删除；有导出进行中或开启法律保留时暂停删除。",
+        "keep": "一直保留",
+        "days": "按天数",
+        "daysLabel": "保留天数"
+      },
+      "legalHold": {
+        "label": "法律保留",
+        "note": "开启后不删除任何组织审计记录，保留期限暂不生效。"
+      },
+      "revision": "策略第 {revision} 版",
+      "tightenNote": "收紧后，已不符合策略的共享会被撤回，相关运行会停止。",
+      "approvals": {
+        "title": "共享审批",
+        "description": "「需审批」时，成员共享资源会在这里等待审批。拒绝会撤回该资源在工作区中的共享；批准不会绕过资源原有的授权。",
+        "empty": "没有共享审批请求",
+        "emptyNote": "成员在组织工作区共享模型凭证、订阅或 MCP 时会出现在这里。",
+        "approvedDone": "已批准。",
+        "deniedDone": "已拒绝，共享已撤回。",
+        "kinds": {
+          "subscription": "模型订阅",
+          "api_key": "API 密钥",
+          "mcp": "MCP 服务"
+        },
+        "status": {
+          "pending": "待审批",
+          "approved": "已批准",
+          "denied": "已拒绝"
+        },
+        "from": "{owner} · {workspace}",
+        "someone": "组织成员",
+        "otherWorkspace": "其他工作区",
+        "deny": "拒绝",
+        "withdraw": "撤回批准",
+        "approve": "批准"
+      }
+    },
+    "audit": {
+      "title": "组织审计",
+      "description": "组织的管理事件：成员与角色、工作区绑定、登录方式、目录同步、策略和导出。不包含令牌、断言或工作区内容。",
+      "system": "系统",
+      "operator": "Mikka 运维",
+      "unknownActor": "组织外的账户",
+      "retentionLabel": "保留期限",
+      "retentionKeep": "一直保留",
+      "retentionDays": "保留 {count} 天",
+      "legalHold": "法律保留中",
+      "workspaceEvents": "工作区内容事件",
+      "workspaceEventsNote": "任务、运行和资源等工作区事件在「审计日志」中查看和导出，需要该工作区的管理员。",
+      "workspaceEventsLink": "打开审计日志",
+      "recentTitle": "最近事件",
+      "recentEmpty": "还没有组织事件。",
+      "exportTitle": "导出",
+      "exportDescription": "导出会固定所选范围内的事件，15 分钟内可以分页读取和下载；每页都会重新检查你的管理权限和记录完整性。",
+      "from": "从",
+      "until": "到",
+      "create": "创建导出",
+      "utcNote": "按 UTC 日期计算，包含结束日。",
+      "limitNote": "单次最多 50,000 条、366 天；超出时请缩短范围。",
+      "manifest": "已导出 {count} 条事件",
+      "expires": "有效至 {time}",
+      "digest": "摘要",
+      "download": "下载 JSON",
+      "pageOf": "第 {from}–{to} 条，共 {count} 条",
+      "previous": "上一页",
+      "next": "下一页",
+      "columns": {
+        "time": "时间",
+        "action": "事件",
+        "actor": "操作人",
+        "result": "结果"
+      },
+      "results": {
+        "success": "成功",
+        "denied": "被拒绝",
+        "failure": "失败"
+      },
+      "actions": {
+        "organization": {
+          "created": "创建组织",
+          "renamed": "组织改名",
+          "archived": "归档组织",
+          "member_changed": "组织角色变更",
+          "member_removed": "移出组织",
+          "workspace_attached": "绑定工作区",
+          "workspace_detached": "解绑工作区",
+          "policy_changed": "资源策略变更",
+          "resource_requested": "提交共享审批",
+          "resource_decided": "处理共享审批",
+          "audit_exported": "导出组织审计",
+          "retention_applied": "按保留期限删除"
+        },
+        "entitlement": {
+          "changed": "套餐变更"
+        },
+        "scim": {
+          "user_created": "目录用户创建",
+          "user_updated": "目录用户更新",
+          "user_suspended": "目录用户停用",
+          "user_deleted": "目录用户删除",
+          "group_changed": "目录群组变更"
+        },
+        "sso": {
+          "configured": "登录方式配置",
+          "domain_verified": "域名验证",
+          "policy_changed": "登录要求变更",
+          "signed_in": "SSO 登录",
+          "sign_in_failed": "SSO 登录失败",
+          "signed_out": "SSO 退出",
+          "logout_failed": "SSO 退出失败"
+        }
+      },
+      "errors": {
+        "auditExportLimitExceeded": "范围内的事件超过 50,000 条，请缩短范围后再导出。",
+        "auditExportUnavailable": "导出已过期或不可用，请重新创建。",
+        "auditExportChanged": "导出的记录与创建时不一致，请重新创建导出。",
+        "default": "导出没有完成，请重试。"
+      }
+    }
+  },
+  "Governance": {
+    "plan": {
+      "title": "套餐与席位",
+      "edition": {
+        "personal": "个人",
+        "community": "社区版",
+        "team_free": "Team Free",
+        "team_pro": "Team Pro",
+        "enterprise": "Enterprise"
+      },
+      "seats": "{count} / {limit} 位活跃成员",
+      "seatsUnlimited": "{count} 位活跃成员，不限人数",
+      "seatsNote": "只计算活跃的人。待接受的邀请、已停用的成员、Bot、Agent 和设备都不占席位。",
+      "overLimit": "活跃成员已超过当前套餐的 {limit} 位上限。现有成员都会保留；人数回到上限以内之前，不能再接受邀请或恢复成员。",
+      "concurrency": "托管模型同时运行上限：{count}",
+      "features": "团队功能",
+      "usageExport": "团队用量报告与 CSV 导出",
+      "approvalTemplatesName": "审批模板",
+      "approvalTemplates": "审批模板（最多 {count} 个）",
+      "included": "已包含",
+      "notIncluded": "不包含",
+      "upgradeTitle": "需要更多席位或团队功能",
+      "upgradeBody": "Team Pro 提供更多席位、团队用量报告与 CSV 导出、审批模板。目前由人工开通，不在线付款：请联系 Mikka 并附上下面的工作区标识。",
+      "memberNote": "席位和套餐由工作区管理员管理。需要更多席位时，请联系管理员。",
+      "workspaceId": "工作区标识",
+      "copy": "复制",
+      "copied": "已复制",
+      "loadFailed": "无法读取套餐信息。",
+      "retry": "重试"
+    },
+    "usage": {
+      "title": "按日期的托管用量报告",
+      "description": "按日期范围查看本工作区已结算的托管模型用量和运行次数，可导出 CSV。日期按 UTC 计算，含起止两天，最长 93 天。",
+      "from": "开始日期",
+      "to": "结束日期",
+      "show": "查看",
+      "csv": "导出 CSV",
+      "rangeInvalid": "结束日期不能早于开始日期，且范围最长 93 天。",
+      "hostedTitle": "托管模型用量",
+      "day": "日期",
+      "model": "模型",
+      "requests": "请求",
+      "inputTokens": "输入 tokens",
+      "outputTokens": "输出 tokens",
+      "cost": "费用",
+      "noHosted": "所选日期内没有已结算的托管模型用量。自有模型、设备和自带服务不在这里计费。",
+      "runsTitle": "运行",
+      "runsNone": "所选日期内没有运行。",
+      "total": "合计",
+      "noEntitlement": "按日期范围查看并导出已结算的托管模型用量属于 Team Pro，当前套餐不包含。上方本月按 Bot、按成员的用量和导出不受影响。",
+      "noAdmin": "只有工作区管理员可以查看按日期的托管用量报告。上方本月按 Bot、按成员的用量不受影响。",
+      "loading": "正在读取用量…"
+    },
+    "templates": {
+      "title": "审批模板",
+      "description": "把一组 Agent 的审批方式和权限保存为模板，需要时应用到整个工作区。",
+      "applyNote": "应用会替换此工作区的 Agent 策略，并停止此工作区中在电脑上持有权限、正在进行的运行。删除模板不会撤回已应用的策略。",
+      "count": "{count} / {limit} 个模板",
+      "empty": "还没有审批模板。",
+      "create": "新建模板",
+      "edit": "编辑",
+      "apply": "应用",
+      "delete": "删除",
+      "save": "保存",
+      "cancel": "取消",
+      "name": "名称",
+      "namePlaceholder": "例如：外包仓库只读",
+      "approvalMode": "审批方式",
+      "approvalModes": {
+        "unset": "不设置",
+        "ask": "需要时询问",
+        "read_only": "只读"
+      },
+      "permissions": "权限",
+      "actions": {
+        "install_dependency": "安装依赖",
+        "write_outside_repo": "写入仓库以外的文件",
+        "git_push": "推送分支",
+        "network": "访问网络"
+      },
+      "decisions": {
+        "unset": "不设置",
+        "allow": "允许",
+        "ask": "询问",
+        "deny": "禁止"
+      },
+      "networkAllow": "允许访问的域名",
+      "networkAllowHint": "每行一个域名。留空表示不设置。",
+      "rulesEmpty": "至少设置一项规则。",
+      "nameEmpty": "请填写名称。",
+      "applyTitle": "应用「{name}」？",
+      "deleteTitle": "删除「{name}」？",
+      "deleteBody": "已经应用的策略不会撤回。",
+      "saved": "已保存",
+      "applied": "已应用「{name}」",
+      "deleted": "已删除",
+      "rulesSummary": "{count} 项规则",
+      "updated": "更新于 {date}",
+      "noEntitlement": "审批模板属于 Team Pro，当前套餐不包含。",
+      "noAdmin": "只有工作区管理员可以管理审批模板。",
+      "loading": "正在读取模板…"
+    }
   },
   "MobileServer": {
     "title": "选择服务器",

@@ -178,7 +178,7 @@ export async function loadConversation(userId: string, botId: string): Promise<L
 }
 
 /** Product memory and settings only; eve owns conversation history and compaction. */
-export async function loadProductPromptContext(userId: string, botId: string): Promise<{ memory: string; personalInstructions: string }> {
+export async function loadProductPromptContext(userId: string, botId: string): Promise<{ memory: string; personalInstructions: string; memoryEnabled: boolean }> {
   const [session, preferences] = await Promise.allSettled([
     db.select({ memory: coordinatorSessions.memory }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1),
     readCoordinatorPromptPreferences(userId),
@@ -188,6 +188,7 @@ export async function loadProductPromptContext(userId: string, botId: string): P
   return {
     memory: preferences.value.memoryEnabled ? session.value[0]?.memory ?? '' : '',
     personalInstructions: preferences.value.personalInstructions,
+    memoryEnabled: preferences.value.memoryEnabled,
   }
 }
 
