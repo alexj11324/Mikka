@@ -55,7 +55,7 @@ test('actual Nitro router accepts multiple named parameters and preserves route 
     const declarations = [
       ['/api/bots/[botId]/subagents/[id]/credentials', 60],
       ['/v1/devices/[deviceId]/runs/[runId]/subscription', 300],
-      ['/api/coordinator/stream', 300],
+      ['/api/agents/[...path]', 300],
     ]
     const routes = []
     for (const [template, maxDuration] of declarations) {
@@ -75,7 +75,7 @@ test('actual Nitro router accepts multiple named parameters and preserves route 
     assert.deepEqual(matched?.data, { maxDuration: 60 })
     assert.deepEqual({ ...matched?.params }, { botId: 'bot-1', id: 'agent-1' })
     assert.equal(findRoute(router, '', '/mikka/v1/devices/device-1/runs/run-1/subscription')?.data.maxDuration, 300)
-    assert.deepEqual(findRoute(router, '', '/mikka/api/coordinator/stream')?.data, { maxDuration: 300, supportsCancellation: true })
+    assert.deepEqual(findRoute(router, '', '/mikka/api/agents/eve/v1/session')?.data, { maxDuration: 300, supportsCancellation: true })
     const pattern = routeToRegExp(credentials)
     for (const path of ['/mikka/api/bots/subagents/agent-1/credentials', '/mikka/api/bots/bot-1/extra/subagents/agent-1/credentials',
       '/mikka/api/bots/bot-1/subagents/agent-1/credentials/extra', '/mikka/api/bots/bot-1/subagents/agent-1/other']) {
@@ -89,7 +89,7 @@ test('actual Nitro Vercel output opts MCP into cancellation without changing oth
   const root = await mkdtemp(join(tmpdir(), 'mikka-mcp-cancellation-'))
   let nitro
   try {
-    const declarations = [['/api/mcp', 120], ['/api/coordinator/stream', 300], ['/api/other', 60]]
+    const declarations = [['/api/mcp', 120], ['/api/agents/[...path]', 300], ['/api/other', 60]]
     const routes = []
     for (const [template, maxDuration] of declarations) {
       const source = `app${template}/route.ts`, text = `export const maxDuration=${maxDuration}; export const POST=handler`
@@ -114,7 +114,7 @@ test('actual Nitro Vercel output opts MCP into cancellation without changing oth
     assert.equal(mcp.maxDuration, 120)
     assert.equal(mcp.supportsResponseStreaming, true)
     assert.equal(mcp.runtime, 'nodejs24.x')
-    assert.equal((await readConfig('mikka/api/coordinator/stream')).supportsCancellation, true)
+    assert.equal((await readConfig('mikka/api/agents/[...]')).supportsCancellation, true)
     assert.equal((await readConfig('mikka/api/other')).supportsCancellation, undefined)
     assert.equal((await readConfig('__server')).supportsCancellation, undefined)
   } finally { await nitro?.close(); await rm(root, { recursive: true, force: true }) }
@@ -149,6 +149,6 @@ test('actual root Nitro configuration loads the API/Workflow graph; an empty def
     nitro = await createNitro({ rootDir: root, preset: 'node-server', buildDir: join(temporary, 'build'), output: { dir: join(temporary, 'output') } }, { dotenv: false })
     assertApiBuildConfiguration(nitro, root)
     assert.equal(nitro.options.workflow.runtime, 'nodejs24.x')
-    assert.equal(nitro.options.vercel.functionRules['/mikka/api/coordinator/stream'].supportsCancellation, true)
+    assert.equal(nitro.options.vercel.functionRules['/mikka/api/agents/**'].supportsCancellation, true)
   } finally { await nitro?.close(); await rm(temporary, { recursive: true, force: true }) }
 })
