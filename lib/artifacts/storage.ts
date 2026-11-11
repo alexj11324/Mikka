@@ -1,6 +1,7 @@
 import 'server-only'
 import { AwsClient } from 'aws4fetch'
 import { isCloudEdition } from '@/lib/edition'
+import { deploymentStage } from '../deployment-stage.mjs'
 
 // Artifact files use an administrator-owned S3-compatible bucket (including R2).
 // Each version is immutable. Community installations without a bucket retain
@@ -26,9 +27,10 @@ function objectStorageConfig(): ObjectStorageConfig | null {
 
 /** Where files go: R2, or the database row when no bucket is configured outside production. */
 export function artifactStorage(): 'r2' | 'inline' {
+  const stage = deploymentStage()
   // Keep the existing persisted 'r2' discriminator for every S3 transport.
   if (objectStorageConfig()) return 'r2'
-  if (isCloudEdition() && process.env.VERCEL_ENV === 'production') throw new Error('Object storage is not configured')
+  if (isCloudEdition() && stage === 'production') throw new Error('Object storage is not configured')
   return 'inline'
 }
 

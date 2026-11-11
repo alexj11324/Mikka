@@ -45,6 +45,19 @@ test('desktop remains unpinned and does not initialize browser analytics or brow
   assert.deepEqual(config.experimental, {})
 }))
 
+test('the actual web flag graph follows the explicit deployment stage while desktop remains server-owned', async () => {
+  for (const stage of ['production', 'preview', 'development']) await environment({ MIKKA_DEPLOYMENT_STAGE: stage, VERCEL_ENV: 'production', NEXT_PUBLIC_COMPUTER_ENABLED: '1' }, async () => {
+    const web = await frontendConfig()
+    const deployment = JSON.parse(web.define['process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT'])
+    assert.equal(deployment, stage)
+    const flags = await browserModule('export { computerProductionEnabled } from "./lib/feature-flags.ts"', web.define)
+    assert.equal(flags.computerProductionEnabled(deployment, '1'), stage === 'production')
+    const desktop = await frontendConfig({ target: 'desktop' })
+    assert.equal(desktop.define['process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT'], '""')
+  })
+  await environment({ MIKKA_DEPLOYMENT_STAGE: 'prod' }, async () => assert.rejects(frontendConfig(), /MIKKA_DEPLOYMENT_STAGE_INVALID/))
+})
+
 test('Vite development keeps the actual development React runtime and Fast Refresh plugin', async () => {
   const config = await frontendConfig({ command: 'serve' })
   assert.equal(config.define['process.env.NODE_ENV'], '"development"')
