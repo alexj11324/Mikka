@@ -40,6 +40,7 @@ import { ReviewSummaryRow } from '@/features/review/components/review-summary-ro
 import { reviewHref } from '@/features/review/model/routes'
 import { ATTEMPT_WORD, attemptState } from '@/features/tasks/model/task-groups'
 import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
+import { NATIVE_ADD_TO_CHAT, NativeSelectableText } from '@/features/chat/components/native-selectable-text'
 import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
 import { ChatQueueCard } from '@/features/chat/components/chat-queue-card'
 import { ADD_TO_CHAT, endsSelection, quotedMessage, selectionQuote, type Rect, type SelectionAction } from '@/features/chat/model/chat-selection'
@@ -218,10 +219,20 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
     return deliver(item)
   }
 
+  const addToChat = (selected: string) => {
+    if (!selection) return
+    setQuote(quotable(selectionQuote(selected, selection.text)))
+    setSelection(null)
+  }
+  // The selected words: on iOS builds with the native module, a UITextView whose edit menu has 添加到对话.
+  const selectable = (words: string, color?: string) => NATIVE_ADD_TO_CHAT
+    ? <NativeSelectableText text={words} color={color} onSelect={onSelected} onAddToChat={addToChat} onRect={rect => { selectionRect.current = rect }} />
+    : <ChatSelectableText text={words} color={color} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
+
   const selectionAction = (action: SelectionAction) => {
     if (!selection) return
     // 添加到对话: the selection becomes the composer's quote; the person writes the rest.
-    if (action.key === ADD_TO_CHAT.key) { setQuote(quotable(selectionQuote(selection.selected, selection.text))); setSelection(null); return }
+    if (action.key === ADD_TO_CHAT.key) { addToChat(selection.selected); return }
     void send(quotedMessage(selectionQuote(selection.selected, selection.text), action.instruction))
   }
 
@@ -284,7 +295,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           : item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
         {item.from === 'person' && (item.text || item.images) ? (
           <MessageRow align="right" onSelect={item.text && !selected ? () => toggleSelection(item.position, item.text) : undefined}>
-            <MyBubble text={item.text} photos={photos(item.id, item.images)} selecting={selected ? <ChatSelectableText text={selected.text} color={colors.onAccent} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} /> : undefined} />
+            <MyBubble text={item.text} photos={photos(item.id, item.images)} selecting={selected ? selectable(selected.text, colors.onAccent) : undefined} />
             {chips(item.id, 'right')}
           </MessageRow>
         ) : null}
@@ -293,7 +304,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
             {isOpenUI(item.text)
               ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} sources={sources} onOpen={open} />
               : <BotBubble>{selected
-                ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
+                ? selectable(selected.text)
                 : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}
             {chips(item.id)}
             {selected ? null : <MessageActions message={message(item.text, item.id, item.position)} copy={index === latestReply && !working} />}
@@ -356,7 +367,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       <Composer value={text} sendDisabled={serviceUnavailable} onChangeText={setText} placeholder={selection ? mobileMessages.MobileCore.replySelection : name ? mobileMessages.Nav.messageBot.replace('{name}', name) : mobileMessages.MobileCore.message} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={<>{serviceUnavailable ? <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.serviceNotice}><Text style={styles.serviceMessage}>对话服务尚未启用，暂时无法回复。</Text><GlassButton label="重试" busy={serviceRefresh.refreshing} onPress={() => void serviceRefresh.onRefresh()} /></View> : null}{composerNotice}{reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : null}
           <ChatQueueCard items={queue} busy={stopper.sending} onSendNow={data?.working ? () => void stopper.stop() : undefined} />
-          <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} /></>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
+          <ChatSelectionBar visible={Boolean(selection)} disabled={serviceUnavailable} onAction={selectionAction} addToChat={!NATIVE_ADD_TO_CHAT} /></>} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )
 }
