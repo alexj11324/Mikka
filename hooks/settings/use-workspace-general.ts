@@ -125,7 +125,8 @@ export function useTransferWorkspace(workspaceId: string) {
     }
   }
 
-  return { people, readError: targets.data?.error ? actionError(targets.data.error) : null, pending, error, transfer }
+  return { people, readError: targets.error || targets.data?.error ? actionError(targets.data?.error) : null,
+    reload: () => targets.mutate(), pending, error, transfer }
 }
 
 /** S-I: what deleting the workspace takes with it, and the delete once its name is typed. */
@@ -149,7 +150,8 @@ export function useDeleteWorkspace(workspaceId: string) {
     }
   }
 
-  return { counts, readError: impact.data?.error ? actionError(impact.data.error) : null, pending, error, remove }
+  return { counts, readError: impact.error || impact.data?.error ? actionError(impact.data?.error) : null,
+    reload: () => impact.mutate(), pending, error, remove }
 }
 
 /**
@@ -162,6 +164,9 @@ export function useArchivedBots(workspaceId: string) {
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<{ botId: string; message: string } | null>(null)
   const bots = list.data && !list.data.error ? list.data.bots : []
+  // Members intentionally have no archived-bot section; other failures are not an empty list.
+  const denied = list.data?.error === 'workspaceAccessDenied'
+  const readError = !denied && (list.error || list.data?.error) ? actionError(list.data?.error) : null
 
   async function takeOver(botId: string) {
     setPending(botId)
@@ -177,5 +182,5 @@ export function useArchivedBots(workspaceId: string) {
     }
   }
 
-  return { bots, pending, failed, takeOver }
+  return { bots, readError, reload: () => list.mutate(), pending, failed, takeOver }
 }

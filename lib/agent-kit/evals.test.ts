@@ -39,7 +39,7 @@ test('reports from an obsolete evaluator cannot authorize activation', async () 
   const baseline=await runEvalSuite({ ...options,run:async () => ({ text:'Unknown',outcome:'blocked',tools:[] }) })
   const candidate=await runEvalSuite({ ...options,run:async () => ({ text:'2026-01-15',outcome:'answered',tools:[{ name:'web_search',outcome:'ok',authorized:false,effectPerformed:false }] }) })
   assert.equal(compareReports(baseline,candidate).activationEligible,true)
-  for (const runnerVersion of ['mikka.eval.v1','mikka.eval.v2','mikka.eval.v3']) {
+  for (const runnerVersion of ['mikka.eval.v1','mikka.eval.v2','mikka.eval.v3','mikka.eval.v4']) {
     const obsolete=JSON.parse(JSON.stringify({baseline,candidate}))
     obsolete.baseline.runnerVersion=runnerVersion
     obsolete.candidate.runnerVersion=runnerVersion

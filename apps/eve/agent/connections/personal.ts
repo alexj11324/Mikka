@@ -1,7 +1,9 @@
+import {evaluationBindingId} from '../../../../lib/eve/evaluation-context'
 import { defineDynamic, defineMcpClientConnection } from 'eve/connections'
 import { executionForSession } from '../../../../lib/eve/runtime'
 
 export default defineDynamic(async ctx => {
+  if(evaluationBindingId(ctx.session.auth.current))return null
   const { scope, execution, scheduledRead } = await executionForSession(ctx)
   if (scheduledRead) return null
   const { personalPlugins } = await import('../../../../lib/plugins/runtime')

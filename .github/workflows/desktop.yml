@@ -106,7 +106,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Chromium system dependencies
         timeout-minutes: 15
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
+          pnpm exec playwright install --with-deps chromium
       - run: sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
       - name: Install the pinned Electron runtime and its Linux sandbox helper
         working-directory: apps/desktop

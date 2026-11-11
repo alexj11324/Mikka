@@ -55,13 +55,14 @@ function TaskTab({ issueId, origin, onOpenTask, onFlush }: { issueId: string; or
  * thread's own panel, as the right column drew it (components/workspace/thread-column.tsx). ← and its task link open
  * the task's tab; a thread it names (a subagent, a review) opens a tab of its own.
  */
-function ThreadTab({ runId, issueId: known, name, onOpenTask, onTitle }: { runId: string; issueId?: string | null; name?: string; onOpenTask: (id: string) => void; /** A thread the chat does not know names its tab once read. */ onTitle?: (runId: string, title: string) => void }) {
+function ThreadTab({ runId, issueId: known, name, onOpenTask, onTitle, onTask }: { runId: string; issueId?: string | null; name?: string; onOpenTask: (id: string) => void; /** A thread the chat does not know names its tab once read. */ onTitle?: (runId: string, title: string) => void; onTask: (runId: string, taskId: string | null) => void }) {
   const t = useTranslations('IssueThreads')
   const { data: looked, error, mutate } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
-  useThreadTitle(known ?? looked?.issueId ?? null, runId, onTitle)
+  const issueId = known ?? looked?.issueId ?? null
+  useThreadTitle(issueId, runId, onTitle)
+  useEffect(() => { onTask(runId, issueId) }, [runId, issueId, onTask])
   if (!known && looked === undefined) return error ? <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div> : <TabLoading />
   if (!known && looked === null) return <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div>
-  const issueId = known ?? looked?.issueId ?? null
   const TaskConversation = taskConversationSlot.TaskConversation ?? null
   const toTask = issueId ? () => onOpenTask(issueId) : undefined
   return TaskConversation && issueId && toTask
@@ -95,6 +96,10 @@ export type WorkTabNames = { task: (issueId: string) => string; thread: (runId: 
  * `?thread=`) opens its tab instead of a column beside the chat.
  */
 export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
+  const onActiveTask = useConversationPanels()?.onActiveTask
+  const [activeTab, onActiveTab] = useState<string | null>(null)
+  const [threadTasks, setThreadTasks] = useState<Record<string, string | null>>({})
+  const learnTask = useCallback((runId: string, taskId: string | null) => setThreadTasks(current => current[runId] === taskId ? current : { ...current, [runId]: taskId }), [])
   const flushes = useRef(new Map<string, () => Promise<boolean>>())
   const registerFlush = useCallback((issueId: string, flush: (() => Promise<boolean>) | null) => {
     if (flush) flushes.current.set(issueId, flush)
@@ -105,6 +110,10 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
     return flush ? await flush() : true
   }, [])
   const [opened, setOpened] = useState<Opened[]>([])
+  const active = opened.find(item => `${item.kind}:${item.id}` === activeTab)
+  const activeTask = !on || !active ? null : active.kind === 'task' ? active.id : names.thread(active.id).issueId ?? threadTasks[active.id] ?? null
+  useEffect(() => { onActiveTask?.(activeTask) }, [activeTask, onActiveTask])
+  useEffect(() => () => onActiveTask?.(null), [onActiveTask])
   const [reveal, setReveal] = useState<{ reveal: number; revealId: string | null }>({ reveal: 0, revealId: null })
   const open = useCallback((kind: Opened['kind'], id: string) => {
     setOpened(list => list.some(item => item.kind === kind && item.id === id) ? list : [...list, { kind, id }])
@@ -135,8 +144,8 @@ export function useWorkTabs(on: boolean, names: WorkTabNames, origin: string) {
     // A run the chat has no source for (opened from the Overview, search or another thread) learns its title once read.
     const unknown = thread.issueId === undefined
     return { id: `thread:${item.id}`, title: (unknown && learned[item.id]) || thread.title,
-      content: <ThreadTab key={item.id} runId={item.id} issueId={thread.issueId} name={thread.name} onOpenTask={openTask} onTitle={unknown ? learn : undefined} /> }
+      content: <ThreadTab key={item.id} runId={item.id} issueId={thread.issueId} name={thread.name} onOpenTask={openTask} onTitle={unknown ? learn : undefined} onTask={learnTask} /> }
   })
-  const work: ThreadScreenProps['work'] = on ? { tabs, ...reveal, beforeClose } : undefined
+  const work: ThreadScreenProps['work'] = on ? { tabs, ...reveal, beforeClose, onActiveTab } : undefined
   return { work, openTask }
 }

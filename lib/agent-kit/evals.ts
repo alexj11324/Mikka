@@ -5,7 +5,8 @@ import { AGENT_TOOL_IDS } from './registry'
 import { DECISION_MODEL, type DecisionImage } from '../coordinator/decision'
 import type { DecisionExecution } from '../coordinator/decide'
 
-export const EVAL_RUNNER_VERSION = 'mikka.eval.v4'
+// Native Eve sessions and control/tool facts supersede the AI SDK eval runner.
+export const EVAL_RUNNER_VERSION = 'mikka.eval.v5'
 export const evalCaseSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9_-]{1,100}$/),
   input: z.string().min(1).max(12_000),

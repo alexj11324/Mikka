@@ -84,6 +84,8 @@ jobs:
           chmod 600 "$RUNNER_TEMP/mikka-selfhost-daemon/session.json"
           docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})'
           node --import tsx scripts/acceptance/self-hosted-daemon.mjs
+      - name: Prepare Ubuntu package mirrors
+        run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
       - name: Install the native desktop runtime dependencies
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { ComputerThread } from '@/components/computer/computer-agents'
 import type { SettingsFrameProps } from '@/components/slots/settings-frame-contract'
+import { browserAddressRequest, consumeBrowserAddress, openBrowserAddress } from '@/lib/browser/navigation'
 
 const nothing = () => {}
 const empty = () => null
@@ -63,12 +64,13 @@ for (const [file, names] of [
   ['./issue-list.tsx', ['IssueList']], ['./board-page.tsx', ['BoardPage']],
   ['../nav/context-panel.tsx', ['ContextPanel']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
-  ['../nav/group-avatar.tsx', ['GroupPillAvatar']], ['../browser/browser-pane.tsx', ['BrowserPane']],
+  ['../nav/group-avatar.tsx', ['GroupPillAvatar']],
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']], ['./group-chat-view.tsx', ['GroupChatView']],
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
   ['./create-issue-dialog.tsx', ['CreateIssueDialog']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
+mock.module('../browser/browser-pane', { namedExports: { BrowserPane: () => <section data-browser-pane="" /> } })
 mock.module('@/components/nav/bot-list', { namedExports: { BotList: empty, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
@@ -85,6 +87,7 @@ mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSetti
 
 let useBrowserNotes: typeof import('../browser/browser-notes')['useBrowserNotes']
 let useBrowserNotesComposer: typeof import('../browser/browser-notes')['useBrowserNotesComposer']
+let useConversationPanels: typeof import('../coordinator/conversation-panels')['useConversationPanels']
 let notes: ReturnType<typeof useBrowserNotes>
 let ComputerConversation: typeof import('../computer/computer-agents')['ComputerConversation']
 let useConversationThread: typeof import('../computer/computer-agents')['useConversationThread']
@@ -99,13 +102,16 @@ function RegisterComputerThread() {
 }
 let editDraft: (value: string) => void
 let composerMounts = 0, composerUnmounts = 0
+let reportWorkTask: ((taskId: string | null) => void) | undefined
 function Conversation({ bot: activeBot }: { bot?: { id: string; name: string } }) {
+  const panels = useConversationPanels()
+  reportWorkTask = panels?.onActiveTask
   notes = useBrowserNotesComposer(true)
   computerThread = useConversationThread(conversationId)
   const [draft, setDraft] = useViewState(`settings-fixture:${activeBot?.id ?? 'coordinator'}:draft`, '')
   editDraft = setDraft
   useEffect(() => { composerMounts++; return () => { composerUnmounts++ } }, [])
-  return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<p>Cached conversation</p><Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} /></>
+  return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<p>Cached conversation</p><Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} />{panels?.revealId === 'browser' && panels.tabs.find(tab => tab.id === 'browser')?.content}</>
 }
 mock.module('./workspace-overview', { namedExports: { WorkspaceOverview: Conversation } })
 mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, children, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; children?: ReactNode; onRail: (destination: 'chats') => void }) => {
@@ -120,7 +126,11 @@ let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let IssueWorkspace: typeof import('./issue-workspace')['IssueWorkspace']
 let HostedIssueWorkspace: typeof IssueWorkspace
+let OfficialIssueWorkspace: typeof IssueWorkspace
 let SettingsShell: typeof import('../settings/settings-shell')['SettingsShell']
+let closeReview: typeof import('@/hooks/code-review/use-review-page')['closeReview']
+mock.module(new URL('../slots/review-summary.tsx', import.meta.url).href, { namedExports: { REVIEW_ENABLED: true, ReviewSummaryLine: empty } })
+mock.module(new URL('../slots/review-page.tsx', import.meta.url).href, { namedExports: { ReviewPage: ({ taskId }: { taskId: string }) => <p data-review-task={taskId}>Review</p> } })
 before(async () => {
   for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'ResizeObserver', 'navigator'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
   Object.defineProperty(globalThis, 'getComputedStyle', { configurable: true, value: browser.getComputedStyle.bind(browser) })
@@ -129,6 +139,8 @@ before(async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ useBrowserNotes, useBrowserNotesComposer } = await import('../browser/browser-notes'))
+  ;({ useConversationPanels } = await import('../coordinator/conversation-panels'))
+  ;({ closeReview } = await import('@/hooks/code-review/use-review-page'))
   ;({ ComputerConversation, useConversationThread, useRegisterComputerThread } = await import('../computer/computer-agents'))
   ;({ IssueWorkspace } = await import('./issue-workspace'))
   ;({ SettingsShell } = await import('../settings/settings-shell'))
@@ -140,8 +152,14 @@ before(async () => {
   } })
   const hostedModule = new URL('./issue-workspace.tsx?hosted-provider-test', import.meta.url).href
   ;({ IssueWorkspace: HostedIssueWorkspace } = await import(hostedModule))
+  const shell = await import('../app-shell')
+  mock.module('../app-shell', { namedExports: { ...shell, FRAME_OWNS_PANEL: true } })
+  ;({ IssueWorkspace: OfficialIssueWorkspace } = await import(new URL('./issue-workspace.tsx?browser-panel-test', import.meta.url).href))
 })
 beforeEach(() => {
+  closeReview(); reportWorkTask = undefined
+  const pendingAddress = browserAddressRequest()
+  if (pendingAddress) consumeBrowserAddress(pendingAddress)
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
   workspaceId = 'workspace-one'
   workspaceReady = true
@@ -156,6 +174,37 @@ beforeEach(() => {
 })
 afterEach(async () => { releaseChunk(); await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
+
+test('a valid browser request from a board clears only competing columns and opens the existing browser', async () => {
+  const selectedRun = '00000000-0000-4000-8000-000000000021'
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&section=all-issues&thread=${selectedRun}&task=${selectedRun}&threads=all`)
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} initialSection="all-issues" />))
+  await act(async () => assert.equal(openBrowserAddress('/preview'), true))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
+  const params = new URL(browser.location.href).searchParams
+  assert.equal(params.get('section'), 'all-issues')
+  assert.equal(params.get('workspace'), 'workspace-one')
+  assert.equal(params.get('account'), 'active')
+  for (const key of ['task', 'thread', 'threads']) assert.equal(params.has(key), false)
+})
+
+test('a valid browser request reveals the conversation browser tab without changing the selected Bot', async () => {
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&bot=${bot.id}`)
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 0)
+  await act(async () => assert.equal(openBrowserAddress('/preview'), true))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
+  const params = new URL(browser.location.href).searchParams
+  assert.equal(params.get('bot'), bot.id)
+  assert.equal(params.get('workspace'), 'workspace-one')
+  assert.equal(params.get('account'), 'active')
+})
+
+test('an invalid browser address does not reveal or create a browser pane', async () => {
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} initialSection="all-issues" />))
+  await act(async () => assert.equal(openBrowserAddress('javascript:alert(1)'), false))
+  assert.equal(container.querySelectorAll('[data-browser-pane]').length, 0)
+})
 
 const render = async (props: Partial<Parameters<typeof IssueWorkspace>[0]> = {}) => { await act(async () => root.render(<IssueWorkspace user={user} {...props} />)) }
 const renderHosted = async () => { await act(async () => root.render(<HostedIssueWorkspace user={user} />)) }
@@ -430,4 +479,46 @@ test('a standalone Settings shell still provides its frame and route-specific me
   assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-settings-section'), 'members')
   assert.equal(container.querySelector('[data-members-workspace]')?.getAttribute('data-members-workspace'), workspaceId)
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
+})
+
+const taskOne = '00000000-0000-4000-8000-000000000041'
+const taskTwo = '00000000-0000-4000-8000-000000000042'
+const reviewShortcut = () => browser.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'B', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }))
+const reviewedTask = () => container.querySelector<HTMLElement>('[data-review-task]')?.dataset.reviewTask
+
+test('Review keyboard targets the actual active work task after its URL was consumed and clears on a non-task tab', async () => {
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  assert.ok(reportWorkTask, 'the current conversation exposes its active-task boundary')
+  assert.equal(new URLSearchParams(browser.location.search).has('task'), false)
+  await act(async () => reportWorkTask!(taskOne))
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskOne)
+  await act(async () => { closeReview(); reportWorkTask!(taskTwo) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskTwo)
+  await act(async () => { closeReview(); reportWorkTask!(null) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined, 'Browser, New and closed tabs cannot reuse the last task')
+})
+
+test('an old workarea callback cannot replace the active task after the workspace or account changes', async () => {
+  const renderOwner = () => root.render(<OfficialIssueWorkspace user={user} />)
+  await act(async () => renderOwner())
+  const oldWorkspace = reportWorkTask!
+  assert.ok(oldWorkspace)
+  await act(async () => oldWorkspace(taskOne))
+  workspaceId = 'workspace-two'
+  await act(async () => renderOwner())
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined)
+  const newWorkspace = reportWorkTask!
+  await act(async () => { newWorkspace(taskTwo); oldWorkspace(taskOne) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskTwo)
+  await act(async () => closeReview())
+  user = { ...user, id: 'owner-two' }
+  await act(async () => renderOwner())
+  await act(async () => { newWorkspace(taskTwo); oldWorkspace(taskOne) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined, 'a new account has no review target from the previous account')
 })

@@ -204,6 +204,22 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
     assert.equal(await memory.recordMemoryFactUsage(owner, wsA,
       { ...event, eventId: randomUUID() }, [manual!]), 0, 'project fact cannot leak into generic thread')
     assert.equal(await memory.removeMemoryFact(owner, wsA, manual!), false, 'hidden project fact cannot be removed from A')
+    const visible = await memory.addMemoryFact(owner, wsA, {
+      requestId: randomUUID(), kind: 'preference', subject: 'Visible correction candidate', scope: { kind: 'global', ids: [] },
+    })
+    assert.ok(visible)
+    assert.equal(await memory.mayCorrectMemoryFact(owner, wsA, visible!, 'Own fact'), false, 'a correction cannot merge a hidden fact into this workspace')
+    assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === visible)?.subject, 'Visible correction candidate', 'refusal leaves the persisted fact unchanged')
+    assert.equal((await memory.readMemoryView(owner, personal)).facts.find(item => item.id === manual)?.subject, 'Own fact', 'a refused deletion leaves the hidden fact unchanged')
+    const survivor = await memory.addMemoryFact(owner, wsA, {
+      requestId: randomUUID(), kind: 'preference', subject: 'Existing visible memory', scope: { kind: 'global', ids: [] },
+    })
+    assert.ok(survivor)
+    assert.equal(await memory.mayCorrectMemoryFact(owner, wsA, visible!, 'Existing visible memory'), true)
+    assert.equal(await profile.correctFact(owner, visible!, 'Existing visible memory'), true)
+    const merged = await memory.readMemoryView(owner, wsA)
+    assert.equal(merged.facts.some(fact => fact.id === visible), false, 'a successful duplicate correction removes the edited id')
+    assert.equal(merged.facts.find(fact => fact.id === survivor)?.subject, 'Existing visible memory', 'the existing visible fact survives the merge')
     assert.equal(await memory.removeMemoryFact(owner, personal, manual!), true)
     assert.equal(await memory.removeMemoryFact(owner, personal, manual!), true, 'delete retried is idempotent')
     const [scrubbed] = await db.select().from(schema.userFacts).where(eq(schema.userFacts.id, manual!))

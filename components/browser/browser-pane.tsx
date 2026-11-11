@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { ArrowLeft, ArrowRight, ArrowUp, RotateCw, SquareDashedMousePointer, X } from 'lucide-react'
 import { ELEMENT_ROLES, FRAME_SCRIPT, type ElementRole, type FromFrame, type ToFrame } from '@mikka/protocol/artifact-frame'
@@ -12,6 +12,9 @@ import { NOTE_MAX, elementLabel, normalizeAddress, pageLabel, type BrowserNote }
 import { cn } from '@/lib/utils'
 import { useBrowserNotes } from './browser-notes'
 import { ResizablePane } from '@/components/ui/resizable-pane'
+import { browserAddressRequest, consumeBrowserAddress, serverBrowserAddressRequest, subscribeBrowserAddress } from '@/lib/browser/navigation'
+
+export { openBrowserAddress, browserAddressRequest, browserAddressVersion, subscribeBrowserAddress } from '@/lib/browser/navigation'
 
 const STORAGE_KEY = 'mikka:browser-url'
 const PICKER_FLAG = '__mikkaPicker'
@@ -68,6 +71,8 @@ export function BrowserPane({ onClose, inTab = false }: { onClose: () => void; i
   const tCommon = useTranslations('Common')
   const tRoles = useTranslations('Artifact.roles')
   const notes = useBrowserNotes()
+  const requestedAddress = useSyncExternalStore(subscribeBrowserAddress, browserAddressRequest, serverBrowserAddressRequest)
+  const initializedAddress = useRef(false)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const addressRef = useRef<HTMLInputElement>(null)
@@ -120,14 +125,21 @@ export function BrowserPane({ onClose, inTab = false }: { onClose: () => void; i
     remember(href)
   }
 
-  // Reopening the browser comes back to the last page.
+  // An explicit request takes the normal navigation path; otherwise reopening restores the last page.
   useEffect(() => {
+    if (requestedAddress && consumeBrowserAddress(requestedAddress)) {
+      initializedAddress.current = true
+      load(requestedAddress.href, true)
+      return
+    }
+    if (initializedAddress.current) return
+    initializedAddress.current = true
     let saved: string | null = null
     try { saved = window.localStorage.getItem(STORAGE_KEY) } catch { /* storage unavailable */ }
     const src = saved ? normalizeAddress(saved, window.location.origin) : null
     if (src) load(src, true)
     else addressRef.current?.focus()
-  }, [])
+  }, [requestedAddress])
 
   function go(step: -1 | 1) {
     const index = history.index + step
