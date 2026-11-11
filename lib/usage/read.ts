@@ -43,11 +43,18 @@ export async function workspaceUsage(actorId: string, workspaceId: string, month
   const seconds = sql<number>`coalesce(sum(case when ${agentRuns.startedAt} is null then 0 else greatest(0, extract(epoch from (least(coalesce(${agentRuns.finishedAt}, now()), ${end}::timestamptz) - greatest(${agentRuns.startedAt}, ${start}::timestamptz)))) end), 0)::float8`
   // Runs that overlap the month: created before its end and not finished before its start.
   // This per-Bot column counts only runs a Bot dispatched (agent_runs.botId), so an
-  // MCP client's run — which has no botId by contract (lib/computer/queue-run.ts) —
-  // is absent here by design. Its time is not lost: `executionAccounts` below
-  // aggregates every run by its frozen execution identity, and that is the surface
-  // billing reads (hosted_usage records usageRunId/executionOwnerId, never a botId).
-  // ALE-77 confirmed both facts; do not "fix" this filter to include them.
+  // MCP client's run — which has no botId by contract (lib/computer/queue-run.ts:119) —
+  // is absent here on purpose, the same way lib/mobile-threads.ts omits it. Do not
+  // "fix" this filter to include those runs: a Bot column means "threads this Bot
+  // dispatched", and nothing dispatched them.
+  // The time is not lost from the page. `executionAccounts` below reads the same month
+  // by execution identity, and its query filters on the run's own "userId", so an MCP
+  // run lands there under whoever ran it. The two paths are not nested: A covers every
+  // run a workspace Bot dispatched, B every run *this viewer* ran, so an admin's B
+  // omits a teammate's Bot runs. Neither is a charge: those rows carry costMicroUsd
+  // null and chargedByMikka false, and credits settle from hosted_usage per model call
+  // (lib/abuse/store.ts), which has no botId column.
+  // ALE-77 measured all of this on a seeded database; see the issue before reopening it.
   const perBot = ids.length ? await db.select({ botId: agentRuns.botId, seconds })
     .from(agentRuns)
     .where(and(inArray(agentRuns.botId, ids), lt(agentRuns.createdAt, end), sql`(${agentRuns.finishedAt} is null or ${agentRuns.finishedAt} >= ${start}::timestamptz)`))
