@@ -165,7 +165,7 @@ async function performUpgrade(release, opts) {
       activated = true
       const deployment = { ...process.env, MIKKA_IMAGE: digest }
       compose(['up', '-d', '--no-deps', '--wait', '--wait-timeout', '240', 'app'], deployment)
-      compose(['exec', '-T', '-e', 'MIKKA_EXPECTED_REVISION=' + release.revision, 'app', 'node', 'scripts/self-hosted-smoke.mjs'], deployment)
+      compose(['exec', '-T', '-e', 'MIKKA_EXPECTED_REVISION=' + release.revision, 'app', 'node', 'scripts/self-hosted-update-smoke.mjs'], deployment)
       saveAtomic(join(stateDirectory, 'last-success.json'), JSON.stringify({
         tag: release.tag, revision: release.revision, image: digest, migrated: assessment.migrationChanged,
         installedAt: new Date().toISOString()
