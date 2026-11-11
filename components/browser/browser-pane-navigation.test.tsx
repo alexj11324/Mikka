@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
-import { act, type ComponentProps, type ReactNode } from 'react'
+import { act, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
 const box = ({ children }: { children?: ReactNode }) => <>{children}</>
 mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
-mock.module('@/components/ui/button', { namedExports: { Button: ({ variant: _variant, size: _size, ...props }: ComponentProps<'button'> & { variant?: string; size?: string }) => <button {...props} /> } })
-mock.module('@/components/ui/input', { namedExports: { Input: (props: ComponentProps<'input'>) => <input {...props} /> } })
 mock.module('@/components/ui/input-group', { namedExports: { InputGroup: box, InputGroupAddon: box, InputGroupButton: box, InputGroupTextarea: box } })
 mock.module('@/components/ui/tooltip', { namedExports: {
   Tooltip: box,
@@ -31,7 +29,9 @@ const address = () => container.querySelector('input[aria-label="address"]') as 
 const button = (label: string) => container.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement
 
 before(async () => {
-  for (const [name, value] of Object.entries({ window: browser, document: browser.document, navigator: browser.navigator })) {
+  for (const [name, value] of Object.entries({ window: browser, document: browser.document, navigator: browser.navigator,
+    HTMLElement: browser.HTMLElement, Element: browser.Element, Node: browser.Node,
+  })) {
     Object.defineProperty(globalThis, name, { configurable: true, value })
   }
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
