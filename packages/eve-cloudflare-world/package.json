@@ -1,0 +1,17 @@
+{
+  "name": "@mikka/eve-cloudflare-world",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@workflow/errors": "5.0.5",
+    "@workflow/world": "5.1.0",
+    "cbor-x": "1.6.0"
+  },
+  "scripts": {
+    "test": "vitest run --testTimeout=30000"
+  },
+  "devDependencies": {
+    "ulid": "3.0.2",
+    "vitest": "5.0.5"
+  }
+}

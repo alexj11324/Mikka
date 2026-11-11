@@ -100,3 +100,19 @@ Eve's generated `.eve` snapshots and `.output` belong to its independent World
 and must never be discovered by the product compiler. Shared model descriptor
 validation stays in the pure `lib/hosted-model-selection.ts` module; provider,
 credential and database resolution remain on the Node side of the step boundary.
+
+## Cloudflare World storage
+
+The private `EveWorldAuthority` Durable Object commits the candidate run, its
+start Hook, the token decision, and the first event in one SQLite transaction.
+Direct starts and the queue's resilient startup call share that transaction.
+The same authority handles Hook delivery, retention, explicit disposal, forced
+claims and terminal run transitions. Its only external HTTP response is 404.
+The Worker has no public route or workers.dev endpoint.
+
+Run `pnpm --filter @mikka/eve-cloudflare-world test` to execute the pinned
+Workflow SDK's atomic-start conformance suite and the workerd restart test.
+`pnpm test:eve` includes both. The current application still starts its existing
+World. Enabling the Cloudflare World for a production Eve host requires complete
+official World event storage, Queue delivery, stream reads and writes, and live
+Eve acceptance under the release revision.
