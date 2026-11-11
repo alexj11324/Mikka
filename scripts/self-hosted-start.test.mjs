@@ -55,6 +55,6 @@ test('Neon migrations take an unpooled PostgreSQL session lock; queries remain p
   assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: pooled }), direct)
   assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: direct }), direct)
   // An explicitly provided direct endpoint wins over the pooled query URL.
-  assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: pooled, MIKKA_DATABASE_URL_UNPOOLED: endpoint('db.example.invalid', 'custom') }), 'postgresql://custom:secret@db.example.invalid/mikka')
+  assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: pooled, MIKKA_DATABASE_URL_UNPOOLED: endpoint('db.example.invalid', 'custom') }), endpoint('db.example.invalid', 'custom'))
   assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: ['postgres://', 'mikka', ':', 'fixture', '@postgres:5432/mikka'].join('') }), ['postgres://', 'mikka', ':', 'fixture', '@postgres:5432/mikka'].join(''))
 })
