@@ -27,9 +27,17 @@ mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) 
 
 let data: AgentProfilesView | undefined, readError: Error | undefined
 const submitted: { text: string; context?: CoordinatorMessageContext }[] = []
+const manualCommands: import('../../lib/task-create-command').CreateOnlyCommand[] = []
+let failManual = false
+mock.module(new URL('../../app/actions/issues.ts', import.meta.url).href, { namedExports: { createTaskOnly: async (command: import('../../lib/task-create-command').CreateOnlyCommand) => {
+  manualCommands.push(command)
+  if (failManual) throw new Error('response lost')
+  return { version: 1, taskId: 'one-task', identifier: 'TEST-1', dispatch: null }
+} } })
 let refreshes = 0
 const mutate = async () => { refreshes++ }
 mock.module('swr', { defaultExport: (key: unknown) => {
+  if (key === null) return { data: undefined, mutate }
   if (Array.isArray(key) && key[0] === 'factory-agent-profiles') return { data, error: readError, mutate }
   if (Array.isArray(key) && key[0] === 'settings:model-order') return { data: { location: 'cloud', first: { kind: 'cloud' }, entries: [], readyDeviceIds: [] }, mutate }
   return { data: key === 'issue-creation-available' ? true : [], mutate }
@@ -75,6 +83,7 @@ before(async () => {
   ;({ NewTaskDialog } = await import('./new-task-dialog'))
 })
 beforeEach(() => {
+  manualCommands.length = 0; failManual = false
   submitted.length = 0; refreshes = 0; readError = undefined
   data = { profiles: [{
     id: customId, name: 'Fixture role', description: '', roles: ['review'], icon: 'lens', color: 'pink', enabled: true, harness: 'claude_code',
@@ -222,4 +231,37 @@ test('Enter in the title moves focus to the description; Ctrl or Cmd+Enter submi
   await press({ metaKey: true })
   assert.equal(submitted.length, 1)
   assert.equal(submitted[0].context?.taskTitle, 'Named task')
+})
+
+test('manual creation survives uncertain results, bypasses dispatch settings, and opens the returned Task', async () => {
+  let opened = ''
+  const form = <NewTaskDialog open workspaceId={workspaceId} initialIntent="create_only" initialText="Keep in backlog."
+    onCreated={id => { opened = id }} onOpenChange={() => {}} />
+  failManual = true
+  await render(form)
+  assert.equal(option('default'), null)
+  const button = () => container.querySelector<HTMLButtonElement>('button[aria-keyshortcuts]')!
+  await act(async () => { button().click(); button().click() })
+  assert.equal(manualCommands.length, 1)
+  assert.equal(opened, '')
+  failManual = false
+  await act(async () => { button().click() })
+  assert.equal(manualCommands.length, 2)
+  assert.deepEqual(manualCommands[0], manualCommands[1])
+  assert.equal(manualCommands[0].title, 'Keep in backlog.')
+  assert.equal(manualCommands[0].intent, 'create_only')
+  assert.equal(submitted.length, 0)
+  assert.equal(opened, 'one-task')
+})
+
+test('the same form explicitly switches to dispatch and sends only its selected command', async () => {
+  await render(<NewTaskDialog open workspaceId={workspaceId} initialIntent="create_only" initialText="Run now."
+    onCreated={() => {}} onOpenChange={() => {}} />)
+  await act(async () => option('create_and_dispatch').click())
+  assert.ok(option('default'))
+  await act(async () => container.querySelector<HTMLButtonElement>('button[aria-keyshortcuts]')!.click())
+  assert.equal(manualCommands.length, 0)
+  assert.equal(submitted.length, 1)
+  assert.deepEqual(submitted[0].context?.taskCommand, { version: 1, intent: 'create_and_dispatch', description: 'Run now.' })
+  assert.equal(submitted[0].context?.expectedWorkspaceId, workspaceId)
 })

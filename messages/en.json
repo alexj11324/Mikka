@@ -4772,6 +4772,10 @@
       "noneToday": "No new suggestions today."
     },
     "newTaskDialog": {
+      "intent": "Action",
+      "backlogTitlePlaceholder": "Title (optional, defaults to the first line)",
+      "createOnly": "Create only",
+      "createAndDispatch": "Create and dispatch",
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",

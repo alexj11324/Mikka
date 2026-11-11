@@ -4772,6 +4772,10 @@
       "noneToday": "今天还没有新的建议。"
     },
     "newTaskDialog": {
+      "intent": "创建方式",
+      "backlogTitlePlaceholder": "标题（可选，默认为首行）",
+      "createOnly": "仅创建",
+      "createAndDispatch": "创建并派发",
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",

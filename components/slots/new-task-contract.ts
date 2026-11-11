@@ -22,6 +22,7 @@ export type NewTaskBot = { id: string | null; name: string; avatar: ReactNode }
 export type NewTaskProfile = { value: string; label: string; detail?: string; disabled?: boolean; icon?: ReactNode }
 
 export type NewTaskProps = {
+  intent?: 'create_only' | 'create_and_dispatch'
   onClose: () => void
   /** The project page the request came from. */
   project?: string | null
