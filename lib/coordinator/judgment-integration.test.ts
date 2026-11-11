@@ -158,3 +158,30 @@ test('the Decisions call uses the app\'s one gateway credential: AI_GATEWAY_API_
  assert.equal(requests.length, 0)
  assert.deepEqual(logged.at(-1), ['Decision unavailable', { purpose: 'no-gateway-auth' }])
 })
+
+test('native Decisions requires a dedicated credential and an explicit global standard rate card', async () => {
+  const { decisionTransport, nativeEndpoint } = await import('./decision-provider')
+  const model = 'openai/gpt-6-luna-decisions'
+  const settings = { OPENAI_DECISIONS_API_KEY: 'dedicated-fixture', DECISIONS_BILLING_PROFILE: 'openai-global-standard' }
+  assert.deepEqual(await decisionTransport(nativeEndpoint, model, settings), { native: true, model: 'gpt-6-luna', key: 'dedicated-fixture' })
+  assert.equal(await decisionTransport(nativeEndpoint, model, { ...settings, OPENAI_DECISIONS_API_KEY: undefined, DECISIONS_API_KEY: 'old-gateway-fixture', AI_GATEWAY_API_KEY: 'foreign-fixture' }), null)
+  assert.equal(await decisionTransport(nativeEndpoint, model, { DECISIONS_API_KEY: 'fixture' }), null)
+  assert.equal(await decisionTransport(nativeEndpoint, 'other', settings), null)
+  assert.equal(await decisionTransport(nativeEndpoint + '?variant=1', model, { AI_GATEWAY_API_KEY: 'foreign-fixture' }), null)
+  assert.deepEqual(await decisionTransport('https://compatible.example/v1/decisions', model, { AI_GATEWAY_API_KEY: 'legacy-config' }), { native: false, model, key: 'legacy-config' })
+})
+
+test('native receipts use the response header and the provider usage at its standard prices', async () => {
+  const { decisionProviderReceipt } = await import('./decision-provider')
+  const id = 'req_receipt_001', headers = new Headers({ 'x-request-id': id })
+  const receipt = (input: number, reads: number, writes: number, model = 'gpt-6-luna') => decisionProviderReceipt(true, 'gpt-6-luna',
+    { model, usage: { input_tokens: input, output_tokens: 19, input_tokens_details: { cached_tokens: reads, cache_write_tokens: writes } },
+      provider_metadata: { gateway: { cost: 999, generationId: 'field-must-not-be-trusted' } } }, headers)
+  assert.deepEqual(receipt(1000, 200, 400), { modelMatches: true, generation: id, cost: 92 })
+  assert.equal(receipt(272000, 0, 0).cost, 27200)
+  assert.equal(receipt(272001, 0, 0).cost, 54401)
+  assert.equal(receipt(30, 15, 16).cost, null)
+  assert.equal(receipt(1000, 0, -1).cost, null)
+  assert.equal(receipt(10, 0, 0, 'another-model').cost, null)
+  assert.equal(decisionProviderReceipt(true, 'gpt-6-luna', { model: 'gpt-6-luna', id: 'req_body_only' }, new Headers()).generation, undefined)
+})
