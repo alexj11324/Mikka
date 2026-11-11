@@ -14,27 +14,29 @@ async function keyFor(material, usage) {
   return crypto.subtle.importKey('raw', bytes(material), { name: 'HMAC', hash: 'SHA-256' }, false, [usage])
 }
 
-function canonical(revision, retries, timestamp, digest) {
-  return encoder.encode(['mikka-eve-world-queue-v1', revision, retries, timestamp, digest].join('\n'))
+function canonical(revision, retries, timestamp, digest, workload) {
+  if (!['eve', 'business'].includes(workload)) throw new TypeError('Unknown World delivery scope')
+  const domain = workload === 'business' ? 'mikka-business-world-queue-v1' : 'mikka-eve-world-queue-v1'
+  return encoder.encode([domain, revision, retries, timestamp, digest].join('\n'))
 }
 
-export async function deliveryHeaders(material, revision, retries, digest) {
+export async function deliveryHeaders(material, revision, retries, digest, workload = 'eve') {
   const timestamp = String(Date.now())
   const key = await keyFor(material, 'sign')
-  const signature = await crypto.subtle.sign(key.algorithm.name, key, canonical(revision, retries, timestamp, digest))
+  const signature = await crypto.subtle.sign(key.algorithm.name, key, canonical(revision, retries, timestamp, digest, workload))
   return {
     'content-type': 'application/json', 'x-mikka-eve-release': revision, 'CF-Queue-Retry-Count': String(retries),
     'x-mikka-queue-time': timestamp, 'x-mikka-queue-signature': hex(signature),
   }
 }
 
-export async function authenticateDelivery(material, revision, headers, body) {
+export async function authenticateDelivery(material, revision, headers, body, workload = 'eve') {
   const timestamp = headers.get('x-mikka-queue-time')
   const retries = headers.get('CF-Queue-Retry-Count')
   const signature = headers.get('x-mikka-queue-signature')
   if (!/^\d{13}$/.test(timestamp ?? '') || Math.abs(Date.now() - Number(timestamp)) > 300_000 ||
       !/^\d{1,3}$/.test(retries ?? '') || !/^(?:[0-9a-f]{64}|[0-9a-f]{128})$/.test(signature ?? '')) return false
   const key = await keyFor(material, 'verify')
-  const input = canonical(revision, retries, timestamp, await bodyDigest(body))
+  const input = canonical(revision, retries, timestamp, await bodyDigest(body), workload)
   return crypto.subtle.verify(key.algorithm.name, key, bytes(signature), input)
 }

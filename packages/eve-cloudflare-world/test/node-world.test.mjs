@@ -49,7 +49,7 @@ beforeAll(async () => {
   await runtime.ready
   outbound = await runtime.getWorker('outbound')
   const businessOutbound = await runtime.getWorker('product-outbound')
-  business = createNodeWorld({ deploymentId, verificationKey: publicMaterial,
+  business = createNodeWorld({ workload: 'business', deploymentId, verificationKey: publicMaterial,
     fetchBound: createBoundFetch(capability, (input, init) => businessOutbound.fetch(input, init)) })
   world = createNodeWorld({ deploymentId, signingKey, fetchBound: (url, options) => outbound.fetch(url, options) })
 })
@@ -129,13 +129,16 @@ test('business and Eve scopes isolate identically named streams and workflow cat
 
 test('a verify-only business Node accepts a Worker Ed25519 receipt bound to the exact body, revision and retry', async () => {
   const body = JSON.stringify({ queueName: '__wkf_workflow_work', messageId: 'local-proof' })
-  const headers = new Headers(await deliveryHeaders(privateMaterial, deploymentId, 2, await bodyDigest(body)))
-  expect(await authenticateDelivery(publicMaterial, deploymentId, headers, body)).toBe(true)
-  expect(await authenticateDelivery(publicMaterial, deploymentId, headers, body + 'x')).toBe(false)
-  expect(await authenticateDelivery(publicMaterial, 'bbb2222-11-1', headers, body)).toBe(false)
+  const headers = new Headers(await deliveryHeaders(privateMaterial, deploymentId, 2, await bodyDigest(body), 'business'))
+  expect(await authenticateDelivery(publicMaterial, deploymentId, headers, body, 'business')).toBe(true)
+  expect(await authenticateDelivery(publicMaterial, deploymentId, headers, body, 'eve')).toBe(false)
+  const eve = new Headers(await deliveryHeaders(privateMaterial, deploymentId, 2, await bodyDigest(body), 'eve'))
+  expect(await authenticateDelivery(publicMaterial, deploymentId, eve, body, 'business')).toBe(false)
+  expect(await authenticateDelivery(publicMaterial, deploymentId, headers, body + 'x', 'business')).toBe(false)
+  expect(await authenticateDelivery(publicMaterial, 'bbb2222-11-1', headers, body, 'business')).toBe(false)
   headers.set('CF-Queue-Retry-Count', '0')
-  expect(await authenticateDelivery(publicMaterial, deploymentId, headers, body)).toBe(false)
-  const symmetric = new Headers(await deliveryHeaders(signingKey, deploymentId, 2, await bodyDigest(body)))
-  expect(await authenticateDelivery(publicMaterial, deploymentId, symmetric, body)).toBe(false)
-  await expect(deliveryHeaders(publicMaterial, deploymentId, 2, await bodyDigest(body))).rejects.toThrow()
+  expect(await authenticateDelivery(publicMaterial, deploymentId, headers, body, 'business')).toBe(false)
+  const symmetric = new Headers(await deliveryHeaders(signingKey, deploymentId, 2, await bodyDigest(body), 'business'))
+  expect(await authenticateDelivery(publicMaterial, deploymentId, symmetric, body, 'business')).toBe(false)
+  await expect(deliveryHeaders(publicMaterial, deploymentId, 2, await bodyDigest(body), 'business')).rejects.toThrow()
 })
