@@ -28,7 +28,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const { sendThreadMessage } = await import('../lib/thread-continue')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { withTaskWorkspace } = await import('../lib/task-workspace')
+  const { withProjectResourceLease } = await import('../lib/project-resources/store')
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
   const users: string[] = []
   const github = githubAppStub()
@@ -214,7 +214,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       const questions = factoryRuntimeForBot(legacyNullScope ? null : b.botId).questions
       // Exercise the same host claim gate that admitted the production run.
       // A task's chat Bot may send work to another owned Bot in its workspace.
-      await withTaskWorkspace(b.id, b.ws.id, async () => {
+      await withProjectResourceLease(b.id, b.ws.id, async () => {
         const claimTx = await pool.connect()
         try {
           await claimTx.query('BEGIN')
@@ -784,7 +784,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"botId","agentDefinition") SELECT $1,"userId","issueId","agentId","deviceId","deviceRepoId",'queued',$2,"botId","agentDefinition" FROM agent_runs WHERE id=$3`, [repairId, 'Historical issue: ' + JSON.stringify(oldText), sent.runId])
       return { runId: repairId }
     })
-    const dispatchRepair = () => withTaskWorkspace(b.id, b.ws.id, () =>
+    const dispatchRepair = () => withProjectResourceLease(b.id, b.ws.id, () =>
       dispatch(b.id, { binding: factoryBinding(repairingTask), agentId: execution.agentId, deviceRepoId: execution.deviceRepoId }))
     await dispatchRepair()
     assert.equal((await dispatchRepair()).runId, repairId)

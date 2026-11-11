@@ -6,6 +6,9 @@ const allowedProperties = new Set([
   '$feature_flag', '$feature_flag_response', '$feature_flag_request_id', '$feature_flag_reason', '$feature_flag_error', '$active_feature_flags',
   'app', 'environment', 'runtime', 'section', 'test_account',
   'live_state', 'live_reason', 'live_kind', 'live_entity_id', 'live_revision', 'read_key', 'read_key_hash',
+  // A heartbeat's round trip in whole milliseconds: a bounded integer from a
+  // monotonic clock, carrying no user data, message text or identifier.
+  'live_rtt_ms',
 ])
 
 /** Replay also uses this callback for its navigation metadata. Keep the

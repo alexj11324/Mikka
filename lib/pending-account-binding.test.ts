@@ -13,9 +13,12 @@ const reviews: unknown[][] = []
 const client = { query: async () => ({ rows: [], command: 'SELECT' }) } as unknown as PoolClient
 observeCommitEffects(client)
 const liveEffects: Array<() => Promise<unknown>> = []
+// The workspace layer `readWriteSettingLayers` reads (w.external_write_permissions), as the settings page stores it.
+let workspacePolicy: Record<string, unknown> | null = null
 const db = {
   session: { client },
   $count: async () => 0,
+  execute: async () => ({ rows: workspacePolicy === null ? [] : [{ workspace: workspacePolicy }] }),
   select: () => ({ from: () => ({ where: () => ({ limit: async () => [row] }) }) }),
   insert: () => ({ values: async (value: Record<string, unknown>) => { row = { status: 'pending', ...value } } }),
   update: () => ({ set: (value: Record<string, unknown>) => ({ where: () => {
@@ -145,4 +148,93 @@ test('an approved store-app call without an account runs only for an app that ne
   row = { id: 'bound', action: 'app_tool_call', input: input('hubspot'), connectedAccountId: 'ca_frozen', createdAt: new Date() }
   await actions.decidePendingAction('u', 'bound', true)
   assert.deepEqual(appCalls.at(-1), ['u', 'hubspot', 'ca_frozen'])
+})
+
+// ALE-8: the workspace's app policy governs the Coordinator's first-class writes, and it is the one surface that
+// does. `send_email`, `create_calendar_event` and `update_calendar_event` were missing from the key map, so a Gmail
+// 不允许 blocked call_app_tool(GMAIL_*) while writeAccountAction still sent.
+const FIRST_CLASS_WRITES = [
+  ['send_email', 'gmail', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }],
+  ['create_calendar_event', 'googlecalendar', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' }],
+  ['update_calendar_event', 'googlecalendar', { event_id: 'e', summary: 'Review' }],
+] as const
+
+// The workspace layer is read through a Bot the person owns (lib/operations/write-setting-layers.ts), which is how
+// the Coordinator's own path reaches it: accountWrite passes its botId through to writeAccountAction.
+const BOT = 'bot-in-workspace'
+
+test('workspace deny withholds each first-class write before dispatch, and never asks the judge', async () => {
+  for (const [action, app, input] of FIRST_CLASS_WRITES) {
+    calls.length = 0; row = {}; workspacePolicy = { [app]: 'deny' }
+    let judged = 0
+    const result = await store.writeAccountAction('u', action, input, undefined, BOT, async () => { judged++; return 'allow' })
+    assert.deepEqual(result, { error: 'integrationActionDenied' }, action)
+    assert.equal(calls.length, 1, `${action}: resolveAccount ran, nothing was sent`)
+    assert.equal(judged, 0, `${action}: a workspace deny is absolute`)
+    assert.equal(row.status, undefined, `${action}: no record, because nothing ran`)
+  }
+  workspacePolicy = null
+})
+
+test('workspace ask makes the card for each first-class write, and never asks the judge', async () => {
+  for (const [action, app, input] of FIRST_CLASS_WRITES) {
+    calls.length = 0; row = {}; workspacePolicy = { [app]: 'ask' }
+    let judged = 0
+    const result = await store.writeAccountAction('u', action, input, undefined, BOT, async () => { judged++; return 'allow' })
+    assert.equal('status' in result && result.status, 'awaiting_approval', action)
+    assert.equal(row.status, 'pending', action)
+    assert.equal(judged, 0, `${action}: the card comes from the workspace setting`)
+  }
+  workspacePolicy = null
+})
+
+test('workspace allow runs each first-class write without the judge', async () => {
+  for (const [action, app, input] of FIRST_CLASS_WRITES) {
+    calls.length = 0; row = {}; workspacePolicy = { [app]: 'allow' }
+    let judged = 0
+    const result = await store.writeAccountAction('u', action, input, undefined, BOT, async () => { judged++; return 'ask' })
+    assert.equal('status' in result && result.status, 'done', action)
+    assert.equal(calls.length, 1, action)
+    assert.equal(judged, 0, `${action}: the workspace's Allow is a real grant`)
+  }
+  workspacePolicy = null
+})
+
+test('a Gmail deny withholds send_email and leaves the calendar writes alone', async () => {
+  workspacePolicy = { gmail: 'deny' }
+  const denied = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, undefined, BOT, async () => 'allow')
+  assert.deepEqual(denied, { error: 'integrationActionDenied' })
+  // A different app: the judge decides, and here it allows.
+  const allowed = await store.writeAccountAction('u', 'create_calendar_event', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' }, undefined, BOT, async () => 'allow')
+  assert.equal('status' in allowed && allowed.status, 'done')
+  workspacePolicy = null
+})
+
+test('an unset workspace choice still reaches the judge, which can card a first-class write', async () => {
+  row = {}; workspacePolicy = null
+  const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, undefined, BOT, async () => 'ask')
+  assert.equal('status' in result && result.status, 'awaiting_approval')
+})
+
+test('a card approved before the app turned deny does not run, and the row records why', async () => {
+  // A card is not a permanent grant: the workspace is read again at approval.
+  calls.length = 0
+  row = { id: 'stale', action: 'send_email', input: { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, connectedAccountId: 'account-a', botId: BOT, createdAt: new Date() }
+  workspacePolicy = { gmail: 'deny' }
+  try {
+    const result = await actions.decidePendingAction('u', 'stale', true)
+    assert.deepEqual(result, { status: 'failed', error: 'integrationActionDenied' })
+    assert.deepEqual(calls, [], 'nothing was sent')
+  } finally { workspacePolicy = null }
+})
+
+test('a card approved while the app is still allowed runs once', async () => {
+  calls.length = 0
+  row = { id: 'fresh', action: 'send_email', input: { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, connectedAccountId: 'account-a', botId: BOT, createdAt: new Date() }
+  workspacePolicy = { gmail: 'allow' }
+  try {
+    const result = await actions.decidePendingAction('u', 'fresh', true)
+    assert.equal(result.status, 'done')
+    assert.equal(calls.length, 1)
+  } finally { workspacePolicy = null }
 })

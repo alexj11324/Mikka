@@ -228,7 +228,7 @@ export async function coordinatorTurn(userId: string, botId: string, startupRece
       // After the reply is stored and committed, so it never delays what the person sees.
       await steps.logTurnTiming({ workflowRunId:holder,round,route:selected.harness !== 'ai_sdk' ? 'native' : hosted?.modelSelection ? 'subscription' : 'hosted',untilStoredMs:storedAt - takenAt,...(startupReceiptVersion === 1 ? {storeTimingOrigin} : {}),modelCalls:(result as { modelCalls?: number }).modelCalls ?? null,tools:(result as { toolTimings?: ToolTiming[] }).toolTimings ?? [],
         // Context reads overlap inside prepare: their durations are not additive.
-        phaseMs: { ...phaseMs, execution:prepared.contextMs?.execution ?? 0,personal:prepared.contextMs?.personal ?? 0,github:prepared.contextMs?.github ?? 0 },...(preparationBodyMs ? {preparationBodyMs} : {}) })
+        phaseMs: { ...phaseMs, execution:prepared.contextMs?.execution ?? 0,personal:prepared.contextMs?.personal ?? 0,github:prepared.contextMs?.github ?? 0,profile:prepared.contextMs?.profile ?? 0 },...(preparationBodyMs ? {preparationBodyMs} : {}) })
     } catch (error) {
       // Either branch can fail first: wait for a possible late execution commit
       // and for the already-started writer before terminal cleanup/publication.

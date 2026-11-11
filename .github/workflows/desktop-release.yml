@@ -28,7 +28,6 @@ on:
       - 'public/**'
       - 'packages/config/**'
       - 'instrumentation-client.ts'
-      - 'next.config.mjs'
       - 'postcss.config.mjs'
       - 'tsconfig.json'
       - 'packages/daemon/**'

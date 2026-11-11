@@ -69,6 +69,8 @@ export async function renewTaskSecretAccess(input: {
             if (!workspaceId || workspaceId !== stored.workspaceId || row.run.issueId !== issue.id
               || !await mayCompleteIssue(issue, row.run.userId, workspaceId)
               || row.run.agentDefinition?.executionIdentity !== undefined && row.run.agentDefinition.executionIdentity?.workspaceId !== workspaceId) return null
+            const environment = row.run.agentDefinition?.projectExecution?.environment
+            if (environment && row.run.agentDefinition?.projectExecution?.workspaceId !== workspaceId) return null
             if (row.deviceKind === 'cloud') {
               // The native cloud-token rotation creates a new token ID. Keep the
               // original claim ID as lineage, and accept only a current scoped
@@ -89,7 +91,7 @@ export async function renewTaskSecretAccess(input: {
               openEgressCapability(capability, binding, Math.max(now.getTime(), clock()), env).name)
             // Read only the at-most-32 granted names during a heartbeat. A large
             // vault must not be scanned/decrypted for every active run or API call.
-            const metadata = await taskSecretMetadata(workspaceId, repository, row.run.userId, tx, requestedNames)
+            const metadata = await taskSecretMetadata(workspaceId, repository, row.run.userId, tx, requestedNames, environment?.secretIds)
             // SQL's initial snapshot is not the issuance time: locks, membership
             // and metadata reads may have waited. Never revive an old capability
             // or issue from an authority/lease which expired during those awaits.

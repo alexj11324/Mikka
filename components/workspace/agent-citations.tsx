@@ -14,6 +14,7 @@ import { Claude } from '@/components/ui/svgs/claude'
 import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { localTaskState } from '@/hooks/use-bot-tasks'
+import { taskStateOf } from '@/lib/task-state'
 import { ISSUE_PRIORITIES } from '@/components/workspace/issue-properties'
 import { TaskStateIcon, useTaskStateLabel } from '@/components/workspace/task-state-icon'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'
@@ -121,15 +122,23 @@ export function PendingCitation() {
 }
 
 /**
- * A task mentioned in a reply (decision 2026-11-10): a compact chip with the task's own state icon (localTaskState, from
- * its board status, newest thread and PRs; never a run's result or a thread group) and its code, as 「◐ ALEX-45」; its
+ * A task mentioned in a reply (decision 2026-11-10): a compact chip with the task's own state icon (taskStateOf for a
+ * run, localTaskState without one; never a run's result or a thread group) and its code, as 「◐ ALEX-45」; its
  * title when it has no code. The title, state and priority are in the hover card.
  */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
   const tIssue = useTranslations('Issue')
   const stateLabel = useTaskStateLabel()
-  const { state, reason } = localTaskState({ status: issue.status, metadata: { pullRequests: issue.pullRequests ?? [] } }, issue.run)
+  const issueState = { status: issue.status, metadata: { pullRequests: issue.pullRequests ?? [] } }
+  // The canonical task state also knows that an open PR waits for review; the
+  // legacy attempt-only slot is used only when there is no run to project.
+  const outcome = issue.run && (issue.run.outcome === 'done' || issue.run.outcome === 'blocked'
+    || issue.run.outcome === 'needs_input' || issue.run.outcome === 'failed' || issue.run.outcome === 'idle')
+    ? issue.run.outcome : null
+  const { state, reason } = issue.run
+    ? taskStateOf(issueState, { runId: '', status: issue.run.status, outcome })
+    : localTaskState(issueState)
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
   const icon = <TaskStateIcon state={state} />

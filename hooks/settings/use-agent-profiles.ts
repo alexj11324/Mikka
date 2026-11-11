@@ -4,10 +4,11 @@ import { useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
+import { agentProfileTemplateDefinition, type AgentProfileTemplateId } from '@/lib/factory/agent-profile-templates'
 import { deriveProfileMark, resolveProfileMark, type ProfileMarkValue } from '@/lib/factory/agent-profile-mark'
 import { profileDefinition, profileModelKey, profileRequest, ProfileRequestError, useAgentProfiles, type AgentProfilesView } from '@/components/settings/factory-profiles-data'
 
-export type ProfileEditor = { profile?: AgentProfile; duplicate?: boolean }
+export type ProfileEditor = { profile?: AgentProfile; duplicate?: boolean; template?: AgentProfileTemplateId }
 const initialDefinition: AgentProfileDefinition = { name: '', description: '', roles: [], enabled: true, harness: 'auto', model: { mode: 'inherit' }, instructions: '', skills: [] }
 
 export type ProfileFailure = 'saveUnconfirmed' | 'versionConflict' | 'modelUnavailable' | 'skillUnavailable' | 'limitReached' | 'invalid' | 'profileMissing' | 'accessChanged' | 'saveFailed'
@@ -21,7 +22,8 @@ export function profileFailure(error: unknown): ProfileFailure {
     case 'agentProfileLimit': return 'limitReached'
     case 'agentProfileInvalid': case 'agentProfileTooLarge': return 'invalid'
     case 'agentProfileArchived': case 'agentProfileNotFound': return 'profileMissing'
-    case 'authRequired': case 'agentProfileScopeNotFound': case 'originMismatch': return 'accessChanged'
+    case 'skillNotFound': return 'profileMissing'
+    case 'authRequired': case 'agentProfileScopeNotFound': case 'originMismatch': case 'workspaceAccessDenied': return 'accessChanged'
     default: return 'saveFailed'
   }
 }
@@ -63,7 +65,9 @@ export function useAgentProfileEditor({ workspaceId, editor, catalog, onSaved }:
   const original = editor.duplicate ? undefined : editor.profile
   const [draft, setDraft] = useState<AgentProfileDefinition>(() => editor.profile
     ? { ...profileDefinition(editor.profile), ...(editor.duplicate ? { name: t('copyName', { name: editor.profile.name }).slice(0, 80) } : {}) }
-    : { ...initialDefinition })
+    : editor.template
+      ? agentProfileTemplateDefinition(editor.template, { name: t(`templates.${editor.template}.name`), description: t(`templates.${editor.template}.description`) })
+      : { ...initialDefinition })
   const [roles, setRoles] = useState(draft.roles.join(', '))
   const [modelMode, setModelMode] = useState(draft.model.mode)
   const [modelKey, setModelKey] = useState(draft.model.mode === 'fixed' ? profileModelKey(draft.model) : '')

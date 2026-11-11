@@ -3,12 +3,15 @@ import { createHash } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { drizzle } from 'drizzle-orm/pg-proxy'
 import { sql } from 'drizzle-orm'
+import { actingContext } from '@/lib/activity-actor'
 import { mergeChat } from './chat-poll'
 import type { ChatView } from './store'
 
 const owner = 'projection-version-owner'
 const botId = '70000000-0000-4000-8000-000000000001'
 const workspaceId = '70000000-0000-4000-8000-000000000002'
+const otherWorkspaceId = '70000000-0000-4000-8000-000000000003'
+const botRead = 'select "workspaceId" from "bots" where ("bots"."id" = $1 and "bots"."ownerId" = $2) limit $3'
 const prefixHash = 'a'.repeat(32)
 const storedHash = 'b'.repeat(32)
 const createdAt = '2026-11-08T00:00:00.000Z'
@@ -19,13 +22,15 @@ const messages = [
   { id: 'row-4', position: 4, message: { role: 'assistant', content: 'Latest reply', mikkaStreamId: 'latest:0' }, createdAt },
 ]
 const reads: string[] = []
+const workspaceReads: string[] = []
+let membershipActive = true
 
 // PostgreSQL's pre-projection aggregates are opaque fixtures. The real store
 // builds/executes its Drizzle reads and makes the version/continuation decision;
 // this adapter neither implements nor imports the new projection hash.
 const database = drizzle(async (query, params) => {
   reads.push(query)
-  if (query.startsWith('select "workspaceId" from "bots"')) {
+  if (query === botRead) {
     assert.deepEqual(params, [botId, owner, 1])
     return { rows: [[workspaceId]] }
   }
@@ -35,7 +40,9 @@ const database = drizzle(async (query, params) => {
   if (query.includes('"chat_messages"')) {
     const after = query.match(/"coordinator_messages"\."position" > \$(\d+)/)
     const rows = messages.filter(row => !after || row.position > Number(params[Number(after[1]) - 1])).toReversed()
-    return { rows: [[null, null, null, null, null, rows, []]] }
+    // Column order follows the store's select: five session lease fields, then
+    // the fold summary and its cursor, then the rows and the waiting inbox.
+    return { rows: [[null, null, null, null, null, null, null, rows, []]] }
   }
   if (query.includes('"latest"')) {
     return { rows: [[null, null, null, null, null, 4, storedHash, 'assistant', 'latest:0', createdAt, []]] }
@@ -50,6 +57,7 @@ mock.module('@/lib/db', { namedExports: { db: database, pool: { query: unused, c
 const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
 const workspaceDatabase = drizzle(async (query, params) => {
   let actualSql = query
+  workspaceReads.push(query)
   // This is the real Drizzle transport SQL: only fixed aliases are expanded,
   // then every base table, column, JOIN and owner/tenant predicate is checked.
   for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
@@ -58,9 +66,9 @@ const workspaceDatabase = drizzle(async (query, params) => {
   }
   assert.equal(actualSql, expectedMembershipSql)
   assert.deepEqual(params, [owner, 'active', workspaceId, 'team', 'personal', owner])
-  return { rows: [[workspaceId, 'personal', null]] }
+  return { rows: membershipActive ? [[workspaceId, 'team']] : [] }
 })
-mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: workspaceDatabase } })
+mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: workspaceDatabase, workspacePool: { query: unused, connect: unused } } })
 for (const [path, exports] of [
   ['./run-completion-observation', { runCompletionObservations: unused }],
   ['@/lib/agent-runs', { visibleRuns: unused }],
@@ -122,3 +130,29 @@ for (const restoreToolMetadata of [false, true]) {
     if (restoreToolMetadata) assert.equal('toolMetadata' in update && update.toolMetadata?.prefix, full.continuation!.prefix)
   })
 }
+
+test('revoking membership rejects fresh chat body and version reads before projection', async () => {
+  await store.chatView(owner, 200, botId)
+  const before = reads.length
+  const beforeWorkspace = workspaceReads.length
+  membershipActive = false
+  try {
+    await assert.rejects(store.chatView(owner, 200, botId), { name: 'ActionFailureError', code: 'workspaceAccessDenied' })
+    await assert.rejects(store.chatVersionState(owner, 200, botId), { name: 'ActionFailureError', code: 'workspaceAccessDenied' })
+    assert.deepEqual(reads.slice(before), [botRead, botRead], 'no chat body, prefix or version aggregate is read after revocation')
+    assert.equal(workspaceReads.length - beforeWorkspace, 2, 'each operation checks current membership')
+  } finally {
+    membershipActive = true
+  }
+})
+
+test('a token pinned to another workspace cannot read this Bot chat projection', async () => {
+  const before = reads.length
+  const beforeWorkspace = workspaceReads.length
+  await actingContext.run({ userId: owner, tokenWorkspaceId: otherWorkspaceId }, async () => {
+    await assert.rejects(store.chatView(owner, 200, botId), { name: 'ActionFailureError', code: 'workspaceAccessDenied' })
+    await assert.rejects(store.chatVersionState(owner, 200, botId), { name: 'ActionFailureError', code: 'workspaceAccessDenied' })
+  })
+  assert.deepEqual(reads.slice(before), [botRead, botRead])
+  assert.equal(workspaceReads.length, beforeWorkspace, 'a mismatched token scope cannot fall back to ordinary membership')
+})

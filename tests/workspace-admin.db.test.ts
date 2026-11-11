@@ -348,7 +348,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal(await count(pool, 'agents where "userId"=$1 and lower(name)=lower($2)', [target, `Cloud codex ${bot}`]), 0, 'the old agent gives up the runtime name, so the bot can come back to its owner')
   })
 
-  await t.test('team deletion: impact counts, name check, scoped delete', async () => {
+  await t.test('team deletion: accurate impact, nonempty hard-delete refusal, explicit grouping removal', async () => {
     const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member')
     const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
     const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
@@ -364,13 +364,16 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
 
     await rejects(teamAdmin.teamDeletionImpact(member, team.id), 'workspaceAccessDenied')
     await rejects(teamAdmin.teamDeletionImpact(admin, randomUUID()), 'teamNotFound')
-    assert.deepEqual(await teamAdmin.teamDeletionImpact(admin, team.id), { teamId: team.id, name: 'Platform', tasks: 2, projects: 1 })
+    assert.deepEqual(await teamAdmin.teamDeletionImpact(admin, team.id), { teamId: team.id, name: 'Platform', tasks: 2, projects: 2, runs: 0, pullRequests: 0, archivedAt: null, canDelete: false, recovery: 'restore_archive' })
     await rejects(teamAdmin.deleteTeamData(member, team.id, 'Platform'), 'workspaceAccessDenied')
     await rejects(teamAdmin.deleteTeamData(admin, team.id, 'platform'), 'teamDeleteNameMismatch')
-    assert.deepEqual(await teamAdmin.deleteTeamData(admin, team.id, 'Platform'), { deleted: { tasks: 2, projects: 1 } })
+    await rejects(teamAdmin.deleteTeamData(admin, team.id, 'Platform'), 'teamDeleteReferenced')
+    assert.equal(await count(pool, 'mikka_teams where id=$1', [team.id]), 1, 'a legacy hard-delete request is refused, not reinterpreted')
+    const removed = await teamAdmin.removeTeamGroupingData(admin, team.id, 'Platform')
+    assert.deepEqual(removed.removed, { teamId: team.id, tasks: 2, projects: 2 })
     assert.equal(await count(pool, 'mikka_teams where id=$1', [team.id]), 0)
-    assert.equal(await count(pool, 'issues where id = any($1)', [tasks]), 0)
-    assert.equal(await count(pool, 'workspace_projects where id=$1', [own]), 0)
+    assert.equal(await count(pool, 'issues where id = any($1)', [tasks]), 2)
+    assert.equal(await count(pool, 'workspace_projects where id=$1', [own]), 1, 'Project belongs to its Workspace without a Team')
     assert.equal(await count(pool, 'workspace_projects where id=$1', [shared]), 1, 'a shared project stays with the other team')
     assert.equal(await count(pool, 'mikka_team_projects where "projectId"=$1', [shared]), 1)
     assert.equal(await count(pool, 'issues where id = any($1)', [[siblingTask, foreignTask]]), 2)

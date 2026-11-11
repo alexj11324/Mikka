@@ -39,6 +39,7 @@ import { addRunMessage,  readRun, requestRunStop, visibleRuns } from '@/lib/agen
 import { compactionCut, forgetNotes, cachedContextLines, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { withPersonalInstructionText } from '@/lib/coordinator/personal-instructions'
+import { grantReadsPersonalSkill } from '@/lib/plugins/skill-prompt'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import * as store from '@/lib/coordinator/store'
@@ -235,7 +236,7 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
  * and duration. Durations and counts only. Each model call logs its own line
  * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
  */
-export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; storeTimingOrigin?: 'startup_checkpoint' | 'inbox_checkpoint'; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { startup?: number; settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; storeTimingOrigin?: 'startup_checkpoint' | 'inbox_checkpoint'; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { startup?: number; settings?: number; inbox?: number; begin?: number; prepare?: number; agentPreparation?: number; execution: number; personal: number; github: number; profile?: number }; preparationBodyMs?: { begin: number; prepare: number } }) {
   'use step'
   try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
@@ -298,11 +299,39 @@ noticeTurnFailure.maxRetries = 0
  */
 export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; stable: number; messages: ModelMessage[] }> {
   'use step'
-  return (await preparePromptDetails(userId, botId, snapshot, mailboxTools)).prompt
+  // ALE-75: the skills section keys on whether this snapshot's frozen tools can
+  // fetch a body. Deliberately does NOT pass a full prompt scope here — that
+  // would also change what the GitHub reader is asked for, which is not this
+  // entry's concern and not this change's business.
+  return (await preparePromptDetails(userId, botId, snapshot, mailboxTools, undefined, snapshot?.effectiveTools)).prompt
 }
 
 /** Context timings stay beside the prompt, never in its instructions or model options. */
-async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope) {
+/**
+ * Whether this round's tools can fetch a skill body, which decides whether the
+ * skills section carries metadata only or the bodies themselves (ALE-75).
+ *
+ * Both halves matter and both come from the same frozen execution:
+ * `effectiveTools` is the grant, and `readOnly` is the narrower scheduled-read
+ * allowlist that replaces the grant outright (workflows/coordinator/tools.ts
+ * keeps only SCHEDULE_READ_TOOL_IDS when readOnly). A scheduled read is
+ * therefore told to carry its bodies: it lists skills it cannot fetch
+ * otherwise, and it runs on a person's schedule with nobody watching to
+ * notice the round quietly had no instructions.
+ */
+function canReadPersonalSkill(scope: import('@/lib/coordinator/github-context').GitHubPromptScope | undefined, grant: readonly string[] | undefined) {
+  // The kill switch, read here rather than in a workflow body: a replay must
+  // see the same value, and a workflow body has no network to ask PostHog.
+  // Off restores the pre-ALE-75 prompt, bodies inline under ALE-72's budget.
+  if (!deploymentSwitch('personalSkillOnDemand')) return false
+  // Enumerating the tools this round will actually offer is the narrowest
+  // statement of the fact, so callers that have them pass them here.
+  if (grant) return grantReadsPersonalSkill(grant)
+  if (!scope || scope.readOnly) return false
+  return grantReadsPersonalSkill(scope.effectiveTools)
+}
+
+async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope, skillGrant?: readonly string[]) {
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
@@ -344,20 +373,32 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubPromptContext } = await import('@/lib/coordinator/github-context')
   const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const contextMs = { execution: 0, personal: 0, github: 0 }
+  const contextMs = { execution: 0, personal: 0, github: 0, profile: 0 }
   const timed = async <T>(part: keyof typeof contextMs, work: () => Promise<T>): Promise<T> => {
     const started = Date.now()
     try { return await work() } finally { contextMs[part] = Math.max(0, Date.now() - started) }
   }
   const [execution, rules, github] = await Promise.all([
     timed('execution', () => executionContextParts(userId, botId)),
-    timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
+    timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined, { canReadPersonalSkill: canReadPersonalSkill(githubScope, skillGrant) })),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
   ])
+  // What Mikka has learnt about the person (R-73). It reaches only the chat's own
+  // repositories' facts, so one project's habits never surface in another's
+  // conversation. A profile read that fails leaves the section out; it never
+  // fails the turn. The `memory` switch governs it exactly as it governs the
+  // person's own notes: with 记忆 off, conversationWithMemory already emptied
+  // `memory`, and nothing learnt is stated either.
+  const profile = memory ? await timed('profile', async () => {
+    const [{ profilePromptSection }, { usedRepositoriesForBot }] = await Promise.all([
+      import('@/lib/profile/store'), import('@/lib/coordinator/github-context'),
+    ])
+    return profilePromptSection(userId, await usedRepositoriesForBot(userId, botId))
+  }).catch(() => '') : ''
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
   // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
-  // Memory and live model availability remain in the later prompt parts.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
+  // The person's memory and what Mikka knows about them ride together just after it, then live model availability.
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
   return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
 }
 
@@ -458,6 +499,13 @@ export async function personalMcp(userId: string, botId: string, executionId: st
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
+/** GitHub's workspace app policy for github_call, read in a step: a workflow body never does DB I/O. */
+export async function githubCallAllowedStep(userId: string, botId: string | null) {
+  'use step'
+  const { githubCallDecision } = await import('@/lib/operations/github-call-policy')
+  return githubCallDecision(userId, botId)
+}
+
 /** GitHub's hosted MCP server as the caller, with the caller's own token only (decision 2026-11-02-1730). */
 export async function githubMcp(userId: string, input: import('@/lib/github/mcp').GitHubMcpCommand, scope?: NativeToolScope) {
   'use step'
@@ -484,6 +532,11 @@ appTools.maxRetries = 0
 export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  // Two app surfaces, both checked before anything is sent: 团队权限 › 允许使用的应用
+  // blocks the app outright for a named Bot, and the workspace's own app setting
+  // (deny / ask / allow, 设置 › 应用与运行权限) decides inside writeAccountAction
+  // through lib/operations/account-write-setting.ts. Reading only the first let the
+  // Coordinator send mail while the same app's call_app_tool was denied (ALE-8).
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return writeAccountAction(userId, action, input, accountId, botId ?? null)
 }

@@ -10,6 +10,7 @@ import { factoryRunBotMatches } from '../run-scope';
 import type { FactoryTask } from '../store';
 import { unclaimedPlanQuestionContinuation } from './execution-continuation';
 import { resolveRunOrigin } from '../../run-origin';
+import { assertRunProjectResources } from '../../project-resources/run-lease';
 
 /** A question resumes its server-bound executor, not the Bot's local queue.
  * The answer holds computer policy -> task -> origin locks. No provider call,
@@ -72,6 +73,7 @@ export async function admitCloudQuestionContinuation(
       ? await unclaimedPlanQuestionContinuation(tx,task,origin.id) : null;
     if (!edge || edge.questionOriginRunId !== questionOriginId) return fail();
   }
+  await assertRunProjectResources(tx, origin);
   return { origin, binding };
 }
 

@@ -43,11 +43,23 @@ test('Factory store selects marker-backed suites and real downstream imports', a
   assert(result.affected.includes(dbId('test:factory')))
   assert(result.db_suites.length < plan.db.scripts.length)
 })
-for (const file of ['drizzle/new.sql','pnpm-lock.yaml','pnpm-workspace.yaml','tsconfig.json','.github/workflows/ui-policy.yml','scripts/ci/select.mjs','lib/db/schema.ts','lib/auth.ts','lib/credentials/store.ts','unmapped.bin']) test(`high risk or unmapped input expands: ${file}`, async () => {
+for (const file of ['pnpm-lock.yaml','pnpm-workspace.yaml','tsconfig.json','.github/workflows/ui-policy.yml','scripts/ci/select.mjs','lib/db/schema.ts','lib/auth.ts','lib/credentials/store.ts','unmapped.bin']) test(`high risk or unmapped input expands: ${file}`, async () => {
   const r = await pick(file)
   assert(r.full)
   assert.equal(r.db_suites.length, plan.db.scripts.length)
   assert(r.daemon && r.image && r.desktop)
+})
+// A migration changes the schema every suite runs against, so it keeps the full
+// DB inventory; it says nothing about rendering, so it must not turn on the
+// macOS packaged acceptance the other global inputs do. Uses a migration that
+// exists, because a name absent from the graph expands for an unrelated reason.
+test('a migration keeps every DB suite without turning on the packaged desktop build', async () => {
+  const migration = Object.keys(plan.graph.nodes).find(id => id.startsWith('source:drizzle/') && id.endsWith('.sql'))
+  assert.ok(migration, 'the graph must map at least one migration')
+  const r = await pick(migration.slice('source:'.length))
+  assert(!r.full)
+  assert.equal(r.db_suites.length, plan.db.scripts.length)
+  assert(!r.desktop)
 })
 test('deletes, renames, executable modes, symlinks and empty diffs run all', async () => {
   for(const extra of [{status:'D'},{status:'R100'},{mode:'100755'},{mode:'120000'},{oldMode:'100755'}]) assert((await pick('README.md', extra)).full)

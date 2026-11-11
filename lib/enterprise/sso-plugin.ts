@@ -222,6 +222,12 @@ export function enterpriseSso(options: Pick<SSOOptions, 'defaultSSO'> = {}) {
     saml,
     schema: { ssoProvider: { additionalFields: { organizationScopeId: { type: 'string', required: true, input: false, returned: false } } } },
   })
+  // A top-level browser POST must reach the native SAML redirect. Keep the
+  // parser allowance local: HIDE_METADATA is shared by other native endpoints.
+  const samlLogoutMetadata = { ...plugin.endpoints.initiateSLO.options.metadata,
+    allowedMediaTypes: ['application/json', 'application/x-www-form-urlencoded'],
+  }
+  plugin.endpoints.initiateSLO.options.metadata = samlLogoutMetadata
   for (const field of ['oidcConfig', 'samlConfig'] as const) {
     const definition = plugin.schema.ssoProvider.fields[field] as DBFieldAttribute
     definition.transform = { input: value => value == null ? value : encryptSsoConfig(value, field), output: value => value == null ? value : decryptSsoConfig(String(value), field) }

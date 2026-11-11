@@ -145,7 +145,12 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     github_call: tool({
       description: 'Call one GitHub tool from github_tools as the person: read issues, pull requests and CI; comment; open or merge pull requests. Use its name and schema, only for the person’s task. An mcpOutcomeUnknown result must not be retried automatically.',
       inputSchema: z.object({ name: z.string().min(1).max(128), arguments: z.record(z.string(), z.unknown()) }).strict(),
-      execute: input => steps.githubMcp(userId, input, scope),
+      execute: async input => {
+        const policy = await steps.githubCallAllowedStep(userId, botId)
+        if (policy === 'deny') return { error: 'githubActionDenied' }
+        if (policy === 'unavailable') return { error: 'githubPolicyUnavailable' }
+        return steps.githubMcp(userId, input, scope)
+      },
     }),
     ...(computerEnabled ? {
       start_web_subagent: tool({
@@ -262,13 +267,14 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: input => steps.stopRun(userId, input, scope, botId),
     }),
     load_skill:tool({ description:'Load an assigned, version-pinned skill from this execution.',inputSchema:z.object({skillId:z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)}),execute:input=>kit.loadAgentSkill(userId,botId,execution?.id,input.skillId,scope) }),
+    read_personal_skill:tool({ description:'Read the full instructions of one skill the person installed. The skills list in your system prompt carries only each skill\'s name and a description; its body is not there. Call this with the skill id before relying on a skill, and do not assume what a skill says from its name.',inputSchema:z.object({skillId:z.uuid()}),execute:input=>kit.readPersonalSkill(userId,botId,execution?.id,input.skillId,scope) }),
   }
   return withToolDisplayNames(options.readOnly ? scheduledReadTools(registry, options.readToolIds) : registry)
 }
 export function coordinatorTools(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   const registry = createCoordinatorRegistry(userId,botId,scope,options)
   const { execution } = options
-  if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill'))
+  if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill' && name !== 'read_personal_skill'))
   // A rollout gate can narrow a frozen grant; enabling it never adds tool IDs
   // absent from this execution's immutable effectiveTools.
   const requested = execution.snapshot.effectiveTools.filter(name =>
