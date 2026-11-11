@@ -198,7 +198,7 @@ export async function resolveComposioAccount(userId: string, toolkit: string, cl
 
 export type ComposioActionClient = Pick<Composio, 'connectedAccounts' | 'tools'>
 /** Runs after the account and tool version are known, before anything is sent. An error stops the action. */
-export type ComposioDispatchGate = (accountId: string, tool: { tags?: readonly string[] }) => Promise<{ error: string } | null>
+export type ComposioDispatchGate = (accountId: string, tool: { tags?: readonly string[]; version?: string }) => Promise<{ error: string } | null>
 
 export async function executeComposioAction(
   userId: string,

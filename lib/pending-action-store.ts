@@ -10,6 +10,7 @@ import { resolveActionAccount, runComposioAction } from '@/lib/composio'
 import { db } from '@/lib/db'
 import { pendingActions } from '@/lib/db/schema'
 import { actionOutcome, calendarEventSummary, PENDING_ACTION_TTL_MS, type PendingActionView } from '@/lib/pending-action-view'
+import type { NativeWriteReview } from './operations/native-write-review'
 
 /** Most proposals one person can have waiting at once. */
 const MAX_PENDING = 20
@@ -27,7 +28,7 @@ const MAX_PENDING = 20
  * The row is written before dispatch and kept as the record; like other writes
  * the policy allows, it has no `decidedAt` and never shows as a card.
  */
-export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId)) {
+export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId), review?: NativeWriteReview) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
@@ -37,7 +38,11 @@ export async function writeAccountAction(userId: string, action: string, input: 
   const id = crypto.randomUUID()
   let recorded = false as boolean
   const result = await runComposioAction(userId, action, parsed, selectedAccountId, async (accountId, tool) => {
-    const outcome = await accountWriteOutcome(setting, () => judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }))
+    let outcome = await accountWriteOutcome(setting, () => judge({ action, tool: COMPOSIO_ACTIONS[action].slug, annotations: tool.tags, input: parsed }))
+    if (review) {
+      const decision = await review(outcome === 'run' ? 'allow' : outcome, { ownerId: userId, botId, action, input: parsed, accountId, version: tool.version ?? '', policy: setting })
+      if (outcome !== 'deny') outcome = decision === 'allow' ? 'run' : decision
+    }
     const stopped = accountWriteError(outcome)
     if (stopped) return stopped
     await db.insert(pendingActions).values({ id, userId, botId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
