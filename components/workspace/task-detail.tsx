@@ -240,7 +240,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     setSaved(initial)
     // This is a read, not an edit: keep generation, selection and the Y.Doc.
   }, [initial])
-  const hasUnsavedChanges = dirty
+  const hasUnsavedChanges = dirty || syncState.pending
   useEffect(() => { onDirty(hasUnsavedChanges || pending) }, [hasUnsavedChanges, pending, onDirty])
   useEffect(() => {
     if (!hasUnsavedChanges) return
@@ -308,10 +308,11 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     return () => onRegisterFlush(null)
   }, [onRegisterFlush, locked, save])
   useEffect(() => {
-    if (!editSequence || !syncState.ready) return
+    // Comments, replies and resolves update the discussion map without changing the editor body.
+    if ((!editSequence && !syncState.pending) || !syncState.ready || syncState.error) return
     const timer = setTimeout(() => { void save() }, 700)
     return () => clearTimeout(timer)
-  }, [editSequence, syncState.ready, save])
+  }, [editSequence, syncState.ready, syncState.pending, syncState.error, save])
   function adopt(issue: Issue) {
     if (issue.revision < savedRef.current.revision) return
     savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
