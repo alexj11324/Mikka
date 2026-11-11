@@ -255,7 +255,7 @@ export function BotPermissionsView({ scope, apps, run, approvalMode, onLoadTools
 }
 
 /** The provider's real catalogue, read on first open. A count alone already replaces the old hand-written action list. */
-function AppTools({ app, onLoadTools }: { app: BotPermissionApp; onLoadTools?: (app: string) => void }) {
+export function AppTools({ app, onLoadTools }: { app: BotPermissionApp; onLoadTools?: (app: string) => void }) {
   const t = useTranslations('Settings.botPermissions')
   const [open, setOpen] = useState(false)
   const tools = app.tools

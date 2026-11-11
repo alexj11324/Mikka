@@ -116,6 +116,18 @@ export type ReviewCheck = {
   name: string
   status: 'failed' | 'passed' | 'pending'
   logExcerpt?: string
+  /** Native GitHub check page, verified against the current repository/check. */
+  logUrl?: string
+}
+
+/** Task-scoped locators; native resource endpoints enforce their own access. */
+export type ReviewResources = {
+  taskId: string
+  workspace: { runId: string; repoId: string; workspaceId: string } | null
+  run: { id: string; threadId: string; status: string } | null
+  previewUrl: string | null
+  interactiveTerminalAvailable: boolean
+  live: { workspaceId: string }
 }
 
 
