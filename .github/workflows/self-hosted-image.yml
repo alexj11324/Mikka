@@ -35,8 +35,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Verify disposable acceptance target guards and model fixture
-        run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
+      - name: Verify public source policy, disposable target guards and model fixture
+        run: node --test scripts/self-hosted-source.test.mjs scripts/acceptance/self-hosted-fixtures.test.mjs
       - name: Verify managed PostgreSQL Compose contract (offline)
         run: node --test scripts/acceptance/self-hosted-neon-compose.test.mjs
       - name: Build the public standalone application
