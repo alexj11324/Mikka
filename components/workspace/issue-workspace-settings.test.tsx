@@ -102,8 +102,10 @@ function RegisterComputerThread() {
 }
 let editDraft: (value: string) => void
 let composerMounts = 0, composerUnmounts = 0
+let reportWorkTask: ((taskId: string | null) => void) | undefined
 function Conversation({ bot: activeBot }: { bot?: { id: string; name: string } }) {
   const panels = useConversationPanels()
+  reportWorkTask = panels?.onActiveTask
   notes = useBrowserNotesComposer(true)
   computerThread = useConversationThread(conversationId)
   const [draft, setDraft] = useViewState(`settings-fixture:${activeBot?.id ?? 'coordinator'}:draft`, '')
@@ -126,6 +128,9 @@ let IssueWorkspace: typeof import('./issue-workspace')['IssueWorkspace']
 let HostedIssueWorkspace: typeof IssueWorkspace
 let OfficialIssueWorkspace: typeof IssueWorkspace
 let SettingsShell: typeof import('../settings/settings-shell')['SettingsShell']
+let closeReview: typeof import('@/hooks/code-review/use-review-page')['closeReview']
+mock.module(new URL('../slots/review-summary.tsx', import.meta.url).href, { namedExports: { REVIEW_ENABLED: true, ReviewSummaryLine: empty } })
+mock.module(new URL('../slots/review-page.tsx', import.meta.url).href, { namedExports: { ReviewPage: ({ taskId }: { taskId: string }) => <p data-review-task={taskId}>Review</p> } })
 before(async () => {
   for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'ResizeObserver', 'navigator'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
   Object.defineProperty(globalThis, 'getComputedStyle', { configurable: true, value: browser.getComputedStyle.bind(browser) })
@@ -135,6 +140,7 @@ before(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ;({ useBrowserNotes, useBrowserNotesComposer } = await import('../browser/browser-notes'))
   ;({ useConversationPanels } = await import('../coordinator/conversation-panels'))
+  ;({ closeReview } = await import('@/hooks/code-review/use-review-page'))
   ;({ ComputerConversation, useConversationThread, useRegisterComputerThread } = await import('../computer/computer-agents'))
   ;({ IssueWorkspace } = await import('./issue-workspace'))
   ;({ SettingsShell } = await import('../settings/settings-shell'))
@@ -151,6 +157,7 @@ before(async () => {
   ;({ IssueWorkspace: OfficialIssueWorkspace } = await import(new URL('./issue-workspace.tsx?browser-panel-test', import.meta.url).href))
 })
 beforeEach(() => {
+  closeReview(); reportWorkTask = undefined
   const pendingAddress = browserAddressRequest()
   if (pendingAddress) consumeBrowserAddress(pendingAddress)
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
@@ -472,4 +479,46 @@ test('a standalone Settings shell still provides its frame and route-specific me
   assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-settings-section'), 'members')
   assert.equal(container.querySelector('[data-members-workspace]')?.getAttribute('data-members-workspace'), workspaceId)
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
+})
+
+const taskOne = '00000000-0000-4000-8000-000000000041'
+const taskTwo = '00000000-0000-4000-8000-000000000042'
+const reviewShortcut = () => browser.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'B', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }))
+const reviewedTask = () => container.querySelector<HTMLElement>('[data-review-task]')?.dataset.reviewTask
+
+test('Review keyboard targets the actual active work task after its URL was consumed and clears on a non-task tab', async () => {
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  assert.ok(reportWorkTask, 'the current conversation exposes its active-task boundary')
+  assert.equal(new URLSearchParams(browser.location.search).has('task'), false)
+  await act(async () => reportWorkTask!(taskOne))
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskOne)
+  await act(async () => { closeReview(); reportWorkTask!(taskTwo) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskTwo)
+  await act(async () => { closeReview(); reportWorkTask!(null) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined, 'Browser, New and closed tabs cannot reuse the last task')
+})
+
+test('an old workarea callback cannot replace the active task after the workspace or account changes', async () => {
+  const renderOwner = () => root.render(<OfficialIssueWorkspace user={user} />)
+  await act(async () => renderOwner())
+  const oldWorkspace = reportWorkTask!
+  assert.ok(oldWorkspace)
+  await act(async () => oldWorkspace(taskOne))
+  workspaceId = 'workspace-two'
+  await act(async () => renderOwner())
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined)
+  const newWorkspace = reportWorkTask!
+  await act(async () => { newWorkspace(taskTwo); oldWorkspace(taskOne) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), taskTwo)
+  await act(async () => closeReview())
+  user = { ...user, id: 'owner-two' }
+  await act(async () => renderOwner())
+  await act(async () => { newWorkspace(taskTwo); oldWorkspace(taskOne) })
+  await act(async () => reviewShortcut())
+  assert.equal(reviewedTask(), undefined, 'a new account has no review target from the previous account')
 })
