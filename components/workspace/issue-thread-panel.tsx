@@ -37,6 +37,8 @@ import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
 import { navigate } from './workspace-navigation'
 import { ThreadHeader, ThreadStatusLine } from './thread-header'
 import { ThreadContextUsage } from './thread-context-usage'
+import { ThreadOutlineIndex } from './thread-outline-index'
+import { threadOutline } from '@/lib/thread-outline'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
@@ -194,6 +196,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const stopRequested = active && (requestedAt !== null || !!view?.stopping)
   const stopPending = stopRequested && !stopFailed
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
+  // The jump index, from the items already built: never a second fold of the stream.
+  const outline = threadOutline(items)
   // A failed run says why under the stage that stopped, else at the end of the conversation.
   const failure = data && view ? runFailureText(view.status, data.thread.questionWake ? actionError('threadRecoveryUnavailable') : data.thread.error) : null
   const modelFallback = data?.thread.modelFallback?.filter(item => item.state === 'switched' || item.runId === liveRunId) ?? []
@@ -301,11 +305,17 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
               {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
             {/* What the run holds (lib/context-usage.ts). Its own row keeps the shared status-line slot unchanged. */}
             {data.context && <ThreadContextUsage usage={data.context} />}
+            {/* A long thread's jump index (lib/thread-outline.ts). It scrolls to the
+                rows the list already anchors with `data-thread-item`. */}
+            <ThreadOutlineIndex entries={outline} />
           </div>
           {/* In a task's one conversation the dispatch is the status line's, not a person's bubble (#1681). */}
           {!attempt && (data.thread.prompt.trim() || data.thread.hasInstructions) && <div className="group/message flex flex-col gap-1">{data.thread.prompt.trim() && <PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />}{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
-            {items.map(item => <li key={item.id} className="group/message flex flex-col gap-1">
+            {/* `data-thread-item` is the jump index's anchor (lib/thread-outline.ts). It is
+                the item id, never its position: an index would point at the wrong row once
+                the list changes, and a jump to the wrong message is worse than none. */}
+            {items.map(item => <li key={item.id} data-thread-item={item.id} className="group/message flex flex-col gap-1">
               {item.kind === 'agent' && <>
                 <div {...{ [QUOTE_SOURCE_ATTR]: '' }} className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>
                 <MessageActions className={cn('self-start', HOVER_ACTIONS)}><CopyAction text={item.text} /></MessageActions>
