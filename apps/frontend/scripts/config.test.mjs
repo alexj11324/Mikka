@@ -52,7 +52,9 @@ test('the actual web flag graph follows the explicit deployment stage while desk
     assert.equal(deployment, stage)
     const flags = await browserModule('export { computerProductionEnabled } from "./lib/feature-flags.ts"', web.define)
     assert.equal(flags.computerProductionEnabled(deployment, '1'), stage === 'production')
-    const desktop = await frontendConfig({ target: 'desktop' })
+    // Exercise the public test renderer without representing a release with a
+    // missing private checkout. The explicit application stage remains set.
+    const desktop = await environment({ VERCEL_ENV: undefined }, () => frontendConfig({ target: 'desktop', publicTestFixture: true }))
     assert.equal(desktop.define['process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT'], '""')
   })
   await environment({ MIKKA_DEPLOYMENT_STAGE: 'prod' }, async () => assert.rejects(frontendConfig(), /MIKKA_DEPLOYMENT_STAGE_INVALID/))
