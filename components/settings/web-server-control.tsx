@@ -48,7 +48,7 @@ export function WebServerControl({ afterSelection, settings = false }: { afterSe
     catch (error) { setFailure(errorText(error)) }
     finally { setPending(false); setConfirm(false) }
   }
-  return <div className="flex flex-wrap items-center gap-2">
+  return <div role="group" aria-label={t('server')} className="flex flex-wrap items-center gap-2">
     <span className="text-sm">{t('server')} · {current?.name ?? t('cloud')}</span>
     <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>{t('change')}</Button>
     {settings && current && <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setConfirm(true)}>{t('disconnect')}</Button>}
