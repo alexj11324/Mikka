@@ -38,7 +38,7 @@ jobs:
       - name: Verify disposable acceptance target guards and model fixture
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
       - name: Verify stable release webhook and safe self-hosted update policy
-        run: node --test scripts/self-hosted-update.test.mjs
+        run: node --test scripts/self-hosted-update.test.mjs scripts/self-hosted-update-smoke.test.mjs
       - name: Build the public standalone application
         run: |
           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
