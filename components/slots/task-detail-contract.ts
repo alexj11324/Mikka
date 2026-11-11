@@ -94,7 +94,7 @@ export type TaskActivityItem =
   | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; time: string }
   /** An Agent's stretch of runs (R-62): opens the task's conversation at its first thread. */
   | { kind: 'agent'; id: string; at: string; who: string; mark: TaskMark; text: string; time: string; open: boolean; onOpen: (() => void) | null; openLabel: string }
-  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; excerpt: string | null; time: (at: string) => string }
+  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string }
 
 export type TaskDetailFrameProps = {
   /** The loaded task's identity, for task-specific navigation such as Review. Absent in older callers. */
@@ -142,6 +142,8 @@ export type TaskDetailFrameProps = {
   /** 活动: the task's events and Agent rows; the comments come with `discussions`. */
   activity: {
     items: (discussions: IssueDiscussions) => TaskActivityItem[]
+    /** New renderers display each reply at its own time; commands still use the original thread. */
+    timeline?: (discussions: IssueDiscussions) => TaskActivityItem[]
     failed: { text: string; retry: () => void }[]
     /** The comment being written and the reply open on one discussion; sending goes to the discussions last drawn. */
     drafts: { body: string; setBody: (value: string) => void; replyTo: string | null; setReplyTo: (id: string | null) => void; reply: string; setReply: (value: string) => void; submit: () => void; sendReply: (id: string) => void }

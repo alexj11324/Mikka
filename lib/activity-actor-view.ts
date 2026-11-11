@@ -1,4 +1,5 @@
-import type { ActivityActorType } from './activity-actor'
+export const ACTIVITY_ACTOR_TYPES = ['user', 'agent', 'system'] as const
+export type ActivityActorType = typeof ACTIVITY_ACTOR_TYPES[number]
 
 export type ActivityActorView = { type: ActivityActorType; id: string | null; name: string | null; avatarUrl: string | null }
 export type StoredActivityActor = { actorType: ActivityActorType | null; actorId: string | null }

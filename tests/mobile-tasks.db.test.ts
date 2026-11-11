@@ -133,8 +133,9 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(response.status, 200)
     assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
     const body = await response.json()
-    assert.deepEqual(Object.keys(body).sort(), ['activity', 'live', 'task'])
+    assert.deepEqual(Object.keys(body).sort(), ['activity', 'live', 'task', 'timeline'])
     assert.equal(body.task.title, 'Short title')
+    assert.equal(body.task.replyRunId, latest)
     assert.equal(body.task.description, 'Description')
     assert.equal(body.task.group, 'pending', 'PR metadata wins over idle')
     assert.deepEqual([body.task.state, body.task.reason, body.task.blockedBy], ['waiting', 'pr_review', null])
@@ -153,6 +154,48 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(body.activity[0].createdAt, body.activity[1].createdAt)
     assert.equal(body.activity.at(-1).by, 'owner')
     assert.doesNotMatch(JSON.stringify(body), /PRIVATE_RAW_ERROR|failureDetails|"error"/)
+  })
+  await t.test('authorized task history, comments and replies retain their source identity and chronological order', async () => {
+    const id = await workspaceTask()
+    const v1 = randomUUID(), v2 = randomUUID(), threadId = 'discussion-' + randomUUID()
+    const first = '2026-01-01T12:00:00.000Z', changed = '2026-01-01T12:01:00.000Z', replied = '2026-01-01T12:02:00.000Z'
+    const { loadIssueDocument, upsertLinearComment, encodedIssueDocument } = await import('../lib/linear-sync/document')
+    const doc = loadIssueDocument(null, { type: 'doc' })
+    try {
+      upsertLinearComment(doc, { threadId, messageId: 'c1', author: 'owner', authorUserId: owner, body: 'Root discussion', at: first })
+      upsertLinearComment(doc, { threadId, messageId: 'c2', author: 'owner', authorUserId: owner, body: 'A reply', at: replied })
+      await pool.query('insert into issue_documents ("issueId","userId",state) values ($1,$2,$3)', [id, owner, encodedIssueDocument(doc)])
+      await pool.query(`insert into issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id,"createdAt")
+        values ($1,$3,$4,1,'Before','{"type":"doc"}','todo','normal','user',$4,$5),($2,$3,$4,2,'After','{"type":"doc"}','todo','normal','user',$4,$6)`, [v1, v2, id, owner, first, changed])
+      const data = await (await request(id)).json()
+      assert.deepEqual(data.timeline.map((row: { id: string }) => row.id), [
+        `discussion:${threadId}:c1`, `history:created-${v1}`, `history:title-${v2}`, `discussion:${threadId}:c2`,
+      ])
+      assert.deepEqual(data.timeline[2].event.source, { kind: 'revision', id: v2, revision: 2 })
+      assert.equal(data.timeline[2].event.actor.id, owner)
+      assert.equal(data.timeline[3].kind, 'reply')
+      assert.equal(data.timeline[3].threadId, threadId)
+      assert.equal(data.timeline[3].authorId, owner)
+      assert.equal(data.task.replyRunId, null, 'a discussion does not create a runnable conversation')
+      const denied = await request(id, { bearer: peer.token, workspaceId: secondWorkspace.id })
+      assert.equal(denied.status, 404)
+      assert.doesNotMatch(await denied.text(), /Root discussion|A reply|Before|After/)
+    } finally {
+      doc.destroy()
+      await pool.query('delete from issue_documents where "issueId"=$1', [id])
+      await pool.query('delete from issue_versions where "issueId"=$1', [id])
+    }
+  })
+  await t.test('conversation reads keep control runs as evidence and route replies only to the latest authorized conversation', async () => {
+    await pool.query("update agent_runs set kind='review' where id=$1", [latest])
+    try {
+      const detail = await (await request(issueId)).json()
+      assert.ok(detail.activity.some((row: { runId?: string }) => row.runId === latest))
+      assert.equal(detail.task.replyRunId, first)
+      assert.equal((await (await request(noRun)).json()).task.replyRunId, null)
+      const teammate = await (await request(issueId, { ...teamSelection, bearer: peer.token })).json()
+      assert.equal(teammate.task.replyRunId, null)
+    } finally { await pool.query("update agent_runs set kind='implement' where id=$1", [latest]) }
   })
   await t.test('list decorations share one batched read, cover no-thread schedules and preserve blocked', async () => {
     const measurement = await measured(() => newestTaskRuns(owner, [issueId, noRun], teamWorkspace.id))

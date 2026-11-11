@@ -56,6 +56,13 @@ export function tasksLive(home: string | null | undefined, open: string | null |
     ...issueIds.map(id => ({ kind: 'factory_issue' as const, id, scope: open }))] }
 }
 
+/** Only an open, authorized Task listens to its discussion and attempt keys. */
+export function taskDetailLive(id: string, workspaceId: string | null | undefined, home: string | null | undefined, open: string | null | undefined): Spec {
+  const spec = tasksLive(home, open, [id])
+  if (workspaceId) for (const kind of ['issue_document', 'issue_threads'] as const) spec.refs.push({ kind, id, scope: workspaceId })
+  return spec
+}
+
 /** One thread: each of its runs' text (`thread`) and state (`run`), on the channel the server resolved for that run. */
 export function threadLive(data: ThreadDetail | null, runId: string): Spec {
   const runs = data?.live?.runs ?? [{ id: runId, workspaceId: null }]
