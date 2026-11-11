@@ -11,12 +11,14 @@
 - 基础数据库为本任务的 loopback 隔离库 `127.0.0.1:55432/mikka_e2e`。HTTP/daemon 与 Git 测试另建随机 `*_e2e` 数据库及磁盘 Git 工作树，并清理自己创建的资源。
 - HTTP/daemon 测试自行监听随机本地 TCP 端口，使用完整 `startDaemon`、默认 `HttpServerLink` 和磁盘 `RunJournal`，未借用部署站点。
 - 个人环境用例来自同轮环境修复工作树，使用真实 action、`queueRun` 与 PostgreSQL；其证据来源单列，不能归入上述未改动的 main 基线。
+- 环境代码与正式 UI 验收绑定 public `310a48894926d056c5494fc1ef4bbf203c4db50b`、private UI `c4de45d367d35953b83effcaf46cbd2dc094ad08`。完整 `corepack pnpm build` 后在 `http://127.0.0.1:3000/mikka` 启动正式应用，使用独立 `mikka_environment_310_ui_e2e` 与同 SHA 正常测试账号池；[截图与 HTTP 记录](https://github.com/alexj11324/mikka-hosted-ui/tree/a80b401/evidence/2026-11-11-environments)单列。
 
 ## 分层结果
 
 | 层次 | 实际结果 | 证明范围 | 证据边界 |
 | --- | --- | --- | --- |
-| 个人环境保存 → Project 默认 → Run 冻结 | 环境后端负责人执行个人 Workspace 回归；验收负责人独立核对源码 | `tests/environment-single-workflow.db.test.ts` 经真实 action 保存环境、设置项目默认、读取设置并调用 `queueRun`；核对持久化的环境 ID、revision、setup、variables、Project 与 repository；后续编辑不改旧 Run | 模型目录、连接与 GitHub push grant 使用 fixture；没有启动真实 CLI 或模型。本行不声明独立重复执行 |
+| 个人环境保存 → Project 默认 → Run 冻结 | `test:project-resources-db` **13/13，0 skip**；主 Agent 独立复跑 | `tests/environment-single-workflow.db.test.ts` 经真实 action 保存环境、设置项目默认、读取设置并调用 `queueRun`；核对持久化的环境 ID、revision、setup、variables、Project 与 repository；后续编辑不改旧 Run | 模型目录、连接与 GitHub push grant 使用 fixture；没有启动真实 CLI 或模型 |
+| 正式环境设置 UI → HTTP → PostgreSQL | **10 项操作检查通过** | 个人 private Project、明确批准 setup、新建与默认设置、全页刷新、修改 setup 撤销批准、归档恢复保留绑定；本人 GET 200、非成员 403、未登录 401；桌面明暗与 390px 编辑器 | 无 Run 或模型调用，与上一行分开；无运行异常，既有头像 `/avatars/purple.webp` 在三次刷新中返回 404 |
 | Files/diff/review：HTTP → PG LISTEN → 完整 daemon → receipt → HTTP | **13/13 通过，0 skip** | 真实 session/PAT/device 身份、TCP HTTP、Git 工作树、文件读取、diff、审查反馈的持久 inbox、session/member/device 撤销拒绝 | fixture 为 **shared Workspace**；留存的 `succeeded` Run 使用 `harnesses: []`、`modelProbe: false`；断言没有 claim/resume 或模型调用 |
 | Git status/history/revert/Undo/checkpoint restore | suite 与 6 个子用例通过 | 真实 PostgreSQL 与 Git；包括 stale HEAD/文件、跨租户和不可用机器拒绝 | 使用 retained source，不证明文件由模型生成；所在组合进程整体失败，见 runner 说明 |
 | Thread 继续、Owner 权限与 Factory repair budget | suite 与全部子用例通过 | 真实 PostgreSQL 的继续、新 epoch、幂等、权限和修复预算；包括个人历史任务兼容路径 | 模型与 GitHub 使用 fixture；所在组合进程整体失败，不能将组合报绿 |
@@ -79,7 +81,7 @@ node --experimental-test-module-mocks --import ./scripts/server-test.mjs \
 
 真实订阅分别使用官方 Claude Code 的 `claude-haiku-5-5` 和官方 Codex 的 `gpt-6-luna`；各自保留原绑定，一条受阻时继续另一条。该策略见[运行时验收](../acceptance.md#live-model-acceptance)。本次没有调用外部模型、创建付费执行资源、执行外部 GitHub merge 或发布 E2B/生产版本。
 
-本地没有可用的原生 Claude CLI 入口；执行宿主提供的 Codex 工具不构成 Mikka daemon 已持有用户订阅身份的证据。真实订阅驱动还要求相应机器、身份与版本证据，不能用离线 fixture 替代。
+只读 readiness 调查进一步确认：两个正在运行的隔离应用库均没有真实订阅、binding、device 或 machine；基础测试库的连接与设备均属 fixture，近期无 daemon 心跳。现有授权 Infisical dev 路径的名称级元数据未提供 BYOS runtime/custody/access 配置或共享 smoke 账号入口；没有读取用户 token 或发送模型 prompt。缺少的是正常 Mikka 用户的真实订阅与 access projection、consumer 绑定、活跃设备和运行身份，不能仅归因于 Claude CLI 不在 PATH，也不能把执行宿主 Codex 身份注入为用户订阅。现成真实订阅驱动还强制选择 team Workspace，不能直接冒充个人闭环证据。
 
 `test:local-loop` 的旧模型分支仍要求 DeepSeek/Flash；[运行时验收说明](../acceptance.md)已明确它不能代表两种官方订阅，DeepSeek/API-key 不再是验收门槛。本次没有补 API key 或发送付费 API prompt。真实 Coding Workspace 驱动绑定生产 origin，CI 入口要求 release/web attestation；本地离线驱动测试不满足这些运行前提。
 
