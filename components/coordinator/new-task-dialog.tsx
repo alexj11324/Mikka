@@ -215,7 +215,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       </Select>
     </Field>
   </FieldGroup> : null
-  if (!NewTask) throw new Error('Required product UI export missing: new-task.NewTask')
+  const TaskWindow = open ? NewTask : null
+  if (open && !TaskWindow) throw new Error('Required product UI export missing: new-task.NewTask')
   const machineNote = (machine: Machine) => machine.cloud && !machine.usable ? t('addE2BKey') : !machine.cloud && !machine.usable ? machine.status : undefined
   const slotMachine = (machine: Machine, group: NewTaskMachine['group']): NewTaskMachine => ({ value: machine.value, label: machine.label, icon: <MachineIcon machine={machine} cloudBotId={cloudBotId} />, usable: machine.usable, note: machineNote(machine), group })
   const notices = <>
@@ -225,7 +226,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     {!only && coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
   </>
   return <>
-    {open && <NewTask onClose={() => onOpenChange(false)} project={project} title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
+    {TaskWindow && <TaskWindow onClose={() => onOpenChange(false)} project={project} title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
       files={attachments.files.length || attachments.pending.length ? <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} /> : null}
       onAttach={files => { void attach(files) }} accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT}
       machines={only ? [] : [slotMachine(defaults, 'default'), slotMachine(cloud, 'cloud'), ...own.map(item => slotMachine(item, 'own'))]} machine={picked ?? 'auto'} onMachine={pick}
