@@ -235,6 +235,13 @@
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/cloud-computer/thread-machines.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Question recovery locks the current PostgreSQL task, owner, run and operation before reusing a retained machine. Self-hosted recovery uses its existing database and configured execution provider.",
+    "test": "lib/factory/checks.db.test.ts",
+    "suite": "test:factory-checks-db"
+  },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
@@ -444,6 +451,12 @@
     "behavior": "Links and daemon commands follow the selected installation's HTTP origin and base path. Unsafe backend addresses and out-of-scope service paths are rejected.",
     "test": "lib/platform/public-origin.test.ts",
     "suite": "test:platform"
+  },
+  "lib/renderer-actions.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the published web action manifest for the selected deployment. When the legacy manifest returns HTTP 404, use the release action contract with the same deployment pin and validate its compiler inventory.",
+    "test": "apps/api/scripts/cloudflare-web.test.mjs"
   },
   "lib/run-app-mcp.ts": {
     "mode": "built-in",

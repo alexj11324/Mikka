@@ -21,7 +21,7 @@ on:
       workload:
         required: true
         type: choice
-        options: [factory-handoff, startup-timing, postgres-policy]
+        options: [factory-handoff, startup-timing, postgres-policy, eve-host-build]
 
 permissions:
   contents: read
@@ -58,7 +58,7 @@ jobs:
     needs: [test, postgres_image]
     if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 13
+    timeout-minutes: 18
     permissions:
       contents: read
       id-token: write

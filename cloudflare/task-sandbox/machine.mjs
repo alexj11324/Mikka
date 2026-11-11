@@ -1,6 +1,7 @@
 import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 import { Files } from '@cloudflare/sandbox'
-import { machineGrant, sameGrant, workspaceName, liveUntil, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
+import { startTaskImage, TaskStartError } from './start.mjs'
+import { machineGrant, sameGrant, workspaceName, liveUntil, verifyCheckpoint, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
 import { TaskFiles } from './files.mjs'
 import { processOptions, taskProcess, stopTaskProcesses } from './process.mjs'
 import { TaskWorkspace } from './workspace.mjs'
@@ -66,9 +67,9 @@ export class TaskMachine extends DurableObject {
   async startImage(run) {
     const container = this.ctx.container
     if (!container) throw new Error('Task container unavailable')
-    container.start({ image: container.images.task, instance: 'standard-1', enableInternet: this.env.NATIVE_TASK_EGRESS === 'direct',
-      entrypoint: ['sleep', String(Math.max(1, Math.ceil(this.idleLimit(run) / 1000)))] })
-    await container.setInactivityTimeout(this.idleLimit(run))
+    await startTaskImage(container, { image: container.images.task, instance: 'standard-1',
+      enableInternet: this.env.NATIVE_TASK_EGRESS === 'direct',
+      entrypoint: ['sleep', String(Math.max(1, Math.ceil(this.idleLimit(run) / 1000)))] }, this.idleLimit(run))
   }
   async verifyScope(grant) {
     if (this.ctx.id.toString() !== this.env.TASKS.idFromName(workspaceName(grant)).toString()) {
@@ -82,6 +83,8 @@ export class TaskMachine extends DurableObject {
       const store = this.ctx.storage, now = Date.now()
       const prior = await store.get('run')
       if (prior && sameGrant(prior.grant, grant)) {
+        verifyCheckpoint(grant.requiredCheckpoint, this.ctx.id.toString(), prior.grant.requiredCheckpoint)
+        verifyCheckpoint(prior.grant.requiredCheckpoint, this.ctx.id.toString(), grant.requiredCheckpoint)
         if (prior.settledAt || prior.stoppedAt) throw new Error('Task machine run already settled')
         if (!this.ctx.container?.running || prior.state !== 'running') throw new Error('Task machine interrupted')
         // An expired lease cannot be revived even if its alarm is delayed.
@@ -100,6 +103,7 @@ export class TaskMachine extends DurableObject {
       if (await store.get('closed:' + grant.runId) || await store.get('closed-operation:' + grant.operationId)) {
         throw new Error('Task machine run already settled')
       }
+      if (grant.requiredCheckpoint) verifyCheckpoint(grant.requiredCheckpoint, this.ctx.id.toString(), await store.get('checkpoint'))
       const consumed = await store.get('spent:' + grant.runId) ?? 0
       const hardDeadline = now + Math.max(0, MAX_RUN_MS - consumed)
       const expiresAt = liveUntil(grant, now, hardDeadline)
@@ -122,7 +126,8 @@ export class TaskMachine extends DurableObject {
       } catch (error) {
         // No task operation has been authorized. Preserve the prior manifest
         // if cold restoration failed, and never admit an empty substitute.
-        await this.stop(run, 'start_failed', false)
+        const failed = error instanceof TaskStartError ? { ...run, startFailure: error.code } : run
+        await this.stop(failed, 'start_failed', false)
         throw error
       }
     })
@@ -211,7 +216,7 @@ export class TaskMachine extends DurableObject {
     return this.exclusive(async () => this.stop(await this.current(grant), 'settled', true))
   }
   receipt(run) {
-    return { state: run.state, outcome: run.outcome, admittedAt: run.admittedAt, settledAt: run.settledAt,
+    return { state: run.state, outcome: run.outcome, ...(run.startFailure ? { startFailure: run.startFailure } : {}), admittedAt: run.admittedAt, settledAt: run.settledAt,
       stoppedAt: run.stoppedAt, checkpoint: run.checkpoint, instanceId: this.ctx.id.toString() }
   }
   async stop(run, outcome, save) {

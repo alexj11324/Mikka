@@ -1,7 +1,9 @@
 import { DurableObject } from 'cloudflare:workers'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
-import { AUDIENCE, DEADLINE_MS, RECEIPT_MS, REPOSITORY, githubRun, jobs, sourceFiles, validJob } from './jobs.mjs'
+import { AUDIENCE, DEADLINE_MS, EVE_DEADLINE_MS, RECEIPT_MS, REPOSITORY, githubRun, jobs, sourceFiles, validJob } from './jobs.mjs'
 import command from './command.txt'
+import eveCommand from './eve-build.txt'
+import { approvedEveBuild, retainEveArtifact, verifyEveArtifact } from './eve-artifact.mjs'
 
 const issuer = 'https://token.actions.githubusercontent.com'
 const keys = createRemoteJWKSet(new URL(issuer + '/.well-known/jwks'))
@@ -39,7 +41,14 @@ export class EngineeringRun extends DurableObject {
   capacity() { return this.env.CAPACITY.getByName('engineering') }
   async begin(job) {
     const postgres = job.workload === 'postgres-policy'
-    const instance = postgres ? 'standard-1' : 'lite'
+    const eve = job.workload === 'eve-host-build'
+    let eveInput
+    if (eve) {
+      try { eveInput = approvedEveBuild(job, this.env) }
+      catch { return { status: 409, message: 'Build source or artifact destination is not approved' } }
+    }
+    const instance = eve ? 'standard-3' : postgres ? 'standard-1' : 'lite'
+    const maximumDuration = eve ? EVE_DEADLINE_MS : DEADLINE_MS
     const claim = await this.ctx.blockConcurrencyWhile(async () => {
       const previous = await this.ctx.storage.get('run')
       if (previous) {
@@ -50,10 +59,10 @@ export class EngineeringRun extends DurableObject {
       }
       const now = Date.now()
       // A crash during admission must leave a wake that can release this slot.
-      await this.ctx.storage.setAlarm(now + DEADLINE_MS)
+      await this.ctx.storage.setAlarm(now + maximumDuration)
       await this.ctx.storage.put('run', { job, provider: 'cloudflare', providerInstanceId: this.ctx.id.toString(),
         repository: REPOSITORY, instance,
-        state: 'active', requestedAt: now, deadline: now + DEADLINE_MS })
+        state: 'active', requestedAt: now, deadline: now + maximumDuration })
       if (await this.capacity().acquire(job.owner)) return null
       await this.ctx.storage.delete('run')
       await this.ctx.storage.deleteAlarm()
@@ -70,16 +79,36 @@ export class EngineeringRun extends DurableObject {
       const container = this.ctx.container
       if (!container) throw new Error('engineering container binding unavailable')
       container.start({
-        image: postgres ? container.images.postgres : 'cloudflare/debian-trixie', instance, enableInternet: false,
+        image: postgres ? container.images.postgres : 'cloudflare/debian-trixie', instance, enableInternet: eve,
         entrypoint: ['node', '-e', 'setTimeout(() => {}, ' + remaining + ')'],
       })
-      await container.setInactivityTimeout(30_000)
-      const body = new Response(JSON.stringify({ files, workload: job.workload })).body
-      const proc = await container.exec(['node', '--input-type=module', '-e', command], { stdin: body })
+      await container.setInactivityTimeout(eve ? remaining : 30_000)
+      const body = new Response(JSON.stringify(eve ? eveInput : { files, workload: job.workload })).body
+      const proc = await container.exec(['node', '--input-type=module', '-e', eve ? eveCommand : command], { stdin: body })
       const output = await proc.output()
       if (output.exitCode !== 0) throw new Error('container test driver exited ' + output.exitCode)
       result = JSON.parse(new TextDecoder().decode(output.stdout))
-      return this.finish(result.exitCode === 0 ? 'passed' : 'failed', { result })
+      if (eve && result.ok) {
+        result.artifact = await retainEveArtifact(container, this.env.EVE_BUILD_ARTIFACTS, job, result.artifact,
+          key => this.ctx.storage.put('eveArtifactKey', key))
+        await container.destroy()
+        if (container.running) throw new Error('Compiler instance stop unconfirmed')
+        result.compileStoppedAt = Date.now()
+        const opened = await this.ctx.blockConcurrencyWhile(async () => {
+          const active = await this.ctx.storage.get('run')
+          const remaining = active.deadline - Date.now()
+          if (active.state !== 'active' || remaining <= 0) return false
+          container.start({image:'cloudflare/debian-trixie',instance:'standard-1',enableInternet:false,
+            entrypoint:['node','-e','setTimeout(()=>{},'+remaining+')']})
+          await container.setInactivityTimeout(Math.min(remaining,120_000))
+          return true
+        })
+        if (!opened) return this.finish('deadline')
+        result.restoredHost = await verifyEveArtifact(container, this.env.EVE_BUILD_ARTIFACTS, result.artifact,
+          files[0].text, job.sha, result.artifact.releaseId)
+      }
+      const passed = eve ? result.ok === true : result.exitCode === 0
+      return this.finish(passed ? 'passed' : 'failed', { result })
     } catch (error) {
       return this.finish('failed', { cause: String(error).slice(0, 1000) })
     }
@@ -120,6 +149,8 @@ export class EngineeringRun extends DurableObject {
     if (!run.stoppedAt) {
       await this.finish('deadline')
     } else if (Date.now() >= run.stoppedAt + RECEIPT_MS) {
+      const key = await this.ctx.storage.get('eveArtifactKey')
+      if (key) await this.env.EVE_BUILD_ARTIFACTS.delete(key)
       await this.ctx.storage.deleteAll()
     } else {
       await this.ctx.storage.setAlarm(run.stoppedAt + RECEIPT_MS)
