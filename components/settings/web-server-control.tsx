@@ -15,7 +15,8 @@ import { WebConnectionError } from '@/lib/web-connection/client'
 export function WebServerControl({ afterSelection, settings = false }: { afterSelection?: (cloud: boolean) => void; settings?: boolean }) {
   const t = useTranslations('DesktopServer')
   const errors = useTranslations('RunErrors')
-  const { account } = useSyncExternalStore(subscribeWebServers, webServerSnapshot, webServerSnapshot)
+  const auth = useTranslations('Auth')
+  const { account, expiredServer } = useSyncExternalStore(subscribeWebServers, webServerSnapshot, webServerSnapshot)
   const [open, setOpen] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [pending, setPending] = useState(false)
@@ -23,7 +24,7 @@ export function WebServerControl({ afterSelection, settings = false }: { afterSe
   const directory = currentWebServers()
   if (!directory || serverDocumentKind()) return null
   const servers = directory.getServers()
-  const current = servers.find(server => server.url === account?.server)
+  const current = servers.find(server => server.url === (account?.server ?? expiredServer))
   const saved = servers.flatMap(server => server.accounts.map(user => ({
     id: JSON.stringify([server.url, user.user.id]),
     label: `${user.user.email} · ${server.url}`,
@@ -41,6 +42,13 @@ export function WebServerControl({ afterSelection, settings = false }: { afterSe
     setOpen(false)
     afterSelection?.(!entry && !url)
   }
+  async function reconnect() {
+    if (!expiredServer || pending) return
+    setPending(true); setFailure('')
+    try { await select(expiredServer) }
+    catch (error) { setFailure(errorText(error)) }
+    finally { setPending(false) }
+  }
   async function disconnect() {
     if (!current || pending) return
     setPending(true); setFailure('')
@@ -50,6 +58,10 @@ export function WebServerControl({ afterSelection, settings = false }: { afterSe
   }
   return <div role="group" aria-label={t('server')} className="flex flex-wrap items-center gap-2">
     <span className="text-sm">{t('server')} · {current?.name ?? t('cloud')}</span>
+    {expiredServer && <>
+      <span>{auth('sessionExpired')}</span>
+      <Button type="button" size="sm" disabled={pending} onClick={() => void reconnect()}>{auth('signIn')}</Button>
+    </>}
     <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>{t('change')}</Button>
     {settings && current && <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => setConfirm(true)}>{t('disconnect')}</Button>}
     {failure && <FieldError>{failure}</FieldError>}

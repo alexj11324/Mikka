@@ -288,7 +288,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
       if (cloud && addAccount) window.location.replace(window.location.href)
       else window.location.replace(home)
     }} /> : null
-  if (addAccount && serverPicker && selectedWebServer()) return <Auth registering={false} addAccount next={returnPath}>{serverPicker}</Auth>
+  if (serverPicker && selectedWebServer()) return <Auth registering={false} addAccount={addAccount} next={returnPath}>{serverPicker}</Auth>
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
     <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={webFlow ? webAuthQuery(webFlow) : desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} sso={!registering ? <AuthSso callbackURL={ssoCallbackURL} disabled={pending} /> : undefined} />
     {serverPicker}
