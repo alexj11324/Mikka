@@ -15,7 +15,7 @@ mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (op
 test('billing management HTTP preserves independent tenants, owners and immutable receipts', { skip: !dbUrl, timeout: 120_000 }, async t => {
   const priorEdition = process.env.MIKKA_EDITION
   process.env.MIKKA_EDITION = 'cloud'
-  const [{ pool }, { workspacePool }, workspace, organization, { withBillingAuthority }, { createPersonalAccessToken }] = await Promise.all([
+  const [{ pool }, { workspacePool }, workspace, organization, { withBillingAuthority }, { createPersonalAccessToken, createLegacyPersonalAccessToken }] = await Promise.all([
     import('../lib/db'), import('../lib/workspace-db'), import('../app/api/workspaces/[workspaceId]/billing/route'),
     import('../app/api/organizations/[organizationId]/billing/route'), import('../lib/billing/authority'), import('../lib/tokens/store'),
   ])
@@ -151,7 +151,7 @@ test('billing management HTTP preserves independent tenants, owners and immutabl
   })
 
   await t.test('real scoped PATs cannot enumerate Organizations, cross tenants or survive expiry/revocation', async () => {
-    const token = await createPersonalAccessToken(owner, first.id, { name: 'Billing acceptance', expiresAt: null })
+    const token = await createLegacyPersonalAccessToken(owner, first.id, { name: 'Billing acceptance', expiresAt: null })
     const headers = { authorization: `Bearer ${token.token}` }
     actor = null
     const read = await get(first.id, headers), data = await read.json() as BillingManagementView
