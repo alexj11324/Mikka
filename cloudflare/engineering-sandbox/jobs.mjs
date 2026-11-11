@@ -44,8 +44,15 @@ export async function sourceFiles(job, fetchImpl = fetch) {
     const response = await fetchImpl(url, { redirect: 'manual', signal: AbortSignal.timeout(20_000) })
     if (!response.ok) throw new Error('source HTTP ' + response.status + ' for ' + path)
     if (Number(response.headers.get('content-length')) > 1024 * 1024) throw new Error('source exceeds limit: ' + path)
-    const text = await response.text()
-    if (text.length > 1024 * 1024) throw new Error('source exceeds limit: ' + path)
-    return { path, text }
+    if (!response.body) throw new Error('source body missing: ' + path)
+    const decoder = new TextDecoder('utf-8', { fatal: true })
+    let bytes = 0
+    let text = ''
+    for await (const chunk of response.body) {
+      bytes += chunk.byteLength
+      if (bytes > 1024 * 1024) throw new Error('source exceeds limit: ' + path)
+      text += decoder.decode(chunk, { stream: true })
+    }
+    return { path, text: text + decoder.decode() }
   }))
 }

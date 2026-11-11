@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
-import { AUDIENCE, DEADLINE_MS, RECEIPT_MS, githubRun, jobs, sourceFiles, validJob } from './jobs.mjs'
+import { AUDIENCE, DEADLINE_MS, RECEIPT_MS, REPOSITORY, githubRun, jobs, sourceFiles, validJob } from './jobs.mjs'
 import command from './command.txt'
 
 const issuer = 'https://token.actions.githubusercontent.com'
@@ -25,6 +25,17 @@ export class EngineeringCapacity extends DurableObject {
 }
 
 export class EngineeringRun extends DurableObject {
+  constructor(ctx, env) {
+    super(ctx, env)
+    ctx.blockConcurrencyWhile(async () => {
+      const previous = await ctx.storage.get('run')
+      if (!previous || previous.stoppedAt) return
+      // The original request and its exec handle died with the old object.
+      // All source is immutable in Git; a partially run suite cannot pass.
+      if (ctx.container?.running) await ctx.container.setInactivityTimeout(30_000)
+      await this.finish(Date.now() >= previous.deadline ? 'deadline' : 'interrupted')
+    })
+  }
   capacity() { return this.env.CAPACITY.getByName('engineering') }
   async begin(job) {
     const claim = await this.ctx.blockConcurrencyWhile(async () => {
@@ -38,7 +49,8 @@ export class EngineeringRun extends DurableObject {
       const now = Date.now()
       // A crash during admission must leave a wake that can release this slot.
       await this.ctx.storage.setAlarm(now + DEADLINE_MS)
-      await this.ctx.storage.put('run', { job, state: 'active', requestedAt: now, deadline: now + DEADLINE_MS })
+      await this.ctx.storage.put('run', { job, provider: 'cloudflare', repository: REPOSITORY, instance: 'lite',
+        state: 'active', requestedAt: now, deadline: now + DEADLINE_MS })
       if (await this.capacity().acquire(job.owner)) return null
       await this.ctx.storage.delete('run')
       await this.ctx.storage.deleteAlarm()

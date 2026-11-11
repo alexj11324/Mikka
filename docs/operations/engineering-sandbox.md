@@ -24,7 +24,7 @@ Actions run attempt and workload has a separate Container identity.
 At most two runs use compute at once. Each receives a ten-minute hard deadline
 and a 30-second inactivity timeout. Completion, failure and cancellation save
 the result and explicitly destroy the Container. A Durable Object alarm
-releases an orphan after its deadline. A stop failure keeps the capacity slot
+releases an orphan at its deadline. On an object restart, the runner stops the interrupted immutable job and records its outcome. A stop failure keeps the capacity slot
 reserved and retries cleanup. Duplicate submissions return the existing state.
 An active duplicate receives HTTP 409; a full runner receives HTTP 429.
 
