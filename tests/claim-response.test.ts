@@ -88,8 +88,10 @@ async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-pr
   try { return await POST(new Request(claimRequestURL,{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.environmentCapability ? {[PROJECT_ENVIRONMENT_HEADER]:probe.environmentCapability} : {}),...(probe.secretCapability ? {[TASK_SECRETS_HEADER]:probe.secretCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
     errors.mock.restore()
+    // The route logs only error names. Keep the intentional refusal distinct
+    // from an unexpected fixture/SQL Error so the optional catch cannot hide it.
     assert.deepEqual(diagnostics, probe.tokenError && probe.preparation.includes('token')
-      ? [['Could not issue a run token', 'synthetic token refusal']] : [],
+      ? [['Could not issue a run token', { name: 'FixtureRunTokenRefusal' }]] : [],
     'optional tool provisioning must not hide a missing fixture or unknown database operation')
     // Trace the intended gate: an unrelated failed prerequisite must not
     // masquerade as a successful lineage, scope or lease rejection.

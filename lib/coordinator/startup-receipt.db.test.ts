@@ -965,7 +965,7 @@ dbTest('startup normal paths use no more statements than old settings plus inbox
             promptExecuted = true
             const conversation = mode === 'old'
               ? await runtime![2].loadConversation(f.owner, f.botId)
-              : await runtime![2].loadConversation(f.owner, f.botId)
+              : await runtime![2].loadConversationForPrompt(f.owner, f.botId)
             let instructions: string
             if (mode === 'old') instructions = await personal.withPersonalInstructions(f.owner, system, plugins)
             else {
