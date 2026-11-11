@@ -135,7 +135,7 @@ async function createWorkspaceInvitationBody(input: { workspaceId: string; email
   return result(async () => {
     const user = await requireUser()
     const role = roleSchema.parse(input.role)
-    const emails = [...new Set(z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase())))]
+    const emails = z.array(z.email().max(254)).min(1).max(20).parse(input.emails.map(email => email.trim().toLowerCase()))
     const request = auditRequestContext(await headers())
     const outcomes = await workspaceDb.transaction(async tx => {
       const { workspace } = await requireWorkspace(tx, input.workspaceId, user.id, true)
