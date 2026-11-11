@@ -66,7 +66,7 @@ export class TaskMachine extends DurableObject {
   async startImage(run) {
     const container = this.ctx.container
     if (!container) throw new Error('Task container unavailable')
-    container.start({ image: container.images.task, instance: 'standard-1', enableInternet: false,
+    container.start({ image: container.images.task, instance: 'standard-1', enableInternet: this.env.NATIVE_TASK_EGRESS === 'direct',
       entrypoint: ['sleep', String(Math.max(1, Math.ceil(this.idleLimit(run) / 1000)))] })
     await container.setInactivityTimeout(this.idleLimit(run))
   }
@@ -94,10 +94,16 @@ export class TaskMachine extends DurableObject {
         return { state: 'running', restored: prior.restored, instanceId: this.ctx.id.toString() }
       }
       if (prior && !prior.stoppedAt) throw new Error('Task machine already has a writer')
-      if (await store.get('closed:' + grant.runId)) throw new Error('Task machine run already settled')
-      const hardDeadline = now + MAX_RUN_MS
+      // Old deployments fenced the entire run. Keep every existing tombstone.
+      // New runs can resume on a distinct API-authorized operation, retaining
+      // the compute already consumed across all prior operations of this run.
+      if (await store.get('closed:' + grant.runId) || await store.get('closed-operation:' + grant.operationId)) {
+        throw new Error('Task machine run already settled')
+      }
+      const consumed = await store.get('spent:' + grant.runId) ?? 0
+      const hardDeadline = now + Math.max(0, MAX_RUN_MS - consumed)
       const expiresAt = liveUntil(grant, now, hardDeadline)
-      const run = { state: 'starting', grant, hardDeadline, expiresAt, admittedAt: now }
+      const run = { state: 'starting', grant, hardDeadline, expiresAt, admittedAt: now, consumed }
       await store.setAlarm(expiresAt)
       await store.put('run', run)
       if (!await this.admission().acquire(this.ctx.id.toString())) {
@@ -109,6 +115,7 @@ export class TaskMachine extends DurableObject {
       try {
         await this.startImage(run)
         const restored = await this.workspace.restore()
+        if (restored && this.env.NATIVE_TASK_EGRESS === 'direct') await this.transferNativeHistory('restore')
         if (!restored) await new Files(this.ctx.container).mkdir('/workspace', { recursive: true })
         await store.put('run', { ...run, restored, state: 'running' })
         return { state: 'running', restored, instanceId: this.ctx.id.toString() }
@@ -167,8 +174,15 @@ export class TaskMachine extends DurableObject {
       }
     })
   }
+  async transferNativeHistory(operation) {
+    const process = await this.ctx.container.exec(['/usr/bin/setpriv', '--reuid=1000','--regid=1000','--clear-groups',
+      '--inh-caps=-all','--ambient-caps=-all','--bounding-set=-all','--no-new-privs',
+      '/usr/bin/python3','-I','/opt/mikka/task-sandbox/native-history.py',operation], {user:'0:0'})
+    if ((await process.output()).exitCode !== 0) throw Error('Native conversation checkpoint unavailable')
+  }
   async saveNativeWorkspace(container) {
     await stopTaskProcesses(container)
+    if (this.env.NATIVE_TASK_EGRESS === 'direct') await this.transferNativeHistory('save')
     const checkpoint = await this.workspace.checkpoint()
     await this.workspace.prune()
     return checkpoint
@@ -222,7 +236,9 @@ export class TaskMachine extends DurableObject {
     await store.delete('nativeWriter')
     await this.admission().release(this.ctx.id.toString())
     const stopped = { ...run, state: 'stopped', stoppedAt: Date.now() }
-    await store.put({ run: stopped, ['closed:' + run.grant.runId]: true })
+    // Commit the budget and fence atomically. A retried stop cannot double-count.
+    await store.put({ run: stopped, ['closed-operation:' + run.grant.operationId]: true,
+      ['spent:' + run.grant.runId]: (run.consumed ?? 0) + Math.max(0, stopped.stoppedAt - run.admittedAt) })
     await this.workspace.prune()
     await store.deleteAlarm()
     return this.receipt(stopped)

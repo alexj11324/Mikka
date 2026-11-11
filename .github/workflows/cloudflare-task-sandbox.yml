@@ -4,6 +4,11 @@ on:
     paths: &task_workspace_paths
       - 'cloudflare/task-sandbox/**'
       - 'packages/daemon/harness/**'
+      - 'packages/daemon/bin/cloud-worker.ts'
+      - 'packages/daemon/src/cloudflare-task-handoff.ts'
+      - 'packages/daemon/src/hosted-binaries.ts'
+      - 'packages/daemon/scripts/build-cloud-worker.mjs'
+      - 'packages/daemon/scripts/prepare-worker-install.py'
       - 'lib/eve/cloudflare-task-*'
       - '.github/workflows/cloudflare-task-sandbox.yml'
   push:
@@ -24,6 +29,7 @@ jobs:
           node-version: 24
       - run: npm ci --ignore-scripts --prefix cloudflare/task-sandbox
       - run: node --test cloudflare/task-sandbox/grant.test.mjs
+      - run: python3 cloudflare/task-sandbox/native-history.test.py
       - name: Verify the task image and both repository-pinned official CLIs offline
         run: |
           docker build --platform linux/amd64 -f cloudflare/task-sandbox/Dockerfile -t mikka-task-sandbox .
@@ -34,6 +40,8 @@ jobs:
               test -x /usr/bin/unshare
               test -x /usr/bin/setpriv
               /usr/bin/python3 -I -c "import ast, os, signal, sys; assert os.pidfd_open and signal.pidfd_send_signal; [ast.parse(open(p).read()) for p in sys.argv[1:]]" /opt/mikka/task-sandbox/*.py
+              test -s /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js
+              test -r /opt/mikka/worker/.mikka-original-cli.json
               node --version
               git --version
               claude --version
