@@ -120,9 +120,12 @@ test('committed native outcomes deliver Telegram and existing phone Decisions on
    const f=await fixture({outcome:'failed',text:'Private partial answer'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 默认点数已用完'}]);assert.equal(pushes[0].text,'Mikka 默认点数已用完');assert.equal(decisions,1)
    const unknown=await fixture({outcome:'failed',error:'turn_failed'});await unknown.deliver(unknown.scope,unknown.input);assert.equal(telegram.length,0);assert.equal(decisions,0)
   })
-  await t.test('scheduled reads and empty reply phone pushes are skipped',async()=>{
+  await t.test('scheduled reads and blank native outcomes remain silent',async()=>{
    const f=await fixture({payload:{source:'schedule_due'}});await f.deliver(f.scope,f.input);assert.equal(telegram.length,0);assert.equal(decisions,0)
-   const empty=await fixture({text:''});await empty.deliver(empty.scope,empty.input);assert.equal(telegram.length,1);assert.equal(decisions,0)
+   for(const options of [{text:''},{text:' \n '},{text:'',outcome:'failed' as const,error:'turn_failed'}]){const blank=await fixture(options);await blank.deliver(blank.scope,blank.input);assert.equal(telegram.length,0);assert.equal(decisions,0)}
+  })
+  await t.test('an actionable failure still delivers its valid refusal line when native text is blank',async()=>{
+   const f=await fixture({text:'',outcome:'failed',error:'points_exhausted'});await f.deliver(f.scope,f.input);assert.deepEqual(telegram,[{thread:f.thread,text:'Mikka 默认点数已用完'}]);assert.equal(decisions,1);assert.equal(pushes[0].text,'Mikka 默认点数已用完')
   })
  }finally{await app.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end()}
 })
