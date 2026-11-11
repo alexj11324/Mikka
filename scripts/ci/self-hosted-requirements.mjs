@@ -38,6 +38,18 @@ export function verifyChange(path, before, after, declarations, isTest) {
   return errors
 }
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+function comparisonBase(event) {
+  const pr = event.pull_request
+  if (pr?.base?.sha && pr.head?.sha && process.env.GITHUB_EVENT_NAME === 'pull_request' &&
+      process.env.GITHUB_REF === `refs/pull/${event.number}/merge`) {
+    // GitHub can refresh its test merge after the event base was captured.
+    const [checkout, first, second, ...extra] = git('rev-list', '-1', '--parents', 'HEAD').trim().split(' ')
+    if (checkout === process.env.GITHUB_SHA && second === pr.head.sha && !extra.length &&
+        spawnSync('git', ['merge-base', '--is-ancestor', pr.base.sha, first]).status === 0) return first
+  }
+  return pr?.base?.sha || event.merge_group?.base_sha ||
+    (typeof event.before === 'string' && !/^0+$/.test(event.before) && event.before) || 'HEAD^1'
+}
 const databaseTest = file => /\.db\.test\./.test(file)
 // Keep each file's package-defined loaders and flags. Large aggregate scripts
 // can contain multiple Node invocations with different runner settings.
@@ -75,8 +87,7 @@ export function dependencyTestCommand(spec, scripts) {
 }
 export function main(runTests = false, reportDatabase = false) {
   const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : {}
-  const base = event.pull_request?.base?.sha || event.merge_group?.base_sha ||
-    (typeof event.before === 'string' && !/^0+$/.test(event.before) && event.before) || 'HEAD^1'
+  const base = comparisonBase(event)
   git('rev-parse', '--verify', base + '^{commit}')
   const declarations = JSON.parse(readFileSync(requirements, 'utf8'))
   const isTest = file => /^(?:scripts|tests|apps|packages|lib|app|hooks|cloudflare|services|components)\/[\w./-]+$/.test(file) &&

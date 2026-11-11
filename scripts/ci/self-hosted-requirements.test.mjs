@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { dependencyTestCommand, isSelfHostedBackendInput, verifyChange } from './self-hosted-requirements.mjs'
 
 const path = 'lib/feature.ts'
@@ -7,6 +12,58 @@ const migration = 'drizzle/0100-upgrade.sql'
 const check = (file, before, after, declarations = {}) =>
   verifyChange(file, before, after, declarations, file => file === 'tests/new.test.ts')
 const local = { mode: 'built-in', environment: [], behavior: 'Uses the installation database.', test: 'tests/new.test.ts' }
+
+test('only the verified PR test merge excludes changes already on its advanced base', t => {
+  const cwd = mkdtempSync(join(tmpdir(), 'mikka-selfhost-base-'))
+  t.after(() => rmSync(cwd, { recursive: true, force: true }))
+  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+  const write = (path, value) => writeFileSync(join(cwd, path), value)
+  git('init', '-q', '-b', 'main')
+  git('config', 'user.name', 'Test')
+  git('config', 'user.email', 'test@example.invalid')
+  mkdirSync(join(cwd, 'config'))
+  mkdirSync(join(cwd, 'lib'))
+  write('config/self-hosted-requirements.json', '{}')
+  write('package.json', '{"scripts":{}}')
+  write('lib/existing.ts', 'export const existing = true')
+  git('add', '.')
+  git('commit', '-qm', 'base recorded in event')
+  const base = git('rev-parse', 'HEAD')
+  git('switch', '-qc', 'feature')
+  write('lib/feature.ts', 'export const feature = true')
+  git('add', '.')
+  git('commit', '-qm', 'PR capability')
+  const head = git('rev-parse', 'HEAD')
+  git('switch', '-q', 'main')
+  write('lib/upstream.ts', 'export const upstream = true')
+  git('add', '.')
+  git('commit', '-qm', 'independent change on main')
+  const advanced = git('rev-parse', 'HEAD')
+  git('merge', '-q', '--no-ff', 'feature', '-m', 'test merge')
+  const sha = git('rev-parse', 'HEAD')
+  const script = fileURLToPath(new URL('./self-hosted-requirements.mjs', import.meta.url))
+  function check(event, env = {}) {
+    write('event.json', JSON.stringify(event))
+    const child = spawnSync(process.execPath, [script], { cwd, encoding: 'utf8', env: {
+      ...process.env, GITHUB_EVENT_PATH: join(cwd, 'event.json'), GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_REF: 'refs/pull/41/merge', GITHUB_SHA: sha, ...env,
+    } })
+    assert.equal(child.status, 1, child.stderr)
+    assert.match(child.stderr, /lib\/feature\.ts: declare/)
+    return child.stderr.includes('lib/upstream.ts: declare')
+  }
+  const payload = (baseSha, headSha) => ({ number: 41, pull_request: { base: { sha: baseSha }, head: { sha: headSha } } })
+  const event = payload(base, head)
+  assert.equal(check(event), false)
+  assert.equal(check(event, { GITHUB_SHA: advanced }), true)
+  assert.equal(check(event, { GITHUB_REF: 'refs/pull/41/head' }), true)
+  assert.equal(check(payload(base, advanced)), true)
+  const divergent = git('commit-tree', base + '^{tree}', '-p', base, '-m', 'divergent event base')
+  assert.equal(check(payload(divergent, head)), true)
+  assert.equal(check({ before: base }, { GITHUB_EVENT_NAME: 'push' }), true)
+  assert.equal(check({ merge_group: { base_sha: base } }, { GITHUB_EVENT_NAME: 'merge_group' }), true)
+})
+
 test('added backend capability and changed migrations need a verified self-hosted declaration', () => {
   for (const file of [path, migration]) {
     assert.match(check(file, null, 'new')[0], /declare/)
