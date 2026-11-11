@@ -2,6 +2,8 @@
 // built for the same release. The public gateway owns deployment pin selection.
 import { applySecurityHeaders, isMachinePath, isPagePath, pageResponse, pageRedirect } from '../../apps/api/runtime/http-policy.mjs'
 
+import { publicVersion } from './version.mjs'
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
@@ -27,6 +29,9 @@ export default {
     if (redirect) return applySecurityHeaders(request, redirect)
     // Workflow callbacks, SSE, WebSocket upgrades and API bodies reach their
     // service intact. Never convert them to a document or cache them.
+    if (url.pathname === '/mikka/api/version' && (request.method === 'GET' || request.method === 'HEAD')) {
+      return applySecurityHeaders(request, await publicVersion(request, env))
+    }
     if (isMachinePath(url.pathname)) return env.API.fetch(request)
 
     // The binding is rooted at the release's static directory. Keep the raw

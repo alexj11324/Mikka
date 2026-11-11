@@ -121,7 +121,7 @@ node cloudflare/web/prepare.mjs release release-input.json release-wrangler.json
 node cloudflare/web/prepare.mjs gateway gateway-input.json gateway-wrangler.json
 ```
 
-The release input takes `id`, `assets` (the built `apps/frontend/dist/web`
+The release input takes `id`, the full `sourceSha` and `overlaySha`, `assets` (the built `apps/frontend/dist/web`
 directory), `api` and `cloud` (private service names selected by the release).
 Preparation checks the hosted slot inventory, source-map boundary and the
 shell's asset pins. The gateway input takes `current` and a `retained` array of
@@ -310,3 +310,6 @@ alone: their recorded overlay SHAs may differ.
   Rotate a checkout key through Infisical and the same repository’s read-only
   deploy-key registration; never broaden its repository or permission scope
   to get a build through.
+
+
+The current release serves GET/HEAD `/mikka/api/version` from the five-field public version document first returned by its own bound API. A cold isolate verifies the public and private revisions before reusing those values. Every response carries `Cache-Control: no-store`. Release Workers and API services are immutable while retained. Publish a new release ID for a change in the minimum native client version. Deployment acceptance also probes the Node health endpoint and the version directly on the bound API before promotion, then exercises an authenticated read through the gateway.
