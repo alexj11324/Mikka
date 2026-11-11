@@ -350,6 +350,27 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   const welcomeFailed = Boolean(data?.error && !working && (lastSaid?.welcome || (!items.length && !stream.replies.length)))
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
+  const welcomeRequest = useRef(false)
+  const [welcomeError, setWelcomeError] = useState<string | null>(null)
+  const [welcoming, setWelcoming] = useState(false)
+  async function requestWelcome(retryTurn = false, manual = false) {
+    if (welcomeRequest.current) return
+    welcomeRequest.current = true
+    setWelcoming(true)
+    try {
+      if (manual && !await checkPageBuildBeforeAction()) return
+      const result = await (retryTurn ? retryCoordinatorTurn(botId) : welcomeCoordinator(botId))
+      if (result.error) { setWelcomeError(actionError(result.error)); return }
+      await mutate()
+      setWelcomeError(null)
+    } catch {
+      setWelcomeError(actionError())
+      // A lost response may already have queued the welcome. Read its real state
+      // before offering the idempotent welcome action again.
+      await mutate().catch(() => undefined)
+    } finally { welcomeRequest.current = false; setWelcoming(false) }
+  }
+  const welcomeRequestFailed = Boolean(welcomeError && !data?.error && !working && !items.length && !stream.replies.length)
   // A welcome Mikka 默认 refused runs again once its model becomes runnable while this chat is open (the trial points
   // arrived, a card was verified): only on a change from not runnable to runnable seen by this mount, never on open
   // (the menu can read runnable while the server still refuses), never for a passing usage limit, never in a hidden
@@ -366,15 +387,16 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       if (runnable !== undefined) wasRunnable.current = runnable
       if (!welcomeFailed || !refusal || TRANSIENT_REFUSALS.has(refusal) || was !== false || runnable !== true || rewelcomed.current === data.error) return
       rewelcomed.current = data.error
-      void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate())
+      void requestWelcome(true)
       return
     }
     if (items.length) return
     welcomed.current = true
-    void (botId ? welcomeCoordinator(botId) : welcomeCoordinator()).then(() => mutate())
+    void requestWelcome()
   })
   // The raw step error (workflow ids, retries, socket codes) is for the logs, never the chat: 回复失败 and 重试 (review C4).
   const failureNotice = <>
+    {welcomeRequestFailed && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="welcome-request">{welcomeError}</AlertTitle><Button variant="ghost" size="sm" disabled={welcoming} onClick={() => { void requestWelcome(false, true) }}>{tCommon('retry')}</Button></Alert>}
     {cloudCode && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="cloud">{cloudErrors(`${cloudCode}.default`)}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><CloudFailureAction code={cloudCode} fallback={retry} /></span></Alert>}
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
@@ -558,7 +580,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     if (working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && !stopping)
       entries.push({ id: 'waiting', role: 'bot', at: Date.now(), parts: [], streaming: true })
     if (welcomeFailed && !items.length) entries.push({ id: 'welcome-failure', role: 'bot', at: Date.now(), parts: [liveFailurePart] })
-    const empty = data && !items.length && !stream.replies.length && !data.error ? (data.enabled
+    const empty = data && !items.length && !stream.replies.length && !data.error && !welcomeRequestFailed ? (data.enabled
       ? <p role="status">{tNav('writingWelcome')}</p>
       : <div className="flex flex-col gap-3"><p>{t('empty', { name })}</p>
         {!bot && <div className="flex flex-wrap gap-2">{STARTERS.map(key => <Button key={key} variant="outline" size="sm" className="rounded-full font-normal" onClick={() => setDraft(t(`starters.${key}`))}>{t(`starters.${key}`)}</Button>)}</div>}</div>) : undefined
@@ -626,7 +648,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
             </div>}
             {/* The header pill and the 概览 panel already name the bot: an empty chat says one line, no third avatar (R-41). */}
             {welcomeFailed && !items.length && <div data-message-failure="welcome" className="flex w-full max-w-md flex-col gap-2 self-start">{failureNotice}</div>}
-            {data && !items.length && !stream.replies.length && !data.error && (data.enabled
+            {data && !items.length && !stream.replies.length && !data.error && !welcomeRequestFailed && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <div className="m-auto flex flex-col items-center gap-3">
                 <p className="text-sm text-muted-foreground">{t('empty', { name })}</p>
