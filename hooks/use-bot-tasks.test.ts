@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { taskPresentation } from '../lib/task-presentation'
 import { groupPresentedTasks, waitingTasks } from '../lib/task-collection'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -199,4 +200,39 @@ test('workspace and Bot lists use the authorized Task presentation, including wo
   assert.deepEqual(dispatched.todo, [])
   assert.deepEqual(dispatched.pending.map(row => row.issue.id), ['review'])
   assert.equal(dispatched.pending[0]!.factoryStage, 'handoff')
+})
+
+test('Tasks, Bot dispatches and Inbox consume the same canonical outcome table', () => {
+  const at = '2026-11-07T10:00:00Z'
+  type Case = {
+    name: string; primary: Parameters<typeof taskPresentation>[0]['status']; run?: string; outcome?: string;
+    factory?: Parameters<typeof taskPresentation>[2]; pr?: true; state: CanonicalTaskState; reason?: TaskReason; pending?: true
+  }
+  const cases: Case[] = [
+    { name: 'zero-run', primary: 'todo', state: 'todo' },
+    { name: 'queued', primary: 'doing', run: 'queued', state: 'queued' },
+    { name: 'active', primary: 'doing', run: 'running', state: 'running' },
+    { name: 'blocked', primary: 'doing', run: 'succeeded', outcome: 'blocked', state: 'blocked', reason: 'blocked' },
+    { name: 'needs input', primary: 'doing', run: 'waiting_input', state: 'waiting', reason: 'needs_input', pending: true },
+    { name: 'failed', primary: 'doing', run: 'failed', state: 'failed' },
+    { name: 'review', primary: 'review', run: 'succeeded', pr: true, state: 'waiting', reason: 'pr_review', pending: true },
+    { name: 'completed run, open issue', primary: 'doing', run: 'succeeded', outcome: 'done', state: 'todo' },
+    { name: 'factory handoff overrides failed run', primary: 'doing', run: 'failed', factory: { stage: 'handoff', needsYou: { kind: 'pr_review', since: at } }, state: 'waiting', reason: 'pr_review', pending: true },
+    { name: 'threadless factory question', primary: 'doing', factory: { stage: 'triage', needsYou: { kind: 'question', since: at } }, state: 'waiting', reason: 'needs_input', pending: true },
+    { name: 'closed', primary: 'done', run: 'waiting_input', state: 'done' },
+  ]
+  for (const c of cases) {
+    const task = { id: c.name, title: c.name, status: c.primary, metadata: { pullRequests: c.pr ? [{ url: 'https://github.com/org/repo/pull/1', state: 'open' as const }] : [] } }
+    const run = c.run ? { runId: 'run', status: c.run, outcome: c.outcome ?? null } : undefined
+    const result = taskPresentation(task, run, c.factory ?? null, () => false)
+    assert.deepEqual([result.state, result.reason], [c.state, c.reason ?? null], c.name)
+    const issueRows = [task as unknown as Awaited<ReturnType<typeof listIssues>>[number]]
+    const threads: Thread[] = run ? [thread(run.runId, task.id, run.status, at, run.outcome)] : []
+    const workspace = groupPresentedTasks(issueRows, threads, { [task.id]: result }, 'workspace')
+    assert.equal(workspace[result.group][0].state, c.state, c.name)
+    const bot = groupPresentedTasks(issueRows, threads, { [task.id]: result }, 'dispatched')
+    assert.equal(bot[result.group][0]?.state, run ? c.state : undefined, c.name)
+    assert.equal(waitingTasks(workspace, []).length, c.pending ? 1 : 0, c.name)
+    assert.equal(waitingTasks(workspace, [{ issueId: task.id }]).length, 0, c.name)
+  }
 })
