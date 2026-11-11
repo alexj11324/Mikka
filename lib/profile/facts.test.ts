@@ -204,8 +204,10 @@ test('a slot answers per repository, so two repositories never vote on one answe
   ], OPTIONS)
   const slots = plan.items.filter(item => item.kind === 'slot')
   assert.equal(slots.length, 1, 'the repository with two answers asks once; the lone one asks nothing')
-  assert.equal(slots[0].evidence.answers.length, 2)
-  assert.match(String(slots[0].evidence.answers[0].repository ?? slots[0].evidence.answers[1].repository), /acme\/widget/)
+  // evidence is Record<string, unknown>: narrow it to the shape a slot item writes.
+  const answers = (slots[0].evidence.answers ?? []) as { repository?: string }[]
+  assert.equal(answers.length, 2)
+  assert.deepEqual(answers.map(answer => answer.repository), ['acme/widget', 'acme/widget'])
   // A person-level answer and a repository answer are different slots too.
   const mixed = consolidationCandidates([
     fact({ id: 'a', kind: 'tool', subject: 'pnpm test', subjectKey: 'pnpm test', repository: null, value: { slot: 'test_command' } }),
