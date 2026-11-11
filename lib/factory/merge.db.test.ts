@@ -654,7 +654,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"revokedAt" timestamptz);
         CREATE TABLE suggestion_executions ("runId" uuid,status text,"endedAt" timestamptz);
         CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"issueId" uuid,
-          "sandboxId" text,state text,"deviceId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
+          "sandboxId" text,"snapshotId" text NOT NULL,state text,"deviceId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
           "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,"lastActiveAt" timestamptz NOT NULL DEFAULT now(),
           "runningSince" timestamptz,"computeSeconds" bigint NOT NULL DEFAULT 0,
           "lifecycleAt" timestamptz DEFAULT now(),lifecycle jsonb NOT NULL DEFAULT '{}');
@@ -687,8 +687,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       await pool.query('UPDATE run_publications SET "runId"=$2,"issueId"=$3 WHERE "pullRequest"->>\'url\'=$1', [x.pr, runId, x.task.issueId]);
       await pool.query(`UPDATE agent_runs SET "deviceId"=$2,report=report||'{"safePoint":{"session":"exited","checkpoint":"unavailable"}}' WHERE id=$1`, [runId, deviceId]);
       await pool.query('INSERT INTO device_tokens VALUES ($1,$2,NULL)', [tokenId, deviceId]);
-      await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","issueId","sandboxId",state,"deviceId","runningSince")
-        VALUES ($1,$2,$3,$4,$5,'running',$6,now()-interval '1 minute')`, [runId, actor.userId, workspaceId, x.task.issueId, sandboxId, deviceId]);
+      await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","issueId","sandboxId","snapshotId",state,"deviceId","runningSince")
+        VALUES ($1,$2,$3,$4,$5,'snapshot-fixture','running',$6,now()-interval '1 minute')`, [runId, actor.userId, workspaceId, x.task.issueId, sandboxId, deviceId]);
       const runs = async () => (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [x.task.issueId])).rows;
       const machine = async () => (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
       const beforeRuns = await runs(), pending: (() => Promise<void>)[] = [];

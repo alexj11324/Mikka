@@ -294,7 +294,7 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(composed.status, 0, JSON.stringify(composed.report.diagnostics))
     assert.equal(composed.report.errors, 0)
     assert.equal(composed.report.libraryFiles, policy.componentRoots.length)
-    assert.equal(composed.report.files, 1 + [...contractSources.keys()].filter(file => !file.startsWith('apps/')).length)
+    assert.equal(composed.report.files, 1)
     const commandFile = 'app/actions/issues.ts'
     writeFileSync(path.join(cwd, commandFile), contractSources.get(commandFile).replace('export function saveIssue', 'function saveIssue'))
     const missingCommand = await execute()

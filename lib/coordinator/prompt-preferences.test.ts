@@ -94,7 +94,7 @@ const database = {
   },
 }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
-stub('../db/index.ts', { db: database, pool: null, withDatabaseClient: forbidden })
+stub('../db/index.ts', { db: database, pool: null, withDatabaseClient: forbidden, withDatabaseTransaction: forbidden })
 stub('../attention/store.ts', {
   attentionEnabled: async (who: string) => { reads.push({ kind: 'attention', owner: who, params: [who] }); return true },
   setAttentionEnabled: forbidden, recordDecision: forbidden, settleTurn: forbidden,
