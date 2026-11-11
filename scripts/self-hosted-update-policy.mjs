@@ -17,6 +17,17 @@ export function parseStableRelease(release) {
   return { tag: release.tag_name, revision: match[1], migrations: match[2], image: IMAGE_REPOSITORY + ':' + release.tag_name }
 }
 
+/** A signed old webhook must not downgrade a server after a newer release. */
+export function compareStableTags(a, b) {
+  if (!STABLE_TAG.test(a || '') || !STABLE_TAG.test(b || '')) throw new Error('SELF_HOSTED_UPDATE_RELEASE_NOT_STABLE')
+  const left = a.slice(1).split('.').map(BigInt)
+  const right = b.slice(1).split('.').map(BigInt)
+  for (let i = 0; i < 3; i++) {
+    if (left[i] !== right[i]) return left[i] > right[i] ? 1 : -1
+  }
+  return 0
+}
+
 export function verifySignature(bytes, signature, secret) {
   if (!secret || !/^sha256=[0-9a-f]{64}$/.test(signature || '')) return false
   const sent = Buffer.from(signature.slice(7), 'hex')
