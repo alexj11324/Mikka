@@ -92,13 +92,17 @@ export async function backfillTaskWorkspaces(application, workspace) {
         const resolved = changed ? { workspaceId: null, reason: 'conflicting_evidence' } : resolveTaskWorkspace(proofs, existing)
         if (resolved.workspaceId) {
           const result = await app.query('UPDATE issues SET "workspaceId"=$2 WHERE id=$1 AND "workspaceId" IS NULL', [id, resolved.workspaceId])
-          // The source trigger now defaults to private. Only the separately
-          // locked authoritative Team kind may restore this legacy root's
-          // shared default; a scope string or creator is never kind evidence.
+          // Work with either SQL default during a code-first rollout. Only
+          // the separately locked kind decides implicit sharing; a scope
+          // string or creator is never Workspace kind evidence.
           if (result.rowCount && aclReady && existing.get(resolved.workspaceId) === 'team') {
             await app.query(`UPDATE resource_access_policies SET visibility='shared',provenance='legacy_shared_task'
               WHERE kind='task' AND id=$1 AND "workspaceId"=$2 AND "ownerId"=$3
                 AND visibility='private' AND provenance='legacy_private' AND "parentId" IS NULL`, [id, resolved.workspaceId, userId])
+          } else if (result.rowCount && aclReady && existing.get(resolved.workspaceId) === 'personal') {
+            await app.query(`UPDATE resource_access_policies SET visibility='private',provenance='legacy_private'
+              WHERE kind='task' AND id=$1 AND "workspaceId"=$2 AND "ownerId"=$3
+                AND visibility='shared' AND provenance='legacy_shared_task'`, [id, resolved.workspaceId, userId])
           }
           bound += result.rowCount
           await app.query('DELETE FROM issue_workspace_repairs WHERE "issueId"=$1', [id])

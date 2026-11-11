@@ -36,9 +36,9 @@ test('API requests stay in their effective workspace on thread, evidence, propos
   const ownBotLooseRun = await run(ownBot, ownLooseIssue), otherBotLooseRun = await run(otherBot, otherLooseIssue), otherBotNoTaskRun = await run(otherBot, null)
 
   let currentHeaders = new Headers()
-  let activeWorkspaceId: string = ws.id
+  let activeWorkspaceId: string | undefined = ws.id
   mock.module('next/headers', { namedExports: { headers: async () => currentHeaders,
-    cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' ? { value: activeWorkspaceId } : undefined }) } })
+    cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && activeWorkspaceId ? { value: activeWorkspaceId } : undefined }) } })
   mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
   // A browser session (no bearer token) is the owner's cookie session when `browser` is set.
   let browser = false
@@ -118,6 +118,56 @@ test('API requests stay in their effective workspace on thread, evidence, propos
       await pool.query('DELETE FROM pending_actions WHERE id=$1', [proposal])
       await pool.query('DELETE FROM message_reactions WHERE "messageId"=$1', [message])
       await pool.query('DELETE FROM coordinator_messages WHERE id=$1', [message])
+    }
+  })
+
+  await t.test('cookie-less browser evidence defaults to a freshly authorized personal workspace even when teams were created first', async () => {
+    const [{ GET }, { createRequestScope, runRequestScope }] = await Promise.all([
+      import('../app/api/runs/[runId]/evidence/route'), import('../apps/api/src/context'),
+    ])
+    const personalRun = await run(null, personalLooseIssue)
+    const ordered = (await pool.query('SELECT id,kind FROM mikka_workspaces WHERE "userId"=$1 ORDER BY "createdAt"', [owner])).rows
+    assert.equal(ordered[0].id, ws.id, 'the older team must actually precede the personal tenant in PostgreSQL')
+    const read = async (runId: string, selected?: string) => {
+      currentHeaders = new Headers({ origin, ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
+        ...(selected !== undefined ? { 'x-mikka-workspace-id': selected } : {}) })
+      const request = new Request(`${origin}/api/runs/${runId}/evidence`, { headers: currentHeaders })
+      return (await runRequestScope(createRequestScope(request), () => GET(request, { params: Promise.resolve({ runId }) }))).status
+    }
+    try {
+      bearer = null; browser = true; activeWorkspaceId = undefined
+      assert.equal(await read(personalRun), 200)
+      assert.equal(await read(ownRun), 404, 'an older team is not the default browser tenant')
+      activeWorkspaceId = ws.id
+      assert.equal(await read(ownRun), 200)
+      assert.equal(await read(personalRun), 404, 'an explicit valid team cookie remains exact')
+      assert.equal(await read(personalRun, personal.id), 200, 'an explicit header overrides the cookie after fresh membership checks')
+      assert.equal(await read(ownRun, personal.id), 404)
+      activeWorkspaceId = personal.id
+      assert.equal(await read(ownRun, ws.id), 200)
+      assert.equal(await read(personalRun, ws.id), 404)
+      for (const invalid of ['invalid-workspace', randomUUID()]) {
+        assert.equal(await read(personalRun, invalid), 404)
+        assert.equal(await read(ownRun, invalid), 404)
+      }
+      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [personal.id, owner])
+      assert.equal(await read(personalRun, personal.id), 404, 'a header cannot revive suspended personal membership')
+      activeWorkspaceId = undefined
+      assert.equal(await read(personalRun), 404, 'the default is chosen only from freshly authorized memberships')
+      await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [personal.id, owner])
+      await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [ws.id, owner])
+      activeWorkspaceId = ws.id
+      assert.equal(await read(ownRun), 404, 'a saved cookie cannot revive suspended team membership')
+      assert.equal(await read(ownRun, ws.id), 404)
+      await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [ws.id, owner])
+      browser = false; bearer = token.token; activeWorkspaceId = personal.id
+      assert.equal(await read(ownRun), 200, 'a PAT retains its pinned team despite the personal cookie')
+      assert.equal(await read(personalRun), 404)
+      assert.equal(await read(ownRun, personal.id), 404, 'a conflicting header cannot widen a PAT')
+    } finally {
+      await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=ANY($1::uuid[]) AND "userId"=$2`, [[personal.id, ws.id], owner])
+      bearer = token.token; browser = false; activeWorkspaceId = ws.id
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [personalRun])
     }
   })
 

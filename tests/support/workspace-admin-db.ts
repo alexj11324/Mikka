@@ -59,11 +59,16 @@ export async function seedPersonalWorkspace(pool: Pool, userId: string) {
   return id
 }
 
-export async function seedIssue(pool: Pool, userId: string, workspaceId?: string) {
+export async function seedIssue(pool: Pool, userId: string, workspaceId?: string, options: { registered?: boolean } = {}) {
   const id = randomUUID()
   const tenant = workspaceId ?? await seedPersonalWorkspace(pool, userId)
-  await registeredTask(pool, userId, tenant, id, client => client.query(`insert into issues (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
-    select $1,$2,w.id,'bound',case when w.kind='personal' then 'personal' else 'workspace' end,'disabled',true,'Task','{"type":"doc"}','todo','normal' from mikka_workspaces w where w.id=$3`, [id, userId, tenant]))
+  const insert = (client: Pick<Pool, 'query'>) => client.query(`insert into issues (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+    select $1,$2,w.id,'bound',case when w.kind='personal' then 'personal' else 'workspace' end,'disabled',true,'Task','{"type":"doc"}','todo','normal' from mikka_workspaces w where w.id=$3`, [id, userId, tenant])
+  // Legacy/rollback fixtures may intentionally own uncommitted Workspace rows
+  // on this same connection. Only normal committed creation opts into the
+  // production WS-first registration boundary; it cannot borrow those rows.
+  if (options.registered) await registeredTask(pool, userId, tenant, id, insert)
+  else await insert(pool)
   return id
 }
 

@@ -39,6 +39,8 @@ jobs:
         run: node scripts/self-hosting-ui/build.mjs
       - name: Export the actual mobile application
         run: pnpm --filter @mikka/mobile exec expo export --platform web --max-workers 2 --output-dir ../../.artifacts/self-hosting-ui/mobile
+      - name: Prepare Ubuntu package mirrors
+        run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
       - name: Install Chromium for visual capture
         run: |
           pnpm exec playwright install --with-deps chromium
