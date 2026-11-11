@@ -2783,7 +2783,7 @@
       "checkAgain": "Check again",
       "confirmTitle": "Share {name} with members of {workspace}?",
       "currentWorkspace": "this workspace",
-      "confirmAuthority": "Members can use the tools authorized for this connection. External services may charge the connected account.",
+      "confirmAuthority": "Members' tasks can use this connection and read its configured credentials on their task machines. External services may charge the connected account.",
       "confirmShare": "Share connection",
       "add": "Add MCP server",
       "empty": "No MCP servers",
