@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Pool } from 'pg'
-import { dbUrl, seedIssue, seedPersonalWorkspace, seedProject, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import type { EnvironmentSaveInput } from './contract'
 import {
   archiveEnvironment, defaultEnvironmentForRun, listEnvironmentRows, readEnvironmentRow, saveEnvironment,
@@ -26,7 +26,7 @@ test('run environments are versioned by revision and one default per scope', { s
   const workspaceId = await seedPersonalWorkspace(pool, owner)
   const projectId = await seedProject(pool, owner, [])
   const issueId = await seedIssue(pool, owner, workspaceId)
-  await pool.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [projectId, JSON.stringify([issueId])])
+  await seedProjectTasks(pool, projectId, [issueId])
   const actor = { userId: owner, workspaceId }
 
   const first = await saveEnvironment(pool, actor, environment({ projectId }))

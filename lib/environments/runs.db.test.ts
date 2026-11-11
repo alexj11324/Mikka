@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedProject, seedRun, seedUser } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedUser } from '../../tests/support/workspace-admin-db'
 import type { EnvironmentSaveInput } from './contract'
 import { saveEnvironment } from './store'
 import {
@@ -23,7 +23,7 @@ test('a claim freezes the project default once; a later config edit leaves the r
   const agentId = await seedAgent(pool, owner)
   const projectId = await seedProject(pool, owner, [])
   const issueId = await seedIssue(pool, owner, workspaceId)
-  await pool.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [projectId, JSON.stringify([issueId])])
+  await seedProjectTasks(pool, projectId, [issueId])
   const actor = { userId: owner, workspaceId }
   const repositoryKey = 'v2/github.com/acme/app'
 

@@ -56,7 +56,7 @@ export async function defaultEnvironmentForRun(pool: Pick<Pool, 'query'>, input:
      WHERE e."workspaceId"=$1 AND e."archivedAt" IS NULL AND e."isDefault"
        AND (jsonb_array_length(e.repositories)=0 OR jsonb_exists(e.repositories,$2))
        AND (e."projectId" IS NULL OR ($3::uuid IS NOT NULL AND EXISTS (
-         SELECT 1 FROM workspace_projects p WHERE p.id=e."projectId" AND jsonb_exists(p."issueIds",$3::text))))
+         SELECT 1 FROM workspace_project_tasks t WHERE t."projectId"=e."projectId" AND t."issueId"=$3::uuid)))
      ORDER BY (e."projectId" IS NOT NULL) DESC, e."updatedAt" DESC
      LIMIT 1`, [input.workspaceId, input.repositoryKey, input.issueId])
   return row ?? null
