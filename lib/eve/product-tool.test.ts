@@ -3,7 +3,7 @@ import test from 'node:test'
 import type { ApprovalConfiguration } from 'eve/tools/approval'
 import { createProductTool } from './product-tool'
 import type { productRpc, ProductOperation } from './product-rpc'
-import { scopeAuth } from './scope'
+import { scopeAuth, type EveScope } from './scope'
 
 const scope = {ownerId:'owner',botId:'10000000-0000-4000-8000-000000000001',workspaceId:'10000000-0000-4000-8000-000000000002',surface:'web' as const}
 const binding = {sessionId:'wrun_fixture',turnId:'turn_0',executionId:'10000000-0000-4000-8000-000000000003'}
@@ -12,7 +12,7 @@ const definition = {name:'send_email',description:'Send mail',inputSchema:{type:
 
 test('native product tool pauses through Eve with exact durable call/input binding',async()=>{
   const requests:ProductOperation[]=[]
-  const rpc:typeof productRpc = async <T>(_scope,request)=>{assert.deepEqual(_scope,scope);requests.push(request);return {status:'user-approval'} as T}
+  const rpc:typeof productRpc = async <T>(_scope:EveScope,request:ProductOperation)=>{assert.deepEqual(_scope,scope);requests.push(request);return {status:'user-approval'} as T}
   const tool=createProductTool(scope,binding,definition,rpc)
   const approval=tool.approval as ApprovalConfiguration<unknown>
   const context={session:{id:binding.sessionId,turn:{id:binding.turnId},auth:{current:scopeAuth(scope)}},callId:'call_1',toolInput:input,abortSignal:new AbortController().signal}
@@ -25,7 +25,7 @@ test('native product tool pauses through Eve with exact durable call/input bindi
 
 test('native approval accepts only original scoped owner and copies no token capability',async()=>{
   const requests:ProductOperation[]=[]
-  const rpc:typeof productRpc = async <T>(_scope,request)=>{requests.push(request);return {output:'sent'} as T}
+  const rpc:typeof productRpc = async <T>(_scope:EveScope,request:ProductOperation)=>{requests.push(request);return {output:'sent'} as T}
   const tool=createProductTool(scope,binding,definition,rpc)
   const approval=tool.approval as ApprovalConfiguration<unknown>
   const owner=scopeAuth(scope)
