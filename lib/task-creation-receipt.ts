@@ -10,7 +10,7 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 /** Both explicit intents share a command namespace. Retain a tombstone when
  * the Task is deleted and a caller retries an already accepted write. */
 export async function withTaskCreationReceipt(tx: Transaction, reader: IssueReader, workspaceId: string,
-  requestId: string, payload: unknown, create: () => Promise<{ taskId: string; identifier: string }>) {
+  requestId: string, payload: unknown, create: () => Promise<{ taskId: string; identifier: string }>, reconcile?: (taskId: string) => Promise<void>) {
   const userId = typeof reader === 'string' ? reader : reader.id
   await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['task-create', userId, requestId])}, 0))`)
   const hashed = await tx.execute<{ fingerprint: string }>(
@@ -24,6 +24,7 @@ export async function withTaskCreationReceipt(tx: Transaction, reader: IssueRead
     if (receipt.workspaceId !== workspaceId || receipt.fingerprint !== fingerprint) throw new ActionFailureError('submissionConflict')
     const issue = await issueForUser(reader, receipt.taskId, false, tx, { withoutBody: true })
     if (!issue || issue.workspaceId !== workspaceId) throw new ActionFailureError('issueNotFound')
+    if (reconcile) await reconcile(receipt.taskId)
     return { taskId: receipt.taskId, identifier: receipt.identifier }
   }
   const created = await create()

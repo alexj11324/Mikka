@@ -9,7 +9,7 @@ import type { CreateOnlyCommand } from '../lib/task-create-command'
 const enabled = disposableDatabase()
 if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Task creation requires a disposable loopback database')
 
-test('a create-only command has one durable Task receipt and no dispatch or inference', { skip: !enabled }, async () => {
+test('a create-only command has one durable Task receipt and no dispatch or inference', { skip: !disposableDatabase() }, async () => {
   const { pool } = await import('../lib/db')
   const { createTaskOnly } = await import('../app/actions/issues')
   const { getTaskPresentation } = await import('../app/actions/task-domain')
@@ -121,5 +121,32 @@ test('an explicit automatic-destination dispatch is bound before execution and c
     await assert.rejects(acceptEveMessage(scope, text, context, request()), /submissionConflict|issueNotFound/)
   } finally {
     await pool.query('delete from "user" where id=$1', [user])
+  }
+})
+
+
+test('an explicit Team backlog task checks the exact selected tenant and reconciles repeated creates without dispatch', { skip: !disposableDatabase() }, async () => {
+  const { pool } = await import('../lib/db')
+  const { createTaskOnly } = await import('../app/actions/issues')
+  const { seedUser, seedWorkspace, seedTeam } = await import('./support/workspace-admin-db')
+  const user = await seedUser(pool, 'Task team owner'), other = await seedUser(pool, 'Other workspace owner')
+  try {
+    const workspace = await seedWorkspace(pool, user, [{ userId: user, role: 'admin' }]), foreign = await seedWorkspace(pool, other, [{ userId: other, role: 'admin' }])
+    const { id: team } = await seedTeam(pool, workspace.id, user), { id: foreignTeam } = await seedTeam(pool, foreign.id, other)
+    const input = { version: 1 as const, intent: 'create_only' as const, workspaceId: workspace.id, teamId: team, requestId: randomUUID(),
+      title: 'A team backlog item', content: { type: 'doc' }, priority: 'normal' as const, status: 'todo' as const }
+    const send = (command: typeof input) => withActivitySession(user, () => createTaskOnly(command), workspace.id)
+    assert.equal((await send({ ...input, teamId: foreignTeam })).error, 'teamIssueAccessDenied')
+    assert.equal((await pool.query('select 1 from issues where "userId"=$1', [user])).rowCount, 0)
+    const results = await Promise.all([send(input), send(input)])
+    assert.ok('taskId' in results[0], JSON.stringify(results))
+    assert.deepEqual(results[1], results[0])
+    const id = results[0].taskId
+    assert.deepEqual((await pool.query('select "teamId","workspaceId" from mikka_team_issues where "issueId"=$1', [id])).rows, [{ teamId: team, workspaceId: workspace.id }])
+    assert.equal((await pool.query('select 1 from agent_runs where "issueId"=$1', [id])).rowCount, 0)
+    assert.equal((await pool.query('select 1 from coordinator_events where "issueId"=$1', [id])).rowCount, 0)
+  } finally {
+    await pool.query('delete from issues where "userId"=any($1::text[])', [[user, other]])
+    await pool.query('delete from "user" where id=any($1::text[])', [[user, other]])
   }
 })

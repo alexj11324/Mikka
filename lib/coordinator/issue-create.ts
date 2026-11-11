@@ -8,6 +8,7 @@ import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { dispatchTaskIntent } from '@/lib/task-create-command'
+import { insertExplicitTask } from '../task-create-scope'
 import { withTaskCreationReceipt } from '@/lib/task-creation-receipt'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { compactTaskTitle } from '@/lib/short-title'
@@ -44,19 +45,23 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
     const typed = taskTitleInputSchema.safeParse(event.payload.taskTitle)
     const command = dispatchTaskIntent.optional().parse(event.payload.taskCommand)
     const title = typed.success ? typed.data : parsed.data.title
+    const fields = { title, content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: command?.description ?? event.payload.text as string }] }] }, status: 'todo' as const, priority: 'normal' as const }
+    const requestId = command ? z.uuid().parse(event.payload.taskCreationRequestId) : undefined
+    if (command?.teamId && !event.payload.humanSessionId) throw new FactoryError('factoryHumanRequired')
     const create = async () => {
-      const issue = await createIssueForUserInTransaction(tx, userId, {
-        title,
-        content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: command?.description ?? event.payload.text as string }] }] },
-        status: 'todo', priority: 'normal',
-      }, systemActor('coordinator'), { workspaceId: source.workspaceId!, deriveShortTitle: !command })
-      if (!issue?.identifier) throw new FactoryError('factoryInvalid')
-      // Preserve the full title while deriving a compact navigation label locally.
-      if (typed.success || command) await tx.update(issues).set({ shortTitle: compactTaskTitle({ title }), shortTitleFrom: title }).where(eq(issues.id, issue.id))
-      return { taskId: issue.id, identifier: issue.identifier }
+      let created
+      if (command && requestId) {
+        created = await insertExplicitTask(tx, userId, source.workspaceId!, requestId, fields, systemActor('coordinator'), command.teamId)
+      } else {
+        const issue = await createIssueForUserInTransaction(tx, userId, fields, systemActor('coordinator'), { workspaceId: source.workspaceId! })
+        if (!issue?.identifier) throw new FactoryError('factoryInvalid')
+        created = { taskId: issue.id, identifier: issue.identifier }
+      }
+      if (typed.success || command) await tx.update(issues).set({ shortTitle: compactTaskTitle({ title }), shortTitleFrom: title }).where(eq(issues.id, created.taskId))
+      return created
     }
     const receipt = command ? await withTaskCreationReceipt(tx, userId, source.workspaceId!,
-      z.uuid().parse(event.payload.taskCreationRequestId), { ...command, sourceEventId: event.id, botId: event.botId }, create) : await create()
+      requestId!, { ...command, sourceEventId: event.id, botId: event.botId }, create) : await create()
     await tx.update(coordinatorEvents).set({ issueId: receipt.taskId }).where(eq(coordinatorEvents.id, event.id))
     return { issueId: receipt.taskId, title }
   }))

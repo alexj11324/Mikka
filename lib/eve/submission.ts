@@ -57,6 +57,7 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
     const session = await auth.api.getSession({headers,query:{disableCookieCache:true}})
     if (session?.user.id === scope.ownerId && !session.tokenWorkspaceId) humanSessionId = session.session.id
   }
+  if (product.taskCommand?.teamId && !humanSessionId) throw new Error('teamIssueAccessDenied')
   const options={botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,taskCommand:product.taskCommand,...(product.retryOf?{retryOf:product.retryOf}:{}),...(retry?{taskRequestSourceEventId:retry.taskRequestSourceEventId}:{}),...(humanSessionId ? {humanSessionId} : {})}
   const record=(executor:Parameters<typeof recordPersonalSubmission>[0])=>recordPersonalSubmission(executor,scope.ownerId,text,options)
   let recorded

@@ -256,3 +256,19 @@ test('the same form explicitly switches to dispatch and sends only its selected 
   assert.deepEqual(submitted[0].context?.taskCommand, { version: 1, intent: 'create_and_dispatch', description: 'Run now.' })
   assert.equal(submitted[0].context?.expectedWorkspaceId, workspaceId)
 })
+
+
+test('Team creation retains its chosen identity when switching from backlog to dispatch', async () => {
+  const teamId = '12250000-0000-4000-8000-000000000003'
+  const team = <NewTaskDialog open workspaceId={workspaceId} teamId={teamId} initialIntent="create_only" initialText="Prepare release."
+    onCreated={() => {}} onOpenChange={() => {}} />
+  await render(team)
+  await act(async () => create().click())
+  assert.equal(manualCommands[0].teamId, teamId)
+  await act(async () => root.render(null))
+  await render(team)
+  await act(async () => option('create_and_dispatch').click())
+  await act(async () => create().click())
+  assert.equal(submitted[0].context?.taskCommand?.teamId, teamId)
+  assert.equal(submitted[0].context?.expectedWorkspaceId, workspaceId)
+})

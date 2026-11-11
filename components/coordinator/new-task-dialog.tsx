@@ -57,7 +57,7 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
  * request goes into the Coordinator conversation, where its reply shows up. A UI layer's new-task slot draws the
  * window instead (docs/ui-overlay.md); the data, state and sending stay here.
  */
-export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId, onCreated, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
+export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId, teamId, onCreated, initialIntent = 'create_and_dispatch', initialBotId, initialText = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSent?: () => void
@@ -67,6 +67,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   /** Project page the request came from. */
   project?: string | null
   workspaceId?: string
+  teamId?: string
   /** Keys typed before the dialog finished opening. */
   initialText?: string
 }) {
@@ -150,11 +151,11 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
     setCoordinatorUnavailable(false)
     try {
       if (only && workspaceId) {
-        const fingerprint = JSON.stringify([workspaceId, name, text])
+        const fingerprint = JSON.stringify([workspaceId, teamId, name, text])
         const requestId = createRequests.current.get(fingerprint) ?? crypto.randomUUID()
         createRequests.current.set(fingerprint, requestId)
         const { createTaskOnly } = await import('@/app/actions/issues')
-        const result = await createTaskOnly({ version: 1, intent: 'create_only', workspaceId, requestId,
+        const result = await createTaskOnly({ version: 1, intent: 'create_only', workspaceId, requestId, ...(teamId ? { teamId } : {}),
           ...backlogTaskDraft(name, text) })
         if (result.error || !('taskId' in result)) { toast.error(actionError(result.error)); return }
         createRequests.current.delete(fingerprint)
@@ -164,7 +165,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
         onCreated?.(result.taskId)
         return
       }
-      const key = JSON.stringify([workspaceId, text, name, picked, project ?? null, handler?.id ?? null, profileId ?? null])
+      const key = JSON.stringify([workspaceId, teamId, text, name, picked, project ?? null, handler?.id ?? null, profileId ?? null])
       if (composed.current?.key !== key) {
         const destination = pickedTaskDestination(picked)
         const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
@@ -172,7 +173,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
           ...(name ? { taskTitle: name } : {}),
           ...(destination ? { taskDestination: destination } : {}) }
       }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, taskTitle: composed.current.taskTitle, expectedWorkspaceId: workspaceId, ...(workspaceId && !project ? { taskCommand: { version: 1, intent: 'create_and_dispatch', description: text } } : {}) })
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, taskTitle: composed.current.taskTitle, expectedWorkspaceId: workspaceId, ...(workspaceId && !project ? { taskCommand: { version: 1, intent: 'create_and_dispatch', description: text, ...(teamId ? { teamId } : {}) } } : {}) })
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')

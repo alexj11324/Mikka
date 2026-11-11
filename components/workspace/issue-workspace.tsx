@@ -473,7 +473,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     move({ issue: null }, 'replace')
   }
   const saved = useCallback((id: string) => { setSelected(id); void mutate() }, [mutate])
-  function create() { if (boardBusy) return; setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreating(true) }
+  function create() { if (boardBusy || section.startsWith('team-') && !activeTeam) return; setTypedAhead(''); setCreationProject((section === 'projects' || section === 'team-projects') ? projectId : null); setCreating(true) }
   function signOut() {
     if (boardBusy || leaving.current) return
     void leave(async () => {
@@ -625,7 +625,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const coordinatorSummary = coordinatorBot ? botChatSummaries?.items[coordinatorBot.id] : undefined
   const coordinatorUpdatedAt = coordinatorSummary?.at ?? undefined
   const dialogs = <>
-    <NewTaskDialog key={JSON.stringify([user.id, workspaceContext?.workspace.id ?? workspaceData?.workspace.id, section, teamId, creationProject, activeBot?.id])} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} open={creating} initialBotId={activeBot?.id} initialIntent={['tasks', 'all-issues'].includes(section) ? 'create_only' : 'create_and_dispatch'} onCreated={!section.startsWith('team-') && !creationProject ? id => { void mutate(); open(id) } : undefined} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
+    <NewTaskDialog key={JSON.stringify([user.id, workspaceContext?.workspace.id ?? workspaceData?.workspace.id, section, teamId, creationProject, activeBot?.id])} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} open={creating} initialBotId={activeBot?.id} teamId={section.startsWith('team-') ? activeTeam?.id : undefined} initialIntent={['tasks', 'all-issues', 'team-issues'].includes(section) ? 'create_only' : 'create_and_dispatch'} onCreated={(!section.startsWith('team-') || !!activeTeam) && !creationProject ? id => { void mutate(); open(id) } : undefined} project={creationProject ? scopedProjects.find(project => project.id === creationProject)?.name : null} initialText={typedAhead} onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />
     {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
     {FRAME_LISTS_CHATS && (workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null) && <NewGroupDialog key={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} workspaceId={(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null)!} bots={bots} open={creatingGroup} onOpenChange={setCreatingGroup}
       onCreated={group => { setCreatingGroup(false); void reloadGroups().catch(() => {}); openChat({ kind: 'group', ...group }) }}
