@@ -229,7 +229,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
         // All copies become private before this transaction can commit. A new
         // child intersects the source Task; a duplicated root retains its
         // source ancestor, including a Private Project or Task parent.
-        await tx.execute(sql`update resource_access_policies p set visibility=${child ? 'shared' : 'private'},
+        await tx.execute(sql`update resource_access_policies p set visibility=${child && workspace.kind === 'team' ? 'shared' : 'private'},
           "parentKind"=case when v."parentId" is not null then 'task' else s."parentKind" end,
           "parentId"=coalesce(v."parentId",s."parentId")
           from jsonb_to_recordset(${JSON.stringify(policies)}::jsonb) v(id uuid,"parentId" uuid),resource_access_policies s

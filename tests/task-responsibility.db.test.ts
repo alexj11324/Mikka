@@ -20,7 +20,7 @@ test('Task responsibility: actual actions, MCP compatibility, tenant denial and 
   const owner = await seedUser(pool, 'responsibility-owner'), member = await seedUser(pool, 'responsibility-member'), foreign = await seedUser(pool, 'responsibility-foreign')
   const alpha = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   const beta = await seedWorkspace(pool, foreign, [{ userId: foreign, role: 'admin' }, { userId: owner, role: 'member' }])
-  const taskId = await seedIssue(pool, owner, alpha.id)
+  const taskId = await seedIssue(pool, owner, alpha.id, { registered: true })
   const taskIds: string[] = [taskId]
   const ownAgent = await seedAgent(pool, owner), foreignAgent = await seedAgent(pool, foreign)
   const ownBot = await seedBot(pool, alpha.id, owner), foreignBot = await seedBot(pool, beta.id, owner)

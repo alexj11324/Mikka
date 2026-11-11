@@ -697,10 +697,11 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const value=input(teamId), {requestId,teamId:selectedTeam,...fields}=value
     const fingerprint=createHash('sha256').update(JSON.stringify({teamId:selectedTeam,...fields})).digest('hex')
     const id=randomUUID()
-    await db.transaction(async tx=>{
+    const {withTaskWorkspace}=await import('../lib/task-workspace')
+    await withTaskWorkspace(owner,workspaceId,()=>db.transaction(async tx=>{
       assert.ok(await createIssueForUserInTransaction(tx,owner,fields,userActor(owner),{workspaceId,id,linearSyncBlocked:true}))
       await tx.insert(teamIssueCreateRequests).values({requestId,issueId:id,ownerId:owner,teamId:selectedTeam,fingerprint})
-    })
+    }))
     await workspace.query('insert into team_issue_create_receipts ("requestId","issueId","ownerId","teamId","workspaceId") values ($1,$2,$3,$4,$5)',[requestId,id,owner,selectedTeam,workspaceId])
     assert.deepEqual(await query(owner,value),{error:'teamIssueChanged',requestId})
     assert.equal((await workspace.query('select count(*)::int n from mikka_team_issues where "issueId"=$1',[id])).rows[0].n,0)
