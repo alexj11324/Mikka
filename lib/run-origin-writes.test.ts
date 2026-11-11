@@ -113,15 +113,25 @@ test('every production agent_runs insert writes origin', () => {
 test('every production dispatch call names its entry origin', () => {
   const failures: string[] = []
   const counts = { queueCloudRun: 0, queueTaskRun: 0 }
-  // A literal `origin:` / shorthand `origin`, or a spread of the canonical
-  // resolver, which always returns `{ origin, originRef }`.
+  // A literal `origin:` / shorthand `origin`, a spread of the canonical
+  // resolver, which always returns `{ origin, originRef }`, or a pass-through of
+  // the whole input object this function already resolved (see below).
   const providesOrigin = /\borigin\s*:|(?:^|[,{]\s*)origin\s*[,}]|\bresolveRunOrigin\s*\(/m
+  // A dispatch that re-enters with its own already-resolved `input` carries the
+  // entry inside it, the way withProjectExecution's recursion does. Recognising
+  // it needs the whole function, not just the argument list, so the callee's own
+  // `resolveRunOrigin(` must appear before the call.
+  const passesOwnInput = (text: string, call: string) => {
+    const at = text.indexOf(call)
+    if (at === -1) return false
+    return /\bresolveRunOrigin\s*\(/.test(text.slice(0, at)) && /\binput\s*(?:,|\))/.test(call)
+  }
   for (const { file, text } of productionSources()) {
     for (const callee of ['queueCloudRun', 'queueTaskRun'] as const) {
       for (const call of callsTo(text, callee)) {
         counts[callee]++
         // The caller never relies on a hidden default.
-        if (!providesOrigin.test(call)) failures.push(`${file}: ${callee} call without origin`)
+        if (!providesOrigin.test(call) && !passesOwnInput(text, call)) failures.push(`${file}: ${callee} call without origin`)
       }
     }
   }

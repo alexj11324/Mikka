@@ -72,6 +72,10 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     console.error(JSON.stringify({ msg: 'cloud_run_model_missing', runId, threadRunId: input.threadRunId ?? null, issueId: input.issueId, agentId: input.agentId }))
     throw error
   }
+  // Validate the entry before taking a connection: an invalid ref must not leak one.
+  // The web default is for legacy tests; the write guard enumerates every
+  // production caller so none can rely on it silently.
+  const entry = resolveRunOrigin({ explicit: input.origin ? { origin: input.origin, originRef: input.originRef } : null, defaultOrigin: 'web' })
   if (!projectExecution) {
     const { rows: [target] } = await (existing ?? pool).query(`SELECT repo."repoPath",repo."remoteUrl",a.harness,
         CASE WHEN source.id IS NULL THEN repo."baseBranch"
@@ -87,10 +91,6 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       snapshot => queueCloudRun(pool, actor, input, existing, factoryContext, snapshot), Boolean(existing))
   }
   requireProjectResourceLease(actor.userId, actor.workspaceId)
-  // Validate the entry before taking a connection: an invalid ref must not leak one.
-  // The web default is for legacy tests; the write guard enumerates every
-  // production caller so none can rely on it silently.
-  const entry = resolveRunOrigin({ explicit: input.origin ? { origin: input.origin, originRef: input.originRef } : null, defaultOrigin: 'web' })
   const client = existing ?? await pool.connect()
   try {
     if (!existing) await client.query('BEGIN')
