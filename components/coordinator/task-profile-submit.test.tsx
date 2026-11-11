@@ -228,6 +228,14 @@ test('a title alone enables submit and becomes the request text', async () => {
   assert.equal(submitted[0].context?.taskTitle, 'Only a title')
 })
 
+test('a backlog entry waits for its authenticated workspace without changing to dispatch', async () => {
+  await render(<NewTaskDialog open onOpenChange={() => {}} onCreated={() => {}} initialIntent="create_only" initialText="Keep in backlog." />)
+  assert.equal(create().disabled, true)
+  await act(async () => create().click())
+  assert.equal(submitted.length, 0)
+  assert.equal(manualCommands.length, 0)
+})
+
 test('manual creation survives uncertain results, bypasses dispatch settings, and opens the returned Task', async () => {
   let opened = ''
   const form = <NewTaskDialog open workspaceId={workspaceId} initialIntent="create_only" initialText="Keep in backlog."

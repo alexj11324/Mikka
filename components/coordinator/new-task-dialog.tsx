@@ -81,7 +81,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
   const { mutate } = useSWRConfig()
   const actionError = useActionError()
   const [intent, setIntent] = useState(initialIntent)
-  const only = Boolean(onCreated && workspaceId && intent === 'create_only')
+  const only = intent === 'create_only'
   const dispatching = open && !only
   const pending = useRef(false)
   const createRequests = useRef(new Map<string, string>())
@@ -150,7 +150,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
     const text = draft.trim() || name
     const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, picked, botPick, profileId])
     const confirmAccess = confirmedFingerprint === fingerprint
-    if (!text || pending.current || attachments.locked || (!only && (!available || !profileAllowed || botPick && !handler))) return
+    if (!text || pending.current || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || botPick && !handler))) return
     pending.current = true
     setSending(true)
     setCoordinatorUnavailable(false)
@@ -229,7 +229,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, projectId, 
       bots={!only && botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
       bot={handler?.id ?? null} onBot={setBotPick}
       profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
-      intent={chooseIntent ? intent : undefined} notices={notices} sending={sending} canSubmit={(only || available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
+      intent={only || chooseIntent ? intent : undefined} notices={notices} sending={sending} canSubmit={(only ? Boolean(workspaceId) : available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
     {keyDialogNode}
     {accessChange && <AccessChangeDialog change={accessChange} pending={sending} onCancel={() => setAccessChange(null)} onConfirm={async () => {
       const current = accessChange
