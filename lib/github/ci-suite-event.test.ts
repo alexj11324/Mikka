@@ -13,7 +13,7 @@ const payload = {
     status: 'completed',
     conclusion: 'failure',
     head_sha: sha,
-    pull_requests: [{ number: 7 }, { number: 7 }, { number: 8 }],
+    pull_requests: [{ number: 7, head: { sha } }, { number: 7, head: { sha } }, { number: 8, head: { sha } }],
   },
 }
 const row = {
@@ -29,7 +29,7 @@ test('completed suite is one bounded canonical wake hint, never an entire check 
   const result = completedCiSuite('check_suite', payload)!
   assert.deepEqual(result, {
     installationId: 123, repositoryId: 456, repository: 'acme/app',
-    suiteId: 789, headSha: sha, conclusion: 'failure', numbers: [7, 8],
+    suiteId: 789, headSha: sha, conclusion: 'failure', numbers: [7, 8], heads: { '7': sha, '8': sha },
   })
   assert.equal(completedCiSuite('workflow_run', payload), null)
   assert.equal(completedCiSuite('check_run', payload), null)
@@ -48,6 +48,13 @@ test('only an already-bound open PR on exactly that head and repository receives
   assert(linkedCiSuiteRun(event, row))
   assert(linkedCiSuiteRun(event, { ...row, state: 'draft' }))
   assert(linkedCiSuiteRun(event, { ...row, pullUrl: 'https://github.com/Acme/App/pull/7' }))
+  // GitHub Actions PR checks may run on a synthetic merge commit; the
+  // associated PR's head.sha still proves the original source head.
+  const synthetic = completedCiSuite('check_suite', {
+    ...payload, check_suite: { ...payload.check_suite, head_sha: 'b'.repeat(40) },
+  })!
+  assert(linkedCiSuiteRun(synthetic, row))
+  assert(!linkedCiSuiteRun(synthetic, { ...row, headSha: 'c'.repeat(40) }))
   for (const invalid of [
     { state: 'merged' }, { state: 'closed' }, { state: null },
     { headSha: 'b'.repeat(40) }, { headSha: null },
