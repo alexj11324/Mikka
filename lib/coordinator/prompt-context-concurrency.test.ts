@@ -100,7 +100,9 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
     await pending
   }
   assert.deepEqual(await pending, expectedPrompt())
-  assert.equal(calls.length, 3)
+  // Exactly five reads and no more: the three parallel context parts, then the
+  // repositories this chat works in, then what Mikka has learnt about the person.
+  assert.equal(calls.length, 5)
 })
 
 test('a later turn reads current context again without caching or changing the frozen host', async () => {
