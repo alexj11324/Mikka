@@ -47,8 +47,8 @@ test('API requests stay in their effective workspace on thread, evidence, propos
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { ...next, after: () => {} } })
   const store = await import('../lib/tokens/store')
-  const token = await store.createPersonalAccessToken(owner, ws.id, { name: 'Scope test' })
-  const personalToken = await store.createPersonalAccessToken(owner, personal.id, { name: 'Scope test personal' })
+  const token = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'Scope test' })
+  const personalToken = await store.createLegacyPersonalAccessToken(owner, personal.id, { name: 'Scope test personal' })
   let bearer: string | null = token.token
   const origin = 'http://127.0.0.1'
   const call = async <P>(handler: (request: Request, context: { params: Promise<P> }) => Promise<Response>, path: string, params: P, body?: unknown, method = body === undefined ? 'GET' : 'POST') => {

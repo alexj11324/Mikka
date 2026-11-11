@@ -205,10 +205,10 @@ test('Files/Diff/Task review HTTP API → commands → full daemon → receipt �
       state: 'succeeded', sessionId: null, worktree, baseCommit: headSha, lastSeq: 0, error: null, updatedAt: new Date().toISOString(),
     })
     const { auth } = await import('../auth')
-    const { createPersonalAccessToken } = await import('../tokens/store')
-    const ownerToken = await createPersonalAccessToken(owner, workspaceId, { name: 'HTTP Files owner' })
-    const memberToken = await createPersonalAccessToken(member, workspaceId, { name: 'HTTP Files member' })
-    const otherToken = await createPersonalAccessToken(owner, otherWorkspace, { name: 'HTTP Files other workspace' })
+    const { createLegacyPersonalAccessToken } = await import('../tokens/store')
+    const ownerToken = await createLegacyPersonalAccessToken(owner, workspaceId, { name: 'HTTP Files owner' })
+    const memberToken = await createLegacyPersonalAccessToken(member, workspaceId, { name: 'HTTP Files member' })
+    const otherToken = await createLegacyPersonalAccessToken(owner, otherWorkspace, { name: 'HTTP Files other workspace' })
     const session = await (await auth.$context).internalAdapter.createSession(owner)
     assert.ok(session)
     appPool = (await import('../db')).pool; workspacePool = (await import('../workspace-db')).workspacePool

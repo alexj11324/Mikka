@@ -40,8 +40,8 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
     const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../lib/db'), import('../lib/workspace-db')])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
-  const { createPersonalAccessToken } = await import('../lib/tokens/store')
-  const token = await createPersonalAccessToken(owner, workspace.id, { name: 'Factory scope fixture' })
+  const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+  const token = await createLegacyPersonalAccessToken(owner, workspace.id, { name: 'Factory scope fixture' })
   const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
   const detail = await import('../app/api/factory/tasks/[taskId]/route')
   const activity = await import('../app/api/factory/tasks/[taskId]/activity/route')
@@ -129,7 +129,7 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
     assert.equal((await pool.query('SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId])).rowCount, 1)
   })
   await t.test('concurrent workspace PAT contexts do not bleed into each other', async () => {
-    const otherToken = await createPersonalAccessToken(owner, otherWorkspace.id, { name: 'Other workspace fixture' })
+    const otherToken = await createLegacyPersonalAccessToken(owner, otherWorkspace.id, { name: 'Other workspace fixture' })
     const cases = [
       [token.token, own.task!.id, 200], [token.token, foreign.task!.id, 404],
       [otherToken.token, foreign.task!.id, 200], [otherToken.token, own.task!.id, 404],
@@ -144,7 +144,7 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
   await t.test('a different account cannot read the task through a valid PAT', async () => {
     const outsider = await seedUser(pool, 'factory-pat-outsider')
     const ownWorkspace = await seedWorkspace(pool, outsider, [{ userId: outsider, role: 'admin' }])
-    const otherToken = await createPersonalAccessToken(outsider, ownWorkspace.id, { name: 'Different owner fixture' })
+    const otherToken = await createLegacyPersonalAccessToken(outsider, ownWorkspace.id, { name: 'Different owner fixture' })
     const response = await detail.GET(new Request(`${origin}/api/factory/tasks/${own.task!.id}`, {
       headers: { authorization: `Bearer ${otherToken.token}` },
     }), { params: Promise.resolve({ taskId: own.task!.id }) })
@@ -170,7 +170,7 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
   })
   await t.test('expired and revoked PATs remain unauthenticated', async () => {
     for (const column of ['expiresAt', 'revokedAt']) {
-      const value = await createPersonalAccessToken(owner, workspace.id, { name: `Inactive ${column} fixture` })
+      const value = await createLegacyPersonalAccessToken(owner, workspace.id, { name: `Inactive ${column} fixture` })
       const { hashPersonalAccessToken } = await import('../lib/tokens/format')
       await pool.query(`UPDATE personal_access_tokens SET "createdAt"=now()-interval '2 hours', "${column}"=now()-interval '1 minute' WHERE "tokenHash"=$1`, [hashPersonalAccessToken(value.token)])
       const response = await detail.GET(new Request(`${origin}/api/factory/tasks/${own.task!.id}`, {

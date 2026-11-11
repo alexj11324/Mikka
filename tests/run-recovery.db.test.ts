@@ -29,6 +29,7 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
   })
   const now = new Date()
   // The other device takes part in dispatch (参与调度) unless a test says otherwise (decision 2026-11-02-1400).
+  const fixtureOriginRef = { kind: 'telegram', chatId: '42', messageId: 7 }
   async function fixture(attempt = 1, definition: unknown = null, otherTakesPart = true) {
     const userId = `recovery-${randomUUID()}`, issueId = randomUUID(), agentId = randomUUID()
     const deviceId = randomUUID(), otherDeviceId = randomUUID(), repoId = randomUUID(), id = randomUUID()
@@ -40,8 +41,8 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
       [deviceId, otherDeviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }]), new Date(now.getTime() - 600_000), DAEMON_PROTOCOL_VERSION, now, otherTakesPart])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Recovery worker\')', [agentId, userId, deviceId])
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, userId, remoteKey(remote), remote])
-    await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,attempt,"leaseExpiresAt","agentDefinition") VALUES ($1,$2,$3,$4,$5,$6,\'running\',\'Controlled recovery fixture\',$7,$8,$9)',
-      [id, userId, issueId, agentId, deviceId, repoId, attempt, new Date(now.getTime() - 1000), definition])
+    await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,attempt,"leaseExpiresAt","agentDefinition",origin,"originRef") VALUES ($1,$2,$3,$4,$5,$6,\'running\',\'Controlled recovery fixture\',$7,$8,$9,\'telegram\',$10)',
+      [id, userId, issueId, agentId, deviceId, repoId, attempt, new Date(now.getTime() - 1000), definition, JSON.stringify(fixtureOriginRef)])
     return { id, userId, workspaceId, deviceId, otherDeviceId, issueId, agentId, repoId }
   }
   async function checkpointRetry(previousId: string, stopReason = 'provider_failure') {
@@ -154,10 +155,12 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
       [run.id, prefix + prompt, Array.from(prefix).length, taskLength])
     const old = await issueRunToken({ id: run.id, userId: run.userId })
     await Promise.all(Array.from({ length: 10 }, () => sweepExpiredRunLeases(now)))
-    const { rows } = await pool.query('SELECT id,status,attempt,"deviceId",prompt,"promptTaskStart","promptTaskLength" FROM agent_runs WHERE "retryOf"=$1', [run.id])
+    const { rows } = await pool.query('SELECT id,status,attempt,"deviceId",prompt,"promptTaskStart","promptTaskLength",origin,"originRef" FROM agent_runs WHERE "retryOf"=$1', [run.id])
     assert.equal(rows.length, 1)
     assert.equal(rows[0].attempt, 2)
     assert.equal(rows[0].deviceId, run.otherDeviceId)
+    assert.equal(rows[0].origin, 'telegram', 'the device retry copies the lost run’s entry')
+    assert.deepEqual(rows[0].originRef, fixtureOriginRef)
     assert.equal(threadPromptView(rows[0].prompt, rows[0].promptTaskStart, rows[0].promptTaskLength).task, '# Recovery 🧪\n\nKeep the task body.')
     assert.ok(rows[0].prompt.includes('SYNTHETIC_INTERNAL_STANDING_INSTRUCTION'))
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [run.id])).rows[0].status, 'failed')

@@ -486,9 +486,12 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   allow/ask/deny wins first; there is no per-Bot or per-person layer. Otherwise
   the Decisions API answers one predicate, `destructive`: does this exact call
   delete, overwrite or remove existing data? The tool's MCP annotations
-  (`destructiveHint`, `readOnlyHint`) are input; a `readOnlyHint` tool is not
-  asked about. Creating, sending, appending and adding never ask. An
-  unavailable or refused judgment shows a card, never a silent write.
+  (`destructiveHint`, `readOnlyHint`) are evidence; the hint is input to the
+  judge and none of them skips the call. Creating, sending, appending and
+  adding never ask. An unavailable, refused or malformed judgment shows no
+  card: the agent running the task already judged the call by making it, so it
+  goes ahead and the log records `Write judgment fallback`
+  ([decision](decisions/2026-11-01-1330-write-judgment-unavailable-goes-ahead.md)).
   Source: Alex, 2026-10-31.
 - **R-78** Threads and runs are executed by an Agent (Claude Code, Codex…)
   in an Agent 配置. Where an Agent stretch is drawn with a mark (the line where

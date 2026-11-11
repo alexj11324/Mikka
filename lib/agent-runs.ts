@@ -34,6 +34,11 @@ import { resolveStopTargets } from '@/lib/run-chain'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { runBotName, threadNameHead } from '@/lib/run-bot-name'
 import { requireTaskWorkspace } from '@/lib/task-workspace'
+import { resolveRunOrigin, type RunOrigin, type RunOriginRef } from '@/lib/run-origin'
+
+/** Which entry asked for the run. `source` keeps its own legacy meaning
+ * ('mcp' only); `origin`/`originRef` are the evidence-only provenance. */
+export interface RunDispatchOrigin { source?: 'mcp' | null; origin?: RunOrigin; originRef?: RunOriginRef | null }
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -123,14 +128,16 @@ type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note
   apiKeyId?: string
   /** Exact server-selected identity; reauthorized for this owner, Agent and workspace at queue time. */
   subscriptionBindingId?: string }
-export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null) {
-  return queueAdmittedRun(userId, input, botId, execution, requestEventId, source)
+export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, dispatch: RunDispatchOrigin = {}) {
+  return queueAdmittedRun(userId, input, botId, execution, requestEventId, { source: dispatch.source ?? null, origin: dispatch.origin ?? 'web', originRef: dispatch.originRef ?? null })
 }
 
 /** Only the Factory/Skill host calls this with an already-open transaction.
  * Repository ids identify prior scheduling metadata; they confer no authority. */
 /** What the host already decided for a Factory run: its model and credential (lib/computer/run-model.ts), the computer it is pinned to, read-only. */
-export type FactoryRunSelection = { threadRunId?: string; model?: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: RunModel['agentProfile']; policyCeiling?: RunModel['policyCeiling']; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution }
+export type FactoryRunSelection = { threadRunId?: string; model?: string; subscriptionBindingId?: string; apiKeyId?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: RunModel['agentProfile']; policyCeiling?: RunModel['policyCeiling']; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution
+  /** Entry provenance the host already knows; not part of any dispatch digest. */
+  origin?: RunOrigin; originRef?: RunOriginRef | null }
 export async function queueFactoryRun(tx: import('pg').PoolClient, userId: string, input: DispatchInput,
   botId: string | null = null, context?: { sourceEventId: string; attemptId: string }, sourceRunId?: string, selection: FactoryRunSelection = {}): Promise<DispatchResult> {
   const parsed = dispatchInput.safeParse(input)
@@ -171,10 +178,12 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
     }
     // One place picks the model (lib/computer/run-model.ts): the host's choice, else a rerun's source run's own,
     // else 优先使用的模型 for this computer's Agent. A Factory run is never queued without one.
-    const { execution, ...chosen } = selection
+    const { execution, origin: selectedOrigin, originRef: selectedOriginRef, ...chosen } = selection
     const runModel = await factoryRunModel(userId, botId, parsed.data.agentId, chosen, sourceRunId
       ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null, parsed.data.profileId, profileStage, parsed.data.issueId, tx)
-    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(profileStage === 'spec' || chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId, factoryContext: context })
+    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, threadRunId: selection.threadRunId ?? sourceRunId, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(profileStage === 'spec' || chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId,
+      { source: null, ...resolveRunOrigin({ explicit: selectedOrigin ? { origin: selectedOrigin, originRef: selectedOriginRef } : null, defaultOrigin: 'factory' }) },
+      { executor, repo, client: tx, sourceRunId, factoryContext: context })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
     // BE-13: the target device cannot take the run right now -> one reason-coded event, same transaction.
@@ -219,7 +228,11 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
       ...input, issueId: current.issueId!, repo: repo.remoteUrl,
       requestKey: `provider:${current.id}`, pinnedDeviceId: current.agentDefinition.pinnedDeviceId,
       readOnly: current.agentDefinition.readOnly,
-    }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId, current.source,
+    }, current.botId, undefined, current.agentDefinition.repositoryAdmission?.requestEventId,
+    // A provider fallback continues the same entry. A legacy source has no
+    // recoverable entry: only the accurate 'mcp' => 'api' signal is used,
+    // never a guess of 'web'; the host's own automatic recovery is recorded.
+    { source: current.source, ...resolveRunOrigin({ sourceRun: current, defaultOrigin: current.source === 'mcp' ? 'api' : 'automation' }) },
     // The wrapper authorizes the failed source above. All target policy,
     // credential, task-destination and publication checks still run normally.
     { executor, repo, client: tx, workspaceHint: originalIdentity.data.workspaceId, frozenSourceRunId: current.id })
@@ -238,7 +251,7 @@ export async function queueProviderFallbackRun(tx: import('pg').PoolClient, user
 }
 
 async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 'model'> & { model?: string }, botId: string | null, execution?: AgentExecution,
-  requestEventId?: string, source: 'mcp' | null = null,
+  requestEventId?: string, dispatch: { source: 'mcp' | null; origin: RunOrigin; originRef: RunOriginRef | null } = { source: null, origin: 'web', originRef: null },
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string; frozenSourceRunId?: string; workspaceHint?: string | null; factoryContext?: { sourceEventId: string; attemptId: string } }) {
   const executor = internal?.executor ?? db
   // Every local run is frozen with its model, a Factory or Skill run included: a caller that left it out fails here, before anything is read or written.
@@ -297,7 +310,7 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
       .catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
   }
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, promptTaskLength, source, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId, frozenSourceRunId: internal.frozenSourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, promptTaskLength, source: dispatch.source, origin: dispatch.origin, originRef: dispatch.originRef, definition: agentDefinition!, profileSourceRunId: input.threadRunId, factoryContext: internal?.factoryContext, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId, frozenSourceRunId: internal.frozenSourceRunId } : {}) }, internal?.client)
 }
 
 /** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */

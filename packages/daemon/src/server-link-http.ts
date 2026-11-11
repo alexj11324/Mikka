@@ -1,6 +1,7 @@
 import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type NativeCoordinatorCommand } from "@mikka/protocol/coordinator"
 import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
 import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
+import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-git'
 // HTTP transport for `ServerLink`: the routes apps/server serves for the
 // daemon (ADR 0016). Paths and payloads come from packages/protocol
 // (`devicePaths`, `runCompletePath` and their zod schemas); responses are
@@ -311,6 +312,7 @@ export class HttpServerLink implements ServerLink {
           [MAILBOX_NOTICE_HEADER]: '1',
           [WORKSPACE_REQUEST_HEADER]: '1',
           [WORKSPACE_DIFF_REQUEST_HEADER]: '1',
+          [WORKSPACE_GIT_REQUEST_HEADER]: '1',
           ...daemonTracer.headers(),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}),
