@@ -2570,6 +2570,12 @@
         "integration": {
           "permission_changed": "set {integration} to {to}"
         },
+        "service_identity": {
+          "created": "created service identity {target}",
+          "renamed": "renamed service identity {target}",
+          "disabled": "disabled service identity {target}",
+          "restored": "restored service identity {target}"
+        },
         "secret": {
           "created": "added secret {target}",
           "replaced": "updated secret {target}",
@@ -5822,6 +5828,8 @@
       "default": "The task could not be completed. Check the error details or try again."
     },
     "governance_denied": {
+      "service_identity_changed": "This service identity changed. Reload it before applying your update.",
+      "service_identity_request_reused": "This request was already used to create a differently named service identity.",
       "plan_changed": "The plan changed. Review its current entitlements before applying this update.",
       "default": "The governance action could not be completed. Try again.",
       "access_denied": "You do not have permission to manage this organization or workspace.",

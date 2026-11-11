@@ -2570,6 +2570,12 @@
         "integration": {
           "permission_changed": "把 {integration} 改为{to}"
         },
+        "service_identity": {
+          "created": "创建了服务身份 {target}",
+          "renamed": "重命名了服务身份 {target}",
+          "disabled": "停用了服务身份 {target}",
+          "restored": "恢复了服务身份 {target}"
+        },
         "secret": {
           "created": "添加了密钥 {target}",
           "replaced": "更新了密钥 {target}",
@@ -5822,6 +5828,8 @@
       "default": "任务未能完成，请查看错误详情或重试。"
     },
     "governance_denied": {
+      "service_identity_changed": "此服务身份已变更，请重新加载再更新。",
+      "service_identity_request_reused": "此请求已用于创建其他名称的服务身份。",
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
       "access_denied": "你没有管理此组织或工作区的权限。",
