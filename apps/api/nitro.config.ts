@@ -22,7 +22,7 @@ export default defineConfig({
   builder: 'rolldown',
   buildDir: `${root}/node_modules/.cache/mikka-api`,
   modules: [workflowNodeExternals, 'workflow/nitro', workflowDevelopmentAliases, vercelRequestAuthority, nodeRequestAuthority, builtinServices],
-  plugins: [`${root}/apps/api/plugins/security-headers.ts`, `${root}/apps/api/plugins/workflow-world.ts`],
+  plugins: [`${root}/apps/api/plugins/security-headers.ts`, `${root}/apps/api/plugins/workflow-world.ts`, `${root}/apps/api/plugins/eve-service.ts`],
   routes: { '/**': `${root}/apps/api/runtime/entry.ts` },
   ...assets,
   manifest: { deploymentId: configuredDeploymentId() },

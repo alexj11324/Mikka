@@ -11,6 +11,7 @@ Web 和桌面通过 [`apps/frontend`](../../apps/frontend/vite.config.mjs) 编�
 | Web 前端 | `apps/frontend/vite.config.mjs`，目标 `web` | `apps/frontend/dist/web`；公开路径 `/mikka/` |
 | 桌面前端 | `apps/desktop/scripts/build-renderer.mjs`，目标 `desktop` | `apps/desktop/dist/renderer`；由 Electron 本地协议提供 |
 | API | `apps/api/nitro.config.ts`、`apps/api/runtime/entry.ts` | Hono 分派现有业务 handler，Nitro 承担 Node/Vercel 生命周期 |
+| Bot Agent | `apps/eve/agent/` | eve 服务；独立会话、事件与 Workflow 队列，部署见 [Bot runtime](eve-runtime.md) |
 | Node 产品 | `apps/api/scripts/build.mjs`，`node-server` preset | `.output/`，包含 API、静态文件、运行资源和构建清单 |
 | Vercel 产品 | 同一构建脚本，`vercel` preset | `.vercel/output/`，Build Output API v3、函数、静态资源和 Workflow 路由 |
 
