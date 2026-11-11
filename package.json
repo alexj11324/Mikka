@@ -330,6 +330,7 @@
     "h3": "2.0.8",
     "hono": "4.13.13",
     "input-otp": "1.4.1",
+    "just-bash": "3.6.0",
     "katex": "^0.16.47",
     "lucide-react": "latest",
     "mcp-handler": "2.3.0",
