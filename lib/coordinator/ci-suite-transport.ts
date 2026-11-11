@@ -15,16 +15,16 @@ export type CiSuiteOutboxObservation = {
 export function verifiedCiSuiteTransport(event: CiSuiteOutboxObservation): boolean {
   if (event.kind !== 'run_report' || !event.runId || !event.botId
     || event.observedRun?.id !== event.runId || !event.observedRun.finishedAt) return false
-  const { source, repository, pullUrl, headSha, suiteId, conclusionHint } = event.payload
+  const { source, repository, pullUrl, suiteHeadSha, suiteId, conclusionHint } = event.payload
   if (source !== 'github_ci_suite' || typeof repository !== 'string'
     || !/^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?\/[\w.-]{1,100}$/i.test(repository)
-    || typeof pullUrl !== 'string' || typeof headSha !== 'string'
-    || !/^[a-f0-9]{40}$/i.test(headSha) || typeof suiteId !== 'number'
+    || typeof pullUrl !== 'string' || typeof suiteHeadSha !== 'string'
+    || !/^[a-f0-9]{40}$/i.test(suiteHeadSha) || typeof suiteId !== 'number'
     || !Number.isSafeInteger(suiteId) || suiteId <= 0
     || typeof conclusionHint !== 'string' || !/^[a-z_]{1,40}$/.test(conclusionHint)) return false
   const repo = repository.toLowerCase()
   const prefix = `https://github.com/${repo}/pull/`
   if (!pullUrl.toLowerCase().startsWith(prefix)
     || !/^[1-9]\d*$/.test(pullUrl.slice(prefix.length))) return false
-  return event.dedupeKey === `github_ci_suite:${event.runId}:${repo}:${headSha.toLowerCase()}:${suiteId}:${conclusionHint}`
+  return event.dedupeKey === `github_ci_suite:${event.runId}:${repo}:${suiteHeadSha.toLowerCase()}:${suiteId}:${conclusionHint}`
 }
