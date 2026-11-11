@@ -14,6 +14,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+
+concurrency:
+  group: ssh-device-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   ssh:
     runs-on: ubuntu-latest
