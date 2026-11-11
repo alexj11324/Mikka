@@ -8,7 +8,8 @@ const source = z.object({
   installation: z.object({ id }),
   repository: z.object({
     id,
-    full_name: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
+    full_name: z.string().regex(/^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?\/[\w.-]{1,100}$/i)
+      .refine(name => !['.', '..'].includes(name.split('/')[1])),
   }),
   check_suite: z.object({
     id,
