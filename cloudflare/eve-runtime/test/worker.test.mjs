@@ -6,7 +6,7 @@ const env = {
   EVE_SOURCE_SHA: 'a'.repeat(40), EVE_UI_SHA: 'b'.repeat(40), EVE_RELEASE_ID: 'fixture-1',
   EVE_HOST_POLICY: 'shared-warm', EVE_PUBLIC_ORIGIN: 'https://eve.example.test',
   EVE_HOST_WARM_UNTIL: new Date(Date.now() + 60_000).toISOString(),
-  EVE_ENV_WORKFLOW_POSTGRES_URL: 'postgres://fixture:private-password@127.0.0.1/world_e2e',
+  WORLD_QUEUE_PUBLIC_KEY: Buffer.alloc(32, 2).toString('base64'), WORLD_SERVICE: { fetch() {} },
   EVE_ENV_MIKKA_DATABASE_URL: 'postgres://fixture:private-password@127.0.0.1/product_e2e',
   EVE_ENV_BETTER_AUTH_URL: 'https://app.example.test',
   EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'preview',
@@ -42,11 +42,12 @@ const { default: ingress, EveRuntime } = await import('../src/index.mjs')
 
 function fixture(map = new Map()) {
   const storage = {
+    kv: { get: key => map.get(key), put: (key, value) => map.set(key, value) },
     async get(key) { return structuredClone(map.get(key)) },
     async put(key, value) { map.set(key, structuredClone(value)) },
     async transaction(work) { return work(storage) },
   }
-  return { host: new EveRuntime({ storage }, env), map }
+  return { host: new EveRuntime({ storage, container: { async interceptOutboundHttps() {} }, exports: { EveWorldOutbound: x => x } }, env), map }
 }
 beforeEach(() => { calls = 0; forwarded = undefined; selected = new Response('native'); mock.restoreAll() })
 

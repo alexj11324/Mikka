@@ -13,7 +13,7 @@ async function fixture(t) {
   await writeFile(join(root, '.output/eve/server/index.mjs'), 'export default {}')
   await writeFile(join(root, '.output/eve/mikka-eve-build.json'), JSON.stringify({
     version: 1, eve: '1.0.0-rc.9', revision: sourceSha, preset: 'node-server',
-    world: '@workflow/world-postgres', worldVersion: '5.1.1',
+    world: '@mikka/eve-cloudflare-world', worldVersion: '5.1.0',
   }))
   await mkdir(join(root, 'cloudflare/eve-runtime'), { recursive: true })
   await cp(new URL('../runtime', import.meta.url), join(root, 'cloudflare/eve-runtime/runtime'), { recursive: true })

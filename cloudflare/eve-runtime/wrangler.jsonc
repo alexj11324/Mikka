@@ -1,8 +1,9 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "mikka-eve-candidate",
-  "main": "src/index.mjs",
+  "main": "src/entry.mjs",
   "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },

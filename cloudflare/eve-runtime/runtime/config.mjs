@@ -27,14 +27,14 @@ export function hostConfiguration(env) {
     if (!/^[A-Z][A-Z0-9_]*$/.test(name) || typeof value !== 'string') return invalid()
     // These values select hosting and durable storage, rather than credentials.
     if (['VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'VERCEL_DEPLOYMENT_ID',
-      'MIKKA_EVE_ORIGIN', 'WORKFLOW_TARGET_WORLD', 'WORKFLOW_LOCAL_DATA_DIR',
+      'EVE_QUEUE_SIGNING_KEY', 'WORLD_QUEUE_ED25519_PRIVATE_KEY', 'WORKFLOW_POSTGRES_URL', 'MIKKA_EVE_WORLD_TOKEN',
+      'WORKFLOW_DEPLOYMENT_ID', 'MIKKA_DEPLOYMENT_ID', 'NODE_EXTRA_CA_CERTS', 'MIKKA_EVE_ORIGIN', 'WORKFLOW_TARGET_WORLD', 'WORKFLOW_LOCAL_DATA_DIR',
       'WORKFLOW_LOCAL_BASE_URL', 'MIKKA_EVE_WORKFLOW_WORLD', 'MIKKA_EVE_HOST',
       'SLACK_USER_BINDINGS', 'SLACK_WATCHED_CHANNELS', 'SLACK_CHANNEL_WORKSPACES',
       'SLACK_TEAM_ID', 'SLACK_BOT_USER_ID', 'SLACK_BOT_TOKEN'].includes(name)) return invalid()
     runtime[name] = value
   }
-  if (typeof runtime.WORKFLOW_POSTGRES_URL !== 'string' || !URL.canParse(runtime.WORKFLOW_POSTGRES_URL)
-    || !['postgres:', 'postgresql:'].includes(new URL(runtime.WORKFLOW_POSTGRES_URL).protocol)
+  if (!/^[A-Za-z0-9+/]{43}=$/.test(env.WORLD_QUEUE_PUBLIC_KEY ?? '') || !env.WORLD_SERVICE?.fetch
     || typeof runtime.BETTER_AUTH_SECRET !== 'string' || runtime.BETTER_AUTH_SECRET.length < 32
     || !(runtime.MIKKA_DATABASE_URL || runtime.DATABASE_URL)
     || !['production', 'preview'].includes(runtime.MIKKA_DEPLOYMENT_STAGE)) return invalid()
@@ -44,7 +44,8 @@ export function hostConfiguration(env) {
     publicOrigin, policy: 'shared-warm', warmUntil,
     runtimeEnv: {
       ...runtime, NODE_ENV: 'production', MIKKA_EVE_HOST: 'cloudflare',
-      MIKKA_EVE_WORKFLOW_WORLD: 'postgres', MIKKA_EVE_PUBLIC_ORIGIN: publicOrigin,
+      MIKKA_EVE_WORKFLOW_WORLD: 'cloudflare', MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: env.WORLD_QUEUE_PUBLIC_KEY,
+      MIKKA_DEPLOYMENT_ID: env.EVE_RELEASE_ID, WORKFLOW_DEPLOYMENT_ID: env.EVE_RELEASE_ID, MIKKA_EVE_PUBLIC_ORIGIN: publicOrigin,
       MIKKA_BUILD_REVISION: env.EVE_SOURCE_SHA, MIKKA_UI_OVERLAY_SHA: env.EVE_UI_SHA,
       MIKKA_EVE_RELEASE_ID: env.EVE_RELEASE_ID,
     },
@@ -60,7 +61,7 @@ export function nativeRequest(request) {
   } else if (url.pathname.startsWith(EVE_PUBLIC_PREFIX + '/')) {
     path = url.pathname.slice(EVE_PUBLIC_PREFIX.length)
   } else return null
-  if ((!path.startsWith('/eve/v1/') && !path.startsWith('/.well-known/workflow/'))
+  if (!path.startsWith('/eve/v1/')
     || /[\\?#]/.test(path) || /%2f|%5c|%2e|\/\.\.?\//i.test(path)) return null
   const headers = new Headers(request.headers)
   headers.set('x-forwarded-host', url.host)
@@ -74,11 +75,11 @@ export function nativeRequest(request) {
 
 export function validateHostBuild(build, host, env) {
   if (!build || build.version !== 1 || build.eve !== '1.0.0-rc.9'
-    || build.preset !== 'node-server' || build.world !== '@workflow/world-postgres'
-    || build.worldVersion !== '5.1.1' || !sha(build.revision)
+    || build.preset !== 'node-server' || build.world !== '@mikka/eve-cloudflare-world'
+    || build.worldVersion !== '5.1.0' || !sha(build.revision)
     || !host || host.version !== 1 || !release(host.releaseId)
     || host.sourceSha !== build.revision || !sha(host.uiSha)
-    || env.MIKKA_EVE_HOST !== 'cloudflare' || env.MIKKA_EVE_WORKFLOW_WORLD !== 'postgres'
+    || env.MIKKA_EVE_HOST !== 'cloudflare' || env.MIKKA_EVE_WORKFLOW_WORLD !== 'cloudflare'
     || env.MIKKA_BUILD_REVISION !== host.sourceSha || env.MIKKA_UI_OVERLAY_SHA !== host.uiSha
     || env.MIKKA_EVE_RELEASE_ID !== host.releaseId) return invalid()
   return host

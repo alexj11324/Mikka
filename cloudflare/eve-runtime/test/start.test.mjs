@@ -5,10 +5,10 @@ import { startCloudflareEveHost } from '../runtime/start.mjs'
 
 const sourceSha = 'a'.repeat(40), uiSha = 'b'.repeat(40)
 const build = { version: 1, eve: '1.0.0-rc.9', revision: sourceSha, preset: 'node-server',
-  world: '@workflow/world-postgres', worldVersion: '5.1.1' }
+  world: '@mikka/eve-cloudflare-world', worldVersion: '5.1.0' }
 const host = { version: 1, releaseId: 'fixture-1', sourceSha, uiSha }
 const environment = {
-  MIKKA_EVE_HOST: 'cloudflare', MIKKA_EVE_WORKFLOW_WORLD: 'postgres',
+  MIKKA_EVE_HOST: 'cloudflare', MIKKA_EVE_WORKFLOW_WORLD: 'cloudflare',
   MIKKA_BUILD_REVISION: sourceSha, MIKKA_UI_OVERLAY_SHA: uiSha, MIKKA_EVE_RELEASE_ID: 'fixture-1',
 }
 const load = async path => JSON.stringify(path.endsWith('eve-host.json') ? host : build)

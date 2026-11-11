@@ -10,7 +10,7 @@ const unavailable = () => Response.json({ ok: false, error: 'coordinatorUnavaila
 })
 
 /** One shared Eve service, never a Task machine or a second Agent loop.
- * v1 keeps the official PG queue available; it does not claim idle scale-to-zero. */
+ * Cloudflare Queues wake the bound immutable release for pending work. */
 export class EveRuntime extends Container {
   defaultPort = 8080
   sleepAfter = '1m'
@@ -18,8 +18,29 @@ export class EveRuntime extends Container {
   constructor(ctx, env) {
     super(ctx, env)
     this.configuration = hostConfiguration(env)
-    this.envVars = this.configuration.runtimeEnv
+    let capability = ctx.storage.kv.get('eve-world-capability')
+    if (!capability) {
+      capability = crypto.randomUUID() + crypto.randomUUID()
+      ctx.storage.kv.put('eve-world-capability', capability)
+    }
+    this.envVars = { ...this.configuration.runtimeEnv, MIKKA_EVE_WORLD_TOKEN: capability,
+      NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt' }
     this.labels = { component: 'eve-runtime', release: this.configuration.releaseId }
+  }
+
+  async bindWorld() {
+    await this.ctx.container.interceptOutboundHttps('world.internal',
+      this.ctx.exports.EveWorldOutbound({ props: { capability: this.envVars.MIKKA_EVE_WORLD_TOKEN } }))
+  }
+
+  async start(...args) {
+    await this.bindWorld()
+    return super.start(...args)
+  }
+
+  async startAndWaitForPorts(...args) {
+    await this.bindWorld()
+    return super.startAndWaitForPorts(...args)
   }
 
   async fetch(request) {

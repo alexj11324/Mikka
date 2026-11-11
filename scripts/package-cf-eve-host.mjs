@@ -24,7 +24,7 @@ export async function packageCloudflareEveHost({
   const build = JSON.parse(await readFile(join(source, 'mikka-eve-build.json'), 'utf8'))
   const host = { version: 1, sourceSha, uiSha, releaseId }
   validateHostBuild(build, host, {
-    MIKKA_EVE_HOST: 'cloudflare', MIKKA_EVE_WORKFLOW_WORLD: 'postgres',
+    MIKKA_EVE_HOST: 'cloudflare', MIKKA_EVE_WORKFLOW_WORLD: 'cloudflare',
     MIKKA_BUILD_REVISION: sourceSha, MIKKA_UI_OVERLAY_SHA: uiSha, MIKKA_EVE_RELEASE_ID: releaseId,
   })
   if ((await readdir(source)).some(name => name === '.env' || name.startsWith('.env.'))) {
@@ -45,7 +45,6 @@ export async function packageCloudflareEveHost({
   for (const file of ['config.mjs', 'start.mjs']) {
     await cp(join(root, 'cloudflare', 'eve-runtime', 'runtime', file), join(output, 'runtime', file))
   }
-  await cp(join(root, 'scripts', 'eve-service.mjs'), join(output, 'runtime', 'eve-service.mjs'))
   await writeFile(join(output, 'eve-host.json'), JSON.stringify(host, null, 2) + '\n')
   return { output, host }
 }

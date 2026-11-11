@@ -8,7 +8,7 @@ function environment() {
     EVE_SOURCE_SHA: sourceSha, EVE_UI_SHA: uiSha, EVE_RELEASE_ID: 'fixture-1',
     EVE_HOST_POLICY: 'shared-warm', EVE_PUBLIC_ORIGIN: 'https://eve.example.test',
     EVE_HOST_WARM_UNTIL: new Date(Date.now() + 60_000).toISOString(),
-    EVE_ENV_WORKFLOW_POSTGRES_URL: 'postgres://fixture:private-password@127.0.0.1/world_e2e',
+    WORLD_QUEUE_PUBLIC_KEY: Buffer.alloc(32, 2).toString('base64'), WORLD_SERVICE: { fetch() {} },
     EVE_ENV_MIKKA_DATABASE_URL: 'postgres://fixture:private-password@127.0.0.1/product_e2e',
     EVE_ENV_BETTER_AUTH_URL: 'https://app.example.test',
     EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'preview',
@@ -16,7 +16,7 @@ function environment() {
   }
 }
 const build = { version: 1, eve: '1.0.0-rc.9', revision: sourceSha, preset: 'node-server',
-  world: '@workflow/world-postgres', worldVersion: '5.1.1' }
+  world: '@mikka/eve-cloudflare-world', worldVersion: '5.1.0' }
 const host = { version: 1, releaseId: 'fixture-1', sourceSha, uiSha }
 
 test('platform credentials and deployment identity remain distinct from customer connections', () => {
@@ -26,7 +26,7 @@ test('platform credentials and deployment identity remain distinct from customer
   assert.equal(selected.runtimeEnv.NEW_PROVIDER_CLIENT_SECRET, 'private-platform-fixture')
   assert.equal(selected.runtimeEnv.ANOTHER_SECRET, undefined)
   assert.equal(selected.runtimeEnv.SOME_OTHER_BINDING, undefined)
-  assert.equal(selected.runtimeEnv.MIKKA_EVE_WORKFLOW_WORLD, 'postgres')
+  assert.equal(selected.runtimeEnv.MIKKA_EVE_WORKFLOW_WORLD, 'cloudflare')
   assert.equal(selected.runtimeEnv.MIKKA_EVE_PUBLIC_ORIGIN, 'https://eve.example.test')
   assert.equal(selected.runtimeEnv.BETTER_AUTH_URL, 'https://app.example.test')
   assert.deepEqual(validateHostBuild(build, host, selected.runtimeEnv), host)
@@ -34,7 +34,7 @@ test('platform credentials and deployment identity remain distinct from customer
 
 test('missing durable storage, unsafe origins or incompatible hosting fail without disclosing values', () => {
   for (const change of [
-    { EVE_ENV_WORKFLOW_POSTGRES_URL: '' }, { EVE_ENV_WORKFLOW_POSTGRES_URL: 'not-private-password' },
+    { WORLD_QUEUE_PUBLIC_KEY: '' }, { WORLD_SERVICE: undefined },
     { EVE_PUBLIC_ORIGIN: 'https://private-password@eve.example.test' },
     { EVE_PUBLIC_ORIGIN: 'https://eve.example.test/another-path' },
     { EVE_ENV_BETTER_AUTH_URL: 'http://app.example.test' }, { EVE_ENV_BETTER_AUTH_SECRET: 'short' },
@@ -100,7 +100,7 @@ test('WebSocket headers and namespaced Workflow callbacks retain their native tr
   assert.equal(socket.headers.get('upgrade'), 'websocket')
   assert.equal(socket.headers.get('sec-websocket-protocol'), 'owned-fixture')
   const callback = nativeRequest(new Request('https://app.example.test/mikka/api/agents/.well-known/workflow/v1/flow'))
-  assert.equal(new URL(callback.url).pathname, '/.well-known/workflow/v1/flow')
+  assert.equal(callback, null)
   assert.equal(new URL(nativeRequest(new Request('https://app.example.test/mikka/api/webhooks/slack')).url).pathname, '/eve/v1/slack')
   for (const path of ['/mikka/api/auth/session', '/.well-known/workflow/v1/flow',
     '/mikka/api/agents/eve/v1/%2fprivate', '/mikka/api/agents/another-service']) {

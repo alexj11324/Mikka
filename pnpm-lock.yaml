@@ -533,6 +533,9 @@ importers:
 
   apps/eve:
     dependencies:
+      '@mikka/eve-cloudflare-world':
+        specifier: workspace:*
+        version: link:../../packages/eve-cloudflare-world
       eve:
         specifier: 1.0.0-rc.9
         version: 1.0.0-rc.9(c629b6f9c4762629636b6743fc5a3ca8)
