@@ -5,7 +5,10 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { connect as connectHttp2, createServer as createHttp2Server } from 'node:http2'
+import { once } from 'node:events'
 import test from 'node:test'
+import { toNodeHandler } from 'srvx/node'
 import { build } from 'esbuild'
 import type { ServerRequest } from 'srvx'
 import { browserRpcOrigin } from '../../../lib/browser-rpc/handler'
@@ -203,6 +206,35 @@ test('legacy domain remains a fixed redirect without reaching application data',
     assert.equal(result.headers.location, 'https://app.aspectlylabs.com/mikka/settings?section=account')
     assert.equal(invoked, false)
   })
+})
+
+test('a real HTTP/2 client can discover the configured self-host installation', { timeout: 10_000 }, async () => {
+  const server = createHttp2Server()
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address()
+  assert.ok(address && typeof address === 'object')
+  const origin = `http://127.0.0.1:${address.port}`
+  server.on('request', toNodeHandler(withNodeRequestAuthority(req => new Response(req.url), { origin })))
+  const client = connectHttp2(origin)
+  try {
+    const get = async (headers: Record<string, string> = {}) => {
+      const stream = client.request({ ':path': '/mikka/api/version', ...headers })
+      const head = once(stream, 'response')
+      stream.end()
+      let body = ''
+      for await (const chunk of stream) body += chunk
+      return { status: (await head)[0][':status'], body }
+    }
+    const accepted = { status: 200, body: origin + '/mikka/api/version' }
+    assert.deepEqual(await get(), accepted)
+    assert.deepEqual(await get({ host: address.address + ':' + address.port }), accepted)
+    assert.equal((await get({ ':authority': 'other.example.test' })).status, 400)
+    assert.equal((await get({ host: 'other.example.test' })).status, 400)
+  } finally {
+    client.destroy()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
 })
 
 test('self-hosted Node accepts only its configured HTTPS authority behind a proxy', { timeout: 10_000 }, async () => {
