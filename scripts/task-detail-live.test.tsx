@@ -44,6 +44,7 @@ let readViewerId = owner
 let knownVersions: (string | undefined)[]
 let documentHold: Promise<void> | null = null
 let documentWaits = 0
+let latestDocumentUpdate: string | undefined
 let writes: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0][]
 mock.module(at('app/actions/issues.ts'), { namedExports: {
   pollIssue: async (id: string, known?: string) => {
@@ -66,9 +67,10 @@ mock.module(at('app/actions/issues.ts'), { namedExports: {
   },
 } })
 mock.module(at('app/actions/collaboration.ts'), { namedExports: {
-  exchangeDocument: async (input: { id: string; seed: string; known?: string }) => {
+  exchangeDocument: async (input: { id: string; seed: string; known?: string; update?: string }) => {
     assert.equal(input.id, issueId)
     documentReads++
+    if (input.update) latestDocumentUpdate = input.update
     if (documentHold) { documentWaits++; await documentHold }
     return { ...(!input.known ? { update: input.seed } : {}), version: 'fixture-document', workspaceId }
   },
@@ -93,8 +95,8 @@ mock.module(at('components/workspace/issue-detail-properties.tsx'), { namedExpor
 mock.module(at('components/workspace/issue-editor.tsx'), { namedExports: {
   // An empty valid Yjs seed keeps the real DocumentSync lifecycle in this test.
   createDocumentSeed: () => new Uint8Array([0, 0]),
-  IssueEditor: ({ content, disabled, onChange, activity, afterDescription }: { content: JSONContent; disabled: boolean; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
-    <><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}<section data-activity="">{activity}</section></>,
+  IssueEditor: ({ content, sharedDoc, disabled, onChange, activity, afterDescription }: { sharedDoc?: import('yjs').Doc; content: JSONContent; disabled: boolean; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
+    <><button data-discussion-write="" disabled={disabled} onClick={() => sharedDoc?.getMap('threads').set('fixture-comment', 'Only a discussion changed')}>Comment</button><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}<section data-activity="">{activity}</section></>,
 } })
 
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })
@@ -146,7 +148,7 @@ beforeEach(() => {
   notices.clear(); dirty = false
   stored = { id: issueId, userId: owner, title: 'Accepted report', content: body('Original description'), status: 'review', priority: 'normal', revision: 1,
     identifier: 'ALEX-60', metadata: {}, createdAt: new Date('2026-11-05T08:00:00Z'), updatedAt: new Date('2026-11-05T08:00:00Z') } as IssueView
-  versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; flush = null; cache = new Map(); sockets.length = 0
+  versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; latestDocumentUpdate = undefined; flush = null; cache = new Map(); sockets.length = 0
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (input, options) => {
@@ -392,6 +394,29 @@ for (const refusal of ['workspaceAccessDenied', 'foreign-viewer'] as const) test
     assert.equal(versionReads, before.versionReads)
     assert.equal(writes.length, 0)
   } finally { release() }
+})
+
+test('a comment-only Yjs change flushes without a title or body edit', async () => {
+  await mount()
+  await act(async () => document.querySelector<HTMLButtonElement>('[data-discussion-write]')!.click())
+  await until(() => Boolean(latestDocumentUpdate && Buffer.from(latestDocumentUpdate, 'base64').includes(Buffer.from('Only a discussion changed'))), 'the discussion reached the document writer')
+  assert.equal(writes.length, 0, 'saving a discussion cannot create a task revision')
+})
+
+test('a confirmed read-only grant shows activity without enabling title, body or document writes', async () => {
+  stored = { ...stored, workspaceId, canSteer: false, readOnlyDiscussions: [] }
+  await mount()
+  assert.equal(title().readOnly, true)
+  assert.equal(description().readOnly, true)
+  assert.equal(documentReads, 0)
+  await input(title(), 'Must not save')
+  await act(async () => { assert.equal(await flush!(), true) })
+  assert.equal(writes.length, 0)
+  assert.equal(title().value, stored.title)
+  accepted()
+  await emit()
+  await until(() => properties().textContent === 'done:normal', 'a read grant continues to observe the task')
+  assert.equal(documentReads, 0)
 })
 
 test('a committed acceptance event refreshes the mounted task status and activity without reload', { timeout: 10_000 }, async () => {

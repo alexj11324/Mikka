@@ -42,6 +42,7 @@ export type FramedTaskProps = {
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
   label: string
   preview: boolean
+  locked: boolean
   origin: string
   navigation: IssueDetailNavigation
   onClose: () => void
@@ -90,7 +91,7 @@ const REOPENED = 'todo'
  * and actions. The layer draws them with its own controls; the editor, 验收, an open thread and the dialogs stay Mikka's.
  */
 export function FramedTask(props: FramedTaskProps) {
-  const { Frame, task, preview, userId, onOpen, getCurrent, adopt } = props
+  const { Frame, task, preview, locked, userId, onOpen, getCurrent, adopt } = props
   const t = useTranslations('IssueDetail')
   const tCommon = useTranslations('Common')
   const tFrame = useTranslations('IssueDetail.frame')
@@ -108,23 +109,23 @@ export function FramedTask(props: FramedTaskProps) {
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
 
-  const menu = useIssueDetailMenu({ task, userId, disabled: preview, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority })
+  const menu = useIssueDetailMenu({ task, userId, disabled: locked, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority })
 
   // The property choices are read when a menu opens, as the community page reads them when its popover opens.
   const [wantOptions, setWantOptions] = useState(false)
-  const { data: options, error: optionsError, mutate: reloadOptions } = useSWR(wantOptions && !preview ? ['issue-property-options', task.id] : null, () => getIssuePropertyOptions(task.id))
+  const { data: options, error: optionsError, mutate: reloadOptions } = useSWR(wantOptions && !locked ? ['issue-property-options', task.id] : null, () => getIssuePropertyOptions(task.id))
   const loadOptions = () => setWantOptions(true)
-  const metadata = useIssueMetadataSave({ task, disabled: preview, onSaved: adopt, onBusyChange: props.onMetadataBusy })
+  const metadata = useIssueMetadataSave({ task, disabled: locked, onSaved: adopt, onBusyChange: props.onMetadataBusy })
   const [teamChoice, setTeamChoice] = useState<ExplicitTeamChoice | null>(null)
-  const scope = useIssueScope({ task, disabled: preview, onSaved: adopt, teamChoice })
-  const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: preview, onChosen: (issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null) })
+  const scope = useIssueScope({ task, disabled: locked, onSaved: adopt, teamChoice })
+  const team = useIssueTeam({ issueId: task.id, viewerId: userId, disabled: locked, onChosen: (issueId, teamId) => setTeamChoice(teamId ? { issueId, teamId, selectionId: crypto.randomUUID() } : null) })
   const { data: threads } = useIssueThreads(task.id, !preview)
-  const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: preview, enabled: !preview })
+  const connections = useIssueConnections({ liveWorkspaceId: props.liveWorkspaceId, viewerId: userId, task, getCurrent, onSaved: adopt, disabled: locked, enabled: !preview })
 
   const loading = (text = tCommon('loading')): TaskMenuItem[] => optionsError
     ? [{ id: 'reload', label: tCommon('retry'), onSelect: () => { void reloadOptions() } }]
     : [{ id: 'loading', label: text }]
-  const busy = preview || metadata.pending
+  const busy = locked || metadata.pending
   const meta = task.metadata
 
   // 负责人 is a person; a Bot the task is handed to has its own line under it (R-60).
@@ -153,14 +154,14 @@ export function FramedTask(props: FramedTaskProps) {
   ]
 
   const rows: TaskDetailRow[] = [
-    { id: 'status', label: tIssue('statusLabel'), disabled: preview, value: { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } }, state: localTaskState({ status: props.status, metadata: meta }, newestThreadRun(threads)), menu: ISSUE_STATUSES.map(item => ({ id: item.value, label: statusLabel(item.value), mark: { kind: 'status', value: item.value }, checked: item.value === props.status, onSelect: () => props.onStatus(item.value) })) },
-    { id: 'priority', label: tIssue('priorityLabel'), disabled: preview, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
-    { id: 'scope', label: scope.judgedByAgent.label, disabled: preview || scope.pending, value: { text: scope.current, mark: { kind: 'icon', icon: task.scope === 'workspace' ? 'workspace' : 'personal' } }, note: scope.judgedByAgent.shown ? scope.judgedByAgent.text : undefined, menu: scope.options.map(option => ({ id: option.value, label: option.label, mark: { kind: 'icon', icon: option.value === 'workspace' ? 'workspace' : 'personal' }, checked: option.value === task.scope, onSelect: () => { void scope.change(option.value) } })) },
+    { id: 'status', label: tIssue('statusLabel'), disabled: locked, value: { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } }, state: localTaskState({ status: props.status, metadata: meta }, newestThreadRun(threads)), menu: ISSUE_STATUSES.map(item => ({ id: item.value, label: statusLabel(item.value), mark: { kind: 'status', value: item.value }, checked: item.value === props.status, onSelect: () => props.onStatus(item.value) })) },
+    { id: 'priority', label: tIssue('priorityLabel'), disabled: locked, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
+    { id: 'scope', label: scope.judgedByAgent.label, disabled: locked || scope.pending, value: { text: scope.current, mark: { kind: 'icon', icon: task.scope === 'workspace' ? 'workspace' : 'personal' } }, note: scope.judgedByAgent.shown ? scope.judgedByAgent.text : undefined, menu: scope.options.map(option => ({ id: option.value, label: option.label, mark: { kind: 'icon', icon: option.value === 'workspace' ? 'workspace' : 'personal' }, checked: option.value === task.scope, onSelect: () => { void scope.change(option.value) } })) },
     { id: 'assignee', label: tProperty('assignee'), disabled: busy, onOpen: loadOptions, value: member ? { text: member.name, mark: { kind: 'person', name: member.name }, aria: tAssignee('aria', { name: member.name }) } : { text: tAssignee('unassignedLabel'), mark: { kind: 'icon', icon: 'person' }, muted: true, aria: tAssignee('aria', { name: tAssignee('unassigned') }) }, menu: assigneeItems },
     ...delegate ? [{ id: 'delegate', label: tFrame('delegate'), value: { text: delegate, aria: tAssignee('delegatedTo', { name: delegate }), mark: { kind: 'node', node: delegateThread ? <BotAvatar {...(delegateThread.bot ?? COORDINATOR_AVATAR)} size="row" still /> : <AgentSphere name={delegate} compact /> } } } satisfies TaskDetailRow] : [],
     { id: 'labels', label: tProperty('labels'), disabled: busy, onOpen: loadOptions, chips: meta.labels.map(label => ({ id: label.name, text: label.name, title: label.name })), add: { label: tProperty('editLabels'), menu: labelItems } },
     { id: 'project', label: tProperty('project'), disabled: busy, onOpen: loadOptions, value: { text: meta.project ?? tProperty('addToProject'), mark: { kind: 'icon', icon: 'project' }, muted: !meta.project, title: meta.project ?? undefined, aria: tProperty('projectAria', { name: meta.project ?? tProperty('unset') }) }, menu: projectItems },
-    { id: 'team', label: team.label, disabled: team.unavailable, value: { text: team.currentLabel, mark: { kind: 'icon', icon: 'team' }, muted: !team.selected, title: team.currentLabel }, menu: team.choices.map(choice => ({ id: choice.value, label: choice.label, mark: { kind: 'icon', icon: 'team' }, checked: choice.value === (team.selected || 'none'), onSelect: () => {
+    { id: 'team', label: team.label, disabled: locked || team.unavailable, value: { text: team.currentLabel, mark: { kind: 'icon', icon: 'team' }, muted: !team.selected, title: team.currentLabel }, menu: team.choices.map(choice => ({ id: choice.value, label: choice.label, mark: { kind: 'icon', icon: 'team' }, checked: choice.value === (team.selected || 'none'), onSelect: () => {
       const value = choice.value === 'none' ? '' : choice.value
       // On reopening a personal task, the stored team still needs an explicit
       // successful selection before it can be used as the sharing destination.
@@ -168,11 +169,11 @@ export function FramedTask(props: FramedTaskProps) {
       setTeamChoice(null)
       void team.save(value)
     } })) },
-    ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: preview, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
-    ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: preview, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
-    ...meta.pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: preview, chips: meta.pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
+    ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
+    ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
+    ...meta.pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: locked, chips: meta.pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
     ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
-      id: `relation-${group.kind}`, label: group.label, disabled: connections.pending,
+      id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,
       chips: group.items.map(row => ({
         id: row.id, text: [row.identifier, row.title].filter(Boolean).join(' '), title: row.title,
         mark: { kind: 'icon', icon: group.kind === 'parent' ? 'parent' : group.kind === 'blockedBy' || group.kind === 'blocks' ? 'flag' : 'link' },
@@ -200,7 +201,7 @@ export function FramedTask(props: FramedTaskProps) {
   const creating = useRef(false)
   // The same create as 创建子任务… in the ⋯ menu (IssueDetailActions), with the title typed in the line.
   async function createChild(title: string) {
-    if (creating.current || preview || !title.trim()) return false
+    if (creating.current || locked || !title.trim()) return false
     creating.current = true
     try {
       const latest = await getCurrent()
@@ -246,7 +247,7 @@ export function FramedTask(props: FramedTaskProps) {
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
     acceptance={props.acceptance}
     copyLink={menu.copyLink}
-    subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: createChild, disabled: connections.pending, failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
+    subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: createChild, disabled: locked || connections.pending, failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems,
       failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : []],
@@ -256,7 +257,7 @@ export function FramedTask(props: FramedTaskProps) {
     rowsError={metadata.error || team.failed}
     meta={[task.identifier, tFrame('created', { when: format.relativeTime(created, now) })].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
-    dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={preview} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
+    dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />
 }
 

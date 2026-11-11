@@ -11,10 +11,12 @@ import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { currentUser } from '@/lib/acting-user'
 import { accessibleTeamScopes } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
+import type { ThreadRecord } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { agents, issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
+import { agents, issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
@@ -49,7 +51,7 @@ import { cacheReadAction } from '@/lib/cache-read-action'
 import { requireTaskWorkspace, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 
 type IssueRow = typeof issues.$inferSelect
-export type IssueView = Awaited<ReturnType<typeof issueView<IssueRow>>>
+export type IssueView = Awaited<ReturnType<typeof issueView<IssueRow>>> & { canSteer?: boolean; readOnlyDiscussions?: ThreadRecord[] }
 
 async function getUserId() {
   const user = await currentUser()
@@ -213,7 +215,7 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
     const { issue, user } = await requireIssueAccessWithoutBody(id)
     if (!issue.issuedIdentifier) await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope }])
     return db.transaction(async tx => {
-      const [locked] = await tx.select({ ...issueSummaryColumns, content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
+      const [locked] = await tx.select({ ...issueSummaryColumns, canSteer: resourceAccessPredicate(user.id, issues.workspaceId, 'task', issues.id, 'canSteer'), content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
       await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // Same unavailable task as the entry ACL, when deletion committed before
@@ -224,6 +226,15 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
       if (known === version) return { viewerId: user.id, version, unchanged: true as const }
       const [body] = await tx.select({ content: issues.content }).from(issues).where(eq(issues.id, id))
       const { bodyVersion: _bodyVersion, ...view } = summary
+      if (!view.canSteer) {
+        // A reader may view discussions without sending the editor's initial Yjs seed or an update.
+        const [document] = await tx.select({ state: issueDocuments.state }).from(issueDocuments)
+          .where(and(eq(issueDocuments.issueId, id), eq(issueDocuments.userId, issue.userId)))
+        const { loadIssueDocument, readIssueThreads } = await import('@/lib/linear-sync/document')
+        const doc = document ? loadIssueDocument(document.state, body.content) : null
+        try { return { viewerId: user.id, version, issue: { ...view, content: body.content, readOnlyDiscussions: doc ? readIssueThreads(doc) : [] } } }
+        finally { doc?.destroy() }
+      }
       return { viewerId: user.id, version, issue: { ...view, content: body.content } }
     })
   }))
