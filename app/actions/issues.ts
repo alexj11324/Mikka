@@ -107,10 +107,10 @@ async function readIssues(workspaceId?: string, known?: string, previous?: ListP
 }
 
 export async function listWorkspaceTaskPage(input: TaskListPageInput) {
-  const { workspaceId, after } = taskListPageInput.parse(input)
+  const { workspaceId, after, dispatchedBy } = taskListPageInput.parse(input)
   if (await effectiveRequestWorkspace(await requireUser()) !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   try {
-    const snapshot = await withDatabaseOperation('/actions/issues/page', () => readIssueSnapshot(workspaceId, undefined, undefined, after))
+    const snapshot = await withDatabaseOperation('/actions/issues/page', () => readIssueSnapshot(workspaceId, undefined, undefined, after, dispatchedBy))
     const items = snapshot.items ?? []
     return { workspaceId, items, next: nextTaskListCursor(items), reset: false }
   } catch (error) {
@@ -119,7 +119,7 @@ export async function listWorkspaceTaskPage(input: TaskListPageInput) {
   }
 }
 
-async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[], after?: TaskListPageInput['after']) {
+async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[], after?: TaskListPageInput['after'], dispatchedBy?: string) {
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
   // Before the list: the selected workspace's key and the home's key, both of which this list listens to.
@@ -153,18 +153,23 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   }
   // The predicate binds every candidate to this one authorized Workspace.
   // Restore that known ID in the DTO instead of transferring it per row.
+  // Membership survives a later Run by a different Bot. Ask only about
+  // the reader's own authorized dispatch history in this exact workspace.
+  const dispatched = dispatchedBy ? sql`exists (select 1 from agent_runs r join bots b on b.id=r."botId"
+    and b."ownerId"=${userId} and b."workspaceId"=${context.workspace.id}
+    where r."userId"=${userId} and r."workspaceId"=${context.workspace.id} and r."issueId"=${issues.id} and r.source is distinct from 'mcp' and b.id=${dispatchedBy})` : undefined
   let continuation
   if (after) {
     // JavaScript timestamps carry milliseconds; PostgreSQL orders the exact
     // microsecond and UUID. Re-read the visible anchor before continuing.
     const [anchor] = await db.select({ time: sql<string>`${issues.updatedAt}::text` }).from(issues)
       .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(visibility.predicate, eq(issues.id, after.id), eq(issues.workspaceId, context.workspace.id),
+      .where(and(visibility.predicate, dispatched, eq(issues.id, after.id), eq(issues.workspaceId, context.workspace.id),
         sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).limit(1)
     if (!anchor || new Date(anchor.time).getTime() !== Date.parse(after.updatedAt)) throw new ActionFailureError('issueStale')
     continuation = sql`(${issues.updatedAt}, ${issues.id}) < (${anchor.time}::timestamptz, ${after.id}::uuid)`
   }
-  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
+  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
   // Issued identifiers are part of the Task row and do not follow Team,
   // personal-prefix or provider renames. Current human profile changes still
   // invalidate responsibility without rewriting historical Task metadata.

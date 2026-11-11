@@ -213,7 +213,7 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   const threadsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:threads:${query ?? ''}`, shown === 'threads' && !threadsLoading)
   const prsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:prs:${query ?? ''}`, shown === 'prs')
 
-  const tasks = <BotTasks stateKey={stateKey} threads={ownThreads} shown={filter(ownThreads)} issues={issues} query={query ?? ''} loading={threadsLoading} onOpenThread={onOpenThread} onOpenTask={id => { onOpenTask?.(); openTask(id) }} />
+  const tasks = <BotTasks workspaceId={workspaceId} botId={chatBotId} stateKey={stateKey} threads={ownThreads} shown={filter(ownThreads)} issues={issues} query={query ?? ''} loading={threadsLoading} onOpenThread={onOpenThread} onOpenTask={id => { onOpenTask?.(); openTask(id) }} />
   // A UI layer may draw the 概览 tab's body (the bot-overview slot); the tab is its header.
   const OverviewView = frameTab ? botOverviewSlot.BotOverview ?? null : null
   if (OverviewView) return <BotOverviewBody View={OverviewView} conversation={conversation} workspaceId={workspaceId} threads={ownThreads} issues={issues} tasks={tasks}
