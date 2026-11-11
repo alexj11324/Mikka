@@ -54,11 +54,13 @@ export async function dispatchVerifiedGitHubWebhook(event: string | null, rawBod
       if (notifications.length) await (await import('@/lib/suggestions/store')).ingestNotifications(notifications)
     }
   }
-  if (options.defer) afterJob('after:github-webhook', async () => {
+  // A suite-only delivery already persisted its wake. It has no other work
+  // and should not allocate an empty after-response job.
+  if (options.defer && (refresh || review || merged || hasNotifications)) afterJob('after:github-webhook', async () => {
     try { await work() }
     catch (error) { console.error(JSON.stringify({ event: 'github_webhook_dispatch_failed', causeName: error instanceof Error ? error.name : 'unknown' })) }
   })
-  else await work()
+  else if (!options.defer) await work()
   noteLogOutcome('work')
   return new Response(null, { status: 202, headers: noStore })
 }
