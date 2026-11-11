@@ -1881,6 +1881,9 @@
       "cloud": {
         "title": "Mikka Cloud",
         "keywords": "cloud Mikka 云服务 自托管 self-hosted"
+      },
+      "environments": {
+        "title": "Run environments"
       }
     },
     "appearance": {
@@ -3208,6 +3211,32 @@
       "pushContent": "Notification content",
       "pushFull": "Full message",
       "pushReminder": "Reminder only"
+    },
+    "environments": {
+      "archive": "Archive",
+      "title": "Run environments",
+      "add": "Add environment",
+      "empty": "No run environments.",
+      "version": "Version {revision}",
+      "editNamed": "Edit {name}",
+      "archiveNamed": "Archive {name}?",
+      "edit": "Edit environment",
+      "projectDefaults": "Project defaults",
+      "none": "No default",
+      "archived": "Archived environment",
+      "defaultFor": "Default environment for {name}",
+      "name": "Name",
+      "runtime": "Run location",
+      "setup": "Setup command",
+      "invalid": "Check the environment settings.",
+      "runtimes": {
+        "any": "Any location",
+        "local": "Local",
+        "cloud": "Cloud"
+      },
+      "restore": "Restore",
+      "copyFiles": "Files to copy into the worktree, one per line",
+      "approveSetup": "Run this setup when a new worktree starts"
     }
   },
   "TelegramBot": {

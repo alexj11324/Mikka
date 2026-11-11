@@ -517,3 +517,9 @@ test('desktop forwards eve protocol headers and fences NDJSON bytes at account/w
   assert.equal((await reader.read()).done, true)
   assert.equal(cancelled, true)
 })
+
+test('run environment settings forwarding permits only the exact read route', () => {
+  assert.equal(allowedApiPath('/api/settings/environments', 'GET'), true)
+  assert.equal(allowedApiPath('/api/settings/environments/extra', 'GET'), false)
+  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath('/api/settings/environments', method), false)
+})

@@ -36,7 +36,7 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/version$/, ['GET']], [/^\/api\/auth\/device$/, ['GET']],
   [/^\/api\/auth\/device\/(approve|deny)$/, ['POST']],
   [/^\/api\/(workspace|workspace\/switcher|search|issues\/search|skills|skills\/search|teams\/directory)$/, ['GET']],
-  [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys)$/, ['GET']],
+  [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys|environments)$/, ['GET']],
   [/^\/api\/agent-cli-policy$/, ['GET', 'POST']],
   [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
   [/^\/api\/(coordinator\/(?:runtime|messages|attention))$/, ['GET', 'POST', 'DELETE']],
@@ -72,7 +72,7 @@ export function normalizedRendererPath(value: string): string | null {
 
 export function allowedApiPath(path: string, method: string): boolean {
   if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
-  if (path === '/api/settings/issue-prefix') return method === 'GET'
+  if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'

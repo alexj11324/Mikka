@@ -40,6 +40,10 @@ export const projectResourcesInput = z.object({
   .refine(value => new Set(value.repositories.map(item => item.repositoryKey)).size === value.repositories.length)
   .refine(value => !value.defaultEnvironmentId || value.environmentIds.includes(value.defaultEnvironmentId))
   .refine(value => value.repositories.every(item => !item.environmentId || value.environmentIds.includes(item.environmentId)))
+export const projectDefaultEnvironmentInput = z.object({
+  workspaceId: z.uuid(), projectId: z.uuid(), revision: z.number().int().positive(),
+  environmentId: z.uuid().nullable(),
+}).strict()
 export const workspaceRepositoryPolicyInput = z.object({
   workspaceId: z.uuid(), revision: z.number().int().nonnegative(),
   mode: z.enum(['inherit', 'restricted']), repositoryKeys: z.array(projectRepositoryKey).max(500),

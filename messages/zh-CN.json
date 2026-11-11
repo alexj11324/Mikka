@@ -1881,6 +1881,9 @@
       "cloud": {
         "title": "Mikka 云服务",
         "keywords": "cloud Mikka 云服务 自托管 self-hosted"
+      },
+      "environments": {
+        "title": "运行环境"
       }
     },
     "appearance": {
@@ -3208,6 +3211,32 @@
       "pushContent": "推送内容",
       "pushFull": "完整",
       "pushReminder": "只提醒"
+    },
+    "environments": {
+      "archive": "归档",
+      "title": "运行环境",
+      "add": "添加环境",
+      "empty": "暂无运行环境。",
+      "version": "版本 {revision}",
+      "editNamed": "编辑 {name}",
+      "archiveNamed": "归档 {name}？",
+      "edit": "编辑环境",
+      "projectDefaults": "项目默认环境",
+      "none": "无默认环境",
+      "archived": "已归档环境",
+      "defaultFor": "{name} 的默认环境",
+      "name": "名称",
+      "runtime": "运行位置",
+      "setup": "准备命令",
+      "invalid": "请检查环境设置。",
+      "runtimes": {
+        "any": "任意位置",
+        "local": "本地",
+        "cloud": "云端"
+      },
+      "restore": "恢复",
+      "copyFiles": "复制到工作树的文件，每行一个",
+      "approveSetup": "新工作树启动时运行这些准备步骤"
     }
   },
   "TelegramBot": {
