@@ -18,7 +18,7 @@ type ServiceIdentity = { id: string; workspaceId: string; name: string; enabled:
 type AuditAction = 'created' | 'renamed' | 'disabled' | 'restored'
 const publicColumns = sql`id, "workspaceId", name, enabled, revision`
 
-function asAdmin<T>(workspaceId: string, actor: EnterpriseReader, work: (tx: WorkspaceTransaction, actorName: string) => Promise<T>) {
+export function withServiceIdentityAdmin<T>(workspaceId: string, actor: EnterpriseReader, work: (tx: WorkspaceTransaction, actorName: string) => Promise<T>) {
   return workspaceDb.transaction(async tx => {
     const { workspace, membership } = await requireWorkspace(tx, workspaceId, actor.id, true, actor[enterprisePrincipal])
     if (workspace.kind !== 'team') throw new GovernanceError('personal_workspace')
@@ -36,7 +36,7 @@ async function recordChange(tx: WorkspaceTransaction, identity: ServiceIdentity,
 
 export function listServiceIdentities(workspaceId: string, actor: EnterpriseReader, after: string | null) {
   const cursor = z.uuid().nullable().parse(after)
-  return asAdmin(workspaceId, actor, async tx => {
+  return withServiceIdentityAdmin(workspaceId, actor, async tx => {
     const { rows } = await tx.execute<ServiceIdentity>(sql`SELECT ${publicColumns} FROM mikka_workspace_service_identities
       WHERE "workspaceId"=${workspaceId}::uuid AND (${cursor}::uuid IS NULL OR id>${cursor}::uuid) ORDER BY id LIMIT 101`)
     const identities = rows.slice(0, 100)
@@ -46,7 +46,7 @@ export function listServiceIdentities(workspaceId: string, actor: EnterpriseRead
 
 export function getServiceIdentity(workspaceId: string, actor: EnterpriseReader, identityId: string) {
   z.uuid().parse(identityId)
-  return asAdmin(workspaceId, actor, async tx => {
+  return withServiceIdentityAdmin(workspaceId, actor, async tx => {
     const { rows: [identity] } = await tx.execute<ServiceIdentity>(sql`SELECT ${publicColumns} FROM mikka_workspace_service_identities
       WHERE "workspaceId"=${workspaceId}::uuid AND id=${identityId}::uuid`)
     if (!identity) throw new GovernanceError('not_found')
@@ -56,7 +56,7 @@ export function getServiceIdentity(workspaceId: string, actor: EnterpriseReader,
 
 export function createServiceIdentity(workspaceId: string, actor: EnterpriseReader, input: unknown) {
   const value = createInput.parse(input)
-  return asAdmin(workspaceId, actor, async (tx, actorName) => {
+  return withServiceIdentityAdmin(workspaceId, actor, async (tx, actorName) => {
     const { rows: [created] } = await tx.execute<ServiceIdentity>(sql`INSERT INTO mikka_workspace_service_identities
       ("workspaceId", name, "createdBy", "requestId", "initialName")
       VALUES (${workspaceId}::uuid, ${value.name}, ${actor.id}, ${value.requestId}::uuid, ${value.name})
@@ -76,7 +76,7 @@ export function createServiceIdentity(workspaceId: string, actor: EnterpriseRead
 export function updateServiceIdentity(workspaceId: string, actor: EnterpriseReader, identityId: string, input: unknown) {
   z.uuid().parse(identityId)
   const change = changeInput.parse(input)
-  return asAdmin(workspaceId, actor, async (tx, actorName) => {
+  return withServiceIdentityAdmin(workspaceId, actor, async (tx, actorName) => {
     const { rows: [current] } = await tx.execute<ServiceIdentity>(sql`SELECT ${publicColumns} FROM mikka_workspace_service_identities
       WHERE "workspaceId"=${workspaceId}::uuid AND id=${identityId}::uuid FOR UPDATE`)
     if (!current) throw new GovernanceError('not_found')

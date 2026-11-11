@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import { serve } from 'srvx/node'
 import { createApiHandler } from '../apps/api/src/application'
 import { routes } from '../apps/api/generated/routes'
-import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedProject, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('registered service identity routes enforce a fresh Workspace admin through real TCP and PostgreSQL', { skip: !dbUrl }, async t => {
   const [{ pool }, { workspacePool }, tokens] = await Promise.all([
@@ -16,6 +16,8 @@ test('registered service identity routes enforce a fresh Workspace admin through
   const tenants: string[] = []
   t.after(async () => {
     try {
+      await pool.query('DELETE FROM workspace_projects WHERE "workspaceId"=ANY($1::uuid[])', [tenants])
+      await pool.query('DELETE FROM resource_access_policies WHERE kind=\'project\' AND "workspaceId"=ANY($1::uuid[])', [tenants])
       await pool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [tenants])
       await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, member]])
     } finally { await Promise.all([pool.end(), workspacePool.end()]) }
@@ -84,9 +86,48 @@ test('registered service identity routes enforce a fresh Workspace admin through
   assert.equal(disabled.body.enabled, false)
   assert.deepEqual(await request(admin.token, first.id, 'POST', '', create), disabled)
   assert.deepEqual(await request(admin.token, first.id, 'PATCH', item, { action: 'disable', revision: 3 }), disabled)
+  const firstTeam = await seedTeam(pool, first.id, owner), otherTeam = await seedTeam(pool, second.id, owner)
+  const project = await seedProject(pool, owner, [{ teamId: firstTeam.id, workspaceId: first.id }])
+  const otherProject = await seedProject(pool, owner, [{ teamId: otherTeam.id, workspaceId: second.id }])
+  const privateProject = await seedProject(pool, member, [{ teamId: firstTeam.id, workspaceId: first.id }])
+  await pool.query("UPDATE resource_access_policies SET visibility='private' WHERE kind='project' AND id=$1", [privateProject])
+  const projectEndpoint = item + '/projects'
+  const assign = { expectedProjectIds: [], projectIds: [project], confirmExpansion: true }
+  assert.equal((await request(admin.token, first.id, 'PUT', projectEndpoint, assign)).body.error.detail, 'service_identity_disabled')
   const restored = await request(admin.token, first.id, 'PATCH', item, { action: 'restore', revision: 3 })
   assert.deepEqual(restored.body, { ...rename.body, enabled: true, revision: 4 })
   assert.equal((await request(admin.token, first.id, 'PATCH', item, { action: 'restore', revision: 4, subscription: 'personal' })).status, 400)
+
+  await t.test('project assignment uses the canonical ACL and preserves other principals', async () => {
+    const serviceAllowed = async (id: string, kind: string) => (await pool.query(
+      "SELECT mikka_resource_acl_allowed('service',$1,$2,'project',$3,$4) AS allowed", [identity.id, first.id, id, kind],
+    )).rows[0].allowed
+    assert.equal(await serviceAllowed(project, 'canReadContent'), false)
+    assert.deepEqual((await request(admin.token, first.id, 'GET', projectEndpoint)).body, { projectIds: [] })
+    assert.equal((await request(admin.token, first.id, 'PUT', projectEndpoint, { ...assign, confirmExpansion: false })).status, 409)
+    for (const unavailable of [otherProject, privateProject]) {
+      assert.equal((await request(admin.token, first.id, 'PUT', projectEndpoint, { ...assign, projectIds: [project, unavailable] })).status, 404)
+      assert.equal(await serviceAllowed(project, 'canReadContent'), false)
+    }
+    assert.equal((await request(ordinary.token, first.id, 'PUT', projectEndpoint, assign)).status, 403)
+    const result = await request({ cookie, origin }, first.id, 'PUT', projectEndpoint, assign)
+    assert.deepEqual(result, { status: 200, body: { projectIds: [project] } })
+    assert.equal(await serviceAllowed(project, 'canReadContent'), true)
+    assert.equal(await serviceAllowed(project, 'canUseCredential'), false)
+    assert.equal(await serviceAllowed(project, 'canSteer'), false)
+    assert.equal((await request(admin.token, first.id, 'PUT', projectEndpoint, assign)).status, 409)
+    assert.deepEqual((await request(admin.token, first.id, 'GET', projectEndpoint)).body, { projectIds: [project] })
+    await pool.query(`INSERT INTO resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+      VALUES ('project',$1,'account',$2,ARRAY['canReadContent'])`, [project, member])
+    assert.deepEqual((await request(admin.token, first.id, 'PUT', projectEndpoint, { expectedProjectIds: [project], projectIds: [] })).body, { projectIds: [] })
+    assert.equal(await serviceAllowed(project, 'canReadContent'), false)
+    const { rows: retained } = await pool.query(`SELECT "subjectId" FROM resource_access_grants
+      WHERE "resourceKind"='project' AND "resourceId"=$1 AND "subjectKind"='account'`, [project])
+    assert.deepEqual(retained, [{ subjectId: member }])
+    const { rows: events } = await pool.query(`SELECT action,"actorId" FROM resource_access_events WHERE "resourceKind"='project'
+      AND "resourceId"=$1 AND source='service_project_assignment' AND detail->>'subjectId'=$2 ORDER BY revision`, [project, identity.id])
+    assert.deepEqual(events, [{ action: 'grant_insert', actorId: owner }, { action: 'grant_delete', actorId: owner }])
+  })
 
   const { rows } = await pool.query('SELECT payload FROM workspace_audit_outbox WHERE "workspaceId"=$1 AND payload->>\'targetId\'=$2 ORDER BY "createdAt",id', [first.id, identity.id])
   assert.deepEqual(rows.map(row => row.payload.action), ['service_identity.created','service_identity.renamed','service_identity.disabled','service_identity.restored'])
