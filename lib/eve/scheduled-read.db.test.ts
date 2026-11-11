@@ -46,8 +46,8 @@ test('eve scheduled turns retain the persisted read-only authority and original 
     })
     await t.test('delegated Eve turns inherit read scope without settling the original occurrence', async () => {
       const { readFile } = await import('node:fs/promises')
-      await pool.query(await readFile(new URL('../../drizzle/20261111210100_eve_sessions.sql', import.meta.url), 'utf8'))
-      await pool.query(await readFile(new URL('../../drizzle/20261111210200_eve_settlements.sql', import.meta.url), 'utf8'))
+      await pool.query(await readFile(new URL('../../drizzle/20261112000100_eve_sessions.sql', import.meta.url), 'utf8'))
+      await pool.query(await readFile(new URL('../../drizzle/20261112000200_eve_settlements.sql', import.meta.url), 'utf8'))
       const { default: hook } = await import('../../apps/eve/agent/hooks/product')
       const { handleEveProductRequest } = await import('./product-gateway')
       const { emptySessionView } = await import('eve/events')
