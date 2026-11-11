@@ -116,3 +116,12 @@ Workflow SDK's atomic-start conformance suite and the workerd restart test.
 World. Enabling the Cloudflare World for a production Eve host requires complete
 official World event storage, Queue delivery, stream reads and writes, and live
 Eve acceptance under the release revision.
+
+The Cloudflare stream adapter implements the official v5 byte-stream methods
+over the community StreamDO's durable chunk format. The object key includes
+the run ID and stream name. Idle readers subscribe to a hibernatable change
+notification and read chunks only after a write or close. The Node reader
+uses a private service binding to release its subscription on cancellation,
+including when an idle HTTP client disconnects. Reconnects use the native
+chunk cursor. The named `WorldStreamService` entrypoint is for a trusted
+host binding and the default Worker accepts no stream requests.
