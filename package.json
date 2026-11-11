@@ -253,6 +253,7 @@
     "@chat-adapter/slack": "4.43.0",
     "@chat-adapter/state-pg": "^4.43.0",
     "@chat-adapter/telegram": "^4.43.0",
+    "@cloudflare/containers": "0.3.7",
     "@composio/core": "^0.26.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
