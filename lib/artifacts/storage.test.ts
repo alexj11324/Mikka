@@ -53,7 +53,7 @@ test('signed uploads retain exact byte length when a fetch adapter streams the b
 })
 
 test('S3 configuration signs a private bucket, round-trips bytes and keeps community files inline when absent', async t => {
-  const names = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_REGION', 'R2_ACCOUNT_ID', 'CLOUDFLARE_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'MIKKA_EDITION', 'VERCEL_ENV'] as const
+  const names = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_REGION', 'R2_ACCOUNT_ID', 'CLOUDFLARE_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'MIKKA_EDITION', 'VERCEL_ENV', 'NODE_ENV'] as const
   const previous = names.map(key => process.env[key])
   for (const key of names) delete process.env[key]
   t.after(() => names.forEach((key, index) => { if (previous[index] === undefined) delete process.env[key]; else process.env[key] = previous[index] }))
@@ -61,7 +61,12 @@ test('S3 configuration signs a private bucket, round-trips bytes and keeps commu
   assert.equal(artifactStorage(), 'inline')
   process.env.MIKKA_EDITION = 'cloud'
   assert.throws(() => artifactStorage(), /Object storage is not configured/)
+  Object.assign(process.env, { NODE_ENV: 'production', VERCEL_ENV: 'preview' })
+  assert.equal(artifactStorage(), 'inline', 'Vercel preview builds can use inline storage')
+  delete process.env.VERCEL_ENV
+  assert.throws(() => artifactStorage(), /Object storage is not configured/, 'a hosted Node production runtime requires the bucket')
   process.env.MIKKA_EDITION = 'community'
+  assert.equal(artifactStorage(), 'inline', 'self-hosted Node production can keep files in PostgreSQL')
   let stored = Buffer.alloc(0)
   const server = createServer(async (request, response) => {
     assert.equal(request.url, '/private-bucket/folder/test%20file')

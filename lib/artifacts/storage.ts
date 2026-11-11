@@ -28,7 +28,8 @@ function objectStorageConfig(): ObjectStorageConfig | null {
 export function artifactStorage(): 'r2' | 'inline' {
   // Keep the existing persisted 'r2' discriminator for every S3 transport.
   if (objectStorageConfig()) return 'r2'
-  if (isCloudEdition() && process.env.VERCEL_ENV === 'production') throw new Error('Object storage is not configured')
+  const deploymentEnvironment = process.env.VERCEL_ENV || process.env.NODE_ENV
+  if (isCloudEdition() && deploymentEnvironment === 'production') throw new Error('Object storage is not configured')
   return 'inline'
 }
 
