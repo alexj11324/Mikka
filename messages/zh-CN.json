@@ -6922,6 +6922,7 @@
     "modeAskText": "写操作按上面的设置，再看 Decision API；Agent 按运行权限",
     "modeReadOnlyText": "只读取和汇报，不做任何改动",
     "unsetText": "没有单独设置：应用写操作由 Decision API 判断；Agent 动作按运行策略",
+    "toolsComponentUnavailable": "此版本无法显示工具列表",
     "runTitle": "Agent 运行权限",
     "runNote": "云端的 Claude Code、Codex 运行时不逐条确认；这些动作按这里的设置执行"
   },
@@ -7035,7 +7036,7 @@
       "noCustom": "还没有自定义服务商",
       "defaultBadge": "默认",
       "readOnly": "暂时不能逐个停用模型",
-      "providerOn": "{on}/{total} 个可用",
+      "providerOn": "{on}/{total} 个已启用",
       "firstModel": "任务先用",
       "keyProvider": "服务商"
     }

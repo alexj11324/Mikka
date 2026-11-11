@@ -315,3 +315,43 @@ test('a native queued-to-running change is a different observation even before t
   assert.equal(first.counts.pending, 1); assert.equal(second.counts.pending, 1)
   assert.notEqual(first.fingerprint, second.fingerprint)
 })
+
+test('full logs use the exact repository native check link without fetching its destination', async t => {
+  const html = `https://github.com/${fullName}/runs/19?check_suite_focus=true`
+  const f = fixture(t, { runs: [run(19, 'failure', { html_url: html,
+    details_url: 'https://github.com/unrelated/repository/runs/19' })] })
+  assert.equal((await f.read()).checks[0]!.logUrl, html)
+  assert.equal(f.calls.length, 3)
+  f.data.runs[0]!.html_url = `https://github.com/${fullName}/actions/runs/71/job/19`
+  const next = await f.read()
+  assert.equal(next.checks[0]!.logUrl, f.data.runs[0]!.html_url)
+  assert.equal(f.calls.length, 6)
+  assert.notEqual(next.fingerprint, (await fixture(t, { runs: [run(19, 'failure', { html_url: html })] }).read()).fingerprint)
+})
+
+test('untrusted links never turn log text or another check into a full-log destination', async t => {
+  for (const value of [
+    'https://outside.invalid/log', 'http://github.com/fixture/review/runs/19',
+    'https://github.com.evil.invalid/fixture/review/runs/19', 'https://github.com/other/repository/runs/19',
+    `https://github.com/${fullName}/runs/20`, `https://github.com/${fullName}/pull/19`,
+    `https://github.com/${fullName}/runs/19?token=private`, `https://github.com/${fullName}/runs/19#private`,
+    `https://user:private@github.com/${fullName}/runs/19`, `https://github.com/${fullName}/runs/19?check_suite_focus=true&check_suite_focus=true`,
+  ]) await t.test(value.replace('user:private@', ''), async t => {
+    const f = fixture(t, { runs: [run(19, 'failure', { html_url: value, details_url: value,
+      output: { title: 'https://github.com/fixture/review/runs/19', summary: null, text: null } })] })
+    assert.equal((await f.read()).checks[0]!.logUrl, undefined)
+  })
+  await t.test('app-defined details cannot impersonate an unrelated Actions job', async t => {
+    const f = fixture(t, { runs: [run(19, 'failure', { details_url: `https://github.com/${fullName}/actions/runs/1/job/2` })] })
+    assert.equal((await f.read()).checks[0]!.logUrl, undefined)
+  })
+  await t.test('a canonical check details link remains a supported fallback', async t => {
+    const url = `https://github.com/${fullName}/runs/19`
+    const f = fixture(t, { runs: [run(19, 'failure', { details_url: url })] })
+    assert.equal((await f.read()).checks[0]!.logUrl, url)
+  })
+  await t.test('source masking also applies to the link', async t => {
+    const f = fixture(t, { runs: [run(19, 'failure', { html_url: `https://github.com/${fullName}/runs/19` })] })
+    assert.equal((await f.read([createSecretMasker([{ name: 'PRIVATE_REPOSITORY', value: fullName }])])).checks[0]!.logUrl, undefined)
+  })
+})

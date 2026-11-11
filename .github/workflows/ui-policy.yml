@@ -349,6 +349,9 @@ jobs:
           POSTGRES_USER: e2e
           POSTGRES_PASSWORD: e2e-local-only
           POSTGRES_DB: mikka_e2e
+          # Parallel full-schema DROP CASCADE needs more than PG17's default
+          # cluster-wide lock table. This applies only to the disposable service.
+          POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512
         ports:
           - 5432:5432
         options: >-
@@ -397,6 +400,7 @@ jobs:
             exit 0
           fi
           echo "No usable cached packages; installing ${packages[*]} from the Ubuntu mirror"
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
           apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
           sudo apt-get "${apt_options[@]}" update
           sudo apt-get clean

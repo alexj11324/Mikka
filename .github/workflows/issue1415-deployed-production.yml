@@ -49,6 +49,8 @@ jobs:
       - name: Run the original and explicit-target offline guards before credentials
         run: pnpm test:read-cache
 
+      - name: Prepare Ubuntu package mirrors
+        run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
       - name: Install Chromium before loading production credentials
         run: pnpm exec playwright install --with-deps --only-shell chromium
 
