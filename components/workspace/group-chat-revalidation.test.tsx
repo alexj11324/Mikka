@@ -137,7 +137,7 @@ test('a second open tab retires only memberships removed by a same-scope list re
   const removed: string[] = []
   function Observer({ ids, workspace }: { ids?: string[]; workspace: string }) {
     const groups = ids?.map(id => ({ id, title: id, workspaceId: workspace, createdAt: '', lastMessage: null }))
-    useGroupMembershipLoss('owner', workspace, groups, id => removed.push(id))
+    useGroupMembershipLoss('owner', workspace, groups, id => removed.push(id), async () => {})
     return null
   }
   const show = (ids: string[] | undefined, workspace = 'workspace') => act(async () => {
@@ -151,4 +151,33 @@ test('a second open tab retires only memberships removed by a same-scope list re
   assert.deepEqual(removed, ['one'])
   await show([], 'another-workspace')
   assert.deepEqual(removed, ['one'], 'changing Workspace cannot revoke the previous scope')
+})
+
+
+test('a confirmed local departure wakes only peer tabs of the same account and workspace', { timeout: 3_000 }, async () => {
+  const { BroadcastChannel } = await import('node:worker_threads')
+  const original = Object.getOwnPropertyDescriptor(window, 'BroadcastChannel')
+  Object.defineProperty(window, 'BroadcastChannel', { value: BroadcastChannel, configurable: true })
+  const refreshed: string[] = []
+  const removed: string[] = []
+  const replied = Promise.withResolvers<void>()
+  let announce = nothing
+  function Tab({ label, owner = 'owner', workspace = 'workspace' }: { label: string; owner?: string; workspace?: string }) {
+    const notify = useGroupMembershipLoss(owner, workspace, undefined, id => removed.push(id), async () => {
+      refreshed.push(label)
+      if (label === 'peer') replied.resolve()
+    })
+    if (label === 'sender') announce = notify
+    return null
+  }
+  try {
+    await act(async () => root.render(<><Tab label="sender" /><Tab label="peer" /><Tab label="other owner" owner="other" /><Tab label="other workspace" workspace="other" /></>))
+    announce()
+    await replied.promise
+    assert.deepEqual(refreshed, ['peer'])
+    assert.deepEqual(removed, [], 'a local notification alone cannot remove a group or draft')
+  } finally {
+    if (original) Object.defineProperty(window, 'BroadcastChannel', original)
+    else Reflect.deleteProperty(window, 'BroadcastChannel')
+  }
 })

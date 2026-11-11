@@ -239,7 +239,8 @@ test('a group absent from stale rows offers retry until a successful membership 
   await render()
 
   const alert = container.querySelector('[role="alert"]')
-  assert.ok(alert?.textContent?.includes('GroupChat.loadError'))
+  assert.ok(alert)
+  assert.ok(alert.textContent?.includes('GroupChat.loadError'))
   assert.doesNotMatch(container.textContent ?? '', /GroupChat\.notFound/)
   const retry = alert.querySelector('button')
   assert.ok(retry)
