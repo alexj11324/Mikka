@@ -28,7 +28,11 @@ export function useMemorySettings() {
       }, { optimisticData: current => next(current ?? shown), rollbackOnError: true, revalidate: false })
     } catch {
       setFailed(true)
+      return
     }
+    // A correction may merge facts and remove the edited id. Keep the server's
+    // surviving rows; a failed confirmation remains a read error, not a refused write.
+    await mutate().catch(() => undefined)
   }
 
   return {

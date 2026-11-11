@@ -16,15 +16,21 @@ const original = {
 } satisfies MemoryData
 let persisted: MemoryData
 let allowed: boolean
+let mergeInto: string | null
 let reads = 0
+let readFailure: Error | null
 const writes: string[] = []
 
 mock.module('@/app/actions/memory', { namedExports: {
-  getMemory: async () => { reads++; return structuredClone(persisted) },
+  getMemory: async () => { reads++; if (readFailure) throw readFailure; return structuredClone(persisted) },
   setMemory: async (enabled: boolean) => { persisted.enabled = enabled },
   updateFact: async (id: string, subject: string) => {
     writes.push('correct')
     if (!allowed) return false
+    if (mergeInto) {
+      persisted.facts = persisted.facts.filter(fact => fact.id !== id).map(fact => fact.id === mergeInto ? { ...fact, subject, userEdited: true } : fact)
+      return true
+    }
     persisted.facts = persisted.facts.map(fact => fact.id === id ? { ...fact, subject, userEdited: true } : fact)
     return true
   },
@@ -49,7 +55,7 @@ before(async () => {
   ;({ useMemorySettings } = await import('./use-memory-settings'))
 })
 beforeEach(() => {
-  persisted = structuredClone(original); allowed = false; reads = 0; writes.length = 0
+  persisted = structuredClone(original); allowed = false; mergeInto = null; reads = 0; readFailure = null; writes.length = 0
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container); root = createRoot(container)
 })
@@ -111,4 +117,30 @@ test('the memory switch still accepts its void action result', async () => {
   assert.equal(memory.failed, false)
   await act(async () => { await refresh() })
   assert.equal(memory.data?.enabled, false)
+})
+
+test('a correction merged into another saved fact renders the authoritative surviving row', async () => {
+  const survivor = 'c12c497e-3511-40a9-a357-aa0e410794aa'
+  persisted.facts.push({ ...persisted.facts[0], id: survivor, subject: 'Existing memory' })
+  await act(async () => root.render(<SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}><Probe /></SWRConfig>))
+  await settle()
+  allowed = true; mergeInto = survivor
+  await act(async () => { await memory.correct(factId, 'Existing memory') })
+  assert.deepEqual(memory.data?.facts.map(fact => fact.id), [survivor])
+  assert.equal(container.textContent, 'Existing memory')
+  await act(async () => { await refresh() })
+  assert.deepEqual(memory.data?.facts.map(fact => fact.id), [survivor])
+})
+
+test('a saved memory whose confirmation read fails exposes a read error without claiming the write was refused', async () => {
+  await render(); allowed = true
+  readFailure = new Error('Confirmation read failed')
+  await act(async () => { await memory.correct(factId, 'Saved correction') })
+  assert.equal(memory.failed, false)
+  assert.equal(memory.error, readFailure)
+  assert.equal(persisted.facts[0].subject, 'Saved correction')
+  readFailure = null
+  await act(async () => { await memory.reload() })
+  assert.equal(memory.error, undefined)
+  assert.equal(container.textContent, 'Saved correction')
 })
