@@ -2,9 +2,10 @@ import type { AgentExecution } from '../agent-kit/store'
 import { internalEveAuthorization } from './auth'
 import type { EveScope } from './scope'
 import type { ApprovalPrincipal } from './approval-principal'
+import type { TurnOutcome } from 'eve/events'
 
 export interface ProductCatalogueEntry { name:string; description:string; inputSchema:Record<string,unknown> }
-export type ProductOperation = {operation:'prepare'|'instructions'|'catalogue'|'approval'|'execute'|'finish';sessionId:string;turnId:string;executionId?:string;name?:string;input?:unknown;callId?:string;approvalResponder?:ApprovalPrincipal}
+export type ProductOperation = {operation:'prepare'|'instructions'|'catalogue'|'approval'|'execute'|'finish';sessionId:string;turnId:string;executionId?:string;name?:string;input?:unknown;callId?:string;approvalResponder?:ApprovalPrincipal;outcome?:TurnOutcome;messages?:unknown[]}
 export interface PreparedProductExecution {execution:AgentExecution|null;runtime:import('../subscription-model-snapshot').HostedRuntimeSnapshot}
 
 /** Business actions execute on the app host, whose Workflow World owns task jobs. */
