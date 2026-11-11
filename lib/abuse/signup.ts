@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { APIError } from 'better-auth'
 import { auditRequestContext } from '../audit/events'
 import { localTestAccountsMode } from '@mikka/protocol/local-test-mode'
+import { runtimeResourcePath } from '../runtime-resource'
 const domains = new Set(
   readFileSync(
-    join(process.cwd(), 'lib/abuse/data/disposable-email-domains.txt'),
+    runtimeResourcePath('lib/abuse/data/disposable-email-domains.txt'),
     'utf8',
   )
     .split(/\r?\n/)

@@ -9,8 +9,8 @@ export function projectEveTurn(view:SessionView,sessionId:string,turnId:string,o
   const toolCalls = calls(view,{turnId}).filter(call => call.kind === 'tool').map(call => ({ type:'tool-call',toolCallId:call.callId,toolName:call.name,input:call.input ?? {} }))
   const output = calls(view,{turnId}).filter(call => call.kind === 'tool' && ['completed','failed','cancelled','rejected'].includes(call.state)).map(call => ({type:'tool-result',toolCallId:call.callId,toolName:call.name,output:{type:'json',value:call.output ?? {error:call.error?.code ?? call.state}}}))
   return [
-    ...(output.length ? [{role:'tool',content:output}] : []),
     {role:'assistant',content:[...content,...toolCalls],mikkaStreamId:eveStreamId(sessionId,turnId),...(outcome === 'cancelled' ? {mikkaStopped:true} : {}),...(outcome === 'failed' ? {mikkaFailure:'turn_failed'} : {})},
+    ...(output.length ? [{role:'tool',content:output}] : []),
   ]
 }
 
