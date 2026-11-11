@@ -40,7 +40,7 @@ export function usePresentedTaskGroups(threads: readonly Thread[], issues: reado
 type EvidenceFolder = { factoryTaskId: string; extraCount: number }
 const EMPTY_FOLDERS: Record<string, EvidenceFolder> = {}
 
-export function useTaskEvidenceFolders(issues: readonly Pick<CollectionIssue, 'id' | 'workspaceId'>[], storedArtifactIds: readonly string[] | undefined) {
+export function useTaskEvidenceFolders(issues: readonly { id: string; workspaceId: string | null }[], storedArtifactIds: readonly string[] | undefined) {
   const scope = useLiveScope()
   const workspaceId = scope?.workspaceId
   const ids = useMemo(() => issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id).sort(), [issues, workspaceId])
