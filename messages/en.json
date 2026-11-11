@@ -3211,6 +3211,9 @@
     "linkCopied": "Invite link copied.",
     "copyManually": "Copy is unavailable; select the link and copy it manually.",
     "refreshFailed": "Invites were created, but the list did not refresh. Close this dialog and reload the page; do not create them again.",
+    "skippedTitle": "{count} address(es) were not invited",
+    "skippedAlreadyMember": "Already a member",
+    "skippedDuplicate": "Listed twice",
     "imported": "{count, plural, =1 {Imported 1 valid email} other {Imported # valid emails}}; {total} to invite.",
     "importedDuplicates": "{count, plural, =1 {Imported 1 valid email} other {Imported # valid emails}}, removed {duplicates} duplicate(s); {total} to invite.",
     "errors": {

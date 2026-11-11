@@ -3211,6 +3211,9 @@
     "linkCopied": "邀请链接已复制。",
     "copyManually": "自动复制不可用，请选中链接后手动复制。",
     "refreshFailed": "邀请已创建，但列表刷新失败。请关闭弹窗后刷新页面，不要重复创建。",
+    "skippedTitle": "{count} 个邮箱未受邀",
+    "skippedAlreadyMember": "已是成员",
+    "skippedDuplicate": "重复填写",
     "imported": "已导入 {count} 个有效邮箱；共 {total} 位待邀请。",
     "importedDuplicates": "已导入 {count} 个有效邮箱，已去重 {duplicates} 个；共 {total} 位待邀请。",
     "errors": {
