@@ -29,6 +29,11 @@ const currentWorkspace = () => {
   return held?.lease.active ? held : undefined
 }
 
+/** Deferred work keeps its database configuration, but owns a fresh transaction. */
+export function withoutWorkspaceTransaction<T>(work: () => T): T {
+  return heldWorkspace.exit(work)
+}
+
 /** Opaque identity of this active top-level Workspace transaction. Nested
  * savepoints and parallel async branches share it; a new transaction does not. */
 export function workspaceTransactionKey(): object | null {
