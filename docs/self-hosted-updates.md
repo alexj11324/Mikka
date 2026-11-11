@@ -205,7 +205,20 @@ For automatic upgrades set both executable hooks:
   exits zero only once all active work has finished. An absent or failing
   guard blocks the upgrade.
 
-A successful manual stable upgrade establishes the unattended baseline.
+A successful manual stable upgrade establishes the unattended baseline. For
+a legacy installation already running an official GHCR image, run this
+command once on the host to enroll the currently installed digest:
+
+```sh
+node scripts/self-hosted-update.mjs enroll
+```
+
+Enrollment pulls and checks the official digest and records its revision
+and migration inventory in `enrolled-image.json`. It pins the running
+image in `.env` and leaves the container running. Before the first automatic
+upgrade, the host checks that this exact image is still active and GitHub
+confirms its revision is an ancestor of the published release. A schema
+change still requires a manual upgrade.
 The host updater checks the release, digest, hooks, schema and backup
 requirements on each attempt. Unattended migrations require operator review.
 Inspect the host log, `pending-release.json` and `last-success.json` together.
@@ -237,7 +250,9 @@ read environment variable, add an entry keyed by its source path to
 `config/self-hosted-requirements.json`. Each entry records `mode` (`built-in`,
 `operator-configured`, or `optional-cloud`), `environment` (variable names),
 `behavior` (the operator-visible behavior or fallback) and `test` (an actual
-test path). Prove the declared behavior in the selected test suite. The CI
+test path). The image job executes the affected tests in community mode. For
+a test using a custom runner, also set `suite` to a `test:...` package script
+which executes that file. Stable releases rerun every declared test. The CI
 source comparison checks the declaration, environment names, new hard-coded
 hosted origins and test path. The Docker gate executes the installation
 acceptance separately. An irreversible migration always requires the

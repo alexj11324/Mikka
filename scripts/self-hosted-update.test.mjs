@@ -109,3 +109,19 @@ test('operator dotenv files must not be symlinks or non-regular targets', () => 
     assert.throws(() => ensureRegularEnvFile(linked), /ENV_NOT_REGULAR/)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
+
+test('first automatic release requires the pinned enrollment and a verified ancestor', async () => {
+  const { validateEnrollment } = await import('./self-hosted-update.mjs')
+  const current = { image: 'ghcr.io/alexj11324/mikka@sha256:' + before, revision: previous, migrations: before }
+  const release = { revision: next }
+  const ahead = async path => {
+    assert.equal(path, 'compare/' + previous + '...' + next + '?per_page=1')
+    return { status: 'ahead', merge_base_commit: { sha: previous } }
+  }
+  await validateEnrollment(current, current, release, ahead)
+  await assert.rejects(validateEnrollment(null, current, release, ahead), /BASELINE_REQUIRED/)
+  await assert.rejects(validateEnrollment(current, { ...current, image: 'other' }, release, ahead), /BASELINE_REQUIRED/)
+  for (const relation of [{ status: 'behind' }, { status: 'diverged' }, { status: 'ahead', merge_base_commit: { sha: next } }]) {
+    await assert.rejects(validateEnrollment(current, current, release, async () => relation), /DOWNGRADE_REFUSED/)
+  }
+})

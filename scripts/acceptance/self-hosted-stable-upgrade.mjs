@@ -2,9 +2,9 @@
 /** Post-publication acceptance. Only random, local Compose projects and their
  * own PG17 volumes are mutated. The manifest, images, HTTP and updater are real. */
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, watch, writeFileSync } from 'node:fs'
 import { createServer, request } from 'node:http'
 import { once } from 'node:events'
 import { createServer as createPortReservation } from 'node:net'
@@ -113,6 +113,132 @@ SELECT json_build_object('taskId',i.id,'title',i.title,'issueStatus',i.status,'r
 FROM issues i JOIN agent_runs r ON r."issueId"=i.id JOIN upgrade_acceptance_data d ON d.id=i.id
 WHERE i.id=:'task' AND r.id=:'run';`
 
+async function loopbackPort() {
+  const reservation = createPortReservation()
+  reservation.listen(0, '127.0.0.1')
+  await once(reservation, 'listening')
+  const port = reservation.address().port
+  await new Promise(done => reservation.close(done))
+  return port
+}
+
+async function startReceiver(options) {
+  const receiver = spawn(process.execPath, [join(repo, 'scripts/self-hosted-update-webhook.mjs')], {
+    cwd: options.cwd, env: options.env, stdio: ['ignore', 'pipe', 'pipe']
+  })
+  let stdout = '', stderr = ''
+  receiver.stderr.setEncoding('utf8').on('data', chunk => { stderr = (stderr + chunk).slice(-512) })
+  try {
+    await new Promise((accept, reject) => {
+      const timer = setTimeout(() => reject(new Error('receiver readiness timed out')), 15_000)
+      receiver.once('error', error => { clearTimeout(timer); reject(error) })
+      receiver.once('exit', () => { clearTimeout(timer); reject(new Error('receiver exited: ' + stderr)) })
+      receiver.stdout.setEncoding('utf8').on('data', chunk => {
+        stdout = (stdout + chunk).slice(-4096)
+        if (stdout.includes('SELF_HOSTED_UPDATE_WEBHOOK_READY')) { clearTimeout(timer); accept() }
+      })
+    })
+    return receiver
+  } catch (error) { receiver.kill(); throw error }
+}
+
+async function stopReceiver(receiver) {
+  if (!receiver || receiver.exitCode !== null || receiver.signalCode !== null) return
+  const stopped = once(receiver, 'exit')
+  receiver.kill()
+  await stopped
+}
+
+function waitForAttempt(state, receiver, proof) {
+  return new Promise((accept, reject) => {
+    const finish = error => {
+      clearTimeout(timer)
+      watcher.close()
+      receiver.off('exit', onExit)
+      if (error) reject(error)
+      else accept()
+    }
+    const onExit = () => finish(new Error('receiver exited while a release was queued'))
+    const watcher = watch(state, (_type, filename) => {
+      if (filename && filename !== 'pending-release.json') return
+      inspect()
+    })
+    const timer = setTimeout(() => finish(new Error('automatic upgrade did not finish')), 12 * 60_000)
+    function inspect() {
+      try {
+        const pending = JSON.parse(readFileSync(join(state, 'pending-release.json'), 'utf8'))
+        if (pending.status === 'applying' && !proof.attemptObservedAt) proof.attemptObservedAt = new Date().toISOString()
+        if (pending.status === 'processed') finish()
+        else if (pending.status === 'failed') finish(new Error('automatic upgrade failed: ' + pending.reason))
+      } catch (error) { finish(error) }
+    }
+    receiver.once('exit', onExit)
+    inspect()
+  })
+}
+
+async function acceptAuto(options, release, previous, cli) {
+  const upstream = await fetch('https://api.github.com/repos/alexj11324/Mikka/releases/tags/' + encodeURIComponent(tag), {
+    headers: { accept: 'application/vnd.github+json', 'user-agent': 'mikka-self-hosted-acceptance' },
+    signal: AbortSignal.timeout(15_000)
+  })
+  assert.equal(upstream.status, 200, 'published GitHub release')
+  const notification = await upstream.json()
+  assert.equal(notification.tag_name, tag)
+  assert.ok(notification.body.includes('https://github.com/alexj11324/Mikka/releases/tag/' + tag))
+  const input = ['MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', 'Content-Transfer-Encoding: base64',
+    'Subject: Mikka self-hosted ' + tag, '', Buffer.from(notification.body).toString('base64'), ''].join('\r\n')
+  const proof = { policy: 'auto', source: 'published GitHub release body, local MIME envelope', baseline: previous.image }
+  proof.enrollment = cli(['enroll']).status
+  assert.ok(readFileSync(join(options.cwd, '.env'), 'utf8').split(/\r?\n/).includes('MIKKA_IMAGE=' + previous.image))
+  // Receiver is a third-party process. It re-fetches the real upstream
+  // manifest, then the normal updater verifies the enrolled source ancestry.
+  const port = await loopbackPort()
+  const secret = randomBytes(32).toString('hex')
+  const keyfile = join(options.cwd, 'mail.key')
+  writeFileSync(keyfile, secret + '\n', { mode: 0o600 })
+  const earliest = Date.now() + 45_000
+  const opens = new Date(Math.ceil(earliest / 60_000) * 60_000)
+  const closes = new Date(opens.getTime() + 60_000)
+  const utc = date => date.toISOString().slice(11, 16)
+  proof.windowUTC = utc(opens) + '-' + utc(closes)
+  proof.opensAt = opens.toISOString()
+  const state = join(options.cwd, '.mikka-updates')
+  const pending = join(state, 'pending-release.json')
+  const config = { ...options, env: { ...options.env,
+    MIKKA_UPDATE_POLICY: 'auto', MIKKA_UPDATE_WINDOW_UTC: proof.windowUTC,
+    MIKKA_UPDATE_WEBHOOK_SECRET: secret, MIKKA_UPDATE_WEBHOOK_PORT: String(port), MIKKA_UPDATE_STATE_DIR: state } }
+  const deliver = () => checked('python3', [join(repo, 'scripts/self-hosted-release-mail.py'), '--secret-file', keyfile, '--port', String(port)], { ...options, input })
+  let receiver
+  try {
+    receiver = await startReceiver(config)
+    const invalid = await fetch('http://127.0.0.1:' + port + '/self-hosted-release-hint', { method: 'POST',
+      headers: { 'x-hub-signature-256': 'sha256=' + '0'.repeat(64) }, body: JSON.stringify({ tag }) })
+    assert.equal(invalid.status, 401)
+    assert.equal(existsSync(pending), false)
+    proof.invalidSignatureHttp = invalid.status
+    deliver()
+    const first = readFileSync(pending, 'utf8')
+    const queued = JSON.parse(first)
+    assert.deepEqual([queued.tag, queued.revision, queued.status], [tag, release.revision, 'queued'])
+    proof.queuedAt = queued.receivedAt
+    assert.ok(new Date(proof.queuedAt) < opens)
+    deliver()
+    assert.equal(readFileSync(pending, 'utf8'), first, 'duplicate mail changed pending work')
+    await stopReceiver(receiver)
+    receiver = await startReceiver(config)
+    proof.restartedAt = new Date().toISOString()
+    await waitForAttempt(state, receiver, proof)
+    assert.ok(new Date(proof.attemptObservedAt) >= opens && new Date(proof.attemptObservedAt) < closes, 'actual auto launch outside UTC window')
+    const processed = readFileSync(pending, 'utf8')
+    deliver()
+    assert.equal(readFileSync(pending, 'utf8'), processed, 'processed release ran again')
+    proof.result = JSON.parse(processed).status
+    proof.duplicateSuppressed = true
+    return proof
+  } finally { await stopReceiver(receiver) }
+}
+
 async function exercise(release, previous, migrationChanged) {
   const dir = mkdtempSync(join(tmpdir(), 'mikka-upgrade-'))
   const project = 'mikka-upgrade-' + randomUUID().slice(0, 12)
@@ -157,11 +283,7 @@ async function exercise(release, previous, migrationChanged) {
   try {
     // Reserve a loopback port once; re-creating the app must keep the same
     // ingress target instead of asking Docker for a new ephemeral binding.
-    const reservation = createPortReservation()
-    reservation.listen(0, '127.0.0.1')
-    await once(reservation, 'listening')
-    const port = reservation.address().port
-    await new Promise(done => reservation.close(done))
+    const port = await loopbackPort()
     copyFileSync(join(repo, 'docker-compose.yml'), join(dir, 'docker-compose.yml'))
     writeFileSync(join(dir, '.env'), [
       'POSTGRES_PASSWORD=' + randomBytes(24).toString('hex'), 'MIKKA_IMAGE=' + previous.image,
@@ -246,8 +368,18 @@ async function exercise(release, previous, migrationChanged) {
     await afterFailureHttp.arrayBuffer()
     record.fixtureContractColumn = migrationChanged ? 'irreversibly dropped by post-start verification fixture' : 'retained'
     rmSync(failureFlag)
-    const retry = migrationChanged ? 'recover' : 'apply'
-    record.recovery = { command: retry, result: cli([retry, tag, ...flags]).status }
+    if (migrationChanged) {
+      record.recovery = { command: 'recover', result: cli(['recover', tag, ...flags]).status }
+    } else {
+      // The installation's own idle hook checks its live database independently.
+      writeFileSync(join(dir, 'idle'), [
+        '#!/bin/sh', 'set -eu',
+        `count=$(docker compose -f docker-compose.yml exec -T postgres psql -XAtq -v ON_ERROR_STOP=1 -U mikka -d mikka -c "SELECT count(*) FROM agent_runs WHERE status IN ('queued','preparing','running','paused','waiting_input','finishing')")`,
+        'test "$count" = 0', ''
+      ].join('\n'), { mode: 0o700 })
+      options.env.MIKKA_UPDATE_IDLE_GUARD = join(dir, 'idle')
+      record.recovery = await acceptAuto(options, release, previous, cli)
+    }
     record.afterRecovery = runtime(release)
     assert.equal(existsSync(drainFlag), false)
     assert.equal(dataInVolume(), ids.sentinel)

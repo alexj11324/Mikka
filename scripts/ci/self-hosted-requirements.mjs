@@ -38,7 +38,17 @@ export function verifyChange(path, before, after, declarations, isTest) {
   return errors
 }
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
-export function main() {
+// A declaration points to an executable check, not an unreferenced fixture.
+// Plain Node tests run directly; other suites name their repository test script.
+export function dependencyTestCommand(spec, scripts) {
+  if (!spec.suite && /\.test\.[cm]?js$/.test(spec.test)) return [process.execPath, '--test', spec.test]
+  const command = Object.hasOwn(scripts, spec.suite) && scripts[spec.suite]
+  if (typeof command !== 'string' || !/^test:[a-z0-9:-]+$/.test(spec.suite) || !command.includes(spec.test)) {
+    throw new Error(spec.test + ': name the package test suite that executes this file')
+  }
+  return ['pnpm', 'run', spec.suite]
+}
+export function main(runTests = false) {
   const event = process.env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : {}
   const base = event.pull_request?.base?.sha || event.merge_group?.base_sha ||
     (typeof event.before === 'string' && !/^0+$/.test(event.before) && event.before) || 'HEAD^1'
@@ -53,7 +63,19 @@ export function main() {
     const prior = spawnSync('git', ['show', base + ':' + path], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
     errors.push(...verifyChange(path, prior.status === 0 ? prior.stdout : null, readFileSync(path, 'utf8'), declarations, isTest))
   }
+  const full = paths.includes(requirements) || paths.includes('config/self-hosted-stable-version') || process.env.GITHUB_REF_TYPE === 'tag'
+  const commands = new Map()
+  const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts
+  for (const [file, spec] of Object.entries(declarations)) {
+    if (!full && !paths.includes(file) && !paths.includes(spec?.test)) continue
+    if (typeof spec?.test !== 'string' || !isTest(spec.test)) throw new Error(file + ': missing declared acceptance test')
+    const command = dependencyTestCommand(spec, scripts)
+    commands.set(JSON.stringify(command), command)
+  }
   if (errors.length) throw new Error(errors.join('\n'))
+  if (runTests) {
+    for (const [bin, ...args] of commands.values()) execFileSync(bin, args, { stdio: 'inherit', env: { ...process.env, MIKKA_EDITION: 'community' } })
+  }
   console.log('Self-hosted dependency declarations verified against ' + base)
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main(process.argv[2] === '--run-tests')

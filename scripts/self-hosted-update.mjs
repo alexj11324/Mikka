@@ -57,12 +57,20 @@ function config() {
   if (!conf?.services?.app || !conf.services.app.volumes?.length) fail('SELF_HOSTED_UPDATE_COMPOSE_UNSUPPORTED')
   return { localDatabase: !!conf.services.postgres }
 }
+async function upstream(path, failure) {
+  try {
+    const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/' + path, {
+      headers: { accept: 'application/vnd.github+json', 'user-agent': 'mikka-self-hosted-updater' },
+      redirect: 'error', signal: AbortSignal.timeout(12_000)
+    })
+    if (!response.ok) throw new Error('HTTP ' + response.status)
+    return await response.json()
+  } catch (cause) { fail(failure, cause) }
+}
+
 async function githubRelease(tag) {
   if (!STABLE_TAG.test(tag)) fail('SELF_HOSTED_UPDATE_RELEASE_NOT_STABLE')
-  const url = 'https://api.github.com/repos/alexj11324/Mikka/releases/tags/' + encodeURIComponent(tag)
-  const response = await fetch(url, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'mikka-self-hosted-updater' }, signal: AbortSignal.timeout(12_000) })
-  if (!response.ok) fail('SELF_HOSTED_UPDATE_RELEASE_FETCH_FAILED')
-  const json = await response.json()
+  const json = await upstream('releases/tags/' + encodeURIComponent(tag), 'SELF_HOSTED_UPDATE_RELEASE_FETCH_FAILED')
   const release = parseStableRelease(json)
   if (release.tag !== tag) fail('SELF_HOSTED_UPDATE_RELEASE_TAG_MISMATCH')
   return release
@@ -176,14 +184,45 @@ function recordSuccess(release, migrated) {
   }) + '\n')
 }
 
-async function performUpgrade(release, opts) {
+async function withUpgradeLock(operation) {
   privateStateDirectory()
-  const available = statfsSync(stateDirectory)
-  if (BigInt(available.bavail) * BigInt(available.bsize) < 512n * 1024n * 1024n) fail('SELF_HOSTED_UPDATE_DISK_SPACE_LOW')
   const lockPath = join(stateDirectory, 'upgrade.lock')
   let lock
   try { lock = openSync(lockPath, 'wx', 0o600) }
   catch (cause) { fail('SELF_HOSTED_UPDATE_ALREADY_RUNNING', cause) }
+  try { return await operation() }
+  finally { closeSync(lock); unlinkSync(lockPath) }
+}
+
+function enroll() {
+  ensureRegularEnvFile(environmentFile)
+  config()
+  if (optionalRecord(join(stateDirectory, 'recovery.json'))) fail('SELF_HOSTED_UPDATE_MANUAL_RECOVERY_REQUIRED')
+  const original = activeImage()
+  const digest = assertPinnedImage(original.image)
+  if (!/^[0-9a-f]{40}$/.test(original.revision || '')) fail('SELF_HOSTED_UPDATE_INSTALLED_REVISION_UNKNOWN')
+  verifyArtifact({ ...original, image: digest })
+  const last = optionalRecord(join(stateDirectory, 'last-success.json'))
+  if (last && (last.image !== digest || last.revision !== original.revision)) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
+  const envText = statSync(environmentFile, { throwIfNoEntry: false }) ? readFileSync(environmentFile, 'utf8') : ''
+  saveAtomic(environmentFile, replaceImage(envText, digest))
+  const baseline = { revision: original.revision, image: digest, migrations: original.migrations }
+  saveAtomic(join(stateDirectory, 'enrolled-image.json'), JSON.stringify(baseline) + '\n')
+  return { status: 'enrolled', ...baseline }
+}
+
+export async function validateEnrollment(enrolled, running, release, lookup = upstream) {
+  if (!enrolled || !/^[0-9a-f]{40}$/.test(enrolled.revision) || enrolled.revision !== running.revision ||
+      enrolled.image !== running.image || enrolled.migrations !== running.migrations) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
+  if (!/^[0-9a-f]{40}$/.test(release.revision)) fail('SELF_HOSTED_UPDATE_RELEASE_IMAGE_MISMATCH')
+  if (enrolled.revision === release.revision) return
+  const relation = await lookup('compare/' + enrolled.revision + '...' + release.revision + '?per_page=1', 'SELF_HOSTED_UPDATE_ANCESTRY_UNAVAILABLE')
+  if (relation.status !== 'ahead' || relation.merge_base_commit?.sha !== enrolled.revision) fail('SELF_HOSTED_UPDATE_DOWNGRADE_REFUSED')
+}
+
+async function performUpgrade(release, opts) {
+  const available = statfsSync(stateDirectory)
+  if (BigInt(available.bavail) * BigInt(available.bsize) < 512n * 1024n * 1024n) fail('SELF_HOSTED_UPDATE_DISK_SPACE_LOW')
   let drained = false
   let recoveryRequired = false
   try {
@@ -223,8 +262,12 @@ async function performUpgrade(release, opts) {
     const lastPath = join(stateDirectory, 'last-success.json')
     const last = optionalRecord(lastPath)
     if (opts.auto) {
-      if (!last || !STABLE_TAG.test(last.tag || '') || last.revision !== original.revision || last.image !== original.image) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
-      if (compareStableTags(release.tag, last.tag) <= 0) return { status: 'ignored-older-release', tag: release.tag }
+      if (last) {
+        if (!STABLE_TAG.test(last.tag || '') || last.revision !== original.revision || last.image !== original.image) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
+        if (compareStableTags(release.tag, last.tag) <= 0) return { status: 'ignored-older-release', tag: release.tag }
+      } else {
+        await validateEnrollment(optionalRecord(join(stateDirectory, 'enrolled-image.json')), original, release)
+      }
     } else if (last && STABLE_TAG.test(last.tag || '') && compareStableTags(release.tag, last.tag) < 0) {
       fail('SELF_HOSTED_UPDATE_DOWNGRADE_REFUSED')
     }
@@ -290,18 +333,14 @@ async function performUpgrade(release, opts) {
       fail('SELF_HOSTED_UPDATE_MIGRATION_RECOVERY_REQUIRED', cause)
     }
   } finally {
-    try {
-      if (drained && !recoveryRequired) runHook('MIKKA_UPDATE_DRAIN_HOOK', 'disable')
-      else if (drained) console.error('SELF_HOSTED_UPDATE_TRAFFIC_REMAINS_DRAINED')
-    } finally {
-      closeSync(lock)
-      unlinkSync(lockPath)
-    }
+    if (drained && !recoveryRequired) runHook('MIKKA_UPDATE_DRAIN_HOOK', 'disable')
+    else if (drained) console.error('SELF_HOSTED_UPDATE_TRAFFIC_REMAINS_DRAINED')
   }
 }
 
 async function main() {
   const [command, tag, ...flags] = process.argv.slice(2)
+  if (command === 'enroll' && !tag) return withUpgradeLock(enroll)
   if (command === 'backup' && !tag) {
     if (!config().localDatabase) fail('SELF_HOSTED_UPDATE_LOCAL_BACKUP_REQUIRED')
     privateStateDirectory()
@@ -314,7 +353,7 @@ async function main() {
   if (flags.some(x => !['--auto', '--ack-idle', '--allow-migrations'].includes(x)) || (opts.auto && (opts.recover || opts.ackIdle || opts.allowMigrations))) fail('SELF_HOSTED_UPDATE_USAGE')
   const release = await githubRelease(tag)
   if (command === 'check') return { status: 'available', tag: release.tag, revision: release.revision, image: release.image }
-  return performUpgrade(release, opts)
+  return withUpgradeLock(() => performUpgrade(release, opts))
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -324,4 +363,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exitCode = 1
   }
 }
-export { githubRelease, replaceImage, performUpgrade, imageMigrations, hashProgram }
+export { githubRelease, replaceImage, imageMigrations, hashProgram }

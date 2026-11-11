@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isSelfHostedBackendInput, verifyChange } from './self-hosted-requirements.mjs'
+import { dependencyTestCommand, isSelfHostedBackendInput, verifyChange } from './self-hosted-requirements.mjs'
 
 const path = 'lib/feature.ts'
 const migration = 'drizzle/0100-upgrade.sql'
@@ -32,4 +32,12 @@ test('Nx and the declaration checker share the backend and migration path classi
   for (const path of ['components/ui/button.tsx', 'lib/feature.test.ts', 'docs/new.md']) {
     assert.equal(isSelfHostedBackendInput(path), false, path)
   }
+})
+
+test('every selected declaration maps to an executable Node test or matching repository suite', () => {
+  assert.deepEqual(dependencyTestCommand({ test: 'scripts/example.test.mjs' }, {}), [process.execPath, '--test', 'scripts/example.test.mjs'])
+  const spec = { test: 'lib/demo.test.ts', suite: 'test:demo' }
+  assert.deepEqual(dependencyTestCommand(spec, { 'test:demo': 'node --import tsx --test lib/demo.test.ts' }), ['pnpm', 'run', 'test:demo'])
+  assert.throws(() => dependencyTestCommand(spec, { 'test:demo': 'node other.ts' }))
+  assert.throws(() => dependencyTestCommand({ ...spec, suite: 'postinstall' }, { postinstall: spec.test }))
 })

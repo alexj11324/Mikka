@@ -48,7 +48,12 @@ docker exec -i -u postgres "$db_container" sh -eu <<'POOL'
 umask 077
 dir=/tmp/mikka-external-pool
 mkdir "$dir"
-printf '"mikka_external_query" "%s"\n' "$POSTGRES_PASSWORD" > "$dir/users"
+# Reuse the database's generated SCRAM verifier for client and server auth.
+psql -XAtq -v ON_ERROR_STOP=1 -U mikka -d postgres > "$dir/users" <<'SQL'
+SELECT format('"%s" "%s"', rolname, rolpassword)
+FROM pg_authid WHERE rolname = 'mikka_external_query';
+SQL
+test -s "$dir/users"
 cat > "$dir/config" <<'CONFIG'
 [databases]
 external_fixture = host=127.0.0.1 port=5432 dbname=external_fixture
@@ -56,7 +61,7 @@ external_fixture = host=127.0.0.1 port=5432 dbname=external_fixture
 listen_addr = *
 listen_port = 6432
 unix_socket_dir = /tmp/mikka-external-pool
-auth_type = plain
+auth_type = scram-sha-256
 auth_file = /tmp/mikka-external-pool/users
 admin_users = mikka_external_query
 pool_mode = transaction
