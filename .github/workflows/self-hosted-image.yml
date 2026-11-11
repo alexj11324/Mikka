@@ -37,12 +37,16 @@ jobs:
           node-version: 24
       - name: Verify disposable acceptance target guards and model fixture
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
+      - name: Verify managed PostgreSQL Compose contract (offline)
+        run: node --test scripts/acceptance/self-hosted-neon-compose.test.mjs
       - name: Build the public standalone application
         run: |
           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
           docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --build-arg MIKKA_BUILD_WORKER_SHA="$mikka_image_worker_sha" --tag mikka-self-hosted:check .
       - name: Verify packaged subscription binaries without network or credentials
         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
+      - name: Verify startup migration locks bypass transaction pooling
+        run: docker run --rm --network none --entrypoint node mikka-self-hosted:check --test scripts/self-hosted-start.test.mjs
       - name: Start with an empty database and no Mikka credentials
         run: |
           node --input-type=module <<'JS'
