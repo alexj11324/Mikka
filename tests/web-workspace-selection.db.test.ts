@@ -288,8 +288,8 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
       } finally { release.resolve(); releaseHeld = undefined; payloadBarrier = undefined; factoryFlight = undefined; await first.catch(() => undefined) }
     })
     await t.test('PAT selection cannot escape its pin; public Web transport never promotes a PAT to a human session', async () => {
-      const { createPersonalAccessToken } = await import('../lib/tokens/store')
-      const pat = await createPersonalAccessToken(owner.userId, alpha, { name: 'Synthetic HTTP Workspace PAT' })
+      const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+      const pat = await createLegacyPersonalAccessToken(owner.userId, alpha, { name: 'Synthetic HTTP Workspace PAT' })
       const before = await snapshot()
       assert.equal((await request('/api/workspace', alpha, { token: pat.token, remote: false })).status, 200)
       for (const workspaceId of [personal, beta, foreign]) {

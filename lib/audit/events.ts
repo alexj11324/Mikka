@@ -41,6 +41,7 @@ export const AUDIT_ACTIONS = {
   // 安全
   'token.created': 'security',
   'token.revoked': 'security',
+  'token.rotated': 'security',
   'auth.signed_in': 'security',
   'auth.sign_in_failed': 'security',
   'credential.created': 'security',
@@ -107,8 +108,13 @@ export const AUDIT_METADATA = {
   'env.created': z.object({ scope }).partial().strict(),
   'env.updated': z.object({ scope }).partial().strict(),
   'env.deleted': z.object({ scope }).partial().strict(),
-  'token.created': z.object({ tokenName: label, expiresAt: z.string().datetime({ offset: true }).nullable() }).partial().strict(),
+  'token.created': z.object({
+    tokenName: label,
+    expiresAt: z.string().datetime({ offset: true }).nullable(),
+    scopes: z.array(z.enum(['tasks:read', 'tasks:write', 'runs:read', 'runs:write', 'legacy:full'])).min(1).max(5),
+  }).partial().strict(),
   'token.revoked': none,
+  'token.rotated': none,
   'auth.signed_in': z.object({ newDevice: z.boolean().optional(), method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']) }).strict(),
   'auth.sign_in_failed': z.object({ method: z.enum(['password', 'oauth', 'magic_link', 'passkey', 'sso']), reason: z.enum(['invalid', 'locked', 'expired', 'denied']) }).partial().strict(),
   'credential.created': none,

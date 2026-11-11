@@ -576,7 +576,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const workspaceId = randomUUID(), patId = randomUUID(), pat = `mkp_${randomBytes(32).toString('base64url')}`
     await pool.query('insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,\'Logout target PAT fixture\',\'team\')', [workspaceId, userId])
     await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role,status) values($1,$2,\'Directory user\',$3,\'member\',\'active\')', [workspaceId, userId, email])
-    await pool.query('insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint) values($1,$2,$3,\'Logout target fixture\',$4,\'test\')', [patId, userId, workspaceId, identityTokenHash(pat)])
+    await pool.query('insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint,scopes) values($1,$2,$3,\'Logout target fixture\',$4,\'test\',ARRAY[\'legacy:full\']::text[])', [patId, userId, workspaceId, identityTokenHash(pat)])
     try {
       await assertLogoutTarget(await logoutTargetFor(ordinary.token), null)
       await assertLogoutTarget(await logoutTarget({ authorization: `Bearer ${ordinary.token}`, cookie }), null)
@@ -1707,7 +1707,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const personal = randomUUID(), patId = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Creator personal','personal')`, [personal, creator.id])
     await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$3,$4,'admin')`, [personal, creator.id, creator.name, creator.email])
-    await pool.query(`insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint) values($1,$2,$3,'Creator fixture',$4,'test')`, [patId, creator.id, personal, identityTokenHash(randomUUID())])
+    await pool.query(`insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint,scopes) values($1,$2,$3,'Creator fixture',$4,'test',ARRAY['legacy:full']::text[])`, [patId, creator.id, personal, identityTokenHash(randomUUID())])
     const refused = await fetch(`${appOrigin}/api/account/deletion`, { method: 'POST',
       headers: { origin: appOrigin, cookie: await applicationCookie(creatorSession.token), 'content-type': 'application/json' },
       body: JSON.stringify({ email: creator.email, requestId: randomUUID() }) })
@@ -1769,7 +1769,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const personal = randomUUID(), patId = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Directory personal','personal')`, [personal, subjectId])
     await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,'Directory user',$3,'admin')`, [personal, subjectId, directoryEmail])
-    await pool.query(`insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint) values($1,$2,$3,'Directory fixture',$4,'test')`, [patId, subjectId, personal, identityTokenHash(randomUUID())])
+    await pool.query(`insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint,scopes) values($1,$2,$3,'Directory fixture',$4,'test',ARRAY['legacy:full']::text[])`, [patId, subjectId, personal, identityTokenHash(randomUUID())])
     let cleanups = 0
     const options = { mainPool: pool, workspacePool: pool, externalCleanup: async () => { cleanups++; return [] as string[] }, deleteObject: async () => { throw new Error('Unexpected directory fixture storage cleanup') } }
     const deletion = await requestAccountDeletion(subjectId, directoryEmail, randomUUID(), options)
@@ -1820,7 +1820,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.deepEqual(await phone.push(), [destination])
     assert.equal(await enterpriseWorkspaceAllowed(userId, personal, { kind: 'session', sessionId: 'wrong' }), true)
     const tokenA = randomUUID(), tokenOther = randomUUID()
-    for (const [id, workspaceId] of [[tokenA, wsA], [tokenOther, other]]) await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,\'Fixture\',$4,\'test\')', [id, userId, workspaceId, identityTokenHash(randomUUID())])
+    for (const [id, workspaceId] of [[tokenA, wsA], [tokenOther, other]]) await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,\'Fixture\',$4,\'test\',ARRAY[\'legacy:full\']::text[])', [id, userId, workspaceId, identityTokenHash(randomUUID())])
     const issueId = randomUUID()
     await pool.query('insert into issues(id,"userId","workspaceId",title,content,status,priority) values($1,$2,$3,\'Enterprise phone target fixture\',$4,\'todo\',\'normal\')',
       [issueId, userId, wsA, { type: 'doc' }])
