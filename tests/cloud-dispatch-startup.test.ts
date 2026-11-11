@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { EventEmitter } from 'node:events'
-import pg from 'pg'
 import * as databaseScope from '../lib/db/request-scope'
 import { ComputerError } from '../lib/computer/store'
 import { ActionFailureError } from '../lib/action-error'
@@ -69,7 +68,7 @@ class TaskLockPool extends EventEmitter {
   connect() { return pool.connect() }
   end() { return Promise.resolve() }
 }
-mock.module('pg', { defaultExport: { ...pg, Pool: TaskLockPool }, namedExports: { ...pg, Pool: TaskLockPool } })
+mock.module('pg', { defaultExport: { Pool: TaskLockPool }, namedExports: { Pool: TaskLockPool, Client: unused, escapeLiteral: unused } })
 stub('../lib/auth.ts', { auth: { api: {} } })
 stub('../lib/cloud-computer-flag.ts', { cloudComputerRunsEnabled: () => true, cloudComputerTasksEnabled: () => true, byosEnabled: () => true, byosEnrollmentEnabled: () => true })
 stub('../lib/db/index.ts', { db: { execute: async () => { calls.push('link-continuation'); return { rows: [], rowCount: 1 } } }, pool, withDatabaseClient: unused, withDatabaseTransaction: unused })
