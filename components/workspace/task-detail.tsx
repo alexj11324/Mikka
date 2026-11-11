@@ -115,7 +115,7 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
   if (!data) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-170 flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
   // Show a local snapshot immediately, but do not seed a writable Y.Doc from
   // it before the normal read rechecks access and the current body fingerprint.
-  return <SectionBoundary key={id} onClose={props.onClose}><TaskForm key={loadedId === id ? 'verified' : 'cached'} initial={data} preview={loadedId !== id} {...props} /></SectionBoundary>
+  return <SectionBoundary key={id} onClose={props.onClose}><TaskForm key={loadedId !== id ? 'cached' : data.canSteer === false ? 'reader' : 'editor'} initial={data} preview={loadedId !== id} {...props} /></SectionBoundary>
 }
 
 function SectionBoundary({ children, onClose }: { children: ReactNode; onClose: () => void }) {
@@ -149,15 +149,18 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const [saved, setSaved] = useState(initial)
   // Content the editor schema rejects opens read-only: no seed is sent and nothing syncs, so the stored body is never overwritten.
   const [seed] = useState(() => createDocumentSeed(initial.content, initial.id))
+  const reader = initial.canSteer === false
+  const locked = preview || reader
   const readOnly = seed === null
   // Read-only never constructs a DocumentSync: no Y.Doc, no provider, no exchange.
-  const [sync] = useState(() => seed && !preview ? new DocumentSync(initial.id, seed) : null)
+  const [sync] = useState(() => seed && !locked ? new DocumentSync(initial.id, seed) : null)
   const syncState = useSyncExternalStore(sync?.subscribe ?? noSubscribe, sync?.getSnapshot ?? readOnlySnapshot, sync?.getSnapshot ?? readOnlySnapshot)
+  const liveWorkspaceId = syncState.workspaceId ?? (reader ? initial.workspaceId : null)
   const syncKey = sync ? issueKeys.document(saved.id, sync.doc.clientID) : null
   const { mutate: retrySync } = useSWR(syncKey, () => sync?.exchange(saved.id), { refreshInterval: 0, revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false })
   // A committed acceptance changes the issue and its history without editing
   // the Yjs body. All three reads follow the same authorized document event.
-  useLiveKey('issue_document', sync ? saved.id : null, syncKey ? [unstable_serialize(syncKey), unstable_serialize(issueKeys.detail(saved.id)), unstable_serialize(issueKeys.versions(saved.id)), unstable_serialize(issueKeys.activityVersions(saved.id))] : [], syncState.workspaceId ?? null, { minIntervalMs: 1500 })
+  useLiveKey('issue_document', sync || reader ? saved.id : null, [...(syncKey ? [unstable_serialize(syncKey)] : []), unstable_serialize(issueKeys.detail(saved.id)), unstable_serialize(issueKeys.versions(saved.id)), unstable_serialize(issueKeys.activityVersions(saved.id))], liveWorkspaceId, { minIntervalMs: 1500 })
   useEffect(() => {
     // Delay disposal so React Strict Mode's immediate effect replay retains this document.
     if (!sync) return
@@ -246,7 +249,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [hasUnsavedChanges])
   function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'priority'>>) {
-    if (preview) return
+    if (locked) return
     draft.current = { ...draft.current, ...patch, generation: draft.current.generation + 1 }
     if (patch.title !== undefined) setTitle(patch.title)
     if (patch.content !== undefined) setContent(patch.content)
@@ -257,7 +260,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     setEditSequence(value => value + 1)
   }
   const save = useCallback((): Promise<boolean> => {
-    if (preview) return Promise.resolve(false)
+    if (locked) return Promise.resolve(false)
     if (flight.current) return flight.current
     if (composing.current) return Promise.resolve(false)
     const operation = (async () => {
@@ -297,13 +300,13 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     flight.current = operation
     void operation.finally(() => { flight.current = null })
     return operation
-  }, [initial.id, preview, sync, onSaved, refreshVersions])
+  }, [initial.id, locked, sync, onSaved, refreshVersions])
   useEffect(() => {
     // A preview cannot acquire an editable draft, so leaving it needs no save.
     // Keep save() itself refused until the normal read verifies access.
-    onRegisterFlush(preview ? () => Promise.resolve(true) : save)
+    onRegisterFlush(locked ? () => Promise.resolve(true) : save)
     return () => onRegisterFlush(null)
-  }, [onRegisterFlush, preview, save])
+  }, [onRegisterFlush, locked, save])
   useEffect(() => {
     if (!editSequence || !syncState.ready) return
     const timer = setTimeout(() => { void save() }, 700)
@@ -343,27 +346,27 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     <IssueActivityFeed versions={historyError ? [] : versions ?? []} children={historyError ? [] : subtasks} agents={agentActivity.rows} />
   </>
 
-  const properties = <IssueDetailProperties task={saved} viewerId={user.id} onMetadataSaved={adopt} metadataDisabled={preview} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={preview} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={preview ? null : <IssueRelations liveWorkspaceId={syncState.workspaceId ?? null} viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} />
+  const properties = <IssueDetailProperties task={saved} viewerId={user.id} onMetadataSaved={adopt} metadataDisabled={locked} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={locked} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={preview ? null : <IssueRelations liveWorkspaceId={liveWorkspaceId} viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={locked} />} />
   const threadPanel = preview ? null : openThread
     ? <TaskThreadPane issueId={saved.id} runId={openThread} tab={threadTab} onOpenThread={showThread} onBack={() => showThread(null)} />
     : openAcceptance && <FactoryAcceptancePanel key={openAcceptance.id} task={openAcceptance} onOpenThread={showThread} onClose={() => setOpenAcceptance(null)} />
 
-  const saveLabel = readOnly || preview ? '' : error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')
-  const actions = <IssueDetailActions task={saved} userId={user.id} disabled={preview} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) setHistory(true) }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />
+  const saveLabel = readOnly || locked ? '' : error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')
+  const actions = <IssueDetailActions task={saved} userId={user.id} disabled={locked} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) setHistory(true) }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />
   // No !important: Textarea ships `text-base md:text-sm`, and a variant-free `text-2xl` cannot beat `md:text-sm` at
   // >=768px, so the title states the size once per breakpoint (text-2xl md:text-2xl), as project-form.tsx does.
   // The rule it used to fight — the official layer holding phone form fields at 16px — is a `@media (max-width: 639px)`
   // rule on input/select/textarea from mikka-hosted-ui, and the layer draws this page's title with its own textarea,
   // not this one; below 640px this component's 24px already outranked it. task-09 (title larger than a body field) holds.
-  const titleField = <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">{t('titleLabel')}</FieldLabel><Textarea id="task-title" readOnly={preview} aria-label={t('titleLabel')} rows={1} placeholder={t('titleLabel')} value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-2xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
+  const titleField = <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">{t('titleLabel')}</FieldLabel><Textarea id="task-title" readOnly={locked} aria-label={t('titleLabel')} rows={1} placeholder={t('titleLabel')} value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-2xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
   const notice = error && <div className="flex flex-wrap items-center gap-2"><FieldError>{error}</FieldError><Button variant="outline" size="sm" disabled={pending} onClick={() => { void save() }}>{t('retryAutosave')}</Button></div>
   const acceptance = preview ? null : <FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} onOpenThread={showThread} />
   // A layer that draws the page puts its own pieces under the description and draws 活动 itself (task-detail-frame.tsx).
   const editorWith = (afterDescription: ReactNode, renderActivity?: (discussions: IssueDiscussions) => ReactNode) => <>
     {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || preview ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} content={content} disabled={readOnly || preview} layout={documentTools ? 'document' : 'issue'} activity={activity} renderActivity={renderActivity} afterDescription={preview ? null : afterDescription} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || preview ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
+    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || locked ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} key={reader ? String(initial.updatedAt) : undefined} content={reader ? initial.content : content} readOnlyDiscussions={reader ? initial.readOnlyDiscussions : undefined} disabled={readOnly || locked} layout={documentTools ? 'document' : 'issue'} activity={activity} renderActivity={renderActivity} afterDescription={preview ? null : afterDescription} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || locked ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
   </>
-  const editor = editorWith(<>{acceptance}<IssueRelations liveWorkspaceId={syncState.workspaceId ?? null} viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} /></>)
+  const editor = editorWith(<>{acceptance}<IssueRelations liveWorkspaceId={liveWorkspaceId} viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={locked} /></>)
   const syncNotice = syncState.error && <FieldError className="text-xs">{t('syncRetryNotice')}</FieldError>
   const dialogs = <>
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await loadIssue(saved.id, user.id)) }} /></DialogContent></Dialog>
@@ -372,9 +375,9 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => closeOnEscape(event, rootRef.current, onClose)
   const titleChange = (value: string) => changed({ title: value })
   const titleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }
-  if (Frame) return <FramedTask Frame={Frame} rootRef={rootRef} onKeyDown={onKeyDown} label={title || t('titleLabel')} preview={preview} origin={origin} navigation={navigation} onClose={onClose} onOpen={onOpen} onDeleted={onDeleted} userId={user.id}
-    task={saved} title={title} status={status} priority={priority} liveWorkspaceId={syncState.workspaceId ?? null} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
-    titleField={{ value: title, label: t('titleLabel'), readOnly: preview, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
+  if (Frame) return <FramedTask Frame={Frame} rootRef={rootRef} onKeyDown={onKeyDown} label={title || t('titleLabel')} preview={preview} locked={locked} origin={origin} navigation={navigation} onClose={onClose} onOpen={onOpen} onDeleted={onDeleted} userId={user.id}
+    task={saved} title={title} status={status} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
+    titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
     saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: () => { void save() }, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
     editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance}
     versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}

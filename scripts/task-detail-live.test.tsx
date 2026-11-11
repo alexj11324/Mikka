@@ -394,6 +394,22 @@ for (const refusal of ['workspaceAccessDenied', 'foreign-viewer'] as const) test
   } finally { release() }
 })
 
+test('a confirmed read-only grant shows activity without enabling title, body or document writes', async () => {
+  stored = { ...stored, workspaceId, canSteer: false, readOnlyDiscussions: [] }
+  await mount()
+  assert.equal(title().readOnly, true)
+  assert.equal(description().readOnly, true)
+  assert.equal(documentReads, 0)
+  await input(title(), 'Must not save')
+  await act(async () => { assert.equal(await flush!(), true) })
+  assert.equal(writes.length, 0)
+  assert.equal(title().value, stored.title)
+  accepted()
+  await emit()
+  await until(() => properties().textContent === 'done:normal', 'a read grant continues to observe the task')
+  assert.equal(documentReads, 0)
+})
+
 test('a committed acceptance event refreshes the mounted task status and activity without reload', { timeout: 10_000 }, async () => {
   await mount()
   assert.equal(properties().textContent, 'review:normal')

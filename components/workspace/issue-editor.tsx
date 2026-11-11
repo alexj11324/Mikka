@@ -50,7 +50,7 @@ export type IssueDiscussions = {
   /** Selects the text a discussion is about. */
   onSelect: (id: string) => void
 }
-export function IssueEditor({ issueId, content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false, renderActivity }: { issueId?: string; content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean; /** Draws 活动 in place of IssueActivity, with the same discussions and actions (task-detail slot). */ renderActivity?: (activity: IssueDiscussions) => ReactNode }) {
+export function IssueEditor({ issueId, content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false, readOnlyDiscussions, renderActivity }: { issueId?: string; content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean; readOnlyDiscussions?: IssueDiscussions['threads']; /** Draws 活动 in place of IssueActivity, with the same discussions and actions (task-detail slot). */ renderActivity?: (activity: IssueDiscussions) => ReactNode }) {
   const t = useTranslations('Editor')
   const tCommon = useTranslations('Common')
   const author = authorProp ?? t('draftAuthor')
@@ -166,7 +166,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     setReply("")
     setReplyId(null)
   }
-  const threadList = Object.values(threads)
+  const threadList = readOnlyDiscussions ?? Object.values(threads)
   const openCount = threadList.filter(thread => !thread.resolved).length
 
   const discussions: Omit<IssueDiscussions, 'issueId'> = {
