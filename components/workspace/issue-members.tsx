@@ -55,6 +55,8 @@ export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => 
       if (result.error) { setInviteError(actionError(result.error)); return }
       if (!result.member) { setInviteError(t('addFailed')); return }
       const member = result.member
+      // The action returns the whole row now, so the optimistic entry has the
+      // same shape as the list it joins (role, subscription, inviter).
       await mutate(current => current ? { ...current, members: [...current.members.filter(item => item.id !== member.id), member] } : current, { revalidate: false })
       setEmail(''); setQuery(''); setMessage(t('addedMessage'))
       void mutate().catch(() => {})

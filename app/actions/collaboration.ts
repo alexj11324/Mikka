@@ -98,7 +98,7 @@ export async function listMembers(id: string) {
   // The channel its `issue_members` key arrives on; null reads once a minute.
   return { ...result, live: { workspaceId: await documentLiveWorkspace(pool, workspacePool, issue.id, user.id) } }
 }
-export async function inviteMember(id: string, email: string): Promise<ActionResult<{ success: true; member: { id: string; name: string; email: string; image: string | null; createdAt: Date } }>> {
+export async function inviteMember(id: string, email: string): Promise<ActionResult<{ success: true; member: { id: string; name: string; email: string; image: string | null; role: 'owner' | 'member'; subscribed: boolean; invitedBy: string | null; createdAt: Date } }>> {
   return runAction(async () => {
     const { issue, user } = await requireIssueAccess(id)
     const parsed = z.email().max(254).safeParse(email.trim().toLowerCase())
@@ -110,10 +110,11 @@ export async function inviteMember(id: string, email: string): Promise<ActionRes
       if (!mayManageMembers(await callerFor(tx, id, user.id, issue.userId))) return { error: 'memberOwnerOnly' }
       const [member] = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(users).where(eq(users.email, parsed.data)).limit(1)
       if (!member || member.id === user.id) return { error: 'memberNotRegistered' }
-      const [added] = await tx.insert(issueMembers).values({ issueId: id, userId: user.id, memberId: member.id, invitedBy: user.id }).onConflictDoNothing().returning({ createdAt: issueMembers.createdAt })
+      const [added] = await tx.insert(issueMembers).values({ issueId: id, userId: user.id, memberId: member.id, invitedBy: user.id }).onConflictDoNothing()
+        .returning({ createdAt: issueMembers.createdAt, role: issueMembers.role, subscribed: issueMembers.subscribed, invitedBy: issueMembers.invitedBy })
       if (!added) return { error: 'memberAlreadyAdded' }
       await issueMembersChanged(tx, id)
-      return { success: true, member: { ...member, createdAt: added.createdAt } }
+      return { success: true, member: { ...member, ...added } }
     }))
   })
 }
