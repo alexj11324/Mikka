@@ -197,7 +197,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   const owner = await seedUser(pool, 'secret-local-owner'), outsider = await seedUser(pool, 'secret-local-outsider')
   owners.push(owner, outsider)
   const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
-  const botId = await seedBot(pool, workspace.id, owner), issueId = await seedIssue(pool, owner)
+  const botId = await seedBot(pool, workspace.id, owner), issueId = await seedIssue(pool, owner, workspace.id)
   await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } } })])
   const repository = `mikka-ci/secret-local-${randomUUID()}`
   const remote = `https://github.com/${repository}.git`
