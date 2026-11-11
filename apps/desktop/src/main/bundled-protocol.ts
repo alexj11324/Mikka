@@ -9,10 +9,10 @@ const TYPES: Record<string, string> = {
   '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.gif': 'image/gif', '.ico': 'image/x-icon',
   '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.webm': 'video/webm',
 }
-const REQUEST_HEADERS = new Set(['accept', 'content-type', 'range', 'if-none-match', 'if-modified-since', 'x-mikka-stream-key', 'x-mikka-submission-id'])
+const REQUEST_HEADERS = new Set(['accept', 'content-type', 'range', 'if-none-match', 'if-modified-since', 'x-mikka-submission-id'])
 // Approval reads use these public headers to bind the result to the current
 // viewer and conservatively anchor expiry. Session/cache credentials stay private.
-const RESPONSE_HEADERS = new Set(['content-type', 'content-disposition', 'content-range', 'accept-ranges', 'etag', 'last-modified', 'x-mikka-stream-key', 'x-mikka-viewer', 'x-mikka-observed-at', 'retry-after', 'x-eve-session-id', 'x-eve-stream-format', 'x-eve-stream-version', 'x-eve-stream-tail-index', 'x-eve-observation-key'])
+const RESPONSE_HEADERS = new Set(['content-type', 'content-disposition', 'content-range', 'accept-ranges', 'etag', 'last-modified', 'x-mikka-viewer', 'x-mikka-observed-at', 'retry-after', 'x-eve-session-id', 'x-eve-stream-format', 'x-eve-stream-version', 'x-eve-stream-tail-index', 'x-eve-observation-key'])
 const MAX_UPLOAD = 32 * 1024 * 1024
 
 function localHeaders(type?: string): Headers {

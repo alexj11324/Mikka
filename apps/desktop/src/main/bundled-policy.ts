@@ -28,7 +28,7 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys)$/, ['GET']],
   [/^\/api\/agent-cli-policy$/, ['GET', 'POST']],
   [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
-  [/^\/api\/(coordinator\/(?:runtime|messages|attention|stream))$/, ['GET', 'POST', 'DELETE']],
+  [/^\/api\/(coordinator\/(?:runtime|messages|attention))$/, ['GET', 'POST', 'DELETE']],
   [/^\/api\/(chat\/attachments|integrations\/mcp|integrations\/mcp\/shares|credentials|device-tokens)$/, ['GET', 'POST', 'PATCH', 'DELETE']],
   [/^\/api\/(agent\/images|agent\/sessions|devices\/hosts)$/, ['GET']],
   [/^\/api\/devices\/ssh$/, ['POST']],
