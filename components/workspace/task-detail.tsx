@@ -1,18 +1,17 @@
 'use client'
 
-import { Component, useCallback, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Component, useCallback, type KeyboardEvent, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { useTranslations } from 'next-intl'
 import type { JSONContent } from '@tiptap/react'
 import { ArrowLeft } from 'lucide-react'
-import { IssueDetailHeader, type IssueDetailNavigation } from './issue-detail-header'
-import { IssueDetailActions, type IssueActionRequest } from './issue-detail-actions'
+import type { IssueDetailNavigation } from './issue-detail-header'
+import type { IssueActionRequest } from './issue-detail-actions'
 import { IssueDescriptionHistory } from './issue-description-history'
-import { IssueRelations } from './issue-relations'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
-import { getDeletedIssue, listIssueConnections, setIssueDeleted } from '@/app/actions/issue-operations'
+import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
 import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
@@ -23,28 +22,21 @@ import { IssueEditor, createDocumentSeed, type IssueDiscussions } from './issue-
 import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
 import { IssueMembers } from './issue-members'
-import { IssueDetailProperties } from './issue-detail-properties'
 import { useAgentActivity } from './issue-threads'
 import { FramedTask } from './task-detail-frame'
 import { TaskThreadPane } from './task-thread-pane'
 import { navigate } from './workspace-navigation'
-import { cn } from '@/lib/utils'
 import { FactoryAcceptance, FactoryAcceptancePanel, type FactoryTask } from './factory-acceptance'
-import { IssueActivityFeed } from './issue-activity-feed'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
-import { Textarea } from '@/components/ui/textarea'
+import { FieldError } from '@/components/ui/field'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { useViewState } from '@/lib/hooks/view-state'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
-import * as detailSlot from '@ui-slot/task-detail'
-
-// A layer's task page (docs/ui-overlay.md); without one, the community layout below.
-const Frame = detailSlot.TaskDetailFrame ?? null
+import { TaskDetailFrame } from '@ui-slot/task-detail'
 
 type Issue = IssueView
 type IssueRead = IssueView & { readVersion?: string }
@@ -192,15 +184,11 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     else { navigate({ thread: null }); setOpenAcceptance(task) }
   }, [])
   const wide = useSyncExternalStore(subscribeWide, () => window.matchMedia(WIDE).matches, () => false)
-  // The right column resizes from its left line (decision 2026-11-01-1310); an open thread and the properties keep their own widths.
+  // The open thread resizes from its left edge.
   const threadWidth = useResizableWidth({ storageKey: 'mikka:task-thread-width', min: 360, max: 720, initial: 432, edge: 'start' })
-  const propertiesWidth = useResizableWidth({ storageKey: 'mikka:task-properties-width', min: 260, max: 480, initial: 320, edge: 'start' })
   const tCommon = useTranslations('Common')
-  const panelRef = useRef<HTMLDivElement>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   useFocusReturn(initial.id, rootRef)
-  const panelWidth = (openThread || openAcceptance ? threadWidth : propertiesWidth).width
-  useLayoutEffect(() => { panelRef.current?.style.setProperty('--task-panel-width', `${panelWidth}px`) })
   const [error, setError] = useState('')
   const [history, setHistory] = useState(false)
   const [members, setMembers] = useState(false)
@@ -223,7 +211,6 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   })
   const versions = activityRead?.items
   const { data: historyVersions, error: historyBodyError, mutate: refreshHistoryVersions } = useSWR(history && !preview ? issueKeys.versions(saved.id) : null, () => listIssueVersions(saved.id))
-  const { data: connections } = useSWR(preview ? null : issueKeys.connections(saved.id), () => listIssueConnections(saved.id))
   useEffect(() => {
     const previous = savedRef.current
     if (initial.id !== previous.id || initial.revision <= previous.revision) return
@@ -340,35 +327,17 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   }
   function requestAction(kind: IssueActionRequest['kind']) { setActionRequest(value => ({ kind, sequence: (value?.sequence ?? 0) + 1 })) }
   function requestProperty(target: MetadataRequest['target']) { setPropertyRequest(value => ({ target, sequence: (value?.sequence ?? 0) + 1 })) }
-  const subtasks = (connections ?? []).filter(row => row.metadata.parentId === saved.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
-  const activity = preview ? null : <>
-    {historyError && <Button variant="ghost" size="sm" type="button" onClick={() => { void refreshVersions() }}>{t('activityFailed')}</Button>}
-    {agentActivity.error}
-    <IssueActivityFeed versions={historyError ? [] : versions ?? []} children={historyError ? [] : subtasks} agents={agentActivity.rows} />
-  </>
-
-  const properties = <IssueDetailProperties task={saved} viewerId={user.id} onMetadataSaved={adopt} metadataDisabled={locked} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={locked} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={preview ? null : <IssueRelations liveWorkspaceId={liveWorkspaceId} viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={locked} />} />
   const threadPanel = preview ? null : openThread
     ? <TaskThreadPane issueId={saved.id} runId={openThread} tab={threadTab} onOpenThread={showThread} onBack={() => showThread(null)} />
     : openAcceptance && <FactoryAcceptancePanel key={openAcceptance.id} task={openAcceptance} onOpenThread={showThread} onClose={() => setOpenAcceptance(null)} />
 
   const saveLabel = readOnly || locked ? '' : error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')
-  const actions = <IssueDetailActions task={saved} userId={user.id} disabled={locked} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) setHistory(true) }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />
-  // No !important: Textarea ships `text-base md:text-sm`, and a variant-free `text-2xl` cannot beat `md:text-sm` at
-  // >=768px, so the title states the size once per breakpoint (text-2xl md:text-2xl), as project-form.tsx does.
-  // The rule it used to fight — the official layer holding phone form fields at 16px — is a `@media (max-width: 639px)`
-  // rule on input/select/textarea from mikka-hosted-ui, and the layer draws this page's title with its own textarea,
-  // not this one; below 640px this component's 24px already outranked it. task-09 (title larger than a body field) holds.
-  const titleField = <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">{t('titleLabel')}</FieldLabel><Textarea id="task-title" readOnly={locked} aria-label={t('titleLabel')} rows={1} placeholder={t('titleLabel')} value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring md:text-2xl dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
-  const notice = error && <div className="flex flex-wrap items-center gap-2"><FieldError>{error}</FieldError><Button variant="outline" size="sm" disabled={pending} onClick={() => { void save() }}>{t('retryAutosave')}</Button></div>
   const acceptance = preview ? null : <FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} onOpenThread={showThread} />
-  // A layer that draws the page puts its own pieces under the description and draws 活动 itself (task-detail-frame.tsx).
-  const editorWith = (afterDescription: ReactNode, renderActivity?: (discussions: IssueDiscussions) => ReactNode) => <>
+  // The frame composes sub-tasks and activity around the shared document editor.
+  const editorWith = (afterDescription: ReactNode, renderActivity: (discussions: IssueDiscussions) => ReactNode) => <>
     {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || locked ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} key={reader ? String(initial.updatedAt) : undefined} content={reader ? initial.content : content} readOnlyDiscussions={reader ? initial.readOnlyDiscussions : undefined} disabled={readOnly || locked} layout={documentTools ? 'document' : 'issue'} activity={activity} renderActivity={renderActivity} afterDescription={preview ? null : afterDescription} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || locked ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
+    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || locked ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} key={reader ? String(initial.updatedAt) : undefined} content={reader ? initial.content : content} readOnlyDiscussions={reader ? initial.readOnlyDiscussions : undefined} disabled={readOnly || locked} layout={documentTools ? 'document' : 'issue'} renderActivity={renderActivity} afterDescription={preview ? null : afterDescription} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || locked ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
   </>
-  const editor = editorWith(<>{acceptance}<IssueRelations liveWorkspaceId={liveWorkspaceId} viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={locked} /></>)
-  const syncNotice = syncState.error && <FieldError className="text-xs">{t('syncRetryNotice')}</FieldError>
   const dialogs = <>
     <Dialog open={members} onOpenChange={setMembers}><DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>{t('membersTitle')}</DialogTitle><DialogDescription>{tDetail('membersDialogDescription')}</DialogDescription></DialogHeader><IssueMembers id={saved.id} onChanged={async () => { adopt(await loadIssue(saved.id, user.id)) }} /></DialogContent></Dialog>
     <IssueDescriptionHistory open={history} onOpenChange={setHistory} identifier={saved.identifier} title={title} currentContent={content} versions={historyVersions} loadingError={!!historyBodyError} onRetry={() => { void refreshHistoryVersions() }} onRestore={restore} />
@@ -376,7 +345,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => closeOnEscape(event, rootRef.current, onClose)
   const titleChange = (value: string) => changed({ title: value })
   const titleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }
-  if (Frame) return <FramedTask Frame={Frame} rootRef={rootRef} onKeyDown={onKeyDown} label={title || t('titleLabel')} preview={preview} locked={locked} origin={origin} navigation={navigation} onClose={onClose} onOpen={onOpen} onDeleted={onDeleted} userId={user.id}
+  return <FramedTask Frame={TaskDetailFrame} rootRef={rootRef} onKeyDown={onKeyDown} label={title || t('titleLabel')} preview={preview} locked={locked} origin={origin} navigation={navigation} onClose={onClose} onOpen={onOpen} onDeleted={onDeleted} userId={user.id}
     task={saved} title={title} status={status} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
     titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
     saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: () => { void save() }, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
@@ -387,30 +356,4 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
     onHistory={() => { void save().then(success => { if (success) setHistory(true) }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
     panel={threadPanel || null} wide={wide} resize={{ handle: wide && threadPanel ? <ResizeHandle resize={threadWidth} label={tCommon('resize.taskPanel')} edge="start" /> : null, width: threadWidth.width, dragging: threadWidth.dragging }} dialogs={dialogs} />
 
-
-  // R-61: one line under the header, one before the properties or an open thread; the page scrolls, the right column stays.
-  return <div ref={rootRef} tabIndex={-1} role="region" aria-busy={preview} aria-label={title || t('titleLabel')} className="flex min-w-0 flex-1 outline-none" onKeyDown={onKeyDown}>
-    <div className="flex min-w-0 flex-1 flex-col">
-    <IssueDetailHeader origin={origin} identifier={saved.identifier} title={title} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving} pending={false} navigation={navigation} onClose={onClose} actions={actions} />
-    <div className="mx-auto flex w-full min-w-0 max-w-170 flex-1 flex-col gap-6 px-5 py-6 sm:px-8 lg:py-10">
-      {!wide && <SectionBoundary onClose={onClose}>{properties}</SectionBoundary>}
-      <div className="min-w-0">
-        <div className="flex w-full flex-col gap-8">
-          {notice}
-          <div className="flex min-w-0 flex-col gap-7">
-            {titleField}
-            {editor}
-          </div>
-          {syncNotice}
-        </div>
-      </div>
-    </div>
-    </div>
-    {/* One element for both widths: crossing the breakpoint restyles the open thread instead of remounting it (its tab, viewer and draft stay). */}
-    {(wide || threadPanel) && <div ref={panelRef} className={cn(wide ? 'sticky top-0 flex h-[calc(100svh-3.25rem)] shrink-0 flex-col self-start border-l border-rule' : 'fixed inset-0 z-30 flex flex-col bg-background', (threadPanel ? threadWidth : propertiesWidth).dragging && 'select-none')}>
-      {threadPanel ? <div className={cn('flex h-full flex-col', wide && 'w-(--task-panel-width)')}>{threadPanel}</div> : <div className="w-(--task-panel-width) overflow-y-auto px-6 py-10"><SectionBoundary onClose={onClose}>{properties}</SectionBoundary></div>}
-      {wide && <ResizeHandle resize={threadPanel ? threadWidth : propertiesWidth} label={tCommon('resize.taskPanel')} edge="start" />}
-    </div>}
-    {dialogs}
-  </div>
 }
