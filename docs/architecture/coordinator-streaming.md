@@ -1,63 +1,68 @@
-# Progressive bot replies
+# Bot conversations with eve
 
-The Coordinator and personal bots use the durable Workflow tool loop with
-`WorkflowAgent.stream()`. The selected hosted or subscription model retains
-its admission, usage accounting and zero SDK retries. A run's writable stays
-open between inbox rounds and closes when the workflow finishes.
+The Coordinator and personal Bots use the pinned `eve` agent service in
+`apps/eve`. Eve owns the model/tool loop, queued messages, session lifecycle,
+stream replay and cancellation. The selected Mikka model still owns admission,
+subscription access, billing and provider usage accounting. There is one agent
+loop; the former `WorkflowAgent` loop and `/api/coordinator/stream` protocol have
+been removed.
 
-The workflow writes a turn marker before generation, then model output, then a
-commit marker after the final messages pass the credential guard and are saved.
-The commit marker carries the actual stored message cursor, since a person can
-submit another message while generation is running.
+## Sessions and streaming
 
-## Authenticated stream
+Web and mobile clients use eve's public `useEveAgent` hook and client APIs through
+`/mikka/api/agents/eve/v1/*`. The server authenticates the caller, resolves the
+Bot and Workspace, and checks the persisted `eve_sessions` binding. Conversation
+addresses include owner, Workspace, Bot and channel surface. Slack uses eve's
+native Slack channel and a separate surface from private web conversations.
 
-`GET /api/coordinator/stream` authenticates the reader and resolves the active
-Workflow lease for that owner and bot. A supplied `runId` checks that the client
-and server still refer to the same run. When a message is queued before a turn
-starts, `wait=1` waits on the existing PostgreSQL lease notification and returns
-the selected run in `x-mikka-stream-run`. An absent or changed active run returns
-HTTP 204.
+Eve provides its native resumable stream, protocol headers and cancellation.
+The application derives live text and tool activity from eve entries, then uses
+the existing OpenUI renderer. Changing Bots cancels the previous reader. The
+Node proxy preserves streaming bodies, query parameters, cookies and request
+cancellation; Vercel mounts the same compiled service under the same public
+prefix. Workflow callbacks and durable storage remain separate from the main
+application's product workflows. See [deployment](../operations/eve-runtime.md).
 
-The route sends sequenced JSON-line events for assistant text, masked reasoning,
-thinking state, and tool activity with bounded masked input/output previews and
-closed error codes. Complete tool inputs and outputs, provider metadata and raw
-errors remain server-side. The credential guard holds the last
-`longest saved secret length - 1` characters to detect a secret split between
-chunks. Quiet handoff sentinels stay hidden. These projections are defined in
-[stream-response.ts](../../lib/coordinator/stream-response.ts).
+## Product authority and history
 
-## Rendering and reconnection
+Eve calls the authenticated internal product gateway for business tools. The
+Mikka host executes those tools in its own Workflow world, preserving Factory,
+E2B, task machines, native CLI lifecycle and their existing authorization gates.
+Enterprise tool authority requires a signed internal service scope and the
+current persisted session and execution binding; model-supplied identifiers do
+not grant authority.
 
-The chat supplies accumulated output and streaming state to OpenUI's `Renderer`.
-Ordinary Markdown also renders incrementally. An unfinished OpenUI prefix stays
-hidden until its component can be recognized. Completed messages come from the
-history projection. A host-written turn ID lets persisted history replace the
-live reply even when a notification delays the commit marker. The marker is
-removed from model history and cannot be supplied by an incoming message.
+Mikka supplies product policy, personal instructions and enabled memory. Eve
+owns conversation history, pruning and compaction. Product history tables remain
+for existing chat display, citations, stored reasoning, task events and retries.
+Stored reasoning still passes credential masking and saved-secret checks before
+it is displayed. Scheduling remains a Mikka business service: its durable timer
+and occurrence authority execute in the product host, then deliver to eve. This
+follows the upstream self-hosted pattern of app-managed schedules rather than
+adding another generic agent queue or scheduler.
 
-A reconnect sends the last acknowledged event sequence as `after` with
-`x-mikka-stream-key`. The key binds the run, credential fingerprints and
-projection version. The server reconstructs masking state from the durable
-stream, then skips already acknowledged projected events. A changed key resets
-the client to a full replay. A page refresh also discovers the active lease.
-Switching bots or leaving the page cancels the reader.
+## Retired infrastructure and compatibility
 
-The chat uses `useLiveKey('bot_chat', ...)` for committed message and turn
-changes, with a lease deadline and the live layer's disconnected fallback.
-Stream completion also revalidates history. The client validates contiguous
-sequences and replaces the matching live turns. See
-[the stream hook](../../components/coordinator/use-coordinator-stream.ts) and
-[chat integration](../../components/coordinator/coordinator-chat.tsx).
+The custom stream projector, decoder, stream state, scoped writable, stop hooks,
+turn-holder waiter, hosted startup/round/finish wrappers, generic compaction
+model and interrupted-lease recovery are removed from production source.
+Historical SQL fixture mutators and the startup-receipt codec live only in
+`tests/support/legacy-coordinator-store.ts` and
+`tests/support/legacy-coordinator-startup.ts`. They verify migration/history
+compatibility and are not imported by production code. Historical receipt rows
+remain in the schema; no new runtime uses that engine.
+
+The legacy native Coordinator device endpoint, native-store, tool scope and wake
+token remain to reject or settle messages from installed older devices. Their
+legacy native coordinator switch stays disabled; the unused native turn relay
+has been removed. These modules are distinct from active native CLI task runners,
+Factory workflows and task machine lifecycle, which remain product services.
 
 ## Verification
 
-`pnpm test:coordinator-stream` covers incremental rendering, replay and resume,
-bot isolation, replacement by one persisted reply, model-step resets, masked
-reasoning and tool previews, cross-chunk credential rejection, authentication,
-reader cancellation and stopped-turn consistency. Run it in the environment
-specified by [the acceptance guide](../acceptance.md).
-
-Projection timing records first raw text, first emitted text and commit time
-for that HTTP projection, including replay. Those values have a separate clock
-from provider generation and send-to-first-visible-text measurements.
+`pnpm test:coordinator-stream` covers the native eve client boundaries and
+`pnpm test:api` covers the public proxy, cancellation and packaged service.
+Product-context tests verify personal settings and memory without reading old
+conversation history. Enterprise authority tests cover signature checks,
+session/execution revocation, callback lifetime and expiry. Real provider and
+subscription acceptance follows [the acceptance guide](../acceptance.md).

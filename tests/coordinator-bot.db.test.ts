@@ -26,7 +26,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   const { observePoolCommits } = await import('../lib/db/commit-effects')
   observePoolCommits(pool)
   const bots = await import('../lib/coordinator/coordinator-bot')
-  const store = await import('../lib/coordinator/store')
+  const store = await import('@/tests/support/legacy-coordinator-store')
   const { preserveMessageSources } = await import('../lib/coordinator/message-safety')
   const { promptMessages } = await import('../lib/coordinator/context')
   const { factoryStore } = await import('../lib/factory/server')

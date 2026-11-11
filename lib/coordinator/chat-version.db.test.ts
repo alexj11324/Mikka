@@ -6,7 +6,7 @@ import { mergeChat } from './chat-poll'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { measured, readMetrics } from '../../tests/helpers/read-metrics'
 import { persistentReadData } from '../swr/cache-policy'
-import type { ChatView } from './store'
+import type { ChatView } from '@/tests/support/legacy-coordinator-store'
 import type { PoolClient } from 'pg'
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
@@ -24,7 +24,7 @@ const dbTest = databaseUrl ? test : test.skip
 // database deadline. A timed-out parent runs cleanup while its nested cases
 // are still starting; their later FK/pool errors obscure the original timeout.
 const snapshotRuntime = databaseUrl ? await Promise.all([
-  import('../db'), import('../db/schema'), import('./store'), import('../coordinator-events'), import('../chat-failure'), import('drizzle-orm'),
+  import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-events'), import('../chat-failure'), import('drizzle-orm'),
 ]) : null
 
 /** Commit the real inbox claim after PostgreSQL has answered the first state
@@ -141,7 +141,7 @@ dbTest('a continuation keeps the tail snapshot state after an earlier version re
 
 dbTest('the chat version changes exactly when the conversation or its inbox does, and costs a few bytes', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-chat-version-${randomUUID()}`, botId = randomUUID(), otherBot = randomUUID()
@@ -264,7 +264,7 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
 
 dbTest('a disk-restored tool chat repairs its proven prefix without returning cached bodies from PostgreSQL', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { and, eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-chat-metadata-${randomUUID()}`, botId = randomUUID(), otherBot = randomUUID()

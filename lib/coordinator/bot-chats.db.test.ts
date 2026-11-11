@@ -21,7 +21,7 @@ if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=
 const dbTest = databaseUrl ? test : test.skip
 
 dbTest('trusted host notices retain their source and friendly display while model appends cannot mint it', async t => {
-  const [{createRequestDatabaseScope,db},schema,store,{quotaSwitchMessage},{sql}] = await Promise.all([import('../db'),import('../db/schema'),import('./store'),import('./message-safety'),import('drizzle-orm')])
+  const [{createRequestDatabaseScope,db},schema,store,{quotaSwitchMessage},{sql}] = await Promise.all([import('../db'),import('../db/schema'),import('@/tests/support/legacy-coordinator-store'),import('./message-safety'),import('drizzle-orm')])
   const scope=createRequestDatabaseScope(databaseUrl!),owner=`display-boundary-${randomUUID()}`,botId=randomUUID()
   t.after(()=>scope.close())
   await scope.run(async()=>{
@@ -52,7 +52,7 @@ dbTest('trusted host notices retain their source and friendly display while mode
 
 dbTest('failed wake state stays with its owner and bot, and recovery keeps the original message', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-wake-state-${randomUUID()}`, peer = `test-wake-peer-${randomUUID()}`
@@ -118,7 +118,7 @@ dbTest('failed wake state stays with its owner and bot, and recovery keeps the o
 
 dbTest('a bot and the Coordinator keep their own conversation, inbox and memory', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const userId = `test-bot-chats-${randomUUID()}`
@@ -168,7 +168,7 @@ dbTest('a bot and the Coordinator keep their own conversation, inbox and memory'
 
 dbTest('personal provenance and STOP/pending survive actual inbox persistence and scoped summary round-trip', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent, peerCoordinatorMessageEvent }, { promptMessages }, { preserveMessageSources }, { eq, and, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./context'), import('./message-safety'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./context'), import('./message-safety'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const userId = `test-message-provenance-${randomUUID()}`, botId = randomUUID()
@@ -235,7 +235,7 @@ dbTest('personal provenance and STOP/pending survive actual inbox persistence an
 
 dbTest('unclassified runtime data stays pending while direct user input and classified results deliver once',async t=>{
   const [{createRequestDatabaseScope,db},schema,store,{recordCoordinatorEvent},{userMessageEvent},{eq,and,sql}]=await Promise.all([
-    import('../db'),import('../db/schema'),import('./store'),import('../coordinator-event-store'),import('../coordinator-events'),import('drizzle-orm'),
+    import('../db'),import('../db/schema'),import('@/tests/support/legacy-coordinator-store'),import('../coordinator-event-store'),import('../coordinator-events'),import('drizzle-orm'),
   ])
   const scope=createRequestDatabaseScope(databaseUrl!),owner=`test-judgment-inbox-${randomUUID()}`
   t.after(async()=>{
@@ -292,7 +292,7 @@ dbTest('unclassified runtime data stays pending while direct user input and clas
 
 dbTest('durable attempts advance past one inbox batch and persist only a matching event receipt',async t=>{
   const [{createRequestDatabaseScope,db},schema,store,{eq,and,sql}]=await Promise.all([
-    import('../db'),import('../db/schema'),import('./store'),import('drizzle-orm'),
+    import('../db'),import('../db/schema'),import('@/tests/support/legacy-coordinator-store'),import('drizzle-orm'),
   ])
   const scope=createRequestDatabaseScope(databaseUrl!),owner=`test-triage-attempt-${randomUUID()}`
   t.after(async()=>{
@@ -343,7 +343,7 @@ dbTest('durable attempts advance past one inbox batch and persist only a matchin
 
 dbTest('Telegram source receipts survive failed turns and reject stale or revoked delivery', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { createTelegramReplies }, { sql, eq }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./telegram-replies'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./telegram-replies'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const userId = `test-telegram-recovery-${randomUUID()}`
@@ -396,7 +396,7 @@ dbTest('Telegram source receipts survive failed turns and reject stale or revoke
 
 dbTest('a workspace Telegram reply reads authorization once without cross-database locks', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { createTelegramReplies }, { sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./telegram-replies'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./telegram-replies'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const userId = `test-telegram-lock-order-${randomUUID()}`
@@ -481,7 +481,7 @@ dbTest('a workspace Telegram reply reads authorization once without cross-databa
 
 dbTest('重试 re-runs a failed bot turn once, for the message already sent, in that chat only', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, isNull, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-turn-retry-${randomUUID()}`
@@ -535,7 +535,7 @@ dbTest('重试 re-runs a failed bot turn once, for the message already sent, in 
 
 dbTest('重新发送 retries a failed message in place: marked once, left out of the chat and the model history, others ignored', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordPersonalSubmission }, { and, eq, isNull, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-submission'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-submission'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-resend-${randomUUID()}`, other = `test-resend-other-${randomUUID()}`
@@ -596,7 +596,7 @@ dbTest('重新发送 retries a failed message in place: marked once, left out of
 
 dbTest('重试 also re-runs a turn that ended with no reply and nothing recorded (its lease ran out)', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-turn-unanswered-${randomUUID()}`
@@ -626,7 +626,7 @@ dbTest('重试 also re-runs a turn that ended with no reply and nothing recorded
 
 dbTest('a turn that says something, calls a tool and then answers stays working until its final reply is stored', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-working-${randomUUID()}`, botId = randomUUID(), holder = 'wrun_multi-step-turn'
@@ -659,52 +659,9 @@ dbTest('a turn that says something, calls a tool and then answers stays working 
   })
 })
 
-dbTest('a run that dies after taking a message (a replay that fails after a deploy) gives the chat back and the next turn answers the same message', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { recoverInterruptedTurns }, { and, eq, isNull, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./interrupted-turns'), import('drizzle-orm'),
-  ])
-  const scope = createRequestDatabaseScope(databaseUrl!)
-  const owner = `test-interrupted-${randomUUID()}`, botId = randomUUID()
-  t.after(async () => {
-    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner], database: 'mikka_e2e' }))
-    await scope.close()
-  })
-  await scope.run(async () => {
-    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Interrupted fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await fixtureWorkspace(owner), name: 'Interrupted bot' })
-    await recordCoordinatorEvent(db, userMessageEvent(owner, '重新派发 ALEX-5', { botId }))
-    // The run takes the message (stored in the chat, lease held), then dies before it can answer or let go.
-    assert.equal((await store.takeInbox(owner, 'wrun_killed', botId)).added, 1)
-    const dying = await store.chatView(owner, 200, botId)
-    assert.deepEqual([dying.working, dying.streamRunId], [true, 'wrun_killed'])
-    const statuses: Record<string, string> = { wrun_killed: 'failed' }
-    const leased = async () => (await db.select({ userId: schema.coordinatorSessions.userId, botId: schema.coordinatorSessions.botId, holder: schema.coordinatorSessions.leaseHolder })
-      .from(schema.coordinatorSessions).where(eq(schema.coordinatorSessions.userId, owner))).flatMap(row => row.botId && row.holder ? [{ userId: row.userId, botId: row.botId, holder: row.holder }] : [])
-    const sweep = () => recoverInterruptedTurns({ leased, status: async holder => statuses[holder] ?? 'running', release: store.releaseLease, retry: store.retryFailedTurn })
-    assert.deepEqual(await sweep(), { checked: 1, recovered: 1, retried: 1 })
-    // The chat is let go at once, not after the 10-minute lease, and its message waits for the next turn.
-    const [session] = await db.select().from(schema.coordinatorSessions).where(and(eq(schema.coordinatorSessions.userId, owner), eq(schema.coordinatorSessions.botId, botId)))
-    assert.deepEqual([session.leaseHolder, session.leaseUntil, session.lastError], [null, null, null])
-    const waiting = await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId, owner), isNull(schema.coordinatorEvents.deliveredAt)))
-    assert.deepEqual(waiting.map(event => [event.kind, event.payload.retry, event.payload.postedToChat]), [['user_message', true, true]])
-    const recovered = await store.chatView(owner, 200, botId)
-    assert.equal(recovered.working, true, 'the retry is waiting for a turn')
-    assert.equal(recovered.error, null)
-    assert.deepEqual(recovered.items.map(item => [item.from, item.text, item.failure ?? null]), [['person', '重新派发 ALEX-5', null]], 'shown once, with no failure mark')
-    // A second sweep finds nothing; the next turn takes the retry and answers the same message.
-    assert.deepEqual(await sweep(), { checked: 0, recovered: 0, retried: 0 })
-    assert.equal((await store.takeInbox(owner, 'wrun_next', botId)).added, 1)
-    assert.deepEqual((await store.chatView(owner, 200, botId)).items.map(item => [item.from, item.text]), [['person', '重新派发 ALEX-5']], 'the retry adds no second copy')
-    await store.appendMessages(owner, 'wrun_next', [{ role: 'assistant', content: '已重新派发。' }], null, botId, 'wrun_next:0')
-    const answered = await store.chatView(owner, 200, botId)
-    assert.deepEqual(answered.items.map(item => [item.from, item.text, item.failure ?? null]), [['person', '重新派发 ALEX-5', null], ['coordinator', '已重新派发。', null]])
-    assert.equal(answered.working, false)
-  })
-})
-
 dbTest('own task completion returns to the original Bot with an exhausted team trial', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { runTriageBatch }, { HostedUsageStore }, { deliverRunCompletion }, { eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('./triage-batch'), import('../abuse/store'), import('./run-completion-delivery'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('./triage-batch'), import('../abuse/store'), import('./run-completion-delivery'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!), owner = `test-completion-${randomUUID()}`
   t.after(async () => { t.diagnostic(`Retained completion transport fixture ${owner}`); await scope.close() })
@@ -750,7 +707,7 @@ dbTest('own task completion returns to the original Bot with an exhausted team t
 
 dbTest('Factory completion delivery keeps historical handoffs and reads current checks only within the owner Bot', async t => {
   const [{ createRequestDatabaseScope, db, pool }, schema, store, { runCompletionObservations }, { eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('./run-completion-observation'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('./run-completion-observation'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!), owner = `test-factory-notice-${randomUUID()}`, peer = `test-factory-peer-${randomUUID()}`
   t.after(async () => { t.diagnostic(`Retained Factory notice fixtures ${owner}, ${peer}`); await scope.close() })
@@ -919,7 +876,7 @@ dbTest('Factory completion delivery keeps historical handoffs and reads current 
 
 dbTest('structured failures survive a fresh chat read, retain the lease fence, and stay out of model/list projections', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, sql }] = await Promise.all([
-    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+    import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const owner = `test-run-failure-${randomUUID()}`, holder = 'wrun_structured_failure'
   const scope = createRequestDatabaseScope(databaseUrl!)

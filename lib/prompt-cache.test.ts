@@ -15,7 +15,7 @@ const prompt: Prompt = [
 test('the system prompt splits where its stable prefix ends, and stays one string otherwise', () => {
   assert.deepEqual(cacheableInstructions('RULESmemory', 5), [{ role: 'system', content: 'RULES' }, { role: 'system', content: 'memory' }])
   for (const stable of [undefined, 0, 11, 20]) assert.equal(cacheableInstructions('RULESmemory', stable), 'RULESmemory')
-  assert.deepEqual(promptOptions({ instructions: 'RULESmemory', stable: 5, messages: [] }), { messages: [], instructions: [{ role: 'system', content: 'RULES' }, { role: 'system', content: 'memory' }] }, '`stable` never reaches WorkflowAgent as an option')
+  assert.deepEqual(promptOptions({ instructions: 'RULESmemory', stable: 5, messages: [] }), { messages: [], instructions: [{ role: 'system', content: 'RULES' }, { role: 'system', content: 'memory' }] }, '`stable` never reaches the model call as an option')
   assert.deepEqual(promptOptions({ prompt: 'synthetic' } as { prompt: string; instructions?: string }), { prompt: 'synthetic' })
 })
 
@@ -31,7 +31,7 @@ test('rules and context have distinct nonempty cache boundaries without changing
   ])
   assert.equal((instructions as { content: string }[]).map(message => message.content).join(''), text)
   assert.deepEqual(promptOptions({ instructions: text, stable, stableRules: rules, messages: [] }), { instructions, messages: [] })
-  assert.deepEqual(promptOptions({ stable, stableRules: rules, messages: [] }), { messages: [] }, 'offsets never reach WorkflowAgent')
+  assert.deepEqual(promptOptions({ stable, stableRules: rules, messages: [] }), { messages: [] }, 'offsets never reach the model call')
   assert.deepEqual(cacheableInstructions('RULEScontext', 12, 5), [
     { role: 'system', content: 'RULES', providerOptions: hint },
     { role: 'system', content: 'context', providerOptions: hint },
