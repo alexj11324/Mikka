@@ -74,3 +74,30 @@ passed 50/50. The other three files passed initially; no assertion was changed.
 | 新建后台资源 lease | 原成员、PAT、Enterprise 与资源锁 | 全部保留并重新校验；父与子同步组合各复用自己的 lease | 否 | `tests/background-database-boundary.db.test.ts` |
 
 Revert the code change to roll back; no schema or persisted data changes exist.
+
+## Main integration on 2026-11-11
+
+Merge `f32f04d0dbc4ee24cd8a8c8ae124232f5a8737a8` incorporates main
+`5c1e0522483d504f64de07066bcd35f603c44248` into the combined dispatch and
+transaction-boundary branch. The merge has no conflicts. All seven production
+runtime files retain the same blobs as `b5f7429b7`; incoming main changes are
+the baseline, including its eve changes. The net patch against main contains
+no frozen-path changes, deletions, migration or UI changes. No main commits are
+missing from this branch. Its three modified package scripts preserve main's
+entries and add the existing dispatch, notification and boundary regressions.
+
+Fresh Cloud Linux validation bootstrapped a separate loopback PostgreSQL 17
+database with this merge's complete migrations. The six dispatch/continuation/
+shared-subscription/notification/boundary/resource-lease files pass 69/69;
+the complete Factory routing package script passes 305/305; coordinator-events
+source checks pass 411/411; the updated DB-runner inventory passes 32/32.
+All have zero skips. These fixtures do not make provider requests.
+
+The unchanged official-wake probe again records separate Workspace transaction
+identities and a fulfilled consumer. The unchanged lock-pool probe again holds
+exactly two connections for five dispatches and closes to zero after permitting
+the owner's final APP query. Root/API typechecking and the frontend package's
+4 GB typecheck pass, as do targeted lint, cloud-boundary/error-cause/polling/
+Factory policies and whitespace checks. The startup and dispatch fixtures retain
+all 116 and 29 assertion lines from main. This source-bound local evidence does
+not establish new-head CI, deployed behavior or live model acceptance.
