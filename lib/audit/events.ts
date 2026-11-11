@@ -287,6 +287,12 @@ const regionCode = (value: string | null | undefined) => { const v = value?.trim
  * x-real-ip is deliberately not read.
  */
 export function auditRequestContext(headers: Pick<Headers, 'get'>, env: Readonly<Record<string, string | undefined>> = process.env as Readonly<Record<string, string | undefined>>): { ip: string | null; geoCity: string | null; geoCountry: string | null; geoRegion: string | null } {
+  if (env.MIKKA_API_INGRESS === 'cloudflare') {
+    // Only the private release ingress sets this header; it first removes any
+    // caller-supplied value. A non-IP or missing edge observation stays unknown.
+    const ip = headers.get('x-mikka-edge-ip')
+    return { ip: ip && isIP(ip) ? ip : null, geoCity: null, geoCountry: null, geoRegion: null }
+  }
   if (env.VERCEL !== '1') return { ip: null, geoCity: null, geoCountry: null, geoRegion: null }
   const forwarded = headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
   let city = headers.get('x-vercel-ip-city')
