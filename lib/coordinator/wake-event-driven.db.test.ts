@@ -20,7 +20,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 50))
 
 dbTest('event-driven Coordinator wakes need no minute sweep', async t => {
   const [{ createRequestDatabaseScope, db, pool }, store, { recordCoordinatorEvent }, { userMessageEvent }, { sql }, recoveryModule, wake] = await Promise.all([
-    import('../db'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+    import('../db'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
     import('./wake-recovery'), import('../workflow-wake'),
   ])
   const { coordinatorWakeTransport } = await import('./wake-after-commit')

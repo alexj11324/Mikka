@@ -594,16 +594,6 @@
       "sourceHash": "cea72e01b9b56bc51e6d5c3cc9041c192c1f423a958c25653726de73a4591858"
     },
     {
-      "path": "/mikka/api/coordinator/stream",
-      "template": "/api/coordinator/stream",
-      "source": "app/api/coordinator/stream/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "maxDuration": 300,
-      "sourceHash": "1843db486151b4f496242bd19e32b1aafb2e5ec8f6e36179689cfb51bf605f31"
-    },
-    {
       "path": "/mikka/api/credentials",
       "template": "/api/credentials",
       "source": "app/api/credentials/route.ts",
@@ -1265,6 +1255,16 @@
         "PATCH"
       ],
       "sourceHash": "d450b093e5517282b41f6a49e6b712675ee8f33e8a0be7b4bafa04fa483ecf31"
+    },
+    {
+      "path": "/mikka/api/internal/eve/tools",
+      "template": "/api/internal/eve/tools",
+      "source": "app/api/internal/eve/tools/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 300,
+      "sourceHash": "a2d812cd50ff6fdb8683f4fe06e70ee76f4dc7361e916b2aa9120e3d177bcfef"
     },
     {
       "path": "/mikka/api/issues/search",
@@ -2239,7 +2239,7 @@
         "POST"
       ],
       "maxDuration": 60,
-      "sourceHash": "b1e491789af5f7523d91f5e13be4ccb43615dbd6d775e64f42a4e07dd202cb37"
+      "sourceHash": "95cbf7838529897157a8a12cb8351a708ff9f9aee30d5c9e385c858ed6012a52"
     },
     {
       "path": "/mikka/api/webhooks/telegram",
@@ -2481,7 +2481,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "6b923afd3fcebb4590bf5c86ed26fc293bd3804e7908de002241337d0d8b9991"
+      "sourceHash": "175a6b1fac6995a7896d9c8e536f23efac031d618ec9806fc832b95505051a9d"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",

@@ -38,7 +38,6 @@ stub('./wake-recovery.ts',{
   failed:async()=>{},due:async()=>[],exhausted:async()=>0,replay:async()=>false,
  }),
 })
-stub('../../workflows/coordinator/workflow.ts',{coordinatorTurn:()=>{}})
 mock.module('workflow/api',{namedExports:{start:async()=>{starts++;return {runId:'synthetic-workflow'}}}})
 let wake:typeof import('./wake'),group:typeof import('./route-group'),transport:typeof import('./decide')
 before(async()=>{

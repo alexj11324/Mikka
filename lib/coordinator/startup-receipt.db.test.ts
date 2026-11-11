@@ -5,8 +5,8 @@ import { setTimeout as delay } from 'node:timers/promises'
 import type { Pool, PoolClient, QueryResult } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import type { HandoffPayload } from '../attention/handoff'
-import type { InboxTake } from './store'
-import type { CoordinatorStartupSettingsCandidate, CoordinatorStartupTake } from './startup-receipt'
+import type { InboxTake } from '@/tests/support/legacy-coordinator-store'
+import type { CoordinatorStartupSettingsCandidate, CoordinatorStartupTake } from '@/tests/support/legacy-coordinator-startup'
 
 // The application and the observer must address the same disposable PG17 DB.
 // Importing this file without a DB is not a verification result; required CI
@@ -59,7 +59,7 @@ function ownBackgroundWork() {
 
 const backgroundWork = databaseUrl ? ownBackgroundWork() : null
 const runtime = databaseUrl ? await Promise.all([
-  import('../db'), import('../db/schema'), import('./store'), import('../coordinator-events'),
+  import('../db'), import('../db/schema'), import('@/tests/support/legacy-coordinator-store'), import('../coordinator-events'),
   import('./coordinator-bot'), import('../db/listen'), import('../db/commit-effects'),
   import('../db/egress-sample'), import('../builtin-gateway/runtime'), import('../workspace-db'),
 ]) : null
@@ -151,7 +151,7 @@ async function receiptRows(f: Fixture) {
   return (await f.pool.query('SELECT holder,round,version,settings,inbox FROM coordinator_startup_receipts WHERE "userId"=$1 AND "botId"=$2 ORDER BY holder,round', [f.owner, f.botId])).rows
 }
 async function decodeReceiptRow(row: { version: unknown; settings: unknown; inbox: unknown }) {
-  const { decodeStoredStartupReceipt } = await import('./startup-receipt')
+  const { decodeStoredStartupReceipt } = await import('@/tests/support/legacy-coordinator-startup')
   return { ...row, ...decodeStoredStartupReceipt(row.version, row.settings, row.inbox) }
 }
 async function seedHistoricalReceipt(f: Fixture, checkpoint: InboxOnly) {
@@ -159,7 +159,7 @@ async function seedHistoricalReceipt(f: Fixture, checkpoint: InboxOnly) {
   // The previous implementation stored these complete, schema-valid results.
   // Seed that committed historical row explicitly; a new take must not be
   // expected to write it merely to exercise backward-compatible replay.
-  const { encodeStoredStartupReceipt } = await import('./startup-receipt')
+  const { encodeStoredStartupReceipt } = await import('@/tests/support/legacy-coordinator-startup')
   const encoded = encodeStoredStartupReceipt(checkpoint)
   const inserted = await f.pool.query('INSERT INTO coordinator_startup_receipts ("userId","botId",holder,round,version,settings,inbox) VALUES ($1,$2,$3,0,1,$4::jsonb,$5::jsonb)',
     [f.owner, f.botId, f.holder, JSON.stringify(encoded.settings), JSON.stringify(encoded.inbox)])
@@ -727,7 +727,7 @@ dbTest('failure after the real receipt INSERT rolls back delivery, lease, Telegr
 dbTest('a real receipt key conflict fails closed and rolls back the newer inbox', { timeout: 30_000 }, async t => {
   await fixture(t, async f => {
     const [{ withDatabaseClient }] = runtime!
-    const { encodeStoredStartupReceipt } = await import('./startup-receipt')
+    const { encodeStoredStartupReceipt } = await import('@/tests/support/legacy-coordinator-startup')
     const conflict = encodeStoredStartupReceipt({ settings: { ...firstSettings, coordinator: true }, inbox: emptyInbox })
     const e1 = await event(f, 'E1 for receipt conflict')
     const originalLease = await lease(f)
@@ -831,7 +831,7 @@ dbTest('compact receipt replay preserves an explicitly stored empty optional que
     const first = ready(await take(f))
     assert.equal(Object.hasOwn(first.inbox, 'attentionQuestions'), false)
     const inbox = { ...first.inbox, attentionQuestions: [] }
-    const { encodeStoredStartupReceipt } = await import('./startup-receipt')
+    const { encodeStoredStartupReceipt } = await import('@/tests/support/legacy-coordinator-startup')
     const encoded = encodeStoredStartupReceipt({ settings: first.settings, inbox })
     await f.pool.query('UPDATE coordinator_startup_receipts SET settings=$4::jsonb,inbox=$5::jsonb WHERE "userId"=$1 AND "botId"=$2 AND holder=$3',
       [f.owner, f.botId, f.holder, JSON.stringify(encoded.settings), JSON.stringify(encoded.inbox)])
@@ -965,7 +965,7 @@ dbTest('startup normal paths use no more statements than old settings plus inbox
             promptExecuted = true
             const conversation = mode === 'old'
               ? await runtime![2].loadConversation(f.owner, f.botId)
-              : await runtime![2].loadConversationForPrompt(f.owner, f.botId)
+              : await runtime![2].loadConversation(f.owner, f.botId)
             let instructions: string
             if (mode === 'old') instructions = await personal.withPersonalInstructions(f.owner, system, plugins)
             else {
