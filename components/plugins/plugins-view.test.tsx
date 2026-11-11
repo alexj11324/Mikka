@@ -45,6 +45,18 @@ mock.module('@/i18n/navigation', { namedExports: { Link: ({ children }: { childr
 const browser = new Window({ url: 'https://mikka.test/settings?section=connections' })
 let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
+// Exercise the public controllers and their loading/error components. The trusted
+// paired build exercises the private store and settings screens themselves.
+mock.module('@ui-slot/settings-connections', { namedExports: {
+  AppPage: () => null,
+  ConnectionsList: (props: Parameters<typeof ConnectedList>[0]) => <ConnectedList {...props} />,
+} })
+mock.module('@ui-slot/plugins', { namedExports: {
+  PluginsPage: () => <OwnAppsStatus read={usePluginsView('plugins').ownRead} />,
+} })
+let usePluginsView: typeof import('./plugins-view')['usePluginsView']
+let ConnectedList: typeof import('./connected-list')['ConnectedList']
+let OwnAppsStatus: typeof import('./connected-list')['OwnAppsStatus']
 let PluginsView: typeof import('./plugins-view')['PluginsView']
 let fetchOwnAppStates: (previous?: Partial<Record<App, State>>) => Promise<Read>
 let githubResponse: { ok: boolean; data?: unknown }, linearResponse: { ok: boolean; data?: unknown }
@@ -59,6 +71,10 @@ before(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
   const module = await import('./plugins-view')
+  usePluginsView = module.usePluginsView
+  const shared = await import('./connected-list')
+  ConnectedList = shared.ConnectedList
+  OwnAppsStatus = shared.OwnAppsStatus
   PluginsView = module.PluginsView
   fetchOwnAppStates = module.fetchOwnAppStates as unknown as typeof fetchOwnAppStates
 })

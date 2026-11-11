@@ -27,8 +27,7 @@ import { AppFrame, AppShellContent, FRAME_LISTS_CHATS, FRAME_OWNS_HEADER, FRAME_
 import { ConversationPanels } from '@/components/coordinator/conversation-panels'
 import * as settingsFrameSlot from '@ui-slot/settings-frame'
 import * as reviewSummarySlot from '@ui-slot/review-summary'
-import * as pluginsSlot from '@ui-slot/plugins'
-import type { PluginsPageProps } from '@/components/slots/plugins-contract'
+import { PluginsPage } from '@ui-slot/plugins'
 import { ReviewPage } from '@ui-slot/review-page'
 import { closeReview, openReview, useReviewPage } from '@/hooks/code-review/use-review-page'
 import { IssueList } from './issue-list'
@@ -74,7 +73,6 @@ import { WorkspaceOverview } from './workspace-overview'
 import { GroupChatView, type GroupChatRequest } from './group-chat-view'
 import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { InlineLoadError } from '@/components/load-error'
-import { PluginsPage as DefaultPluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
 import { backToTaskOrigin, dropQueryKeys, goTo, navigate as navigateWorkspace, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest, appHrefBeforeSettings, rememberAppHref } from '@/lib/settings-navigation'
@@ -120,7 +118,6 @@ const { SettingsFrame } = settingsFrameSlot
 // REVIEW_ENABLED is optional too: a layer without the review page (and the default) adds no ⌘⇧B and no 「审阅 #N」.
 const reviewEnabled = (reviewSummarySlot as { REVIEW_ENABLED?: boolean }).REVIEW_ENABLED === true
 // The rail's 插件 page: a layer's own (optional export, docs/ui-overlay.md), else today's store.
-const PluginsPage = (pluginsSlot as { PluginsPage?: ComponentType<PluginsPageProps> | null }).PluginsPage ?? DefaultPluginsPage
 const SettingsRouteContent = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsRouteContent), { loading: WorkspaceContentLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
