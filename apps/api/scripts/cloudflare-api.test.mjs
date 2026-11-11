@@ -109,3 +109,17 @@ test('task bridge fixes the authority and methods and forwards only a grant and 
   const bound = ingressConfig({release:id,origin:'https://test.example',image:'registry.cloudflare.com/'+'0'.repeat(32)+'/mikka-api@sha256:'+'2'.repeat(64),taskMachine:'dedicated-machines'})
   assert.deepEqual(bound.services, [{ binding:'TASK_MACHINE', service:'dedicated-machines' }])
 })
+
+test('the task process handshake requires the private host capability, binding and an exact WebSocket upgrade', async () => {
+  const token = 'per-shared-host', url = 'http://task-machine.internal/v1/process'
+  const context = { params: { token } }, env = { TASK_MACHINE: {} }
+  const headers = { authorization: 'Bearer ' + token, upgrade: 'websocket' }
+  const send = (target, options, bindings = env) => taskMachine(new Request(target, options), bindings, context)
+  assert.equal((await send(url, { headers: { upgrade: 'websocket' } })).status, 403)
+  assert.equal((await send(url, { headers: { ...headers, authorization: 'Bearer other' } })).status, 403)
+  assert.equal((await send(url, { headers: { authorization: headers.authorization } })).status, 400)
+  assert.equal((await send(url, { method: 'POST', headers })).status, 400)
+  assert.equal((await send(url + '?run=x', { headers })).status, 404)
+  assert.equal((await send(url.replace('task-machine.internal', 'another.internal'), { headers })).status, 404)
+  assert.equal((await send(url, { headers }, {})).status, 503)
+})

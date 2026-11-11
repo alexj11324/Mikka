@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto'
+import { handleTaskProcessSocket } from '../../task-sandbox/process-socket.mjs'
 
 const HOST = 'task-machine.internal'
 const MAX_FILE_BYTES = 4 * 1024 * 1024
@@ -53,13 +54,19 @@ function machineFailure(error) {
 
 export async function taskMachine(request, env, { params }) {
   const url = new URL(request.url)
-  if (url.origin !== 'http://' + HOST || url.username || url.password || url.search || url.hash || !writes.has(url.pathname)) return refused('not_found', 404)
+  const processSocket = url.pathname === '/v1/process'
+  if (url.origin !== 'http://' + HOST || url.username || url.password || url.search || url.hash || (!processSocket && !writes.has(url.pathname))) return refused('not_found', 404)
   const token = params?.token
   const header = request.headers.get('authorization') ?? ''
   const expected = 'Bearer ' + token
   if (!token || header.length !== expected.length || !/^[ !-~]+$/.test(header)
       || !timingSafeEqual(new TextEncoder().encode(header), new TextEncoder().encode(expected))) return refused('forbidden', 403)
   if (!env.TASK_MACHINE) return refused('machine_unavailable', 503)
+  if (processSocket) {
+    if (request.method !== 'GET' || request.headers.get('upgrade')?.toLowerCase() !== 'websocket') return refused('invalid_request', 400)
+    // The RPC handshake needs only an Upgrade. Never carry the container capability or cookies into the session.
+    return handleTaskProcessSocket(new Request(url, { headers: { upgrade: 'websocket' } }), env.TASK_MACHINE)
+  }
   if (request.method !== 'POST' || request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return refused('invalid_request', 400)
   const write = url.pathname === '/v1/write-file'
   let body, bytes
