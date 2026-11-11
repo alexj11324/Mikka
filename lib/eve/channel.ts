@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { authenticateEveRequest, internalEveScope } from './auth'
 import { assertSessionScope, conversationAddress, registerSession, scopeFromAuth, scopeAuth, type EveScope } from './scope'
 import { priorHistory } from './history'
+import { forwardEveRequest } from './forward-request'
 
 const body = z.object({ message: z.unknown().optional(), operationId: z.string().optional(), clientContext: z.unknown().optional() }).passthrough()
 
@@ -40,7 +41,7 @@ export function mikkaEveChannel() {
           const submission = request.headers.get('x-mikka-submission-id')
           if (submission) payload.idempotencyKey = z.uuid().parse(submission)
           const url = new URL(request.url); url.pathname = `/eve/v1/session/${session.id}`
-          const forwarded = new Request(url, { method:'POST',headers:request.headers,body:JSON.stringify(payload) })
+          const forwarded = forwardEveRequest(request,url,JSON.stringify(payload))
           const response = await follow.handler(forwarded, { ...args, params:{sessionId:session.id} })
           if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
           return response
@@ -56,12 +57,12 @@ export function mikkaEveChannel() {
           if (!parsed.success) return Response.json({ok:false,error:'validationGeneric'},{status:400})
           streamAfter=Math.max(0,parsed.data)
           url.searchParams.set('startIndex','0')
-          forwarded=new Request(url,request)
+          forwarded=forwardEveRequest(request,url)
         }
         if (request.method === 'POST' && route.path === '/eve/v1/session/:sessionId' && request.headers.has('x-mikka-submission-id')) {
           const payload = await request.clone().json()
           payload.idempotencyKey = z.uuid().parse(request.headers.get('x-mikka-submission-id'))
-          forwarded = new Request(request,{method:'POST',body:JSON.stringify(payload)})
+          forwarded = forwardEveRequest(request,request.url,JSON.stringify(payload))
         }
         const response = await route.handler(forwarded,args)
         if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
