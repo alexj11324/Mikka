@@ -57,6 +57,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/eve/auth-bot.ts', file: 'lib/eve/auth-bot.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/eve/sandbox.ts', file: 'lib/eve/sandbox.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/eve/settlement.ts', file: 'lib/eve/settlement.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/outcome-delivery.ts', file: 'lib/eve/outcome-delivery.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/eve/approval-store.ts', file: 'lib/eve/approval-bridge.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
   { marker: 'lib/run-leases.ts', file: 'tests/run-recovery.db.test.ts', script: 'test:run-recovery-db' },

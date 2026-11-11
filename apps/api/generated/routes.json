@@ -1359,7 +1359,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "19c5cf47f4f90fb565adb103d466719f63503af89a8a5cf2085f37dbdcba0342"
+      "sourceHash": "048664e1e6ceb53a28f29da3c5848199cd2ff145081b2eeecf650b37caa3b684"
     },
     {
       "path": "/mikka/api/mobile/chat/stop",

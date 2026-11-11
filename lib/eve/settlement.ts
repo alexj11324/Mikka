@@ -52,7 +52,10 @@ export async function finishEveTurn(scope:EveScope,input:EveTurnSettlement) {
       // precede the user's message in the product history.
       if(source&&scope.surface==='web')await (await import('./submission')).markEventAccepted(scope,source.source_event_id)
       if (receipt.occurrence && source) await settleSchedule(scope,input,source.source_event_id,receipt.occurrence)
-      else await projectTurnState(scope,input.sessionId,input.turnId,false,input.messages,{outcome:input.outcome,sourceEventId:source?.source_event_id})
+      else {
+        await projectTurnState(scope,input.sessionId,input.turnId,false,input.messages,{outcome:input.outcome,sourceEventId:source?.source_event_id})
+        await (await import('./outcome-delivery')).deliverEveOutcome(scope,input)
+      }
     }
     if (execution) await (await import('../../workflows/coordinator/agent-kit-steps')).finishAgentExecution(scope.ownerId,scope.botId,execution.id,input.outcome === 'failed' ? 'turn_failed' : undefined)
     await client.query('UPDATE eve_turn_settlements SET completed_at=now() WHERE session_id=$1 AND turn_id=$2',[input.sessionId,input.turnId])
