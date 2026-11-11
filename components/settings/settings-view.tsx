@@ -17,6 +17,8 @@ import { MembersPanel } from '@/components/settings/members-panel'
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
+import { WebServerControl } from '@/components/settings/web-server-control'
+import { DesktopServerSettings } from '@/components/settings/desktop-server-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
 import { EnvironmentsSettings } from './environments-settings'
 import { CloudSettings } from '@/components/settings/cloud-settings'
@@ -131,7 +133,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     ? preview || workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
     : null
   switch (section) {
-    case 'account': return <><AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} />{community && userKey && <CloudSettings personal userKey={userKey} workspaceId={workspaceId} />}</>
+    case 'account': return <><AccountSettings user={user} onSignOut={onSignOut} signingOut={signingOut} /><WebServerControl settings /><DesktopServerSettings />{community && userKey && <CloudSettings personal userKey={userKey} workspaceId={workspaceId} />}</>
     case 'cloud': return userKey ? <CloudSettings userKey={userKey} workspaceId={workspaceId} /> : null
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
 

@@ -77,3 +77,12 @@ test('Apple sign-in requires an explicit boolean in discovery', async () => {
     if (result.status === 'ok') assert.equal(result.server.signIn.apple, apple === true)
   }
 })
+
+test('a typed installation path cannot select another installation on the same origin', async () => {
+  const base = 'https://self.example/team-a'
+  const check = (basePath: string) => probeMobileServer(base, options(async () => reply({ ...document, basePath })))
+  assert.deepEqual(await check('/team-b'), { status: 'not_mikka' })
+  const correct = await check('/team-a')
+  assert.equal(correct.status, 'ok')
+  if (correct.status === 'ok') assert.equal(correct.server.url, base)
+})

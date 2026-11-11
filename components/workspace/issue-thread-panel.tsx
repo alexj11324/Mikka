@@ -106,7 +106,7 @@ function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; 
  * the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'changes' | 'acceptance'
-type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** With `before`: scroll to this run's section, an earlier one or this panel's own, once the conversation has loaded. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean; /** Its place in its task's one conversation: the status line names the attempt, and the dispatch is not a person's bubble. */ attempt?: { n: number; first: boolean; taskTitle?: string }; /** With a layer's thread screen: this run's rows as data, reported instead of drawn (an earlier attempt in a task's conversation). */ collect?: (runId: string, entries: ThreadEntry[]) => void; /** With a layer's thread screen: the earlier attempts' rows, above this run's own. */ beforeEntries?: ThreadEntry[] }
+type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** With `before`: scroll to this run's section, an earlier one or this panel's own, once the conversation has loaded. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean; /** Its place in its task's one conversation: the status line names the attempt, and the dispatch is not a person's bubble. */ attempt?: { n: number; first: boolean; taskTitle?: string }; /** With a layer's thread screen: this run's rows as data, reported instead of drawn (an earlier attempt in a task's conversation). */ collect?: (runId: string, entries: ThreadEntry[]) => void; /** With a layer's thread screen: the earlier attempts' rows, above this run's own. */ beforeEntries?: ThreadEntry[]; /** Readable control-run evidence that follows the writable root, without acquiring its composer. */ afterEntries?: ThreadEntry[]; after?: ReactNode }
 
 export type ThreadChangeRequest = { label: string; onSend: (note: string) => Promise<boolean>; onCancel: () => void }
 
@@ -115,7 +115,7 @@ export function IssueThreadPanel(props: IssueThreadPanelProps) {
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, before, focusRunId, transcriptOnly = false, attempt, collect, beforeEntries }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, before, focusRunId, transcriptOnly = false, attempt, collect, beforeEntries, afterEntries, after }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const runErrorText = useRunErrorText()
   const format = useFormatter()
@@ -204,8 +204,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const providerExplained = data?.thread.modelFallbackPending || modelFallback.some(item => item.runId === liveRunId)
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
-  const replyBlocked = data?.thread.replyAvailable === false
-  const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && data.thread.retryAvailable && !runIsActive(view?.status ?? '')
+  const replyBlocked = transcriptOnly || data?.thread.replyAvailable === false
+  const canRetry = !transcriptOnly && !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && data.thread.retryAvailable && !runIsActive(view?.status ?? '')
   const failureText = runErrorText(failure)
   const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
     <div className="flex min-w-0 flex-1 flex-col">
@@ -238,6 +238,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     } finally { setSending(false) }
   }
   async function send(retry?: string, retryOriginalSession?: true) {
+    if (transcriptOnly) return
     if (changeRequest && retry === undefined) return sendChangeRequest(changeRequest)
     const text = retry ?? draft.trim()
     const questionWake = retryOriginalSession ? data?.thread.questionWake : null
@@ -260,6 +261,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     finally { setSending(false) }
   }
   async function stop() {
+    if (transcriptOnly) return
     if (!active || (!stopFailed && (stopRequested || stopAttemptRef.current !== null))) return
     const attempt = Date.now()
     stopAttemptRef.current = attempt
@@ -280,7 +282,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // A run opened from its task's 活动 scrolls to its section in the joined conversation (TaskConversation), the newest
   // run's own section included. It waits until no section above still shows its skeleton: a transcript that loads
   // after the scroll would push the opened run back out of view.
-  const joined = before != null && before !== false
+  const joined = Boolean(before || after)
   useEffect(() => {
     const root = rootRef.current
     if (!focusRunId || !joined || !root) return
@@ -397,11 +399,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (data.thread.quota?.switched.length || modelFallback.length || (!active && (view?.status ?? data.thread.status) === 'succeeded') || data.thread.feedbackEligible) bot('tail', [{ kind: 'text', text: '', node: tail }])
     if (active && !items.length) bot('waiting', [], { streaming: true })
   }
-  const entriesKey = entries.map(entry => `${entry.id}:${entry.role === 'bot' ? entry.parts.length : entry.text.length}`).join('|')
-  useEffect(() => { if (collect && Screen) collect(runId, entries) }, [collect, Screen, runId, entriesKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Re-publish the admitted read itself. Identical message lengths or tool
+  // counts do not prove the content, grant or attempt result is unchanged.
+  useEffect(() => { if (collect && Screen) collect(runId, entries) }, [collect, Screen, runId, data, active, canRetry, sending, view?.status, retryLabel]) // eslint-disable-line react-hooks/exhaustive-deps
   if (collect && Screen) return null
   if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
-  const screen = Screen && !bare && detail ? <Screen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries] : null}
+  const screen = Screen && !bare && detail ? <Screen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
     composer={{ ref: inputRef, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
       attachmentScope: { kind: 'thread', id: liveRunId }, sending: sending || stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || stopRequested || question === 'resuming',
@@ -438,6 +441,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
       {before}
       <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
+      {after}
     </div>
     {data?.thread.quota?.paused && <div className="shrink-0 p-3">
       <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />

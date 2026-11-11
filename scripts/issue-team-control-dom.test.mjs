@@ -26,7 +26,7 @@ async function exercise(response) {
   const host=document.createElement('div');document.body.append(host)
   const root=createRoot(host)
   try {
-    await act(async()=>root.render(createElement(IssueTeamControl,{issueId:'issue-a',disabled:false,onChosen:(...args)=>choices.push(args)})))
+    await act(async()=>root.render(createElement(IssueTeamControl,{issueId:'issue-a',viewerId:'owner',disabled:false,onChosen:(...args)=>choices.push(args)})))
     await act(async()=>{const select=host.querySelector('select');select.value=team.id;select.dispatchEvent(new window.Event('change',{bubbles:true}))})
     assert.deepEqual(choices,[['issue-a',null]],'changing an unsaved choice invalidates earlier intent')
     await act(async()=>{host.querySelector('button').click();await new Promise(resolve=>setImmediate(resolve))})

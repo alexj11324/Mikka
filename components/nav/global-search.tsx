@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useContext, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Bot, FileDiff, FolderClosed, ListTodo, Plus, RotateCw, Search, SquarePen, Users } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
@@ -14,7 +14,7 @@ import { Badge } from '@/components/reui/badge'
 import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from '@/components/ui/command'
 import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { Spinner } from '@/components/ui/spinner'
-import { statusTone, type StatusTone } from '@/lib/status-appearance'
+import type { StatusTone } from '@/lib/status-appearance'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import type { SavedAgentSession } from '@/lib/agent-history'
 import { matchesQuery, mergeById, type SiteSearchItem } from '@/lib/site-search'
@@ -26,7 +26,9 @@ import { cn } from '@/lib/utils'
 import { LetterAvatar } from './letter-avatar'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { FieldError } from '@/components/ui/field'
-import { localTaskState, type TaskState } from '@/hooks/use-bot-tasks'
+import type { TaskState } from '@/lib/task-state'
+import { TaskPresentationsContext, useWorkspaceTaskPresentations } from '@/hooks/use-task-collection'
+import { useLiveScope } from '@/hooks/use-live-key'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Project = Awaited<ReturnType<typeof listProjects>>[number]
@@ -35,7 +37,7 @@ type GroupHit = Extract<SiteSearchItem, { type: 'group' }>
 type HistoryHit = Extract<SiteSearchItem, { type: 'history' }>
 
 /** A task state's badge tone: waiting is the person's turn, blocked and failed need help, the rest are calm. */
-const TASK_STATE_TONE = { waiting: 'warning', blocked: 'destructive', failed: 'destructive', running: 'info', queued: 'neutral', todo: 'neutral', idle: 'neutral', done: 'success', canceled: 'neutral', duplicate: 'neutral' } as const satisfies Record<TaskState, StatusTone>
+const TASK_STATE_TONE = { waiting: 'warning', blocked: 'destructive', failed: 'destructive', running: 'info', queued: 'neutral', todo: 'neutral', done: 'success', canceled: 'neutral', duplicate: 'neutral' } as const satisfies Record<TaskState, StatusTone>
 
 const STATUS_BADGES = { neutral: 'outline', warning: 'warning-light', info: 'info-light', success: 'success-light', destructive: 'destructive-light', focus: 'focus-light' } as const satisfies Record<StatusTone, string>
 
@@ -100,11 +102,9 @@ export function GlobalSearch(props: GlobalSearchProps) {
 function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, threads = [], workspaceId, onChat, onNewBot, onIssue, onProject, onThread, onCreateIssue, reviewTaskId = null, onReview }: GlobalSearchProps): SearchPaletteProps {
   const t = useTranslations('Shell')
   const tNav = useTranslations('Nav')
-  const tIssue = useTranslations('Issue')
   const [query, setQuery] = useState('')
   const search = useSiteSearch(query, workspaceId)
   const text = query.trim()
-  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const sessionName = (title: string) => tNav('archivedConversation', { title: title || tNav('untitledConversation') })
   function pick(action: () => void) { onOpenChange(false); action() }
   const shown = (value: string) => !text || matchesQuery(value, text)
@@ -117,9 +117,19 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
     search.state.history.items.filter((item): item is HistoryHit => item.type === 'history'),
   )
   const groupRows = search.state.groups.items.filter((item): item is GroupHit => item.type === 'group')
+  const presentations = useContext(TaskPresentationsContext)
+  const scope = useLiveScope()
+  const remoteTasks = useMemo(() => search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'), [search.state.tasks.items])
+  // The workspace already reads its loaded issues. Only hits outside that collection need another batch.
+  const extraTasks = useMemo(() => {
+    if (!workspaceId) return []
+    const loaded = new Set(issues.map(issue => issue.id))
+    return remoteTasks.filter(hit => !loaded.has(hit.id)).map(hit => ({ id: hit.id, workspaceId }))
+  }, [issues, remoteTasks, workspaceId])
+  const extra = useWorkspaceTaskPresentations(scope?.ownerId ?? '', workspaceId ?? undefined, null, extraTasks, open && !!scope?.ownerId && scope.workspaceId === workspaceId)
   const taskRows: (Issue | TaskHit)[] = mergeById(
     issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
-    search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'),
+    remoteTasks,
   )
   const threadRows = onThread ? threadSearchHits(threads, text, thread => threadName(thread, issues, tNav('untitledConversation')), new Set(taskRows.map(row => row.id))) : []
   const projectRows = projects.filter(project => shown(`${project.name} ${project.summary}`))
@@ -176,13 +186,8 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
     { id: 'tasks', heading: t('groups.tasks'), rows: taskRows.length ? [
       ...taskRows.map(row => {
         const assignee = 'metadata' in row ? row.metadata.assignee?.name : null
-        // The task's one state, as its card, panel row and board read it (localTaskState), not the bare board
-        // status: a done run whose PR waits says Needs review here too (UI audit work-04). A server hit without
-        // its metadata keeps the board status.
-        const task = 'metadata' in row ? localTaskState(row, threads.find(thread => thread.issueId === row.id)) : null
-        const status = task
-          ? { label: task.reason ? t(`panel.task.reason.${task.reason}`) : t(`panel.task.state.${task.state}`), tone: TASK_STATE_TONE[task.state] }
-          : { label: statusLabel(row.status), tone: statusTone(row.status) }
+        const task = presentations[row.id] ?? extra.items[row.id]
+        const status = task && { label: task.reason ? t(`panel.task.reason.${task.reason}`) : t(`panel.task.state.${task.state}`), tone: TASK_STATE_TONE[task.state] }
         return { key: `issue ${row.id}`, label: row.title, identifier: row.identifier ?? undefined, detail: assignee ?? undefined, status, lead: { kind: 'icon', icon: ListTodo }, select: () => { if (onIssue(row.id)) onOpenChange(false) } } satisfies SearchRow
       }),
       ...moreRow('tasks'),

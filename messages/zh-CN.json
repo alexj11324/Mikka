@@ -3,6 +3,17 @@
     "daily": "每天 {time}",
     "interval": "每 {minutes} 分钟"
   },
+  "TaskAttachments": {
+    "title": "附件",
+    "add": "添加文件",
+    "empty": "暂无附件",
+    "remove": "移除 {name}",
+    "failed": "附件修改未保存。",
+    "downloadFailed": "附件下载失败。",
+    "readFailed": "附件加载失败。",
+    "size": "请选择不超过 3 MiB 的非空文件。",
+    "limit": "每个任务最多 10 个文件。"
+  },
   "Common": {
     "privacyPolicy": "隐私政策",
     "appUpdated": "Mikka 已更新",
@@ -4772,6 +4783,10 @@
       "noneToday": "今天还没有新的建议。"
     },
     "newTaskDialog": {
+      "intent": "创建方式",
+      "backlogTitlePlaceholder": "标题（可选，默认为首行）",
+      "createOnly": "仅创建",
+      "createAndDispatch": "创建并派发",
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",
@@ -6745,6 +6760,7 @@
     "moreMany": "{first}、{second} 等 {count, number} 个"
   },
   "HostedTasks": {
+    "loadMore": "加载更多任务",
     "open": "打开任务",
     "status": "状态",
     "factoryStage": "Factory 阶段",
@@ -7072,6 +7088,7 @@
   },
   "CodeReview": {
     "summary": {
+      "fileCount": "{count} 个文件",
       "pr": "PR #{number}",
       "files": "{count} 个文件 +{additions} −{deletions}",
       "failed": "⚠ {count} 项检查失败",

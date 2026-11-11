@@ -8,6 +8,7 @@ import { workspacePool } from '../../workspace-db'
 import { actingContext } from '../../activity-actor'
 import { issuesForUser } from '../../issues-for-user'
 import type { IssueReader } from '../../issue-visibility'
+import { enterprisePrincipal } from '../../enterprise/principal'
 import { tokenWorkspace } from '../../tokens/principal'
 import { UNFINISHED_RUN_STATUSES } from '../../agent-run-statuses'
 import { secretMaskerFor } from '../../secrets/runtime'
@@ -37,7 +38,7 @@ export async function taskReviewSummaries(reader: IssueReader, taskIds: readonly
   const userId = typeof reader === 'string' ? reader : reader.id, acting = actingContext.getStore()
   const token = typeof reader === 'string' ? (acting?.userId === userId ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
   const selectedWorkspace = token ?? workspaceId
-  const scopedReader: IssueReader = selectedWorkspace ? { id: userId, [tokenWorkspace]: selectedWorkspace } : reader
+  const scopedReader: IssueReader = selectedWorkspace ? { id: userId, [tokenWorkspace]: selectedWorkspace, [enterprisePrincipal]: typeof reader === 'string' ? undefined : reader[enterprisePrincipal] } : reader
   const tasks = await issuesForUser(scopedReader, wanted, false, undefined, { withoutBody: true })
   if (!tasks.size) return result
   const { rows } = await pool.query<SourceRow>(`SELECT i.id AS "taskId",i."userId" AS "ownerId",r.id AS "runId",r.status,

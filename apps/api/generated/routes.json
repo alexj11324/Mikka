@@ -1473,7 +1473,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "4b46f4026c507c2ff0d5bcd6b8be2a58ccdd70473357b28a961f6f53ef29f024"
+      "sourceHash": "616a763ca36c495cf3ab01b2102ef325859f6d46c3cd12f897488625a409fed6"
     },
     {
       "path": "/mikka/api/mobile/tasks/[id]",
@@ -2096,6 +2096,17 @@
         "POST"
       ],
       "sourceHash": "4bbd05f3ec67d39a691094ce7e2bc2b8558d37d1fa5c9ecb80237c33f728814a"
+    },
+    {
+      "path": "/mikka/api/tasks/[taskId]/attachments",
+      "template": "/api/tasks/[taskId]/attachments",
+      "source": "app/api/tasks/[taskId]/attachments/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "79f9d760e1f9c920238ab98e0813ba727b4ec2a3cf78388663e8e15d2ac305f6"
     },
     {
       "path": "/mikka/api/tasks/[taskId]/review",

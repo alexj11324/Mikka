@@ -4,15 +4,18 @@ import { useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import type { UseEveAgentReturn } from 'eve/react'
 import type { SendTurnOptions } from 'eve/client'
+import { acceptTaskDelivery } from '@/lib/task-create-form'
 import { authClient } from '@/lib/auth-client'
 import { coordinatorAgentClient, coordinatorSendFailure, type SubmitOutcome } from '@/lib/eve/client'
 import type { ArtifactQuote } from '@/lib/artifacts/quote'
 import type { BrowserNote } from '@/lib/browser/note'
+import type { DispatchTaskIntent, DispatchedTaskReceipt } from '@/lib/task-create-command'
 import type { TaskDestination } from '@/lib/task-destination'
 
 export type CoordinatorMessageContext = {
   quote?: ArtifactQuote | null
   botId?: string | null
+  taskCommand?: DispatchTaskIntent
   taskDestination?: TaskDestination
   profileId?: string
   /** The composer's captured target; the server checks it against its trusted selection. */
@@ -28,7 +31,7 @@ export type CoordinatorMessageContext = {
 export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
   const t = useTranslations('Coordinator')
   const tErrors = useTranslations('Errors')
-  const operations = useRef(new Map<string, { id: string; conflict?: true }>())
+  const operations = useRef(new Map<string, { id: string; conflict?: true; delivered?: true }>())
   const submit = useCallback(async (text: string, context?: CoordinatorMessageContext): Promise<SubmitOutcome> => {
     const trimmed = text.trim()
     if (!trimmed || trimmed.length > 10_000) return { kind: 'rejected', error: 'messageRequired' }
@@ -45,14 +48,24 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
     const options: SendTurnOptions = { headers: { 'x-mikka-submission-id': operation.id },
       clientContext: JSON.parse(JSON.stringify(context ?? {})) as NonNullable<SendTurnOptions['clientContext']> }
     try {
-      if (agent) await agent.send(trimmed, options)
-      else {
-        const { session } = await coordinatorAgentClient(context?.botId ?? null).sessions.create()
-        await session.send(trimmed, options)
+      await acceptTaskDelivery(operation, async () => {
+        if (agent) await agent.send(trimmed, options)
+        else {
+          const { session } = await coordinatorAgentClient(context?.botId ?? null).sessions.create()
+          await session.send(trimmed, options)
+        }
+      })
+      let task: DispatchedTaskReceipt | null = null
+      if (context?.taskCommand && context.expectedWorkspaceId) {
+        const { getDispatchedTaskReceipt } = await import('@/app/actions/issues')
+        task = await getDispatchedTaskReceipt({ workspaceId: context.expectedWorkspaceId, requestId: operation.id, botId: context.botId ?? null })
+        // Once Eve acknowledged the write, a lost receipt only retries this read.
+        if (!task) return { kind: 'uncertain' }
       }
       operations.current.delete(body)
-      return { kind: 'accepted', enabled: true, sourceEventId: null, replayed: false }
+      return { kind: 'accepted', enabled: true, sourceEventId: task?.dispatch.sourceEventId ?? null, replayed: false, ...(task ? { task } : {}) }
     } catch (error) {
+      if (operation.delivered) return { kind: 'uncertain' }
       const outcome = coordinatorSendFailure(error)
       if (outcome.kind === 'conflict') operations.current.set(body, { ...operation, conflict: true })
       else if (outcome.kind !== 'uncertain' && outcome.kind !== 'authRequired') operations.current.delete(body)

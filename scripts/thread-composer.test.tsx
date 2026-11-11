@@ -290,6 +290,14 @@ test('a strict question recovery on a check keeps Retry while ordinary Send rema
   assert.match(html, /data-composer-send="" disabled=""/)
 })
 
+test('a historical failed root retains its diagnostic but cannot offer Retry or a composer', () => {
+  thread = { ...base, status: 'failed', error: 'An earlier run failed', retryAvailable: true }
+  const html = render({ transcriptOnly: true })
+  assert.match(html, /An earlier run failed/)
+  assert.doesNotMatch(html, /data-slot="thread-composer"|>Retry</)
+  assert.match(render(), />Retry</)
+})
+
 test('a failed queued question wake retains its explicit Retry without reopening ordinary Send', () => {
   thread = { ...base, status: 'stopped', latestRunId: 'run-2', question: 'resuming', replyAvailable: true, retryAvailable: true,
     continuation: { id: 'run-2', status: 'queued', stopping: false }, questionWake: { generation: 'generation', error: 'Original task machine unavailable' } }

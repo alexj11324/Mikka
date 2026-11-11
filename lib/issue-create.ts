@@ -23,7 +23,7 @@ const createIssueSchema = z.object({
 })
 
 /** `actor` is who issue history records as creating it, decided by the caller on the server. */
-export async function createIssueForUserInTransaction(tx: Transaction, userId: string, input: unknown, actor: ActivityActor, options: { workspaceId: string; id?: string; linearSyncBlocked?: boolean }) {
+export async function createIssueForUserInTransaction(tx: Transaction, userId: string, input: unknown, actor: ActivityActor, options: { workspaceId: string; id?: string; linearSyncBlocked?: boolean; deriveShortTitle?: boolean }) {
   const parsed = createIssueSchema.safeParse(input)
   if (!parsed.success) return null
   const workspace = await requireTaskWorkspace(userId, options.workspaceId)
@@ -56,6 +56,6 @@ export async function createIssueForUserInTransaction(tx: Transaction, userId: s
   })
   await issueListChanged(tx, id)
   // A short title for the lists, written once after this commits (lib/short-title-schedule.ts).
-  scheduleShortTitle(tx, id, userId)
+  if (options.deriveShortTitle !== false) scheduleShortTitle(tx, id, userId)
   return issueView(issue, tx)
 }
