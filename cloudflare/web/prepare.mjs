@@ -1,5 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isValidDeploymentId } from '../../lib/deployment-id.mjs'
 import { assertNoSourceMaps } from '../../scripts/release/hosted-ui.mjs'
@@ -40,6 +40,28 @@ export async function releaseConfig({ id, assets, api, cloud, sourceSha, overlay
   }
 }
 
+/** Keep the signed build's verification inventory available to the private publisher.
+ * Cloudflare receives only the files the official web client can request. */
+export async function prepareRelease(input, outputDirectory) {
+  const config = await releaseConfig(input)
+  const source = config.assets.directory
+  const parent = resolve(outputDirectory)
+  if (parent === source || parent.startsWith(source + sep)) throw new Error('WEB_RELEASE_OUTPUT_INSIDE_BUILD')
+  const published = await mkdtemp(join(parent, 'mikka-web-assets-'))
+  try {
+    await cp(source, published, { recursive: true, dereference: true, filter(path) {
+      const file = relative(source, path)
+      return !file.split(sep).some(segment => segment.startsWith('.'))
+        && !['renderer-manifest.json', '_headers', '_redirects'].includes(file)
+    } })
+    config.assets.directory = published
+    return config
+  } catch (error) {
+    await rm(published, { recursive: true, force: true })
+    throw error
+  }
+}
+
 export function gatewayConfig({ current, retained }) {
   if (!Array.isArray(retained) || !retained.includes(current) || new Set(retained).size !== retained.length
       || retained.some(id => !isValidDeploymentId(id) || id !== id.toLowerCase() || !serviceName.test(nameForRelease(id)))) {
@@ -57,6 +79,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const [kind, input, output] = process.argv.slice(2)
   if (!['release', 'gateway'].includes(kind) || !input || !output) throw new Error('WEB_RELEASE_ARGUMENTS_INVALID')
   const config = JSON.parse(await readFile(input, 'utf8'))
-  const result = kind === 'release' ? await releaseConfig(config) : gatewayConfig(config)
+  const result = kind === 'release' ? await prepareRelease(config, dirname(resolve(output))) : gatewayConfig(config)
   await writeFile(output, JSON.stringify(result, null, 2) + '\n')
 }
