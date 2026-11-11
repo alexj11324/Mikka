@@ -1,6 +1,6 @@
 import { defineSandbox } from 'eve/sandbox'
-import { JustBashSandbox } from 'eve/sandbox/just-bash'
+import { PortableScratchSandbox } from '../../../lib/eve/sandbox'
 
 /** Per-session scratch/attachments; native execution remains on Mikka task machines. */
-export const environment = JustBashSandbox.environment({autoInstall:false})
+export const environment = PortableScratchSandbox.environment()
 export default defineSandbox(() => environment.open())
