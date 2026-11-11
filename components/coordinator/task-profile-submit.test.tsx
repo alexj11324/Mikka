@@ -11,6 +11,7 @@ import type { CoordinatorMessageContext } from './use-coordinator-submit'
 const Selection = createContext<{ pick?: (value: string) => void; disabled?: boolean }>({})
 const Wrap = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 let Button: typeof import('../ui/button')['Button']
+let Input: typeof import('../ui/input')['Input']
 mock.module(new URL('../ui/select.tsx', import.meta.url).href, { namedExports: {
   Select: ({ children, onValueChange, disabled }: { children: ReactNode; onValueChange?: (value: string) => void; disabled?: boolean }) =>
     <Selection.Provider value={{ pick: onValueChange, disabled }}>{children}</Selection.Provider>,
@@ -23,7 +24,7 @@ mock.module(new URL('../ui/select.tsx', import.meta.url).href, { namedExports: {
 // Check the controller's inputs and callbacks without requiring the private renderer.
 mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExports: {
   NewTask: (props: import('../slots/new-task-contract').NewTaskProps) => <>
-    <input id="new-task-name" value={props.title} maxLength={props.titleMax} onChange={event => props.onTitle(event.target.value)} />
+    <Input id="new-task-name" value={props.title} maxLength={props.titleMax} onChange={event => props.onTitle(event.target.value)} />
     {props.notices}
     {props.intent !== 'create_only' && props.profile.choices.map(choice => <Button key={choice.value} data-option={choice.value}
       disabled={choice.disabled || props.profile.disabled} onClick={() => props.profile.onChange(choice.value)}>{choice.label}</Button>)}
@@ -85,6 +86,7 @@ before(async () => {
   }
   ;({ createRoot } = await import('react-dom/client'))
   ;({ Button } = await import('../ui/button'))
+  ;({ Input } = await import('../ui/input'))
   ;({ TaskProfilePicker, TaskProfileNotice } = await import('./task-profile-picker'))
   ;({ NewTaskDialog } = await import('./new-task-dialog'))
 })
