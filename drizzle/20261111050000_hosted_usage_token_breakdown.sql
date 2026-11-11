@@ -33,5 +33,5 @@
 -- at the read edge, not in a write-time constraint that would reject a real
 -- receipt and leave a call unsettled.
 ALTER TABLE hosted_usage
-  ADD COLUMN "cacheReadTokens" bigint,
-  ADD COLUMN "cacheWriteTokens" bigint;
+  ADD COLUMN IF NOT EXISTS "cacheReadTokens" bigint,
+  ADD COLUMN IF NOT EXISTS "cacheWriteTokens" bigint;
