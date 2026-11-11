@@ -4,7 +4,7 @@ import { requireUser } from '@/lib/issue-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { runAction } from '@/lib/action-error'
 import * as store from '@/lib/project-resources/store'
-import { saveEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 
 export async function listProjectResources(workspaceId: string, projectId?: string) {
   const user = await requireUser()
@@ -16,6 +16,9 @@ export async function saveEnvironment(input: z.input<typeof saveEnvironmentInput
 }
 export async function saveProjectResources(input: z.input<typeof projectResourcesInput>) {
   return runAction(async () => store.saveProjectResources(await requireUser(), input))
+}
+export async function setProjectDefaultEnvironment(input: z.input<typeof projectDefaultEnvironmentInput>) {
+  return runAction(async () => store.setProjectDefaultEnvironment(await requireUser(), input))
 }
 export async function saveWorkspaceRepositoryPolicy(input: z.input<typeof workspaceRepositoryPolicyInput>) {
   return runAction(async () => store.saveWorkspaceRepositoryPolicy(await requireUser(), input))

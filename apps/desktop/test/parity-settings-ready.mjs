@@ -17,6 +17,7 @@ export function settingsReadRequirements(id, fixture) {
   sectionId(id)
   if (!UUID.test(fixture.workspace ?? '')) throw new Error('PARITY_SETTINGS_WORKSPACE_INVALID')
   switch (id) {
+    case 'environments': return [{ path: '/api/settings/environments' }]
     case 'general': return [{ action: 'workspace-settings.listArchivedBots' }]
     case 'permissions': return [{ path: `/api/workspaces/${fixture.workspace}/computer-policy` }]
     case 'billing': return [{ path: '/api/settings/credit-billing' }]
@@ -70,6 +71,9 @@ export async function settingsReady(page, id, fixture, messages, observed = { li
   await visible(body)
 
   switch (id) {
+    case 'environments':
+      await visible(body.locator('[data-settings-state="ready"]'))
+      break
     case 'members': {
       await visible(body.locator('[data-settings-state="ready"]'))
       // These are the helper's ordinary provisioned account display names.

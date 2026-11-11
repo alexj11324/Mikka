@@ -226,6 +226,7 @@ const functions = {
   'teams.restoreTeam': actions28.restoreTeam,
   'teams.removeTeamGrouping': actions28.removeTeamGrouping,
   'project-resources.listProjectResources': projectResourcesActions.listProjectResources,
+  'project-resources.setProjectDefaultEnvironment': projectResourcesActions.setProjectDefaultEnvironment,
   'project-resources.saveEnvironment': projectResourcesActions.saveEnvironment,
   'project-resources.saveProjectResources': projectResourcesActions.saveProjectResources,
   'project-resources.saveWorkspaceRepositoryPolicy': projectResourcesActions.saveWorkspaceRepositoryPolicy,
