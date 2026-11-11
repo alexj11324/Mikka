@@ -65,8 +65,8 @@ and copies the runtime resources. `.vercel/output/mikka-build.json` records
 the source SHA, function contracts and resource hashes. These build checks do
 not prove hosted queue delivery or production OAuth callbacks.
 
-Before copying runtime resources, `dedupe-functions.mjs` replaces identical
-HTTP function directories with relative `.func` aliases, as Nitro already does
+After wrapping and copying runtime resources, `dedupe-functions.mjs` replaces
+identical HTTP function directories with relative `.func` aliases, as Nitro already does
 for routes without custom configuration. The full function configuration,
 file bytes, executable modes and internal dependency links must match. Functions
 with external or unresolved dependency links remain independent, as do all

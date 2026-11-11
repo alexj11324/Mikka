@@ -124,12 +124,15 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     const deploymentId = configuredDeploymentId()
     if (process.env.VERCEL_ENV === 'production' && !deploymentId) throw new Error('API_PRODUCTION_DEPLOYMENT_ID_REQUIRED')
     if (deploymentId) config.deploymentId = deploymentId
-    evidence.functionPackaging = await deduplicateVercelFunctions(join(output, 'functions'))
     for (const directory of await functionDirectories(join(output, 'functions'))) {
       const contract = await wrapFunction(directory, tracing)
       await copyResources(directory)
       evidence.functions.push({ path: relative(output, directory), ...contract })
     }
+    // Compare complete, final runtime bytes, including tracing and resources.
+    evidence.functionPackaging = await deduplicateVercelFunctions(join(output, 'functions'))
+    const implementations = new Set(await functionDirectories(join(output, 'functions')))
+    evidence.functions = evidence.functions.filter(entry => implementations.has(resolve(output, entry.path)))
     await writeFile(path, `${JSON.stringify(config, null, 2)}\n`)
   } else if (preset === 'node-server') {
     const server = join(output, 'server')
