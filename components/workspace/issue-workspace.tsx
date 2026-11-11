@@ -145,7 +145,7 @@ function IssueWorkspaceScope({ withinLiveProvider = false, ...props }: Parameter
 
 function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false, onboarding }: { onboarding?: { computer: OnboardingComputer }; initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
   const i18nText = useTranslations()
-  const { data: workspaceRead } = useWorkspace(user.email)
+  const { data: workspaceRead, error: workspaceReadError } = useWorkspace(user.email)
   const workspaceData = workspaceRead?.currentUserId === user.id ? workspaceRead : undefined
   const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)
   const t = useTranslations('Workspace')
