@@ -153,6 +153,7 @@ export async function managedReader(token) {
       const rows = await storage.runs.list({ resolveData: 'none', pagination: { limit: 1, sortOrder: 'desc' } })
       check(Array.isArray(rows.data), 'manager_read_unavailable')
     },
+    listRuns: (status, pagination) => storage.runs.list({ status, pagination, resolveData: 'none' }),
     getRun: id => storage.runs.get(id, { resolveData: 'none' }),
     timer: () => readTimerHook(() => storage.hooks.getByToken('due-timer:schedules')),
     async events(runId, since) {

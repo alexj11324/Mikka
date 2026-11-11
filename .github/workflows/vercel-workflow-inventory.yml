@@ -1,0 +1,49 @@
+name: Vercel production Workflow inventory
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/ops/vercel-workflow-inventory.mjs'
+      - '.github/workflows/vercel-workflow-inventory.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+        with:
+          skip-electron: 'true'
+          ffmpeg-github-token: ${{ github.token }}
+      - run: node --test scripts/ci/vercel-workflow-inventory.test.mjs
+      - name: Read the existing platform credential
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Inventory pending and running workflows
+        run: node --import tsx scripts/ops/vercel-workflow-inventory.mjs > "$RUNNER_TEMP/workflow-inventory.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: workflow-inventory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/workflow-inventory.json
+          retention-days: 14
+          if-no-files-found: error
