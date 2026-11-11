@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
@@ -30,7 +30,9 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   const { setOpenMobile, isMobile } = useSidebar()
   const { data: teams = [], error, mutate } = useSWR(activeSection ? 'teams' : null, listTeams)
   const contentRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
+  // Reveal the active group before paint, including when cached route data
+  // is already ready and no subsequent render would settle the scroll.
+  useLayoutEffect(() => {
     contentRef.current?.querySelector('[aria-current="page"]')?.closest('[data-slot="sidebar-group"]')?.scrollIntoView({ block: 'nearest' })
   }, [creating, section, selectedTeamId, teams.length])
   const normalizedQuery = query.trim().toLowerCase()
