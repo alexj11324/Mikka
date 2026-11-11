@@ -51,7 +51,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   await pool.query(readFileSync('drizzle/20261110150011_resource_budgets.sql', 'utf8'))
   // Settlement writes the cache breakdown, so this ledger's schema needs the
   // migration that adds those columns as well.
-  await pool.query(readFileSync('drizzle/20261111050000_hosted_usage_token_breakdown.sql', 'utf8'))
+  await pool.query(readFileSync('drizzle/20261111060000_hosted_usage_token_breakdown.sql', 'utf8'))
   const store = new HostedUsageStore(pool)
   /** `n` messages sent in this workspace's chats (created by `creator`), plus a 重试 and a welcome request that never count. */
   const sent = async (workspaceId: string, n: number, creator = `creator-${workspaceId}`) => {
