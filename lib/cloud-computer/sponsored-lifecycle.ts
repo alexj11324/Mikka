@@ -200,7 +200,7 @@ export async function ensureSponsoredTaskMachine(pool: Pool, actor: TaskMachineA
     )
     if (!changed.rowCount) throw unavailable()
     const signal = AbortSignal.timeout(60_000)
-    const proc = await connection.spawn({ command: fixedWorker, workingDirectory: '/workspace', stdin: true })
+    const proc = await connection.spawn({ command: fixedWorker, workingDirectory: '/workspace', env: {}, stdin: true })
     if (!proc.stdin) throw unavailable()
     const drain = new WritableStream<Uint8Array>({ write() {} })
     void proc.stderr.pipeTo(drain).catch(() => {})

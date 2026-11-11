@@ -2768,7 +2768,8 @@
         "subscription": "Model subscription",
         "native_login": "Device model account",
         "local_device": "Personal device",
-        "e2b": "Personal E2B account"
+        "e2b": "Personal E2B account",
+        "cloudflare_sponsored": "Mikka Cloudflare account"
       },
       "accountAmounts": {
         "provider_unknown": "Billed by provider / amount unknown",
@@ -4425,7 +4426,8 @@
         "subscription": "Subscription",
         "native_login": "Native login",
         "local_device": "Local device",
-        "e2b": "E2B"
+        "e2b": "E2B",
+        "cloudflare_sponsored": "Mikka Cloudflare account"
       },
       "amounts": {
         "provider_unknown": "External cost unknown",

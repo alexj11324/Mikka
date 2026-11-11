@@ -440,7 +440,7 @@ test('Workers AI fallback enforces its own route before reserve and before send 
   assert.deepEqual(settlements.map(x=>x.cost),[6,6])
   for(const actual of modelOptions as typeof args[]) { assert.equal(actual.headers,undefined); assert.equal(actual.providerOptions,undefined) }
   denyAt='send'
-  await assert.rejects(selected.doGenerate(args),/modelRouteDenied/)
+  await assert.rejects(Promise.resolve(selected.doGenerate(args)),/modelRouteDenied/)
   assert.equal(settlements.at(-1)?.cost,0)
   delete process.env.CLOUDFLARE_WORKERS_AI_TOKEN
   await assert.rejects(hostedModel('w',COORDINATOR_MODEL),/modelRouteDenied/)

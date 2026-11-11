@@ -2768,7 +2768,8 @@
         "subscription": "模型订阅",
         "native_login": "设备上的模型账户",
         "local_device": "个人设备",
-        "e2b": "个人 E2B 账户"
+        "e2b": "个人 E2B 账户",
+        "cloudflare_sponsored": "Mikka Cloudflare 账户"
       },
       "accountAmounts": {
         "provider_unknown": "由供应商计费/金额未知",
@@ -4425,7 +4426,8 @@
         "subscription": "订阅",
         "native_login": "本机登录",
         "local_device": "本地电脑",
-        "e2b": "E2B"
+        "e2b": "E2B",
+        "cloudflare_sponsored": "Mikka Cloudflare 账户"
       },
       "amounts": {
         "provider_unknown": "外部费用未知",
