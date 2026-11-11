@@ -1,4 +1,6 @@
 import 'server-only'
+import type { Pool, PoolClient } from 'pg'
+import { releaseGrant, withSponsoredTaskGrant, type TaskMachineActor } from '../cloud-computer/sponsored-task'
 import { newWebSocketRpcSession, type RpcTarget } from 'capnweb'
 import { WebSocket } from 'undici'
 import { cloudflareTaskConnection, type TaskMachineGrant, type TaskWorkspaceBinding } from './cloudflare-task-connection'
@@ -32,6 +34,8 @@ async function post(path:string, body:unknown) {
 const binding:TaskWorkspaceBinding={
   async spawn(grant,options) {
     const socket=new WebSocket('ws://task-machine.internal/v1/process',{headers:{authorization:token()}})
+    const handshake=setTimeout(()=>socket.close(),70_000)
+    handshake.unref()
     const remote=newWebSocketRpcSession<Spawn>(socket as unknown as globalThis.WebSocket)
     try {
       const proc=await remote.spawn(grant,options)
@@ -55,7 +59,7 @@ const binding:TaskWorkspaceBinding={
       void done.catch(()=>{})
       return {pid:proc.pid,stdout:follow(proc.stdout),stderr:follow(proc.stderr),...(proc.stdin?{stdin:proc.stdin}:{}),
         handle:{wait:()=>done,kill:async()=>{await proc.handle.kill()}}}
-    } catch(error){socket.close();throw error}
+    } catch(error){socket.close();throw error} finally {clearTimeout(handshake)}
   },
   async readFile(grant,path){
     const r=await post('read-file',{grant,path})
@@ -66,9 +70,41 @@ const binding:TaskWorkspaceBinding={
   async park(grant){await (await post('park',{grant})).body?.cancel()},
 }
 
-/** Acquire only after authoritative Task/Run admission. A chat, history read,
- * or client-supplied workspace location cannot call this adapter directly. */
-export async function openCloudflareTaskConnection(grant:TaskMachineGrant){
-  await (await post('open',{grant})).body?.cancel()
-  return cloudflareTaskConnection(binding,grant)
+export async function openOwnedCloudflareTaskMachine(pool:Pool, actor:TaskMachineActor, runId:string) {
+  return withSponsoredTaskGrant(pool,actor,runId,async initial=>{
+    const authorized=<T>(operation:(grant:TaskMachineGrant)=>Promise<T>)=>
+      withSponsoredTaskGrant(pool,actor,runId,grant=>{
+        if (grant.operationId!==initial.operationId) throw Error('Task machine lease changed')
+        return operation(grant)
+      })
+    const opened = await (await post('open',{grant:initial})).json()
+    if (opened.state !== 'running' || typeof opened.instanceId !== 'string' || !/^[0-9a-f]{64}$/.test(opened.instanceId)) {
+      throw Error('Cloudflare did not acknowledge the task machine')
+    }
+    // The authorized grant never crosses the public API. Cleanup may release
+    // the original lease after membership or the Run was revoked.
+    const connection = cloudflareTaskConnection({
+      spawn:(_,options)=>authorized(g=>binding.spawn(g,options)),
+      readFile:(_,path)=>authorized(g=>binding.readFile(g,path)),
+      writeFile:(_,path,bytes)=>authorized(g=>binding.writeFile(g,path,bytes)),
+      removePath:(_,path,options)=>authorized(g=>binding.removePath(g,path,options)),
+      park:()=>binding.park(initial),
+    },initial)
+    return { connection, instanceId: opened.instanceId as string }
+  })
+}
+
+export async function releaseOwnedCloudflareTaskMachine(db:Pick<PoolClient,'query'>, actor:TaskMachineActor, runId:string, operationId:string) {
+  const grant = await releaseGrant(db, actor, runId, operationId)
+  const status = await (await post('status', { grant })).json()
+  if (status.state === 'absent' || status.state === 'stopped') return
+  const receipt = await (await post('park', { grant })).json()
+  if (receipt.state !== 'stopped' || !receipt.stoppedAt) throw Error('Cloudflare task stop unconfirmed')
+}
+
+export function confirmOwnedTaskMachine(pool:Pool,actor:TaskMachineActor,runId:string) {
+  return withSponsoredTaskGrant(pool, actor, runId, async grant=>{
+    const status=await (await post('status',{grant})).json()
+    if(status.state!=='running') throw Error('Cloudflare task is no longer running')
+  })
 }

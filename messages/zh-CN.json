@@ -4334,6 +4334,8 @@
       "costModelSubscription": "模型费用由{owner} {provider} 订阅承担",
       "costModelApiKey": "模型费用由{owner} {provider} API key 承担",
       "costModelLogin": "模型用电脑上已登录的 Agent 账号运行",
+      "sponsoredCloudflare": "Mikka 付费的 Cloudflare 任务机器",
+      "costRuntimeCloudflare": "此任务的 Cloudflare 机器费用由 Mikka 支付",
       "costRuntimeE2b": "云电脑费用由{owner} E2B 账号承担",
       "costRuntimeDevice": "电脑是{owner} {device}",
       "costMikkaFree": "Mikka 不收费",
@@ -4772,6 +4774,7 @@
       "noneToday": "今天还没有新的建议。"
     },
     "newTaskDialog": {
+      "sponsoredCloud": "Cloudflare 编程机器 · Mikka 付费",
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",

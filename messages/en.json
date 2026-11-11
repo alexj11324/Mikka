@@ -4334,6 +4334,8 @@
       "costModelSubscription": "{owner} {provider} subscription pays for the model",
       "costModelApiKey": "{owner} {provider} API key pays for the model",
       "costModelLogin": "The model runs on the Agent account signed in on the computer",
+      "sponsoredCloudflare": "Mikka-sponsored Cloudflare machine",
+      "costRuntimeCloudflare": "Mikka pays for this task’s Cloudflare machine",
       "costRuntimeE2b": "{owner} E2B account pays for the cloud computer",
       "costRuntimeDevice": "the computer is {owner} {device}",
       "costMikkaFree": "Mikka charges nothing",
@@ -4772,6 +4774,7 @@
       "noneToday": "No new suggestions today."
     },
     "newTaskDialog": {
+      "sponsoredCloud": "Cloudflare coding machine · paid by Mikka",
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",

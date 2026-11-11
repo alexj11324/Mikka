@@ -111,7 +111,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
       await pool.query('INSERT INTO model_api_key_shares("keyId","workspaceId") VALUES($1,$2)', [sharedKey, workspace])
       await reset(); await claim(requester, device, runId, lease())
     })
-    await t.test('cloud quota continuation freezes parent placement, then rebinds to a new child with the same principal', async () => {
+    await t.test('cloud quota continuation freezes parent placement, then rebinds to a new child with the same principal', async t => {
       const { queueCloudRun } = await import('./computer/queue-run')
       const { queueCloudQuotaContinuation } = await import('./run-quota')
       const { claimCloudRun } = await import('./computer/claim')
@@ -125,11 +125,76 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
       await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES($1,$2,$3,\'synthetic-parent\',$4,\'running\',true)', [workspace, requester, randomUUID(), cloudDevice])
       await pool.query('INSERT INTO bot_desktops("botId","workspaceId","ownerId",display) VALUES($1,$2,$3,1)', [bot, workspace, requester])
       await pool.query('INSERT INTO bot_cloud_runtimes("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES($1,$2,$3,\'codex\',$4,$5)', [bot, workspace, requester, cloudAgent, cloudRepo])
-      await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,\'synthetic\',\'synthetic\',1,\'test\')', [requester])
       await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,\'Cloud quota\',\'{"type":"doc","attrs":{"mikka":{"number":1163}},"content":[]}\',\'doing\',\'normal\')', [cloudIssue, requester, workspace])
       await pool.query('INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES($1,$2,$3,\'codex\',\'connected\',1,\'synthetic\',$4,\'synthetic\',$5)', [connection, requester, workspace, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] })])
       await pool.query('INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,$4,$5,1,\'codex_cli\',\'gpt-5\')', [binding, requester, workspace, cloudAgent, connection])
       await pool.query('UPDATE model_api_keys SET models=\'["gpt-5"]\' WHERE id=$1', [ownKey])
+      // A person can explicitly choose company-paid compute for this one task.
+      // Exercise the real queue and repository leases before the legacy E2B key exists.
+      await t.test('sponsored selection, run ownership, expiry, stop and revocation', async () => {
+        const { readSponsoredTaskGrant, withSponsoredTaskGrant } = await import('./cloud-computer/sponsored-task')
+        const taskId = randomUUID(), eventId = randomUUID()
+        const actor = { userId: requester, workspaceId: workspace }
+        await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority)
+          VALUES($1,$2,$3,'Sponsored fixture','{"type":"doc","content":[]}','doing','normal')`, [taskId, requester, workspace])
+        await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,"deliveredAt")
+          VALUES($1,$2,$3,$4,'user_message',$5,'{"taskDestination":{"kind":"cloud","provider":"cloudflare"}}',now())`,
+        [eventId, requester, bot, taskId, 'sponsored:'+eventId])
+        const input = { botId: bot, issueId: taskId, agentId: cloudAgent, deviceRepoId: cloudRepo, sourceEventId: eventId,
+          title: 'Sponsored task', body: '', model: 'gpt-5', subscriptionBindingId: binding }
+        const oldCohort = process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
+        const oldToken = process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
+        try {
+          process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = 'synthetic-test-only'
+          process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = randomUUID()
+          await assert.rejects(() => queueCloudRun(pool, actor, input))
+          process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = workspace
+          const { runId: sponsored } = await queueCloudRun(pool, actor, input)
+          const machines = await import('./cloud-computer/thread-machines')
+          const originalOrigin = process.env.MIKKA_CLOUD_WORKER_URL
+          try {
+            process.env.MIKKA_CLOUD_WORKER_URL = 'http://untrusted.invalid'
+            let calls = 0
+            const provider = { create: async () => {calls++;throw Error('wrong provider')}, connect: async () => {calls++;throw Error('wrong provider')}, kill: async () => {calls++} }
+            await assert.rejects(() => machines.ensureThreadMachine(pool, actor, sponsored, provider), /Cloudflare task machine unavailable/)
+            assert.equal(calls, 0, 'a failed sponsored preflight never tries a personal E2B key')
+          } finally {
+            if(originalOrigin === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL
+            else process.env.MIKKA_CLOUD_WORKER_URL = originalOrigin
+          }
+          const op = randomUUID(), leaseId = randomUUID()
+          await pool.query(`UPDATE thread_machines SET "operationId"=$2,"workerLeaseId"=$3,"workerLeaseUntil"=now()+interval '4 minutes' WHERE "runId"=$1`, [sponsored, op, leaseId])
+          const admitted = await withSponsoredTaskGrant(pool, actor, sponsored, async g=>g)
+          assert.equal(admitted.runId, sponsored)
+          assert.equal(admitted.taskId, taskId)
+          assert.equal(admitted.operationId, op)
+          assert.equal(admitted.repositoryKey, 'v2/github.com/example/identity-quota')
+          const { run } = await readSponsoredTaskGrant(pool, actor, sponsored)
+          assert.equal(run.agentDefinition.executionIdentity?.billingAccount.runtime.kind, 'cloudflare_sponsored')
+          assert.equal(run.agentDefinition.executionIdentity?.billingAccount.model.kind, 'subscription')
+          for (const scope of [{ ...actor, userId: other }, { ...actor, workspaceId: randomUUID() }]) {
+            await assert.rejects(() => readSponsoredTaskGrant(pool, scope, sponsored))
+          }
+          await assert.rejects(() => readSponsoredTaskGrant(pool, actor, randomUUID()))
+          await pool.query(`UPDATE byos_connections SET paused=true WHERE id=$1`, [connection])
+          await assert.rejects(() => withSponsoredTaskGrant(pool,actor,sponsored,async()=>assert.fail('revoked subscription reached provider')), ExecutionIdentityError)
+          await pool.query(`UPDATE byos_connections SET paused=false WHERE id=$1`, [connection])
+          await pool.query(`UPDATE coordinator_events SET "deliveredAt"=null WHERE id=$1`, [eventId])
+          await assert.rejects(() => withSponsoredTaskGrant(pool,actor,sponsored,async()=>assert.fail('withdrawn event reached provider')), /unavailable/)
+          await pool.query(`UPDATE coordinator_events SET "deliveredAt"=now() WHERE id=$1`, [eventId])
+          await pool.query(`UPDATE thread_machines SET "workerLeaseUntil"=now()-interval '1 minute' WHERE "runId"=$1`, [sponsored])
+          await assert.rejects(() => readSponsoredTaskGrant(pool, actor, sponsored))
+          await pool.query(`UPDATE thread_machines SET "workerLeaseUntil"=now()+interval '1 minute' WHERE "runId"=$1`, [sponsored])
+          await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1`, [sponsored])
+          await assert.rejects(() => readSponsoredTaskGrant(pool, actor, sponsored))
+        } finally {
+          if (oldCohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
+          else process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = oldCohort
+          if (oldToken === undefined) delete process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
+          else process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = oldToken
+        }
+      })
+      await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,\'synthetic\',\'synthetic\',1,\'test\')', [requester])
       const machines = await fakeThreadMachines(pool, harnesses)
       try {
         const actor = { userId: requester, workspaceId: workspace }
