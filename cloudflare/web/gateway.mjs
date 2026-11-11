@@ -1,14 +1,17 @@
 // Only the deployment-owned binding map selects origins. Each retained entry
 // names a private, immutable Worker with its own API, cloud and static assets.
+import { releaseRoutePath, versionPath } from './route-path.mjs'
+
 export default {
   fetch(request, env) {
     const url = new URL(request.url)
     const params = url.searchParams.getAll('dpl')
     const header = request.headers.get('x-deployment-id')
-    const api = url.pathname.startsWith('/mikka/api/')
-    const pinnedAsset = url.pathname.startsWith('/mikka/') && /\/[^/]+\.[^/]+$/.test(url.pathname) && !api
+    const path = releaseRoutePath(url.pathname)
+    const api = path.startsWith('/mikka/api/')
+    const pinnedAsset = url.pathname.startsWith('/mikka/') && /\/[^/]+\.[^/]+$/.test(path) && !api
     let id = env.CURRENT_RELEASE
-    if (url.pathname !== '/mikka/api/version' && (api || pinnedAsset)) {
+    if (path !== versionPath && (api || pinnedAsset)) {
       if (params.length > 1 || (header !== null && params.length && header !== params[0])) {
         return Response.json({ error: 'deploymentPinConflict' }, { status: 400, headers: { 'cache-control': 'no-store' } })
       }

@@ -1,3 +1,4 @@
+import { readRendererActions } from '../../lib/renderer-actions.mjs'
 import { observeEveSession } from '../acceptance/eve-session.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
@@ -67,7 +68,7 @@ export function welcomeOptions(text) {
 }
 
 export function requestAllowed(path, method, body) {
-  if (method === 'GET') return ['/api/version', '/api/auth/get-session', '/api/bots', '/renderer-manifest.json'].includes(path)
+  if (method === 'GET') return ['/api/version', '/api/auth/get-session', '/api/bots', '/renderer-manifest.json', '/renderer-actions.json'].includes(path)
     || isTeamWorkspaceReadPath('/mikka' + path)
     || /^\/api\/settings\/model-order\?workspace=[a-f0-9-]{36}$/.test(path)
     || /^\/api\/(?:bots|factory\/tasks)\/[a-f0-9-]{36}$/.test(path)
@@ -310,7 +311,9 @@ export async function runAcceptance() {
     const original=await json('/api/workspace')
     check(original.currentUserId===ownerId && UUID.test(original.workspace?.id??''),'original_workspace_unknown')
     originalWorkspace=original.workspace.id
-    const manifest = await json('/renderer-manifest.json')
+    const manifestResponse = await readRendererActions(request)
+    check(manifestResponse.ok, 'acceptance_http_failed')
+    const manifest = await manifestResponse.json()
     check(manifest.version === 1 && manifest.target === 'web' && Array.isArray(manifest.usedActions), 'acceptance_manifest_invalid')
     published = new Set(manifest.usedActions)
     check([...ACTIONS].every(action => published.has(action)), 'acceptance_action_not_published')
