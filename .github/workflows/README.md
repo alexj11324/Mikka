@@ -45,6 +45,29 @@ bindings. Current workflow files define the triggers and selected coverage.
 See [test ownership and CI cost](../../docs/ci/test-ownership.md) before
 adding or duplicating regression suites.
 
+## Draft pull requests
+
+There are two intentionally different classes of PR checks:
+
+- **Required checks always run**, even on drafts: `UI policy (strict)`,
+  `Production build and browser interactions`, `Browser tests (before merge)`
+  and external GitGuardian. A skipped required job can be reported as
+  successful by GitHub, so draft status must never authorize a bypass.
+- **Non-required specialized acceptances** (`E2B additive runtime release`
+  offline PR test, E2B subscription custody, Read cache API acceptance,
+  SSH device backend, Site search read contract and Unattended sandbox
+  acceptance) skip their runner jobs while the PR is a draft. Each workflow
+  explicitly handles `ready_for_review` to execute its real proof on the
+  same code even without an extra commit, and `converted_to_draft` to
+  cancel obsolete work. Main push, merge-group and manual dispatch behavior
+  is unchanged. Exact-source required gate and release policies are unchanged.
+- Mobile OTA preview publication remains available on drafts for UI evidence
+  and TestFlight-oriented review. Other specialized evidence may have its
+  own intentional manual or source-version trigger.
+
+This reduces runner allocation without mistaking a draft-only skipped result
+for proof that a ready PR is safe to merge.
+
 ## Main pushes: postmerge checks
 
 - A push to `main` triggers the required `ui-policy.yml` checks again. Daemon
