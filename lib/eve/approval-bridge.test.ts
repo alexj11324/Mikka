@@ -7,8 +7,11 @@ const responder = {authenticator:'mikka',principalType:'user',principalId:'owner
 function fixture(decision:'allow'|'ask'|'deny'='ask') {
   const records = new Map<string,ApprovalRecord>()
   let sends = 0
+  const audits:string[]=[]
   let version = '2026-11-11', uncertain = false
   const bridge = createEveApprovalBridge({
+    beforeExecute:async()=>{audits.push('before')},
+    afterExecute:async(_c,_output,failed)=>{audits.push(failed?'error':'after')},
     store: {
       async read(key) { return records.get(key) ?? null },
       async prepare(key,record) { const old=records.get(key); if(old) return old; records.set(key,record); return record },
@@ -23,18 +26,20 @@ function fixture(decision:'allow'|'ask'|'deny'='ask') {
       return {status:'done',actionId:'receipt'}
     },
   })
-  return {bridge,records,sends:()=>sends,setDecision:(value:typeof decision)=>{decision=value},setVersion:(value:string)=>{version=value},loseResponse:()=>{uncertain=true}}
+  return {bridge,records,audits,sends:()=>sends,setDecision:(value:typeof decision)=>{decision=value},setVersion:(value:string)=>{version=value},loseResponse:()=>{uncertain=true}}
 }
 
 test('Ask uses native approval without executing; an exact owner response sends once',async()=>{
   const f=fixture()
   assert.equal((await f.bridge.review(call))?.status,'user-approval')
   assert.equal(f.sends(),0)
+  assert.deepEqual(f.audits,[])
   await assert.rejects(f.bridge.execute(call),/writeApprovalRequired/)
   const output=await f.bridge.execute(call,responder)
   assert.deepEqual(output,{status:'done',actionId:'receipt'})
   assert.deepEqual(await f.bridge.execute(call,responder),output)
   assert.equal(f.sends(),1)
+  assert.deepEqual(f.audits,['before','after'])
 })
 
 test('Allow needs no native prompt and Deny never acquires an execution receipt',async()=>{
@@ -90,4 +95,13 @@ test('simultaneous native responses and an uncertain provider outcome never rese
   await assert.rejects(lost.bridge.execute(call,responder),/synthetic lost response/)
   assert.deepEqual(await lost.bridge.execute(call,responder),{error:'operationUncertain'})
   assert.equal(lost.sends(),1)
+  assert.deepEqual(lost.audits,['before','error'])
+})
+
+test('an aborted native response cannot claim or dispatch the write',async()=>{
+  const f=fixture();await f.bridge.review(call)
+  await assert.rejects(f.bridge.execute(call,responder,AbortSignal.abort()))
+  assert.equal(f.sends(),0);assert.deepEqual(f.audits,[])
+  await f.bridge.execute(call,responder)
+  assert.equal(f.sends(),1)
 })

@@ -18,20 +18,21 @@ import type { NativeWriteReview } from './operations/native-write-review'
 type Client = NonNullable<ReturnType<typeof getComposio>>
 
 /** Runs a pinned call in one connected account, or with no account for an app that needs none. */
-export async function executeAppToolCall(client: Client, userId: string, call: AppToolCall, accountId: string | null): Promise<AppToolExecution> {
+export async function executeAppToolCall(client: Client, userId: string, call: AppToolCall, accountId: string | null, signal?:AbortSignal): Promise<AppToolExecution> {
   // A no-auth app's tools run with the person's id alone; every other call names its account.
-  const result = await client.tools.execute(call.tool, { userId, ...(accountId ? { connectedAccountId: accountId } : {}), version: call.version, arguments: call.arguments })
+  signal?.throwIfAborted()
+  const result = await client.tools.execute(call.tool, { userId, ...(accountId ? { connectedAccountId: accountId } : {}), version: call.version, arguments: call.arguments }, {signal})
   return { successful: result.successful, data: result.data, error: result.error, ...(result.logId ? { logId: result.logId } : {}) }
 }
 
-export function appToolDeps(userId: string, botId: string | null, client: Client): AppToolDeps {
+export function appToolDeps(userId: string, botId: string | null, client: Client, signal?:AbortSignal): AppToolDeps {
   return {
     appAllowed: async toolkit => (await import('@/lib/app-policy/store')).botMayUseApp(botId, toolkit),
     noAuth: toolkit => isNoAuthToolkit(composioToolkitLister(client), toolkit).catch(() => false),
     resolveAccount: (toolkit, selected) => resolveComposioAccount(userId, toolkit, client, kit => chosenComposioDefault(userId, kit), selected),
     listTools: (toolkit, query) => client.tools.getRawComposioTools(query ? { toolkits: [toolkit], search: query, limit: 15 } : { toolkits: [toolkit], limit: 15 }) as Promise<AppTool[]>,
     getTool: slug => client.tools.getRawComposioToolBySlug(slug) as Promise<AppTool>,
-    execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId),
+    execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId, signal),
     setting: async (tool, toolkit) => {
       // A layer that cannot be read names nothing: the call goes to the
       // Decisions judge exactly as an unset key does, and the failure is logged
@@ -56,10 +57,10 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
   }
 }
 
-export async function runAppTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, review?: NativeWriteReview) {
+export async function runAppTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, review?: NativeWriteReview, signal?:AbortSignal) {
   const client = getComposio()
   if (!client) return { error: 'composioNotConfigured' }
-  const deps = appToolDeps(userId, botId, client)
+  const deps = appToolDeps(userId, botId, client, signal)
   return operation === 'list' ? listAppTools(deps, input) : callAppTool(deps, input, review ? { ownerId: userId, botId, review } : undefined)
 }
 
