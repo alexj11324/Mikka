@@ -27,7 +27,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Recheck failures after entering the serialized release queue
         id: history
-        run: node scripts/e2b/runtime-inputs.mjs
+        run: node scripts/e2b/runtime-inputs.mjs recheck
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RETRY_REASON: ${{ github.event.inputs.reason }}

@@ -8,7 +8,7 @@ import { join, matchesGlob } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { buildEnvironment, productionSha, verifyProductionBuild, PRODUCTION_VERSION_URL, REQUIRED,
-  assertCurrentMain, waitForWebDeployment, webDeploymentWaitOptions, deploymentPlan, runtimeRefreshRequired, RUNTIME_RELEASE_PATHS } from './web-deploy.mjs'
+  assertCurrentMain, waitForWebDeployment, webDeploymentWaitOptions, deploymentPlan } from './web-deploy.mjs'
 
 const SHA = 'a'.repeat(40)
 const pulled = [
@@ -413,16 +413,15 @@ test('both release paths use one non-cancelling pending queue, and the Web wait 
   assert.match(e2b, /uses: \.\/\.github\/workflows\/web-deploy\.yml/)
   assert.match(e2b, /runtime-refresh: true/)
   assert.match(e2b, /workflow_dispatch:\n    inputs:\n      runtime-refresh:\n        description: [^\n]+\n        type: boolean\n        default: false/)
-  assert.match(e2b, /if \[ "\$MANUAL_RETRY" = true \] \|\| \[ "\$RUNTIME_REFRESH" = true \] \|\| \[ "\$wanted" != "\$live" \]; then echo "changed=true"/)
   assert.match(e2b, /release:\n    needs: \[test, check\]\n    if: needs\.check\.outputs\.changed == 'true'/)
   assert.match(e2b, /runtime-worker-sha: \$\{\{ needs\.validate\.outputs\.source-sha \}\}/)
   assert.match(e2b, /runtime-template-models-sha256: \$\{\{ needs\.validate\.outputs\.template-models-sha256 \}\}/)
   const checkJob = e2b.slice(e2b.indexOf('\n  check:'), e2b.indexOf('\n  release:'))
   assert.match(checkJob, /fetch-depth: 0/)
   const checkGuard = checkJob.indexOf('node scripts/release/web-deploy.mjs main')
-  assert.ok(checkGuard >= 0 && checkGuard < checkJob.indexOf('uses: Infisical/'))
-  assert.match(checkJob, /RUNTIME_REFRESH: \$\{\{ steps\.control\.outputs\.refresh \}\}/)
-  for (const path of RUNTIME_RELEASE_PATHS) assert.ok(e2b.includes(`      - '${path}'`), `main push filter must include ${path}`)
+  assert.ok(checkGuard >= 0)
+  assert.doesNotMatch(checkJob, /Infisical|VERCEL_TEAM_TOKEN|publish-template-env|RUNTIME_REFRESH/)
+  assert.match(checkJob, /steps\.history\.outputs\.changed/)
   assert.match(web, /workflow_call:/)
   assert.match(web, /RUNTIME_REFRESH: \$\{\{ inputs\.runtime-refresh \|\| inputs\.overlay-refresh \|\| github\.event_name == 'push' \}\}/)
   // queue:max is GitHub's documented queue contract, not a locally simulated
@@ -445,72 +444,6 @@ test('runtime env, build and upload are ordered under the same job with fixed id
   assert.deepEqual([...new Set([...web.matchAll(/project-id: (.+)/g)].map(match => match[1]))], ['89850d6a-f020-4936-863e-df77380dfe40'])
 })
 
-test('the actual comparison builds on manual dispatch, control refresh or a changed worker', () => {
-  const e2b = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
-    + readFileSync(new URL('../../.github/workflows/e2b-runtime-release.yml', import.meta.url), 'utf8')
-  const condition = e2b.split('\n').find(line => line.trim().startsWith('if [ "$MANUAL_RETRY"'))?.trim()
-  assert.ok(condition)
-  const dir = mkdtempSync(join(tmpdir(), 'runtime-dispatch-'))
-  try {
-    for (const [manual, refresh, live, changed] of [['', '', SHA, false], ['false', 'false', SHA, false], ['false', 'true', SHA, true], ['false', 'false', OTHER, true], ['true', 'false', SHA, true]]) {
-      const output = join(dir, `${manual || 'push'}-${refresh}-${live}`)
-      execFileSync('bash', ['-euc', condition], { env: { PATH: process.env.PATH, MANUAL_RETRY: manual, RUNTIME_REFRESH: refresh, wanted: SHA, live, GITHUB_OUTPUT: output } })
-      assert.equal(readFileSync(output, 'utf8'), `changed=${changed}\n`)
-    }
-  } finally { rmSync(dir, { recursive: true, force: true }) }
-})
-
-test('release-control refresh validates both immutable push endpoints and never assumes missing history is unchanged', () => {
-  const valid = { expectedBuild: SHA, eventName: 'push', event: { before: OTHER, after: SHA, ref: 'refs/heads/main' } }
-  for (const event of [{ ...valid.event, before: undefined }, { ...valid.event, before: 'main' }, { ...valid.event, before: '0'.repeat(40) },
-    { ...valid.event, after: OTHER }, { ...valid.event, ref: 'refs/heads/other' }]) {
-    assert.throws(() => runtimeRefreshRequired({ ...valid, event }, () => assert.fail('invalid source must not reach Git')), /invalidPushSource/)
-  }
-  assert.throws(() => runtimeRefreshRequired(valid, () => { throw Error('missing history') }), /releaseControlDiffUnavailable/)
-  assert.throws(() => runtimeRefreshRequired(valid, () => null), /releaseControlDiffUnavailable/)
-  for (const path of RUNTIME_RELEASE_PATHS) assert.equal(runtimeRefreshRequired(valid, () => [path]), true)
-  assert.equal(runtimeRefreshRequired(valid, () => ['docs/change.md', 'scripts/release/web-deploy.test.mjs']), false)
-})
-
-test('manual runtime refresh defaults off and does not make pull requests eligible', () => {
-  const noGit = () => assert.fail('non-push events do not compare Git endpoints')
-  assert.equal(runtimeRefreshRequired({ expectedBuild: SHA, eventName: 'workflow_dispatch' }, noGit), false)
-  assert.equal(runtimeRefreshRequired({ expectedBuild: SHA, eventName: 'workflow_dispatch', explicit: true }, noGit), true)
-  assert.equal(runtimeRefreshRequired({ expectedBuild: SHA, eventName: 'pull_request', explicit: true }, noGit), false)
-})
-
-test('real Git and the production CLI compare the entire push, preserve docs-only skip and reject unavailable before', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'runtime-control-git-'))
-  const git = args => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-  const commit = () => { git(['add', '.']); git(['-c', 'user.name=Release fixture', '-c', 'user.email=release@example.invalid', 'commit', '-qm', 'fixture']); return git(['rev-parse', 'HEAD']) }
-  const run = (before, after) => {
-    const eventPath = join(dir, '.git/event.json'), output = join(dir, '.git/output.txt')
-    writeFileSync(eventPath, JSON.stringify({ before, after, ref: 'refs/heads/main' }))
-    rmSync(output, { force: true })
-    execFileSync(process.execPath, [fileURLToPath(new URL('./web-deploy.mjs', import.meta.url)), 'runtime-refresh'], {
-      cwd: dir, env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'push', GITHUB_SHA: after, GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output }, stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    return readFileSync(output, 'utf8')
-  }
-  try {
-    git(['init', '-q', '-b', 'main'])
-    mkdirSync(join(dir, '.github/workflows'), { recursive: true }); mkdirSync(join(dir, 'docs'))
-    writeFileSync(join(dir, '.github/workflows/web-deploy.yml'), 'name: before\n')
-    writeFileSync(join(dir, 'docs/change.md'), 'before\n')
-    const before = commit()
-    writeFileSync(join(dir, '.github/workflows/web-deploy.yml'), 'name: changed\n'); commit()
-    writeFileSync(join(dir, 'docs/change.md'), 'last commit only changes docs\n')
-    const after = commit()
-    assert.equal(run(before, after), 'refresh=true\n', 'a control change earlier in a multi-commit push is included')
-    writeFileSync(join(dir, 'docs/change.md'), 'only docs this push\n')
-    const docsAfter = commit()
-    assert.equal(run(after, docsAfter), 'refresh=false\n')
-    assert.throws(() => run('f'.repeat(40), docsAfter), error => {
-      assert.match(String(error.stderr), /webDeploy:releaseControlDiffUnavailable/)
-      return true
-    })
-  } finally { rmSync(dir, { recursive: true, force: true }) }
-})
 
 function desktopWebFixture({ version = () => OTHER, overlay = () => undefined, main = () => OTHER, budget = 500,
   comparison = (base, head) => ({ url: `https://api.github.com/repos/alexj11324/Mikka/compare/${base}...${head}`,

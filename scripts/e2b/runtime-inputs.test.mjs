@@ -4,9 +4,9 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runtimeInputsDigest, releaseDecision, findFailedInputs, rememberFailure } from './runtime-inputs.mjs'
+import { runtimeInputsDigest, pushRuntimeInputs, releaseDecision, findFailedInputs, rememberFailure } from './runtime-inputs.mjs'
 
-const digest = 'a'.repeat(64)
+const digest = 'a'.repeat(40)
 const sha = 'b'.repeat(40)
 const options = { digest, token: 'test', currentRunId: 99 }
 const artifact = { name: `e2b-runtime-inputs-${digest}`, expired: false, created_at: '2026-11-09T20:01:00Z',
@@ -32,13 +32,14 @@ function api({ artifacts = [artifact], previousRun = run, steps = [{ name: build
   } }
 }
 
-test('same inputs that failed skip; new runtime inputs build; matching worker skips; dispatch builds', () => {
-  assert.deepEqual(releaseDecision({ wanted: sha, live: 'old', failedRunId: 10 }), { changed: false, reason: 'skipped: same inputs as failed run 10' })
-  assert.equal(releaseDecision({ wanted: sha, live: 'old' }).changed, true)
-  assert.equal(releaseDecision({ wanted: sha, live: sha }).changed, false)
-  assert.equal(releaseDecision({ wanted: sha, live: 'old', refresh: true, failedRunId: 10 }).changed, false)
-  assert.equal(releaseDecision({ wanted: sha, live: sha, eventName: 'workflow_dispatch', reason: 'service recovered', failedRunId: 10 }).changed, true)
+test('only actual push input changes build, even when production is stale; manual retry remains explicit', () => {
+  const push = { eventName: 'push', workerHash: sha, beforeWorkerHash: 'c'.repeat(40), live: 'stale-production' }
+  assert.equal(releaseDecision(push).changed, true)
+  assert.equal(releaseDecision({ ...push, beforeWorkerHash: sha }).changed, false)
+  assert.deepEqual(releaseDecision({ ...push, failedRunId: 10 }), { changed: false, reason: 'skipped: same inputs as failed run 10' })
+  assert.equal(releaseDecision({ eventName: 'workflow_dispatch', reason: 'service recovered', failedRunId: 10 }).changed, true)
   assert.throws(() => releaseDecision({ eventName: 'workflow_dispatch', reason: '  ' }), /retryReasonRequired/)
+  assert.throws(() => releaseDecision({ ...push, beforeWorkerHash: undefined }), /workerHashRequired/)
 })
 
 test('failed build and subscription gate are recognized from the exact latest run attempt', async () => {
@@ -60,7 +61,7 @@ test('supersession, Web/cleanup failures, cancelled runs, foreign workflows and 
     [{ name: buildStep, conclusion: 'skipped' }], [{ name: 'Close leftover probes and failed private builds', conclusion: 'failure' }]]) {
     assert.equal(await findFailedInputs({ ...options, ...api({ steps }) }), null)
   }
-  for (const change of [{ expired: true }, { name: `e2b-runtime-inputs-${'c'.repeat(64)}` }, { workflow_run: { ...artifact.workflow_run, id: 99 } }]) {
+  for (const change of [{ expired: true }, { name: `e2b-runtime-inputs-${'c'.repeat(40)}` }, { workflow_run: { ...artifact.workflow_run, id: 99 } }]) {
     assert.equal(await findFailedInputs({ ...options, ...api({ artifacts: [{ ...artifact, ...change }] }) }), null)
   }
 })
@@ -69,29 +70,93 @@ test('history/API failures fail closed rather than silently rebuilding', async (
   await assert.rejects(findFailedInputs({ ...options, fetchImpl: async () => new Response('', { status: 403 }) }), /github:403/)
 })
 
-test('digest uses committed runtime_paths blobs, paths and modes, including lockfile and deletions', () => {
+function runtimeRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'runtime-inputs-'))
-  const git = args => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim()
+  const git = args => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  const write = (path, value) => { mkdirSync(join(dir, path, '..'), { recursive: true }); writeFileSync(join(dir, path), value) }
   const commit = () => { git(['add', '.']); git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'fixture']); return git(['rev-parse', 'HEAD']) }
+  git(['init', '-q'])
+  write('scripts/e2b/build-template.py', readFileSync(new URL('./build-template.py', import.meta.url)))
+  write('scripts/e2b/official-files.py', '# recipe one')
+  write('packages/daemon/worker.ts', 'worker one')
+  write('package.json', JSON.stringify({ packageManager: 'pnpm@10.34.3', scripts: { build: 'one' }, dependencies: { eve: '1.0.0' } }))
+  write('packages/daemon/package.json', JSON.stringify({ name: '@mikka/daemon', dependencies: { runtime: '1.0.0' } }))
+  write('pnpm-lock.yaml', `lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      eve:
+        specifier: 1.0.0
+        version: 1.0.0
+  packages/daemon:
+    dependencies:
+      runtime:
+        specifier: 1.0.0
+        version: 1.0.0
+packages:
+  eve@1.0.0:
+    resolution: {integrity: web}
+  runtime@1.0.0:
+    resolution: {integrity: runtime}
+  shared@1.0.0:
+    resolution: {integrity: transitive-runtime}
+snapshots:
+  eve@1.0.0: {}
+  runtime@1.0.0:
+    dependencies:
+      shared: 1.0.0
+  shared@1.0.0: {}
+`)
+  return { dir, git, write, commit, dispose: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+test('canonical worker input ignores Eve-only package/lock, Web/helper, migration, docs and Agent edits', () => {
+  const fixture = runtimeRepo(), { dir, write, commit } = fixture
   try {
-    git(['init', '-q']); mkdirSync(join(dir, '.github/workflows'), { recursive: true })
-    const workflow = readFileSync(new URL('../../.github/workflows/e2b-official-runtime.yml', import.meta.url), 'utf8')
-    writeFileSync(join(dir, '.github/workflows/e2b-official-runtime.yml'), workflow)
-    writeFileSync(join(dir, 'pnpm-lock.yaml'), 'lock-a')
-    mkdirSync(join(dir, 'packages/daemon'), { recursive: true }); writeFileSync(join(dir, 'packages/daemon/install.sh'), 'install')
-    mkdirSync(join(dir, 'app/api/runs/[runId]/evidence'), { recursive: true }); writeFileSync(join(dir, 'app/api/runs/[runId]/evidence/route.ts'), 'route')
-    let head = commit(), previous = runtimeInputsDigest({ ref: head, cwd: dir })
-    writeFileSync(join(dir, 'README.md'), 'docs'); head = commit()
-    assert.equal(runtimeInputsDigest({ ref: head, cwd: dir }), previous)
-    for (const path of ['pnpm-lock.yaml', 'packages/daemon/install.sh', 'app/api/runs/[runId]/evidence/route.ts']) {
-      writeFileSync(join(dir, path), 'changed'); head = commit()
-      const next = runtimeInputsDigest({ ref: head, cwd: dir }); assert.notEqual(next, previous); previous = next
+    const before = commit(), original = runtimeInputsDigest({ ref: before, cwd: dir })
+    const root = JSON.parse(readFileSync(join(dir, 'package.json'))); root.dependencies.eve = '2.0.0'; root.scripts.build = 'two'
+    write('package.json', JSON.stringify(root))
+    write('pnpm-lock.yaml', readFileSync(join(dir, 'pnpm-lock.yaml'), 'utf8').replaceAll('eve@1.0.0', 'eve@2.0.0').replace('specifier: 1.0.0\n        version: 1.0.0', 'specifier: 2.0.0\n        version: 2.0.0'))
+    let after = commit()
+    assert.equal(runtimeInputsDigest({ ref: after, cwd: dir }), original)
+    for (const path of ['.github/workflows/web-deploy.yml', 'scripts/release/build-vercel.mjs', 'scripts/acceptance/cloud-startup.mjs',
+      'scripts/acceptance/model-provider-fallback.mjs', 'lib/agents/new-agent.ts', 'apps/eve/eve.config.ts', 'migrations/next.sql', 'docs/change.md']) {
+      write(path, 'unrelated app change'); after = commit()
+      const inputs = pushRuntimeInputs({ ref: after, event: { before, after, ref: 'refs/heads/main' }, cwd: dir })
+      assert.equal(releaseDecision({ ...inputs, eventName: 'push', live: 'stale-production', refresh: true }).changed, false, path)
     }
-    git(['update-index', '--chmod=+x', 'packages/daemon/install.sh']); git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'mode'])
-    const mode = runtimeInputsDigest({ ref: git(['rev-parse', 'HEAD']), cwd: dir }); assert.notEqual(mode, previous)
-    rmSync(join(dir, 'pnpm-lock.yaml')); head = commit()
-    assert.notEqual(runtimeInputsDigest({ ref: head, cwd: dir }), mode)
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+    const output = join(dir, '.git/output'), event = join(dir, '.git/push.json')
+    writeFileSync(event, JSON.stringify({ before, after, ref: 'refs/heads/main' }))
+    const processResult = spawnSync(process.execPath, [new URL('./runtime-inputs.mjs', import.meta.url).pathname], {
+      cwd: dir, env: { PATH: process.env.PATH, GITHUB_SHA: after, GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: event,
+        GITHUB_OUTPUT: output, RUNTIME_REFRESH: 'true' }, encoding: 'utf8' })
+    assert.equal(processResult.status, 0, processResult.stderr)
+    assert.match(readFileSync(output, 'utf8'), /changed=false\nskip=true/)
+    // No GITHUB_TOKEN or production credential exists: an unnecessary history or
+    // live-worker request would fail this actual CLI invocation.
+  } finally { fixture.dispose() }
+})
+
+test('canonical worker, recipe and transitive installed dependency changes trigger across the entire push', () => {
+  const fixture = runtimeRepo(), { dir, write, commit } = fixture
+  try {
+    let before = commit(), changeNumber = 0
+    for (const change of [() => write('packages/daemon/worker.ts', 'worker two'), () => write('scripts/e2b/official-files.py', '# recipe two'),
+      () => write('pnpm-lock.yaml', readFileSync(join(dir, 'pnpm-lock.yaml'), 'utf8').replace('integrity: transitive-runtime', 'integrity: changed-runtime'))]) {
+      change(); commit(); write('docs/change.md', String(++changeNumber)); const after = commit()
+      const inputs = pushRuntimeInputs({ ref: after, event: { before, after, ref: 'refs/heads/main' }, cwd: dir })
+      assert.notEqual(inputs.workerHash, inputs.beforeWorkerHash)
+      assert.equal(releaseDecision({ ...inputs, eventName: 'push' }).changed, true)
+      before = after
+    }
+    assert.throws(() => pushRuntimeInputs({ ref: before, event: { before: 'f'.repeat(40), after: before, ref: 'refs/heads/main' }, cwd: dir }))
+  } finally { fixture.dispose() }
+})
+
+test('invalid push endpoints fail before hashing, without assuming missing history is unchanged', () => {
+  const value = { before: 'c'.repeat(40), after: sha, ref: 'refs/heads/main' }
+  for (const event of [{ ...value, before: undefined }, { ...value, before: '0'.repeat(40) }, { ...value, after: 'd'.repeat(40) }, { ...value, ref: 'refs/heads/other' }])
+    assert.throws(() => pushRuntimeInputs({ ref: sha, event }, () => assert.fail('must validate before hashing')), /invalidPushSource/)
 })
 
 test('the workflow checks history before secrets and holds one queue across all release gates and cleanup', () => {
@@ -99,9 +164,9 @@ test('the workflow checks history before secrets and holds one queue across all 
   const child = readFileSync(new URL('../../.github/workflows/e2b-runtime-release.yml', import.meta.url), 'utf8')
   assert.doesNotMatch(caller, /^concurrency:/m)
   const check = caller.slice(caller.indexOf('\n  check:'), caller.indexOf('\n  release:'))
-  assert.ok(check.indexOf('id: history') < check.indexOf('uses: Infisical/'))
-  assert.match(check, /changed: \$\{\{ steps.compare.outputs.changed \|\| 'false' \}\}/)
-  assert.match(check, /Compare the worker hash with production\n        if: steps.history.outputs.skip != 'true'/)
+  assert.doesNotMatch(check, /Infisical|VERCEL_TEAM_TOKEN|publish-template-env|runtime-refresh/)
+  assert.match(check, /changed: \$\{\{ steps.history.outputs.changed \|\| 'false' \}\}/)
+  assert.match(child, /run: node scripts\/e2b\/runtime-inputs.mjs recheck/)
   assert.match(caller, /reason:\n        description: [^\n]+\n        type: string\n        required: true/)
   assert.match(caller, /release:\n    needs: \[test, check\]\n    if: needs.check.outputs.changed == 'true'\n    concurrency:\n      group: e2b-official-runtime-release\n      cancel-in-progress: false\n      queue: max/)
   assert.match(child, /validate:\n    needs: recheck\n    if: needs.recheck.outputs.skip != 'true'/)
