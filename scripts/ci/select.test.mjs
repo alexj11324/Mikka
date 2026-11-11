@@ -43,6 +43,13 @@ test('Factory store selects marker-backed suites and real downstream imports', a
   assert(result.affected.includes(dbId('test:factory')))
   assert(result.db_suites.length < plan.db.scripts.length)
 })
+test('Eve model changes select native unit tests and schedule authority selects its database gate', async () => {
+  const unit = await pick('lib/eve/streaming-model.ts')
+  assert(unit.units.includes('ci-core-eve'))
+  const database = await pick('lib/eve/scheduled-read.ts')
+  assert(database.db_suites.includes('test:eve-db'))
+  assert(database.affected.includes(dbId('test:eve-db')))
+})
 for (const file of ['pnpm-lock.yaml','pnpm-workspace.yaml','tsconfig.json','.github/workflows/ui-policy.yml','scripts/ci/select.mjs','lib/db/schema.ts','lib/auth.ts','lib/credentials/store.ts','unmapped.bin']) test(`high risk or unmapped input expands: ${file}`, async () => {
   const r = await pick(file)
   assert(r.full)

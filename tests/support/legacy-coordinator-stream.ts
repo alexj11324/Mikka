@@ -1,4 +1,4 @@
-import type { CoordinatorStreamEvent } from './coordinator/stream'
+import type { CoordinatorStreamEvent } from '@/lib/coordinator/stream'
 
 /** A tool a live reply is using, as the stream reports it. */
 export type CoordinatorLiveTool = { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; quote?: string; at?: number; target?: string; displayName?: string; errorCode?: string; errorDetail?: string }

@@ -10,5 +10,6 @@
       "next-intl/server": ["../api/compat/intl.ts"]
     }
   },
-  "include": ["agent/**/*.ts"]
+  "include": ["agent/**/*.ts"],
+  "exclude": ["node_modules", ".eve", ".output"]
 }

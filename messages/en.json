@@ -3519,6 +3519,10 @@
     "unknownClient": "An unnamed app"
   },
   "Coordinator": {
+    "eve": {
+      "submit": "Send",
+      "open": "Open"
+    },
     "waitingQuestions": "{count, plural, one {# task is waiting for your answer} other {# tasks are waiting for your answer}}",
     "stop": "Stop",
     "stopped": "Stopped",
