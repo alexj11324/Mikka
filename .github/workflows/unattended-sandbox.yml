@@ -3,6 +3,7 @@ name: Unattended sandbox acceptance
 # CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - '.github/workflows/unattended-sandbox.yml'
       - 'packages/daemon/**'
@@ -30,6 +31,8 @@ env:
 
 jobs:
   runtime:
+    # No Runner allocation until a draft becomes review-ready.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
