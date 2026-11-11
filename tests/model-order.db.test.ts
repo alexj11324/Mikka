@@ -76,6 +76,34 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     return { id, agents }
   }
 
+  await t.test('an explicitly sponsored cloud uses the selected active subscription without an E2B key or catalogue', async () => {
+    const scope = {...await person('sponsored-dispatch'), botId:null}
+    const previous = {cohort: process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES, token: process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN}
+    try {
+      process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = scope.workspaceId
+      process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = 'synthetic-test-only'
+      for (const [provider, harness, model] of [
+        ['claude','claude_code','claude-haiku-5-5'], ['codex','codex','gpt-6-luna'],
+      ] as const) {
+        const connection = await subscribe(scope,provider,[model])
+        const asked = {harness,model}
+        const resolve = () => resolveModelDispatch(pool,scope,asked,'cloud',undefined,
+          {cloudPurpose:'cloudflare_task',skipCatalogueRefresh:true,probeQuota:false,bindSubscription:false})
+        const eligible = await resolve()
+        assert.equal(eligible.kind,'cloud')
+        assert.equal(eligible.kind === 'cloud' && eligible.entry.source.kind === 'subscription' && eligible.entry.source.connectionId,connection)
+        assert.equal((await resolveModelDispatch(pool,scope,asked,'cloud',undefined,{skipCatalogueRefresh:true,probeQuota:false})).kind,'none')
+        await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1',[connection])
+        assert.equal((await resolve()).kind,'none')
+      }
+    } finally {
+      if (previous.cohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
+      else process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = previous.cohort
+      if (previous.token === undefined) delete process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
+      else process.env.MIKKA_TASK_MACHINE_BRIDGE_TOKEN = previous.token
+    }
+  })
+
   await t.test('a display caller can supply its invocation-local devices without a second device read', async () => {
     const scope = await person('order-display-projection')
     await device(scope.ownerId, [])

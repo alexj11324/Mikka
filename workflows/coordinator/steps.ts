@@ -519,9 +519,27 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     const workspaceId = await timedPhase('executionWorkspace', () => executionWorkspace(userId, botId))
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
     const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
-    const { target, agentProfile, selectionMode } = await timedPhase('resolveModelDispatch', () => resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId, botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, location: place === 'cloud' ? 'cloud' : undefined, agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) }))
+    let sponsored = false
+    if (requestEventId) {
+      const event=(await pool.query(`SELECT "userId","botId","issueId",kind,"deliveredAt",
+        payload ? 'taskDestination' AS "hasTaskDestination",payload->'taskDestination' AS "taskDestination"
+        FROM coordinator_events WHERE id=$1`,[requestEventId])).rows[0]
+      if (!event || event.userId!==userId || event.botId!==botId) throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
+      if (event.hasTaskDestination) {
+        const destination = taskDestinationSchema.safeParse(event.taskDestination)
+        // create_issue binds a task-form event to the created issue. A chat
+        // request has no destination and retains ordinary placement behavior.
+        if (!destination.success || destination.data.kind !== 'cloud' || event.issueId !== input.issueId ||
+          event.kind !== 'user_message' || !event.deliveredAt) throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
+        // The person's fixed cloud choice also applies when the model omitted
+        // target; startup failure cannot turn it into local placement recovery.
+        place = 'cloud'
+        sponsored = destination.data.provider === 'cloudflare'
+      }
+    }
+    const { target, agentProfile, selectionMode } = await timedPhase('resolveModelDispatch', () => resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId, botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, location: place === 'cloud' ? 'cloud' : undefined, ...(sponsored ? {cloudPurpose:'cloudflare_task' as const}:{}), agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) }))
     if (target.kind === 'none') {
-      if (target.reason === 'cloudNotConfigured') {
+      if (target.reason === 'cloudNotConfigured' && !sponsored) {
         const { cloudDispatchFailureReason } = await import('@/lib/cloud-dispatch-failure')
         const { modelUnavailableCard } = await import('@/lib/model-dispatch')
         const reason = await cloudDispatchFailureReason(pool, userId)
@@ -539,22 +557,6 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
       return { ...result, status: 'queued' as const }
     }
     if (target.kind === 'device') return onDevice(target)
-    if (requestEventId) {
-      const event=(await pool.query(`SELECT "userId","botId","issueId",kind,"deliveredAt",
-        payload ? 'taskDestination' AS "hasTaskDestination",payload->'taskDestination' AS "taskDestination"
-        FROM coordinator_events WHERE id=$1`,[requestEventId])).rows[0]
-      if (!event || event.userId!==userId || event.botId!==botId) throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
-      if (event.hasTaskDestination) {
-        const destination = taskDestinationSchema.safeParse(event.taskDestination)
-        // create_issue binds a task-form event to the created issue. A chat
-        // request has no destination and retains ordinary placement behavior.
-        if (!destination.success || destination.data.kind !== 'cloud' || event.issueId !== input.issueId ||
-          event.kind !== 'user_message' || !event.deliveredAt) throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
-        // The person's fixed cloud choice also applies when the model omitted
-        // target; startup failure cannot turn it into local placement recovery.
-        place = 'cloud'
-      }
-    }
     // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
     // An API-key model binds no subscription to it; a subscription model binds the entry's own account.
     const autoRuntime=await import('@/lib/computer/auto-runtime')
@@ -579,6 +581,11 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
       // An admitted but unclaimed startup failure is the same Factory intent.
       // Its server-confirmed failed run supplies ancestry for the normal retry.
       if (fallback.kind === 'device') return { ...await onDevice(fallback, 'failedRunId' in cloud ? cloud.failedRunId : input.threadRunId), fallback: 'cloudUnavailable' as const }
+    }
+    if (sponsored) {
+      const { modelUnavailableCard } = await import('@/lib/model-dispatch')
+      return { error:'machineUnavailable' as const, issueId:input.issueId, reason:'cloudTemporarilyUnavailable' as const,
+        card:modelUnavailableCard('cloudTemporarilyUnavailable') }
     }
     // A startup failure can be capacity, quota, template or service availability. Only a confirmed
     // missing key offers 填入 E2B Key; an existing key must never be described as absent.
