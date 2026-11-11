@@ -27,6 +27,7 @@ test('platform credentials and deployment identity remain distinct from customer
   assert.equal(selected.runtimeEnv.ANOTHER_SECRET, undefined)
   assert.equal(selected.runtimeEnv.SOME_OTHER_BINDING, undefined)
   assert.equal(selected.runtimeEnv.MIKKA_EVE_WORKFLOW_WORLD, 'cloudflare')
+  assert.equal(selected.runtimeEnv.MIKKA_HOSTED_MODEL_FALLBACK, 'cloudflare-workers-ai')
   assert.equal(selected.runtimeEnv.MIKKA_EVE_PUBLIC_ORIGIN, 'https://eve.example.test')
   assert.equal(selected.runtimeEnv.BETTER_AUTH_URL, 'https://app.example.test')
   assert.deepEqual(validateHostBuild(build, host, selected.runtimeEnv), host)
@@ -34,6 +35,8 @@ test('platform credentials and deployment identity remain distinct from customer
 
 test('missing durable storage, unsafe origins or incompatible hosting fail without disclosing values', () => {
   for (const change of [
+    { EVE_ENV_MIKKA_HOSTED_MODEL_FALLBACK: 'vercel-gateway' },
+    { EVE_ENV_VERCEL_OIDC_TOKEN: 'unusable-fixture' }, { EVE_ENV_AI_GATEWAY_API_KEY: 'unusable-fixture' },
     { WORLD_QUEUE_PUBLIC_KEY: '' }, { WORLD_SERVICE: undefined },
     { EVE_PUBLIC_ORIGIN: 'https://private-password@eve.example.test' },
     { EVE_PUBLIC_ORIGIN: 'https://eve.example.test/another-path' },
