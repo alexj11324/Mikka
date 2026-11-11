@@ -2,13 +2,13 @@
 /** Host-only upgrade controller. Never mount the Docker socket in the Mikka app.
  * No timer, registry polling, remote command execution, or destructive DB rollback. */
 import { spawn, execFileSync } from 'node:child_process'
-import { openSync, closeSync, unlinkSync, mkdirSync, readFileSync, writeFileSync, renameSync, copyFileSync, statSync, realpathSync } from 'node:fs'
+import { openSync, closeSync, unlinkSync, mkdirSync, readFileSync, writeFileSync, renameSync, statSync, statfsSync, lstatSync, realpathSync } from 'node:fs'
 import { createWriteStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { resolve, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { assessUpgrade, assertPinnedImage, ensureRegularEnvFile, IMAGE_REPOSITORY, migrationsFingerprint, parseStableRelease, STABLE_TAG } from './self-hosted-update-policy.mjs'
+import { assessUpgrade, assertPinnedImage, compareStableTags, ensureRegularEnvFile, IMAGE_REPOSITORY, parseStableRelease, STABLE_TAG } from './self-hosted-update-policy.mjs'
 
 const root = process.cwd()
 const composeFile = process.env.MIKKA_UPDATE_COMPOSE_FILE || 'docker-compose.yml'
@@ -22,7 +22,7 @@ const hashProgram = [
 
 function fail(code) { throw new Error(code) }
 function docker(args, env = process.env, { maxBuffer = 8 * 1024 * 1024 } = {}) {
-  try { return execFileSync('docker', args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer }).trim() }
+  try { return execFileSync('docker', args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer, timeout: 20 * 60_000 }).trim() }
   catch { fail('SELF_HOSTED_UPDATE_DOCKER_FAILED') }
 }
 function compose(args, env = process.env) {
@@ -106,6 +106,10 @@ function executeRelease(tag, opts) {
 }
 async function performUpgrade(release, opts) {
   mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
+  const state = lstatSync(stateDirectory)
+  if (!state.isDirectory() || state.isSymbolicLink() || (state.mode & 0o077) !== 0) fail('SELF_HOSTED_UPDATE_STATE_PERMISSIONS_INVALID')
+  const available = statfsSync(stateDirectory)
+  if (BigInt(available.bavail) * BigInt(available.bsize) < 512n * 1024n * 1024n) fail('SELF_HOSTED_UPDATE_DISK_SPACE_LOW')
   const lockPath = join(stateDirectory, 'upgrade.lock')
   let lock
   try { lock = openSync(lockPath, 'wx', 0o600) }
@@ -117,6 +121,16 @@ async function performUpgrade(release, opts) {
     if (!opts.auto) assertOption(opts.ackIdle)
     const { localDatabase } = config()
     const original = activeImage()
+    const lastPath = join(stateDirectory, 'last-success.json')
+    let last = null
+    try { last = JSON.parse(readFileSync(lastPath, 'utf8')) }
+    catch { /* Legacy installs must be moved to the stable channel manually. */ }
+    if (opts.auto) {
+      if (!last || !STABLE_TAG.test(last.tag || '') || last.revision !== original.revision) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
+      if (compareStableTags(release.tag, last.tag) <= 0) return { status: 'ignored-older-release', tag: release.tag }
+    } else if (last && STABLE_TAG.test(last.tag || '') && compareStableTags(release.tag, last.tag) < 0) {
+      fail('SELF_HOSTED_UPDATE_DOWNGRADE_REFUSED')
+    }
     if (original.revision === release.revision) return { status: 'already-current', tag: release.tag }
     const backupHook = localDatabase || !!process.env.MIKKA_EXTERNAL_DB_BACKUP_HOOK
     const assessment = assessUpgrade(original, release, {
