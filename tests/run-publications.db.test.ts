@@ -90,7 +90,12 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Publication CI computer\',\'local\',$3)', [row.deviceId, row.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [row.agentId, row.userId, row.deviceId, `codex ${row.deviceId}`])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,null)', [row.repoId, row.deviceId, row.userId, row.remoteKey, row.remoteUrl])
-    await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
+    const { rows: [createdTask] } = await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4) returning "issuedIdentifier"', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
+    if (options.scope === 'workspace') {
+      assert.equal(createdTask.issuedIdentifier, `W${row.workspaceId.replaceAll('-', '').slice(0, 12).toUpperCase()}-1`)
+      row.identifier = createdTask.issuedIdentifier
+      row.branch = `mikka/${row.identifier.toLowerCase()}`
+    }
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
     if (options.approved) await admit(row)
@@ -203,25 +208,25 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(await failFromRequest(queued.runId, queued.deviceId, queued.userId), false)
     })
 
-    await t.test('an unlinked workspace task publishes with its owner number without changing scope', async () => {
+    await t.test('an unlinked workspace task publishes its immutable Workspace identifier without changing scope', async () => {
       const { admitCloudPush } = await import('../lib/computer/cloud-push')
       const { workspacePool } = await import('../lib/workspace-db')
+      const { seedTeam } = await import('./support/workspace-admin-db')
       const f = await fixture({ approved: true, prefix: 'MINE', number: 12, scope: 'workspace' })
       const linked = await fixture({ approved: true, prefix: 'OTHR', number: 18, scope: 'workspace' })
-      const workspaceId = linked.workspaceId, teamId = randomUUID()
-      await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Publication budget CI\',\'PUBREAD\')', [teamId, workspaceId, linked.userId])
-      const { rows: [link] } = await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4) returning number', [linked.issueId, teamId, workspaceId, linked.userId])
-      linked.identifier = `PUBREAD-${link.number}`
-      linked.branch = `mikka/pubread-${link.number}`
-      await admit(linked)
+      const workspaceId = linked.workspaceId
+      const { id: teamId } = await seedTeam(workspacePool, workspaceId, linked.userId, 'Publication budget CI')
+      await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [linked.issueId, teamId, workspaceId, linked.userId])
       const client = await pool.connect()
-      const cloudAdmission = (row = f) => admitCloudPush(client, { userId: row.userId, issueId: row.issueId, agentId: row.agentId, deviceId: row.deviceId, deviceRepoId: row.repoId, now: new Date() })
+      // The internal helper is measured after the caller's admission. Grouping
+      // cannot change a previously issued identifier or its repository branch.
+      const cloudAdmission = (row = f) => admitCloudPush(client, { userId: row.userId, issueId: row.issueId, agentId: row.agentId, deviceId: row.deviceId, deviceRepoId: row.repoId, workspaceId: row.workspaceId, now: new Date() })
       try {
         await client.query('BEGIN')
         const admitted = await measured(() => cloudAdmission())
         const linkedCloud = await measured(() => cloudAdmission(linked))
         assert.ok(admitted.value, 'a task without a local team still gets a publication receipt')
-        assert.equal(admitted.value.publication.identifier, 'MINE-12')
+        assert.equal(admitted.value.publication.identifier, f.identifier)
         assert.equal(admitted.value.publication.branch, f.branch)
         assert.equal(admitted.value.publication.remoteUrl, f.remoteUrl)
         assert.equal(linkedCloud.value?.publication.identifier, linked.identifier)
@@ -236,18 +241,20 @@ test('run result publication commits one owner-scoped result through retries and
         await client.query('BEGIN')
         const frozen = await measured(() => cloudAdmission())
         assert.equal(frozen.value?.publication.branch, f.branch, 'a later prefix edit does not move the existing PR branch')
-        assert.equal(frozen.value?.publication.identifier, 'MINE-12')
-        assert.ok(frozen.statements < admitted.statements, 'a frozen identifier and branch skip the helper lookup')
+        assert.equal(frozen.value?.publication.identifier, f.identifier)
+        assert.equal(frozen.statements, admitted.statements, 'both paths reuse the selected immutable identifier without a helper query')
         await client.query('COMMIT')
         await pool.query('update run_publications set identifier=null where "runId"=$1', [f.runId])
         await client.query('BEGIN')
         const repaired = await cloudAdmission()
-        assert.equal(repaired?.publication.identifier, 'NEXT-12', 'a null frozen identifier still resolves its current owner prefix')
+        assert.equal(repaired?.publication.identifier, f.identifier, 'a null receipt identifier reuses the original issued identity')
         assert.equal(repaired?.publication.branch, f.branch, 'filling an identifier does not replace the frozen branch')
         await client.query('COMMIT')
         await pool.query('update run_publications set identifier=$2 where "runId"=$1', [f.runId, f.identifier])
         assert.equal((await task(f)).scope, 'workspace')
         assert.equal((await task(f)).userId, f.userId)
+        assert.equal((await task(f)).issuedIdentifier, f.identifier)
+        assert.equal((await task(linked)).issuedIdentifier, linked.identifier)
         assert.equal((await workspacePool.query('select count(*)::int n from mikka_team_issues where "issueId"=$1', [f.issueId])).rows[0].n, 0, 'naming does not assign a team or change access')
         console.log('Publication identifier read budget:', JSON.stringify({
           cloud: { unlinked: admitted.statements, linked: linkedCloud.statements, frozen: frozen.statements, resultBytes: admitted.resultBytes },
@@ -263,27 +270,27 @@ test('run result publication commits one owner-scoped result through retries and
     await t.test('identifier transport stays observable for empty and short tasks across team states', async t => {
       const { admitCloudPush } = await import('../lib/computer/cloud-push')
       const { workspacePool } = await import('../lib/workspace-db')
+      const { withTaskWorkspace } = await import('../lib/task-workspace')
+      const { withRunWorkspace } = await import('../lib/run-completion')
+      const { ActionFailureError } = await import('../lib/action-error')
+      const { seedTeam } = await import('./support/workspace-admin-db')
       const { searchIssues, parseSearchParams } = await import('../lib/issue-search')
       const { listArtifacts } = await import('../lib/artifacts/store')
-      const { withRunWorkspace } = await import('../lib/run-completion')
       const samples: Array<{ body: string; teamState: string; search: ReturnType<typeof readMetrics>; artifacts: ReturnType<typeof readMetrics>; cloud: ReturnType<typeof readMetrics>; publication: ReturnType<typeof readMetrics>; frozen: ReturnType<typeof readMetrics> }> = []
       for (const body of ['empty', 'short'] as const) for (const teamState of ['linked', 'unlinked', 'revoked-owner'] as const) {
         const f = await fixture({ approved: true, prefix: 'MTRX', number: 12, scope: 'workspace' })
-        const workspaceId = f.workspaceId, teamId = randomUUID()
+        const workspaceId = f.workspaceId
         await pool.query('update issues set content=$2 where id=$1', [f.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 12 } }, content: body === 'empty' ? [] : [{ type: 'paragraph', content: [{ type: 'text', text: 'Short task body' }] }] })])
         if (teamState !== 'unlinked') {
-          await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Identifier transport CI\',\'MTRTEAM\')', [teamId, workspaceId, f.userId])
-          const { rows: [link] } = await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4) returning number', [f.issueId, teamId, workspaceId, f.userId])
-          f.identifier = `MTRTEAM-${link.number}`
-          f.branch = `mikka/mtrteam-${link.number}`
-          await admit(f)
+          const { id: teamId } = await seedTeam(workspacePool, workspaceId, f.userId, 'Identifier transport CI')
+          await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [f.issueId, teamId, workspaceId, f.userId])
         }
         const artifactId = randomUUID()
-        await pool.query('insert into artifacts (id,"userId",kind,title,"issueId","latestVersion") values ($1,$2,\'markdown\',\'Transport fixture\',$3,1)', [artifactId, f.userId, f.issueId])
+        await pool.query('insert into artifacts (id,"userId","workspaceId",kind,title,"issueId","latestVersion") values ($1,$2,$4,\'markdown\',\'Transport fixture\',$3,1)', [artifactId, f.userId, f.issueId, workspaceId])
         await pool.query('insert into artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") values ($1,$2,1,$3,\'fixture\',\'fixture\',7,\'CI\')', [randomUUID(), artifactId, `ci/identifier-transport/${artifactId}.md`])
         if (teamState === 'revoked-owner') {
-          // Freeze an authorized receipt first; it must not authorize later
-          // reads or publication after current workspace membership is lost.
+          // Preserve a real pre-revocation receipt. Neither cached naming nor
+          // authorship authorizes new admission or publication after suspension.
           await prepareRunPublication(assignment(f), f.remoteUrl)
           await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, f.userId])
         }
@@ -292,39 +299,42 @@ test('run result publication commits one owner-scoped result through retries and
         await listArtifacts(f.userId)
         const searched = await measured(search)
         const artifacts = await measured(() => listArtifacts(f.userId))
-        const client = await pool.connect()
-        const cloud = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, now: new Date() })
-        try {
-          if (teamState === 'revoked-owner') {
-            const savedReceipt = await receipt(f)
-            let helperReached = false
-            // Cloud's naming helper runs only inside a workspace-authorized
-            // queue operation. Exercise that real membership gate as well as
-            // the standalone publication boundary, including a frozen receipt.
-            const gatedCloud = () => withRunWorkspace(f.userId, workspaceId, () => {
-              helperReached = true
-              return cloud()
-            })
-            const admitted = await measured(gatedCloud)
-            const prepared = await measured(async () => {
-              await assert.rejects(() => prepareRunPublication(assignment(f), f.remoteUrl),
-                (error: unknown) => error instanceof PublicationError && error.code === 'issue_unavailable')
-              return { error: 'issue_unavailable' }
-            })
-            const frozen = await measured(gatedCloud)
-            const sample = { body, teamState, search: readMetrics(searched), artifacts: readMetrics(artifacts), cloud: readMetrics(admitted), publication: readMetrics(prepared), frozen: readMetrics(frozen) }
-            samples.push(sample)
-            t.diagnostic(JSON.stringify({ event: 'identifier_transport_matrix', ...sample }))
-            assert.deepEqual(searched.value.items, [])
-            assert.deepEqual(artifacts.value, [])
-            assert.equal(admitted.value, null)
-            assert.equal(frozen.value, null)
-            assert.equal(helperReached, false, 'revoked membership cannot reach cloud admission')
-            assert.deepEqual(await receipt(f), savedReceipt, 'revocation leaves the old receipt unchanged')
-            assert.deepEqual(await counts(f), { versions: 0, events: 0 })
-            assert.doesNotMatch(JSON.stringify([searched.value, artifacts.value]), /MTRTEAM-|prefixInput|__mikkaIdentifierPrefix|@example\.invalid/)
-            continue
+        if (teamState === 'revoked-owner') {
+          const before = { task: await task(f), receipt: await receipt(f), counts: await counts(f) }
+          let admissions = 0
+          const cloudAdmission = async () => {
+            admissions++
+            const client = await pool.connect()
+            try {
+              await client.query('BEGIN')
+              return await admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, workspaceId, now: new Date() })
+            } finally { await client.query('ROLLBACK'); client.release() }
           }
+          const guardedCloud = () => withTaskWorkspace(f.userId, workspaceId, cloudAdmission)
+          assert.equal(await withRunWorkspace(f.userId, workspaceId, cloudAdmission), null, 'the normal Run boundary denies revoked membership before APP admission')
+          const deniedCloud = async () => {
+            await assert.rejects(guardedCloud, error => error instanceof ActionFailureError && error.code === 'workspaceAccessDenied')
+            return { error: 'workspaceAccessDenied' }
+          }
+          const admitted = await measured(deniedCloud)
+          const prepared = await measured(async () => {
+            await assert.rejects(() => prepareRunPublication(assignment(f), f.remoteUrl), error => error instanceof PublicationError && error.code === 'issue_unavailable')
+            return { error: 'issue_unavailable' }
+          })
+          const frozen = await measured(deniedCloud)
+          const sample = { body, teamState, search: readMetrics(searched), artifacts: readMetrics(artifacts), cloud: readMetrics(admitted), publication: readMetrics(prepared), frozen: readMetrics(frozen) }
+          samples.push(sample)
+          t.diagnostic(JSON.stringify({ event: 'identifier_transport_matrix', ...sample }))
+          assert.deepEqual(searched.value.items, [])
+          assert.deepEqual(artifacts.value, [])
+          assert.equal(admissions, 0, 'current Workspace denial occurs before the APP admission transaction')
+          assert.deepEqual({ task: await task(f), receipt: await receipt(f), counts: await counts(f) }, before, 'denial does not rewrite the Task, its frozen publication or history')
+          assert.doesNotMatch(JSON.stringify([searched.value, artifacts.value]), /prefixInput|__mikkaIdentifierPrefix|@example\.invalid/)
+          continue
+        }
+        const client = await pool.connect()
+        const cloud = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, workspaceId, now: new Date() })
+        try {
           await client.query('BEGIN')
           const admitted = await measured(cloud)
           await client.query('COMMIT')

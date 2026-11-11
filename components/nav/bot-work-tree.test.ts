@@ -6,8 +6,9 @@ import { botWorkTree } from './bot-work-tree'
 type Issue = Parameters<typeof botWorkTree>[3][number]
 type Thread = Parameters<typeof botWorkTree>[2][number]
 const issue = (id: string, status = 'doing'): Issue => ({
-  id, status, identifier: `MIK-${id}`, title: `Task ${id}`, shortTitle: null,
+  id, status, identifier: `MIK-${id}`, issuedIdentifier: `MIK-${id}`, title: `Task ${id}`, shortTitle: null,
   ownerId: 'owner', ownerName: 'Owner', ownerImage: null, teamId: null,
+  workspaceId: 'workspace', projectId: null,
   scope: 'personal', priority: 'normal', revision: 1,
   createdAt: new Date('2026-11-10T00:00:00Z'), updatedAt: new Date('2026-11-10T00:00:00Z'),
   metadata: readIssueMetadata({ type: 'doc', content: [] }),
@@ -24,7 +25,7 @@ test('a Bot contains one row per task, and the latest run decides its own task s
   assert.equal(rows.length, 1)
   assert.equal(rows[0].name, 'MIK-a Task a')
   assert.equal(rows[0].state, 'waiting')
-  assert.equal(rows[0].reason, 'needsReply')
+  assert.equal(rows[0].reason, 'needs_input')
   assert.deepEqual(rows[0].runs.map(item => item.id), ['2', '1'])
 })
 

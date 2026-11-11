@@ -1,11 +1,13 @@
 import 'server-only'
 import { createHash } from 'node:crypto'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { issues, issueVersions, teamIssueCreateRequests } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
+import { withTeamWorkspace } from '@/lib/team-workspace'
+import { ActionFailureError } from '@/lib/action-error'
 import { teams, teamIssues, teamIssueCreateReceipts } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
@@ -27,7 +29,7 @@ async function lockAllowedTeam(tx: WorkspaceTx, userId: string, teamId: string) 
   await lockTeamRelations(tx)
   const [team] = await tx.select({ id: teams.id, workspaceId: teams.workspaceId }).from(teams)
     .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, teams.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
-    .where(eq(teams.id, teamId)).for('share').limit(1)
+    .where(and(eq(teams.id, teamId), isNull(teams.archivedAt))).for('share').limit(1)
   if (!team) throw new TeamCreateError('teamIssueAccessDenied')
   return team
 }
@@ -42,7 +44,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
   const fingerprint = createHash('sha256').update(JSON.stringify({ teamId, ...content })).digest('hex')
   let promotionStarted = false
   try {
-    const issueId = await workspaceDb.transaction(async workspace => {
+    const issueId = await withTeamWorkspace(userId, teamId, async workspace => {
       const team = await lockAllowedTeam(workspace, userId, teamId)
       const [receipt] = await workspace.select().from(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.requestId, requestId)).for('update')
       if (receipt && (receipt.teamId !== teamId || receipt.workspaceId !== team.workspaceId || receipt.ownerId !== userId)) throw new TeamCreateError('teamIssueRequestConflict')
@@ -70,7 +72,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
       if (!receipt) await workspace.insert(teamIssueCreateReceipts).values({ requestId, issueId: id, teamId, workspaceId: team.workspaceId, ownerId: userId })
       return id
     })
-    return await workspaceDb.transaction(async workspace => {
+    return await withTeamWorkspace(userId, teamId, async workspace => {
       const team = await lockAllowedTeam(workspace, userId, teamId)
       const [link] = await workspace.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).for('update')
       if (!link || link.teamId !== teamId || link.workspaceId !== team.workspaceId || link.userId !== userId) throw new TeamCreateError('teamIssueChanged')
@@ -94,6 +96,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
     })
   } catch (error) {
     if (error instanceof TeamCreateError) return { error: error.code, requestId }
+    if (error instanceof ActionFailureError && (error.code === 'workspaceAccessDenied' || error.code === 'teamIssueAccessDenied')) return { error: 'teamIssueAccessDenied' as const, requestId }
     // An application commit can succeed even if a database connection loses
     // its response. Reconcile before reporting a failure; never create a new
     // request ID for an uncertain result.

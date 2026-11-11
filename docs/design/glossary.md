@@ -199,13 +199,32 @@ _Owner_: the workspace where it was dispatched (Thread aggregate).
 _Avoid_: 会话, session, 任务, run (a run is one turn of a thread).
 
 **Task (任务)**:
-A unit of work to be done, with a status and an assignee who is always a
-person (`MIK-xx`). A thread works on it; it is not a thread.
-_Owner_: the workspace; in a shared workspace, its team (Task aggregate).
+A unit of work with an immutable UUID and issued Mikka identifier, a status,
+and an optional human assignee who is an active member of its Workspace.
+A thread works on it; it is not a thread. Team and Project are optional groups
+inside that Workspace and do not own the task or change its issued identifier.
+_Owner_: the workspace (Task aggregate).
 _Avoid_: issue in the UI, ticket, 工单, thread.
 _Note_: 受阻 (Blocked) is a board column a task falls into while its newest
 thread, a task it is blocked by or the person's flag stops it; it is not one of
 the task's statuses ([2026-11-06-1600](decisions/2026-11-06-1600-blocked-board-column.md)).
+
+**Task identifier (任务编号)**:
+The immutable human reference issued to a Task. Historical Team, personal and
+Linear spellings are scoped aliases, not access grants. New shared tasks use a
+Workspace prefix/counter; existing publication identifiers and branches stay
+frozen. See [stable identity](decisions/2026-11-07-2301-stable-task-identity.md).
+_Owner_: the Task; the issuing counter belongs to its Workspace.
+_Avoid_: deriving identity from the current Team, owner prefix or a Run number.
+
+**Human assignee (人类负责人)** and **Agent Delegate**:
+The assignee is the active person responsible for the work, or nobody. Delegate
+is an independent Bot, Agent or Agent Profile reference for execution. Neither
+is the reviewer/approver, and changing either does not rewrite an existing Run.
+“Assigned to me” uses the human relation; following is explicit subscription.
+See [compatibility contract](task-responsibility-contract.md).
+_Owner_: the Task, within its Workspace.
+_Avoid_: treating the owner of the executing Bot/Agent as the human assignee.
 
 ### Resources
 

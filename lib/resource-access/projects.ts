@@ -35,17 +35,21 @@ export async function registerProjectAccess(reader: IssueReader, projectId: stri
 export async function bindProjectTasks(executor: ResourceExecutor, reader: IssueReader, project: ResourceReference,
   previousIds: readonly string[], nextIds: readonly string[], options: { confirmAccess?: boolean } = {}) {
   const userId = taskReaderScope(reader).userId
-  await lockResourceAccess(executor, userId, project, 'canSteer')
+  const projectPolicy = await lockResourceAccess(executor, userId, project, 'canSteer')
   const added = nextIds.filter(id => !previousIds.includes(id))
   const removed = previousIds.filter(id => !nextIds.includes(id))
   const changes = [...new Set([...added, ...removed])].sort()
   const policies = await lockResourcesAccess(executor, userId,
-    changes.map(id => ({ reference: { kind: 'task' as const, id, workspaceId: project.workspaceId }, action: 'canManageAccess' as const })), true)
+    changes.map(id => ({ reference: { kind: 'task' as const, id, workspaceId: project.workspaceId }, action: 'canSteer' as const })), true)
   for (const policy of policies) {
     // A subtask's explicit Task parent is a stronger boundary than a grouping
     // link. Do not replace that ancestor silently with a Project.
     if (policy.parentKind && policy.parentKind !== 'project') throw new ActionFailureError('issueRelationInvalid')
-    if (removed.includes(policy.id) && (policy.parentKind !== 'project' || policy.parentId !== project.id)) throw new ActionFailureError('issueOutdated')
+    // A canonical relation may exist before its Task gained an ACL parent
+    // (historical/seeded rows). Removing that relation has no other ancestor to
+    // widen; only a different recorded parent must refuse the removal.
+    if (removed.includes(policy.id) && policy.parentKind !== null
+      && (policy.parentKind !== 'project' || policy.parentId !== project.id)) throw new ActionFailureError('issueOutdated')
   }
   // Each changed task would hang under this project (attaching) or under
   // nothing (detaching); compare who could read it before and after, and refuse
@@ -63,7 +67,7 @@ export async function bindProjectTasks(executor: ResourceExecutor, reader: Issue
         // An initial attachment only narrows access. Changing an existing parent
         // or removing it also preserves confidentiality in the local policy.
         await executor.execute(sql`update resource_access_policies set
-          visibility=case when "parentId" is not null then 'private' else visibility end,
+          visibility=case when "parentId" is not null and ${projectPolicy.visibility !== 'shared'} then 'private' else visibility end,
           "parentKind"=${attaching ? 'project' : null},"parentId"=${attaching ? project.id : null}::uuid
           where kind='task' and id=${policy.id}::uuid`)
       }

@@ -1,3 +1,4 @@
+import { resourceBoundDispatchConstructor, resourceBoundReconcilerConstructor } from './helpers/factory-resource-boundary'
 // Real PostgreSQL, model preference admission, completion and claim. Only the
 // provider catalogue and Next's request-scoped `after` are replaced; Coordinator
 // wakes are observed without running a separate inbox consumer. Provider
@@ -7,11 +8,11 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { MODEL_CREDENTIAL_HEADER, RECOVERY_WORKTREE_HEADER, REPO_ORIGIN_HEADER, MIN_DAEMON_VERSION } from '@mikka/protocol/device'
+import { MODEL_CREDENTIAL_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, REPO_ORIGIN_HEADER, MIN_DAEMON_VERSION } from '@mikka/protocol/device'
 import type { ProviderFailure } from '@mikka/protocol/provider-failure'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { emptyRunReport } from '@mikka/protocol/run'
-import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
 import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allowed-model'
 import type { DecisionAnswer } from '../lib/coordinator/decision'
@@ -177,7 +178,7 @@ test('provider failure continues the same task through its authorized preferred 
   const claim = async (p: Person, runId: string) => {
     const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
       method: 'POST', headers: { 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${p.token}`,
-        [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
+        [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [PROJECT_ENVIRONMENT_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
     }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
     const body = await response.text()
     assert.equal(response.status, 200, body)
@@ -195,14 +196,89 @@ test('provider failure continues the same task through its authorized preferred 
     return { p, first, second, entries }
   }
 
+  await t.test('a real Factory review keeps its candidate checkout SHA and frozen Project Environment across provider fallback', async () => {
+    const { p, second } = await twoModels('provider-candidate-checkout')
+    const [{ createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun },
+      { factoryCheckGates }, { factoryCheckIndependent }, { ensureDeviceRepository }, resources,
+      { providerContinuationLaunchMatches }] = await Promise.all([
+      import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
+      import('../lib/factory/checks'), import('../lib/factory/check-independence'), import('../lib/device-repositories'),
+      import('../lib/project-resources/store'), import('../lib/run-provider-fallback'),
+    ])
+    const issueId = await task(p), projectId = randomUUID(), epoch = randomUUID(), sha = 'c'.repeat(40)
+    const environment = await resources.saveEnvironment(p.id, { workspaceId: p.workspaceId, name: 'Frozen candidate environment',
+      configuration: { runtime: 'local', variables: { REVIEW_MODE: 'frozen' } } })
+    try {
+      await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+        VALUES($1,$2,$3,'Candidate checkout','','','planned','none','','','','','[]',1)`, [projectId, p.id, p.workspaceId])
+      await seedProjectTasks(pool, projectId, [issueId])
+      await resources.saveProjectResources(p.id, { workspaceId: p.workspaceId, projectId, revision: 1,
+        repositories: [{ repositoryKey: normalizeRepository(p.remote).key, baseBranch: 'environment-base', environmentId: environment.id, isPrimary: true }],
+        environmentIds: [environment.id], defaultEnvironmentId: environment.id })
+      await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+        VALUES($1,$2,$3,$4,'user_message',$5,'{"text":"Review this exact candidate with the admitted environment"}')`, [epoch, p.id, p.botId, issueId, `candidate-fallback:${epoch}`])
+      const repo = await ensureDeviceRepository(p.id, p.deviceId, p.remote)
+      const factory = createFactoryStore(pool, async (owner, id, tx) =>
+        (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [id, owner])).rowCount === 1, p.botId,
+      { independent: factoryCheckIndependent, gates: factoryCheckGates })
+      const routed = await factory.route(p.id, { issueId, sourceEventId: epoch, eventId: randomUUID(), rationale: 'Provider candidate checkout fixture' })
+      const selected = await chooseLocalRunModel(pool, scope(p), { id: p.agents.claude_code, deviceId: p.deviceId, harness: 'claude_code' })
+      assert.ok(!('error' in selected))
+      const dispatch = resourceBoundDispatchConstructor(rawDispatch)(pool, factory, (tx, owner, input, bot, context) =>
+        queueFactoryRun(tx, owner, input, bot, context, undefined, { ...selected, readOnly: true }))
+      const first = await dispatch(p.id, { binding: factoryBinding(routed.task), agentId: p.agents.claude_code, deviceRepoId: repo.id })
+      const sessionId = `candidate-implementation-${first.runId}`
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"startedAt"=now()-interval '1 second',"finishedAt"=now(),"sessionId"=$2,report=$3 WHERE id=$1`,
+        [first.runId, sessionId, JSON.stringify({ ...emptyRunReport('Completed fixture candidate'), sourceCommit: sha, publish: { commit: sha }, verify: { status: 'passed' } })])
+      let state = await factory.apply(p.id, first.binding, randomUUID(), { action: 'candidate', runId: first.runId,
+        candidate: { sha, repository: p.remote, environment: `device:${p.deviceId}`, scope: `issue:${issueId}` } })
+      state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'finish', status: 'passed', reason: 'The implementation yielded the fixed candidate',
+        evidence: [{ artifact: `run-report:${first.runId}`, kind: 'report', runId: first.runId, sessionId, candidateId: state.task.candidateId,
+          sha, environment: `device:${p.deviceId}`, recordedAt: new Date().toISOString() }], output: {} })
+      state = await factory.apply(p.id, factoryBinding(state.task), randomUUID(), { action: 'advance', stage: 'review', reason: 'Independent candidate review' })
+      const check = await dispatch(p.id, { binding: factoryBinding(state.task), agentId: p.agents.claude_code, deviceRepoId: repo.id })
+      await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [check.runId, `independent-review-${check.runId}`])
+      const admitted = await row(check.runId)
+      assert.equal(admitted.baseBranch, sha, 'real Factory dispatch selects the verified candidate, not the Project target branch')
+      assert.equal(admitted.agentDefinition.projectExecution.baseBranch, 'environment-base')
+      assert.equal(admitted.agentDefinition.projectExecution.environment.id, environment.id)
+      await end(p, check.runId, balance)
+      const original = await row(check.runId)
+      assert.equal(original.status, 'failed'); assert.equal(original.report.modelFallback.state, 'switched')
+      const continued = await row(original.report.modelFallback.retryRunId)
+      assert.equal(continued.agentDefinition.apiKey.keyId, second.id)
+      assert.equal(continued.baseBranch, sha)
+      assert.deepEqual(continued.agentDefinition.projectExecution, admitted.agentDefinition.projectExecution)
+      assert.deepEqual(original.agentDefinition, admitted.agentDefinition)
+      assert.equal(continued.retryOf, null, 'the real Factory adoption starts an independent check')
+      assert.equal(continued.sessionId, null)
+      assert.equal(await providerContinuationLaunchMatches(pool, original, continued), true)
+      const assignment = await claim(p, continued.id)
+      assert.equal(assignment.baseBranch, sha)
+      assert.equal(assignment.projectEnvironment.id, environment.id)
+      assert.equal(assignment.projectEnvironment.revision, environment.revision)
+      assert.deepEqual(assignment.taskEnv, { REVIEW_MODE: 'frozen' })
+      assert.equal(assignment.resumeSessionId, undefined)
+      await recoverProviderFailure(pool, p.id, check.runId)
+      assert.deepEqual((await row(check.runId)).report.modelFallback, original.report.modelFallback)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_attempts WHERE "taskId"=$1 AND stage=\'review\'', [routed.task.id])).rows[0].n, 2)
+    } finally {
+      await workspacePool.query('DELETE FROM workspace_project_repositories WHERE "projectId"=$1', [projectId])
+      await workspacePool.query('DELETE FROM workspace_projects WHERE id=$1', [projectId])
+      await workspacePool.query('DELETE FROM workspace_environments WHERE id=$1', [environment.id])
+    }
+  })
+
   const automaticFailure = async (label: string, options: { subscription?: boolean; onlyLight?: boolean } = {}) => {
-    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
-      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler: rawReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
       { ensureDeviceRepository }] = await Promise.all([
       import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
       import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'),
       import('../lib/factory/check-independence'), import('../lib/device-repositories'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
+    const createFactoryReconciler = resourceBoundReconcilerConstructor(rawReconciler)
     const p = await person(label), issueId = await task(p), epoch = randomUUID()
     const harness = options.subscription ? 'codex' : 'claude_code'
     const light = options.subscription ? 'gpt-6-luna' : 'claude-haiku-5-5'
@@ -284,13 +360,15 @@ test('provider failure continues the same task through its authorized preferred 
   })
 
   for (const failure of ['execute', 'review'] as const) await t.test(`automatic ${failure} repair raises the inherited Profile one tier through real Factory admission`, async () => {
-    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
-      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler: rawReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
       { admitProfileSelection }, { profileNativeSessionMatches }, { ensureDeviceRepository }, { workerDefinitionDigest }] = await Promise.all([
       import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
       import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'), import('../lib/factory/check-independence'),
       import('../lib/factory/profile-admission'), import('../lib/factory/profile-native-session'), import('../lib/device-repositories'), import('../lib/agent-kit/worker-digest'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
+    const createFactoryReconciler = resourceBoundReconcilerConstructor(rawReconciler)
     const p = await person(`automatic-routing-${failure}`), issueId = await task(p), epoch = randomUUID()
     const credential = await addKey(p.id, 'anthropic', ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'])
     await preferences(p, ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map(model => entry('claude_code', model, credential.id)))

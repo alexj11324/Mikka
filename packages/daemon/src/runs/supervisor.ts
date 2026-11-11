@@ -1736,6 +1736,10 @@ export class RunSupervisor {
         )
       }
       const setup = runPolicy(assignment.policy).readOnly === true ? 'read-only' : continued ? 'continued' : this.deps.bootstrap ? await this.deps.bootstrap(worktree,repo) : await this.deps.worktrees.bootstrap(worktree, repo.path, repo.setup)
+      if (!continued && !runPolicy(assignment.policy).readOnly && assignment.projectEnvironment?.setup?.approved) {
+        if (runPolicy(assignment.policy).permissions.install_dependency !== 'allow') throw new Error('Environment setup requires dependency-install permission')
+        await this.deps.worktrees.bootstrap(worktree, repo.path, assignment.projectEnvironment.setup, assignment.taskEnv)
+      }
       log.info({ worktree, setup }, "worktree ready")
       this.deps.journal.update(runId, { worktree, baseCommit })
     }

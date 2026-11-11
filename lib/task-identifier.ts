@@ -1,10 +1,8 @@
-// How a task is named in the UI (MIK-46). The single source of truth: every
-// place that shows a task id goes through `taskIdentifier`.
-// - Workspace tasks use their team key and their number in that team (AL-12),
-//   which the database assigns when the task joins the team. A task without
-//   a local team keeps its owner number; a Linear id is only an outside alias.
-// - Personal tasks use a four-letter personal prefix (ALEX-12) and the
-//   owner's number. Every owner has a prefix: their own, else a default.
+// A server-issued Task ID never follows mutable grouping or profile names.
+// The fallbacks describe pre-migration spellings only; server projections use
+// task-identity-store to persist their first canonical choice and old aliases.
+// New shared tasks use a Workspace counter; personal tasks keep the owner
+// prefix that was current when they were created.
 
 export type TaskScope = 'workspace' | 'personal'
 export const TASK_SCOPES = ['workspace', 'personal'] as const satisfies readonly TaskScope[]
@@ -14,6 +12,8 @@ const PREFIX_PATTERN = /^[A-Z]{4}$/
 
 export type TaskIdentifierInput = {
   scope: TaskScope
+  /** The issued identifier is immutable. Team names and owner prefixes are aliases. */
+  issuedIdentifier?: string | null
   number?: number | null
   /** The task's team key and its number in that team, e.g. `AL` and 12. */
   team?: { key: string; number: number } | null
@@ -23,6 +23,7 @@ export type TaskIdentifierInput = {
 
 /** `AL-12` or `ALEX-12`; a missing team never removes the task's owner number. */
 export function taskIdentifier(task: TaskIdentifierInput): string | null {
+  if (task.issuedIdentifier) return task.issuedIdentifier
   if (task.scope === 'workspace' && task.team) return `${task.team.key}-${task.team.number}`
   if (!task.number || !task.personalPrefix) return null
   return `${task.personalPrefix}-${task.number}`
