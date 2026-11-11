@@ -1,4 +1,7 @@
-import { COMPACT_AT_TOKENS, estimateTokens, promptMessages, KEEP_RECENT_TOKENS, type StoredMessage, type SummaryTrust } from './context'
+import { COMPACT_AT_TOKENS, estimateTokens, promptMessages, KEEP_RECENT_TOKENS, type StoredMessage } from './context'
+// `SummaryTrust` is declared in message-safety and only consumed by context;
+// taking it from its own module is what typechecks.
+import type { SummaryTrust } from './message-safety'
 
 /**
  * How full the Coordinator's conversation is, in the same estimate its
