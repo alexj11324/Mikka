@@ -18,7 +18,8 @@ const forbidden = () => { throw Error('No DB, provider or device in catalogue te
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
 stub('../../workflows/coordinator/steps.ts', {recordProjectDecisionStep: capture('project-decision'), composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy'), githubCallAllowedStep: async () => 'allow', githubMcp: capture('github'), findRepository: capture('find-repository'), getFactoryTask: capture('factory-read-legacy-id'), readFactoryTask: capture('factory-read-scoped-id')})
-stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }) })
+const readPersonalSkill = capture('read-personal-skill')
+stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }), readPersonalSkill })
 let registry: typeof import('../../workflows/coordinator/tools')
 let service: typeof import('./service')
 let factoryRegistry: typeof import('../../workflows/coordinator/factory-tools')
@@ -29,9 +30,25 @@ test('a new builtin execution retains every existing core tool from the real int
   assert.ok(previous.read_gmail_message, 'the existing host exposes Gmail full reads')
   const execution: AgentExecution = { id: '10000000-0000-4000-8000-000000000001', status: 'running', snapshot: makeSnapshot('10000000-0000-4000-8000-000000000002', 1, DEFAULT_AGENT_DEFINITION, 'host', { harness: 'ai_sdk', model: 'existing' }) }
   const versioned = registry.coordinatorTools('synthetic-owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution })
-  assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill'].sort())
+  assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill', 'read_personal_skill'].sort())
 })
 
+
+test('read_personal_skill is offered to a versioned round and calls its own step', async () => {
+  // ALE-75: "read_personal_skill 注册且可调用". Registered means it reaches the
+  // tool set a versioned execution is given; callable means its execute routes
+  // to the step that reads personal_skills — not to loadAgentSkill, which reads
+  // the agent-kit definition and would answer skillNotAssigned for every
+  // personally installed skill.
+  const run = execution()
+  const tools = registry.coordinatorTools(owner, bot, scope, { coordinator: true, execution: run })
+  assert.ok(tools.read_personal_skill, 'the tool is in the versioned catalogue')
+  const skillId = '10000000-0000-4000-8000-000000000010'
+  await invoke(tools, 'read_personal_skill', { skillId })
+  const recorded = calls.filter(call => call.name === 'read-personal-skill')
+  assert.equal(recorded.length, 1, 'the tool routed to its own step exactly once')
+  assert.deepEqual(recorded[0].args, [owner, bot, run.id, skillId, scope])
+})
 
 const owner = 'synthetic-owner', bot = '10000000-0000-4000-8000-000000000003'
 const scope = {holder: 'synthetic-holder', turnId: 'synthetic-turn', callId: 'synthetic-call'}
@@ -86,7 +103,7 @@ test('all four existing flag combinations preserve the actual pre-kit catalogue 
       const defaults = service.agentKitDefaults()
       const previous = registry.coordinatorTools(owner, bot, undefined, {computerEnabled})
       const versioned = registry.coordinatorTools(owner, bot, undefined, {computerEnabled, execution: execution(defaults)})
-      assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill'].sort())
+      assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill', 'read_personal_skill'].sort())
       for (const name of COMPUTER_TOOL_IDS) assert.equal(defaults.tools.includes(name), computerEnabled)
     }
     assert.equal(DEFAULT_AGENT_DEFINITION.tools.some(name => (COMPUTER_TOOL_IDS as readonly string[]).includes(name)), false)
