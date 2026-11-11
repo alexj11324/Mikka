@@ -5,6 +5,7 @@ import type { SharedSubscription } from '../../../../../lib/db/listen'
 import { MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
 import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
+import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-git'
 
 // Keep the real wait helper while replacing database-backed route operations.
 mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, {
@@ -15,7 +16,7 @@ mock.module(new URL('../../../../../lib/workspace-db.ts', import.meta.url).href,
 })
 const pendingWorkspaceReads = mock.fn(async (_database: unknown, _membership: unknown,
   _caller: { userId: string; tokenId: string }, _deviceId: string, _skip: readonly string[] = [],
-  _capabilities: { diff?: boolean } = {}): Promise<WorkspaceReadCommand[]> => {
+  _capabilities: { diff?: boolean; git?: boolean } = {}): Promise<WorkspaceReadCommand[]> => {
   assert.fail('A daemon without the Files capability must never query source requests')
 })
 mock.module(new URL('../../../../../lib/coding-workspace/requests.ts', import.meta.url).href, { namedExports: { pendingWorkspaceReads } })
@@ -212,7 +213,7 @@ test('Files requests wake a capable daemon even when its ordinary inbox is empty
   const capable = new Request(ordinary, { headers: { ...Object.fromEntries(ordinary.headers), [WORKSPACE_REQUEST_HEADER]: '1' } })
   assert.deepEqual(await (await GET(capable, params)).json(), { commands: [], workspaceRequests: [command] })
   assert.equal(pendingWorkspaceReads.mock.callCount(), 1)
-  assert.deepEqual(pendingWorkspaceReads.mock.calls[0].arguments.slice(2), [{ userId: 'owner', tokenId: 'token' }, 'device-1', [], { diff: false }])
+  assert.deepEqual(pendingWorkspaceReads.mock.calls[0].arguments.slice(2), [{ userId: 'owner', tokenId: 'token' }, 'device-1', [], { diff: false, git: false }])
   assert.equal(deviceWork.mock.callCount(), 0)
   assert.equal(sleep.mock.callCount(), 0)
   assert.equal(logs[0].outcome, 'work')
@@ -228,7 +229,7 @@ test('an old Files daemon receives Stop while pending Diff stays outside its cap
   const commands = [{ kind: 'stop', runId: 'run-1' }]
   deviceWork.mock.mockImplementation(async () => ({ commands, queuedRuns: [] }))
   pendingWorkspaceReads.mock.mockImplementation(async (_db, _membership, _caller, _device, _skip, capabilities) => {
-    assert.deepEqual(capabilities, { diff: false })
+    assert.deepEqual(capabilities, { diff: false, git: false })
     return capabilities.diff ? [diff] : []
   })
   const ordinary = request()
@@ -250,13 +251,34 @@ test('Diff capability is passed independently and does not replace Stop delivery
   const commands = [{ kind: 'stop', runId: 'run-1' }]
   deviceWork.mock.mockImplementation(async () => ({ commands, queuedRuns: [] }))
   pendingWorkspaceReads.mock.mockImplementation(async (_db, _membership, _caller, _device, _skip, capabilities) => {
-    assert.deepEqual(capabilities, { diff: true })
+    assert.deepEqual(capabilities, { diff: true, git: false })
     return [diff]
   })
   const ordinary = request()
   const capable = new Request(ordinary, { headers: { ...Object.fromEntries(ordinary.headers),
     [WORKSPACE_REQUEST_HEADER]: '1', [WORKSPACE_DIFF_REQUEST_HEADER]: '1' } })
   assert.deepEqual(await (await GET(capable, params)).json(), { commands, workspaceRequests: [diff] })
+  assert.equal(pendingWorkspaceReads.mock.callCount(), 1)
+  assert.equal(sleep.mock.callCount(), 0)
+})
+
+test('Git capability reaches the request read without enabling Diff', async () => {
+  const id = '00000000-0000-4000-8000-000000000001'
+  const git: WorkspaceReadCommand = {
+    id, identity: { version: 1, runId: id, repoId: id, deviceId: id, workspaceId: id, ownerId: 'owner',
+      repositoryKey: 'github.com/owner/repository', bindingId: 'a'.repeat(64) },
+    request: { kind: 'git_status' }, expiresAt: new Date(Date.now() + 15_000).toISOString(),
+  }
+  const commands = [{ kind: 'stop', runId: 'run-1' }]
+  deviceWork.mock.mockImplementation(async () => ({ commands, queuedRuns: [] }))
+  pendingWorkspaceReads.mock.mockImplementation(async (_db, _membership, _caller, _device, _skip, capabilities) => {
+    assert.deepEqual(capabilities, { diff: false, git: true })
+    return [git]
+  })
+  const ordinary = request()
+  const capable = new Request(ordinary, { headers: { ...Object.fromEntries(ordinary.headers),
+    [WORKSPACE_REQUEST_HEADER]: '1', [WORKSPACE_GIT_REQUEST_HEADER]: '1' } })
+  assert.deepEqual(await (await GET(capable, params)).json(), { commands, workspaceRequests: [git] })
   assert.equal(pendingWorkspaceReads.mock.callCount(), 1)
   assert.equal(sleep.mock.callCount(), 0)
 })
@@ -278,7 +300,7 @@ test('unknown Diff header versions do not enable Diff on a Files daemon', async 
     const unsupported = new Request(ordinary, { headers: { ...Object.fromEntries(ordinary.headers),
       [WORKSPACE_REQUEST_HEADER]: '1', [WORKSPACE_DIFF_REQUEST_HEADER]: value } })
     assert.deepEqual(await (await GET(unsupported, params)).json(), { commands: [] })
-    assert.deepEqual(pendingWorkspaceReads.mock.calls.at(-1)?.arguments[5], { diff: false })
+    assert.deepEqual(pendingWorkspaceReads.mock.calls.at(-1)?.arguments[5], { diff: false, git: false })
   }
   assert.equal(pendingWorkspaceReads.mock.callCount(), 4)
 })

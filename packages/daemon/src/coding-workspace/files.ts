@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto'
 import { extname, resolve } from 'node:path'
 import {
   CodingWorkspaceError, WORKSPACE_MAX_FILE_BYTES, WORKSPACE_MAX_PATHS, WORKSPACE_MAX_RESPONSE_BYTES,
-  visibleWorkspacePath, workspaceReadCommand, type WorkspaceReadCommand,
+  visibleWorkspacePath, workspaceReadCommand, type WorkspaceReadCommand, type WorkspaceReadRequest,
   type WorkspaceReadResult, type WorkspaceReadReceipt, type WorkspaceEntry, type WorkingSourceRevision, type WorkspaceFileSelection, type WorkspaceFileResult,
 } from '@mikka/protocol/coding-workspace'
 import { remoteKey } from '@mikka/protocol/repository'
@@ -16,6 +16,11 @@ import { buildChildEnv } from '../env'
 const execute = promisify(execFile)
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 const denied = () => new CodingWorkspaceError('workspace_path_unavailable')
+type FileReadRequest = Extract<WorkspaceReadRequest, { kind: 'file' | 'tree' | 'search' | 'context' }>
+/** Diff and Git requests have their own readers; this one owns source reads. */
+function isFileReadRequest(request: WorkspaceReadRequest): request is FileReadRequest {
+  return request.kind === 'file' || request.kind === 'tree' || request.kind === 'search' || request.kind === 'context'
+}
 // These paths remain forbidden even when Git tracks them. Dotfiles are opt-in.
 const safeDotfiles = new Set(['.gitignore', '.gitattributes', '.editorconfig', '.prettierignore', '.prettierrc', '.eslintrc', '.dockerignore'])
 export type WorkspaceRoot = { path: string; handle: FileHandle; device: bigint; mountId: string; gitPath: string }
@@ -100,7 +105,7 @@ export async function readWorkspaceReceipt(command: WorkspaceReadCommand, entry:
     const parsed = input.data
     if (Date.parse(parsed.expiresAt) <= Date.now()) throw new CodingWorkspaceError('workspace_request_expired')
     const { identity, request } = parsed
-    if (request.kind === 'diff_snapshot' || request.kind === 'diff_file') throw new CodingWorkspaceError('workspace_unsupported')
+    if (!isFileReadRequest(request)) throw new CodingWorkspaceError('workspace_unsupported')
     if (!entry?.worktree || entry.assignment.runId !== identity.runId || entry.assignment.deviceId !== identity.deviceId || entry.assignment.repoId !== identity.repoId)
       throw new CodingWorkspaceError('workspace_checkout_unavailable')
     const remote = entry.assignment.remoteUrl ?? entry.assignment.expectedRepoRemote
