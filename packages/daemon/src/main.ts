@@ -1,7 +1,6 @@
 import type { AnonymousCodexCandidate } from './anonymous-codex-spare'
 import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
 import { captureRunFailure } from "@mikka/protocol/run-failure"
-import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
 //
@@ -1105,7 +1104,7 @@ export class Daemon {
   /** Advertise only a checked local runner, replacing any old readiness or failure. */
   private async localHarnessReport(info: HarnessInfo): Promise<HarnessInfo> {
     const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness),
-      toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
+      toolApproval: this.supportsToolApproval(info), coordinator: false }
     delete report.subscriptionBroker
     delete report.subscriptionModelCatalogue
     delete report.subscriptionPreflight

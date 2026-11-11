@@ -38,7 +38,6 @@ export const pollingAllowlist = {
   // Daemon: loops that call our server, which reads the database.
   'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down (always so for a cloud computer, whose server pushes), 1 s against a server older than run-control push; a watcher with timedFloorMs runs at most that often on timer ticks', 1),
   'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second; with review push it syncs only when the pending set changes, on a gateway push, or every 5 s for presence (the server takes decisions on requests seen in the last 10 s); every second only against a server without review push or while the gateway is down', 1),
-  'packages/daemon/src/coordinator/runner.ts': db(daemon, 'awaitToolResult fallback timer only: none while the gateway pushes Coordinator tool results (a 15 s safety re-ask), every 5 s while it is down, 500 ms against a server older than that push', 1),
   'packages/daemon/src/login.ts': db(daemon, 'device login polls the token endpoint at the server-given interval until approved (RFC 8628)', 1),
   'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a periodic write, not a read; saves an idle run\'s checkpoint to the server at most every 2 min', 1),
   // Third-party APIs.

@@ -1,7 +1,8 @@
+import {compactionCut} from '../../tests/support/legacy-compaction'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { COMPACT_AT_TOKENS, KEEP_RECENT_TOKENS, compactionCut, estimateTokens, promptMessages, type StoredMessage } from './context'
+import { COMPACT_AT_TOKENS, KEEP_RECENT_TOKENS, estimateTokens, promptMessages, type StoredMessage } from './context'
 import { conversationUsage } from './context-usage'
 
 const said = (position: number, text: string): StoredMessage => ({ position, message: { role: 'user', content: text } })
