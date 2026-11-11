@@ -735,10 +735,18 @@ export interface UserFactEvidence { source: string; suggestionId?: string; exter
  * One fact in one person's profile (lib/profile), drawn from what reaches them
  * and merged nightly. Facts belong to the person, never to a workspace, and
  * only they see them in 记忆. A fact the person corrected (`userEdited`) is
- * never overwritten by the model. Same fact = same (userId, kind, subjectKey).
+ * never overwritten by the model. Same fact = same
+ * (userId, repository, kind, subjectKey).
  */
 export const userFacts = pgTable('user_facts', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /**
+   * The work context the fact is true of, as the folded `remoteKey` Mikka
+   * already scopes repository settings and secrets by (drizzle/20261111010000).
+   * Null is a fact about the person themselves, true wherever they are; a
+   * repository fact reaches only a chat whose workspace works in it.
+   */
+  repository: text('repository'),
   kind: text('kind').$type<UserFactKind>().notNull(),
   /** One line, e.g. 川菜, or Verizon 套餐. */
   subject: text('subject').notNull(),
@@ -755,7 +763,7 @@ export const userFacts = pgTable('user_facts', {
   userEdited: boolean('userEdited').notNull().default(false),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
+}, table => [unique('user_facts_repository_subject_key').on(table.userId, table.repository, table.kind, table.subjectKey).nullsNotDistinct(), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind), index('user_facts_repository_idx').on(table.userId, table.repository, table.state)])
 
 /** The local date (YYYY-MM-DD) the nightly consolidation last ran for the person (lib/profile/store.ts). The 记忆 switch is userPreferences.memoryEnabled. */
 export const userFactConsolidations = pgTable('user_fact_consolidations', {

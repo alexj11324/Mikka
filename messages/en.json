@@ -1910,6 +1910,7 @@
       "empty": "No memories yet",
       "correct": "Correct",
       "delete": "Delete",
+      "scopedTo": "Only in {repository}",
       "kinds": {
         "interest": "Interests",
         "routine": "Routines",
