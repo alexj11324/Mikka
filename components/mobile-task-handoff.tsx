@@ -10,7 +10,7 @@ import { withBasePath } from '@/lib/base-path'
 import { cloudAuthClient } from '@/lib/auth-client'
 import { mobileTaskTarget } from '@/lib/mobile-task-handoff'
 import { currentWebServers, signInToServer } from '@/lib/web-connection/browser'
-import { showMobileTaskLocation } from '@/lib/web-connection/mobile-task-location'
+import { canResumeMobileTask, showMobileTaskLocation } from '@/lib/web-connection/mobile-task-location'
 import { selectedWorkspaceId } from '@/lib/workspace-selection'
 
 type Launch = { server: string; ref: string }
@@ -64,7 +64,8 @@ export default function MobileTaskHandoff({ launch }: { launch: Launch }) {
   // browser's current identity before exposing its route to the shared app.
   useEffect(() => {
     const saved = window.history.state?.mobileTask
-    if (saved?.server === server && saved?.ref === ref && validTarget(saved) && (cloud || directory?.getActiveAccount()?.server === server)) void open(true)
+    if (directory && saved?.server === server && saved?.ref === ref && validTarget(saved)
+      && canResumeMobileTask(server, cloud, saved.userId, directory.getSnapshot())) void open(true)
   }, [cloud, directory, open, ref, server])
 
   return <Auth><AuthCard title={t('title')} description={server}>

@@ -61,3 +61,15 @@ test('the native Task rendezvous is HTTPS, bounded, keeps the physical URL entit
   version++
   assert.equal(mobileTaskLocation(launch.href), launch.href)
 })
+
+test('restoring a saved handoff only resumes the currently selected server and account', async () => {
+  const { canResumeMobileTask } = await import('./web-connection/mobile-task-location')
+  const server = 'https://self.example/mikka'
+  const self = { server, user: { id: 'reader' } }
+  assert.ok(canResumeMobileTask(server, false, 'reader', { account: self, expiredServer: null }))
+  assert.ok(canResumeMobileTask('https://official.example/mikka', true, 'reader', { account: null, expiredServer: null }))
+  assert.equal(canResumeMobileTask('https://official.example/mikka', true, 'reader', { account: self, expiredServer: null }), false)
+  assert.equal(canResumeMobileTask(server, false, 'other', { account: self, expiredServer: null }), false)
+  assert.equal(canResumeMobileTask('https://other.example', false, 'reader', { account: self, expiredServer: null }), false)
+  assert.equal(canResumeMobileTask(server, true, 'reader', { account: null, expiredServer: server }), false)
+})
