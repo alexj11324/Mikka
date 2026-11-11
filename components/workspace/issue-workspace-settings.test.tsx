@@ -114,13 +114,11 @@ function Conversation({ bot: activeBot }: { bot?: { id: string; name: string } }
   return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<p>Cached conversation</p><Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} />{panels?.revealId === 'browser' && panels.tabs.find(tab => tab.id === 'browser')?.content}</>
 }
 mock.module('./workspace-overview', { namedExports: { WorkspaceOverview: Conversation } })
-mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, children, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; children?: ReactNode; onRail: (destination: 'chats') => void }) => {
+mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, workspaceId: id, inviteInitially, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; workspaceId?: string; inviteInitially?: boolean; onRail: (destination: 'chats') => void }) => {
   notes = useBrowserNotes()
   computerThread = useConversationThread(conversationId)
-  return <main data-settings-section={activeSection ?? initialSection} data-team={selectedTeamId}><Button onClick={() => onRail('chats')}>leave settings</Button>{children}</main>
+  return <main data-settings-section={activeSection ?? initialSection} data-team={selectedTeamId} data-workspace={id} data-invite={inviteInitially}><Button onClick={() => onRail('chats')}>leave settings</Button></main>
 } } })
-mock.module('@/components/teams/team-directory', { namedExports: { TeamDirectory: ({ workspaceId: id }: { workspaceId: string }) => <div data-team-workspace={id} /> } })
-mock.module('@/components/workspace/members-settings', { namedExports: { MembersSettings: ({ workspaceId: id, inviteInitially }: { workspaceId: string; inviteInitially: boolean }) => <div data-members-workspace={id} data-invite={inviteInitially} /> } })
 
 let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -284,7 +282,7 @@ test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps 
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.equal(railMounts, 1)
   await go('/settings/teams?workspace=workspace-one&team=team-one')
-  assert.equal(container.querySelector('[data-team-workspace]')?.getAttribute('data-team-workspace'), workspaceId)
+  assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-workspace'), workspaceId)
   assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-team'), 'team-one')
   await go('/settings/members?workspace=workspace-one&invite=1')
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
@@ -477,7 +475,7 @@ test('a standalone Settings shell still provides its frame and route-specific me
   assert.equal(container.querySelectorAll('[data-slot="app-frame-content"]').length, 1)
   assert.ok(bar() && rail())
   assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-settings-section'), 'members')
-  assert.equal(container.querySelector('[data-members-workspace]')?.getAttribute('data-members-workspace'), workspaceId)
+  assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-workspace'), workspaceId)
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
 })
 

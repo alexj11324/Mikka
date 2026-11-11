@@ -1,28 +1,13 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
-import { Clock, FileText, Search, Trash2, type LucideIcon } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
-import { Button } from '@/components/ui/button'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { SearchInput } from '@/components/ui/search-input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { PR_GROUPS, pullRequestsOf } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
-import { LetterAvatar } from './letter-avatar'
-import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
-import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
-import { BotLookEditor } from './bot-look-editor'
-import { BotOverviewBody, useBotLibrary } from './bot-overview'
-import { BotNameEditor } from './bot-name-editor'
-import { BotPublicRoleEditor } from './bot-public-role-editor'
-import { GroupHeader } from './group-header'
-import { ThreadList, threadName, TWO_LINE_ROW } from './thread-list'
-import { PullRequestIcon } from '@/components/workspace/pull-request-icon'
+import { BotOverviewBody } from './bot-overview'
+import { ThreadList, threadName } from './thread-list'
 import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availability'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { usePanelInitialWidth } from '@/hooks/use-panel-width'
@@ -30,7 +15,6 @@ import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { BotTasks } from '@ui-slot/bot-tasks'
 import * as botTasksSlot from '@ui-slot/bot-tasks'
-import * as botOverviewSlot from '@ui-slot/bot-overview'
 import { PanelHeader } from '@ui-slot/panel-header'
 import { openTask } from '@/components/workspace/workspace-navigation'
 
@@ -41,97 +25,10 @@ const TABS: readonly PanelTab[] = ['details', 'threads', 'prs', 'computer']
 export const PANEL_WIDTH = { storageKey: 'mikka:context-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } as const
 const WIDE = 520
 
-/** A row in 详情: a routine or a library file. */
-type DetailItem = { id: string; label: string }
-/** Rows shown before 「展开」. */
-const COLLAPSED_ROWS = 5
-// Nothing stores a bot's routines yet; the list fills once something does.
-const NO_ITEMS: DetailItem[] = []
-
-/**
- * One list in 详情 (Figma 402:5699). Routines are set up in chat and files come
- * in through the threads the bot dispatched, so there is nothing to add here; a list of the
- * person's own files offers 删除 on each row (R-51).
- */
-function DetailList({ title, empty, items, icon: Icon, onDelete, stateKey = 'details' }: { title: string; empty: string; items: DetailItem[]; icon: LucideIcon; onDelete?: (item: DetailItem) => void; stateKey?: string }) {
-  const t = useTranslations('Shell.panel')
-  const [expanded, setExpanded] = useViewState(`${stateKey}:expanded`, false)
-  const shown = expanded ? items : items.slice(0, COLLAPSED_ROWS)
-  // R-52's group header, as in 线程 and PR.
-  return <section aria-label={title} className="flex flex-col gap-1">
-    <GroupHeader>{title}</GroupHeader>
-    {items.length ? <div className="flex flex-col rounded-2xl bg-muted/60 p-1.5">
-      <ul className="flex flex-col">{shown.map(item => <li key={item.id} className="group/row flex min-h-8 min-w-0 items-center gap-2.5 py-1 pr-1 pl-2.5 text-sm"><Icon aria-hidden="true" className="size-4 shrink-0" /><span className="min-w-0 flex-1 truncate">{item.label}</span>
-        {onDelete && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('deleteFile', { name: item.label })} className="shrink-0 text-muted-foreground opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100" onClick={() => onDelete(item)} />}><Trash2 data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('deleteFileConfirm')}</TooltipContent></Tooltip>}
-      </li>)}</ul>
-      {items.length > COLLAPSED_ROWS && !expanded && <Button variant="ghost" size="sm" className="self-center font-normal text-muted-foreground" onClick={() => setExpanded(true)}>{t('expand')}</Button>}
-    </div> : <p className="px-2 py-1.5 text-xs text-muted-foreground">{empty}</p>}
-  </section>
-}
-
-/**
- * 资料库: the documents the threads this bot dispatched handed over, the same list as the
- * phone's (decision 2026-11-01-0050). Each is the person's own, so each can be
- * deleted, after a confirmation, since nothing brings it back.
- */
-function LibraryList({ botId }: { botId: string | null }) {
-  const t = useTranslations('Shell.panel')
-  const library = useBotLibrary(botId)
-  const [deleting, setDeleting] = useState<DetailItem | null>(null)
-  const [pending, setPending] = useState(false)
-  const items = library.items
-  async function remove(item: DetailItem) {
-    setPending(true)
-    try { await library.remove(item) } finally { setDeleting(null); setPending(false) }
-  }
-  return <>
-    <DetailList stateKey={`library:${botId ?? 'coordinator'}`} title={t('library')} empty={library.loadError ? t('libraryError') : t('noLibrary')} items={items} icon={FileText} onDelete={setDeleting} />
-    <AlertDialog open={deleting !== null} onOpenChange={open => { if (!open && !pending) setDeleting(null) }}>
-      <AlertDialogContent size="sm">
-        <AlertDialogHeader><AlertDialogTitle>{t('deleteFileTitle', { name: deleting?.label ?? '' })}</AlertDialogTitle></AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{t('deleteFileCancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={pending} onClick={() => { if (deleting) void remove(deleting) }}>{t('deleteFileConfirm')}</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  </>
-}
-
 /** Whether `text` contains the panel search's query, ignoring case. An empty query matches everything. */
 export function matches(query: string, ...texts: (string | null | undefined)[]) {
   const needle = query.trim().toLocaleLowerCase()
   return !needle || texts.some(text => text?.toLocaleLowerCase().includes(needle))
-}
-
-/** PR: the bot's pull requests by 等待审查 / 进行中 / 已合并, each its task's title and the PR's number (Figma 422:5820). */
-function PullRequests({ threads, issues, query }: { threads: Thread[]; issues: Issue[]; query: string }) {
-  const t = useTranslations('Shell.panel')
-  const all = pullRequestsOf(threads, issues)
-  const rows = all.filter(row => {
-    const issue = issues.find(item => item.id === row.issueId)
-    return matches(query, issue?.title, `#${row.number}`, issue?.identifier)
-  })
-  if (!rows.length) return <p className="px-2 text-xs text-muted-foreground">{all.length ? t('noMatches') : t('noPullRequests')}</p>
-  return <div className="flex flex-col gap-3">
-    {PR_GROUPS.map(group => {
-      const list = rows.filter(row => row.group === group)
-      if (!list.length) return null
-      const label = t(`prGroup.${group}`, { count: list.length })
-      return <section key={group} aria-label={label} className="flex flex-col gap-1">
-        <GroupHeader>{label}</GroupHeader>
-        <ul className="flex flex-col">{list.map(row => {
-          const issue = issues.find(item => item.id === row.issueId)
-          return <li key={row.url}>
-            <Button variant="ghost" className={TWO_LINE_ROW} render={<a href={row.url} target="_blank" rel="noreferrer" />} nativeButton={false}>
-              <span className="truncate text-sm">{issue?.title}</span>
-              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"><span className="flex shrink-0 [&_svg]:size-3.5"><PullRequestIcon state={row.state} /></span><span className="truncate">#{row.number}{issue?.identifier && ` · ${issue.identifier}`}</span></span>
-            </Button>
-          </li>
-        })}</ul>
-      </section>
-    })}
-  </div>
 }
 
 /** A thread list under the panel search: 无匹配结果 when the query hides every thread, else the list as usual. */
@@ -167,7 +64,7 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   onClose: () => void
   /** Shown in a Sheet below xl, where the column has no room. */
   sheet?: boolean
-  /** The 概览 tab of the conversation's work area (FRAME_OWNS_PANEL): the tab is its header, and a UI layer's bot-overview slot may draw the body. */
+  /** The 概览 tab of the conversation's work area (FRAME_OWNS_PANEL): the tab supplies its header. */
   frameTab?: boolean
 }) {
   const t = useTranslations('Shell.panel')
@@ -209,60 +106,25 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   // No computer here (the kill switch is on): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'
-  const detailsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:details`, shown === 'details')
-  const threadsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:threads:${query ?? ''}`, shown === 'threads' && !threadsLoading)
-  const prsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:prs:${query ?? ''}`, shown === 'prs')
+  const scrollKey = shown === 'details' ? `${stateKey}:details` : `${stateKey}:${shown}:${query ?? ''}`
+  const standaloneScroll = useViewScroll<HTMLDivElement>(scrollKey, !frameTab && (shown !== 'threads' || !threadsLoading))
 
   const tasks = <BotTasks stateKey={stateKey} threads={ownThreads} shown={filter(ownThreads)} issues={issues} query={query ?? ''} loading={threadsLoading} onOpenThread={onOpenThread} onOpenTask={id => { onOpenTask?.(); openTask(id) }} />
-  // A UI layer may draw the 概览 tab's body (the bot-overview slot); the tab is its header.
-  const OverviewView = frameTab ? botOverviewSlot.BotOverview ?? null : null
-  if (OverviewView) return <BotOverviewBody View={OverviewView} conversation={conversation} workspaceId={workspaceId} threads={ownThreads} issues={issues} tasks={tasks}
+  const body = <BotOverviewBody conversation={conversation} workspaceId={workspaceId} threads={ownThreads} issues={issues} tasks={tasks}
     tabs={tabs.map(item => ({ id: item, label: item === 'threads' && botTasksSlot.LISTS_TASKS ? t('tasks') : t(item) }))} tab={shown} onTab={value => { setTab(value); setTabChosen(true) }}
     query={query} onQuery={setQuery}
     computer={!computer ? null : chatBotId ? { botId: chatBotId, name: conversation.name } : registered ? { botId: registered.botId, name: registered.botName } : null} />
 
-  const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
-  // The panel keeps its transparent pills while Alex compares them with the shared segmented control (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md);
-  // `indicator: false` opts out of the gliding pill. To switch, drop `pillTab` and the list overrides.
-  const pillTab = { className: pill, indicator: false }
+  if (frameTab) return body
+
   // R-37: opening, closing and widening are instant, no motion (decision 2026-11-01-2320); dragging the edge follows the pointer.
   return <aside ref={asideRef} aria-label={t('label')} className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden w-(--context-panel-width) overflow-hidden border-l bg-background xl:flex', dragging && 'select-none')}>
     {/* Drag the inner edge or use the arrow keys on it to resize the panel; double-click it to reset. */}
     {!sheet && <ResizeHandle resize={resize} label={t('resize')} edge="start" onDoubleClick={() => setBeforeWide(null)} />}
     <div className={cn('flex min-h-0 flex-1 flex-col', !sheet && 'min-w-[var(--context-panel-width,22.5rem)]')}>
-      {/* Search, ⤢ (not in a sheet, which has no edge to widen) and ✕; the panel-header slot lays them out. */}
-      <PanelHeader variant="context" title={t('overview')} onClose={onClose}
-        actions={[{ id: 'search', label: t('search'), icon: Search, pressed: query !== null, onSelect: () => setQuery(query === null ? '' : null) }]}
+      <PanelHeader variant="context" title={t('overview')} onClose={onClose} actions={[]}
         widen={sheet ? undefined : { wide, onToggle: toggleWide }} />
-      {query !== null && <div className="shrink-0 px-3 pb-2">
-        <SearchInput autoFocus aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setQuery(null) } }} />
-      </div>}
-      <Tabs value={shown} onValueChange={value => { setTab(value as PanelTab); setTabChosen(true) }} className="min-h-0 flex-1 gap-0">
-          <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
-            {/* A bot's name and look are edited in place; the Coordinator keeps its own. */}
-            {botId ? <BotLookEditor botId={botId} name={conversation.name} color={conversation.color} shape={conversation.shape} />
-              : coordinator ? <BotAvatar {...COORDINATOR_AVATAR} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
-            {botId ? <BotNameEditor key={botId} botId={botId} name={conversation.name} /> : <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>}
-            <TabsList aria-label={t('tabs')} className="mt-2 gap-1 bg-transparent p-0">
-              {tabs.map(item => <TabsTrigger key={item} value={item} {...pillTab}>{item === 'threads' && botTasksSlot.LISTS_TASKS ? t('tasks') : t(item)}</TabsTrigger>)}
-            </TabsList>
-          </div>
-          <TabsContent ref={detailsScroll} value="details" className="flex min-h-0 flex-col gap-3 overflow-y-auto px-4 pb-4">
-            {botId && <BotPublicRoleEditor key={botId} botId={botId} workspaceId={workspaceId} />}
-            <DetailList title={t('routines')} empty={t('noRoutines')} items={NO_ITEMS} icon={Clock} />
-            {/* A bot's or the Coordinator's own documents; an agent chat has no library. */}
-            {botId || coordinator ? <LibraryList botId={botId} /> : <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />}
-          </TabsContent>
-          <TabsContent ref={threadsScroll} value="threads" className="min-h-0 overflow-y-auto px-4 pb-4">
-            {tasks}
-          </TabsContent>
-          <TabsContent ref={prsScroll} value="prs" className="min-h-0 overflow-y-auto px-4 pb-4">
-            <PullRequests threads={ownThreads} issues={issues} query={query ?? ''} />
-          </TabsContent>
-          {computer && <TabsContent value="computer" className="min-h-0 overflow-y-auto px-4 pb-4">
-            {chatBotId ? <AgentComputer botId={chatBotId} name={conversation.name} header={false} workspaceId={workspaceId} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} workspaceId={workspaceId} />}
-          </TabsContent>}
-        </Tabs>
+      <div ref={standaloneScroll} className="min-h-0 flex-1 overflow-y-auto">{body}</div>
     </div>
   </aside>
 }
