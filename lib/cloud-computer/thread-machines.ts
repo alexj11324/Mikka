@@ -424,7 +424,6 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
     // An already paused provider/row still needs token revocation after a lost
     // response. Both the run and machine stay locked through this commit.
     const parked = await client.query(`UPDATE thread_machines SET state='paused',"lastActiveAt"=now(),
-      "sandboxId"=CASE WHEN "snapshotId"='cloudflare-task-v1' THEN NULL ELSE "sandboxId" END,
       "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL,
       "workerLeaseId"=NULL,"workerLeaseUntil"=NULL,
       lifecycle=lifecycle||jsonb_build_object('phase','paused','owner','run-recovery','failures',0,'pausedAt',COALESCE(lifecycle->'pausedAt',to_jsonb(floor(extract(epoch FROM clock_timestamp())*1000)::bigint)))
@@ -502,7 +501,7 @@ type QuestionRuntimeUpgrade = { taskId: string; attemptId: string; requestEpoch:
 
 /** Maintenance uses the existing answer/recovery receipt for every stage. Lock
  * the task/question before the run, matching answer, claim and cancellation. */
-async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: string, questionId: string, expected?: QuestionRuntimeUpgrade): Promise<QuestionRuntimeUpgrade> {
+export async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: string, questionId: string, expected?: QuestionRuntimeUpgrade): Promise<QuestionRuntimeUpgrade> {
   const unavailable = (): never => { throw new ComputerError(409, 'Original question runtime is no longer current') }
   const { rows: [identity] } = await tx.query('SELECT "taskId" FROM factory_questions WHERE id=$1 AND "userId"=$2 AND "continuationRunId"=$3', [questionId, actor.userId, runId])
   if (!identity) return unavailable()

@@ -1,6 +1,6 @@
 import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 import { Files } from '@cloudflare/sandbox'
-import { machineGrant, sameGrant, workspaceName, liveUntil, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
+import { machineGrant, sameGrant, workspaceName, verifyCheckpoint, liveUntil, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
 import { TaskFiles } from './files.mjs'
 import { processOptions, taskProcess, stopTaskProcesses } from './process.mjs'
 import { TaskWorkspace } from './workspace.mjs'
@@ -82,6 +82,8 @@ export class TaskMachine extends DurableObject {
       const store = this.ctx.storage, now = Date.now()
       const prior = await store.get('run')
       if (prior && sameGrant(prior.grant, grant)) {
+        verifyCheckpoint(grant.requiredCheckpoint, this.ctx.id.toString(), prior.grant.requiredCheckpoint)
+        verifyCheckpoint(prior.grant.requiredCheckpoint, this.ctx.id.toString(), grant.requiredCheckpoint)
         if (prior.settledAt || prior.stoppedAt) throw new Error('Task machine run already settled')
         if (!this.ctx.container?.running || prior.state !== 'running') throw new Error('Task machine interrupted')
         // An expired lease cannot be revived even if its alarm is delayed.
@@ -100,6 +102,7 @@ export class TaskMachine extends DurableObject {
       if (await store.get('closed:' + grant.runId) || await store.get('closed-operation:' + grant.operationId)) {
         throw new Error('Task machine run already settled')
       }
+      verifyCheckpoint(grant.requiredCheckpoint, this.ctx.id.toString(), await store.get('checkpoint'))
       const consumed = await store.get('spent:' + grant.runId) ?? 0
       const hardDeadline = now + Math.max(0, MAX_RUN_MS - consumed)
       const expiresAt = liveUntil(grant, now, hardDeadline)
@@ -115,6 +118,7 @@ export class TaskMachine extends DurableObject {
       try {
         await this.startImage(run)
         const restored = await this.workspace.restore()
+        if (grant.requiredCheckpoint && !restored) throw new Error('Retained task checkpoint unavailable')
         if (restored && this.env.NATIVE_TASK_EGRESS === 'direct') await this.transferNativeHistory('restore')
         if (!restored) await new Files(this.ctx.container).mkdir('/workspace', { recursive: true })
         await store.put('run', { ...run, restored, state: 'running' })

@@ -2,7 +2,7 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import type { WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
-import type { TaskMachineGrant } from '@/lib/eve/cloudflare-task-connection'
+import type { TaskMachineGrant, TaskCheckpoint } from '@/lib/eve/cloudflare-task-connection'
 import { revalidateExecutionIdentity } from '@/lib/execution-identity'
 import { withRunProjectResources } from '@/lib/project-resources/run-lease'
 
@@ -23,6 +23,7 @@ type BoundRun = ResourceRun & {
   id: string
   botId: string
   operationId: string
+  requiredCheckpoint: TaskCheckpoint | null
   until: Date | null
   repoPath: string
   remoteUrl: string
@@ -50,7 +51,7 @@ export async function verifySponsoredChoice(query: Query, placement: SponsoredTa
 }
 
 const bindingSql = `SELECT r.id,r."userId",r."workspaceId",r."issueId",r."botId",r."agentId",r."deviceId",
-      r."deviceRepoId",r."baseBranch",r."agentDefinition",m."operationId",
+      r."deviceRepoId",r."baseBranch",r."agentDefinition",m."operationId",m.lifecycle->'sponsoredRequiredCheckpoint' AS "requiredCheckpoint",
       COALESCE((m.lifecycle->>'sponsoredUntil')::timestamptz,m."workerLeaseUntil") AS until,repo."repoPath",repo."remoteUrl"
     FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId" AND b."workspaceId"=r."workspaceId" AND b."botId"=r."botId"
@@ -87,6 +88,7 @@ function frozenGrant(run: BoundRun | undefined, actor: TaskMachineActor): TaskMa
     repositoryKey: p.repositoryKey,
     runId: run.id,
     operationId: run.operationId,
+    ...(run.requiredCheckpoint ? {requiredCheckpoint:run.requiredCheckpoint} : {}),
     expiresAt: run.until?.getTime() ?? 0,
   }
 }

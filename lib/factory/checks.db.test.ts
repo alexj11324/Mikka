@@ -1620,7 +1620,8 @@ test(
         );
       for (const phase of ['review', 'verify'] as const) for (const machineState of ['running', 'paused'] as const)
         for (const kind of ['repository', 'deliverable'] as const)
-        await t.test(kind + ' ' + phase + ' question continuation keeps its owned ' + machineState + ' VM, issue, candidate and original session without a parent runtime', async () => {
+        for (const hosted of (kind === 'repository' && phase === 'review' && machineState === 'paused' ? [false,true] : [false]))
+        await t.test((hosted ? 'Cloudflare ' : '') + kind + ' ' + phase + ' question continuation keeps its owned ' + machineState + ' VM, issue, candidate and original session without a parent runtime', async () => {
           const pending = await pendingReview(kind);
           let origin = await start(pending.task);
           if (phase === 'verify') {
@@ -1643,7 +1644,7 @@ test(
             assert.ok(!oldPrompt.includes(outputChunkId));
           }
           const childDevice = randomUUID(), childRepo = randomUUID(), connectionId = randomUUID(), credentialId = randomUUID();
-          const nativeSession = 'original-question-' + origin.runId, sandboxId = 'retained-question-' + origin.runId;
+          const nativeSession = 'original-question-' + origin.runId, sandboxId = hosted ? 'a'.repeat(64) : 'retained-question-' + origin.runId;
           await db.query("INSERT INTO devices(id,\"ownerId\",name,kind,enabled,\"lastSeenAt\",harnesses) VALUES($1,'owner','Retained task','cloud',true,now()-interval '1 hour','[{\"harness\":\"codex\",\"installed\":true}]')", [childDevice]);
           await db.query("INSERT INTO device_repos(id,\"deviceId\",\"userId\",\"repoPath\",\"remoteUrl\",\"baseBranch\",\"verifyCommand\") VALUES($1,$2,'owner','/retained','/fixture/repo','main',$3)", [childRepo, childDevice, command]);
           await db.query("INSERT INTO byos_connections(id,\"ownerId\",\"workspaceId\",state,epoch,provider,\"secretName\",\"providerSubject\",\"secretDigest\") VALUES($1,'owner',$2,'connected',1,'codex','synthetic-retained-question-' || $1::uuid::text,'synthetic-subject',repeat('a',64))", [connectionId, billingWorkspaceId]);
@@ -1654,6 +1655,16 @@ test(
           await db.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,\'owner\')', [origin.runId, coordinatorBot, billingWorkspaceId]);
           await db.query('INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId") VALUES($1,$2,\'owner\',$3,$4,\'codex\',$5,$6,$7,$8,$9)',
             [origin.runId, billingWorkspaceId, coordinatorBot, pending.task.issueId, randomUUID(), machineState, sandboxId, childDevice, childRepo]);
+          const retainedRepository = 'v2/github.com/owner/recovery-fixture';
+          if (hosted) {
+            const placement = { provider:'cloudflare',payer:'mikka',ownerId:'owner',workspaceId:billingWorkspaceId,
+              botId:coordinatorBot,taskId:pending.task.issueId,repositoryKey:retainedRepository,requestEventId:randomUUID() };
+            await db.query('UPDATE agent_runs SET "agentDefinition"="agentDefinition"||jsonb_build_object(\'taskMachine\',$2::jsonb) WHERE id=$1', [origin.runId,placement]);
+            await db.query('UPDATE device_repos SET "repoPath"=$2,"remoteUrl"=$3 WHERE id=$1', [childRepo,retainedRepository,'https://github.com/owner/recovery-fixture.git']);
+            await db.query(`UPDATE thread_machines SET "snapshotId"='cloudflare-task-v1',
+              lifecycle=jsonb_build_object('sponsoredRepositoryKey',$2::text,'sponsoredInstanceId',$3::text)
+              WHERE "runId"=$1`, [origin.runId,retainedRepository,sandboxId]);
+          }
           // This is the task-device reassignment normally performed when the
           // first check VM is created. No parent metadata or provider is mocked.
           await db.query("UPDATE factory_attempts SET output=jsonb_set(jsonb_set(output,'{check,deviceRepoId}',to_jsonb($2::text)),'{check,environment}',to_jsonb($3::text)) WHERE id=$1",
@@ -1689,6 +1700,12 @@ test(
           assert.equal(run.botId, coordinatorBot);
           assert.equal(run.deviceId, childDevice);
           assert.equal(run.deviceRepoId, childRepo);
+          if (hosted) {
+            const custody = (await db.query('SELECT lifecycle FROM thread_machines WHERE "runId"=$1',[run.id])).rows[0].lifecycle;
+            const previous = (await db.query('SELECT "operationId" FROM thread_machines WHERE "runId"=$1',[origin.runId])).rows[0];
+            assert.deepEqual(custody.sponsoredPrevious,{runId:origin.runId,operationId:previous.operationId,instanceId:sandboxId});
+            assert.equal(custody.sponsoredRepositoryKey,retainedRepository);
+          }
           assert.equal(run.questionContinuation.originSessionId, nativeSession);
           assert.equal(run.questionContinuation.requiredSandboxId, sandboxId);
           assert.equal(run.agentDefinition.definitionDigest, definition.definitionDigest);
