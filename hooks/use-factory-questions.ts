@@ -3,6 +3,7 @@
 import useSWR from 'swr'
 import { withBasePath } from '@/lib/base-path'
 import { getIssue } from '@/app/actions/issues'
+import { ReadResponseError } from '@/lib/swr/retry'
 
 /** A pending Factory question as `/api/factory/questions` returns it (lib/factory/questions/ask-user.ts). */
 export type FactoryQuestionItem = {
@@ -23,7 +24,8 @@ export type FactoryQuestionItem = {
 
 async function json(path: string) {
   const response = await fetch(withBasePath(path), { credentials: 'same-origin', cache: 'no-store' })
-  return response.ok ? response.json() as Promise<Record<string, unknown>> : null
+  if (!response.ok) throw new ReadResponseError(response.status)
+  return response.json() as Promise<Record<string, unknown>>
 }
 
 async function readQuestions(): Promise<FactoryQuestionItem[]> {
@@ -54,7 +56,7 @@ export function factoryQuestionsVersion(threads: readonly { id: string; status: 
  * changes when they may have (the chat's own version, the task list), and a change reads them again.
  */
 export function useFactoryQuestions(version: unknown, enabled = true) {
-  const { data, mutate } = useSWR(enabled ? ['factory-questions', version] : null, readQuestions, { revalidateOnFocus: false, keepPreviousData: true })
+  const { data, error, mutate } = useSWR(enabled ? ['factory-questions', version] : null, readQuestions, { revalidateOnFocus: false, keepPreviousData: true })
   /** Answers with `text` (the option's label or the person's own words); null when it went, else the error code. */
   async function answer(question: FactoryQuestionItem, text: string): Promise<string | null> {
     const response = await fetch(withBasePath(`/api/factory/questions/${question.questionId}`), {
@@ -66,5 +68,5 @@ export function useFactoryQuestions(version: unknown, enabled = true) {
     const body = await response?.json().catch(() => null) as { error?: string } | null
     return body?.error ?? 'actionFailed'
   }
-  return { questions: data ?? [], answer }
+  return { questions: data ?? [], error: error ?? null, reload: () => mutate(), answer }
 }

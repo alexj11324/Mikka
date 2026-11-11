@@ -3,8 +3,9 @@
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, LoaderCircle } from 'lucide-react'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
-import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field'
 import type { FreeAllowanceState } from '@/hooks/settings/use-billing'
 
 export { cardVerificationKey } from '@/hooks/settings/use-billing'
@@ -17,8 +18,14 @@ export { cardVerificationKey } from '@/hooks/settings/use-billing'
  */
 export function FreeAllowanceSection({ allowance }: { allowance: FreeAllowanceState }) {
   const t = useTranslations('Billing.allowance')
+  const common = useTranslations('Common')
   const { confirming, redirecting, verify } = allowance
   const data = allowance.status
+  if (allowance.error) return <SettingsSection id="billing-free-allowance" title={t('section')}>
+    {allowance.reload
+      ? <SettingsSaveError message={allowance.error} retryLabel={common('retry')} onRetry={allowance.reload} />
+      : <FieldError>{allowance.error}</FieldError>}
+  </SettingsSection>
   if (!data || (data.status === 'verified' && !confirming)) return null
   const pending = confirming || data.status === 'pending'
   return <SettingsSection id="billing-free-allowance" title={t('section')}>

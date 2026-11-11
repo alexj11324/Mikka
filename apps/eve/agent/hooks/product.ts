@@ -1,3 +1,4 @@
+import {evaluationBindingId} from '../../../../lib/eve/evaluation-context'
 import { defineHook } from 'eve/hooks'
 import { scopeFromAuth, registerSession } from '../../../../lib/eve/scope'
 import { projectEveTurn, projectTurnState } from '../../../../lib/eve/projection'
@@ -5,9 +6,11 @@ import { productRpc } from '../../../../lib/eve/product-rpc'
 
 export default defineHook({events:{
   async 'session.started'(_event,ctx) {
+    if(evaluationBindingId(ctx.session.auth.current))return
     await registerSession(scopeFromAuth(ctx.session.auth.current),ctx.session.id)
   },
   async 'turn.started'(event,ctx) {
+    if(evaluationBindingId(ctx.session.auth.current))return
     const scope = scopeFromAuth(ctx.session.auth.current)
     const {pool} = await import('../../../../lib/db')
     const source = ctx.session.auth.current?.attributes.sourceEventId
@@ -18,6 +21,7 @@ export default defineHook({events:{
     if (!scheduled && !ctx.session.parent) await projectTurnState(scope,ctx.session.id,event.data.turnId,true)
   },
   async 'turn.settled'(event,ctx) {
+    if(evaluationBindingId(ctx.session.auth.current))return
     const scope = scopeFromAuth(ctx.session.auth.current)
     // Product retry timers and task workflows belong to the Mikka app host.
     // Children retain their read authority but never publish or settle the

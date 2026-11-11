@@ -501,7 +501,7 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.scripts.includes('test:coordinator-native'))
   assert.ok(plan.files.includes('lib/coordinator/native-store.test.ts'))
   assert.ok(plan.scripts.includes('test:eve-db'))
-  for (const file of ['approval-bridge', 'scheduled-read', 'scope', 'settlement', 'sandbox']) assert.ok(plan.files.includes(`lib/eve/${file}.db.test.ts`))
+  for (const file of ['approval-bridge', 'scheduled-read', 'scope', 'settlement', 'sandbox', 'evaluation-store']) assert.ok(plan.files.includes(`lib/eve/${file}.db.test.ts`))
   assert.ok(plan.selfManaged.includes('lib/auth-email.test.ts'))
   assert.ok(plan.scripts.includes('test:factory'))
   assert.ok(plan.files.includes('lib/self-improvement/wiring-postgres.test.ts'))
@@ -545,6 +545,19 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
     assert.ok(taskCommands.some(command => command.includes(`pnpm ${name}`)) || workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)
     assert.ok(pkg.check.includes(`pnpm ${name}`), `${name} in check`)
   }
+})
+
+test('the disposable CI service budgets cluster-wide DDL locks for parallel full-schema cleanup', () => {
+  const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
+  const job = workflow.split('\n  browser-tests-full:')[1]
+  assert.ok(job, 'the required database matrix must exist')
+  const service = job.split('\n    services:')[1]?.split('\n    env:')[0]
+  assert.ok(service, 'capacity belongs to the disposable service, not application configuration')
+  assert.match(service, /image: postgres:17/)
+  assert.match(service, /POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512/)
+  assert.equal(concurrency(undefined), 4, 'retain the existing parallel DB suites')
+  assert.match(job, /REQUIRE_DB: '1'/)
+  assert.match(job, /run: pnpm test:db\n/)
 })
 
 test('self-improvement DB suite stays mandatory when its feature exists', () => {

@@ -211,6 +211,36 @@ Ordinary acceptance must not sign in as Alex. For production checks described
 below, use this shared-account team scope rather than an isolated account-pool
 lease. Keep the normal identity, membership and cleanup checks.
 
+### Issue #1918: authorized owned Codex Cloud MCP case
+
+For this case, Alex explicitly authorized the existing 2023 account and its
+own Codex `gpt-6-luna` subscription
+([decision](design/decisions/2026-11-11-1405-owned-codex-cloud-mcp-acceptance.md)).
+Run `scripts/acceptance/cloud-native-mcp.mjs` with the complete
+`MIKKA_TEST_ACCOUNT_EMAIL` / `MIKKA_TEST_ACCOUNT_PASSWORD` environment pair,
+mapped in memory from the existing Infisical `prod:/` `ALEX_TEST_EMAIL` /
+`ALEX_TEST_PASSWORD`. Keep `SMOKE_OWNER_*` unchanged.
+
+Pass `--expected-build`, `--expected-worker-sha`, `--expected-worker-source`
+and a unique `--output` path. The existing `VERCEL_TEAM_TOKEN` supplies the
+read-only published runtime configuration check. Without `--execute`, the command only prints
+its preparation contract and makes no network calls. Execution creates one
+normal cloud task on the owned Luna source, calls the configured public
+DeepWiki native MCP once, and verifies its paired Task CLI input/output,
+later handoff and root-owned worker release markers. The native shell proof
+reads the README and release markers; it uses the existing probe assignment
+policy and does not set the assignment's `readOnly` flag, which disables that
+shell. The task instructions prohibit writes, commits, pushes and messages.
+
+The report and adjacent `.fixture.jsonl` journal use private files and a new
+case ID. Cleanup targets only that case's MCP connection, Profile, task and
+machine, then restores and closes its sessions. The result records
+`actor: authorized_2023_codex` and `ownedScope.access: owner`. It does not
+replace the existing shared SMOKE Claude result or complete the two-model
+candidate publication gate. The production worker pins must already match
+the version being accepted. The account's normal `apiKeyAfterQuota` setting
+must be false; the driver checks it and preserves the setting.
+
 The one-time setup and the subsequent fixed-deployment production verification
 are recorded in [issue #1415 acceptance report](acceptance/issue-1415/final-report.md).
 The setup made the existing Claude and Codex subscription sources visible; it

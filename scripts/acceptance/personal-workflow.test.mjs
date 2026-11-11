@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
 import pins from '../../packages/daemon/harness/pins.json' with { type: 'json' }
-import { createSessionClient, parseOptions, personalAcceptanceAccount, runCloudStartup, selectAcceptanceTeam, subscriptionProof } from './cloud-startup.mjs'
+import { createSessionClient, parseOptions, personalAcceptanceAccount, runCloudStartup, runSubscriptionCase, selectAcceptanceTeam, subscriptionProof } from './cloud-startup.mjs'
 import { createWorkspaceProbe, runCodingWorkspaceAcceptance } from './coding-workspace.mjs'
 import { PERSONAL_MODELS, personalReadiness, selectAcceptancePersonal } from './personal-workspace.mjs'
 import { parsePersonalOptions, runPersonalWorkflow } from './personal-workflow.mjs'
@@ -145,6 +146,36 @@ test('personal subscription evidence requires requester ownership and owner acce
   assert.equal(record.execution.sharedScope, undefined)
   identity.resourceBindings[1].access = 'workspace_share'
   await assert.rejects(subscriptionProof({ json: async () => ({ run }) }, record, scope, profile), /startup_personal_subscription_identity_mismatch/)
+})
+
+test('personal cases select the own subscription menu for each fixed harness before creating any task', async () => {
+  for (const [harness, modelId] of Object.entries(PERSONAL_MODELS)) {
+    const botId = id(70), profileId = id(71), ownOption = id(72), sharedOption = id(73)
+    const provider = harness === 'codex' ? 'codex' : 'claude', chosen = []
+    const scope = { ownerId, adminId: ownerId, botId, workspaceId: workspace, workspaceKind: 'personal',
+      acceptanceEmailHash: createHash('sha256').update(env.SMOKE_OWNER_EMAIL).digest('hex'), evidence: { personalWorkspaceConfirmed: true } }
+    const client = { request() { throw Error('unexpected request') },
+      json: async path => {
+        if (path === '/api/auth/get-session') return { user: { id: ownerId, email: env.SMOKE_OWNER_EMAIL } }
+        if (path === '/api/workspace') return { currentUserId: ownerId, workspace: { id: workspace, kind: 'personal' }, role: 'admin' }
+        assert.equal(path, '/api/bots/' + botId); return { id: botId, name: '测试1505 personal' }
+      }, rpc: async (action, args) => {
+        if (action === 'execution-settings.getBotModelMenu') return { groups: [
+          { kind: 'subscription', provider, options: [{ id: ownOption, provider, modelId }] },
+          { kind: 'subscription', provider, owner: 'foreign member', options: [{ id: sharedOption, provider, modelId }] },
+        ] }
+        if (action === 'execution-settings.chooseBotModel') {
+          chosen.push(args[1]); return { current: { kind: 'subscription', chosen: true, available: true, id: args[1], provider, modelId } }
+        }
+        assert.equal(action, 'issues.saveIssue')
+        throw Error('startup_issue_create_failed')
+      } }
+    const record = await runSubscriptionCase({ client, scope, botId, profileId, profile: { id: profileId, digest: 'a'.repeat(64) },
+      harness, deviceId, agentId, pinBuild: async () => {} })
+    assert.deepEqual(chosen, [ownOption])
+    assert.equal(record.error, 'startup_issue_create_failed')
+    assert.equal(record.runId, undefined)
+  }
 })
 
 test('personal Files issue creation uses the ordinary personal task action and never asks for a Team', async () => {

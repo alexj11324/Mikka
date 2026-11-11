@@ -17,6 +17,8 @@ const submitted: { text: string; context: { retryOf?: number } | undefined }[] =
 let chatItems: import('@/lib/coordinator/context').ChatItem[] = []
 let chatError: string | null = null
 let chatEnabled = false
+let welcomeReply: unknown = { queued: true }
+let welcomeCalls = 0
 const modelPicks: (string | null)[] = []
 // A chat whose welcome failed: its read, the model menu's 可用, the refusal code and whether the tab is visible.
 let chatData: Record<string, unknown> | null = null
@@ -41,7 +43,8 @@ mock.module(new URL('../ui/alert-dialog.tsx', import.meta.url).href, { namedExpo
 } })
 mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
   retryCoordinatorTurn: async () => { calls++; if (reply instanceof Error) throw reply; if (typeof reply === 'function') return reply(); return reply },
-  getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), syncCoordinatorChat: async () => ({}), coordinatorHistory: async () => ({}), stopCoordinatorTurn: async () => ({}), welcomeCoordinator: async () => ({}), coordinatorCitationSources: async () => ({}),
+  getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), syncCoordinatorChat: async () => ({}), coordinatorHistory: async () => ({}), stopCoordinatorTurn: async () => ({}),
+  welcomeCoordinator: async () => { welcomeCalls++; if (welcomeReply instanceof Error) throw welcomeReply; if (typeof welcomeReply === 'function') return welcomeReply(); return welcomeReply }, coordinatorCitationSources: async () => ({}),
 } })
 mock.module(new URL('../../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: { getBotModelMenu: async () => ({}) } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
@@ -116,7 +119,7 @@ before(async () => {
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
 })
-beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { welcomeCalls = 0; welcomeReply = { queued: true }; chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
@@ -436,4 +439,42 @@ test('a hidden tab never retries the welcome', async () => {
   menu = { current: { id: 'mikka', available: true } }
   await act(async () => chat())
   assert.equal(calls, 0)
+})
+
+for (const failure of [new Error('private transport detail'), { error: 'authRequired' }]) test(`a welcome ${failure instanceof Error ? 'transport rejection' : 'action refusal'} stops the waiting line and offers a guarded explicit retry`, async () => {
+  chatEnabled = true
+  welcomeReply = failure
+  await act(async () => chat())
+  assert.equal(welcomeCalls, 1)
+  const notice = container.querySelector('[data-chat-failure="welcome-request"]')!
+  assert.ok(notice)
+  assert.doesNotMatch(container.textContent ?? '', /writingWelcome|private transport detail/)
+  const retry = notice.parentElement!.querySelector<HTMLButtonElement>('button')!
+  assert.equal(retry.textContent, 'Common.retry')
+  await act(async () => chat())
+  assert.equal(welcomeCalls, 1, 'rendering a failed welcome does not submit it again')
+  currentBuild = false
+  await act(async () => retry.click())
+  assert.equal(welcomeCalls, 1, 'stale-build retry keeps the existing page guard')
+  currentBuild = true
+  let finish!: (value: unknown) => void
+  welcomeReply = () => new Promise(resolve => { finish = resolve })
+  await act(async () => { retry.click(); retry.click() })
+  assert.equal(welcomeCalls, 2, 'one request even before the asynchronous build guard finishes')
+  assert.equal(retry.disabled, true)
+  await act(async () => finish({ queued: false }))
+  assert.equal(container.querySelector('[data-chat-failure="welcome-request"]'), null)
+})
+
+test('a rejected automatic welcome recovery retains its stored refusal and never rejects the render effect', async () => {
+  welcomeFailed(); menu = { current: { id: 'mikka', available: false } }
+  await act(async () => chat())
+  reply = new Error('private recovery transport detail')
+  menu = { current: { id: 'mikka', available: true } }
+  await act(async () => chat())
+  assert.equal(calls, 1)
+  assert.ok(container.querySelector('[data-message-failure="welcome"]'))
+  assert.doesNotMatch(container.textContent ?? '', /private recovery transport detail/)
+  await act(async () => chat())
+  assert.equal(calls, 1)
 })
