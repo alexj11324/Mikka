@@ -29,3 +29,35 @@ test('the hosted API needs two trusted service origins, existing PostgreSQL conf
   }
   assert.throws(() => verifyConfiguration({ ...env, VERCEL_ENV: 'production' }), /EDITION_INVALID/)
 })
+
+import { apiRequest } from '../../../cloudflare/api/ingress/request.mjs'
+import { ingressConfig } from '../../../cloudflare/api/ingress/config.mjs'
+
+test('private ingress keeps authority, body, cookies and upgrades while replacing client proxy fields', async () => {
+  const origin = 'https://app.example'
+  const request = new Request(origin + '/mikka/api/rpc', { method: 'POST', body: 'payload',
+    headers: { authorization: 'Bearer fixture', cookie: 'fixture', 'cf-connecting-ip': '192.0.2.31',
+      forwarded: 'for=bad', 'x-forwarded-host': 'other.example', 'x-mikka-edge-ip': '192.0.2.99',
+      'cf-container-target-port': '9000', 'x-vercel-ip-city': 'bad', 'x-forwarded-for': '192.0.2.10' } })
+  assert.equal(apiRequest(request, 'https://other.example'), null)
+  const forwarded = apiRequest(request, origin)
+  assert.equal(await forwarded.text(), 'payload')
+  for (const [key, value] of Object.entries({ host: 'app.example', authorization: 'Bearer fixture', cookie: 'fixture',
+    'x-forwarded-host': 'app.example', 'x-forwarded-proto': 'https', 'x-mikka-edge-ip': '192.0.2.31' })) assert.equal(forwarded.headers.get(key), value)
+  for (const key of ['forwarded', 'x-vercel-ip-city', 'x-forwarded-for', 'cf-container-target-port', 'cf-connecting-ip']) assert.equal(forwarded.headers.has(key), false)
+  const upgrade = apiRequest(new Request(origin + '/mikka/api/stream', { headers: { upgrade: 'websocket' } }), origin)
+  assert.equal(upgrade.headers.get('upgrade'), 'websocket')
+  assert.equal(upgrade.headers.get('x-mikka-edge-ip'), null)
+})
+
+test('ingress binds only the immutable account image with a private route and a bounded staging pool', () => {
+  const input = { release: id, origin: 'https://app.example', image: 'registry.cloudflare.com/' + 'e'.repeat(32) + '/mikka-api@sha256:' + '3'.repeat(64) }
+  const config = ingressConfig(input)
+  assert.equal(config.workers_dev, false)
+  assert.equal(config.preview_urls, false)
+  assert.equal(config.containers[0].max_instances, 1)
+  assert.equal(config.containers[0].image, input.image)
+  for (const changed of [{ release: 'main' }, { image: input.image.split('@')[0] + ':latest' }, { origin: 'https://user@app.example' }]) {
+    assert.throws(() => ingressConfig({ ...input, ...changed }))
+  }
+})
