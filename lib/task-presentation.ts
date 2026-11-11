@@ -1,3 +1,4 @@
+import type { ReviewLineSummary } from './code-review/summary-text'
 import type { IssueStatus } from './issue-meta'
 import { taskBlock, type BlockIssue } from './task-blocked'
 import type { FactoryFlowView } from './factory/public-flow'
@@ -8,6 +9,7 @@ export type TaskPresentation = TaskStateView & {
   /** Opt-in list context for opening the authorized Factory on user selection. */
   factoryTaskId?: string
   factoryExtraCount?: number
+  review?: ReviewLineSummary
   primaryStatus: IssueStatus
   factoryStage: FactoryFlowView['stage'] | null
   runStatus: string | null

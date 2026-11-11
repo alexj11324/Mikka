@@ -46,6 +46,7 @@ import { BrowserPane } from '@/components/browser/browser-pane'
 import { browserAddressRequest, browserAddressVersion, subscribeBrowserAddress } from '@/lib/browser/navigation'
 import { ThreadColumn } from './thread-column'
 import { AllThreadsColumn, AllThreadsToggle } from '@/components/nav/all-threads'
+import { TaskCardDataProvider } from '@/hooks/use-task-cards'
 import { TaskPresentationsContext, useWorkspaceTaskPresentations } from '@/hooks/use-task-collection'
 import { groupPresentedTasks, waitingTasks } from '@/lib/task-collection'
 import { useInboxCount } from '@/hooks/use-inbox-count'
@@ -684,7 +685,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
   // the default keeps the workspace frame mounted around settings (#1603).
   // Both visual frames share the workspace's pending notes and computer registry.
-  return <TaskPresentationsContext value={presentation.items}><SignOutBoundary pending={signingOut}><EmbeddedTaskLifecycle value={embeddedLifecycle}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
+  return <TaskPresentationsContext value={presentation.items}><TaskCardDataProvider key={JSON.stringify([user.id, listWorkspaceId])} ownerId={user.id} workspaceId={listWorkspaceId}><SignOutBoundary pending={signingOut}><EmbeddedTaskLifecycle value={embeddedLifecycle}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
@@ -731,5 +732,5 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     {artifactId && <ArtifactWindow artifactId={artifactId} />}
     </>}
     {dialogs}
-  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></EmbeddedTaskLifecycle></SignOutBoundary></TaskPresentationsContext>
+  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></EmbeddedTaskLifecycle></SignOutBoundary></TaskCardDataProvider></TaskPresentationsContext>
 }
