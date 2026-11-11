@@ -25,11 +25,22 @@ export async function proxyEveRequest(request: Request, upstreamPath?: string, o
   fetch?: typeof fetch
 } = {}): Promise<Response> {
   let target: URL
+  let path: string
   try {
-    target = new URL(eveProxyPath(request, upstreamPath), eveServiceOrigin(options.env))
+    path = eveProxyPath(request, upstreamPath)
+    target = new URL(path, eveServiceOrigin(options.env))
     target.search = new URL(request.url).search
   } catch {
     return Response.json({ ok: false, error: 'notFound' }, { status: 404 })
+  }
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && /^\/eve\/v1\/session(?:\/|$)/.test(path)
+    && request.headers.has('cookie') && !request.headers.has('authorization')) {
+    let expectedOrigin: string
+    try { expectedOrigin = new URL((options.env ?? process.env).BETTER_AUTH_URL ?? request.url).origin }
+    catch { return Response.json({ ok: false, error: 'coordinatorUnavailable' }, { status: 503 }) }
+    if (request.headers.get('origin') !== expectedOrigin || request.headers.get('sec-fetch-site') === 'cross-site') {
+      return Response.json({ ok: false, error: 'originRejected' }, { status: 403, headers: { 'cache-control': 'no-store' } })
+    }
   }
   const headers = new Headers(request.headers)
   // Connection can nominate additional hop-by-hop fields.
