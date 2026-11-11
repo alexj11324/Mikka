@@ -7,7 +7,7 @@ import { withBrowserNotes, NOTE_MAX, NOTES_MAX } from '../browser/note'
 import { taskDestinationSchema } from '../task-destination'
 import { taskTitleInputSchema } from '../task-title-input'
 import { agentProfileReferenceSchema } from '../factory/agent-profile-reference'
-import { personalSubmissionInput, recordPersonalSubmission } from '../coordinator-submission'
+import { personalSubmissionInput, recordPersonalSubmission,personalSubmissionEventId,SubmissionConflictError } from '../coordinator-submission'
 
 const quote = z.object({ artifactId:z.uuid(),version:z.number().int().positive(),kind:z.enum(['text','element']),text:z.string().min(1).max(QUOTE_TEXT_MAX),label:z.string().max(200).optional(),selector:z.string().max(1000).optional() })
 const notes = z.array(z.object({n:z.number().int().positive(),kind:z.enum(['element','region']),url:z.url({protocol:/^https?$/}).max(2000),label:z.string().min(1).max(200),note:z.string().min(1).max(NOTE_MAX),selector:z.string().max(1000).optional(),rect:z.object({x:z.number(),y:z.number(),width:z.number().nonnegative(),height:z.number().nonnegative(),viewportWidth:z.number().nonnegative(),viewportHeight:z.number().nonnegative()}).optional()})).max(NOTES_MAX)
@@ -49,7 +49,18 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
     const session = await auth.api.getSession({headers:request.headers,query:{disableCookieCache:true}})
     if (session?.user.id === scope.ownerId) humanSessionId = session.session.id
   }
-  const { eventId } = await recordPersonalSubmission(db,scope.ownerId,text,{botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,...(humanSessionId ? {humanSessionId} : {})})
+  const options={botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,...(product.retryOf?{retryOf:product.retryOf}:{}),...(humanSessionId ? {humanSessionId} : {})}
+  const record=(executor:Parameters<typeof recordPersonalSubmission>[0])=>recordPersonalSubmission(executor,scope.ownerId,text,options)
+  let recorded
+  if(product.retryOf) {
+    const {sendRetryOf}=await import('../coordinator/store')
+    recorded=await sendRetryOf(scope.ownerId,scope.botId,product.retryOf,record)
+    if(!recorded) {
+      if(!input.submissionId||!await personalSubmissionEventId(db,scope.ownerId,scope.botId,input.submissionId))throw new SubmissionConflictError()
+      recorded=await record(db)
+    }
+  }else recorded=await record(db)
+  const {eventId}=recorded
   ingress.set(request,{scope,eventId})
   const contextual = text === input.text ? [] : [withQuote(withBrowserNotes('',product.notes) ?? '',product.quote)]
   return {eventId,context:contextual}
@@ -64,7 +75,7 @@ export async function markEventAccepted(scope:EveScope,eventId:string) {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${scope.ownerId}:${scope.botId}`},0))`)
     const event = (await tx.execute(sql`SELECT * FROM coordinator_events WHERE id=${eventId}::uuid AND "userId"=${scope.ownerId} AND "botId"=${scope.botId}::uuid FOR UPDATE`)).rows[0] as any
     if (!event || event.deliveredAt) return
-    const message = maskDeep(sourcedEventMessage({...event,deliveredAt:new Date()},eventPrompt(event)),credentialMasker)
+    const message = maskDeep(sourcedEventMessage({...event,createdAt:new Date(event.createdAt),deliveredAt:new Date()},eventPrompt(event)),credentialMasker)
     await tx.execute(sql`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT ${crypto.randomUUID()}::uuid,${scope.ownerId},${scope.botId}::uuid,coalesce(max(position),0)+1,${JSON.stringify(message)}::jsonb FROM coordinator_messages WHERE "userId"=${scope.ownerId} AND "botId"=${scope.botId}::uuid`)
     await tx.execute(sql`UPDATE coordinator_events SET "deliveredAt"=now() WHERE id=${eventId}::uuid`)
     await botChatChanged(tx,scope.ownerId,scope.botId)

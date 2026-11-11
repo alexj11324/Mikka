@@ -45,7 +45,7 @@ export async function personalSubmissionRecorded(executor: Pick<typeof db, 'sele
  * included (resolved where the message enters), or a suggestion's stored one
  * (null only on a suggestion from before it stored one).
  */
-export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string; humanSessionId?: string; filesValidated?: true }) {
+export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string; humanSessionId?: string; filesValidated?: true;retryOf?:number }) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
   const botId = options.botId
   if (!options.filesValidated && splitChatFiles(text).files.length) {
@@ -57,10 +57,11 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
   const profileId = agentProfileReferenceSchema.optional().parse(options.profileId)
   const taskTitle = taskTitleInputSchema.optional().parse(options.taskTitle)
+  const retryOf = z.number().int().positive().optional().parse(options.retryOf)
   const dedupeKey = submissionId
     ? submissionKey(userId, botId, submissionId)
     : `user_message:${randomUUID()}`
-  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, source: 'person', ...(images.length ? { images } : {}), ...(taskDestination ? { taskDestination } : {}), ...(profileId ? { profileId } : {}), ...(taskTitle ? { taskTitle } : {}), ...(options.humanSessionId ? { humanSessionId: options.humanSessionId } : {}) } }
+  const event = { userId, botId, kind: 'user_message' as const, dedupeKey, issueId: null, runId: null, payload: { text, source: 'person', ...(images.length ? { images } : {}), ...(taskDestination ? { taskDestination } : {}), ...(profileId ? { profileId } : {}), ...(taskTitle ? { taskTitle } : {}), ...(retryOf?{retryOf}:{}),...(options.humanSessionId ? { humanSessionId: options.humanSessionId } : {}) } }
   const [inserted] = await executor.insert(coordinatorEvents).values({ id: randomUUID(), ...event })
     .onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
   if (inserted) return { duplicate: false, eventId: inserted.id }
@@ -71,6 +72,13 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   if (!prior) throw new Error('personalSubmissionUnavailable')
   if (!submissionId || prior.userId !== userId || prior.botId !== botId || prior.kind !== event.kind || (prior.issueId !== null && !taskDestination) || prior.runId !== null || !isDeepStrictEqual(withoutHostSession(prior.payload), withoutHostSession(event.payload))) throw new SubmissionConflictError()
   return { duplicate: true, eventId: prior.id }
+}
+
+/** An already-marked resend may recover only its existing immutable receipt. */
+export async function personalSubmissionEventId(executor:Pick<typeof db,'select'>,userId:string,botId:string,submissionId:string) {
+  const id=personalSubmissionInput.shape.submissionId.parse(submissionId)!
+  const [prior]=await executor.select({id:coordinatorEvents.id,userId:coordinatorEvents.userId,botId:coordinatorEvents.botId,kind:coordinatorEvents.kind}).from(coordinatorEvents).where(eq(coordinatorEvents.dedupeKey,submissionKey(userId,botId,id))).limit(1)
+  return prior?.userId===userId&&prior.botId===botId&&prior.kind==='user_message'?prior.id:null
 }
 
 /** Byte bound applies even when Content-Length is absent or dishonest. */
