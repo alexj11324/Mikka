@@ -3,7 +3,8 @@ import { canonicalWebServer, WEB_CONNECTION_PROTOCOL } from './policy'
 export type WebServer = { url: string; name: string; version: string; edition: 'cloud' | 'community'; signIn: { email: boolean; google: boolean; github: boolean } }
 export type WebServerProbe =
   | { status: 'ok'; server: WebServer }
-  | { status: 'invalid_address' | 'https_required' | 'unreachable' | 'not_mikka' | 'web_disabled' }
+  | { status: 'invalid_address' | 'https_required' | 'unreachable' | 'not_mikka' }
+  | { status: 'web_disabled' }
   | { status: 'server_update_required'; version: string | null }
   | { status: 'app_update_required'; minimum: string | null }
 export type WebFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
