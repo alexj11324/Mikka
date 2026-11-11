@@ -74,7 +74,7 @@ mock.module('../browser/browser-pane', { namedExports: { BrowserPane: () => <sec
 mock.module('@/components/nav/bot-list', { namedExports: { BotList: empty, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
-mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty, waitingCount: () => 0 } })
+mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty } })
 mock.module('@/components/browser/browser-toggle', { namedExports: { useBrowserFits: () => true, BrowserToggle: ({ onToggle }: { onToggle: () => void }) => <Button onClick={onToggle}>browser</Button> } })
 mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: plain, SheetHeader: plain, SheetTitle: plain, SheetDescription: plain } })
 mock.module('@/components/nav/global-search', { namedExports: { GlobalSearch: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => open ? <div data-search-open=""><Button onClick={() => onOpenChange(false)}>dismiss search</Button></div> : null, SearchPill: ({ onSearch }: { onSearch: () => void }) => <Button onClick={onSearch}>search</Button> } })
