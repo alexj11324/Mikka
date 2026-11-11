@@ -428,35 +428,25 @@ export async function getThreadMachine(issueId: string | null, runId: string): P
 }
 
 /**
- * What this thread's run holds (lib/context-usage.ts). Reads the whole run
- * chain and the whole stored brief whatever the chunk cursor returned, so a
- * cursor read reports the same usage as a full one. Characters are counted in
- * SQL: a push must not re-transfer a thread to price it.
+ * What this thread's run holds (lib/context-usage.ts). One query counts every
+ * character in SQL and returns no text: a cursor read must stay small, so the
+ * brief cannot be sent again to be measured (tests/thread-detail-bytes.db.test.ts).
+ * It covers the whole run chain and the whole stored brief whatever the cursor
+ * returned, so a cursor read reports the same usage as a full one.
  */
 async function readContextUsage(runIds: string[], rootRunId: string): Promise<import('@/lib/context-usage').ContextUsage> {
-  const { CONVERSATION_CHARS_SQL, contextUsageFromCounts, countChars } = await import('@/lib/context-usage')
-  const [brief, spoken, streamed] = await Promise.all([
-    db.select({ prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength,
-      model: sql<string | null>`${agentRuns.agentDefinition}->>'model'` })
-      .from(agentRuns).where(eq(agentRuns.id, rootRunId)).limit(1),
-    db.select({ ascii: sql<number>`coalesce(sum(length(regexp_replace(${runMessages.text}, '[^[:ascii:]]', '', 'g'))),0)`.mapWith(Number),
-      other: sql<number>`coalesce(sum(length(${runMessages.text}) - length(regexp_replace(${runMessages.text}, '[^[:ascii:]]', '', 'g'))),0)`.mapWith(Number) })
-      .from(runMessages).where(inArray(runMessages.runId, runIds)),
-    pool.query<{ ascii: string; other: string }>(CONVERSATION_CHARS_SQL, [runIds]),
-  ])
-  const stored = brief[0]
-  if (!stored) return contextUsageFromCounts({ prompt: { ascii: 0, other: 0 }, task: { ascii: 0, other: 0 },
-    messages: { ascii: 0, other: 0 }, conversation: { ascii: 0, other: 0 } })
-  // The task sits at the recorded code-point offset, not always at the start:
-  // a Factory check prepends its guidance and shifts `promptTaskStart`
-  // (lib/factory/checks.ts). `threadPromptView` is the one reader of that range.
-  const { task } = threadPromptView(stored.prompt, stored.promptTaskStart, stored.promptTaskLength)
+  const { CONTEXT_CHARS_SQL, contextUsageFromCounts } = await import('@/lib/context-usage')
+  const { rows: [counted] } = await pool.query<Record<string, string | number | null>>(CONTEXT_CHARS_SQL, [runIds, rootRunId])
+  const count = (value: unknown) => Number(value ?? 0) || 0
+  const counts = (ascii: unknown, other: unknown) => ({ ascii: count(ascii), other: count(other) })
   return contextUsageFromCounts({
-    prompt: countChars(stored.prompt),
-    task: countChars(task),
-    messages: { ascii: spoken[0]?.ascii ?? 0, other: spoken[0]?.other ?? 0 },
-    conversation: { ascii: Number(streamed.rows[0]?.ascii ?? 0), other: Number(streamed.rows[0]?.other ?? 0) },
-    model: stored.model ?? null,
+    prompt: counts(counted?.promptAscii, counted?.promptOther),
+    // The task range is sliced in SQL by the recorded code points, and is empty
+    // when the range does not hold (lib/thread-prompt.ts rejects it there).
+    task: counts(counted?.taskAscii, counted?.taskOther),
+    messages: counts(counted?.messageAscii, counted?.messageOther),
+    conversation: counts(counted?.conversationAscii, counted?.conversationOther),
+    model: typeof counted?.model === 'string' ? counted.model : null,
   })
 }
 

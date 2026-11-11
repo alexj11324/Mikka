@@ -109,24 +109,54 @@ export const PROMPT_BUDGET_TOKENS = Math.ceil(PROMPT_MAX_CHARS / ASCII_CHARS_PER
 export const CONVERSATION_CHUNK_KEYS = ['delta', 'output', 'errorText'] as const
 
 /**
- * The SQL that counts characters rather than returning text, so a live push
- * does not re-transfer a whole thread to price it. It must stay the counting
- * twin of `countChars`: `[^[:ascii:]]` removes exactly the non-ASCII
- * characters, so what is left is the ASCII count and the difference is the
- * rest. `$1` is the run-id array.
+ * The SQL that counts characters instead of returning them, so a cursor read
+ * stays small: the whole point of `chunkCursor` is that a later read does not
+ * carry the brief again (tests/thread-detail-bytes.db.test.ts enforces it).
+ *
+ * It must stay the counting twin of `countChars`: `[^[:ascii:]]` removes
+ * exactly the characters `countChars` calls `other`, so what `length` reports
+ * for the stripped text is the ASCII count and the difference is the rest.
+ *
+ * `$1` is the run-id array, `$2` the root run. One round trip returns both the
+ * brief's counts and the conversation's; neither row carries any text.
  */
-export const CONVERSATION_CHARS_SQL = `
-  SELECT coalesce(sum(ascii),0)::bigint AS ascii, coalesce(sum(other),0)::bigint AS other FROM (
-    SELECT length(regexp_replace(txt, '[^[:ascii:]]', '', 'g')) AS ascii,
-           length(txt) - length(regexp_replace(txt, '[^[:ascii:]]', '', 'g')) AS other
-    FROM (
-      SELECT chunk->>'delta' AS txt FROM run_chunks WHERE "runId" = ANY($1::uuid[]) AND chunk->>'type' IN ('text-delta','reasoning-delta')
-      UNION ALL
-      SELECT chunk->>'output' FROM run_chunks WHERE "runId" = ANY($1::uuid[]) AND chunk->>'type' = 'tool-output-available'
-      UNION ALL
-      SELECT chunk->>'errorText' FROM run_chunks WHERE "runId" = ANY($1::uuid[]) AND chunk->>'type' = 'tool-output-error'
-    ) frames WHERE txt IS NOT NULL
-  ) counted`
+export const CONTEXT_CHARS_SQL = `
+  WITH frames AS (
+    SELECT chunk->>'delta' AS txt FROM run_chunks WHERE "runId" = ANY($1::uuid[]) AND chunk->>'type' IN ('text-delta','reasoning-delta')
+    UNION ALL
+    SELECT chunk->>'output' FROM run_chunks WHERE "runId" = ANY($1::uuid[]) AND chunk->>'type' = 'tool-output-available'
+    UNION ALL
+    SELECT chunk->>'errorText' FROM run_chunks WHERE "runId" = ANY($1::uuid[]) AND chunk->>'type' = 'tool-output-error'
+  ), counted AS (
+    SELECT coalesce(sum(length(regexp_replace(txt, '[^[:ascii:]]', '', 'g'))),0) AS ascii,
+           coalesce(sum(length(txt) - length(regexp_replace(txt, '[^[:ascii:]]', '', 'g'))),0) AS other
+    FROM frames WHERE txt IS NOT NULL
+  ), spoken AS (
+    SELECT coalesce(sum(length(regexp_replace(text, '[^[:ascii:]]', '', 'g'))),0) AS ascii,
+           coalesce(sum(length(text) - length(regexp_replace(text, '[^[:ascii:]]', '', 'g'))),0) AS other
+    FROM run_messages WHERE "runId" = ANY($1::uuid[])
+  ), brief AS (
+    SELECT prompt, "agentDefinition"->>'model' AS model,
+      -- The same range validTaskRange accepts (lib/run-prompt-copy.ts): two
+      -- non-negative integers that fit inside the prompt, else no task at all.
+      CASE WHEN "promptTaskStart" IS NOT NULL AND "promptTaskLength" IS NOT NULL
+        AND "promptTaskStart" >= 0 AND "promptTaskLength" >= 0
+        AND "promptTaskStart" + "promptTaskLength" <= length(prompt)
+        THEN substring(prompt FROM "promptTaskStart" + 1 FOR "promptTaskLength") END AS task
+    FROM agent_runs WHERE id = $2
+  )
+  SELECT
+    (SELECT ascii FROM counted) AS "conversationAscii",
+    (SELECT other FROM counted) AS "conversationOther",
+    (SELECT ascii FROM spoken) AS "messageAscii",
+    (SELECT other FROM spoken) AS "messageOther",
+    length(regexp_replace(prompt, '[^[:ascii:]]', '', 'g')) AS "promptAscii",
+    length(prompt) - length(regexp_replace(prompt, '[^[:ascii:]]', '', 'g')) AS "promptOther",
+    -- The recorded task, sliced here so its text never leaves the server.
+    length(regexp_replace(task, '[^[:ascii:]]', '', 'g')) AS "taskAscii",
+    length(task) - length(regexp_replace(task, '[^[:ascii:]]', '', 'g')) AS "taskOther",
+    model
+  FROM brief`
 
 /** Everything about a run this host can read, as counted characters. */
 export interface ContextCharSources {

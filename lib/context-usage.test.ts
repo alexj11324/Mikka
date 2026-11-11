@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  chunkText, contextUsage, countChars, CONTEXT_SEGMENT_KEYS, CONVERSATION_CHARS_SQL,
-  CONVERSATION_CHUNK_KEYS, estimateTextTokens, estimateTokensFromCounts, PROMPT_BUDGET_TOKENS, PROMPT_MAX_CHARS,
+  chunkText, contextUsage, countChars, CONTEXT_SEGMENT_KEYS, CONTEXT_CHARS_SQL, CONVERSATION_CHUNK_KEYS,
+  estimateTextTokens, estimateTokensFromCounts, PROMPT_BUDGET_TOKENS, PROMPT_MAX_CHARS,
 } from './context-usage'
 
 const brief = (task: string, rules: string) => `${task}\n\n${rules}`
@@ -147,10 +147,23 @@ test('the SQL counts the same characters countChars does, and over the same fram
   const stripped = [...text].filter(char => char.charCodeAt(0) < 128).length
   assert.equal(stripped, 3)
   assert.equal([...text].length - stripped, 2)
-  // And the query must read the three fields, and only run_chunks in the run chain.
-  assert.match(CONVERSATION_CHARS_SQL, /'text-delta','reasoning-delta'/)
-  assert.match(CONVERSATION_CHARS_SQL, /'tool-output-available'/)
-  assert.match(CONVERSATION_CHARS_SQL, /'tool-output-error'/)
-  assert.equal((CONVERSATION_CHARS_SQL.match(/run_chunks/g) ?? []).length, 3)
-  assert.match(CONVERSATION_CHARS_SQL, /ANY\(\$1::uuid\[\]\)/)
+  // And the query reads the three fields, over the run chain and the root brief.
+  assert.match(CONTEXT_CHARS_SQL, /'text-delta','reasoning-delta'/)
+  assert.match(CONTEXT_CHARS_SQL, /'tool-output-available'/)
+  assert.match(CONTEXT_CHARS_SQL, /'tool-output-error'/)
+  assert.match(CONTEXT_CHARS_SQL, /ANY\(\$1::uuid\[\]\)/)
+  assert.match(CONTEXT_CHARS_SQL, /id = \$2/)
+})
+
+test('the query returns no text, so a cursor read stays small', () => {
+  // The whole reason this counts in SQL: the byte budget a later read keeps
+  // (tests/thread-detail-bytes.db.test.ts). No column may hand back prompt or
+  // chunk text, only lengths.
+  const selected = CONTEXT_CHARS_SQL.slice(CONTEXT_CHARS_SQL.indexOf('SELECT\n    (SELECT ascii'))
+  for (const column of ['promptAscii', 'promptOther', 'taskAscii', 'taskOther', 'messageAscii', 'messageOther', 'conversationAscii', 'conversationOther']) {
+    assert.match(selected, new RegExp(`AS "${column}"`))
+  }
+  // Every projected value is a length() or a count aggregate, never a bare column.
+  assert.doesNotMatch(selected, /^\s*(?:prompt|text|chunk|txt|delta|output|errorText),?$/m)
+  assert.match(selected, /length\(/)
 })
