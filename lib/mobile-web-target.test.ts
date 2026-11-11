@@ -34,3 +34,30 @@ test('anything else is the home page', () => {
     assert.equal(mobileWebTarget(value), '/', String(value))
   }
 })
+
+test('the native Task rendezvous is HTTPS, bounded, keeps the physical URL entity-free, and retires on account change', async () => {
+  const { mobileTaskLaunch, mobileTaskTarget } = await import('./mobile-task-handoff')
+  const { showMobileTaskLocation, mobileTaskLocation } = await import('./web-connection/mobile-task-location')
+  const { installWebSelection } = await import('./web-connection/selection')
+  let version = 0
+  installWebSelection(() => ({ version, account: null }))
+  const ref = 'A'.repeat(43)
+  const origin = 'https://official.example/mikka'
+  const launch = new URL(origin)
+  launch.hash = new URLSearchParams({ mobileTask: ref, server: 'https://self.example/mikka' }).toString()
+  assert.deepEqual(mobileTaskLaunch(launch), { ref, server: 'https://self.example/mikka' })
+  assert.equal(mobileTaskTarget('https://wrong.example/?issue=' + BOT), null)
+  assert.equal(mobileTaskTarget('/?issue=' + BOT + '&token=outside'), null)
+  for (const fragment of [
+    new URLSearchParams({ mobileTask: 'short', server: 'https://self.example' }),
+    new URLSearchParams({ mobileTask: ref, server: 'http://self.example' }),
+    new URLSearchParams({ mobileTask: ref, server: 'https://self.example', issue: BOT }),
+  ]) assert.equal(mobileTaskLaunch(new URL(origin + '#' + fragment)), null)
+  const params = new URLSearchParams({ issue: BOT })
+  showMobileTaskLocation(launch.href, params)
+  assert.equal(launch.search, '')
+  assert.equal(new URL(mobileTaskLocation(launch.href)).searchParams.get('issue'), BOT)
+  assert.equal(mobileTaskLocation('https://elsewhere.example'), 'https://elsewhere.example')
+  version++
+  assert.equal(mobileTaskLocation(launch.href), launch.href)
+})
