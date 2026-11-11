@@ -445,6 +445,12 @@
     "test": "lib/platform/public-origin.test.ts",
     "suite": "test:platform"
   },
+  "lib/renderer-actions.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the published web action manifest for the selected deployment. When the legacy manifest returns HTTP 404, use the release action contract with the same deployment pin and validate its compiler inventory.",
+    "test": "apps/api/scripts/cloudflare-web.test.mjs"
+  },
   "lib/run-app-mcp.ts": {
     "mode": "built-in",
     "environment": [],
