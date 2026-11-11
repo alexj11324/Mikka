@@ -32,7 +32,8 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
   try {
     await pool.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL,name varchar(120) NOT NULL,slug varchar(64) UNIQUE,icon text,kind text NOT NULL DEFAULT 'team',"createdAt" timestamptz NOT NULL DEFAULT now());
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid NOT NULL,"userId" text NOT NULL,name text NOT NULL,email text NOT NULL,role text NOT NULL,status text NOT NULL DEFAULT 'active',"createdAt" timestamptz NOT NULL DEFAULT now(),PRIMARY KEY("workspaceId","userId"));
-      CREATE TABLE mikka_workspace_invitations (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL,"userId" text NOT NULL,email text NOT NULL,role text NOT NULL,"tokenHash" text NOT NULL UNIQUE,status text NOT NULL DEFAULT 'pending',"expiresAt" timestamptz NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now(),UNIQUE("workspaceId",email));`)
+      CREATE TABLE mikka_workspace_invitations (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL,"userId" text NOT NULL,email text NOT NULL,role text NOT NULL,"tokenHash" text NOT NULL UNIQUE,status text NOT NULL DEFAULT 'pending',"expiresAt" timestamptz NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now(),UNIQUE("workspaceId",email));
+      CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"leadUserId" text,"archivedAt" timestamptz);`)
     const { planWorkspaces } = await import('../lib/account/delete')
     const legacyPersonal = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,'legacy-owner','Legacy','personal');`, [legacyPersonal])
@@ -40,6 +41,7 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
     assert.deepEqual(await db.transaction(tx => planWorkspaces(tx, 'legacy-owner')), { soleAdminOf: ['Legacy'] }, 'an active Personal peer must still block deletion')
     await pool.query(await readFile(new URL('../drizzle/20261109035010_team_entitlements.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../drizzle/20261109035020_organization_governance.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261110150009_billing_entitlements.sql', import.meta.url), 'utf8'))
     await pool.query('create table workspace_audit_outbox (id uuid primary key,"workspaceId" uuid not null,payload jsonb not null,"createdAt" timestamptz not null,"deliveredAt" timestamptz)')
     assert.equal((await pool.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=\'legacy-peer\'', [legacyPersonal])).rows[0].status, 'suspended')
     await assert.rejects(pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=\'legacy-peer\'', [legacyPersonal]), /only its owner/)
@@ -75,37 +77,34 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
       assert.deepEqual(await db.transaction(tx => planWorkspaces(tx, 'human-0')), { soleAdminOf: ['Seat fixture'] })
     })
 
-    await t.test('two accepts competing for the fifth seat leave exactly five humans', async () => {
+    await t.test('concurrent invitations are not refused over shared member count', async () => {
       const id = await workspace(4)
       const candidates = ['candidate-a', 'candidate-b']
       for (const userId of candidates) await db.insert(workspaceSchema.workspaceInvitations).values({ id: randomUUID(), workspaceId: id, userId: 'human-0', email: `${userId}@example.invalid`, role: 'member', tokenHash: userId, expiresAt: new Date(Date.now() + 60000) })
       const outcomes = await Promise.allSettled(candidates.map(userId => db.transaction(tx => acceptHumanInvitation(tx, { id: userId, name: userId, email: `${userId}@example.invalid` }, userId, 'cloud'))))
       const statuses = await db.select({ status: workspaceSchema.workspaceInvitations.status }).from(workspaceSchema.workspaceInvitations).where(eq(workspaceSchema.workspaceInvitations.workspaceId, id))
-      assert.deepEqual(statuses.map(row => row.status).sort(), ['accepted', 'pending'], 'the refused invitation remains reusable after an upgrade')
-      assert.equal(outcomes.filter(value => value.status === 'fulfilled').length, 1)
-      const denied = outcomes.find(value => value.status === 'rejected') as PromiseRejectedResult
-      assert.ok(denied.reason instanceof GovernanceError)
-      assert.equal(denied.reason.detail, 'seat_limit')
-      assert.equal((await db.transaction(tx => activeHumanSeats(tx, id, null))).length, 5)
+      assert.deepEqual(statuses.map(row => row.status).sort(), ['accepted', 'accepted'])
+      assert.equal(outcomes.filter(value => value.status === 'fulfilled').length, 2)
+      assert.equal((await db.transaction(tx => activeHumanSeats(tx, id, null))).length, 6)
     })
 
-    await t.test('pending invitations and suspended humans consume no seat; restoration does', async () => {
+    await t.test('restoring a member and accepting an invitation both succeed without a seat charge', async () => {
       const id = await workspace(4)
       await db.insert(workspaceSchema.workspaceMembers).values({ workspaceId: id, userId: 'suspended', name: 'Suspended', email: 's@example.invalid', role: 'member', status: 'suspended' })
       for (let i = 0; i < 10; i++) await db.insert(workspaceSchema.workspaceInvitations).values({ id: randomUUID(), workspaceId: id, userId: 'human-0', email: `${i}@invite.invalid`, role: 'member', tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 60000) })
       const outcomes = await Promise.allSettled([admit(id, 'suspended', 'cloud', true), accept(id, 'accepted')])
-      assert.equal(outcomes.filter(value => value.status === 'fulfilled').length, 1)
-      assert.equal((await db.transaction(tx => activeHumanSeats(tx, id, null))).length, 5)
+      assert.equal(outcomes.filter(value => value.status === 'fulfilled').length, 2)
+      assert.equal((await db.transaction(tx => activeHumanSeats(tx, id, null))).length, 6)
     })
 
-    await t.test('community is not capped; expired grants block new seats without deleting old ones', async () => {
+    await t.test('expired grants lower capacity without blocking new shared members', async () => {
       const id = await workspace(7)
       await accept(id, 'community-new', 'selfhost')
       await db.insert(workspaceEntitlements).values({ workspaceId: id, plan: 'pro', source: 'cloud', seatLimit: 20, expiresAt: new Date(Date.now() + 60000) })
       await admit(id, 'paid-new')
       await db.update(workspaceEntitlements).set({ expiresAt: new Date(0) }).where(eq(workspaceEntitlements.workspaceId, id))
-      await assert.rejects(admit(id, 'expired-new'), (error: unknown) => error instanceof GovernanceError && error.detail === 'seat_limit')
-      assert.equal((await db.transaction(tx => activeHumanSeats(tx, id, null))).length, 9)
+      await admit(id, 'expired-new')
+      assert.equal((await db.transaction(tx => activeHumanSeats(tx, id, null))).length, 10)
       await db.transaction(tx => assertActiveHumanAdmission(tx, id, 'paid-new', 'cloud'))
       assert.equal((await db.transaction(tx => lockWorkspaceEntitlements(tx, id, 'cloud'))).entitlements.plan, 'free')
     })
@@ -124,10 +123,10 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
       await provisionWorkspacePlan(pool, input, { mode: 'cloud', apply: true })
       await assert.rejects(provisionWorkspacePlan(pool, input, { mode: 'cloud', apply: true }), (error: unknown) => error instanceof GovernanceError && error.detail === 'plan_changed')
       const down = await provisionWorkspacePlan(pool, { ...input, expectedPlan: 'pro', plan: 'free', seatLimit: null, reason: 'downgrade' }, { mode: 'cloud', apply: true })
-      assert.equal(down.overLimit, true)
+      assert.equal(down.overLimit, false)
       assert.equal(down.activeHumans, 7)
       assert.equal((await db.transaction(tx => activeHumanSeats(tx, id, null))).length, 7)
-      await assert.rejects(admit(id, 'after-downgrade'), (error: unknown) => error instanceof GovernanceError && error.detail === 'seat_limit')
+      await admit(id, 'after-downgrade')
       const events = (await pool.query('select payload from workspace_audit_outbox where "workspaceId"=$1 order by "createdAt"', [id])).rows
       assert.equal(events.length, 2)
       assert.equal(events[0].payload.action, 'workspace.entitlements_changed')
@@ -169,13 +168,20 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
     await t.test('real hosted reservations enforce Pro quota without credit grants or double charges', async () => {
       await pool.query(`create table hosted_verifications ("workspaceId" uuid primary key);
         create table hosted_allowances ("workspaceId" uuid primary key,remaining bigint not null);
-        create table workspace_credit_grants (id uuid primary key,"workspaceId" uuid,points integer,bucket text);
+        create table workspace_credit_grants (id uuid primary key,"workspaceId" uuid,points integer,bucket text,"periodStart" timestamptz,"expiresAt" timestamptz,"parentGrantId" uuid);
+        create table workspace_settings ("workspaceId" uuid primary key,"monthlyCreditLimit" integer);
         create table bots (id uuid primary key,"workspaceId" uuid);
         create table coordinator_events (id uuid primary key,"botId" uuid,kind text,payload jsonb);
         create table hosted_usage (id text primary key,"workspaceId" uuid,model text,state text,"holdMicroUsd" bigint default 0,
           "reservedUnpaid" bigint default 0,"unpaidMicroUsd" bigint default 0,"reservedFree" bigint default 0,"reservedPurchased" bigint default 0,
           "costMicroUsd" bigint,"freeMicroUsd" bigint default 0,"purchasedMicroUsd" bigint default 0,"inputTokens" bigint default 0,"outputTokens" bigint default 0,
           "generationId" text,"createdAt" timestamptz default now(),"settledAt" timestamptz);`)
+      await pool.query(await readFile(new URL('../drizzle/20261110150010_plan_credit_usage.sql', import.meta.url), 'utf8'))
+      await pool.query(await readFile(new URL('../drizzle/20261110150011_resource_budgets.sql', import.meta.url), 'utf8'))
+      // The fixture above hand-lists the columns it needs; this settlement path
+      // also writes the cache breakdown, so the migration that adds those two
+      // columns has to run too rather than being restated by hand.
+      await pool.query(await readFile(new URL('../drizzle/20261111060000_hosted_usage_token_breakdown.sql', import.meta.url), 'utf8'))
       const id = await workspace(1)
       await db.insert(workspaceEntitlements).values({ workspaceId: id, plan: 'pro', source: 'cloud', seatLimit: 20 })
       await pool.query('insert into hosted_verifications values($1)', [id])

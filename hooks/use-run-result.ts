@@ -23,7 +23,8 @@ export function runResult(run: { status: string; outcome?: string | null }, late
   const { state, reason } = localTaskState(OPEN_TASK, run)
   const result: RunResult = state === 'canceled' || state === 'duplicate' ? 'done' : state === 'todo' ? 'idle' : state
   if (!latest && result === 'waiting') return { result: 'ended', reason: null }
-  return { result, reason }
+  // A blocked Run already says 受阻; the reason slot is for what it waits on.
+  return { result, reason: reason === 'blocked' ? null : reason }
 }
 
 /** A run result's words: what it waits on (等你回复, 等你确认, 待审阅, 额度用完) when it says, else the result's name. */

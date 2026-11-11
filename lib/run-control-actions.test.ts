@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { before, mock, test } from 'node:test'
+import { afterEach, before, mock, test } from 'node:test'
 import { PgDialect, QueryBuilder, type PgTable, type SelectedFields } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
@@ -19,10 +19,12 @@ let requestHeaders = new Headers({cookie: 'synthetic-session'})
 let sessionUser: string | null = null
 let freshSession = true
 function fixture() {
-  const run = { id: runId, issueId, workspaceId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
+  const run = { id: runId, issueId, workspaceId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', promptTaskStart: 0, promptTaskLength: Array.from('Private thread').length, report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
   return { factoryStages: new Map<string, string>(), controlReads: [] as unknown[][], questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], epochReads: [] as unknown[][], run, continuation: null as typeof run | null, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, ordinaryDispatches: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined, recovery: null as Record<string,unknown> | null, recoveryReads: 0, recoveryCalls: [] as Array<{actor:unknown;input:unknown}> }
 }
 let current = fixture()
+const revisionFailures: unknown[] = []
+afterEach(() => assert.deepEqual(revisionFailures.splice(0), [], 'Live revision SQL cannot fail silently in a source-only action test'))
 class Selection {
   table: unknown
   condition?: SQL
@@ -145,6 +147,18 @@ before(async () => {
       assert.match(sql,/r\."userId"=\$1/);assert.match(sql,/q\."userId"=\$1/);assert.match(sql,/t\."userId"=\$1/);
       return {rows:current.recovery?[current.recovery]:[]};
     }
+    // The thread's context usage (lib/context-usage.ts) counts characters in
+    // SQL and returns no text, so it never re-sends the brief.
+    if (sql.includes('AS "conversationAscii"')) {
+      // The real query, so this fixture cannot silently drift from it.
+      const { CONTEXT_CHARS_SQL } = await import('./context-usage')
+      assert.equal(sql, CONTEXT_CHARS_SQL, 'the context read is the shipped query')
+      assert.ok(sql.includes('ANY($1::uuid[])'), 'context reads bind the run chain')
+      assert.equal(params[1], current.run.id, 'context reads the root brief')
+      assert.ok((params[0] as string[]).includes(current.run.id))
+      return { rows: [{ conversationAscii: 0, conversationOther: 0, messageAscii: 0, messageOther: 0,
+        promptAscii: 14, promptOther: 0, taskAscii: 14, taskOther: 0, model: null }] }
+    }
     if (!/FROM factory_questions/.test(sql)) return runChainQuery(sql, params)
     // Factory questions are the other pool read on the thread path (lib/issue-thread-questions.ts).
     current.questionReads.push(params)
@@ -156,6 +170,21 @@ before(async () => {
       && (!questionOwner || (current.questionOwners.get(id) ?? current.run.userId) === viewerId)
       && (!taskOwner || current.run.userId === viewerId)).map(id => ({ runId: id, status: current.questions.get(id) })) }
   } } } })
+  // revision-read intentionally uses the request executor directly. Keep its
+  // real key normalization/batching while replacing this otherwise live pool.
+  mock.module('@/lib/db/request-scope', { namedExports: {
+    inDatabaseTransaction: () => false,
+    withoutDatabaseClient: (work: () => unknown) => work(),
+    pool: { async query(sql: string, params: [string[], string[]]) {
+      try {
+        assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT r.kind, r.id::text AS id, r.revision FROM live_revisions r JOIN unnest($1::text[], $2::uuid[]) AS t(k, i) ON r.kind = t.k AND r.id = t.i')
+        assert.deepEqual(params[0], ['run', 'thread'])
+        assert.equal(params[1].length, 2); assert.equal(params[1][0], params[1][1])
+        return { rows: params[0].flatMap((kind, index) => [current.run.id, current.continuation?.id].includes(params[1][index])
+          ? [{ kind, id: params[1][index], revision: '7' }] : []) }
+      } catch (error) { revisionFailures.push(error); throw error }
+    } },
+  } })
   mock.module('@/lib/workspace-db', { namedExports: {
     workspacePool: { query: () => { throw new Error('Unexpected raw workspace read') } },
     workspaceDb: { select: (projection?: Record<string, unknown>) => ({ from: (table: PgTable) => {
@@ -251,6 +280,7 @@ test('actual thread actions preserve owner detail/Bot display and attribute an a
   current = fixture(); viewer = 'owner'
   const detail = await actions.getIssueThread(issueId, runId)
   assert.equal(detail.thread.detail?.agentName, 'Owned Bot')
+  assert.deepEqual(detail.live?.revisions, { [`run:${runId}`]: 7, [`thread:${runId}`]: 7 })
   await actions.sendIssueThreadMessage({ issueId, runId, text: '  continue  ' })
   assert.deepEqual(current.messages.map(({ runId: run, userId, text }) => ({ run, userId, text })), [{ run: runId, userId: 'owner', text: 'continue' }])
   assert.equal(current.transactions, 1)

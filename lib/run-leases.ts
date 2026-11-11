@@ -32,6 +32,9 @@ import messages from '@/messages/zh-CN.json'
 import { armDueTimerSoon } from '@/lib/due-timer'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
+import { withRunWorkspace } from './run-completion'
+import { withProjectResourceLease } from './project-resources/store'
+import { assertRunProjectResources, isProjectExecutionRefusal } from './project-resources/run-lease'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -143,22 +146,46 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
       continue
     }
     if (run.deviceId && presence.get(run.deviceId)) continue
+    try {
+    await withRetryProjectResources(run, async () => {
     // Nothing waits on an offline device (设备离线时 is gone): another device takes it, else the person gets the card.
     const target = await takeoverTarget(run)
     if (target && run.agentDefinition?.repositoryAdmission) {
       await recoverAdmittedRun(run, target, now, true)
-      continue
+      return
     }
     if (target) {
+      await assertRunProjectResources(pool, { ...run, deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentId: target.agentId })
       const moved = await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentDefinition: await rebindExecutionDevice(pool, run, target.deviceId), updatedAt: now })
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
       if (moved.length) { await runListChanged(db, run.id); await runChanged(db, run.id) }
       notifyDeviceWork(target.deviceId)
-      continue
+      return
     }
     const ended = await endRun(run.id, ['queued'], { status: 'failed', error: DEVICE_STAYED_OFFLINE }, now, false, await noMachineCard())
     if (ended) await announceEnd({ ...run, status: 'failed' })
+    })
+    } catch (error) {
+      if (!isProjectExecutionRefusal(error)) throw error
+      await endResourceRefusedRecovery(run, now, true, error.code)
+    }
   }
+}
+
+/** A watchdog may end an expired execution without gaining permission to start
+ * its successor. Hold WS/member/resources before any retry APP transaction. */
+async function withRetryProjectResources<T>(run: Run, work: () => Promise<T>) {
+  return withRunWorkspace(run.userId, run.workspaceId, () => withProjectResourceLease(run.userId, run.workspaceId!, async () => {
+    await assertRunProjectResources(pool, run)
+    return work()
+  }))
+}
+
+async function endResourceRefusedRecovery(run: Run, now: Date, queued: boolean, code: string) {
+  const ended = await endRun(run.id, queued ? ['queued'] : LEASED_RUN_STATUSES, {
+    status: 'failed', error: `Recovery requires unchanged, currently authorized project resources (${code}). No continuation was created.`,
+  }, now, !queued)
+  if (ended) await announceEnd({ ...run, status: 'failed' })
 }
 
 /**
@@ -261,6 +288,15 @@ async function reclaimLostRun(run: Run, now: Date) {
     if (ended) await announceEnd({ ...run, status })
     return
   }
+  try {
+    await withRetryProjectResources(run, () => reclaimAuthorizedLostRun(run, outcome, now))
+  } catch (error) {
+    if (!isProjectExecutionRefusal(error)) throw error
+    await endResourceRefusedRecovery(run, now, false, error.code)
+  }
+}
+
+async function reclaimAuthorizedLostRun(run: Run, outcome: Extract<ReturnType<typeof lostRunOutcome>, { kind: 'retry' }>, now: Date) {
   const bound = (await db.execute(sql`select b."workspaceId",m."sandboxId",m."operationId",m."deviceId",m."repoId" from computer_run_bindings b
     left join thread_machines m on m."runId"=b."runId" and m."ownerId"=b."ownerId" and m."workspaceId"=b."workspaceId"
     where b."runId"=${run.id} and b."ownerId"=${run.userId}`)).rows[0] as CloudRecoverySource | undefined
@@ -275,9 +311,10 @@ async function reclaimLostRun(run: Run, now: Date) {
     await recoverAdmittedRun(run, target, now, false, bound)
     return
   }
+  if (target) await assertRunProjectResources(pool, { ...run, deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, agentId: target.agentId })
   const retryId = crypto.randomUUID()
   const where = bound || cloud ? 'moved to the cloud' : 'handed to another device'
-  const recovery = await (await import('@/lib/factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run.prompt, outcome.attempt))
+  const recovery = await (await import('@/lib/factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run, outcome.attempt))
   if (recovery.blocked) {
     const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status: 'failed', error: recovery.blocked }, now, true)
     if (ended) await announceEnd({ ...run, status: 'failed' })
@@ -296,7 +333,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
       agentDefinition: retryWorkerDefinition(target ? await rebindExecutionDevice(pool, run, target.deviceId) : run.agentDefinition, recovery.prompt),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
-      prompt: recovery.prompt, attempt: outcome.attempt, retryOf: run.id,
+      prompt: recovery.prompt, promptTaskStart: recovery.promptTaskStart, promptTaskLength: recovery.promptTaskLength, attempt: outcome.attempt, retryOf: run.id,
     })
     await runListChanged(tx, retryId)
     await runChanged(tx, retryId)
@@ -373,7 +410,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     const { queueCloudRun } = await import('@/lib/computer/queue-run')
     const repo = await ensureDeviceRepository(run.userId, cloud.deviceId, cloud.remoteUrl)
     const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: cloud.agentId, deviceRepoId: repo.id, title: issue.title, body: tiptapToText(issue.content),
-      note: retryNote(attempt) + handoff, withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
+      executionNote: retryNote(attempt) + handoff, withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
     await db.update(agentRuns).set({ retryOf: run.id, attempt, updatedAt: now }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
     await recordCoordinatorEvent(db, runRetriedEvent(run, { runId, attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedTo: { kind: 'cloud' } }))
     await startThreadMachine(actor, runId)
@@ -395,6 +432,9 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
     }
     return { state: 'running' as const }
   } catch (error) {
+    // Resource withdrawal is not a failed VM provision. Preserve the queued
+    // receipt and every retained machine/token; the durable handoff stops.
+    if (isProjectExecutionRefusal(error)) return { state: 'unavailable' as const, reason: 'project_resources' as const }
     const { RetainedTaskMachineUnavailable } = await import('@/lib/cloud-computer/thread-machines')
     if (error instanceof RetainedTaskMachineUnavailable) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
     // A concurrent durable handoff owns this run's provisioning lease. Its

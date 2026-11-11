@@ -8,7 +8,12 @@ const HEARTBEAT_MS = 30_000
 type Timer = unknown
 export type LiveTicket = { url: string; protocol: string; expiresAt: number }
 export type LiveSocket = Pick<WebSocket, 'onopen' | 'onmessage' | 'onclose' | 'onerror' | 'readyState' | 'send' | 'close'>
-export type LiveObservation = { event: 'socket' | 'received' | 'skipped' | 'read'; state?: 'connecting' | 'open' | 'ready' | 'closed'; reason?: 'hidden' | 'revision_held' | 'unsubscribed' | 'covered' | 'invalid'; kind?: LiveKind; id?: string; rev?: number; key?: string }
+export type LiveObservation = { event: 'socket' | 'received' | 'skipped' | 'read'; state?: 'connecting' | 'open' | 'ready' | 'closed'; reason?: 'hidden' | 'revision_held' | 'unsubscribed' | 'covered' | 'invalid'; kind?: LiveKind; id?: string; rev?: number; key?: string
+  /** Round trip of the heartbeat that just answered, in milliseconds. Present only on
+   * `received`/`socket` observations that close a ping, and absent when the runtime
+   * cannot supply a monotonic clock. A browser clock adjustment cannot make it
+   * negative the way `Date.now()` arithmetic can. */
+  rttMs?: number }
 export interface LiveRuntime {
   ticket(signal: AbortSignal): Promise<LiveTicket | null>
   socket(ticket: LiveTicket): LiveSocket
@@ -63,6 +68,8 @@ export class LiveChannel {
   skippedReads = 0
   private retryMs = 1_000
   private pong = true
+  /** Monotonic time the outstanding `ping` was sent at, null when none is in flight. */
+  private pingSentAt: number | null = null
   private timers = new Map<string, Timer>()
   private pending = new Map<string, PendingRead>()
   private lastRead = new Map<string, number>()
@@ -375,6 +382,10 @@ export class LiveChannel {
       if (generation !== this.generation || !this.connected) return
       if (!this.pong) { this.disconnected(generation); return }
       this.pong = false
+      // Record when the ping left, on the same clock the reply is timed with.
+      // Null when the runtime has no monotonic clock: then no rttMs is reported
+      // rather than measuring across a clock that can jump.
+      this.pingSentAt = this.runtime.monotonicNow?.() ?? null
       try { this.socket?.send('ping') } catch { this.disconnected(generation); return }
       this.heartbeat(generation)
     })
@@ -407,7 +418,18 @@ export class LiveChannel {
       }
       socket.onmessage = message => {
         if (generation !== this.generation || !this.runtime.visible()) return
-        if (message.data === 'pong') { this.pong = true; return }
+        if (message.data === 'pong') {
+          this.pong = true
+          // Report the round trip this pong closes. Read-only: `pong`, the
+          // heartbeat cadence and every reconnect decision stay as they were.
+          const sentAt = this.pingSentAt
+          this.pingSentAt = null
+          const now = this.runtime.monotonicNow?.()
+          // A runtime without a monotonic clock reports no figure instead of
+          // measuring across a clock that can jump.
+          if (sentAt !== null && now !== undefined) this.observe({ event: 'received', rttMs: Math.max(0, Math.round(now - sentAt)) })
+          return
+        }
         if (typeof message.data !== 'string' || message.data.length > 2_048) return
         try {
           const parsed: unknown = JSON.parse(message.data)

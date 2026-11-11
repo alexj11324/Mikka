@@ -26,6 +26,8 @@ export type MemoryAction = 'correct' | 'remove' | 'setScope' | 'approve' | 'reje
 export type MemoryUse = { kind: 'thread' | 'task'; id: string; url: string | null; usedAt: string }
 export type MemoryItem = {
   id: string; kind: UserFactKind; subject: string; userEdited: boolean
+  /** Where the fact is true of; null is a fact about the person themselves (ALE-68). */
+  repository: string | null
   createdAt: string; firstSeenAt: string
   reviewStatus: 'approved' | 'pending'; source: MemorySource | null
   usedCount: number; recentUses: MemoryUse[]
@@ -133,7 +135,7 @@ export async function readMemoryView(reader: MemoryReader, workspaceId: string, 
         ? ['approve', 'reject', 'correct', 'remove', 'setScope']
         : ['correct', 'remove', 'setScope']
       return {
-        id: row.id, kind: row.kind, subject: row.subject, userEdited: row.userEdited,
+        id: row.id, kind: row.kind, subject: row.subject, userEdited: row.userEdited, repository: row.repository,
         createdAt: row.createdAt.toISOString(), firstSeenAt: row.firstSeenAt.toISOString(),
         reviewStatus: row.reviewStatus,
         source: source(row),

@@ -10,6 +10,7 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { templateModelsFixture } from './support/template-models'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
+import { threadPromptView } from '../lib/thread-prompt'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists.
 const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
@@ -158,6 +159,9 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     }
     assert.equal(children.length, 1, 'ordinary automatic dispatch must produce one actual re-admitted B run')
     const child = children[0]
+    assert.ok(original.promptTaskLength > 0)
+    assert.deepEqual(threadPromptView(child.prompt, child.promptTaskStart, child.promptTaskLength),
+      threadPromptView(original.prompt, original.promptTaskStart, original.promptTaskLength))
     assert.equal(child.deviceId, deviceB)
     assert.equal(child.botId, botId)
     assert.equal(child.agentDefinition.pinnedDeviceId, undefined)
@@ -372,8 +376,10 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
       [lost, c.id, c.issueId, agentId, server, repoId, JSON.stringify({ harness: 'codex' }), botId])
     await reclaimLostRuns(c.id, new Date())
     assert.equal((await runOf(lost)).status, 'failed')
-    const moved = (await pool.query(`SELECT r.id,r.attempt,r.status,r."deviceId",b."botId" FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id WHERE r."retryOf"=$1`, [lost])).rows
+    const moved = (await pool.query(`SELECT r.id,r.attempt,r.status,r."deviceId",r.prompt,r."promptTaskStart",r."promptTaskLength",b."botId" FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id WHERE r."retryOf"=$1`, [lost])).rows
     assert.equal(moved.length, 1, 'the retry was queued on the cloud through the normal cloud queue')
+    assert.ok(moved[0].prompt.includes('## This run is a retry'))
+    assert.equal(threadPromptView(moved[0].prompt, moved[0].promptTaskStart, moved[0].promptTaskLength).task.includes('## This run is a retry'), false)
     assert.equal(moved[0].attempt, 2)
     assert.equal(moved[0].deviceId, cloudDevice, 'queued on the bot cloud computer, not the offline server')
     const retried = (await pool.query(`SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind='run_retried'`, [lost])).rows[0]

@@ -14,6 +14,7 @@ const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new UR
 stub('../execution-settings.ts',{executionWorkspace:async()=> 'fixture-workspace'})
 stub('../abuse/runtime.ts',{canUseMikkaPaid:async()=>({verified:true,free:1000000,purchased:0}),hostedUsage:{reserve:async()=>{},settle:async()=>{}}})
 stub('../abuse/alerts.ts',{checkAbuseAlerts:async()=>{}})
+stub('../credit-shares.ts',{withSharedCredits:async(workspaceId:string,attempt:(payer:string)=>unknown)=>attempt(workspaceId)})
 stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:async()=>{}})
 stub('../abuse/context.ts',{hostedBillingScope:{
  getStore:()=>({workspaceId:'fixture-workspace',ownerId:'synthetic'}),

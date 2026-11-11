@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, desc, eq, inArray, lt, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm'
 import { createHash, randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -8,6 +8,8 @@ import { personLocale } from '@/lib/suggestions/action-title-server'
 import { localClock, safeTimeZone } from '@/lib/suggestions/briefing'
 import type { UserFactKind } from './kinds'
 import { clampSubject, EVIDENCE_MAX, mergedEvidence, mergedValue, planConsolidation, raisedConfidence, subjectKey, type ConsolidationDecider, type FactInput } from './facts'
+import { foldRepository } from './repository'
+import { profileSection, promptFacts, type PromptFact } from './prompt'
 
 // Each person's profile (R-73). Every read and write is keyed by the person's
 // own user id; nothing here takes a workspace, so teammates never see each
@@ -51,6 +53,10 @@ export async function recordExtractionTokens(userId: string, day: string, inputT
  * lastSeenAt moves forward, value and evidence are merged, and an expired fact
  * comes back. A fact the person corrected only has lastSeenAt moved, and one
  * they deleted or said is wrong is left as it is.
+ *
+ * A fact is one row per (person, repository, kind, subject): the same subject
+ * can hold a different answer in each repository, and the account-level facts
+ * (repository null) keep merging among themselves.
  */
 export async function recordFacts(userId: string, facts: readonly FactInput[], { pattern = false }: { pattern?: boolean } = {}): Promise<number> {
   let written = 0
@@ -58,6 +64,7 @@ export async function recordFacts(userId: string, facts: readonly FactInput[], {
     const key = subjectKey(fact.subject)
     if (!key) continue
     const subject = clampSubject(fact.subject)
+    const repository = foldRepository(fact.repository)
     written += await db.transaction(async tx => {
       const parents = [...new Set(fact.evidence.filter(item => item.source === 'consolidation').flatMap(item => item.factIds ?? []))].sort()
       if (pattern) {
@@ -83,7 +90,7 @@ export async function recordFacts(userId: string, facts: readonly FactInput[], {
       }
       const [inserted] = await tx.insert(userFacts).values({
         id: randomUUID(), userId, kind: fact.kind, subject, subjectKey: key, value: fact.value, evidence: fact.evidence,
-        confidence: fact.confidence, firstSeenAt: fact.seenAt, lastSeenAt: fact.seenAt, expiresAt: fact.expiresAt,
+        confidence: fact.confidence, firstSeenAt: fact.seenAt, lastSeenAt: fact.seenAt, expiresAt: fact.expiresAt, repository,
         reviewStatus: 'pending', sourceKind: pattern ? null : fact.source?.kind ?? null,
         sourceId: pattern ? null : fact.source?.id ?? null, sourceUrl: pattern ? null : fact.source?.url ?? null,
       }).onConflictDoNothing().returning({ id: userFacts.id })
@@ -95,7 +102,10 @@ export async function recordFacts(userId: string, facts: readonly FactInput[], {
         ))
         return 1
       }
-      const [current] = await tx.select().from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.subjectKey, key))).for('update').limit(1)
+      // A fact is identified by its subject inside one repository, so a write for
+      // one repository never touches the person-level row (ALE-68).
+      const [current] = await tx.select().from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.subjectKey, key),
+        ...(repository === null ? [isNull(userFacts.repository)] : [eq(userFacts.repository, repository)]))).for('update').limit(1)
       if (!current || current.state === 'deleted' || current.state === 'dismissed') return 0
       if (pattern && (current.scopeKind !== 'global' || parents.includes(current.id))) return 0
       const lastSeenAt = current.lastSeenAt > fact.seenAt ? current.lastSeenAt : fact.seenAt
@@ -116,13 +126,37 @@ export async function recordFacts(userId: string, facts: readonly FactInput[], {
   return written
 }
 
-const shownColumns = { id: userFacts.id, kind: userFacts.kind, subject: userFacts.subject, value: userFacts.value, confidence: userFacts.confidence, lastSeenAt: userFacts.lastSeenAt, expiresAt: userFacts.expiresAt, userEdited: userFacts.userEdited }
-export type ShownFact = { id: string; kind: UserFactKind; subject: string; value: Record<string, unknown>; confidence: number; lastSeenAt: Date; expiresAt: Date | null; userEdited: boolean }
+const shownColumns = { id: userFacts.id, kind: userFacts.kind, subject: userFacts.subject, repository: userFacts.repository, value: userFacts.value, confidence: userFacts.confidence, lastSeenAt: userFacts.lastSeenAt, expiresAt: userFacts.expiresAt, userEdited: userFacts.userEdited }
+export type ShownFact = { id: string; kind: UserFactKind; subject: string; repository: string | null; value: Record<string, unknown>; confidence: number; lastSeenAt: Date; expiresAt: Date | null; userEdited: boolean }
 
-/** The person's active facts for 记忆, most certain first within each kind. */
+/**
+ * The person's active facts for 记忆, most certain first within each kind.
+ * Every repository's facts are here: 记忆 is the person's whole profile, so
+ * they can see and correct what Mikka believes about them anywhere.
+ */
 export async function listFacts(userId: string): Promise<ShownFact[]> {
   return db.select(shownColumns).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active')))
     .orderBy(asc(userFacts.kind), desc(userFacts.confidence), desc(userFacts.lastSeenAt)).limit(500)
+}
+
+/**
+ * The section of the Coordinator's system prompt that states what Mikka knows
+ * about the person (lib/profile/prompt.ts), or '' when there is nothing to say.
+ *
+ * It reads the same rows 记忆 shows, through the same active-state filter, so
+ * the two can never disagree about what Mikka believes; what differs is only
+ * the reach of each surface: 记忆 shows every repository's facts, and a chat is
+ * told the person-level ones plus those of the repositories its workspace
+ * actually works in. `used` is those repositories (lib/coordinator/github-context.ts
+ * usedRepositoriesForBot). An unreadable profile leaves the section out, never
+ * fails the turn.
+ */
+export async function profilePromptSection(userId: string, used: readonly string[]): Promise<string> {
+  const rows = await db.select({
+    kind: userFacts.kind, subject: userFacts.subject, repository: userFacts.repository, confidence: userFacts.confidence,
+    lastSeenAt: userFacts.lastSeenAt, userEdited: userFacts.userEdited,
+  }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'))).limit(500)
+  return profileSection(promptFacts(rows as PromptFact[], used))
 }
 
 /**
@@ -165,21 +199,24 @@ export async function clearFacts(userId: string): Promise<number> {
 /**
  * The person's correction of a fact's subject. It becomes theirs: the model
  * no longer changes it and the nightly merge does not fade it. A correction
- * onto another fact of the same kind keeps that one and removes this one.
- * False when the fact is not the person's or the subject is empty.
+ * onto another fact of the same kind, in the same repository, keeps that one
+ * and removes this one: the same words in another repository are a different
+ * fact, so correcting one never deletes the other. False when the fact is not
+ * the person's or the subject is empty.
  */
 export async function correctFact(userId: string, id: string, subjectText: string): Promise<boolean> {
   const subject = clampSubject(subjectText)
   const key = subjectKey(subject)
   if (!key) return false
   return db.transaction(async tx => {
-    const [fact] = await tx.select({ id: userFacts.id, kind: userFacts.kind }).from(userFacts)
+    const [fact] = await tx.select({ id: userFacts.id, kind: userFacts.kind, repository: userFacts.repository }).from(userFacts)
       .where(and(eq(userFacts.id, id), eq(userFacts.userId, userId), ne(userFacts.state, 'deleted'))).for('update').limit(1)
     if (!fact) return false
     const now = new Date()
     const corrected = { subject, subjectKey: key, state: 'active' as const, reviewStatus: 'approved' as const, userEdited: true, confidence: 1, lastSeenAt: now, updatedAt: now }
     const [other] = await tx.select({ id: userFacts.id }).from(userFacts)
-      .where(and(eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.subjectKey, key), ne(userFacts.id, id))).for('update').limit(1)
+      .where(and(eq(userFacts.userId, userId), eq(userFacts.kind, fact.kind), eq(userFacts.subjectKey, key), ne(userFacts.id, id),
+        ...(fact.repository === null ? [isNull(userFacts.repository)] : [eq(userFacts.repository, fact.repository)]))).for('update').limit(1)
     if (!other) {
       await tx.update(userFacts).set(corrected).where(eq(userFacts.id, id))
       return true
@@ -214,7 +251,7 @@ export function consolidationDecider(userId: string): ConsolidationDecider {
  */
 export async function consolidateFacts(userId: string, timeZone: string, now = new Date(), decide: ConsolidationDecider = consolidationDecider(userId)) {
   const facts = await db.select({
-    id: userFacts.id, kind: userFacts.kind, subject: userFacts.subject, subjectKey: userFacts.subjectKey, value: userFacts.value, confidence: userFacts.confidence,
+    id: userFacts.id, kind: userFacts.kind, subject: userFacts.subject, subjectKey: userFacts.subjectKey, repository: userFacts.repository, value: userFacts.value, confidence: userFacts.confidence,
     lastSeenAt: userFacts.lastSeenAt, expiresAt: userFacts.expiresAt, state: userFacts.state, userEdited: userFacts.userEdited,
   }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'), eq(userFacts.scopeKind, 'global')))
   const { updates, patterns } = await planConsolidation(facts, { now, timeZone: safeTimeZone(timeZone), locale: await personLocale(userId) }, decide)

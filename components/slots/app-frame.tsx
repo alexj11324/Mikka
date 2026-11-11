@@ -9,3 +9,7 @@ export { AppFrameView as AppFrame } from '@/components/app-frame-view'
 export { IconRailView as IconRail } from '@/components/nav/icon-rail-view'
 /** The open-source frame leaves the chats to the page's bot list. */
 export const FRAME_LISTS_CHATS = false
+/** The open-source page draws its own right-hand panel (Overview, the browser) beside the chat. */
+export const FRAME_OWNS_PANEL = false
+/** The open-source window bar keeps search, ✋ and 🌐. */
+export const FRAME_OWNS_HEADER = false

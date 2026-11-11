@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  MAX_SKILL_INSTRUCTIONS_LENGTH,
+  MAX_SKILLS_PER_RUN,
   runSkillSchema,
+  SKILL_PROMPT_BUDGET_CHARS,
   skillFilePathSchema,
   skillMarkdown,
+  skillPromptPlan,
   skillSlug,
   skillsPromptSection,
   type RunSkill,
@@ -95,6 +99,94 @@ describe("skillsPromptSection", () => {
     expect(section).toContain("/run/skills/release-notes/template.md")
     // The first skill has no files, so no file line under it.
     expect(section).not.toContain("/run/skills/triage/")
+  })
+})
+
+describe("skillPromptPlan", () => {
+  const body = (index: number, length: number): RunSkill =>
+    skill({
+      id: `0199f000-0000-7000-8000-${String(index).padStart(12, "0")}`,
+      name: `Skill ${index}`,
+      instructions: String.fromCharCode(96 + index).repeat(length),
+    })
+  const full = (index: number): RunSkill =>
+    body(index, MAX_SKILL_INSTRUCTIONS_LENGTH)
+
+  it("inlines everything a typical run carries", () => {
+    const plan = skillPromptPlan([body(1, 1200), body(2, 900), body(3, 1500)])
+    expect(plan.degraded).toEqual([])
+    expect(plan.inlined).toHaveLength(3)
+  })
+
+  it("holds the worst case the section used to send whole", () => {
+    // The reason this budget exists: 20 skills at the body cap would carry
+    // 400,000 characters into every turn of the run.
+    const skills = Array.from({ length: MAX_SKILLS_PER_RUN }, (_, i) => full(i + 1))
+    const plan = skillPromptPlan(skills)
+    expect(plan.usedChars).toBeLessThanOrEqual(SKILL_PROMPT_BUDGET_CHARS)
+    expect(plan.degraded.length).toBeGreaterThan(0)
+    expect(plan.inlined.length + plan.degraded.length).toBe(MAX_SKILLS_PER_RUN)
+  })
+
+  it("never leaves the run without a body, whatever the budget", () => {
+    for (const budget of [0, 1, 100, MAX_SKILL_INSTRUCTIONS_LENGTH - 1]) {
+      const plan = skillPromptPlan([full(1), body(2, 5)], budget)
+      expect(plan.inlined[0]?.name).toBe("Skill 1")
+    }
+  })
+})
+
+describe("skillsPromptSection with a budget", () => {
+  const body = (index: number, length: number): RunSkill =>
+    skill({
+      id: `0199f000-0000-7000-8000-${String(index).padStart(12, "0")}`,
+      name: `Skill ${index}`,
+      instructions: String.fromCharCode(96 + index).repeat(length),
+    })
+
+  it("degrades the body that does not fit and names its file instead", () => {
+    const skills = [
+      body(1, MAX_SKILL_INSTRUCTIONS_LENGTH),
+      body(2, MAX_SKILL_INSTRUCTIONS_LENGTH),
+      body(3, 500),
+    ]
+    const plan = skillPromptPlan(skills)
+    const section = skillsPromptSection(skills, "/run/skills", plan)!
+    expect(plan.inlined).toHaveLength(2)
+    expect(plan.degraded.map((entry) => entry.name)).toEqual(["Skill 3"])
+    // A deferred skill keeps its description, and points at its whole text.
+    expect(section).toContain("### Skill 3")
+    expect(section).toContain("Full text: /run/skills/skill-3/SKILL.md")
+    // Never a partial body: the deferred text is absent, not truncated.
+    expect(section).not.toContain("c".repeat(100))
+    expect(section).toContain("One skill is listed by description only")
+  })
+
+  it("keeps every inlined body whole and no deferred body at all", () => {
+    const skills = Array.from({ length: MAX_SKILLS_PER_RUN }, (_, i) =>
+      body(i + 1, MAX_SKILL_INSTRUCTIONS_LENGTH)
+    )
+    const plan = skillPromptPlan(skills)
+    const section = skillsPromptSection(skills, "/run/skills", plan)!
+    for (let index = 1; index <= MAX_SKILLS_PER_RUN; index++) {
+      const letter = String.fromCharCode(96 + index)
+      const deferred = plan.degraded.some((entry) => entry.name === `Skill ${index}`)
+      expect(section.includes(letter.repeat(100)), `Skill ${index}`).toBe(!deferred)
+    }
+  })
+
+  it("keeps the attached files of a deferred skill reachable", () => {
+    const skills = [1, 2, 3].map((index) =>
+      skill({
+        id: `0199f000-0000-7000-8000-${String(index).padStart(12, "0")}`,
+        name: `Skill ${index}`,
+        instructions: String.fromCharCode(96 + index).repeat(MAX_SKILL_INSTRUCTIONS_LENGTH),
+        files: [{ path: "t.md", content: "x" }],
+      })
+    )
+    const section = skillsPromptSection(skills, "/run/skills")!
+    expect(section).toContain("Files: /run/skills/skill-1/t.md")
+    expect(section).toContain("Files: /run/skills/skill-3/t.md")
   })
 })
 

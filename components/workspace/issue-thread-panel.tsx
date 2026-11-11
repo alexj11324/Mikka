@@ -36,6 +36,9 @@ import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-con
 import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
 import { navigate } from './workspace-navigation'
 import { ThreadHeader, ThreadStatusLine } from './thread-header'
+import { ThreadContextUsage } from './thread-context-usage'
+import { ThreadOutlineIndex } from './thread-outline-index'
+import { threadOutline } from '@/lib/thread-outline'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
@@ -193,6 +196,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const stopRequested = active && (requestedAt !== null || !!view?.stopping)
   const stopPending = stopRequested && !stopFailed
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
+  // The jump index, from the items already built: never a second fold of the stream.
+  const outline = threadOutline(items)
   // A failed run says why under the stage that stopped, else at the end of the conversation.
   const failure = data && view ? runFailureText(view.status, data.thread.questionWake ? actionError('threadRecoveryUnavailable') : data.thread.error) : null
   const modelFallback = data?.thread.modelFallback?.filter(item => item.state === 'switched' || item.runId === liveRunId) ?? []
@@ -294,13 +299,23 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {error && !data ? <InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} data-thread-loading className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
-          <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
-            issueId={issueId} runId={runId} harness={detail?.harness ?? null}
-            {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
+              issueId={issueId} runId={runId} harness={detail?.harness ?? null}
+              {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
+            {/* What the run holds (lib/context-usage.ts). Its own row keeps the shared status-line slot unchanged. */}
+            {data.context && <ThreadContextUsage usage={data.context} />}
+            {/* A long thread's jump index (lib/thread-outline.ts). It scrolls to the
+                rows the list already anchors with `data-thread-item`. */}
+            <ThreadOutlineIndex entries={outline} />
+          </div>
           {/* In a task's one conversation the dispatch is the status line's, not a person's bubble (#1681). */}
-          {!attempt && data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
+          {!attempt && (data.thread.prompt.trim() || data.thread.hasInstructions) && <div className="group/message flex flex-col gap-1">{data.thread.prompt.trim() && <PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />}{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
-            {items.map(item => <li key={item.id} className="group/message flex flex-col gap-1">
+            {/* `data-thread-item` is the jump index's anchor (lib/thread-outline.ts). It is
+                the item id, never its position: an index would point at the wrong row once
+                the list changes, and a jump to the wrong message is worse than none. */}
+            {items.map(item => <li key={item.id} data-thread-item={item.id} className="group/message flex flex-col gap-1">
               {item.kind === 'agent' && <>
                 <div {...{ [QUOTE_SOURCE_ATTR]: '' }} className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>
                 <MessageActions className={cn('self-start', HOVER_ACTIONS)}><CopyAction text={item.text} /></MessageActions>
@@ -356,6 +371,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (!attempt || attempt.first || stopRequested) bot('status', [{ kind: 'text', text: '', node: <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
       issueId={issueId} runId={runId} harness={detail?.harness ?? null} {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} /> }])
     if (!attempt && data.thread.prompt.trim()) { open = null; entries.push({ id: `${runId}:prompt`, role: 'person', at: at(data.thread.createdAt), text: data.thread.prompt.trim() }) }
+    if (!attempt && data.thread.hasInstructions) bot('instructions', [{ kind: 'text', text: '', node: <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} /> }])
     for (const item of items) {
       if (item.kind === 'person') { open = null; entries.push({ id: `${runId}:${item.id}`, role: 'person', at: at(item.at), text: item.text }); continue }
       const part: ThreadEntryPart = item.kind === 'agent' ? { kind: 'text', text: item.text, node: <div {...{ [QUOTE_SOURCE_ATTR]: '' }}><AgentMarkdown text={item.text} isStreaming={active} /></div> }

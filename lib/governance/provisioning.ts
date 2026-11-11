@@ -10,11 +10,11 @@ import { resolveEntitlements, type DeploymentMode, type PlanGrant } from './poli
 export const workspacePlanInput = z.object({
   workspaceId: z.uuid(), expectedPlan: z.enum(['free', 'pro', 'enterprise']),
   plan: z.enum(['free', 'pro']), source: z.enum(['cloud', 'license']),
-  seatLimit: z.number().int().min(1).max(100_000).nullable(),
+  seatLimit: z.number().int().min(1).max(100_000).nullable().default(null),
   expiresAt: z.iso.datetime({ offset: true }).nullable(),
   reason: z.enum(['evaluation', 'licensed', 'downgrade', 'correction']),
   operator: z.string().trim().min(1).max(120).refine(value => !looksLikeSecretValue(value)),
-}).strict().refine(value => value.plan === 'pro' ? value.seatLimit !== null : value.seatLimit === null && value.expiresAt === null)
+}).strict().refine(value => value.plan === 'pro' || value.seatLimit === null && value.expiresAt === null)
 
 /** Uses the operator's existing database authority; never touches cards, credits or Stripe. */
 export async function provisionWorkspacePlan(database: Pick<Pool, 'connect'>, input: unknown, options: { apply?: boolean; mode?: DeploymentMode } = {}) {

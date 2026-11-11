@@ -3,13 +3,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Clock, FileText, Search, Trash2, type LucideIcon } from 'lucide-react'
-import useSWR from 'swr'
-import { toast } from 'sonner'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { deleteLibraryFile, fetchBotLibrary } from '@/lib/bot-library'
 import { SearchInput } from '@/components/ui/search-input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -20,6 +17,7 @@ import { AgentComputer } from '@/components/computer/agent-computer'
 import { useConversationThread } from '@/components/computer/computer-agents'
 import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
 import { BotLookEditor } from './bot-look-editor'
+import { BotOverviewBody, useBotLibrary } from './bot-overview'
 import { BotNameEditor } from './bot-name-editor'
 import { BotPublicRoleEditor } from './bot-public-role-editor'
 import { GroupHeader } from './group-header'
@@ -32,6 +30,7 @@ import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { BotTasks } from '@ui-slot/bot-tasks'
 import * as botTasksSlot from '@ui-slot/bot-tasks'
+import * as botOverviewSlot from '@ui-slot/bot-overview'
 import { PanelHeader } from '@ui-slot/panel-header'
 import { openTask } from '@/components/workspace/workspace-navigation'
 
@@ -77,23 +76,16 @@ function DetailList({ title, empty, items, icon: Icon, onDelete, stateKey = 'det
  */
 function LibraryList({ botId }: { botId: string | null }) {
   const t = useTranslations('Shell.panel')
-  const { data, error, mutate } = useSWR(['bot-library', botId ?? 'coordinator'], () => fetchBotLibrary(botId))
+  const library = useBotLibrary(botId)
   const [deleting, setDeleting] = useState<DetailItem | null>(null)
   const [pending, setPending] = useState(false)
-  const items = (data ?? []).map(file => ({ id: file.id, label: file.title }))
+  const items = library.items
   async function remove(item: DetailItem) {
     setPending(true)
-    try {
-      await deleteLibraryFile(item.id)
-      await mutate(files => files?.filter(file => file.id !== item.id), { revalidate: true })
-      setDeleting(null)
-    } catch {
-      setDeleting(null)
-      toast.error(t('deleteFileFailed', { name: item.label }))
-    } finally { setPending(false) }
+    try { await library.remove(item) } finally { setDeleting(null); setPending(false) }
   }
   return <>
-    <DetailList stateKey={`library:${botId ?? 'coordinator'}`} title={t('library')} empty={error && !data ? t('libraryError') : t('noLibrary')} items={items} icon={FileText} onDelete={setDeleting} />
+    <DetailList stateKey={`library:${botId ?? 'coordinator'}`} title={t('library')} empty={library.loadError ? t('libraryError') : t('noLibrary')} items={items} icon={FileText} onDelete={setDeleting} />
     <AlertDialog open={deleting !== null} onOpenChange={open => { if (!open && !pending) setDeleting(null) }}>
       <AlertDialogContent size="sm">
         <AlertDialogHeader><AlertDialogTitle>{t('deleteFileTitle', { name: deleting?.label ?? '' })}</AlertDialogTitle></AlertDialogHeader>
@@ -160,7 +152,7 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * ⤢ widens just this column. Picking another bot switches the threads it
  * dispatched, its PRs and its computer.
  */
-export function ContextPanel({ issues, threads, threadsLoading = false, conversation, workspaceId, onOpenThread, onOpenTask, onClose, sheet = false }: {
+export function ContextPanel({ issues, threads, threadsLoading = false, conversation, workspaceId, onOpenThread, onOpenTask, onClose, sheet = false, frameTab = false }: {
   issues: Issue[]
   threads: Thread[]
   /** The thread list has not been read yet (review C7). */
@@ -175,6 +167,8 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   onClose: () => void
   /** Shown in a Sheet below xl, where the column has no room. */
   sheet?: boolean
+  /** The 概览 tab of the conversation's work area (FRAME_OWNS_PANEL): the tab is its header, and a UI layer's bot-overview slot may draw the body. */
+  frameTab?: boolean
 }) {
   const t = useTranslations('Shell.panel')
   const stateKey = `context:${conversation.kind}:${conversation.id ?? 'coordinator'}`
@@ -219,6 +213,14 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   const threadsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:threads:${query ?? ''}`, shown === 'threads' && !threadsLoading)
   const prsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:prs:${query ?? ''}`, shown === 'prs')
 
+  const tasks = <BotTasks stateKey={stateKey} threads={ownThreads} shown={filter(ownThreads)} issues={issues} query={query ?? ''} loading={threadsLoading} onOpenThread={onOpenThread} onOpenTask={id => { onOpenTask?.(); openTask(id) }} />
+  // A UI layer may draw the 概览 tab's body (the bot-overview slot); the tab is its header.
+  const OverviewView = frameTab ? botOverviewSlot.BotOverview ?? null : null
+  if (OverviewView) return <BotOverviewBody View={OverviewView} conversation={conversation} workspaceId={workspaceId} threads={ownThreads} issues={issues} tasks={tasks}
+    tabs={tabs.map(item => ({ id: item, label: item === 'threads' && botTasksSlot.LISTS_TASKS ? t('tasks') : t(item) }))} tab={shown} onTab={value => { setTab(value); setTabChosen(true) }}
+    query={query} onQuery={setQuery}
+    computer={!computer ? null : chatBotId ? { botId: chatBotId, name: conversation.name } : registered ? { botId: registered.botId, name: registered.botName } : null} />
+
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
   // The panel keeps its transparent pills while Alex compares them with the shared segmented control (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md);
   // `indicator: false` opts out of the gliding pill. To switch, drop `pillTab` and the list overrides.
@@ -252,7 +254,7 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
             {botId || coordinator ? <LibraryList botId={botId} /> : <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />}
           </TabsContent>
           <TabsContent ref={threadsScroll} value="threads" className="min-h-0 overflow-y-auto px-4 pb-4">
-            <BotTasks stateKey={stateKey} threads={ownThreads} shown={filter(ownThreads)} issues={issues} query={query ?? ''} loading={threadsLoading} onOpenThread={onOpenThread} onOpenTask={id => { onOpenTask?.(); openTask(id) }} />
+            {tasks}
           </TabsContent>
           <TabsContent ref={prsScroll} value="prs" className="min-h-0 overflow-y-auto px-4 pb-4">
             <PullRequests threads={ownThreads} issues={issues} query={query ?? ''} />

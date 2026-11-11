@@ -35,5 +35,9 @@ export function liveTelemetry(observation: LiveObservation): { event: string; pr
   if (observation.id && LIVE_ID.test(observation.id)) properties.live_entity_id = observation.id
   if (observation.rev !== undefined && Number.isSafeInteger(observation.rev) && observation.rev > 0) properties.live_revision = observation.rev
   if (observation.key) Object.assign(properties, liveReadKey(observation.key))
+  // A heartbeat's round trip: the link latency a person feels, not a read cost.
+  // Bounded and integral so a bad clock cannot send a nonsense figure.
+  if (observation.rttMs !== undefined && Number.isFinite(observation.rttMs) && observation.rttMs >= 0 && observation.rttMs <= 600_000)
+    properties.live_rtt_ms = Math.round(observation.rttMs)
   return { event: `mikka_live_${observation.event}`, properties }
 }

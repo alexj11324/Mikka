@@ -453,6 +453,8 @@ export class CodexAdapter implements AgentAdapter {
       policyHash: options.policyHash,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
+      profileSkills: options.profileSkills,
+      repositorySkills: options.repositorySkills,
       runDir,
       privateDir: paths.privateDir,
     })
@@ -477,6 +479,8 @@ export class CodexAdapter implements AgentAdapter {
       "-c", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.command=${toml(mcp.command)}`,
+      // Hand-in tools must be ready before the first turn, including native resume.
+      "-c", `mcp_servers.${MCP_SERVER_NAME}.required=true`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.args=${toml(mcp.args)}`,
       ...(options.mcp ? ["-c", `mcp_servers.${MCP_SERVER_NAME}.env_vars=${toml(Object.keys(ctx.decisionMcpEnv()))}`] : []),

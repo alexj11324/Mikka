@@ -59,7 +59,7 @@ function fixture() {
     } else if (sql.includes('FROM factory_agent_profiles')) {
       kind = 'profile_lock'
       rows = profile && params[0] === profile.profileId && params[1] === (profileState.ownerId ?? scope.ownerId) && params[2] === (profileState.workspaceId ?? scope.workspaceId)
-        ? [{ id: profile.profileId, ownerId: scope.ownerId, workspaceId: scope.workspaceId, version: profileState.version ?? profile.version, definition: { ...profile.definition, enabled: profileState.enabled ?? true }, digest: profile.digest, archivedAt: profileState.archivedAt ?? null }] : []
+        ? [{ id: profile.profileId, ownerId: scope.ownerId, workspaceId: scope.workspaceId, version: profileState.version ?? profile.version, definition: { ...profile.definition, enabled: profileState.enabled ?? true }, skills: profile.skills, digest: profile.digest, archivedAt: profileState.archivedAt ?? null }] : []
     } else if (sql.includes('WITH choices AS')) {
       kind = 'catalogue'
       rows = connections.filter(row => row.ownerId === params[0] && row.state === 'connected' && !row.paused && !row.removed && row.epoch === row.bindingEpoch)

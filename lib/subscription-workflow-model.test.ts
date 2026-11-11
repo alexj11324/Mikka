@@ -4,6 +4,7 @@ import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
 import { cacheableInstructions, withCacheBreakpoints } from './prompt-cache'
+import type { ModelCallTiming, SubscriptionTransportLog } from './model-call-timing'
 const calls: {selection: unknown; signal: unknown; options?: unknown}[] = []
 let resolverObservation: (() => Promise<void>) | undefined
 const streamResult = {stream: new ReadableStream({start(controller) {controller.close()}})}
@@ -133,8 +134,25 @@ test('only the supported Codex CPA route moves the prepared tail; Claude, API-ke
   }
 })
 
+type TimingLog = ModelCallTiming | SubscriptionTransportLog
+function timingPair(logs: TimingLog[]) {
+  assert.equal(logs.length, 2, 'one model timing and one transport diagnostic per completed mock stream')
+  assert.deepEqual(logs.map(line => line.msg).sort(), ['model_call_timing', 'subscription_transport_timing'])
+  const model = logs.find((line): line is ModelCallTiming => line.msg === 'model_call_timing')
+  const transport = logs.find((line): line is SubscriptionTransportLog => line.msg === 'subscription_transport_timing')
+  assert.ok(model)
+  assert.ok(transport)
+  assert.deepEqual([model.workflowRunId, model.stepId, model.attempt], [null, null, null], 'a direct Node call has no Workflow step identity')
+  assert.deepEqual(transport, {
+    msg: 'subscription_transport_timing',
+    workflowRunId: model.workflowRunId, stepId: model.stepId, attempt: model.attempt,
+    workerOrdinal: null, outcome: null, state: 'missing',
+  }, 'the mocked provider has no execution worker or HTTP evidence; inputs and unknown fields stay absent')
+  return model
+}
+
 test('timing reports whether the actual Codex layout was applied without changing other routes or unknown shapes', async t => {
-  const logs: { codexLayoutApplied?: boolean }[] = []
+  const logs: TimingLog[] = []
   t.mock.method(console, 'info', (line: string) => { logs.push(JSON.parse(line)) })
   const supported: StreamOptions['prompt'] = [...cacheableInstructions('RULEScontexttail', 12, 5) as StreamOptions['prompt'], { role: 'user', content: [{ type: 'text', text: 'fixture' }] }]
   const cases = [
@@ -147,7 +165,7 @@ test('timing reports whether the actual Codex layout was applied without changin
   for (const sample of cases) {
     const result = await new SubscriptionWorkflowModel(sample.frozen).doStream({ prompt: sample.prompt })
     await result.stream.pipeTo(new WritableStream())
-    const line = logs.at(-1)!
+    const line = timingPair(logs.splice(0))
     assert.equal(line.codexLayoutApplied, sample.expected, 'actual_codex_layout_not_reported')
     assert.equal(Object.hasOwn(line, 'codexLayoutApplied'), sample.expected !== undefined)
   }
@@ -155,7 +173,7 @@ test('timing reports whether the actual Codex layout was applied without changin
 
 test('setup quota workers are observed before the provider request without logging their inputs', async t => {
   const { currentSubscriptionTiming } = await import('../packages/daemon/src/subscription-worker-timing')
-  const logs: { setupMs: number; subscriptionStages: { workers: { method: string }[] } }[] = []
+  const logs: TimingLog[] = []
   t.mock.method(console, 'info', (line: string) => { logs.push(JSON.parse(line)) })
   resolverObservation = async () => {
     await Promise.resolve()
@@ -169,9 +187,10 @@ test('setup quota workers are observed before the provider request without loggi
   try {
     const result = await new SubscriptionWorkflowModel(selection).doStream({ prompt: [] })
     await result.stream.pipeTo(new WritableStream())
-    assert.equal(logs.length, 1)
-    assert.deepEqual(logs[0].subscriptionStages.workers.map(worker => worker.method), ['prepare', 'quota'])
-    assert.ok(logs[0].setupMs >= 0)
+    const line = timingPair(logs)
+    assert.ok(line.subscriptionStages)
+    assert.deepEqual(line.subscriptionStages.workers.map(worker => worker.method), ['prepare', 'quota'])
+    assert.ok(line.setupMs >= 0)
     assert.equal(JSON.stringify(logs).includes(selection.bindingId), false)
     assert.equal(JSON.stringify(logs).includes(selection.ownerId), false)
   } finally { resolverObservation = undefined }
