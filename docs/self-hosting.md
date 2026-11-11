@@ -35,6 +35,90 @@ If you publish a different host port, set both `MIKKA_PORT` and the port in `BET
 docker compose up -d --force-recreate app
 ```
 
+
+## Managed PostgreSQL: Neon (recommended)
+
+For operators who want a managed database rather than maintaining PostgreSQL on
+their own Linux host, we **recommend [Neon](https://neon.com/)**. It provides
+standard PostgreSQL with managed operations, connection pooling, database
+branching, and recovery options. Mikka does **not** require Neon or a Neon
+account: the bundled PostgreSQL Compose file above and other compatible
+PostgreSQL providers remain supported. This recommendation covers the database,
+not hosted Mikka compute, model credits, or access to any Mikka account.
+
+Use the independent [`docker-compose.neon.yml`](../docker-compose.neon.yml)
+from the **same Mikka release** as the application image. Unlike the default
+Compose file, it launches **only the Mikka app** and does not create a local
+PostgreSQL service. This is a fresh-installation procedure; changing an existing
+installation's database URL does not migrate its data.
+
+1. [Create a Neon project](https://console.neon.tech/) and choose a region close
+   to your Linux host. Use a dedicated database/role for this deployment.
+2. In the Neon **Connect** dialog, select the same branch, database and role
+   twice. First copy the **pooled** connection string (the host includes
+   `-pooler`); disable *Connection pooling* to copy the **direct** string.
+   Keep the SSL parameters supplied by Neon. See [Neon's connection
+   guide](https://neon.com/docs/connect/connect-from-any-app) and
+   [pooled vs direct requirements](https://neon.com/docs/connect/connection-pooling).
+3. Alongside `docker-compose.neon.yml`, create a private `.env` file.
+   The values below are **placeholders**, not runnable credentials:
+
+   ```dotenv
+   BETTER_AUTH_URL=http://localhost:3000
+   MIKKA_IMAGE=ghcr.io/alexj11324/mikka:latest
+   MIKKA_DATABASE_URL=postgresql://YOUR_ROLE:YOUR_PASSWORD@ep-YOUR-ID-pooler.YOUR-REGION.aws.neon.tech/YOUR_DATABASE?sslmode=require
+   MIKKA_DATABASE_URL_UNPOOLED=postgresql://YOUR_ROLE:YOUR_PASSWORD@ep-YOUR-ID.YOUR-REGION.aws.neon.tech/YOUR_DATABASE?sslmode=require
+   ```
+
+   Copy **both complete URLs** directly from your Neon console, including any
+   additional TLS parameters it supplies. They must address the **same**
+   database and role. The deployment maps `DATABASE_URL` to the pooled
+   `MIKKA_DATABASE_URL`, as the bundled Compose deployment does. Never add
+   either connection URL to source control, support messages or screenshots;
+   run `chmod 600 .env`. Be aware that `docker compose config` expands
+   variables and may print the credentials.
+4. Start the app (not the bundled `postgres` service):
+
+   ```sh
+   docker compose -f docker-compose.neon.yml up -d --wait
+   curl --fail-with-body http://localhost:3000/mikka/api/server
+   ```
+
+   A remote deployment still needs the HTTPS reverse proxy, `BETTER_AUTH_URL`,
+   and WebSocket forwarding described above. Configure an email sender or
+   your own OAuth provider before creating the first account. Continue with
+   [server entry and initial account](#server-entry-and-initial-account).
+
+**Why two connection URLs?** Regular requests can use Neon's PgBouncer
+transaction pool; persistent `LISTEN` sessions and session-level advisory
+locks **cannot**. Mikka's built-in realtime/device transport uses dedicated
+direct PostgreSQL sessions, so `MIKKA_DATABASE_URL_UNPOOLED` must be the
+non-pooler URL. The migration code also uses a direct connection. These are
+ordinary PostgreSQL features, not Neon-specific services.
+See [realtime and replica guidance](self-hosting-realtime.md).
+
+**Operations and recovery:** Neon stores your database; the Compose `app-data`
+volume still stores local encryption keys and Workflow state. Back up **both**
+the managed database (using an independently verified recovery/export plan)
+and the application volume. Neon branching/history retention is useful for
+recovery but is not a substitute for your separate application-key backup.
+Pin a published image revision before upgrades; run `docker compose -f
+docker-compose.neon.yml pull` and `docker compose -f docker-compose.neon.yml
+up -d --wait` after the backup. Never use `down --volumes` for an upgrade.
+For an existing local installation, first plan an explicit PostgreSQL
+`pg_dump`/`pg_restore` using **direct** connections and a stopped writer;
+this guide does not perform data migration automatically.
+
+Image CI checks the external Compose configuration offline, then starts the
+published Compose file with a private environment file against an independent
+PostgreSQL 17 database. The query role has no DDL privileges. The direct role
+runs migrations, and the server API reads the migrated database using the
+query role. The bundled PostgreSQL quickstart also runs the real daemon and
+packaged desktop tests. These checks use isolated PostgreSQL. On a live Neon
+deployment, also verify its TLS and pooler settings, signup, bot chat,
+WebSocket updates and daemon work on your own origin.
+
+
 ## Server entry and initial account
 
 `GET /mikka/api/server` is the public server-info contract. In this backend delivery, the default root entry returns the same JSON viewmodel; the minimal HTML layout is supplied by the UI owner using this contract. It includes the configured name/address, running version, client entry links, initial-account state and login-method configuration. A healthy response means the configured origin is valid and the auth-user existence query succeeded; it does not claim to have checked external providers, workers or every subsystem. A failed query returns HTTP 503 and `setup.state: unavailable`, never an empty-installation state.

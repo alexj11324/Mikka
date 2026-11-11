@@ -39,12 +39,16 @@ jobs:
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
       - name: Verify stable release webhook and safe self-hosted update policy
         run: node --test scripts/self-hosted-update.test.mjs scripts/self-hosted-update-smoke.test.mjs
+      - name: Verify managed PostgreSQL Compose contract (offline)
+        run: node --test scripts/acceptance/self-hosted-neon-compose.test.mjs
       - name: Build the public standalone application
         run: |
           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
           docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --build-arg MIKKA_BUILD_WORKER_SHA="$mikka_image_worker_sha" --tag mikka-self-hosted:check .
       - name: Verify packaged subscription binaries without network or credentials
         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
+      - name: Verify startup migration locks bypass transaction pooling
+        run: docker run --rm --network none --entrypoint node mikka-self-hosted:check --test scripts/self-hosted-start.test.mjs
       - name: Start with an empty database and no Mikka credentials
         run: |
           node --input-type=module <<'JS'
@@ -56,6 +60,8 @@ jobs:
           }
           appendFileSync(process.env.GITHUB_ENV, 'MIKKA_IMAGE=mikka-self-hosted:check\n')
           JS
+      - name: Start an independent external Compose installation against isolated PG17
+        run: bash scripts/acceptance/self-hosted-external-postgres.sh
       - name: Build the pinned upstream MinIO fixture
         run: docker compose build minio
       - name: Apply migrations and wait for health
