@@ -32,6 +32,7 @@ function parseObservation(row: ObservationRow, snapshot: DiffSnapshot, masks: Ma
 const publicCheck = (rowId: string, check: ObservedReviewChecks['checks'][number]) => ({
   id: `github-check:${rowId}:${check.kind}:${check.nativeId}`, name: check.name, nameTruncated: check.nameTruncated,
   status: check.status, conclusion: check.conclusion, logExcerpt: check.logExcerpt, logTruncated: check.logTruncated,
+  ...(check.logUrl ? { logUrl: check.logUrl } : {}),
 })
 
 export async function latestTaskReviewChecks(tx: Query, actor: ReviewActor, scope: ReviewScope, snapshot: DiffSnapshot, masks: Masker[]) {

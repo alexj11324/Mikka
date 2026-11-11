@@ -89,7 +89,7 @@ const diffSchema = z.object({
 }) satisfies z.ZodType<ReviewDiff>
 
 const readSchema = z.object({ summary: summarySchema, diff: diffSchema }) satisfies z.ZodType<ReviewRead>
-const checksSchema = z.array(z.object({ id: z.string().min(1), name: z.string().min(1), status: z.enum(['failed', 'passed', 'pending']), logExcerpt: z.string().optional() })) satisfies z.ZodType<ReviewCheck[]>
+const checksSchema = z.array(z.object({ id: z.string().min(1), name: z.string().min(1), status: z.enum(['failed', 'passed', 'pending']), logExcerpt: z.string().optional(), logUrl: z.string().url().optional() })) satisfies z.ZodType<ReviewCheck[]>
 const sentSchema = z.object({ messageId: z.string().min(1), attempt: z.number().int().positive() })
 const mergedSchema = z.object({ merged: z.literal(true) })
 // Error bodies carry their code in `error` (both clients read it); a 403 repeats it as `reason`.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
-import { getReviewDiff, getReviewFile, getReviewSummary, mergeReview, REVIEW_ENDPOINTS, ReviewRequestError, sendToAgent } from './client'
+import { getReviewChecks, getReviewDiff, getReviewFile, getReviewSummary, mergeReview, REVIEW_ENDPOINTS, ReviewRequestError, sendToAgent } from './client'
 import type { ReviewSummary } from './contract'
 
 const TASK = '6f1c8a52-1b0e-4c3a-9d2f-0a1b2c3d4e5f'
@@ -31,6 +31,14 @@ const summary: ReviewSummary = {
 test('the endpoints live in one map under the task', () => {
   assert.equal(REVIEW_ENDPOINTS.summary(TASK), `/api/tasks/${TASK}/review/summary`)
   assert.equal(REVIEW_ENDPOINTS.merge('a/b'), '/api/tasks/a%2Fb/review/merge')
+})
+
+test('check contracts retain native log links while accepting historical checks without links', async () => {
+  const checks = [{ id: 'native-check-19', name: 'Build', status: 'failed', logExcerpt: 'Build failed',
+    logUrl: 'https://github.com/fixture/review/runs/19' }, { id: 'historical-check', name: 'Tests', status: 'passed' }]
+  answer(200, checks)
+  assert.deepEqual(await getReviewChecks(TASK), checks)
+  assert.equal(calls[0]!.url, `/api/tasks/${TASK}/review/checks`)
 })
 
 test('a summary is narrowed to the contract: unknown fields drop, permissions keep their reasons', async () => {
