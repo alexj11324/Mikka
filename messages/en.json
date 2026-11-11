@@ -6191,7 +6191,7 @@
       "memberNote": "Only a workspace admin can bind this workspace to an Organization.",
       "body": "Once bound, the Organization's sign-in requirements and resource policy apply here, and seats count distinct active members across all its workspaces. Each workspace keeps its own members, tasks and resources.",
       "bodyTitle": "What binding does",
-        "bindLabel": "Bind to an Organization",
+      "bindLabel": "Bind to an Organization",
       "bindNote": "You need to be an owner or admin of that Organization and an admin of this workspace.",
       "bind": "Bind",
       "createLabel": "New Organization",
@@ -7142,5 +7142,29 @@
     "content": "Content",
     "readFailed": "Unable to load {label}.",
     "refreshFailed": "Unable to refresh {label}. Previous content is shown."
+  },
+  "PersonalFiles": {
+    "createFolder": "New folder",
+    "folderName": "Folder name",
+    "create": "Create",
+    "personalFolder": "My files · {name}",
+    "back": "Artifact",
+    "file": "File",
+    "empty": "No files in this folder.",
+    "upload": "Upload files",
+    "history": "Version history",
+    "currentVersion": "Current version",
+    "version": "Version {seq} · {count} files · {date}",
+    "moreVersions": "More versions",
+    "moreFolders": "More folders",
+    "restore": "Restore version",
+    "restoreTitle": "Restore this version?",
+    "replace": "Replace files",
+    "replaceTitle": "Replace files with the same names?",
+    "conflict": "These files changed. Review the latest version before trying again.",
+    "tooLarge": "This file is too large.",
+    "accessUnavailable": "These files are no longer available to this account.",
+    "saveUnconfirmed": "The change could not be confirmed. Refresh the folder before trying again.",
+    "loadError": "Could not load personal files."
   }
 }
