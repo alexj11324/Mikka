@@ -2,7 +2,8 @@
 
 本说明用于 Project v2、稳定 Task 编号、Team / Project 生命周期和仓库环境绑定的发布。代码与正常迁移入口是执行依据；设计背景见 [领域模型决定](../design/decisions/2026-11-07-2300-work-domain-model.md)，发布规则见 [开发工作流](../dev-workflow.md)，迁移机制见 [migration bootstrap](../migration-bootstrap.md)。
 
-发布记录中的 SHA、实际测试数和生产观测结果由发布负责人填写。本文提供操作步骤，不表示生产验收已经完成。
+本文保留公共迁移、归属和生命周期合同。公司生产观测、发布账号与操作记录见
+[私有运维入口](README.md)；文档说明不表示生产验收已完成。
 
 ## 1. 入口与双数据库顺序
 
@@ -80,192 +81,21 @@ Project 待修复原因包括 `invalid_task_ids`、`conflicting_task_projects`�
 
 ## 3. 发布前后只读证据
 
-以下查询只读。使用运维已授权的连接环境，不把连接串、用户内容或完整 `agentDefinition` 放进日志。示例通过 `PGDATABASE` 传入连接配置，通过只读会话限制执行范围；每条 `psql` 的失败必须阻止验收继续。
+公司生产查询、样本导出和观测记录见[私有运维入口](README.md)。
+公共数据完整性合同仍适用于自托管部署和隔离测试。
 
 ### 3.1 迁移账本和隔离存量
 
-迁移完成后，在 APP 执行：
-
-```sh
-PGDATABASE="$MIKKA_DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=60000' \
-  psql -X --set=ON_ERROR_STOP=1 <<'SQL'
-SELECT name, "appliedAt" FROM schema_migrations
-WHERE name IN (
-  '20261109035000_task_workspace_ownership.sql',
-  '20261111030001_task_identity.sql',
-  '20261111030006_project_history_retention.sql',
-  '20261111030007_task_alias_tenant.sql'
-) ORDER BY name;
-
-SELECT "ownershipState", count(*) AS tasks FROM issues GROUP BY "ownershipState" ORDER BY 1;
-SELECT reason, count(*) AS repairs FROM issue_workspace_repairs GROUP BY reason ORDER BY reason;
-SELECT count(*) AS pending_without_repair FROM issues i
-WHERE i."ownershipState"='pending'
-  AND NOT EXISTS (SELECT 1 FROM issue_workspace_repairs r WHERE r."issueId"=i.id);
-SELECT count(*) AS bound_without_identifier FROM issues
-WHERE "ownershipState"='bound' AND "issuedIdentifier" IS NULL;
-SELECT count(*) AS issued_without_alias FROM issues i
-WHERE i."ownershipState"='bound' AND i."issuedIdentifier" IS NOT NULL AND NOT EXISTS (
-  SELECT 1 FROM task_identifier_aliases a WHERE a."issueId"=i.id AND a.identifier=i."issuedIdentifier"
-    AND a."ownerId"=i."userId" AND a."workspaceId"=i."workspaceId"
-);
-SELECT count(*) AS published_identifier_without_alias FROM run_publications p
-JOIN issues i ON i.id=p."issueId" AND i."ownershipState"='bound'
-JOIN agent_runs r ON r.id=p."runId" AND r."issueId"=i.id AND r."userId"=p."userId"
-  AND r."workspaceId"=i."workspaceId"
-WHERE p.identifier IS NOT NULL AND p.identifier<>'' AND NOT EXISTS (
-  SELECT 1 FROM task_identifier_aliases a WHERE a."issueId"=i.id AND a.identifier=p.identifier
-    AND a."ownerId"=i."userId" AND a."workspaceId"=i."workspaceId"
-);
-SELECT count(*) AS bound_alias_without_tenant FROM task_identifier_aliases a
-JOIN issues i ON i.id=a."issueId" AND i."userId"=a."ownerId" AND i."ownershipState"='bound'
-WHERE a."workspaceId" IS NULL;
--- Report quarantined/conflicting receipts separately: they are not authority
--- to issue an identifier or make an old alias visible.
-SELECT CASE
-  WHEN i.id IS NULL OR i."ownershipState"<>'bound' THEN 'unresolved_task'
-  WHEN r.id IS NULL OR r."issueId" IS DISTINCT FROM i.id OR r."userId" IS DISTINCT FROM p."userId" THEN 'mismatched_run'
-  WHEN r."workspaceId" IS NULL THEN 'unresolved_run'
-  WHEN r."workspaceId" IS DISTINCT FROM i."workspaceId" THEN 'conflicting_workspace'
-  ELSE 'verified'
-END AS publication_evidence, count(*)
-FROM run_publications p LEFT JOIN issues i ON i.id=p."issueId" LEFT JOIN agent_runs r ON r.id=p."runId"
-WHERE p.identifier IS NOT NULL AND p.identifier<>'' GROUP BY 1 ORDER BY 1;
-SELECT count(*) AS conflicting_alias_projection FROM task_identifier_aliases a
-JOIN issues i ON i.id=a."issueId" WHERE a."ownerId" IS DISTINCT FROM i."userId"
-  OR (a."workspaceId" IS NOT NULL AND a."workspaceId" IS DISTINCT FROM i."workspaceId");
-SELECT 'agent_runs' AS relation, count(*) AS unbound FROM agent_runs WHERE "workspaceId" IS NULL
-UNION ALL SELECT 'factory_tasks', count(*) FROM factory_tasks WHERE "workspaceId" IS NULL
-UNION ALL SELECT 'artifacts', count(*) FROM artifacts WHERE "workspaceId" IS NULL;
-SQL
-```
-
-`bound_without_identifier`、`issued_without_alias`、`published_identifier_without_alias`、`bound_alias_without_tenant` 应为 0；这些统计限于可信的 bound 数据。`pending_without_repair` 应为 0；出现非零应检查回填是否中断，以及查询期间是否有旧写入路径产生新行。publication 的未确定 / 冲突证据、错误 owner 或非空冲突 Workspace 的别名需单列审查，回填不会覆盖它们，也不要求它们能被解析。派生表未绑定的历史记录不一定能自动修复，需与可信来源和 Task 隔离存量一起审查，不能按总数强行绑定。
-
-在 WS 执行：
-
-```sh
-PGDATABASE="$DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=60000' \
-  psql -X --set=ON_ERROR_STOP=1 <<'SQL'
-SELECT name, "appliedAt" FROM schema_migrations
-WHERE name IN (
-  '20261111030000_project_v2.sql', '20261111030002_task_identity_aliases.sql',
-  '20261111030003_team_lifecycle.sql', '20261111030004_project_resources.sql',
-  '20261111030005_project_lifecycle.sql', '20261111030008_project_writer_fence.sql'
-) ORDER BY name;
-
-SELECT count(*) FILTER (WHERE "workspaceId" IS NOT NULL) AS bound_projects,
-       count(*) FILTER (WHERE "workspaceId" IS NULL) AS quarantined_projects
-FROM workspace_projects;
-SELECT reason, count(*) AS repairs FROM workspace_project_repairs GROUP BY reason ORDER BY reason;
-SELECT count(*) AS receipts FROM workspace_project_v2_migrations;
-SELECT count(*) AS bound_without_receipt FROM workspace_projects p
-WHERE p."workspaceId" IS NOT NULL AND NOT EXISTS (
-  SELECT 1 FROM workspace_project_v2_migrations m WHERE m."projectId"=p.id
-);
-SELECT count(*) AS quarantine_without_repair FROM workspace_projects p
-WHERE p."workspaceId" IS NULL AND NOT EXISTS (
-  SELECT 1 FROM workspace_project_repairs r WHERE r."projectId"=p.id
-);
-SELECT count(*) AS invalid_project_task_relation FROM workspace_project_tasks t
-LEFT JOIN workspace_projects p ON p.id=t."projectId"
-WHERE p.id IS NULL OR p."workspaceId" IS DISTINCT FROM t."workspaceId";
-SELECT "issueId", count(*) FROM workspace_project_tasks
-GROUP BY "issueId" HAVING count(*) > 1;
-SQL
-```
-
-后三类异常计数（缺回执、缺修复记录、Project 关系错租户）应为 0，重复 Task 查询应返回空集。历史 `mikka_team_projects` 外键采用 `NOT VALID` 保留冲突证据，不能把“数据库里仍有旧 Team 链接”当成授权依据，也不要为了让计数好看直接删除这些证据。
-
-APP / WS 分库的 Task 关系一致性需要分别读取后配对。可在授权的验收样本上导出 WS 的 `issueId,projectId,workspaceId` 和 APP 的 `id,workspaceId,ownershipState`，按 UUID 比较：每个 canonical 关系都应对应同一 Workspace 的 `bound` Task。数据库测试覆盖分库执行；不要在生产临时装跨库扩展来执行 JOIN。
+APP 与 WS 各自拥有独立的迁移账本和数据权威。结构迁移必须先于跨库回填；
+每个文件按目标验证历史，不能把另一数据库中同名表的内容当成已完成证明。
+Task 的 bound 归属、Project canonical 关系和 Workspace 必须一致；未知归属
+保留隔离状态，不能以清零 repair 数量代替证据审查。
 
 ### 3.2 已发布编号与 Run 快照：同一批 UUID 前后比较
 
-选择一组已授权、包含已发布历史的 Task UUID，并包含有旧 Run 的 Task。若已有带 `projectExecution` 的 Run，也包含一个这类样本。第一次上线前没有该类历史快照时，将该项记为“不适用”，不能填成旧快照兼容性已被生产证明。运行中的正常业务会新增行；下面比较只要求发布前已存在的行保持一致，允许发布后新增行。
-
-在迁移前保存下面的函数和变量；在迁移后使用同一组 UUID、同一目录再执行一次。将示例 UUID 替换为授权样本 UUID，保留 PostgreSQL 数组格式。
-
-```sh
-umask 077
-export DOMAIN_EVIDENCE="$PWD/.cache/domain-model-rollout"
-export DOMAIN_TASK_IDS='{00000000-0000-0000-0000-000000000001}'
-mkdir -p "$DOMAIN_EVIDENCE"
-
-domain_snapshot() {
-  local domain_phase="$1"
-  case "$domain_phase" in before|after) ;; *) return 2 ;; esac
-  PGDATABASE="$MIKKA_DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=60000' \
-    psql -X --quiet --set=ON_ERROR_STOP=1 --set=task_ids="$DOMAIN_TASK_IDS" \
-    > "$DOMAIN_EVIDENCE/$domain_phase-task.csv" <<'SQL' || return
-COPY (
-  SELECT id, coalesce(to_jsonb(i)->>'workspaceId','') AS workspace_id,
-    coalesce(to_jsonb(i)->>'issuedIdentifier','') AS issued_identifier
-  FROM issues i WHERE id=ANY(:'task_ids'::uuid[]) ORDER BY id
-) TO STDOUT WITH (FORMAT csv, HEADER true);
-SQL
-  PGDATABASE="$MIKKA_DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=60000' \
-    psql -X --quiet --set=ON_ERROR_STOP=1 --set=task_ids="$DOMAIN_TASK_IDS" \
-    > "$DOMAIN_EVIDENCE/$domain_phase-publication.csv" <<'SQL' || return
-COPY (
-  SELECT "runId" AS id, "issueId", identifier, branch, "baseBranch", "remoteKey"
-  FROM run_publications WHERE "issueId"=ANY(:'task_ids'::uuid[]) AND status='published'
-  ORDER BY "runId"
-) TO STDOUT WITH (FORMAT csv, HEADER true);
-SQL
-  PGDATABASE="$MIKKA_DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=60000' \
-    psql -X --quiet --set=ON_ERROR_STOP=1 --set=task_ids="$DOMAIN_TASK_IDS" \
-    > "$DOMAIN_EVIDENCE/$domain_phase-run.csv" <<'SQL' || return
-COPY (
-  SELECT id, "issueId", "agentDefinition"->'projectExecution' IS NOT NULL AS has_project_snapshot,
-    md5(jsonb_build_object('agentDefinition',"agentDefinition",'baseBranch',"baseBranch")::text) AS frozen_digest
-  FROM agent_runs WHERE "issueId"=ANY(:'task_ids'::uuid[])
-    AND status IN ('succeeded','stopped','failed','cancelled')
-  ORDER BY id
-) TO STDOUT WITH (FORMAT csv, HEADER true);
-SQL
-}
-
-domain_snapshot before
-```
-
-只输出编号、UUID、仓库键和快照摘要，不输出执行定义、变量或密钥。摘要用于一致性比较，不是安全签名。`to_jsonb(i)` 让第一次上线前尚无新列的 Task 查询也能运行。Run 摘要特意不包含 P0 合法补齐的顶层 `workspaceId`，仍覆盖原有 `executionIdentity`、已有 `projectExecution`、配置快照和 base branch。已完成 Run 的状态和 publication 的 PR 状态不参与比较。
-
-迁移完成后：
-
-```sh
-domain_snapshot after
-python3 - <<'PY'
-import csv
-import os
-from pathlib import Path
-
-root = Path(os.environ['DOMAIN_EVIDENCE'])
-expected = {value.strip() for value in os.environ['DOMAIN_TASK_IDS'].strip('{}').split(',') if value.strip()}
-def read(phase, kind):
-    with (root / f'{phase}-{kind}.csv').open(newline='') as stream:
-        rows = list(csv.DictReader(stream))
-    assert len(rows) == len({row['id'] for row in rows}), f'{phase}/{kind}: duplicate UUID'
-    return {row['id']: row for row in rows}
-
-for kind in ('task', 'publication', 'run'):
-    before, after = read('before', kind), read('after', kind)
-    assert before, f'{kind}: choose a nonempty historical sample'
-    if kind == 'task':
-        assert set(before) == expected, 'task: sample UUID missing before migration'
-    for identity, old in before.items():
-        assert identity in after, f'{kind}: historical row disappeared: {identity}'
-        new = after[identity]
-        if kind == 'task':
-            for field in ('workspace_id', 'issued_identifier'):
-                if old[field]:
-                    assert old[field] == new[field], f'task: immutable {field} changed: {identity}'
-        else:
-            assert old == new, f'{kind}: published identity or frozen configuration changed: {identity}'
-    print(f'{kind}: preserved {len(before)} historical rows')
-PY
-```
-
-保留脚本输出、样本数量和摘要文件。公开 Issue / PR 只记录汇总和证据位置，不贴数据库内容。样本比较说明所选历史的前后稳定性；全量完整性还依赖迁移回归、不可变约束和 3.1 的异常查询，不能把一个样本表述成所有生产数据均已审计。
+已经发布的编号、别名与 Run 执行快照保持不可变。升级允许增加新历史，不重写
+原有历史。APP / WS 分库时分别读取各自权威数据后配对，不安装临时跨库 JOIN
+或按显示名称猜测关联。样本检查只证明该样本，不能宣称所有生产数据均已审计。
 
 ## 4. 幂等和失败恢复
 
@@ -283,7 +113,8 @@ PY
 
 ## 5. Team 与 Project 生命周期验收
 
-以下变更操作在隔离验收账户和真实 HTTP / RPC 流程中验证。生产观测以已有数据的只读查询、部署状态及正常业务读路径为主，不创建再删除客户 Task / Team / Project 来做破坏性 smoke。
+以下变更操作在隔离验收账户和真实 HTTP / RPC 流程中验证。
+公司生产观测与部署验证步骤见[私有运维入口](README.md)。
 
 | 操作 | 应保留 / 应拒绝 |
 | --- | --- |
@@ -316,39 +147,13 @@ LOCAL_LOOP_ITEMS=11 pnpm test:local-loop
 
 保留 `.cache/dev-local/progress.jsonl` 中本次 `runId` 的 `item11-workspace-governance` 证据和 runner 的最终退出状态。测试账户和原始服务日志遵循现有 runner 的脱敏和访问限制。Item 11 的零模型调用验收，不替代需要外部服务的既有执行验收。
 
-| 发布证据 | 负责人填写 |
-| --- | --- |
-| Issue / PR | #1687 / 待填写 |
-| 被验证候选 SHA / 最终 merge SHA | 待填写 |
-| APP / WS 是否真实分库，隔离 PostgreSQL 版本 | 待填写，不记录连接串 |
-| 空库迁移 / 旧数据回填 / 重跑幂等结果 | 待填写 |
-| DB suite 实际 passed / failed / skipped 数和日志位置 | 待填写 |
-| HTTP Item 11 的 runId、最终退出状态和证据位置 | 待填写 |
-| Task / Project pending 原因统计及已审查处置 | 待填写 |
-| 已发布编号、Run 快照前后比较数量与结果 | 待填写 |
-| 生产部署 READY 时间、服务实际 SHA、正常只读观测 | 待填写 |
-| 外部服务相关验收是否适用及其独立证据 | 待填写 |
-
-发布完成需同时确认部署 READY、实际服务 SHA 与合并结果一致，以及迁移日志和只读完整性检查符合上述标准。未知归属有隔离和可追踪处置，不能用“测试通过”省略它们，也不能因要求清零而降低权限边界。
+测试记录应包含实际源码版本、APP / WS 是否分库、数据库版本、迁移和重跑结果、
+HTTP / RPC 的最终退出状态及副作用检查。未知归属的隔离状态和历史兼容性需要
+单独验证，不能因测试通过而降低权限边界。公司发布回执见[私有运维入口](README.md)。
 
 ## 7. 真实订阅与项目资源的生产验收入口
 
-现有 `Production smoke` 工作流增加了本 Epic 的显式手动模式，驱动为 `scripts/acceptance/work-domain-production.mjs`。只在真实 `main` 的 `workflow_dispatch` 中运行；`domain_model_sha` 必须同时等于该 workflow 的 SHA 和生产 `/mikka/api/version` 返回的完整 SHA。输入检查和实际部署版本检查先于凭据读取。已有 GitHub OIDC 身份只读取共享 smoke 账号的邮箱和密码，不把生产数据库、GitHub 或模型凭据交给外部执行环境。
-
-| `domain_model_mode` | 行为及条件 |
-| --- | --- |
-| `preflight` | 正常登录并验证唯一授权 Shared Workspace，读取角色、Project、Environment、Bot、GitHub 仓库许可及小模型订阅候选；不提交模型工作。可不传 scope，先取得可用身份和资源 ID。 |
-| `provision` | 明确选择 Workspace、Bot、Mikka 仓库、base branch 和两订阅后，以正常 API 新建并保留领域模型审阅 Project 和受限 cloud/any Environment，或使用显式给定且配置一致的已有 Environment；不修改既有 Project 的绑定。要求当前 Workspace admin；不调用模型。 |
-| `active` | 使用完整明确的 Project、Environment、仓库、Bot 与订阅 scope，创建两个保留的实际审阅 Task，分别以官方 Claude Haiku 5.5 与 Codex GPT-6 Luna 固定 Profile 通过正常 Coordinator 派发并读取运行证据。 |
-
-`domain_model_scope` 是严格 JSON 对象，字段为 `workspaceId`、`botId`、`repositoryKey`、可选 `baseBranch`、`projectId`、`environmentId` 和 `models`。`models.claude` / `models.codex` 分别含对应的 `connectionId` 和可选的已存在固定 `profileId`。所有 ID 都来自本次正常 API 预检；仓库键沿用 `v2/github.com/owner/repo`。active 必须有 Project / Environment ID，provision 必须有 base branch 且不能指定待覆盖的 Project ID。工作流回执中的 provision scope 可作为下一步 active 输入。
-
-普通 member 可以执行其有权使用的已配置资源，但不能配置 Workspace Environment 或 Project 资源绑定。首次上线缺少资源且 smoke 账号只是 member 时，记录 `provision_permission` 和精确缺少的绑定，由已有工作区管理员通过正常产品接口完成配置后再验收。不得提高 smoke 角色、借用 Alex 会话、改数据库记录或放宽 API 权限来让测试通过。
-
-每条订阅只提交一次初始工作，使用确定的 submission ID。Task 内保留本次配置指纹，重复操作会先拒绝；网络超时不能证明请求未执行，也不是重新生成 Task 或 submission ID 的理由。两条订阅独立记录失败，不用另一模型重试已绑定的任务。正常 Factory review / verify 仍可能产生额外 Run；其模型只能来自预检确认的固定小模型订阅集合，逐个记录实际 Run，不把两条 Task 宣称为只有两次模型调用。平台内建 Decision judge 沿现有规则独立记录，不算作 CLI 订阅路径证据。
-
-驱动不改变账号的 API-key fallback 设置。固定订阅 Profile 不允许执行源 fallback；Coordinator chat 的付费 fallback 则依据已有公开 key catalog 核实。只有能够证明所选小模型不存在可达的付费 API-key fallback 时才提交；未知配置或超出小模型范围的 enabled Profile 必须在提交前拒绝。
-
-报告保留实际 Task、Project 和环境；清理只停止可归属于本次提交的 Run、回收其机器、归档本次新建的专用 Profile，并恢复自己的会话 Workspace 后退出。未知派发结果或无法证明的运行归属必须保留恢复信息并报告清理未完成，不能把普通 stop ACK 当成资源已关闭。
-
-active 的成功状态仍是 `execution_observed_pending_snapshot_review`：负责人还须将报告中的实际 Task / Run / Project UUID 与第 3 节的授权只读 APP / WS 证据配对，核对真实 repository、base branch、Environment 配置快照和历史前后摘要。只读任务按现有 daemon 规则不执行 Environment setup，因此本入口不证明生产 setup 命令已执行；setup 的实际执行由隔离的 queue / claim / daemon 贯通回归证明。最后补齐 UI owner 的最终 PR / SHA 和本地 production build 证据，才满足 Epic 的完整关闭条件。
+公司生产账号、订阅、资源选择及部署验证入口见[私有运维入口](README.md)。
+公开的 Project / Repository / Environment admission 与历史快照合同不改变。
+隔离测试不替代真实外部服务证据；预检或配置保存成功也不代表模型与 GitHub
+已经执行成功。
