@@ -134,8 +134,9 @@ async function reserve(tx: PoolClient, actor: TaskMachineActor, runId: string): 
   await tx.query(
     `UPDATE thread_machines SET state='starting',epoch=epoch+1,"sandboxId"=NULL,"operationId"=$2,"workerLeaseId"=$3,
     "workerLeaseUntil"=clock_timestamp()+interval '90 seconds',"lifecycleAt"=clock_timestamp()+interval '90 seconds',
-    lifecycle=lifecycle||jsonb_build_object('phase','create_requested','sponsoredUntil',clock_timestamp()+interval '15 minutes') WHERE "runId"=$1`,
-    [runId, operationId, leaseId],
+    lifecycle=lifecycle||jsonb_build_object('phase','create_requested','sponsoredUntil',clock_timestamp()+interval '15 minutes',
+      'sponsoredRepositoryKey',$4::text) WHERE "runId"=$1`,
+    [runId, operationId, leaseId, run.repoPath],
   )
   await tx.query(`UPDATE device_tokens SET "expiresAt"=clock_timestamp()+interval '15 minutes' WHERE id=$1`, [tokenId])
   return {

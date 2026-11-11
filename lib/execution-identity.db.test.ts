@@ -132,7 +132,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
       // A person can explicitly choose company-paid compute for this one task.
       // Exercise the real queue and repository leases before the legacy E2B key exists.
       await t.test('sponsored selection, run ownership, expiry, stop and revocation', async () => {
-        const { readSponsoredTaskGrant, withSponsoredTaskGrant } = await import('./cloud-computer/sponsored-task')
+        const { readSponsoredTaskGrant, withSponsoredTaskGrant, releaseGrant } = await import('./cloud-computer/sponsored-task')
         const taskId = randomUUID(), eventId = randomUUID()
         const actor = { userId: requester, workspaceId: workspace }
         await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority)
@@ -187,6 +187,17 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
           await pool.query(`UPDATE thread_machines SET "workerLeaseUntil"=now()+interval '1 minute' WHERE "runId"=$1`, [sponsored])
           await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1`, [sponsored])
           await assert.rejects(() => readSponsoredTaskGrant(pool, actor, sponsored))
+          await pool.query(`UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('sponsoredRepositoryKey',$2::text)
+            WHERE "runId"=$1`, [sponsored,admitted.repositoryKey])
+          const cleanup = await pool.connect()
+          try {
+            await cleanup.query('BEGIN')
+            await cleanup.query('UPDATE device_repos SET "remoteUrl"=NULL WHERE id=$1', [cloudRepo])
+            assert.deepEqual(await releaseGrant(cleanup, actor, sponsored, op), {...admitted, expiresAt:0})
+            await assert.rejects(releaseGrant(cleanup, {...actor, userId:other}, sponsored, op))
+            await assert.rejects(releaseGrant(cleanup, actor, sponsored, randomUUID()))
+          } finally { await cleanup.query('ROLLBACK'); cleanup.release() }
+
         } finally {
           if (oldCohort === undefined) delete process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES
           else process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = oldCohort

@@ -106,14 +106,27 @@ export async function readSponsoredTaskGrant(query: Query, actor: TaskMachineAct
 /** Cleanup must still work after stop, withdrawal, suspension or grant expiry.
  * This operation can only tear down a previously bound exact operation. */
 export async function releaseGrant(query: Query, actor: TaskMachineActor, runId: string, operationId: string) {
-  const result = await query.query<BoundRun>(bindingSql + ' AND m."operationId"=$5', [
-    runId,
-    actor.userId,
-    actor.workspaceId,
-    hostedSnapshot,
-    operationId,
+  // The reservation saved this key only after checking the original account,
+  // human event and repository. Revocation or repository removal must not
+  // strand paid compute. expiresAt=0 prevents this cleanup tuple from opening
+  // a machine or using any live filesystem or process capability.
+  const result = await query.query<{ taskId: string; repositoryKey: string | null }>(
+    `SELECT "issueId" AS "taskId", lifecycle->>'sponsoredRepositoryKey' AS "repositoryKey"
+     FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3
+       AND "snapshotId"=$4 AND "operationId"=$5`,
+    [runId, actor.userId, actor.workspaceId, hostedSnapshot, operationId],
+  )
+  const target = result.rows[0]
+  if (!target) throw denied()
+  if (target.repositoryKey) {
+    return {ownerId: actor.userId, workspaceId: actor.workspaceId, taskId: target.taskId,
+      repositoryKey: target.repositoryKey, runId, operationId, expiresAt: 0}
+  }
+  // In-flight rows created by the earlier provider still use their frozen Run.
+  const previous = await query.query<BoundRun>(bindingSql + ' AND m."operationId"=$5', [
+    runId, actor.userId, actor.workspaceId, hostedSnapshot, operationId,
   ])
-  return frozenGrant(result.rows[0], actor)
+  return { ...frozenGrant(previous.rows[0], actor), expiresAt: 0 }
 }
 
 export async function withSponsoredTaskGrant<T>(

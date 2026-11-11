@@ -1231,6 +1231,9 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     const client = await pool.connect()
     let sandboxId: string | null
     let creationPending: boolean
+    let hosted: boolean
+    let operationId: string | null
+    let wasPaused: boolean
     let epoch: number
     try {
       await client.query('BEGIN')
@@ -1240,7 +1243,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
         ? (await client.query('SELECT status,content FROM issues WHERE id=$1 FOR SHARE', [machine.issueId])).rows[0]
         : undefined
       const lockedRun = (await client.query('SELECT status,report FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
-      const locked = (await client.query('SELECT "sandboxId","deviceId","workerLeaseId","workerLeaseUntil",epoch,state FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE', [runId, actor.userId, actor.workspaceId])).rows[0]
+      const locked = (await client.query('SELECT "sandboxId","deviceId","operationId","snapshotId","workerLeaseId","workerLeaseUntil",epoch,state FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE', [runId, actor.userId, actor.workspaceId])).rows[0]
       if (!locked) throw new ComputerError(404, 'Thread unavailable')
       if (expectedFence && (locked.epoch !== expectedFence.epoch || locked.sandboxId !== expectedFence.sandboxId)) {
         await client.query('COMMIT')
@@ -1264,6 +1267,9 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
       }
       sandboxId = locked.sandboxId
       epoch = locked.epoch
+      hosted = locked.snapshotId === hostedSnapshot
+      operationId = locked.operationId
+      wasPaused = locked.state === 'paused'
       creationPending = !sandboxId && Boolean(locked.workerLeaseId || locked.workerLeaseUntil)
       const stopped = await client.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=COALESCE("stopRequestedAt",now()),"finishedAt"=COALESCE("finishedAt",now())
         WHERE id=$1 AND "userId"=$2 AND status NOT IN ('succeeded','failed','stopped','cancelled') RETURNING id`, [runId, actor.userId])
@@ -1286,18 +1292,18 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     // This is a terminal write outside the daemon completion path: finalize a
     // bound Factory task after commit. Flag-gated, idempotent, never throws.
     await afterRunEnded(actor.userId, runId)
-    if (creationPending && machine.snapshotId !== hostedSnapshot) throw new ComputerError(409, 'Thread creation cleanup pending')
+    if (creationPending && !hosted) throw new ComputerError(409, 'Thread creation cleanup pending')
     // Run end has fenced new captures. Preserve existing recordings before
     // destroying the dedicated filesystem that still holds their bytes.
     const { screenCaptures } = await import('@/lib/captures/screen')
-    if (machine.snapshotId !== hostedSnapshot) await screenCaptures.stopRunRecordings([runId])
+    if (!hosted) await screenCaptures.stopRunRecordings([runId])
     // A running machine's last output is kept before the kill (a parked one kept it when it paused).
     // Best effort and bounded: reading never blocks the kill.
-    if (sandboxId && machine.state !== 'paused' && machine.snapshotId !== hostedSnapshot) await keepTailBeforeKill(pool, actor, runId, sandboxId)
+    if (sandboxId && !wasPaused && !hosted) await keepTailBeforeKill(pool, actor, runId, sandboxId)
     try {
-      if (machine.snapshotId === hostedSnapshot) await releaseOwnedCloudflareTaskMachine(pool,actor,runId,machine.operationId)
-      else if (sandboxId) await threadMachineProvider.kill(sandboxId, actor.userId).catch(error => { if (!sandboxGone(error)) throw error })
-      const retired = await pool.query(`UPDATE thread_machines SET "sandboxId"=NULL,"lifecycleAt"=NULL,
+      if (hosted && operationId && (sandboxId || creationPending)) await releaseOwnedCloudflareTaskMachine(pool,actor,runId,operationId)
+      else if (!hosted && sandboxId) await threadMachineProvider.kill(sandboxId, actor.userId).catch(error => { if (!sandboxGone(error)) throw error })
+      const retired = await pool.query(`UPDATE thread_machines SET "sandboxId"=NULL,"workerLeaseUntil"=NULL,"lifecycleAt"=NULL,
         lifecycle=(lifecycle-'reconcileId'-'reconcileUntil')||jsonb_build_object('phase','retired','owner','run-recovery','failures',0)
         WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND state='ended'
           AND "sandboxId" IS NOT DISTINCT FROM $5::text RETURNING "computeSeconds"`, [runId, actor.userId, actor.workspaceId, epoch, sandboxId])
@@ -1306,7 +1312,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     } catch (error) {
       await pool.query(`UPDATE thread_machines SET "lifecycleAt"=now()+interval '30 seconds',
         lifecycle=lifecycle||jsonb_build_object('phase','retire_failed','owner','run-recovery')
-        WHERE "runId"=$1 AND "sandboxId"=$2 AND epoch=$3 AND state='ended'`, [runId, sandboxId, epoch])
+        WHERE "runId"=$1 AND "sandboxId" IS NOT DISTINCT FROM $2::text AND epoch=$3 AND state='ended'`, [runId, sandboxId, epoch])
         .catch(() => { /* The committed retirement intent survives a lost DB response. */ })
       armDueTimerSoon('run-recovery')
       throw error
