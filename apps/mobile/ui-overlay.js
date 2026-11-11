@@ -29,7 +29,7 @@ function mobileOverlay(app, env = process.env) {
   const configured = env.MIKKA_MOBILE_OVERLAY_DIR?.trim()
   const slots = Object.fromEntries(MOBILE_SLOTS.map(name => [name, join(app, 'slots', `${name}.tsx`)]))
   if (!configured) {
-    if (env.EAS_BUILD_PROFILE === 'hosted-production') throw new Error('MOBILE_OVERLAY_DIR_REQUIRED_FOR_RELEASE')
+    if (['production', 'hosted-production'].includes(env.EAS_BUILD_PROFILE)) throw new Error('MOBILE_OVERLAY_DIR_REQUIRED_FOR_RELEASE')
     return { dir: null, slots }
   }
   const dir = resolve(repository, configured)

@@ -404,4 +404,4 @@ The server works without a Mikka account. For optional official GitHub, iOS push
 
 See [BYOK services](self-hosting-byok.md) for SMTP, S3, local vault and default-model configuration, and [builtin realtime](self-hosting-realtime.md) for multi-instance operation.
 
-Building from this public repository with `pnpm build` selects the same server-only renderer as Docker. Official application releases provide both the private checkout directory and its pinned Git revision. A configured official release fails when that pair is incomplete.
+A public checkout selects the server-only renderer for `pnpm build`, `pnpm build:app` and `pnpm --filter @mikka/frontend build`. Official Web and Desktop builds require a separate private Git checkout and its matching revision. Public CI explicitly requests `--public-test-fixture` for the unlicensed renderer used by the existing loopback and package tests. Its manifest identifies it as a test fixture.

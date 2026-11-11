@@ -101,7 +101,7 @@ jobs:
           node apps/desktop/scripts/install-electron.mjs
       - name: Build one packaged acceptance desktop with an independent default server
         run: |
-          pnpm --filter @mikka/desktop build
+          pnpm --filter @mikka/desktop build --public-test-fixture
           pnpm --filter @mikka/desktop exec electron-builder --dir --linux --config electron-builder.acceptance.yml --config.linux.executableName=mikka-selfhost-acceptance --publish never
           sudo chown root:root apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
           sudo chmod 4755 apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox

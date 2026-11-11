@@ -75,7 +75,7 @@ pnpm dev --host 127.0.0.1 --port 3000
 | --- | --- |
 | `pnpm dev` | Nitro API watch + Vite 同源页面/HMR；内部 API 用独立 loopback 端口；公共入口 `/mikka` |
 | `pnpm dev:local` | 既有完整本地循环：同源前端/API、受隔离 guard 保护的数据库、源码 daemon 与 GitHub/邮件等本地替身；不是生产验收 |
-| `pnpm build:app` | 先构建 Web Vite，再构建 API；默认 `node-server`，不执行完整发布链的最后迁移步骤 |
+| `pnpm build:app` | 构建当前安装的页面与 API。公开 checkout 生成认证和服务状态页面，提供私有 UI 与配对 SHA 时生成官方工作区。默认使用 `node-server`，不执行迁移 |
 | `pnpm build` | subscription worker → agent UI 生成 → build:app → 完整 typecheck → **数据库迁移** |
 | `pnpm start --hostname 127.0.0.1 --port 3000` | 验证已编译 `.output` 后启动实际 Node 产品；不构建、不迁移 |
 | `pnpm --filter @mikka/desktop build` | Electron 主进程/preload 与同图桌面 Vite renderer |

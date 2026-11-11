@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { installationBuild } from './build-installation.mjs'
@@ -19,6 +19,9 @@ test('official releases require the checkout and a complete immutable revision',
   git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '--quiet', '--allow-empty', '-m', 'fixture')
   const directory = { MIKKA_UI_OVERLAY_DIR: checkout }
   const revision = { MIKKA_UI_OVERLAY_SHA: git('rev-parse', 'HEAD') }
+  const nested = join(checkout, 'unversioned-provider')
+  mkdirSync(nested)
+  await assert.rejects(installationBuild({ MIKKA_UI_OVERLAY_DIR: nested, ...revision }), /independentCheckoutRequired/)
   for (const env of [directory, revision, { ...directory, MIKKA_UI_OVERLAY_SHA: 'main' }, { VERCEL: '1', VERCEL_ENV: 'production' }]) {
     await assert.rejects(installationBuild(env), /OFFICIAL_UI_CHECKOUT_AND_REVISION_REQUIRED/)
   }
