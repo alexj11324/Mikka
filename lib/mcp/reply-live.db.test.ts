@@ -294,7 +294,7 @@ test('MCP waits use committed PG notifications; independent web observers still 
         try {
           await tx.query('BEGIN')
           if (!(await tx.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\' FOR SHARE', [workspace, owner])).rowCount) throw new ScheduleError('scheduleWorkspaceAccessDenied', 403)
-          const result = await work()
+          const result = await work({ role: 'admin' })
           await tx.query('COMMIT')
           return result
         } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }

@@ -17,7 +17,7 @@ test('native connection exports only the frozen authorized endpoints and encrypt
   await admin.query(`CREATE SCHEMA ${schema}`)
   try {
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY); INSERT INTO "user" VALUES('owner'),('other'); CREATE TABLE workspace_app_policies(app text)`)
-    for (const migration of ['20261031040000_personal_plugins.sql','20261104003000_mcp_workspace_shares.sql','20261111070000_native_task_mcp.sql']) await pool.query(await readFile(new URL('../../drizzle/'+migration,import.meta.url),'utf8'))
+    for (const migration of ['20261031040000_personal_plugins.sql','20261104003000_mcp_workspace_shares.sql','20261111210000_native_task_mcp.sql']) await pool.query(await readFile(new URL('../../drizzle/'+migration,import.meta.url),'utf8'))
     const store = new PersonalPluginStore(pool,{WORKSPACE_SECRETS_KEY:randomBytes(32).toString('hex')})
     const secret = `synthetic-${randomUUID()}`
     const native = await store.createMcp('owner',createMcpSchema.parse({name:'Local',transport:'stdio',command:'node',args:['server.js'],cwd:'/workspace/repo',env:{SERVICE_TOKEN:secret}}))

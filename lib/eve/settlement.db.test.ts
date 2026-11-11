@@ -9,7 +9,7 @@ if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Eve settlement te
 
 test('host settlement receipts preserve product publication across native RPC retries', {skip:!valid}, async t => {
   const {pool} = await import('../db')
-  for (const migration of ['20261111070100_eve_sessions.sql','20261111070200_eve_settlements.sql','20261111170000_eve_outcome_deliveries.sql']) await pool.query(await readFile(new URL('../../drizzle/'+migration,import.meta.url),'utf8'))
+  for (const migration of ['20261111210100_eve_sessions.sql','20261111210200_eve_settlements.sql','20261111210500_eve_outcome_deliveries.sql']) await pool.query(await readFile(new URL('../../drizzle/'+migration,import.meta.url),'utf8'))
   const {finishEveTurn} = await import('./settlement')
   const {registerSession} = await import('./scope')
   const ownerId='eve-settlement-'+randomUUID(),botId=randomUUID(),workspaceId=randomUUID()
