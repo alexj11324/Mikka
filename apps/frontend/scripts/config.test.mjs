@@ -52,3 +52,12 @@ test('Vite development keeps the actual development React runtime and Fast Refre
   assert.ok(config.plugins.flat(Infinity).some(plugin => /react/.test(plugin.name)))
   await assert.rejects(frontendConfig({ target: 'server' }), /FRONTEND_TARGET_INVALID/)
 })
+
+test('a server-pages build cannot package a private release or a desktop renderer', async () => {
+  await assert.rejects(frontendConfig({ target: 'desktop', serverPages: true }), /SERVER_PAGES_REQUIRE_PUBLIC_WEB_BUILD/)
+  for (const key of ['MIKKA_UI_OVERLAY_DIR', 'MIKKA_UI_OVERLAY_SHA']) {
+    await environment({ [key]: 'configured' }, async () => {
+      await assert.rejects(frontendConfig({ serverPages: true }), /SERVER_PAGES_REQUIRE_PUBLIC_WEB_BUILD/)
+    })
+  }
+})
