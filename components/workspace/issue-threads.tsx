@@ -14,6 +14,7 @@ import { Badge } from '@/components/reui/badge'
 import { runResult, useRunResultLabel, type RunResult } from '@/hooks/use-run-result'
 import { GROUP_BADGES, ThreadStatusIcon } from './thread-status-icon'
 import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
+import { ProfileAgentMark, ProfileMark } from '@/components/labels/profile-mark'
 import type { ThreadGroup } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
@@ -65,7 +66,9 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
   const items: AgentActivityItem[] = []
   const rows = stretches.map(({ first, last, ids }, index): AgentActivityRow => {
     const harness = last.detail?.harness ?? null
-    const name = harness ? harnessName(harness) : (last.ownerName ? t('ownerThread', { name: last.ownerName }) : t('hidden'))
+    // A custom Agent 配置 leads its row as on the conversation's stretch label; the Agent's mark follows, smaller.
+    const profile = harness ? last.detail?.profile ?? null : null
+    const name = profile ? profile.name : harness ? harnessName(harness) : (last.ownerName ? t('ownerThread', { name: last.ownerName }) : t('hidden'))
     const view = threadQuestionView(last)
     const outcome = acceptedProducerOutcome(last, issueId, allTasks)
     // The stretch's latest run, in the run-result words the right column and iOS use (glossary: Run result).
@@ -73,8 +76,9 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
     const group = RESULT_GROUP[result]
     const open = openId !== null && ids.includes(openId)
     const body = <>
-      {harness ? <span data-slot="agent-mark" className="flex size-5 shrink-0 items-center justify-center [&_svg]:size-4.5"><HarnessMark harness={harness} /></span> : <ThreadStatusIcon group={group} />}
-      <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">{name}</span>
+      {profile ? <span data-slot="profile-mark" className="flex size-5 shrink-0 items-center justify-center"><ProfileMark icon={profile.icon} color={profile.color} /></span>
+        : harness ? <span data-slot="agent-mark" className="flex size-5 shrink-0 items-center justify-center [&_svg]:size-4.5"><HarnessMark harness={harness} /></span> : <ThreadStatusIcon group={group} />}
+      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm font-medium"><span className="truncate">{name}</span>{profile && harness && <ProfileAgentMark harness={harness} />}</span>
       <Badge variant={view.stopping ? 'secondary' : GROUP_BADGES[group]} size="sm" data-group={group} data-run-result={result}>{view.stopping ? t('stopping') : resultLabel(result, reason)}</Badge>
       <time className="min-w-14 shrink-0 whitespace-nowrap text-right text-xs font-normal text-muted-foreground tabular-nums" dateTime={new Date(last.finishedAt ?? last.createdAt).toISOString()}>{format.relativeTime(threadTime(last, now), now)}</time>
     </>
@@ -82,7 +86,7 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
       ? <Button variant="ghost" data-agent-stretch={index + 1} aria-pressed={open} aria-label={t('open', { name })} className={cn('-mx-3 h-auto w-[calc(100%+1.5rem)] justify-start gap-3 rounded-lg px-3 py-2', open && 'bg-muted hover:bg-muted')} onClick={() => onOpen(first.id)}>{body}<ChevronRight data-icon="inline-end" className="text-muted-foreground rtl:rotate-180" /></Button>
       : <div className="flex min-w-0 items-center gap-3 py-2">{body}<span className="size-4" /></div>
     const at = new Date(first.createdAt).toISOString()
-    items.push({ id: `agent:${first.id}`, at, name, mark: harness ? <HarnessMark harness={harness} /> : <ThreadStatusIcon group={group} />, result: view.stopping ? t('stopping') : resultLabel(result, reason), group, time: format.relativeTime(threadTime(last, now), now), open, onOpen: first.detail ? () => onOpen(first.id) : null })
+    items.push({ id: `agent:${first.id}`, at, name, mark: profile ? <ProfileMark icon={profile.icon} color={profile.color} /> : harness ? <HarnessMark harness={harness} /> : <ThreadStatusIcon group={group} />, result: view.stopping ? t('stopping') : resultLabel(result, reason), group, time: format.relativeTime(threadTime(last, now), now), open, onOpen: first.detail ? () => onOpen(first.id) : null })
     return { id: `agent:${first.id}`, at, node }
   })
   return { rows, items, error: null, failed: null }

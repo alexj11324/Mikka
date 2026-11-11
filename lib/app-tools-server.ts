@@ -1,6 +1,6 @@
 import 'server-only'
 import { eq } from 'drizzle-orm'
-import { callAppTool, explicitSetting, listAppTools, type AppTool, type AppToolCall, type AppToolDeps, type AppToolExecution } from '@/lib/app-tools'
+import { appCallSetting, callAppTool, listAppTools, type AppTool, type AppToolCall, type AppToolDeps, type AppToolExecution } from '@/lib/app-tools'
 import { serverWriteJudge } from '@/lib/operations/write-judgment'
 import { resolveComposioAccount } from '@/lib/composio-actions'
 import { chosenComposioDefault } from '@/lib/composio-account-store'
@@ -13,27 +13,36 @@ import { proposeAppToolCall } from '@/lib/pending-action-store'
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { composioToolkitLister, isNoAuthToolkit } from '@/lib/plugins/catalog'
 import { MAX_RUN_APP_TOOLS, runAppTool, type RunAppScope } from '@/lib/run-app-mcp'
+import type { NativeWriteReview } from './operations/native-write-review'
 
 type Client = NonNullable<ReturnType<typeof getComposio>>
 
 /** Runs a pinned call in one connected account, or with no account for an app that needs none. */
-export async function executeAppToolCall(client: Client, userId: string, call: AppToolCall, accountId: string | null): Promise<AppToolExecution> {
+export async function executeAppToolCall(client: Client, userId: string, call: AppToolCall, accountId: string | null, signal?:AbortSignal): Promise<AppToolExecution> {
   // A no-auth app's tools run with the person's id alone; every other call names its account.
-  const result = await client.tools.execute(call.tool, { userId, ...(accountId ? { connectedAccountId: accountId } : {}), version: call.version, arguments: call.arguments })
+  signal?.throwIfAborted()
+  const result = await client.tools.execute(call.tool, { userId, ...(accountId ? { connectedAccountId: accountId } : {}), version: call.version, arguments: call.arguments }, {signal})
   return { successful: result.successful, data: result.data, error: result.error, ...(result.logId ? { logId: result.logId } : {}) }
 }
 
-export function appToolDeps(userId: string, botId: string | null, client: Client): AppToolDeps {
+export function appToolDeps(userId: string, botId: string | null, client: Client, signal?:AbortSignal): AppToolDeps {
   return {
     appAllowed: async toolkit => (await import('@/lib/app-policy/store')).botMayUseApp(botId, toolkit),
     noAuth: toolkit => isNoAuthToolkit(composioToolkitLister(client), toolkit).catch(() => false),
     resolveAccount: (toolkit, selected) => resolveComposioAccount(userId, toolkit, client, kit => chosenComposioDefault(userId, kit), selected),
     listTools: (toolkit, query) => client.tools.getRawComposioTools(query ? { toolkits: [toolkit], search: query, limit: 15 } : { toolkits: [toolkit], limit: 15 }) as Promise<AppTool[]>,
     getTool: slug => client.tools.getRawComposioToolBySlug(slug) as Promise<AppTool>,
-    execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId),
+    execute: (call, accountId) => executeAppToolCall(client, userId, call, accountId, signal),
     setting: async (tool, toolkit) => {
-      // Unreadable settings name nothing; the Decisions judge then decides, not a fixed ask.
-      try { return explicitSetting(await readWriteSettingLayers(db, userId, botId), [tool, toolkit]) } catch { return null }
+      // A layer that cannot be read names nothing: the call goes to the
+      // Decisions judge exactly as an unset key does, and the failure is logged
+      // by name (decision 2026-11-01-1330). Deliberately not a refusal — this
+      // contradicts the P1 note that would fail closed here; the ruling wins.
+      // The lookup covers the tool's slug, its app key and its legacy write action (send_slack_message).
+      try { return appCallSetting(await readWriteSettingLayers(db, userId, botId), tool, toolkit) } catch (failure) {
+        console.error('Workspace app setting unreadable: judged without it', { toolkit, tool, cause: failure instanceof Error ? failure.name : 'unknown' })
+        return null
+      }
     },
     judge: serverWriteJudge(userId, botId),
     recordStart: async (call, accountId) => {
@@ -48,11 +57,11 @@ export function appToolDeps(userId: string, botId: string | null, client: Client
   }
 }
 
-export async function runAppTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown) {
+export async function runAppTools(userId: string, botId: string | null, operation: 'list' | 'call', input: unknown, review?: NativeWriteReview, signal?:AbortSignal) {
   const client = getComposio()
   if (!client) return { error: 'composioNotConfigured' }
-  const deps = appToolDeps(userId, botId, client)
-  return operation === 'list' ? listAppTools(deps, input) : callAppTool(deps, input)
+  const deps = appToolDeps(userId, botId, client, signal)
+  return operation === 'list' ? listAppTools(deps, input) : callAppTool(deps, input, review ? { ownerId: userId, botId, review } : undefined)
 }
 
 /** The apps a device run may reach (one MCP entry each): connected by the owner, not one of Mikka's own integrations, and allowed for the Bot. */

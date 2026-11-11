@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test, { mock } from "node:test";
+import type { PoolClient } from 'pg';
 import { factory194Fixture } from "../../tests/helpers/factory194";
 import { factory194Target } from "../../tests/helpers/factory194-target";
 import { FactoryError } from "./approval-contract";
 import { createFactoryApprovals } from "./approval";
 import { handleFactoryApproval } from "./approval-http";
-import { createFactoryMerges, FactoryMergeRefused, type GitHubMergePort, type GitHubPullRequestView } from "./merge";
+import { createFactoryMerges, FactoryMergeRefused, type FactoryMergeBoundary, type GitHubMergePort, type GitHubPullRequestView } from "./merge";
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { threadGroup } from '../thread-groups'
 import { observePoolCommits } from '../db/commit-effects'
@@ -186,13 +187,20 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
           CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
           CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
           CREATE TABLE mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
-          CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,"issueIds" jsonb NOT NULL DEFAULT '[]'::jsonb);
+          CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,
+            "workspaceId" uuid NOT NULL REFERENCES mikka_workspaces(id),"issueIds" jsonb NOT NULL DEFAULT '[]'::jsonb,
+            UNIQUE(id,"workspaceId"));
+          CREATE TABLE workspace_project_tasks ("projectId" uuid NOT NULL,"issueId" uuid NOT NULL UNIQUE,"workspaceId" uuid NOT NULL,
+            PRIMARY KEY("projectId","issueId"),FOREIGN KEY("projectId","workspaceId") REFERENCES workspace_projects(id,"workspaceId"));
           CREATE TABLE mikka_team_projects ("projectId" uuid NOT NULL,"workspaceId" uuid NOT NULL,PRIMARY KEY("projectId","workspaceId"));
         `);
         const home = f.workspaceId;
         await pool.query(`INSERT INTO mikka_workspaces VALUES ($1,$2,'personal')`, [home, actor.userId]);
         await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,$2,'active')`, [home, actor.userId]);
         const x = await preparedDeliverable();
+        const projectId = randomUUID();
+        await pool.query('INSERT INTO workspace_projects (id,"userId","workspaceId") VALUES ($1,$2,$3)', [projectId, actor.userId, home]);
+        await pool.query('INSERT INTO workspace_project_tasks ("projectId","issueId","workspaceId") VALUES ($1,$2,$3)', [projectId, x.task.issueId, home]);
         const parent = randomUUID(), blocked = randomUUID();
         for (const [id, metadata] of [[parent, {}], [blocked, { blockedByIds: [x.task.issueId] }]] as const) {
           await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,revision) VALUES($1,$2,$4,'bound','Connected fixture',$3,1)`,
@@ -208,6 +216,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         await drain();
         const relations = sent.flatMap(value => value.events.filter(event => event.kind === 'issue_relations').map(event => event.id)).sort();
         assert.deepEqual(relations, [x.task.issueId, parent, blocked].sort(), 'the accepted child, parent progress and blocked task all refresh');
+        assert.ok(sent.some(value => value.events.some(event => event.kind === 'project_map' && event.id === projectId)), 'the canonical Project relation refreshes after COMMIT even with an empty legacy issueIds cache');
         assert.ok(sent.every(value => value.scope.ownerId === actor.userId && value.scope.workspaceId === home));
         const delivered = sent.length;
         assert.deepEqual(await x.accept(eventId, null), accepted);
@@ -295,6 +304,256 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       assert.equal(ledger.merges[0].status, "merged");
       const shown = await f.service([]).evidence(actor, x.task.id);
       assert.ok(shown.manifest.artifacts.length > 0, "a merged candidate keeps showing its evidence");
+    });
+
+    await t.test('trusted host guards compose with the durable Factory merge ledger', async t => {
+      type Prepared = Awaited<ReturnType<typeof prepared>>;
+      function guarded(overrides: Partial<FactoryMergeBoundary> = {}) {
+        const state = { commits: 0, rollbacks: 0, client: null as PoolClient | null, pid: null as number | null };
+        const boundary: FactoryMergeBoundary = {
+          async claim(work) {
+            const tx = await pool.connect();
+            state.client = tx;
+            try {
+              await tx.query('BEGIN');
+              state.pid = (await tx.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+              const result = await work(tx);
+              await tx.query('COMMIT');
+              state.commits++;
+              return result;
+            } catch (error) {
+              await tx.query('ROLLBACK');
+              state.rollbacks++;
+              throw error;
+            } finally {
+              state.client = null;
+              tx.release();
+            }
+          },
+          beforeInsert: async () => {},
+          existing: async () => {},
+          effect: (_id, _pull, invoke) => invoke(),
+          preserveUnknown: true,
+          ...overrides,
+        };
+        return { boundary, state };
+      }
+      const accept = (x: Prepared, boundary: FactoryMergeBoundary, eventId = randomUUID()) =>
+        x.merges.accept(actor, { binding: x.approval.binding, eventId }, TOKEN, boundary);
+      const ledger = async (x: Prepared, reader: Pick<PoolClient, 'query'> = pool) =>
+        (await reader.query('SELECT * FROM factory_merges WHERE "taskId"=$1 ORDER BY "createdAt"', [x.task.id])).rows;
+      async function pending(x: Prepared, mergeId: string, eventId: string) {
+        const rows = await ledger(x);
+        assert.equal(rows.length, 1);
+        assert.deepEqual([rows[0].id, rows[0].eventId, rows[0].status, rows[0].code, rows[0].finishedAt],
+          [mergeId, eventId, 'merging', null, null]);
+        assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
+      }
+
+      for (const reason of ['needs confirmation', 'source changed'] as const) await t.test(`${reason} before insertion rolls back without a claim or provider call`, async () => {
+        const x = await prepared(), eventId = randomUUID();
+        const denial = reason === 'needs confirmation' ? new Error('fixture_needs_confirm') : new FactoryError('factoryStale');
+        let checked = 0;
+        const g = guarded({
+          beforeInsert: async (tx, task, pull) => {
+            checked++;
+            assert.equal(tx, g.state.client);
+            assert.equal(task.candidateId, x.task.candidateId);
+            assert.deepEqual(pull, { sha: x.candidate.sha, url: x.pr, repo: 'alexj11324/Mikka', number: Number(x.pr.split('/').at(-1)) });
+            assert.equal((await ledger(x, tx)).length, 0);
+            await tx.query('UPDATE factory_tasks SET revision=revision+1 WHERE id=$1', [x.task.id]);
+            throw denial;
+          },
+          effect: async () => { assert.fail('a rejected claim cannot reach the effect boundary'); },
+        });
+        await assert.rejects(accept(x, g.boundary, eventId), error => error === denial);
+        assert.equal(checked, 1);
+        assert.deepEqual([g.state.commits, g.state.rollbacks], [0, 1]);
+        assert.deepEqual(await ledger(x), []);
+        assert.equal(x.github.calls.length, 0);
+        assert.equal((await pool.query('SELECT revision FROM factory_tasks WHERE id=$1', [x.task.id])).rows[0].revision, x.task.revision);
+        assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
+      });
+
+      await t.test('an effect guard rejects after a durable claim, records failure and never invokes PUT', async () => {
+        const x = await prepared(), eventId = randomUUID(), observer = await pool.connect();
+        let checked = 0;
+        const g = guarded({ effect: async (id, pull) => {
+          checked++;
+          assert.equal(g.state.commits, 1);
+          const rows = await ledger(x, observer);
+          assert.equal(rows.length, 1);
+          assert.deepEqual([rows[0].id, rows[0].eventId, rows[0].status, rows[0].sha], [id, eventId, 'merging', pull.sha]);
+          throw new FactoryMergeRefused('githubMergeHeadMoved', pull.url);
+        } });
+        try {
+          await assert.rejects(accept(x, g.boundary, eventId), refused('githubMergeHeadMoved'));
+          const rows = await ledger(x);
+          assert.equal(rows.length, 1);
+          assert.deepEqual([rows[0].eventId, rows[0].status, rows[0].source, rows[0].code],
+            [eventId, 'failed', 'mikka', 'githubMergeHeadMoved']);
+          assert.ok(rows[0].finishedAt);
+          assert.deepEqual(x.github.calls.map(call => call.op), ['pull', 'methods']);
+          await assert.rejects(accept(x, g.boundary, eventId), refused('githubMergeHeadMoved'));
+          assert.equal(checked, 1);
+          assert.deepEqual(await ledger(x), rows);
+          assert.equal(x.github.calls.filter(call => call.op === 'merge').length, 0);
+          assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
+        } finally { observer.release(); }
+      });
+
+      await t.test('the provider is invoked only after COMMIT and the claim task lock has been released', async () => {
+        const x = await prepared(), eventId = randomUUID(), observer = await pool.connect();
+        const g = guarded();
+        let effectCalls = 0, providerCalls = 0, claimId: string | undefined;
+        g.boundary.effect = async (id, pull, invoke) => {
+          effectCalls++;
+          claimId = id;
+          assert.equal(g.state.commits, 1);
+          assert.equal(g.state.client, null);
+          assert.equal(pull.sha, x.candidate.sha);
+          return invoke();
+        };
+        x.github.state.merge = async () => {
+          providerCalls++;
+          const rows = await ledger(x, observer);
+          assert.equal(rows.length, 1, 'an independent connection sees the committed claim before PUT');
+          assert.deepEqual([rows[0].id, rows[0].eventId, rows[0].status], [claimId, eventId, 'merging']);
+          assert.notEqual((await observer.query('SELECT pg_backend_pid() AS pid')).rows[0].pid, g.state.pid);
+          await observer.query('BEGIN');
+          try {
+            const unlocked = await observer.query('SELECT id FROM factory_tasks WHERE id=$1 FOR UPDATE NOWAIT', [x.task.id]);
+            assert.equal(unlocked.rowCount, 1, 'the claim does not hold its task lock over provider I/O');
+          } finally { await observer.query('ROLLBACK'); }
+          return { merged: true, mergeCommitSha: 'c'.repeat(40) };
+        };
+        try {
+          const result = await accept(x, g.boundary, eventId);
+          assert.equal(result.status, 'merged');
+          assert.deepEqual([effectCalls, providerCalls], [1, 1]);
+          assert.deepEqual(await x.taskState(), { stage: 'publish', status: 'passed' });
+          const row = (await ledger(x))[0];
+          assert.deepEqual([row.id, row.status, row.headSha, row.mergeCommitSha], [claimId, 'merged', x.candidate.sha, 'c'.repeat(40)]);
+        } finally { observer.release(); }
+      });
+
+      await t.test('a lost claim callback after COMMIT cannot restart a provider attempt on replay or after sixty seconds', async () => {
+        const x = await prepared(), eventId = randomUUID(), lost = new Error('fixture_claim_callback_lost');
+        const g = guarded(), originalClaim = g.boundary.claim;
+        g.boundary.claim = async work => { await originalClaim(work); throw lost; };
+        await assert.rejects(accept(x, g.boundary, eventId), error => error === lost);
+        const row = (await ledger(x))[0];
+        await pending(x, row.id, eventId);
+        assert.equal(x.github.calls.length, 0);
+        g.boundary.claim = originalClaim;
+        for (const replayId of [eventId, randomUUID()]) {
+          assert.deepEqual(await accept(x, g.boundary, replayId), { status: 'merging', mergeId: row.id, pullRequestUrl: x.pr });
+        }
+        assert.equal(x.github.calls.length, 0, 'fresh replay does not even read the provider');
+        await pool.query(`UPDATE factory_merges SET "createdAt"=clock_timestamp()-interval '61 seconds' WHERE id=$1`, [row.id]);
+        for (const replayId of [eventId, randomUUID()]) {
+          assert.deepEqual(await accept(x, g.boundary, replayId), { status: 'merging', mergeId: row.id, pullRequestUrl: x.pr });
+          await pending(x, row.id, eventId);
+        }
+        assert.deepEqual(x.github.calls.map(call => call.op), ['pull', 'pull']);
+      });
+
+      for (const loss of ['PUT response', 'effect callback', 'typed effect authorization'] as const)
+        await t.test(`${loss} loss preserves an unknown outcome through negative readback and stale replays`, async () => {
+          const x = await prepared(), eventId = randomUUID();
+          let effectCalls = 0, existingCalls = 0;
+          const g = guarded({
+            existing: async () => { existingCalls++; },
+            effect: async (_id, _pull, invoke) => {
+              effectCalls++;
+              const result = await invoke();
+              if (loss === 'effect callback') throw new Error('fixture_effect_callback_lost');
+              if (loss === 'typed effect authorization') throw new FactoryMergeRefused('githubMergeAuthorizationRequired', x.pr);
+              return result;
+            },
+          });
+          if (loss === 'PUT response') x.github.state.merge = async () => { throw new FactoryMergeRefused('githubUnavailable', x.pr); };
+          const result = await accept(x, g.boundary, eventId);
+          assert.equal(result.status, 'merging');
+          if (result.status !== 'merging') assert.fail('the provider outcome is still unknown');
+          await pending(x, result.mergeId, eventId);
+          assert.deepEqual(x.github.calls.map(call => call.op), ['pull', 'methods', 'merge', 'pull']);
+          const calls = x.github.calls.length;
+          for (const replayId of [eventId, randomUUID()]) assert.deepEqual(await accept(x, g.boundary, replayId), result);
+          assert.equal(x.github.calls.length, calls);
+          await pool.query(`UPDATE factory_merges SET "createdAt"=clock_timestamp()-interval '61 seconds' WHERE id=$1`, [result.mergeId]);
+          for (const replayId of [eventId, randomUUID()]) {
+            assert.deepEqual(await accept(x, g.boundary, replayId), result);
+            await pending(x, result.mergeId, eventId);
+          }
+          assert.deepEqual([effectCalls, existingCalls], [1, 4]);
+          assert.equal(x.github.calls.filter(call => call.op === 'merge').length, 1);
+          assert.equal(x.github.calls.length, calls + 2, 'stale reconciliation only reads, never issues a second PUT');
+        });
+
+      for (const readback of ['immediate', 'stale replay'] as const) await t.test(`a positive ${readback} still settles the original durable merge`, async () => {
+        const x = await prepared(), eventId = randomUUID(), g = guarded();
+        let reads = 0, mergedVisible = readback === 'immediate';
+        x.github.state.merge = async () => { throw new FactoryMergeRefused('githubUnavailable', x.pr); };
+        x.github.state.view = sha => ++reads > 1 && mergedVisible
+          ? { state: 'closed', merged: true, headSha: sha, mergeableState: null, mergeCommitSha: 'd'.repeat(40) }
+          : { state: 'open', merged: false, headSha: sha, mergeableState: 'clean', mergeCommitSha: null };
+        let result = await accept(x, g.boundary, eventId);
+        if (readback === 'stale replay') {
+          assert.equal(result.status, 'merging');
+          if (result.status !== 'merging') assert.fail('negative readback must remain unknown');
+          await pending(x, result.mergeId, eventId);
+          await pool.query(`UPDATE factory_merges SET "createdAt"=clock_timestamp()-interval '61 seconds' WHERE id=$1`, [result.mergeId]);
+          mergedVisible = true;
+          result = await accept(x, g.boundary, eventId);
+        }
+        assert.equal(result.status, 'merged');
+        if (result.status !== 'merged') assert.fail('a positive native receipt must settle');
+        const rows = await ledger(x);
+        assert.equal(rows.length, 1);
+        assert.deepEqual([rows[0].id, rows[0].eventId, rows[0].status, rows[0].headSha, rows[0].mergeCommitSha],
+          [result.mergeId, eventId, 'merged', x.candidate.sha, 'd'.repeat(40)]);
+        assert.deepEqual(await x.taskState(), { stage: 'publish', status: 'passed' });
+        assert.deepEqual(await accept(x, g.boundary, eventId), result);
+        assert.equal(x.github.calls.filter(call => call.op === 'merge').length, 1);
+      });
+
+      for (const status of ['merged', 'merging'] as const) for (const route of ['event replay', 'active candidate'] as const)
+        await t.test(`the existing guard rejects a different review tuple before returning a ${status} ${route}`, async () => {
+          const x = await prepared(), eventId = randomUUID(), g = guarded();
+          if (status === 'merging') x.github.state.merge = async () => { throw new FactoryMergeRefused('githubUnavailable', x.pr); };
+          const original = await accept(x, g.boundary, eventId);
+          assert.equal(original.status, status);
+          const before = await ledger(x), providerCalls = x.github.calls.length;
+          let seen = 0;
+          const binding = { ...x.approval.binding };
+          if (route === 'event replay') {
+            binding.candidateId = randomUUID(); binding.revision++;
+            await pool.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,kind,"runId")
+              SELECT $2,"taskId",sha,repository,environment,scope,kind,"runId" FROM factory_candidates WHERE id=$1`,
+            [x.task.candidateId, binding.candidateId]);
+            await pool.query('UPDATE factory_tasks SET "candidateId"=$2,revision=$3 WHERE id=$1', [x.task.id, binding.candidateId, binding.revision]);
+          } else {
+            // The same candidate can acquire a different current PR head; the
+            // host's frozen review must not inherit the earlier active receipt.
+            x.github.setHead('b'.repeat(40));
+          }
+          const denial = new FactoryError('factoryReplayMismatch');
+          g.boundary.existing = async (tx, row) => {
+            seen++;
+            assert.equal(tx, g.state.client);
+            assert.deepEqual([row.id, row.candidateId, row.sha, row.pullRequestUrl, row.eventId, row.status],
+              [before[0].id, x.task.candidateId, x.candidate.sha, x.pr, eventId, status]);
+            if (route === 'event replay') assert.notEqual(row.candidateId, binding.candidateId);
+            else assert.notEqual(row.sha, 'b'.repeat(40));
+            throw denial;
+          };
+          await assert.rejects(x.merges.accept(actor, { binding, eventId: route === 'event replay' ? eventId : randomUUID() }, TOKEN, g.boundary),
+            error => error === denial);
+          assert.equal(seen, 1);
+          assert.deepEqual(await ledger(x), before);
+          assert.equal(x.github.calls.length, providerCalls, 'the guard runs before returning or reconciling the previous receipt');
+        });
     });
 
     await t.test("head moved → refused before merging; GitHub's sha mismatch is refused the same way", async () => {
@@ -402,7 +661,11 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         CREATE TABLE IF NOT EXISTS mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
         CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
         CREATE TABLE IF NOT EXISTS mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
-        CREATE TABLE IF NOT EXISTS workspace_projects (id uuid PRIMARY KEY,"userId" text,"issueIds" jsonb NOT NULL DEFAULT '[]');
+        CREATE TABLE IF NOT EXISTS workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,
+          "workspaceId" uuid NOT NULL REFERENCES mikka_workspaces(id),"issueIds" jsonb NOT NULL DEFAULT '[]'::jsonb,
+          UNIQUE(id,"workspaceId"));
+        CREATE TABLE IF NOT EXISTS workspace_project_tasks ("projectId" uuid NOT NULL,"issueId" uuid NOT NULL UNIQUE,"workspaceId" uuid NOT NULL,
+          PRIMARY KEY("projectId","issueId"),FOREIGN KEY("projectId","workspaceId") REFERENCES workspace_projects(id,"workspaceId"));
         CREATE TABLE IF NOT EXISTS mikka_team_projects ("projectId" uuid,"workspaceId" uuid,PRIMARY KEY("projectId","workspaceId"));
       `);
       for (const name of ['20261025013400_run_checkpoints.sql', '20261031002607_checkpoint_recovery_availability.sql'])
@@ -416,6 +679,9 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         await pool.query('INSERT INTO mikka_workspaces VALUES ($1,$2,\'personal\')', [workspaceId, actor.userId]);
         await pool.query('INSERT INTO mikka_workspace_members VALUES ($1,$2,\'active\')', [workspaceId, actor.userId]);
       }
+      const projectId = randomUUID();
+      await pool.query('INSERT INTO workspace_projects (id,"userId","workspaceId") VALUES ($1,$2,$3)', [projectId, actor.userId, workspaceId]);
+      await pool.query('INSERT INTO workspace_project_tasks ("projectId","issueId","workspaceId") VALUES ($1,$2,$3)', [projectId, x.task.issueId, workspaceId]);
       await pool.query('UPDATE issues SET status=\'review\' WHERE id=$1', [x.task.issueId]);
       await pool.query('UPDATE factory_candidates SET "runId"=$2 WHERE id=$1', [x.task.candidateId, runId]);
       await pool.query('UPDATE run_publications SET "runId"=$2,"issueId"=$3 WHERE "pullRequest"->>\'url\'=$1', [x.pr, runId, x.task.issueId]);
@@ -494,6 +760,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
         await drain();
         assert.ok(sent.some(value => value.events.some(event => event.kind === 'pull_request_status' && event.id === x.task.issueId)));
+        assert.ok(sent.some(value => value.events.some(event => event.kind === 'project_map' && event.id === projectId)), 'the committed publication refreshes its canonical Project');
         sent.length = 0;
         assert.deepEqual(await x.merges.pullRequestMerged(event), { completed: 1 });
         assert.deepEqual(await x.taskState(), { stage: 'publish', status: 'passed' });

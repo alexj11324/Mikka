@@ -18,6 +18,16 @@ test('an unknown event or an older server never shows the stored text', () => {
   assert.equal(eventText(undefined, {}), '有一条新动态')
 })
 
+test('schedule results and task snapshots retain their useful status without protocol details', () => {
+  const line = { kind: 'scheduleRan' as const, runId: null, issueId: null, status: 'succeeded', title: '每日报告' }
+  assert.equal(eventText(line, {}), '定时任务「每日报告」 已执行')
+  for (const [status, text] of Object.entries({ failed: '执行失败', skipped: '已跳过', cancelled: '已取消' })) {
+    assert.equal(eventText({ ...line, status }, {}), `定时任务「每日报告」 ${text}`)
+  }
+  assert.equal(eventText({ ...line, kind: 'scheduleDue', status: null }, {}), '定时任务「每日报告」 到时间了')
+  assert.equal(eventText({ ...line, kind: 'issueSnapshot', issueId: 'task-id', title: '准备报告', status: 'review' }, {}), '「准备报告」 状态为评审中')
+})
+
 test('a thread still waiting for an answer is a card named without its task key (#1386)', () => {
   const line = { kind: 'runQuestion' as const, runId, issueId: null, status: null, title: null }
   assert.deepEqual(questionCard(line, sources), { runId, title: '登录页在 Safari 17 上白屏' })

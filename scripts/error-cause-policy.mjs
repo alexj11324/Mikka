@@ -136,7 +136,6 @@ export const droppedCauseAllowlist = {
   'lib/factory/vercel-publication.ts': 3,
   'lib/federated-search/input.ts': 1,
   'lib/github/run-pull-request.ts': 3,
-  'lib/github/user-access.ts': 5,
   'lib/infisical-workload.ts': 1,
   'lib/linear-sync/graphql.ts': 2,
   'lib/linear-sync/tokens.ts': 1,

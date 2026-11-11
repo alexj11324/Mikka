@@ -45,8 +45,11 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   // Like every hosted call (lib/abuse/model.ts): the workspace's own balance first, then shared credits.
   const { withSharedCredits } = await import('@/lib/credit-shares')
   if (store && usage) {
-    await withSharedCredits(scope.workspaceId, billingAdapter?.admit ?? usage.canUseMikkaPaid)
-    await withSharedCredits(scope.workspaceId, payer => store.reserve(payer, DECISION_MODEL, callId))
+    const billingPrincipal = await withSharedCredits(scope.workspaceId, async payer => {
+      await (billingAdapter?.admit ?? usage.canUseMikkaPaid)(payer)
+      return { payer, organizationId: hostedBillingScope.getStore()?.billingOrganizationId ?? null }
+    })
+    await withSharedCredits(scope.workspaceId, payer => store.reserve(payer, DECISION_MODEL, callId), billingPrincipal)
   }
   let requestStarted = false
   try {
@@ -78,8 +81,13 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
       {
         const receipt = payload as {provider_metadata?:unknown; usage?:unknown}
         const cost = gatewayCost(receipt.provider_metadata)
-        report({ usage: decisionTokenUsage(receipt.usage), totalCostUsd: cost === null ? null : cost / 1_000_000 })
-        if (store) await store.settle(callId,cost,0,0,gatewayGenerationId(receipt.provider_metadata))
+        const tokens = decisionTokenUsage(receipt.usage)
+        report({ usage: tokens, totalCostUsd: cost === null ? null : cost / 1_000_000 })
+        // The receipt already carries the real counts; settle them instead of the
+        // zeros this used to record, which made every routing decision look free.
+        if (store) await store.settle(callId,cost,decisionTokenCount(tokens.inputTokens),decisionTokenCount(tokens.outputTokens),
+          gatewayGenerationId(receipt.provider_metadata),
+          { read: decisionTokenCountOrNull(tokens.inputTokenDetails.cacheReadTokens), write: decisionTokenCountOrNull(tokens.inputTokenDetails.cacheWriteTokens) })
         if (store && isCloudEdition()) await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
       }
       const answers = validatedAnswers(payload, requestedQuestions)
@@ -126,6 +134,24 @@ function decisionTokenUsage(value: unknown) {
     outputTokens: usage.outputTokens ?? usage.output_tokens ?? usage.completion_tokens,
     inputTokenDetails: { cacheReadTokens: details.cached_tokens, cacheWriteTokens: usage.cache_creation_input_tokens },
   }
+}
+
+/**
+ * A ledger token total, or 0 when the envelope carried no usable number. These
+ * columns have always meant "this call ran", so an absent total stays 0 here.
+ */
+function decisionTokenCount(value: unknown): number {
+  const count = decisionTokenCountOrNull(value)
+  return count ?? 0
+}
+
+/**
+ * A cache count, or null when absent. Absent means the provider reported no cache
+ * figure, which is not the same fact as reporting zero, so it must stay null.
+ */
+function decisionTokenCountOrNull(value: unknown): number | null {
+  const count = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN
+  return Number.isSafeInteger(count) && count >= 0 ? count : null
 }
 /** Compatibility for callers that need answers only. Use invokeDecision when
  * binding a downstream operation/evaluation to the actual model invocation. */

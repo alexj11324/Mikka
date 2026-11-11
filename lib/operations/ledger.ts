@@ -48,7 +48,9 @@ export type OperationAuthorize = (tx: PoolClient, binding: OperationIntent, runI
 export async function lockOperation(tx: PoolClient, input: OperationIdentity) {
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['operation', z.uuid().parse(input.operationId).toLowerCase(), input.ownerId, input.workspaceId])])
 }
-export function createOperationLedger(pool: Pool, authorize: OperationAuthorize, context: WriteRequestContext = {}) {
+export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
+  context: WriteRequestContext & { /** Trusted local projection, committed atomically with the ledger outcome. */
+    project?: (tx: PoolClient, record: Readonly<OperationRecord>) => Promise<void> } = {}) {
   if (typeof authorize !== 'function') throw new OperationError('operationAuthorizationRequired')
   async function transaction<T>(input: OperationIdentity, work: (tx: PoolClient) => Promise<T>, guardedWork?: WriteTransactionOptions<T>['guardedWork']): Promise<T> {
     return writeTransaction(pool, async tx => { await lockOperation(tx, input); return work(tx) }, { signal: context.signal, guard: context.guard, guardedWork })
@@ -75,8 +77,10 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
     async read(input: OperationIdentity) {
       return transaction(input, async tx => { const row = await owned(tx, input); if (row.runId !== null) assertOperationRun(row.binding, row.runId); await authorize(tx, row.binding, row.runId, 'read'); return row })
     },
-    async claim(input: OperationIdentity, runId: string) {
-      z.uuid().parse(runId)
+    /** Session-owned human effects have no execution Run. Their authorizer
+     * binds the source artifact separately; never invent a Run for an effect. */
+    async claim(input: OperationIdentity, runId: string | null) {
+      z.uuid().nullable().parse(runId)
       return transaction(input, async tx => {
         const row = await owned(tx, input)
         assertOperationRun(row.binding, runId)
@@ -110,6 +114,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         const beforeSend = async () => { await lease?.check(); await authorize(tx, row.binding, row.runId, 'invoke'); await lease?.check() }
         const receipt = receiptSchema.parse(await execute(row, beforeSend, signal))
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=\'succeeded\',receipt=$2,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, receipt])
+        await context.project?.(tx, rows[0]!)
         await approvedWriteChanged(tx, row.operationId, row.ownerId)
         return rows[0]
       })
@@ -128,6 +133,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         await authorize(tx, row.binding, row.runId, 'settle')
         if (row.attemptToken !== attemptToken || row.status !== 'executing') throw new OperationError('operationStaleAttempt')
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=$2,receipt=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, outcome.status, receipt])
+        await context.project?.(tx, rows[0]!)
         if (outcome.status === 'succeeded') await approvedWriteChanged(tx, row.operationId, row.ownerId)
         return rows[0]
       })
@@ -154,6 +160,7 @@ export function createOperationLedger(pool: Pool, authorize: OperationAuthorize,
         if (evidence === null) return row
         const receipt = receiptSchema.parse(evidence)
         const { rows } = await tx.query<OperationRecord>('UPDATE operation_ledger SET status=$2,receipt=$3,"updatedAt"=clock_timestamp() WHERE "operationId"=$1 RETURNING *', [row.operationId, 'succeeded', receipt])
+        await context.project?.(tx, rows[0]!)
         await approvedWriteChanged(tx, row.operationId, row.ownerId)
         return rows[0]
       })

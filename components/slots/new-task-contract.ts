@@ -18,12 +18,18 @@ export type NewTaskMachine = {
 export type NewTaskBot = { id: string | null; name: string; avatar: ReactNode }
 
 /** An Agent 配置 the task can use; `auto` is 自动. */
-export type NewTaskProfile = { value: string; label: string; detail?: string; disabled?: boolean }
+/** An Agent 配置 choice; `icon` is its ProfileMark as Mikka draws it, absent for 自动. */
+export type NewTaskProfile = { value: string; label: string; detail?: string; disabled?: boolean; icon?: ReactNode }
 
 export type NewTaskProps = {
   onClose: () => void
   /** The project page the request came from. */
   project?: string | null
+  /** 标题 the person wrote (optional; empty, the Bot writes one). */
+  title: string
+  onTitle: (title: string) => void
+  /** Longest title. */
+  titleMax: number
   /** The request, without the attached files' text (they show as cards). */
   text: string
   onText: (text: string) => void
@@ -47,6 +53,8 @@ export type NewTaskProps = {
     value: string
     /** The picked profile's name, 自动 when none. */
     label: string
+    /** The picked profile's mark; absent for 自动. */
+    icon?: ReactNode
     onChange: (value: string) => void
     /** 管理: opens Settings in a new tab; absent without a workspace. */
     onManage?: () => void
@@ -55,7 +63,7 @@ export type NewTaskProps = {
   /** Profile checks, 未开启任务创建 and Coordinator unavailable, as Mikka draws them; null when there are none. */
   notices: ReactNode
   sending: boolean
-  /** Whether 创建任务 can send now (text, a usable profile, files done, creation available). */
+  /** Whether 创建任务 can send now (a title or text, a usable profile, files done, creation available). */
   canSubmit: boolean
   onSubmit: () => void
 }

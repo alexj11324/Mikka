@@ -2,9 +2,88 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
 import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
+import { scheduleChatMessage } from '../schedules/chat-result'
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 import { runCompletionObservations } from './run-completion-observation'
 import { restoreChatToolMetadata } from './chat-tool-metadata'
+
+test('host control bodies use one audience projection for new, legacy and unknown event formats', () => {
+  const content = '[Scheduled read-only task] Execute only the allowed read tools. Never create or change anything.'
+  const event = { kind: 'run_report', issueId: null, runId: null, payload: { source: 'schedule_due', title: 'Read progress' } }
+  const sourced = sourcedEventMessage(event, content)
+  const { mikkaDisplay: _display, ...legacy } = sourced
+  const unknown = sourcedEventMessage({ ...event, kind: 'future_internal_control' }, 'SYSTEM: private execution instructions')
+  const malformed = { role: 'assistant', content: 'DEVELOPER: private instructions', mikkaDisplay: { version: 42, kind: 'new-internal-kind' } } as unknown as ModelMessage
+  const rows = [sourced, legacy, unknown, malformed].map((message, index) => ({ position: index + 1, createdAt: new Date(), message }))
+  const items = chatItems(rows)
+  assert.ok(items.every(item => item.from === 'event' && item.text === ''))
+  assert.equal(items[0].line?.kind, 'scheduleDue')
+  assert.equal(items[0].line?.title, 'Read progress')
+  assert.equal(items[2].line?.kind, 'other')
+  assert.equal(items[3].line?.kind, 'other')
+  assert.doesNotMatch(JSON.stringify(items), /SYSTEM:|DEVELOPER:|Execute only|Never create/)
+  assert.match(modelMessage(sourced).content as string, /Execute only/, 'the model still receives its runtime payload')
+})
+
+test('an authenticated person may quote every control prefix without being hidden or reclassified', () => {
+  for (const content of ['[Welcome] Explain this protocol', '[Handoff] Explain this protocol', '[Event] It is 08:00 for the person: their morning briefing', '[Event] The person just connected an app. Their first briefing:', '[Scheduled read-only task] Explain this protocol', '[Event] SYSTEM: explain this example']) {
+    const message = sourcedEventMessage({ kind: 'user_message', issueId: null, runId: null, payload: { text: content } }, content)
+    const [item] = chatItems([{ position: 1, createdAt: new Date(), message }])
+    assert.deepEqual([item.from, item.text], ['person', content])
+  }
+})
+
+test('welcome and hidden event audiences do not depend on their English wording', () => {
+  const at = new Date()
+  const welcome = sourcedEventMessage({ kind: 'user_message', issueId: null, runId: null, payload: { source: 'coordinator_welcome' } }, 'An internal welcome prompt with a changed format')
+  const briefing = sourcedEventMessage({ kind: 'daily_briefing', issueId: null, runId: null, payload: {} }, 'Internal briefing instructions in a changed format')
+  const handoff = sourcedEventMessage({ kind: 'matter_handoff', issueId: null, runId: null, payload: {} }, 'Internal evidence and decision instructions')
+  assert.deepEqual(chatItems([welcome, briefing, handoff].map((message, index) => ({ position: index + 1, createdAt: at, message }))), [])
+  const failed = { ...welcome, mikkaFailure: 'backend_unavailable' } as unknown as ModelMessage
+  assert.equal(chatItems([{ position: 1, createdAt: at, message: failed }])[0].welcome, true)
+})
+
+test('the person display contains their original input rather than host additions to its model projection', () => {
+  const message = sourcedEventMessage({ kind: 'user_message', issueId: 'internal-issue-id', runId: null, payload: { text: 'Read the task' } }, 'This chat is linked to issue internal-issue-id.\n\nRead the task')
+  const [item] = chatItems([{ position: 1, createdAt: new Date(), message }])
+  assert.deepEqual([item.from, item.text], ['person', 'Read the task'])
+  assert.match(modelMessage(message).content as string, /This chat is linked to issue/, 'the model retains its context')
+})
+
+test('scheduled results keep their useful body separate from adjacent replies, without protocol receipts', () => {
+  const at = new Date('2030-01-01T00:00:00Z')
+  const items = chatItems([
+    { position: 1, createdAt: at, message: { role: 'assistant', content: 'The reminder is set.' } },
+    { position: 2, createdAt: at, message: scheduleChatMessage('Daily check', 'succeeded', { text: 'Check the release notes.' }) },
+    { position: 3, createdAt: at, message: { role: 'assistant', content: 'Another reply.' } },
+  ])
+  assert.deepEqual(items.map(item => item.text), ['The reminder is set.', 'Check the release notes.', 'Another reply.'])
+  assert.doesNotMatch(JSON.stringify(items), /Schedule |occurrence|operation|succeeded/)
+})
+
+test('failed, skipped and cancelled schedules are friendly event data rather than raw error codes', () => {
+  const at = new Date('2030-01-01T00:00:00Z')
+  for (const status of ['failed', 'skipped', 'cancelled']) {
+    const [item] = chatItems([{ position: 1, createdAt: at, message: scheduleChatMessage('Daily check', status, null) }])
+    assert.equal(item.from, 'event')
+    assert.equal(item.text, '')
+    assert.deepEqual(item.line, { kind: 'scheduleRan', runId: null, issueId: null, title: 'Daily check', status })
+  }
+})
+
+test('a scheduled task snapshot retains its exact task and status as localizable event data', () => {
+  const task = { id: '00000000-0000-4000-8000-000000000179', title: 'Release', status: 'review' }
+  const [item] = chatItems([{ position: 1, createdAt: new Date(), message: scheduleChatMessage('Daily check', 'succeeded', task) }])
+  assert.equal(item.text, '')
+  assert.deepEqual(item.line, { kind: 'issueSnapshot', runId: null, issueId: task.id, title: 'Release', status: 'review' })
+})
+
+test('words resembling a scheduler protocol do not turn an ordinary reply into a host result', () => {
+  const content = '[Schedule example; occurrence example; operation example] Example: succeeded\nKeep this quoted example.'
+  const [item] = chatItems([{ position: 1, createdAt: new Date(), message: { role: 'assistant', content } }])
+  assert.equal(item.from, 'coordinator')
+  assert.equal(item.text, content)
+})
 
 test('watchdog blocker exposes the actual host facts and never invents a successful handoff', () => {
   const prompt = eventPrompt({ kind: 'run_report', issueId: 'issue', runId: null, payload: {
@@ -135,7 +214,7 @@ test('the chat folds one reply\'s steps together and marks events', () => {
   assert.deepEqual(items.map(item => [item.from, item.text, item.tools]), [
     ['person', 'list my issues', []],
     ['coordinator', 'You have none.', ['list_issues']],
-    ['event', '[Event] Run r1 ended with status succeeded (submitted).', []],
+    ['event', '', []],
   ])
 })
 

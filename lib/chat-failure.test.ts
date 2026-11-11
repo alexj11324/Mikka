@@ -3,6 +3,14 @@ import { CLOUD_ERROR_CODES, CloudServiceError } from './cloud-services/errors'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { chatFailure, failureMessageKey } from './chat-failure'
+
+test('native admission and quiet completion require an explicit native failure',()=>{
+  const items=[{from:'person',native:true as const}]
+  assert.equal(chatFailure({working:false,error:null,items}),null)
+  assert.equal(chatFailure({working:true,error:'turn_failed',items}),null)
+  assert.equal(chatFailure({working:false,error:'turn_failed',items})?.kind,'failed')
+  assert.equal(chatFailure({working:false,error:null,items:[{from:'person'}]})?.kind,'failed','historical legacy failures retain their existing presentation')
+})
 import { chatBalanceRefusal } from './chat-balance'
 import { failureLine } from '../apps/mobile/lib/chat-failure'
 

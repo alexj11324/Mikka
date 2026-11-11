@@ -255,6 +255,7 @@ before(async () => {
     chatReadTrace.push('live'); return { ownerId: owner, workspaceId: chatHome, deadline: { at: chatExpiry.toISOString(), afterMs: chatExpiry.getTime() - observedAt } }
   } } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
+  mock.module('@/lib/eve/retry',{namedExports:{retryEveTurn:async()=>retryQueued?{queued:true}:{queued:false,reason:retryWorking?'working':'nothingToRetry'}}})
   mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
   mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
   ;({ POST } = await import('../app/api/coordinator/messages/route'))
@@ -284,7 +285,7 @@ test('matching captured workspaces keep one trusted resolution and immutable ret
   assert.deepEqual(botResolutions, [{ botId: null, workspaceId: PROFILE_WORKSPACE }])
   const saved = structuredClone([...current.rows.values()])
   assert.equal(saved.length, 1); assert.equal(saved[0].botId, COORDINATOR_BOT)
-  assert.deepEqual(saved[0].payload, { text: 'captured task' }, 'the client expectation does not become persisted authority')
+  assert.deepEqual(saved[0].payload, { text: 'captured task', source: 'person' }, 'the client expectation does not become persisted authority')
   workspaceReads = 0; botResolutions.length = 0
   actionWorkspace = CHAT_HOME
   try {
@@ -352,7 +353,7 @@ test('reply retry reports unavailable, already working and no failed turn withou
   assert.equal(callbacks.length, 0)
   retryQueued = true
   assert.deepEqual(await retryCoordinatorTurn(), { queued: true })
-  assert.equal(callbacks.length, 1)
+  assert.equal(callbacks.length, 0, 'native retry delegates send directly without the old outbox wake')
   retryQueued = false; callbacks.length = 0
 })
 
@@ -651,13 +652,43 @@ for (const profileId of ['default', 'a1284000-0000-4000-8000-000000000005']) tes
   await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, profileId: undefined }), SubmissionConflictError)
 })
 
+test('a task title is trimmed, frozen in the immutable user submission and cannot be changed on retry', async () => {
+  const f = fixture()
+  const options = { botId: COORDINATOR_BOT, submissionId, taskTitle: '  Fix login redirect  ' }
+  const sent = await recordPersonalSubmission(f.executor, 'owner', 'Build this feature', options)
+  assert.deepEqual(await recordPersonalSubmission(f.executor, 'owner', 'Build this feature', options), { duplicate: true, eventId: sent.eventId })
+  assert.equal((([...f.rows.values()][0].payload) as Record<string, unknown>).taskTitle, 'Fix login redirect')
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, taskTitle: 'Another title' }), SubmissionConflictError)
+  await assert.rejects(recordPersonalSubmission(f.executor, 'owner', 'Build this feature', { ...options, taskTitle: undefined }), SubmissionConflictError)
+  for (const invalid of ['', '   ', 'x'.repeat(61), 'two\nlines']) await assert.rejects(recordPersonalSubmission(fixture().executor, 'owner', 'Build this feature', { ...options, taskTitle: invalid }), `rejects ${JSON.stringify(invalid)}`)
+})
+
+test('a task title makes the message a task submission with the normal gates and rejects an invalid title', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = true
+  overrideDeploymentSwitch('issueTools', true)
+  const send = (title = 'Fix login redirect') => sendCoordinatorMessage('do the task', null, null, submissionId, undefined, undefined, undefined, undefined, undefined, undefined, title)
+  try {
+    assert.deepEqual(await send(), { queued: true })
+    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', source: 'person', taskTitle: 'Fix login redirect' })
+    assert.deepEqual(await send(), { queued: true })
+    assert.equal(current.rows.size, 1)
+    for (const invalid of ['', '   ', 'x'.repeat(61), 'two\nlines']) assert.deepEqual(await send(invalid), { error: 'validationGeneric', params: undefined })
+    assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'Fix login redirect'), { error: 'validationGeneric', params: undefined }, 'a titled task needs a submission id')
+    enabled = false
+    assert.deepEqual(await send(), { error: 'coordinatorUnavailable', params: undefined })
+    enabled = true; overrideDeploymentSwitch('issueTools', false)
+    assert.deepEqual(await send(), { error: 'issueToolsDisabled', params: undefined })
+    assert.equal(current.rows.size, 1)
+  } finally { enabled = true; overrideDeploymentSwitch('issueTools', undefined) }
+})
+
 test('the task-form Default choice needs no custom row and retains normal submission gates', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = true
   overrideDeploymentSwitch('issueTools', true)
   const send = (profileId = 'default') => sendCoordinatorMessage('do the task', null, null, submissionId, undefined, undefined, undefined, undefined, profileId)
   try {
     assert.deepEqual(await send(), { queued: true })
-    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', profileId: 'default' })
+    assert.deepEqual([...current.rows.values()][0].payload, { text: 'do the task', source: 'person', profileId: 'default' })
     assert.deepEqual(await send(), { queued: true })
     assert.equal(current.rows.size, 1)
     const wakes = callbacks.length
@@ -704,13 +735,15 @@ test('an explicit Profile keeps workspace-default placement and the normal task 
   } finally { enabled = true; profileRows.clear(); overrideDeploymentSwitch('issueTools', undefined) }
 })
 
-test('the composer transport carries an explicit expectation and preserves legacy argument length', async () => {
+test('the composer carries its captured Workspace expectation through the native transport', async () => {
   const { createElement } = await import('react')
   const { renderToStaticMarkup } = await import('react-dom/server')
-  const actions = await import('../app/actions/coordinator')
-  const sent: unknown[][] = []
-  const action = mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
-    ...actions, sendCoordinatorMessage: async (...args: Parameters<typeof sendCoordinatorMessage>) => { sent.push(args); return { queued: true as const } },
+  const native = await import('./eve/client')
+  const sent: { botId: string | null; text: string; options: import('eve/client').SendTurnOptions }[] = []
+  const transport = mock.module(new URL('./eve/client.ts', import.meta.url).href, { namedExports: {
+    ...native, coordinatorAgentClient: (botId: string | null) => ({ sessions: { create: async () => ({ session: {
+      send: async (text: string, options: import('eve/client').SendTurnOptions) => { sent.push({ botId, text, options }) },
+    } }) } }),
   } })
   const client = mock.module(new URL('./auth-client.ts', import.meta.url).href, { namedExports: {
     authClient: { getSession: async () => ({ data: { user: { id: 'owner' } }, error: null }) },
@@ -723,9 +756,12 @@ test('the composer transport carries an explicit expectation and preserves legac
     renderToStaticMarkup(createElement(Probe))
     assert.ok(held.composer)
     assert.equal((await held.composer.submit('legacy message', { botId: COORDINATOR_BOT })).kind, 'accepted')
-    assert.equal(sent[0].length, 9, 'omission remains compatible with an older nine-argument transport schema')
+    assert.equal(sent[0].botId, COORDINATOR_BOT)
+    assert.deepEqual(sent[0].options.clientContext, { botId: COORDINATOR_BOT })
+    assert.match(new Headers(sent[0].options.headers).get('x-mikka-submission-id')!, /^[0-9a-f-]{36}$/)
     assert.equal((await held.composer.submit('captured message', { botId: COORDINATOR_BOT, expectedWorkspaceId: PROFILE_WORKSPACE })).kind, 'accepted')
-    assert.equal(sent[1].length, 10); assert.equal(sent[1][9], PROFILE_WORKSPACE)
-    assert.equal(sent[1][2], COORDINATOR_BOT)
-  } finally { translations.restore(); client.restore(); action.restore() }
+    assert.equal(sent[1].botId, COORDINATOR_BOT)
+    assert.deepEqual(sent[1].options.clientContext, { botId: COORDINATOR_BOT, expectedWorkspaceId: PROFILE_WORKSPACE })
+    assert.equal(sent[1].text, 'captured message')
+  } finally { translations.restore(); client.restore(); transport.restore() }
 })

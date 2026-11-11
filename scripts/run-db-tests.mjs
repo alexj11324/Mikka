@@ -12,6 +12,17 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/task-presentation-read.ts', file: 'tests/task-presentation.db.test.ts', script: 'test:task-presentation-db' },
+  { marker: 'lib/telegram/handler.ts', file: 'tests/telegram-task-link.db.test.ts', script: 'test:task-identity-db' },
+  { marker: 'lib/linear-sync/issue-sync.ts', file: 'tests/linear-responsibility.db.test.ts', script: 'test:task-identity-db' },
+  { marker: 'lib/project-lifecycle.ts', file: 'tests/project-lifecycle.db.test.ts', script: 'test:project-v2-db' },
+  { marker: 'lib/issue-delegation.test.ts', file: 'tests/task-responsibility.db.test.ts', script: 'test:task-identity-db' },
+  { marker: 'lib/project-resources/run-lease.ts', file: 'tests/project-resource-lease.db.test.ts', script: 'test:project-resources-db' },
+  { marker: 'drizzle/20261111030006_project_history_retention.sql', file: 'tests/domain-lifecycle.db.test.ts', script: 'test:domain-lifecycle-db' },
+  { marker: 'lib/project-resources/store.ts', file: 'tests/project-resources.db.test.ts', script: 'test:project-resources-db' },
+  { marker: 'lib/task-identity-store.ts', file: 'tests/task-identity.db.test.ts', script: 'test:task-identity-db' },
+  { marker: 'scripts/project-v2-backfill.mjs', file: 'tests/project-v2.db.test.ts', script: 'test:project-v2-db' },
+  { marker: 'drizzle/20261111030003_team_lifecycle.sql', file: 'tests/team-lifecycle.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/inbox/store.ts', file: 'lib/inbox/store.db.test.ts', script: 'test:inbox-db' },
   { marker: 'app/api/factory/tasks/[taskId]/activity/route.ts', file: 'tests/factory-activity-http.db.test.ts', script: 'test:factory-activity-http-db' },
   { marker: 'lib/factory/activity.ts', file: 'lib/factory/activity.db.test.ts', script: 'test:factory-activity-db' },
@@ -30,12 +41,24 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/governance/templates.ts', file: 'tests/team-governance-api.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/governance/entitlements.ts', file: 'tests/governance-seats.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/task-workspace.ts', file: 'tests/task-workspace-governance.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/resource-access/store.ts', file: 'tests/resource-access.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
+  { marker: 'lib/drive/store.ts', file: 'lib/drive/store.db.test.ts', script: 'test:drive-db' },
+  { marker: 'lib/coding-workspace/requests.ts', file: 'lib/coding-workspace/files.db.test.ts', script: 'test:coding-workspace-db' },
+  { marker: 'app/api/runs/[runId]/workspace/files/route.ts', file: 'lib/coding-workspace/http-daemon.db.test.ts', script: 'test:coding-workspace-db' },
+  { marker: 'packages/daemon/src/main.ts', file: 'lib/coding-workspace/http-daemon.db.test.ts', script: 'test:coding-workspace-db' },
   { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/workspace-selection.ts', file: 'tests/web-workspace-selection.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
   { marker: 'lib/chat-attachments/store.ts', file: 'lib/chat-attachments/store.db.test.ts', script: 'test:chat-attachments-db' },
   { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
+  { marker: 'lib/eve/scheduled-read.ts', file: 'lib/eve/scheduled-read.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/scope.ts', file: 'lib/eve/scope.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/auth-bot.ts', file: 'lib/eve/auth-bot.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/sandbox.ts', file: 'lib/eve/sandbox.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/settlement.ts', file: 'lib/eve/settlement.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/outcome-delivery.ts', file: 'lib/eve/outcome-delivery.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/approval-store.ts', file: 'lib/eve/approval-bridge.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
   { marker: 'lib/run-leases.ts', file: 'tests/run-recovery.db.test.ts', script: 'test:run-recovery-db' },
   { marker: 'app/v1/runs/[runId]/checkpoint/route.ts', file: 'tests/checkpoint-recovery.db.test.ts', script: 'test:run-recovery-db' },
@@ -126,6 +149,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/run-bot-name.ts', file: 'tests/run-agent-names.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/run-outcome-judge.ts', file: 'tests/run-outcomes.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/billing/service.ts', file: 'tests/billing.db.test.ts', script: 'test:workspace-admin-db' },
+  { marker: 'lib/billing/management.ts', file: 'tests/billing-management.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/audit/query.ts', file: 'tests/audit-query.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/subscription-acquire-expiry.ts', file: 'lib/subscription-acquire-expiry.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/issue-relation-cycle.db.test.ts', file: 'lib/issue-relation-cycle.db.test.ts', script: 'test:relation-cycle' },
@@ -162,6 +186,7 @@ export const SELF_MANAGED = [
 // Register exact files so another pg-backed test in the same folder still fails
 // inventory until it has its own explicit gate.
 export const BROWSER_SUITES = [
+  // Compatibility path; the retained local MVP now uses native Eve HTTP only.
   { file: 'tests/mvp/coordinator-streaming.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
   { file: 'tests/mvp/core-loop.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
 ]

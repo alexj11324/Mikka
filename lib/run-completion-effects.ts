@@ -101,7 +101,7 @@ const defaultReconcileFor: FactoryReconcileFor = botId => async (userId, runId) 
  * this run, so execute → review no longer waits for a Coordinator turn.
  * Runs after the completion transaction commits (the reconciler takes its own
  * task/issue/run locks). It is idempotent: each transition is keyed by
- * factoryEventId("run-completion", runId), so replays and the preparePrompt
+ * factoryEventId("run-completion", runId), so replays and the product instruction preparation
  * fallback (workflows/coordinator/steps.ts) never advance a task twice.
  * Default-off: returns before any SQL unless both Factory flags are on.
  * Best effort: a failure is logged without payload and left to the fallback. */
@@ -128,7 +128,7 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
     })
   }
   // The next stage may fail to reconcile after this run has already committed.
-  // Record its terminal result independently: preparePrompt recovers the stage
+  // Record its terminal result independently: product instruction preparation recovers the stage
   // through a different entry point and would not retry this completion hook.
   // The recorder itself enforces owner/task/terminal scope and the replay key.
   try {

@@ -16,4 +16,4 @@ its kind's icon and verb plus object (「查看任务 ALEX-45」). A call that a
 reason in words. Raw input and output open only from that call's row. Any group's 全部展开 opens or closes every
 group in the chat. A task whose thread the same reply cites shows as its title, only the thread is a chip; a thread
 has one card per chat; a thread's repeated event line shows once, the latest. 「N 个来源」 lists web pages only and
-sits beside 复制 in one line that shows on hover or tap.
+sits beside 复制 in one line that is always there, muted until hovered or focused ([decision](2026-11-10-2002-chat-reply-actions-and-waiting.md)).

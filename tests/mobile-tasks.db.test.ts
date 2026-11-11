@@ -37,8 +37,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
         await pool.query('delete from artifacts where "userId"=any($1::text[])', [users])
         await pool.query('delete from agent_runs where "userId"=any($1::text[])', [users])
         await pool.query('delete from issues where "userId"=any($1::text[])', [users])
-        await pool.query('delete from issue_prefixes where "userId"=any($1::text[])', [users])
         await pool.query('delete from bots where "ownerId"=any($1::text[])', [users])
+        await pool.query('delete from issue_prefixes where "userId"=any($1::text[])', [users])
         await workspace.query('delete from mikka_workspaces where "userId"=any($1::text[])', [users])
         await pool.query('delete from "user" where id=any($1::text[])', [users])
       }
@@ -87,6 +87,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const noRun = await workspaceTask()
   const schedule = randomUUID()
   await pool.query(`insert into user_schedules (id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at) values ($1,$2,$3,$4,$5,$6,$7,$7,'active','2030-01-01T09:00:00Z')`, [schedule, owner, teamWorkspace.id, bot, randomUUID(), randomUUID(), { title: 'Daily task', timezone: 'UTC', timing: { kind: 'daily', time: '09:00', fold: 'earlier', gap: 'skip' }, task: { kind: 'issue_snapshot', issueId: noRun }, misfire: 'skip', maxLatenessMinutes: 60 }])
+  await pool.query(`insert into run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") values ($1,$2,$3,'https://github.com/acme/app','github.com/acme/app','published',$4)`, [latest, owner, issueId, { url: 'https://github.com/acme/app/pull/42', state: 'open' }])
   const personalTask = await seedIssue(pool, owner, own.id)
   const unlinkedTask = await workspaceTask(teamWorkspace.id, false)
   const secondTask = await workspaceTask(secondWorkspace.id, false)
@@ -105,8 +106,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const peer = await authContext.internalAdapter.createSession(other); assert.ok(peer)
   const signature = createHmac('sha256', authContext.secret).update(native.token).digest('base64')
   const cookie = authContext.authCookies.sessionToken.name + '=' + encodeURIComponent(native.token + '.' + signature)
-  const { createPersonalAccessToken, revokePersonalAccessToken } = await import('../lib/tokens/store')
-  const pat = await createPersonalAccessToken(owner, teamWorkspace.id, { name: 'Mobile task isolated fixture', expiresAt: null })
+  const { createLegacyPersonalAccessToken, revokePersonalAccessToken } = await import('../lib/tokens/store')
+  const pat = await createLegacyPersonalAccessToken(owner, teamWorkspace.id, { name: 'Mobile task isolated fixture', expiresAt: null })
   const teamSelection = { workspaceId: teamWorkspace.id }
   const run = async <T>(path: string, handler: (request: Request) => Promise<T>, options: ReadOptions = {}) => {
     const bearer = options.bearer === undefined ? native.token : options.bearer
@@ -136,6 +137,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(body.task.title, 'Short title')
     assert.equal(body.task.description, 'Description')
     assert.equal(body.task.group, 'pending', 'PR metadata wins over idle')
+    assert.deepEqual([body.task.state, body.task.reason, body.task.blockedBy], ['waiting', 'pr_review', null])
     assert.equal(body.task.bot.id, bot)
     assert.deepEqual(body.task.agent, { harness: 'codex', model: 'fixture-model' })
     assert.deepEqual(body.task.place, { kind: 'cloud', name: 'Cloud' })
@@ -143,6 +145,10 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.deepEqual(body.live, { workspaceId: teamWorkspace.id })
     assert.deepEqual(body.activity.map((row: { kind: string }) => row.kind), ['attempt', 'replaced', 'attempt', 'created'])
     assert.deepEqual(body.activity.filter((row: { kind: string }) => row.kind === 'attempt').map((row: { runId: string; n: number }) => [row.runId, row.n]), [[latest, 2], [first, 1]])
+    assert.equal(body.activity[0].state, 'done')
+    assert.deepEqual(body.activity[0].pullRequest, { number: 42, url: 'https://github.com/acme/app/pull/42' })
+    assert.equal(body.activity[2].state, 'replaced')
+    assert.equal(body.activity[2].pullRequest, null)
     assert.equal(body.activity[0].group, 'waiting', 'attempts retain the five thread groups consumed by iOS')
     assert.equal(body.activity[0].createdAt, body.activity[1].createdAt)
     assert.equal(body.activity.at(-1).by, 'owner')
@@ -157,7 +163,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(row.group, 'pending'); assert.equal(row.bot.id, bot); assert.ok(row.createdAt)
     assert.ok(Object.hasOwn(row, 'blocked'))
     const scheduled = body.tasks.find((item: { id: string }) => item.id === noRun)
-    assert.equal(scheduled.group, 'todo'); assert.equal(scheduled.bot, null)
+    assert.equal(scheduled.group, 'running'); assert.equal(scheduled.state, 'queued'); assert.equal(scheduled.bot, null)
     assert.equal(scheduled.schedule.label, 'Every day at 09:00')
     assert.equal(Date.parse(scheduled.schedule.nextAt), Date.parse('2030-01-01T09:00:00Z'))
     await pool.query(`update issues set status='done' where id=$1`, [issueId])
@@ -165,27 +171,148 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(closed.tasks.find((item: { id: string }) => item.id === issueId).group, 'done')
     assert.equal((await (await request(issueId)).json()).task.group, 'done')
   })
-  await t.test('without a thread, board flags and open dependencies put both list and detail in pending', async () => {
+  await t.test('without a thread, flags and dependencies preserve todo with matching reasons and visible identifiers', async () => {
+    await pool.query(`update user_schedules set status='cancelled',next_at=null where id=$1`, [schedule])
+    try {
     const groups = async () => {
       const listBody = await (await listRequest(teamSelection)).json()
       const row = listBody.tasks.find((item: { id: string }) => item.id === noRun)
       const detail = await (await request(noRun)).json()
-      return [row.group, detail.task.group]
+      for (const field of ['state', 'reason', 'blockedBy', 'group']) assert.equal(row[field], detail.task[field], `list/detail ${field}`)
+      return [row.group, detail.task.group, row.reason, row.blockedBy]
     }
     const metadata = async (value: unknown) => pool.query('update issues set content=$2 where id=$1', [noRun, { type: 'doc', attrs: { mikka: value } }])
     await metadata({ block: { blocked: true, runId: null } })
-    assert.deepEqual(await groups(), ['pending', 'pending'])
+    assert.deepEqual(await groups(), ['todo', 'todo', 'flagged', null])
     await pool.query(`update issues set status='done' where id=$1`, [noRun])
-    assert.deepEqual(await groups(), ['done', 'done'])
+    assert.deepEqual(await groups(), ['done', 'done', null, null])
     await pool.query(`update issues set status='todo' where id=$1`, [noRun])
     const blocker = await workspaceTask()
     await metadata({ blockedByIds: [blocker] })
-    assert.deepEqual(await groups(), ['pending', 'pending'])
+    const identifier = (await (await request(blocker)).json()).task.identifier
+    assert.ok(identifier)
+    assert.deepEqual(await groups(), ['todo', 'todo', 'blocked_by', identifier])
     await pool.query(`update issues set status='done' where id=$1`, [blocker])
-    assert.deepEqual(await groups(), ['todo', 'todo'])
+    assert.deepEqual(await groups(), ['todo', 'todo', null, null])
     await pool.query(`update issues set status='todo' where id=$1`, [blocker])
     await metadata({ blockedByIds: [blocker], block: { blocked: false, runId: null } })
-    assert.deepEqual(await groups(), ['todo', 'todo'], 'an explicitly cleared board block stays clear')
+    assert.deepEqual(await groups(), ['todo', 'todo', null, null], 'an explicitly cleared board block stays clear')
+    } finally {
+      await pool.query(`update user_schedules set status='active',next_at='2030-01-01T09:00:00Z' where id=$1`, [schedule])
+    }
+  })
+  await t.test('an ungrouped Shared Task keeps its issued number and tenant without an extra naming read', async () => {
+    const { setIssueTeam } = await import('../app/actions/team-relations')
+    const id = await workspaceTask()
+    const { rows: [original] } = await pool.query('select "issuedIdentifier","workspaceId","ownershipState",scope from issues where id=$1', [id])
+    assert.equal(original.workspaceId, teamWorkspace.id)
+    assert.equal(original.ownershipState, 'bound')
+    assert.equal(original.scope, 'workspace')
+    assert.ok(original.issuedIdentifier)
+    const setTeam = async (teamId: string | null, expectedTeamId: string | null) => {
+      const response = await run('/actions/team-relations/setIssueTeam', async () => Response.json(await setIssueTeam({ issueId: id, teamId, expectedTeamId })), { ...teamSelection, bearer: null, cookie })
+      assert.equal((await response.json()).ok, true, 'the ordinary authenticated grouping action succeeds')
+    }
+    await setTeam(null, team.id)
+    await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'MOBI', other, 'OTHR'])
+    await request(personalTask, { workspaceId: own.id })
+    const warmed = await request(id)
+    assert.equal(warmed.status, 200)
+    assert.equal((await warmed.json()).task.identifier, original.issuedIdentifier)
+    const personalRead = await measured(async () => {
+      const response = await request(personalTask, { workspaceId: own.id })
+      assert.equal(response.status, 200)
+      return response.json()
+    })
+    const unlinkedRead = await measured(async () => {
+      const response = await request(id)
+      assert.equal(response.status, 200)
+      return response.json()
+    })
+    assert.equal(unlinkedRead.value.task.identifier, original.issuedIdentifier)
+    assert.deepEqual(unlinkedRead.value.live, { workspaceId: teamWorkspace.id }, 'an absent Team link retains Shared ownership')
+    assert.ok(unlinkedRead.statements <= personalRead.statements,
+      'the same owner and absent Team link need no extra naming statement in a Shared Workspace')
+    assert.equal((await request(id, { workspaceId: own.id })).status, 404, 'removing a Team does not move the Task to Personal')
+    const member = await request(id, { bearer: peer.token })
+    assert.equal(member.status, 200, 'current Shared membership retains the ungrouped Task')
+    assert.equal((await member.json()).task.identifier, original.issuedIdentifier)
+    await setTeam(team.id, null)
+    const relinked = await request(id)
+    assert.equal(relinked.status, 200)
+    const relinkedBody = await relinked.json()
+    assert.equal(relinkedBody.task.identifier, original.issuedIdentifier, 'reattaching a Team cannot reissue the number')
+    assert.deepEqual(relinkedBody.live, { workspaceId: teamWorkspace.id }, 'relinking keeps the persisted Shared workspace')
+    assert.equal((await request(id, { workspaceId: own.id })).status, 404, 'a prior negative Team lookup cannot move the Task to Personal')
+    assert.equal((await request(id, { workspaceId: secondWorkspace.id })).status, 404)
+    const { rows: [retained] } = await pool.query('select "issuedIdentifier","workspaceId","ownershipState",scope from issues where id=$1', [id])
+    assert.deepEqual(retained, original)
+    t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'mobile-unlinked-task-detail', scope: 'data-read-path_not_page_http',
+      personal: readMetrics(personalRead), unlinked: readMetrics(unlinkedRead) }))
+  })
+
+  await t.test('all task states/reasons are projected identically by real GET routes', async () => {
+    const id = await workspaceTask()
+    const runId = await seedRun(pool, { userId: owner, agentId: agent, issueId: id })
+    const scenarios = [
+      ['todo', 'waiting_input', null, null, null, 'waiting', 'needs_input', 'pending'],
+      ['todo', 'paused', null, 'human_control', null, 'waiting', 'approval', 'pending'],
+      ['review', 'succeeded', 'done', null, null, 'waiting', 'pr_review', 'pending'],
+      ['todo', 'succeeded', 'blocked', null, null, 'blocked', 'blocked', 'pending'],
+      ['todo', 'paused', null, 'quota_exhausted', null, 'blocked', 'quota', 'pending'],
+      ['todo', 'failed', null, null, 'device_lost', 'blocked', 'offline', 'pending'],
+      ['todo', 'failed', null, null, null, 'failed', null, 'pending'],
+      ['todo', 'preparing', null, null, null, 'running', null, 'running'],
+      ['todo', 'running', null, null, null, 'running', null, 'running'],
+      ['todo', 'finishing', null, null, null, 'running', null, 'running'],
+      ['todo', 'queued', null, null, null, 'queued', null, 'running'],
+      ['todo', 'succeeded', 'done', null, null, 'todo', null, 'todo'],
+      ['done', 'running', null, null, null, 'done', null, 'done'],
+      ['canceled', 'running', null, null, null, 'canceled', null, 'done'],
+      ['duplicate', 'running', null, null, null, 'duplicate', null, 'done'],
+    ]
+    for (const [taskStatus, status, outcome, pauseReason, stopReason, state, reason, group] of scenarios) {
+      await pool.query('update issues set status=$2 where id=$1', [id, taskStatus])
+      await pool.query('update agent_runs set status=$2,outcome=$3,"pauseReason"=$4,"stopReason"=$5 where id=$1', [runId, status, outcome, pauseReason, stopReason])
+      const detail = (await (await request(id)).json()).task
+      const body = await (await listRequest(teamSelection)).json()
+      const row = body.tasks.find((item: { id: string }) => item.id === id)
+      for (const task of [detail, row]) assert.deepEqual([task.state, task.reason, task.blockedBy, task.group], [state, reason, null, group], `${taskStatus}/${status}/${outcome}`)
+    }
+    // Queued local devices use presence, while completed attempts ignore later device loss.
+    const device = randomUUID()
+    await pool.query(`insert into devices (id,"ownerId",name,kind,"lastSeenAt") values ($1,$2,'Test device','local',now()-interval '1 day')`, [device, owner])
+    await pool.query(`update issues set status='todo' where id=$1`, [id])
+    await pool.query(`update agent_runs set status='queued',outcome=null,"stopReason"=null,"deviceId"=$2 where id=$1`, [runId, device])
+    const compare = async (state: string, reason: string | null) => {
+      const task = (await (await request(id)).json()).task
+      const row = (await (await listRequest(teamSelection)).json()).tasks.find((item: { id: string }) => item.id === id)
+      for (const value of [task, row]) assert.deepEqual([value.state, value.reason], [state, reason])
+    }
+    await compare('blocked', 'offline')
+    await pool.query('update devices set "lastSeenAt"=now() where id=$1', [device])
+    await compare('queued', null)
+    await pool.query('update devices set enabled=false where id=$1', [device])
+    await compare('blocked', 'offline')
+    await pool.query(`update agent_runs set status='succeeded',outcome='done' where id=$1`, [runId])
+    await compare('todo', null)
+    // Pending CLI approval is run-scoped and expires instead of remaining waiting forever.
+    await pool.query(`update agent_runs set status='running',outcome=null where id=$1`, [runId])
+    await pool.query(`insert into agent_tool_approvals (id,"runId","userId","deviceId","requestId",harness,method,input,digest,status,"expiresAt") values ($1,$2,$3,$4,'request','codex','fixture','{}','digest','pending',now()+interval '1 hour')`, [randomUUID(), runId, owner, device])
+    await compare('waiting', 'approval')
+    await pool.query(`update agent_tool_approvals set "expiresAt"=now()-interval '1 hour' where "runId"=$1`, [runId])
+    await compare('running', null)
+    await pool.query(`insert into local_computer_reviews (id,"runId","deviceId","userId",target,call,digest,"expiresAt","seenAt") values ($1,$2,$3,$4,'fixture','{}','digest',now()+interval '1 hour',now())`, [randomUUID(), runId, device, owner])
+    await compare('waiting', 'approval')
+    await pool.query('update local_computer_reviews set decision=true where "runId"=$1', [runId])
+    await compare('running', null)
+
+    await pool.query(`update issues set status='todo' where id=$1`, [id])
+    await pool.query(`update agent_runs set status='succeeded',outcome='done',"stopReason"=null where id=$1`, [runId])
+    await pool.query(`insert into run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status) values ($1,$2,$3,'https://github.com/acme/app','github.com/acme/app','awaiting_approval')`, [runId, owner, id])
+    for (const task of [(await (await request(id)).json()).task, (await (await listRequest(teamSelection)).json()).tasks.find((item: { id: string }) => item.id === id)]) {
+      assert.deepEqual([task.state, task.reason], ['waiting', 'approval'])
+    }
   })
   await t.test('without a cookie or header, the Personal list and authorized task tenants keep their own decorations', async () => {
     const unselected = { workspaceId: null }
@@ -259,53 +386,8 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.deepEqual(await persisted(), before)
   })
 
-  await t.test('an unlinked workspace task keeps its owner number without a repeated empty team read', async () => {
-    const { setIssueTeam } = await import('../app/actions/team-relations')
-    const changeTeam = (input: Parameters<typeof setIssueTeam>[0]) => run('/actions/team-relations', () => setIssueTeam(input), teamSelection)
-    const unlinkedId = await workspaceTask()
-    const { rows: [localTeam] } = await workspace.query('select identifier from mikka_teams where id=$1', [team.id])
-    const removed = await changeTeam({ issueId: unlinkedId, teamId: null, expectedTeamId: team.id })
-    assert.equal(removed.ok, true)
-    await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'MOBI', other, 'OTHR'])
-    const { rows: [numbered] } = await pool.query('select content,scope,"workspaceId","ownershipState" from issues where id=$1', [unlinkedId])
-    const identifier = 'MOBI-' + numbered.content.attrs.mikka.number
-    assert.equal(numbered.scope, 'workspace')
-    assert.equal(numbered.workspaceId, teamWorkspace.id, 'removing a Team link cannot move task ownership')
-    assert.equal(numbered.ownershipState, 'bound')
-    await request(personalTask, { workspaceId: own.id })
-    const warmup = await request(unlinkedId)
-    assert.equal(warmup.status, 200)
-    assert.equal((await warmup.json()).task.identifier, identifier)
-    const personalRead = await measured(async () => {
-      const response = await request(personalTask, { workspaceId: own.id })
-      assert.equal(response.status, 200)
-      return response.json()
-    })
-    const unlinkedRead = await measured(async () => {
-      const response = await request(unlinkedId)
-      assert.equal(response.status, 200)
-      return response.json()
-    })
-    assert.equal(unlinkedRead.value.task.identifier, identifier)
-    assert.deepEqual(unlinkedRead.value.live, { workspaceId: teamWorkspace.id }, 'an absent Team link does not turn Shared ownership into Personal')
-    assert.ok(unlinkedRead.statements <= personalRead.statements,
-      'the same owner and absent team link require no extra database statement for workspace scope')
-    assert.equal((await request(unlinkedId, { workspaceId: own.id })).status, 404)
-    const linked = await changeTeam({ issueId: unlinkedId, teamId: team.id, expectedTeamId: null })
-    assert.equal(linked.ok, true)
-    const relinked = await request(unlinkedId)
-    assert.equal(relinked.status, 200)
-    const relinkedBody = await relinked.json()
-    assert.match(relinkedBody.task.identifier, new RegExp('^' + localTeam.identifier + '-\\d+$'))
-    assert.deepEqual(relinkedBody.live, { workspaceId: teamWorkspace.id }, 'relinking keeps the same persisted Shared workspace')
-    assert.equal((await request(unlinkedId, { workspaceId: own.id })).status, 404, 'a prior negative link read cannot cross a later team boundary')
-    assert.equal((await request(unlinkedId, { workspaceId: secondWorkspace.id })).status, 404)
-    t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'mobile-unlinked-task-detail', scope: 'data-read-path_not_page_http',
-      personal: readMetrics(personalRead), unlinked: readMetrics(unlinkedRead) }))
-  })
-
   await t.test('explicit workspace selections return 404 across tenants, and workspace tokens stay scoped', async () => {
-    const personalPat = await createPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
+    const personalPat = await createLegacyPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
     const ownerMember = (await workspace.query('select name,email,role from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, owner])).rows[0]
     assert.ok(ownerMember)
     try {

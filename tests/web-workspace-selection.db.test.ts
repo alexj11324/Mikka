@@ -219,7 +219,7 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
       assert.equal(source.rowCount, 1); assert.equal(source.rows[0].workspaceId, alpha)
       const session = await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${owner.token}` }), query: { disableCookieCache: true } })
       assert.ok(session); assert.equal(session.user.id, owner.userId)
-      assert.deepEqual(source.rows[0].payload, { text, humanSessionId: session.session.id }, 'the message retains authenticated session provenance, not the client Workspace expectation')
+      assert.deepEqual(source.rows[0].payload, { text, source: 'person', humanSessionId: session.session.id }, 'the message retains authenticated audience/session provenance, not the client Workspace expectation')
       assert.equal(coordinatorWakes.length, wakes + 1)
       const recorded = await stored()
       const retryElsewhere = await rpc<{ error?: string }>('coordinator.sendCoordinatorMessage', args(alpha), beta)
@@ -288,8 +288,8 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
       } finally { release.resolve(); releaseHeld = undefined; payloadBarrier = undefined; factoryFlight = undefined; await first.catch(() => undefined) }
     })
     await t.test('PAT selection cannot escape its pin; public Web transport never promotes a PAT to a human session', async () => {
-      const { createPersonalAccessToken } = await import('../lib/tokens/store')
-      const pat = await createPersonalAccessToken(owner.userId, alpha, { name: 'Synthetic HTTP Workspace PAT' })
+      const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+      const pat = await createLegacyPersonalAccessToken(owner.userId, alpha, { name: 'Synthetic HTTP Workspace PAT' })
       const before = await snapshot()
       assert.equal((await request('/api/workspace', alpha, { token: pat.token, remote: false })).status, 200)
       for (const workspaceId of [personal, beta, foreign]) {

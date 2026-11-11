@@ -1,12 +1,10 @@
-import { afterJob } from '@/lib/background'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
-import { chatView, retryFailedTurn } from '@/lib/coordinator/store'
-import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
+import { coordinatorEnabled } from '@/lib/coordinator/wake'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 
@@ -34,13 +32,7 @@ async function handlePOST(request: Request) {
   }
   const resolved = await openChatBotId(user, botId)
   if (!await coordinatorEnabled(user.id, resolved)) return json({ queued: false, reason: 'unavailable' })
-  const queued = await retryFailedTurn(user.id, resolved)
-  if (queued) {
-    afterJob('after:coordinator-wake', () => wakeCoordinator(user.id))
-    return json({ queued: true })
-  }
-  const current = await chatView(user.id, 1, resolved)
-  return json({ queued: false, reason: current.working ? 'working' : 'nothingToRetry' })
+  return json(await (await import('@/lib/eve/retry')).retryEveTurn(user.id,resolved,request.headers))
 }
 
 export const POST = withRequestLog('/api/mobile/chat/retry', handlePOST)

@@ -1,7 +1,10 @@
 import 'server-only'
 import { serverRunFailure } from '../run-failure-details'
 import type { Pool } from 'pg'
+import { withDatabaseClient } from '../db'
+import type { agentRuns } from '../db/schema'
 import { factoryAutomaticRuntime } from './automatic-dispatch'
+import { assertRunProjectResources, isProjectExecutionRefusal, withRunProjectResources } from '../project-resources/run-lease'
 
 type Actor = { userId: string; workspaceId: string }
 
@@ -12,7 +15,7 @@ export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previou
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     JOIN issues i ON i.id=r."issueId"
     LEFT JOIN agent_runs previous ON previous.id=$4
-    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3
+    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId"
       AND (EXISTS (SELECT 1 FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
         WHERE a."runId"=r.id AND t."userId"=r."userId" AND t."issueId"=r."issueId" AND t.status='running')
         OR ($5::boolean AND NOT EXISTS (SELECT 1 FROM factory_attempts a WHERE a."runId" IN (r.id,$4::uuid))))
@@ -36,17 +39,44 @@ export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previou
   // A lost step response can replay after the worker claimed. Continue this
   // durable workflow's lifecycle without parking or bootstrapping active work.
   if (handoff.status !== 'queued') return true
-  try { if (previousRunId) await factoryAutomaticRuntime.park(pool, actor, previousRunId, runId) }
-  catch {
-    await failFactoryCloudStage(pool, actor, runId, 'Previous stage artifacts could not be retained')
-    return false
+  try {
+    return await withRunProjectResources(pool, handoff.run, async () => {
+      try {
+        if (previousRunId) {
+          const client = await pool.connect()
+          try {
+            await client.query('BEGIN')
+            const { rows: [current] } = await client.query<typeof agentRuns.$inferSelect>(`SELECT r.* FROM agent_runs r
+              JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+              WHERE r.id=$1 AND r."userId"=$2 AND r."workspaceId"=$3 AND b."workspaceId"=r."workspaceId"
+                AND r."issueId"=$4 AND r.status='queued' AND r."stopRequestedAt" IS NULL FOR UPDATE OF r`,
+            [runId, actor.userId, actor.workspaceId, handoff.run.issueId])
+            if (!current) { await client.query('ROLLBACK'); return false }
+            // The next Run's current placement remains locked through parent
+            // retention/park. Release it before ensure acquires its own lock.
+            await assertRunProjectResources(client, current)
+            await withDatabaseClient(client, () => factoryAutomaticRuntime.park(pool, actor, previousRunId, runId, client))
+            await client.query('COMMIT')
+          } catch (error) { await client.query('ROLLBACK'); throw error }
+          finally { client.release() }
+        }
+      } catch (error) {
+        if (isProjectExecutionRefusal(error)) throw error
+        await failFactoryCloudStage(pool, actor, runId, 'Previous stage artifacts could not be retained')
+        return false
+      }
+      const started = await factoryAutomaticRuntime.start(actor, runId)
+      if (started?.state === 'unavailable' && started.reason === 'project_resources') return false
+      // Native continuations and later stages retain the task's existing VM on
+      // wake failure. Retry this durable step instead of discarding its history.
+      if (started?.state === 'unavailable') throw new Error(started.reason === 'retained_runtime' ? 'Retained task machine unavailable'
+        : started.reason === 'provisioning' ? 'Thread provisioning in progress' : 'Original question machine unavailable')
+      return started?.state === 'running'
+    })
+  } catch (error) {
+    if (isProjectExecutionRefusal(error)) return false
+    throw error
   }
-  const started = await factoryAutomaticRuntime.start(actor, runId)
-  // Native continuations and later stages retain the task's existing VM on
-  // wake failure. Retry this durable step instead of discarding its history.
-  if (started?.state === 'unavailable') throw new Error(started.reason === 'retained_runtime' ? 'Retained task machine unavailable'
-    : started.reason === 'provisioning' ? 'Thread provisioning in progress' : 'Original question machine unavailable')
-  return started?.state === 'running'
 }
 
 export async function failFactoryCloudStage(pool: Pool, actor: Actor, runId: string, message: string) {

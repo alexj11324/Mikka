@@ -88,6 +88,26 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       assert.ok('error' in denied); assert.equal(denied.error, 'not_found')
     })
 
+    await t.test('evidence is the owner-only read that exposes opaque entry provenance', async () => {
+      const entryRun = randomUUID()
+      const originRef = { kind: 'slack', teamId: 'T1', channelId: 'C1', threadTs: '1.1' }
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","issueId",status,origin,"originRef") VALUES($1,$2,$3,$4,'succeeded','slack',$5::jsonb)`,
+        [entryRun, alice, agentId, issueId, JSON.stringify(originRef)])
+      try {
+        const evidence = await runEvidence(alice, entryRun)
+        assert.equal(evidence?.run.origin, 'slack')
+        assert.deepEqual(evidence?.run.originRef, originRef)
+        assert.equal(await runEvidence(bob, entryRun), null)
+        // A legacy row stays unknown; it is never reported as 'web'.
+        await pool.query(`UPDATE agent_runs SET origin=NULL,"originRef"=NULL WHERE id=$1`, [entryRun])
+        const legacy = await runEvidence(alice, entryRun)
+        assert.equal(legacy?.run.origin, null)
+        assert.equal(legacy?.run.originRef, null)
+      } finally {
+        await pool.query('DELETE FROM agent_runs WHERE id=$1', [entryRun])
+      }
+    })
+
     const seed = async (owner = alice, runId = firstRun, issue = issueId) => {
       const id = randomUUID()
       await pool.query(`INSERT INTO artifacts(id,"userId","runId","issueId",kind,title,"latestVersion") VALUES($1,$2,$3,$4,'markdown','Legacy fixture',2)`, [id, owner, runId, issue])

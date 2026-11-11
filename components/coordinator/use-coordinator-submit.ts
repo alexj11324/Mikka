@@ -2,9 +2,10 @@
 
 import { useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
+import type { UseEveAgentReturn } from 'eve/react'
+import type { SendTurnOptions } from 'eve/client'
 import { authClient } from '@/lib/auth-client'
-import { sendCoordinatorMessage } from '@/app/actions/coordinator'
-import { createCoordinatorSubmitter, readActionOutcome, type SubmitOutcome } from '@/lib/coordinator-client-submission'
+import { coordinatorAgentClient, coordinatorSendFailure, type SubmitOutcome } from '@/lib/eve/client'
 import type { ArtifactQuote } from '@/lib/artifacts/quote'
 import type { BrowserNote } from '@/lib/browser/note'
 import type { TaskDestination } from '@/lib/task-destination'
@@ -19,34 +20,46 @@ export type CoordinatorMessageContext = {
   notes?: readonly BrowserNote[] | null
   /** 重新发送 on a failed message: its position, so the server retries it in place. */
   retryOf?: number
+  /** 标题 the person wrote for the new task; the task gets exactly it. */
+  taskTitle?: string
 }
 
-// The account the next request's cookie belongs to, read fresh from the server
-// rather than from the cached session, which can lag behind a switch elsewhere.
-async function currentOwner() {
-  const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } })
-  if (error) throw new Error(error.message ?? 'session')
-  return data?.user.id ?? null
-}
-
-/** One composer's immutable submissions, including its quote, bot and destination. */
-export function useCoordinatorSubmit() {
+/** The caller keeps the logical operation key across an uncertain result; eve owns delivery dedupe. */
+export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
   const t = useTranslations('Coordinator')
   const tErrors = useTranslations('Errors')
-  const submitter = useRef<ReturnType<typeof createCoordinatorSubmitter> | null>(null)
+  const operations = useRef(new Map<string, { id: string; conflict?: true }>())
+  const submit = useCallback(async (text: string, context?: CoordinatorMessageContext): Promise<SubmitOutcome> => {
+    const trimmed = text.trim()
+    if (!trimmed || trimmed.length > 10_000) return { kind: 'rejected', error: 'messageRequired' }
+    // The cookie's current account owns the operation key, including after an account switch in another tab.
+    const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } })
+    if (error) return { kind: 'uncertain' }
+    if (!data?.user.id) return { kind: 'authRequired' }
+    const body = JSON.stringify([data.user.id, trimmed, context ?? null])
+    // Another message may be sent before this one's uncertain result is retried.
+    // Retain each unresolved key; the native server remains the dedupe authority.
+    let operation = operations.current.get(body)
+    if (operation?.conflict) return { kind: 'conflict' }
+    if (!operation) { operation = { id: crypto.randomUUID() }; operations.current.set(body, operation) }
+    const options: SendTurnOptions = { headers: { 'x-mikka-submission-id': operation.id },
+      clientContext: JSON.parse(JSON.stringify(context ?? {})) as NonNullable<SendTurnOptions['clientContext']> }
+    try {
+      if (agent) await agent.send(trimmed, options)
+      else {
+        const { session } = await coordinatorAgentClient(context?.botId ?? null).sessions.create()
+        await session.send(trimmed, options)
+      }
+      operations.current.delete(body)
+      return { kind: 'accepted', enabled: true, sourceEventId: null, replayed: false }
+    } catch (error) {
+      const outcome = coordinatorSendFailure(error)
+      if (outcome.kind === 'conflict') operations.current.set(body, { ...operation, conflict: true })
+      else if (outcome.kind !== 'uncertain' && outcome.kind !== 'authRequired') operations.current.delete(body)
+      return outcome
+    }
+  }, [agent?.send])
 
-  const submit = useCallback((text: string, context?: CoordinatorMessageContext) => {
-    submitter.current ??= createCoordinatorSubmitter({ currentOwner, transport: async submission => {
-      const details = submission.context as CoordinatorMessageContext | undefined
-      const expectation: [expectedWorkspaceId?: string] = details?.expectedWorkspaceId === undefined ? [] : [details.expectedWorkspaceId]
-      const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf, details?.profileId, ...expectation)
-      return readActionOutcome(result)
-    } })
-    return submitter.current.submit(text, undefined, context)
-  }, [])
-
-  // What to tell the person when a send did not end in "accepted"; null when
-  // there is nothing to say (accepted, or another send of this composer is out).
   const failureMessage = useCallback((outcome: SubmitOutcome) => {
     if (outcome.kind === 'accepted' || outcome.kind === 'busy') return null
     if (outcome.kind === 'uncertain') return t('sendUncertain')
@@ -54,6 +67,5 @@ export function useCoordinatorSubmit() {
     if (outcome.kind === 'conflict') return tErrors('submissionConflict')
     return tErrors(outcome.error === 'originRejected' || outcome.error === 'failed' ? 'generic' : outcome.error)
   }, [t, tErrors])
-
   return { submit, failureMessage }
 }

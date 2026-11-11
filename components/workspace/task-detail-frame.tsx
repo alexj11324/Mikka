@@ -18,12 +18,14 @@ import { useActionError } from '@/lib/use-action-error'
 import type { IssueDetailNavigation } from './issue-detail-header'
 import { useIssueDetailMenu, type IssueActionRequest } from './issue-detail-actions'
 import { overdue } from './issue-detail-properties'
-import { IssueMetadataControls, useIssueMetadataSave, type MetadataRequest } from './issue-metadata-controls'
+import { AccessChangeDialog, IssueMetadataControls, useIssueMetadataSave, type MetadataRequest } from './issue-metadata-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useIssueScope } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
 import { useIssueThreads, type useAgentActivity } from './issue-threads'
+import { newestThreadRun } from './task-state-icon'
+import { localTaskState } from '@/hooks/use-bot-tasks'
 import { useActivityEvents } from './issue-activity-feed'
 import { useActivityDrafts } from './issue-activity'
 import type { IssueDiscussions } from './issue-editor'
@@ -149,7 +151,7 @@ export function FramedTask(props: FramedTaskProps) {
   ]
 
   const rows: TaskDetailRow[] = [
-    { id: 'status', label: tIssue('statusLabel'), disabled: preview, value: { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } }, menu: ISSUE_STATUSES.map(item => ({ id: item.value, label: statusLabel(item.value), mark: { kind: 'status', value: item.value }, checked: item.value === props.status, onSelect: () => props.onStatus(item.value) })) },
+    { id: 'status', label: tIssue('statusLabel'), disabled: preview, value: { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } }, state: localTaskState({ status: props.status, metadata: meta }, newestThreadRun(threads)), menu: ISSUE_STATUSES.map(item => ({ id: item.value, label: statusLabel(item.value), mark: { kind: 'status', value: item.value }, checked: item.value === props.status, onSelect: () => props.onStatus(item.value) })) },
     { id: 'priority', label: tIssue('priorityLabel'), disabled: preview, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
     { id: 'scope', label: scope.judgedByAgent.label, disabled: preview || scope.pending, value: { text: scope.current, mark: { kind: 'icon', icon: task.scope === 'workspace' ? 'workspace' : 'personal' } }, note: scope.judgedByAgent.shown ? scope.judgedByAgent.text : undefined, menu: scope.options.map(option => ({ id: option.value, label: option.label, mark: { kind: 'icon', icon: option.value === 'workspace' ? 'workspace' : 'personal' }, checked: option.value === task.scope, onSelect: () => { void scope.change(option.value) } })) },
     { id: 'assignee', label: tProperty('assignee'), disabled: busy, onOpen: loadOptions, value: member ? { text: member.name, mark: { kind: 'person', name: member.name }, aria: tAssignee('aria', { name: member.name }) } : { text: tAssignee('unassignedLabel'), mark: { kind: 'icon', icon: 'person' }, muted: true, aria: tAssignee('aria', { name: tAssignee('unassigned') }) }, menu: assigneeItems },
@@ -247,7 +249,7 @@ export function FramedTask(props: FramedTaskProps) {
     rowsError={metadata.error || team.failed}
     meta={[task.identifier, tFrame('created', { when: format.relativeTime(created, now) })].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
-    dialogs={<>{props.dialogs}{menu.dialogs}<IssueMetadataControls task={task} section="dialog" disabled={preview} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
+    dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={preview} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />
 }
 

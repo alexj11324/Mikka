@@ -46,6 +46,7 @@ import { BrowserPane } from '@/components/browser/browser-pane'
 import { ThreadColumn } from './thread-column'
 import { AllThreadsColumn, AllThreadsToggle, waitingCount } from '@/components/nav/all-threads'
 import { pendingTaskCount } from '@/hooks/use-bot-tasks'
+import { useInboxCount } from '@/hooks/use-inbox-count'
 import { TaskColumn } from './task-column'
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
 import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
@@ -70,7 +71,8 @@ import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
 import { GroupChatView, type GroupChatRequest } from './group-chat-view'
-import { WorkspaceContentLoading } from './workspace-loading'
+import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
+import { InlineLoadError } from '@/components/load-error'
 import { PluginsPage as DefaultPluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
 import { backToTaskOrigin, dropQueryKeys, goTo, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
@@ -81,6 +83,7 @@ import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
+import { useEnterpriseSignOut } from '@/hooks/use-enterprise-sign-out'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { LiveProvider, useLiveKey } from '@/hooks/use-live-key'
 import { focusChatComposer } from '@/hooks/use-focus-return'
@@ -126,9 +129,15 @@ export function IssueWorkspace({ cacheWorkspace, ...props }: Parameters<typeof I
 }
 
 function IssueWorkspaceScope({ withinLiveProvider = false, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean }) {
-  const { data: read } = useWorkspace(props.user.email)
+  const errors = useTranslations('Errors')
+  const common = useTranslations('Common')
+  const { data: read, error, mutate } = useWorkspace(props.user.email)
   const data = read?.currentUserId === props.user.id ? read : undefined
-  const content = <ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>
+  // Cached chats can arrive before the workspace read. Do not accept a draft
+  // in a temporary scope that would discard it when its workspace resolves.
+  if (!data && error) return <InlineLoadError message={errors('workspaceReadFailed')} retryLabel={common('retry')} onRetry={() => { void mutate() }} />
+  if (!data) return <WorkspaceLoading />
+  const content = <ViewStateProvider scope={`${props.user.id}:${data.workspace.id}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>
   return withinLiveProvider ? content : <LiveProvider ownerId={props.user.id} workspaceId={data?.workspace.id}>{content}</LiveProvider>
 }
 
@@ -255,6 +264,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const [threadsView, setThreadsView] = useState<string | null>(() => readLocation(params).threads)
   // 全部线程's button counts the threads waiting on you (Figma 802:56).
   const threadsWaiting = useMemo(() => waitingCount(threads, tasks), [threads, tasks])
+  // The count on 收件箱, for a frame that shows it there (FRAME_OWNS_HEADER): what the Inbox lists, from the same reads.
+  const inboxItems = useInboxCount(threads, tasks, FRAME_OWNS_HEADER)
   // FRAME_OWNS_HEADER: no 全部线程 list beside the page (the frame shows the waiting count on 收件箱); an old address
   // keeps its open thread beside the page it was on, and without one lands on 任务.
   useEffect(() => {
@@ -361,6 +372,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     return () => window.removeEventListener('keydown', capture, true)
   }, [creating])
   const [signingOut, setSigningOut] = useState(false)
+  const enterpriseSignOut = useEnterpriseSignOut()
   const [accountError, setAccountError] = useState('')
   const onDirty = useCallback((value: boolean) => { dirtyRef.current = value }, [])
   async function leave(action: () => void | Promise<void>) {
@@ -465,6 +477,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     void leave(async () => {
       setSigningOut(true); setAccountError('')
       try {
+        // A company sign-in session signs out at its IdP (OIDC / SAML); with none, the existing sign-out below.
+        if (await enterpriseSignOut().catch(() => false)) { await clearCache(() => true, undefined, { revalidate: false }); return }
         const result = await endSession()
         if (result.error) throw new Error('sign out failed')
         await clearCache(() => true, undefined, { revalidate: false }); router.replace('/sign-in?login=1'); router.refresh()
@@ -515,7 +529,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const activeBot = section === 'coordinator' && activeBotId && activeBotId !== coordinatorBot?.id ? bots.find(bot => bot.id === activeBotId) ?? (createdBot?.id === activeBotId ? createdBot : undefined) : undefined
   const activeChat: ChatTarget | null = section === 'coordinator' ? activeBot ? { kind: 'bot', botId: activeBot.id } : { kind: 'coordinator' } : section === 'agent' ? { kind: 'agent', sessionId: activeAgentId } : section === 'group' && groupRequest ? { kind: 'group', ...groupRequest } : null
   // The same rows as the bot list, for a frame that draws its own navigation (RailProps.chats).
-  const { entries: chatNav, reloadGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id })
+  const { entries: chatNav, reloadGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id, threads, issues: tasks })
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }
   const isProjects = section === 'projects' || section === 'team-projects'
@@ -580,7 +594,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // + (its Tools), ⌘⇧B for the browser, or the phone's chat pill for the Overview.
   const panelsInFrame = FRAME_OWNS_PANEL && isConversation
   const conversationPanels = panelsInFrame ? { ...panelReveal, tabs: [
-    { id: 'overview' as const, title: i18nText('Shell.panel.overview'), content: <ContextPanel key="context-panel" sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => {}}
+    { id: 'overview' as const, title: i18nText('Shell.panel.overview'), content: <ContextPanel key="context-panel" sheet frameTab workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => {}}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: botChatSummaries && coordinatorBot ? botChatSummaries.items[coordinatorBot.id]?.at ?? undefined : undefined }} /> },
     { id: 'browser' as const, title: i18nText('Browser.label'), content: <BrowserPane inTab onClose={() => showBrowser(false)} /> },
   ] } : undefined
@@ -640,7 +654,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
-    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ entries: chatNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreatingGroup(true) }} onSearch={searchFromBar} inboxCount={threadsWaiting} />}>
+    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, entries: chatNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreatingGroup(true) }} onSearch={searchFromBar} inboxCount={inboxItems} />}>
     {settingsShown ? settingsContent
       : <>
     {/* The board keeps only the rail on its left (MIK-45); a phone, with no rail, keeps the list's sheet. */}

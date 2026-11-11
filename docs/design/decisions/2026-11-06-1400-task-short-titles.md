@@ -4,6 +4,7 @@
 - Source: Alex, relayed by the coordinator on 2026-11-06, after the research in
   [`docs/research/2026-11-06-agent-session-titles.md`](../../research/2026-11-06-agent-session-titles.md).
 - Rule: —
+- Superseded in part by: [2026-11-10-1341](2026-11-10-1341-sidebar-short-title-limits.md): compact Bot navigation and stored derived short titles have strict limits rather than an approximate model target; manual full titles stay unchanged.
 
 - Lists name a task, and the threads that work on it, by a short title, the way Claude Code and Codex name a session:
   about 12 Chinese characters or 6 English words, with no issue key, date or time.

@@ -4,7 +4,7 @@ import { AgentKitError } from '../agent-kit/store'
 import {
   decodeStoredStartupReceipt, encodeStoredStartupReceipt, readStartupReceipt,
   type CoordinatorStartupReceipt, type CoordinatorStartupSettings,
-} from './startup-receipt'
+} from '@/tests/support/legacy-coordinator-startup'
 
 // Exercise the real codec and schemas. No database, transport, model or module
 // mocks are needed; all identifiers and text below are synthetic metadata.
@@ -46,6 +46,8 @@ function completeReceipt(): CoordinatorStartupReceipt {
       occurrenceId: 'occurrence-a', leaseToken: 'synthetic-lease', allowedActions: ['read-b', 'read-a'],
       prompt: 'Synthetic scheduled text: "quoted", \\ slash, 中文\nSecond line.',
     },
+    origin: 'telegram',
+    originRef: { kind: 'telegram', chatId: 'chat-a', messageId: 7 },
   }
   return value
 }
@@ -98,7 +100,7 @@ test('all 256 independent settings combinations survive JSON without conflating 
 
 test('optional absence differs from an explicitly empty attention question list', () => {
   const absent = throughJSON(emptyReceipt())
-  for (const key of ['taskEventId', 'sourceEventId', 'attentionQuestions', 'scheduledRead'] as const) {
+  for (const key of ['taskEventId', 'sourceEventId', 'attentionQuestions', 'scheduledRead', 'origin', 'originRef'] as const) {
     assert.equal(Object.hasOwn(absent.inbox, key), false, key)
   }
   const explicit = emptyReceipt()
@@ -134,7 +136,7 @@ test('stored envelopes reject missing or unknown keys, unsupported versions and 
   for (const f of [-1, 0.5, 256, Number.MAX_SAFE_INTEGER, NaN, Infinity, '1', true, null, undefined]) {
     malformed.push(['settings bitmap ' + String(f), 1, { ...valid.settings, f }, valid.inbox])
   }
-  for (const f of [-1, 0.5, 512, Number.MAX_SAFE_INTEGER, NaN, Infinity, '1', true, null, undefined]) {
+  for (const f of [-1, 0.5, 2048, Number.MAX_SAFE_INTEGER, NaN, Infinity, '1', true, null, undefined]) {
     malformed.push(['inbox bitmap ' + String(f), 1, valid.settings, { ...valid.inbox, f }])
   }
   for (const a of [-1, 0.5, NaN, Infinity, '0', true, null, undefined]) {
@@ -146,7 +148,7 @@ test('stored envelopes reject missing or unknown keys, unsupported versions and 
 test('the presence bitmap prevents deleting or injecting any stored metadata field', () => {
   const complete = encodeStoredStartupReceipt(completeReceipt())
   const empty = encodeStoredStartupReceipt(emptyReceipt())
-  for (const key of ['t', 'm', 'p', 'k', 's', 'q', 'd'] as const) {
+  for (const key of ['t', 'm', 'p', 'k', 's', 'q', 'd', 'o', 'r'] as const) {
     const deleted: Record<string, unknown> = { ...complete.inbox }
     delete deleted[key]
     rejects(() => decodeStoredStartupReceipt(1, complete.settings, deleted), 'declared field deleted: ' + key)
@@ -185,6 +187,9 @@ test('nested metadata retains its original strict validation instead of gaining 
     ['invalid schedule actions', inbox => { (inbox.d as RecordValue).allowedActions = ['read', 1] }],
     ['invalid schedule prompt', inbox => { (inbox.d as RecordValue).prompt = false }],
     ['unknown schedule field', inbox => { (inbox.d as RecordValue).writeAllowed = true }],
+    ['unknown origin', inbox => { inbox.o = 'carrier_pigeon' }],
+    ['mismatched ref kind', inbox => { inbox.o = 'slack' }],
+    ['ref without origin', inbox => { delete inbox.o }],
   ]
   for (const [label, corrupt] of malformed) {
     const stored = jsonCopy(encodeStoredStartupReceipt(completeReceipt()))
@@ -209,7 +214,7 @@ test('writes reject malformed canonical input and every explicitly present undef
     corrupt(value)
     rejects(() => encodeStoredStartupReceipt(value), label)
   }
-  for (const key of ['taskEventId', 'sourceEventId', 'attentionQuestions', 'scheduledRead'] as const) {
+  for (const key of ['taskEventId', 'sourceEventId', 'attentionQuestions', 'scheduledRead', 'origin', 'originRef'] as const) {
     const value = emptyReceipt()
     Object.assign(value.inbox, { [key]: undefined })
     assert.equal(Object.hasOwn(value.inbox, key), true)

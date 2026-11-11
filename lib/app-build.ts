@@ -6,7 +6,7 @@ import { withBasePath } from '@/lib/base-path'
 // server actions; once the new one has removed them they fail. The page
 // compares its build with the server's and offers a reload instead.
 
-/** Inlined at build time (next.config.mjs); empty in a build without one. */
+/** Inlined at build time (apps/frontend/vite.config.mjs); empty without one. */
 export const APP_BUILD = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? ''
 
 let refreshRequired = false

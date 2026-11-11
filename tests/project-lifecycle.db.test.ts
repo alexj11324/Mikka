@@ -1,0 +1,123 @@
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import test from 'node:test'
+import { dbUrl, seedAgent, seedIssue, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
+
+test('Project archive and strict deletion preserve canonical work and frozen history', { skip: !dbUrl, timeout: 60_000 }, async t => {
+  const { Pool } = await import('pg')
+  const connection = new Pool({ connectionString: dbUrl, max: 4 })
+  const lifecycle = await import('../lib/project-lifecycle')
+  const resources = await import('../lib/project-resources/store')
+  const { withRunProjectExecution } = await import('../lib/project-resources/run-lease')
+  const { accessibleProjects, requireProjectWrite } = await import('../lib/project-access')
+  const { withTaskWorkspace } = await import('../lib/task-workspace')
+  const { lockTeamRelations } = await import('../lib/team-access')
+  const { projectDb } = await import('../lib/db/projects')
+  const { pool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
+  const { tokenWorkspace } = await import('../lib/tokens/principal')
+  t.after(async () => { await Promise.all([connection.end(), pool.end(), workspacePool.end()]) })
+  const owner = await seedUser(connection, 'project-lifecycle-owner'), member = await seedUser(connection, 'project-lifecycle-member')
+  const outsider = await seedUser(connection, 'project-lifecycle-outsider')
+  const workspace = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
+  const other = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }])
+  const team = await seedTeam(connection, workspace.id, owner)
+  const projectId = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: workspace.id }])
+  const issueId = await seedIssue(connection, owner, workspace.id)
+  await seedProjectTasks(connection, projectId, [issueId])
+  const agentId = await seedAgent(connection, owner)
+  const runId = await seedRun(connection, { userId: owner, agentId, workspaceId: workspace.id, issueId, status: 'queued' })
+  const request = { userId: owner, workspaceId: workspace.id, issueId, repositoryKey: 'v2/github.com/acme/project', baseBranch: 'main', runtime: 'local' as const, harness: 'codex' }
+  const snapshot = await resources.withProjectExecution(request, async value => value)
+  await connection.query('update agent_runs set "agentDefinition"=$2 where id=$1', [runId, JSON.stringify({ projectExecution: snapshot })])
+  const frozen = JSON.stringify((await connection.query('select "agentDefinition" from agent_runs where id=$1', [runId])).rows[0].agentDefinition)
+  const originalTask = (await connection.query('select id,"workspaceId",revision,status from issues where id=$1', [issueId])).rows[0]
+  const archive = (id: string, revision?: number) => lifecycle.setProjectArchive(member, workspace.id, { id, revision, archived: true, message: 'Project archived' })
+  const restore = (id: string, revision?: number) => lifecycle.setProjectArchive(member, workspace.id, { id, revision, archived: false, message: 'Project restored' })
+  const emptyProject = async () => {
+    const id = randomUUID()
+    await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+      values($1,$2,$3,'Pristine','','','planned','none','','','','','[]',1)`, [id, owner, workspace.id])
+    await connection.query(`insert into resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance)
+      values('project',$1,$2,$3,'shared','created')`, [id, workspace.id, owner])
+    return id
+  }
+
+  await t.test('impact reports all canonical links and active execution without creator ownership', async () => {
+    const impact = await lifecycle.projectLifecycleImpact(member, workspace.id, projectId)
+    assert.equal(impact.counts.tasks, 1)
+    assert.equal(impact.counts.teams, 1)
+    assert.equal(impact.counts.runs, 1)
+    assert.equal(impact.counts.activeRuns, 1)
+    assert.equal(impact.canDelete, false)
+    await assert.rejects(lifecycle.projectLifecycleImpact(outsider, workspace.id, projectId), /workspaceAccessDenied/)
+    await assert.rejects(lifecycle.projectLifecycleImpact({ id: owner, [tokenWorkspace]: other.id }, workspace.id, projectId), /workspaceAccessDenied/)
+    await assert.rejects(lifecycle.projectLifecycleImpact(owner, other.id, projectId), /projectNotFound/)
+  })
+
+  await t.test('archive retains read access and UUIDs while rejecting new writes, bindings and claims', async () => {
+    const archived = await archive(projectId, 1)
+    assert.equal(archived.id, projectId)
+    assert.equal(archived.status, 'planned')
+    assert.equal(archived.revision, 2)
+    assert.ok(archived.archivedAt)
+    assert.deepEqual(archived.issueIds, [issueId])
+    assert.equal((await accessibleProjects(member, projectDb, workspace.id, projectId))[0].archivedBy, member)
+    assert.equal((await archive(projectId, 2)).revision, 2, 'repeated archive is idempotent')
+    await assert.rejects(resources.withProjectExecution(request, async () => assert.fail('archived work admitted')), /projectArchived/)
+    await assert.rejects(withRunProjectExecution(request, snapshot, async () => assert.fail('archived work claimed')), /projectArchived/)
+    await assert.rejects(resources.saveProjectResources(owner, { workspaceId: workspace.id, projectId, revision: 2, repositories: [], environmentIds: [], defaultEnvironmentId: null }), /projectArchived/)
+    await assert.rejects(withTaskWorkspace(member, workspace.id, async (_workspace, tx) => {
+      await lockTeamRelations(tx)
+      return requireProjectWrite(tx, member, projectId, workspace.id)
+    }), /projectArchived/)
+    const newTask = await seedIssue(connection, owner, workspace.id)
+    await assert.rejects(connection.query('insert into workspace_project_tasks("issueId","projectId","workspaceId") values($1,$2,$3)', [newTask, projectId, workspace.id]), { code: '23514' })
+    assert.deepEqual((await connection.query('select id,"workspaceId",revision,status from issues where id=$1', [issueId])).rows[0], originalTask)
+    assert.equal(JSON.stringify((await connection.query('select "agentDefinition" from agent_runs where id=$1', [runId])).rows[0].agentDefinition), frozen)
+  })
+
+  await t.test('restore is explicit, revision checked, and preserves earlier Project events', async () => {
+    await assert.rejects(restore(projectId, 1), /projectSaveConflict/)
+    const restored = await restore(projectId, 2)
+    assert.equal(restored.archivedAt, null)
+    assert.equal(restored.archivedBy, null)
+    assert.equal(restored.revision, 3)
+    assert.deepEqual(restored.issueIds, [issueId])
+    assert.equal(await withRunProjectExecution(request, snapshot, async () => 'admitted'), 'admitted')
+    assert.equal(JSON.stringify((await connection.query('select "agentDefinition" from agent_runs where id=$1', [runId])).rows[0].agentDefinition), frozen)
+    assert.equal((await connection.query('select count(*)::int n from workspace_project_events where "projectId"=$1', [projectId])).rows[0].n, 2)
+    await assert.rejects(lifecycle.deleteProjectData(owner, workspace.id, { id: projectId, revision: 3, confirmation: 'P' }), /projectDeleteNotEmpty/)
+  })
+
+  await t.test('moving work cannot conceal immutable Run provenance from delete impact', async () => {
+    await seedProjectTasks(connection, projectId, [])
+    const impact = await lifecycle.projectLifecycleImpact(member, workspace.id, projectId)
+    assert.equal(impact.counts.tasks, 0)
+    assert.equal(impact.counts.runs, 1)
+    assert.equal(impact.canDelete, false)
+    assert.equal((await connection.query('select id from issues where id=$1', [issueId])).rowCount, 1)
+  })
+
+  await t.test('hard delete requires admin, exact revision, explicit name and no relationships or history', async () => {
+    const id = await emptyProject()
+    const input = { id, revision: 1, confirmation: 'Pristine' }
+    assert.equal((await lifecycle.projectLifecycleImpact(member, workspace.id, id)).canDelete, true)
+    await assert.rejects(lifecycle.deleteProjectData(member, workspace.id, input), /workspaceAccessDenied/)
+    await assert.rejects(lifecycle.deleteProjectData(owner, workspace.id, { ...input, revision: 2 }), /projectSaveConflict/)
+    await assert.rejects(lifecycle.deleteProjectData(owner, workspace.id, { ...input, confirmation: 'wrong' }), /projectCheckFields/)
+    const deleted = await lifecycle.deleteProjectData(owner, workspace.id, input)
+    assert.equal(deleted.deleted, true)
+    assert.equal((await connection.query('select id from workspace_projects where id=$1', [id])).rowCount, 0)
+    assert.equal((await connection.query('select kind from workspace_resource_events where id=$1 and "resourceId"=$2', [deleted.auditId, id])).rows[0].kind, 'project.deleted')
+    assert.equal((await connection.query('select id from agent_runs where id=$1', [runId])).rowCount, 1)
+    const historyOnly = await emptyProject()
+    await connection.query('insert into workspace_project_events(id,"projectId","userId",message) values($1,$2,$3,\'Past work\')', [randomUUID(), historyOnly, owner])
+    await assert.rejects(lifecycle.deleteProjectData(owner, workspace.id, { id: historyOnly, revision: 1, confirmation: 'Pristine' }), /projectDeleteNotEmpty/)
+    const dependencyTarget = await emptyProject(), dependent = await emptyProject()
+    await connection.query('update workspace_projects set properties=jsonb_set(properties,\'{dependencyIds}\',$2::jsonb) where id=$1', [dependent, JSON.stringify([dependencyTarget])])
+    const targetImpact = await lifecycle.projectLifecycleImpact(owner, workspace.id, dependencyTarget)
+    assert.equal(targetImpact.counts.incomingDependencies, 1)
+    await assert.rejects(lifecycle.deleteProjectData(owner, workspace.id, { id: dependencyTarget, revision: 1, confirmation: 'Pristine' }), /projectDeleteNotEmpty/)
+  })
+})

@@ -1,4 +1,5 @@
 import { ScheduleError, type Definition } from './contract'
+import { nextCron } from './cron'
 
 export function timezone(value: string): string {
   if ((!value.includes('/') && !['UTC', 'GMT'].includes(value)) || !/^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)*$/.test(value)) throw new ScheduleError('invalidIanaTimezone', 400)
@@ -37,6 +38,7 @@ export function nextTime(def: Definition, after: Date, creating = false): Date |
     const period = def.timing.minutes * 60000
     return new Date(start > now ? start : start + (Math.floor((now - start) / period) + 1) * period)
   }
+  if (def.timing.kind === 'cron') return nextCron(def.timing.expression, zone, after)
   const localNow = new Date(wall(Math.floor(now / 1000) * 1000, zone))
   const [hour, minute] = def.timing.time.split(':').map(Number)
   const start = Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate(), hour, minute)

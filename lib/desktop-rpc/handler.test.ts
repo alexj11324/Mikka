@@ -180,6 +180,52 @@ test('explicit schemas and function map have exactly matching action names', () 
   }
 })
 
+test('memory RPC exposes manual, review, scope and undo actions with closed owner-free inputs', () => {
+  const schemas = desktopActionSchemas as Record<string, z.ZodType | undefined>
+  const manual = { requestId: owner, kind: 'preference', subject: 'Synthetic fact', scope: { kind: 'global', ids: [] } }
+  const valid: [string, unknown[]][] = [
+    ['memory.addFact', [manual]], ['memory.clearMemory', []],
+    ['memory.reviewFact', [owner, 'approve']], ['memory.reviewFact', [owner, 'reject']],
+    ['memory.setFactScope', [owner, { kind: 'workspaces', ids: [peer] }]],
+    ['memory.setFactScope', [owner, { kind: 'projects', ids: [peer] }]], ['memory.undoRemoveFact', [owner]],
+  ]
+  for (const [name, args] of valid) assert.equal(schemas[name]?.safeParse(args).success, true, name)
+  const invalid: [string, unknown[]][] = [
+    ['memory.addFact', [{ ...manual, userId: peer }]],
+    ['memory.addFact', [{ ...manual, subject: '' }]],
+    ['memory.addFact', [{ ...manual, kind: 'administrator' }]],
+    ['memory.addFact', [{ ...manual, scope: { kind: 'global', ids: [peer] } }]],
+    ['memory.reviewFact', [owner, 'approve', peer]], ['memory.reviewFact', [owner, 'force']],
+    ['memory.setFactScope', [owner, { kind: 'projects', ids: [] }]],
+    ['memory.setFactScope', [owner, { kind: 'workspaces', ids: [peer], admin: true }]],
+    ['memory.undoRemoveFact', [owner, peer]], ['memory.clearMemory', [peer]],
+  ]
+  for (const [name, args] of invalid) assert.equal(schemas[name]?.safeParse(args).success, false, name)
+})
+
+test('Task presentation batch rejects forged authority and oversized input before invoking its reader', async () => {
+  const action = 'task-domain.getTaskPresentations'
+  let calls = 0
+  const handle = createDesktopRpc({
+    authenticate: async () => sessions.get(tokenA)!,
+    scope: withDesktopSession,
+    actions: { [action]: { args: desktopActionSchemas[action], invoke: async () => { calls++; return { version: 1, workspaceId: owner, items: {} } } } },
+  })
+  for (const args of [
+    [{ workspaceId: owner, issueIds: [peer], userId: peer }],
+    [{ workspaceId: owner, issueIds: [peer], includeDeleted: true }],
+    [{ workspaceId: owner, issueIds: [peer] }, { role: 'admin' }],
+    [{ workspaceId: 'invalid', issueIds: [] }],
+    [{ workspaceId: owner, issueIds: ['invalid'] }],
+    [{ workspaceId: owner, issueIds: Array.from({ length: 201 }, () => peer) }],
+  ]) assert.equal((await handle(request(action, args))).status, 400)
+  assert.equal(calls, 0)
+  for (const issueIds of [[], Array.from({ length: 200 }, () => peer)]) {
+    assert.equal((await handle(request(action, [{ workspaceId: owner, issueIds }]))).status, 200)
+  }
+  assert.equal(calls, 2, 'empty and bounded inputs still enter the reader and its membership checks')
+})
+
 test('Coordinator submission accepts an optional captured workspace without widening its authority tuple', () => {
   const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
   const legacy = ['hello', null, null, owner, undefined, undefined, undefined, undefined, undefined]
@@ -190,6 +236,23 @@ test('Coordinator submission accepts an optional captured workspace without wide
     assert.equal(schema.safeParse([...legacy, expected]).success, false)
   }
   assert.equal(schema.safeParse([...legacy, peer, { admin: true }]).success, false)
+})
+
+test('Coordinator task titles cross the shared Web and desktop RPC boundary', () => {
+  const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
+  const args = ['Task description', null, null, owner, undefined, undefined, undefined, undefined, undefined]
+  for (const workspaceId of [undefined, peer]) {
+    const parsed = schema.safeParse([...args, workspaceId, '  修复登录后回跳  '])
+    assert.equal(parsed.success, true)
+    if (parsed.success) {
+      assert.ok(Array.isArray(parsed.data))
+      assert.equal(parsed.data[10], '修复登录后回跳')
+    }
+    for (const title of ['', ' ', 'x'.repeat(61), 'two\nlines', null, { admin: true }]) {
+      assert.equal(schema.safeParse([...args, workspaceId, title]).success, false)
+    }
+  }
+  assert.equal(schema.safeParse([...args, peer, 'Title', { admin: true }]).success, false)
 })
 
 test('billing re-export consumers accept only the existing workspace selector and purchase amounts', () => {

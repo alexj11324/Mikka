@@ -18,16 +18,17 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatVersionState, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersionState, chatView, citationSources, storedReasoning, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import * as chatStore from '@/lib/coordinator/store'
 import { refreshChatMetadata, type UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
-import { reasoningText } from '@/lib/coordinator/stream-response'
+import { reasoningText } from '@/lib/coordinator/reasoning-mask'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { and, eq, sql } from 'drizzle-orm'
 import { chatBotId, type openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
 import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
+import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
 import { NOTE_MAX, NOTES_MAX, withBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
@@ -242,7 +243,7 @@ async function readBotChatSummaries() {
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string, taskTitle?: string): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -267,7 +268,9 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     if (!destination.success) throw new ActionFailureError('validationGeneric')
     const profile = agentProfileReferenceSchema.optional().safeParse(profileId)
     if (!profile.success) throw new ActionFailureError('validationGeneric')
-    const taskSubmission = Boolean(destination.data || profile.data)
+    const title = taskTitleInputSchema.optional().safeParse(taskTitle)
+    if (!title.success) throw new ActionFailureError('validationGeneric')
+    const taskSubmission = Boolean(destination.data || profile.data || title.data)
     if (profile.data && profile.data !== BUILTIN_AGENT_PROFILE_ID) {
       try {
         const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
@@ -290,7 +293,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
     if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
     const reader = { id: userId, [tokenWorkspace]: bot.workspaceId, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
-    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, taskTitle: title.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
     try {
       // Already retried (a double click, two sends at once): nothing more is sent.
       if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }
@@ -319,7 +322,8 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     const chat = await chatView(session.user.id, 1, bot.id)
     if (chat.items.length || chat.working || chat.error) return { queued: false }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
-    await recordCoordinatorEvent(db, userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id }))
+    const event = userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id })
+    await recordCoordinatorEvent(db, { ...event, payload: { ...event.payload, source: 'coordinator_welcome' } })
     afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
     return { queued: true }
   })
@@ -342,13 +346,7 @@ export async function retryCoordinatorTurn(botId: string | null = null): Promise
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
     if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false as const, reason: 'unavailable' as const }
-    const queued = await retryFailedTurn(session.user.id, bot.id)
-    if (queued) {
-      afterJob('after:coordinator-wake', () => wakeCoordinator(session.user.id))
-      return { queued: true as const }
-    }
-    const current = await chatView(session.user.id, 1, bot.id)
-    return { queued: false as const, reason: current.working ? 'working' as const : 'nothingToRetry' as const }
+    return (await import('@/lib/eve/retry')).retryEveTurn(session.user.id,bot.id,await headers())
   })
 }
 

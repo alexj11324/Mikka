@@ -5,16 +5,16 @@
 // (no request scope in node:test) and the provider's model list are replaced.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { MODEL_CREDENTIAL_HEADER, REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
+import { MODEL_CREDENTIAL_HEADER, PROJECT_ENVIRONMENT_HEADER, REPO_ORIGIN_HEADER, runAssignmentSchema } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { apiKeyHarnesses } from '../lib/model-api-key-providers'
-import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
 import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
 import { fakeThreadMachines } from './support/thread-machine-fake'
@@ -91,8 +91,8 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     return { id, workspaceId: ws.id, botId, issueId, remote, deviceId, agents, token }
   }
   const definition = async (runId: string) => (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0].agentDefinition
-  const claim = (deviceId: string, runId: string, token: string, credentialHeader = true) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${runId}/claim`, {
-    method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', ...(credentialHeader ? { [MODEL_CREDENTIAL_HEADER]: '1' } : {}) },
+  const claim = (deviceId: string, runId: string, token: string, credentialHeader = true, environmentHeader = false) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${runId}/claim`, {
+    method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', ...(credentialHeader ? { [MODEL_CREDENTIAL_HEADER]: '1' } : {}), ...(environmentHeader ? { [PROJECT_ENVIRONMENT_HEADER]: '1' } : {}) },
   }), { params: Promise.resolve({ deviceId, runId }) })
   const recorded = async (runId: string) => (await pool.query('SELECT "keyId" FROM model_api_key_runs WHERE "runId"=$1', [runId])).rows[0]?.keyId ?? null
   /** A connected Claude subscription bound to the person's Claude Code Agent. */
@@ -120,6 +120,144 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await pool.query('INSERT INTO bot_cloud_runtimes ("botId","ownerId","workspaceId",harness,"agentId","repoId") VALUES ($1,$2,$3,\'claude_code\',$4,$5)', [p.botId,p.id,p.workspaceId,agentId,repoId])
     return { cloudDevice, agentId, repoId }
   }
+
+  await t.test('Project Environment crosses real queue, claim and daemon bootstrap; stale selections never claim or execute', async () => {
+    const p = await person('project-environment-execution')
+    const resources = await import('../lib/project-resources/store')
+    const { createWorkspaceSecret } = await import('../lib/secrets/store')
+    // The same execution helper exercised by packages/daemon/test/project-environment.test.ts.
+    // Here its only inputs are the assignment returned by the actual claim handler.
+    const { WorktreeManager, runBranch } = await import('../packages/daemon/src/worktrees')
+    const projectId = randomUUID(), repositoryKey = normalizeRepository(p.remote).key
+    const changedIssue = await task(p.id, p.workspaceId), revokedIssue = await task(p.id, p.workspaceId)
+    const selectedValue = `environment-selected-${randomBytes(24).toString('hex')}`
+    const unselectedValue = `environment-unselected-${randomBytes(24).toString('hex')}`
+    const root = mkdtempSync(join(tmpdir(), 'mikka-project-environment-'))
+    const checkout = join(root, 'checkout')
+    mkdirSync(checkout)
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env,
+      GIT_AUTHOR_NAME: 'Environment Fixture', GIT_AUTHOR_EMAIL: 'environment@example.invalid',
+      GIT_COMMITTER_NAME: 'Environment Fixture', GIT_COMMITTER_EMAIL: 'environment@example.invalid' } }).trim()
+    const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
+    const bootstrapScript = 'const fs=require("node:fs");fs.appendFileSync("bootstrap-count","run\\n");fs.writeFileSync(".env.local","FEATURE_MODE="+process.env.FEATURE_MODE+"\\nPROJECT_PASSWORD="+process.env.PROJECT_PASSWORD+"\\n")'
+    const configuration = { runtime: 'local' as const, harness: 'claude_code' as const, variables: { FEATURE_MODE: 'accepted-environment' },
+      repositoryKeys: [repositoryKey], setup: { copyFiles: ['.env.local'], command: `${shellQuote(process.execPath)} -e ${shellQuote(bootstrapScript)}`, approved: true }, secretIds: [] as string[] }
+    try {
+      git(checkout, 'init', '-q', '-b', 'main')
+      git(checkout, 'remote', 'add', 'origin', p.remote)
+      writeFileSync(join(checkout, 'README.md'), 'Existing checkout history\n')
+      writeFileSync(join(checkout, '.gitignore'), '.env.local\nbootstrap-count\n')
+      git(checkout, 'add', '.'); git(checkout, 'commit', '-q', '-m', 'existing main history')
+      const originalHead = git(checkout, 'rev-parse', 'HEAD')
+      git(checkout, 'checkout', '-q', '-b', 'environment-base')
+      writeFileSync(join(checkout, 'environment-base.txt'), 'Selected Project base\n')
+      git(checkout, 'add', '.'); git(checkout, 'commit', '-q', '-m', 'environment base history')
+      const environmentHead = git(checkout, 'rev-parse', 'HEAD')
+      git(checkout, 'checkout', '-q', 'main')
+      writeFileSync(join(checkout, '.env.local'), 'LOCAL_ONLY=untouched\n')
+      const manager = new WorktreeManager(join(root, 'worktrees'))
+      const existingId = randomUUID(), existingWorktree = await manager.create(existingId, checkout, 'main')
+      writeFileSync(join(existingWorktree, 'existing-note.txt'), 'Keep unrelated worktree edits\n')
+      const existingStatus = git(existingWorktree, 'status', '--porcelain')
+
+      const selected = await createWorkspaceSecret(p.id, p.workspaceId, { name: 'PROJECT_PASSWORD', kind: 'secret', value: selectedValue, scope: { type: 'repository', repository: repositoryKey.slice('v2/github.com/'.length) }, delivery: { mode: 'direct', exposeToAgent: true } })
+      await createWorkspaceSecret(p.id, p.workspaceId, { name: 'UNSELECTED_PASSWORD', kind: 'secret', value: unselectedValue })
+      configuration.secretIds = [selected.id]
+      const environment = await resources.saveEnvironment(p.id, { workspaceId: p.workspaceId, name: 'Actual claim environment', configuration })
+      await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+        VALUES($1,$2,$3,'Environment execution','','','planned','none','','','','','[]',1)`, [projectId, p.id, p.workspaceId])
+      await seedProjectTasks(pool, projectId, [p.issueId, changedIssue, revokedIssue])
+      await resources.saveProjectResources(p.id, { workspaceId: p.workspaceId, projectId, revision: 1,
+        repositories: [{ repositoryKey, baseBranch: 'environment-base', environmentId: environment.id, isPrimary: true }],
+        environmentIds: [environment.id], defaultEnvironmentId: environment.id })
+      const queue = (issueId: string) => queueRun(p.id, { issueId, agentId: p.agents.claude_code, repo: p.remote, model: 'fixture-model' }, p.botId)
+      const persisted = async (runId: string) => ({
+        run: (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0],
+        tokens: (await pool.query('SELECT * FROM run_tokens WHERE "runId"=$1 ORDER BY id', [runId])).rows,
+        publication: (await pool.query('SELECT * FROM run_publications WHERE "runId"=$1', [runId])).rows,
+      })
+      const noPlaintext = async () => {
+        const durable = JSON.stringify({
+          runs: (await pool.query('SELECT * FROM agent_runs WHERE "userId"=$1', [p.id])).rows,
+          publications: (await pool.query('SELECT * FROM run_publications WHERE "userId"=$1', [p.id])).rows,
+          events: (await pool.query('SELECT * FROM coordinator_events WHERE "userId"=$1', [p.id])).rows,
+          resourceEvents: (await workspacePool.query('SELECT * FROM workspace_resource_events WHERE "workspaceId"=$1', [p.workspaceId])).rows,
+          configuration: (await workspacePool.query('SELECT * FROM workspace_environments WHERE "workspaceId"=$1', [p.workspaceId])).rows,
+        })
+        assert.ok(!durable.includes(selectedValue) && !durable.includes(unselectedValue), 'Run snapshots, publication receipts and events never persist an opened Environment secret')
+      }
+      const { runId } = await queue(p.issueId)
+      const queued = await persisted(runId)
+      const frozen = queued.run.agentDefinition.projectExecution
+      assert.equal(frozen.workspaceId, p.workspaceId); assert.equal(frozen.projectId, projectId)
+      assert.equal(frozen.repositoryKey, repositoryKey); assert.equal(frozen.baseBranch, 'environment-base')
+      assert.deepEqual(frozen.environment.secretIds, [selected.id])
+      assert.deepEqual(frozen.environment.variables, configuration.variables)
+      assert.equal(frozen.environment.revision, environment.revision)
+      assert.equal(queued.run.status, 'queued'); assert.equal(queued.run.startedAt, null)
+      assert.equal(queued.tokens.length, 0)
+      await noPlaintext()
+
+      const refuse = async (id: string, code: string, header = true) => {
+        const before = await persisted(id)
+        const response = await claim(p.deviceId, id, p.token, true, header)
+        assert.equal(response.status, 409)
+        const body = await response.json()
+        assert.equal(body.code, code)
+        for (const field of ['runId', 'taskEnv', 'taskSecretNames', 'projectEnvironment', 'modelCredential', 'mcp']) assert.equal(body[field], undefined)
+        assert.deepEqual(await persisted(id), before, 'rejection leaves the queued Run, token set and publication history untouched')
+        assert.equal(await recorded(id), null)
+        assert.equal(existsSync(manager.pathFor(id)), false, 'a rejected claim gives the daemon no assignment or worktree to execute')
+      }
+      await refuse(runId, 'projectEnvironmentUnavailable', false)
+      const response = await claim(p.deviceId, runId, p.token, true, true)
+      assert.equal(response.status, 200, 'the environment-capable daemon claims the exact frozen selection')
+      const assignment = runAssignmentSchema.parse(await response.json())
+      assert.equal(response.headers.get('cache-control'), 'private, no-store')
+      assert.equal(assignment.baseBranch, 'environment-base')
+      assert.deepEqual(assignment.projectEnvironment, { ...environment, setup: configuration.setup })
+      assert.deepEqual(Object.keys(assignment.taskEnv ?? {}).sort(), ['FEATURE_MODE', 'PROJECT_PASSWORD'])
+      assert.equal(assignment.taskEnv?.FEATURE_MODE, configuration.variables.FEATURE_MODE)
+      assert.ok(assignment.taskEnv?.PROJECT_PASSWORD === selectedValue, 'claim opens the exact selected encrypted Workspace secret')
+      assert.deepEqual(assignment.taskSecretNames, ['PROJECT_PASSWORD'])
+      const worktree = await manager.create(assignment.runId, checkout, assignment.baseBranch!)
+      assert.equal(git(worktree, 'rev-parse', 'HEAD'), environmentHead)
+      assert.equal(git(worktree, 'symbolic-ref', '--short', 'HEAD'), runBranch(assignment.runId))
+      assert.equal(await manager.bootstrap(worktree, checkout, assignment.projectEnvironment!.setup, assignment.taskEnv), 'done')
+      assert.ok(readFileSync(join(worktree, '.env.local'), 'utf8') === `FEATURE_MODE=${configuration.variables.FEATURE_MODE}\nPROJECT_PASSWORD=${selectedValue}\n`, 'the real bootstrap child receives the claim variables without printing secrets')
+      assert.equal(readFileSync(join(worktree, 'bootstrap-count'), 'utf8'), 'run\n')
+      assert.equal(git(checkout, 'symbolic-ref', '--short', 'HEAD'), 'main')
+      assert.equal(git(checkout, 'rev-parse', 'HEAD'), originalHead)
+      assert.equal(git(checkout, 'rev-parse', 'environment-base'), environmentHead)
+      assert.equal(readFileSync(join(checkout, '.env.local'), 'utf8'), 'LOCAL_ONLY=untouched\n')
+      assert.equal(git(existingWorktree, 'rev-parse', 'HEAD'), originalHead)
+      assert.equal(git(existingWorktree, 'symbolic-ref', '--short', 'HEAD'), runBranch(existingId))
+      assert.equal(git(existingWorktree, 'status', '--porcelain'), existingStatus)
+      assert.equal(readFileSync(join(existingWorktree, 'existing-note.txt'), 'utf8'), 'Keep unrelated worktree edits\n')
+      const accepted = await persisted(runId)
+      assert.equal(accepted.run.status, 'preparing')
+      assert.deepEqual(accepted.run.agentDefinition, queued.run.agentDefinition)
+      await noPlaintext()
+
+      const changedRun = await queue(changedIssue)
+      await resources.saveEnvironment(p.id, { workspaceId: p.workspaceId, ...environment, name: 'Changed after admission', configuration: { ...configuration, variables: { FEATURE_MODE: 'later-environment' } } })
+      await refuse(changedRun.runId, 'projectEnvironmentUnavailable')
+      const revokedRun = await queue(revokedIssue)
+      await resources.saveWorkspaceRepositoryPolicy(p.id, { workspaceId: p.workspaceId, revision: 0, mode: 'restricted', repositoryKeys: [] })
+      await refuse(revokedRun.runId, 'projectRepositoryDenied')
+      assert.deepEqual(await persisted(runId), accepted, 'later Environment edits and repository withdrawal never rewrite an admitted historical Run')
+      assert.equal(readFileSync(join(worktree, 'bootstrap-count'), 'utf8'), 'run\n', 'neither refused claim starts another bootstrap child')
+      await noPlaintext()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+      await workspacePool.query('DELETE FROM workspace_project_repositories WHERE "projectId"=$1', [projectId])
+      await workspacePool.query('DELETE FROM workspace_projects WHERE id=$1', [projectId])
+      await workspacePool.query('DELETE FROM workspace_environments WHERE "workspaceId"=$1', [p.workspaceId])
+      await workspacePool.query('DELETE FROM workspace_repository_policies WHERE "workspaceId"=$1', [p.workspaceId])
+      await workspacePool.query('DELETE FROM workspace_resource_events WHERE "workspaceId"=$1', [p.workspaceId])
+      await pool.query('DELETE FROM workspace_secrets WHERE "workspaceId"=$1', [p.workspaceId])
+    }
+  })
 
   await t.test('bot-less shared tasks freeze their own tenant and survive personal Coordinator backfill', async () => {
     const p = await person('task-tenant')

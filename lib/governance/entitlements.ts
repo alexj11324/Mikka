@@ -18,10 +18,11 @@ export async function lockWorkspaceEntitlements(tx: WorkspaceTransaction, worksp
     const [organization] = await tx.select({ archivedAt: organizations.archivedAt }).from(organizations).where(eq(organizations.id, organizationId)).for('update')
     if (!organization || organization.archivedAt) throw new GovernanceError('access_denied')
   }
-  const [grant] = organizationId
-    ? await tx.select().from(organizationEntitlements).where(eq(organizationEntitlements.organizationId, organizationId)).limit(1)
-    : await tx.select().from(workspaceEntitlements).where(eq(workspaceEntitlements.workspaceId, workspaceId)).limit(1)
-  const entitlements = resolveEntitlements({ mode, kind: workspace.kind, grant })
+  const [grants] = await tx.select({ local: workspaceEntitlements, organization: organizationEntitlements }).from(workspaces)
+    .leftJoin(workspaceEntitlements, eq(workspaceEntitlements.workspaceId, workspaces.id))
+    .leftJoin(organizationEntitlements, organizationId ? eq(organizationEntitlements.organizationId, organizationId) : sql`false`)
+    .where(eq(workspaces.id, workspaceId)).limit(1)
+  const entitlements = resolveEntitlements({ mode, kind: workspace.kind, grants: [grants?.local, grants?.organization] })
   return { workspace, organizationId, entitlements }
 }
 

@@ -16,13 +16,15 @@
 //
 // Naming (firm): the machine is a `device`; agents are named by `harness`.
 import { z } from "zod"
+import { taskMcpServerSchema } from './task-mcp'
+import { workspaceReadCommand } from './coding-workspace'
 
 import { modelNameSchema, runPolicySchema } from "./agent-policy"
 import { signedPolicySnapshotSchema } from "./policy-snapshot"
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotSchema } from "./quota"
 import { runStopReason, runBenchmarkContext } from "./run"
-import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
+import { MAX_PROFILE_SKILLS_PER_RUN, MAX_SKILLS_PER_RUN, profileRunSkillSchema, runSkillSchema } from "./skill"
 import { skillAssignmentReceiptSchema } from './skill-artifact'
 import { sanitizeTraceContext } from './trace-context'
 import { nativeLeaseSchema } from './subscription'
@@ -300,6 +302,9 @@ export const runCheckpointSchema = z.object({
   takenAt: isoTime,
   /** The latest tree could not be checkpointed; it supersedes older patches. */
   unavailableReason: z.literal('too_large').optional(),
+  /** Full-source review proof is optional and independently validated. It is
+   * consumed in memory, never retained in recovery records or claim payloads. */
+  review: z.unknown().optional(),
 })
 export type RunCheckpoint = z.infer<typeof runCheckpointSchema>
 
@@ -324,6 +329,7 @@ export const setupRecipeSchema = z.object({
 export type SetupRecipe = z.infer<typeof setupRecipeSchema>
 
 export const REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check"
+export const PROJECT_ENVIRONMENT_HEADER = "x-mikka-project-environment"
 
 /** Sent by a daemon that injects `modelCredential`; a run frozen on an API key is handed only to one. */
 export const MODEL_CREDENTIAL_HEADER = "x-mikka-model-credential"
@@ -402,6 +408,8 @@ export const runAssignmentSchema = z.object({
   remoteUrl: z.string().min(1).max(4_000).optional(),
   /** Absent means origin/HEAD after fetch. */
   baseBranch: z.string().min(1).max(500).optional(),
+  /** Frozen configuration, not a VM or a credential. Requires PROJECT_ENVIRONMENT_HEADER. */
+  projectEnvironment: z.object({ id: z.uuid(), revision: z.number().int().positive(), setup: setupRecipeSchema.optional() }).strict().optional(),
   expectedRepoRemote: z.string().max(2_000).optional(),
   harness: harnessSchema,
   prompt: z.string().max(100_000),
@@ -482,6 +490,8 @@ export const runAssignmentSchema = z.object({
     mailboxCatalogue: mailboxCatalogueSchema.optional(),
     /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
     apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
+    /** User/Workspace MCP configuration; credentials are deliberately readable by this task. */
+    servers: z.array(taskMcpServerSchema).max(64).optional(),
   }).optional(),
   /**
    * The run owner's own GitHub credential for git and gh, prepared once at
@@ -550,6 +560,17 @@ export const runAssignmentSchema = z.object({
   skills: z.array(runSkillSchema).max(MAX_SKILLS_PER_RUN).optional(),
   /** Server-minted assignment provenance; does not grant any policy permission. */
   skillReceipt: skillAssignmentReceiptSchema.optional(),
+  /**
+   * The frozen Profile's selected capabilities, with the exact pinned bodies
+   * the `load_skill` Mikka tool serves. Only metadata enters the brief. Absent
+   * from an older server: the run has no Profile Skills.
+   */
+  profileSkills: z.array(profileRunSkillSchema).max(MAX_PROFILE_SKILLS_PER_RUN).optional(),
+  /**
+   * Repository Skill names declared by the Profile. The daemon pins them from
+   * its own authorized checkout; the server never reads a repository here.
+   */
+  repositorySkills: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)).max(MAX_PROFILE_SKILLS_PER_RUN).optional(),
   /** Frozen by the server benchmark ledger; never extracted from model output. */
   benchmark: runBenchmarkContext.optional(),
 }).refine(value => !(value.modelCredential && value.subscriptionBinding), { message: "A run has one model credential", path: ["modelCredential"] })
@@ -657,6 +678,8 @@ export type RunCommand = z.infer<typeof runCommandSchema>
  */
 export const runCommandsResponse = z.object({
   commands: z.array(runCommandSchema).max(500),
+  /** Owner-scoped reads, delivered only to a daemon advertising protocol v1. */
+  workspaceRequests: z.array(workspaceReadCommand).max(4).optional(),
   /**
    * Runs queued for this device (outside `skip`), so it claims them now
    * instead of on its next heartbeat. A queued run also ends the long-poll.

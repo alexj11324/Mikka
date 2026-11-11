@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 
+const confirmAccess = z.boolean().optional().describe('Only to replay a call that returned error accessChangeConfirmationRequired: the call would change who can read the task, and this confirms it.')
 const changes = {
+  confirmAccess,
   status: z.enum(ISSUE_STATUS_CODES).optional(),
   priority: z.enum(ISSUE_PRIORITY_CODES).optional(),
   labels: z.array(z.string().trim().min(1).max(40)).max(12).optional(),

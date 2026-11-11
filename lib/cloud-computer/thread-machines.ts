@@ -38,6 +38,8 @@ import { factoryEventId } from '../factory/event-id'
 import { questionFingerprint } from '../factory/questions/contract'
 import { unclaimedPlanQuestionContinuation } from '../factory/questions/execution-continuation'
 import type { FactoryTask } from '../factory/store'
+import type { agentRuns } from '../db/schema'
+import { assertRunProjectResources, isProjectExecutionRefusal, withRunProjectResources } from '../project-resources/run-lease'
 /** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
 async function options(ownerId: string) {
   return { apiKey: await e2bApiKey(ownerId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
@@ -149,18 +151,30 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
  * provider work. A never-claimed continuation may still own its task's native
  * history, so checking only the current run's status is not enough to kill. */
 async function canAcknowledgeQueuedThreadStop(client: PoolClient, actor: Actor, run: Record<string, any>, machine: Record<string, any> | undefined) {
-  if (run.status !== 'queued' || !run.stopRequestedAt || run.startedAt != null || run.sessionId != null ||
+  if (run.workspaceId !== actor.workspaceId || run.status !== 'queued' || !run.stopRequestedAt || run.startedAt != null || run.sessionId != null ||
     run.deviceTokenId != null || run.leaseExpiresAt != null || run.questionContinuation != null) return false
-  if (machine && (machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
-    machine.state === 'ended' || machine.botId !== run.runtimeBotId || machine.issueId !== run.issueId ||
+  const legacyMachine = machine?.issueId === null
+  if (machine && (machine.runId !== run.id || machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
+    machine.state === 'ended' || machine.botId !== run.runtimeBotId || (!legacyMachine && machine.issueId !== run.issueId) ||
     machine.workerLeaseId || (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now()) ||
     machine.lifecycle?.requiresNativeExit === true)) return false
+  if (machine && legacyMachine) {
+    // The task-machine migration added a nullable column without backfilling
+    // old machines. A verified never-claimed binding may still be stopped;
+    // this does not assign a Task or authorize a wake, adoption or credential.
+    if (!machine.deviceId || !machine.repoId || machine.deviceId !== run.deviceId || machine.repoId !== run.deviceRepoId) return false
+    const target = await client.query(`SELECT 1 FROM devices d
+      JOIN device_repos repo ON repo."deviceId"=d.id AND repo."userId"=d."ownerId"
+      WHERE d.id=$1 AND d."ownerId"=$2 AND d.kind='cloud' AND repo.id=$3 FOR SHARE OF d,repo`,
+    [machine.deviceId, actor.userId, machine.repoId])
+    if (!target.rowCount) return false
+  }
   const native = await client.query(`SELECT 1 FROM byos_native_runs WHERE "runId"=$1
     UNION ALL SELECT 1 FROM agent_runs source WHERE source.id<>$1
-      AND source."userId"=$2 AND source."issueId" IS NOT DISTINCT FROM $3::uuid
+      AND ($5::boolean OR (source."userId"=$2 AND source."issueId" IS NOT DISTINCT FROM $3::uuid))
       AND source."deviceId"=$4 AND (source."sessionId" IS NOT NULL OR source."startedAt" IS NOT NULL
         OR source."deviceTokenId" IS NOT NULL OR EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=source.id))
-    LIMIT 1`, [run.id, actor.userId, run.issueId, machine?.deviceId ?? null])
+    LIMIT 1`, [run.id, actor.userId, run.issueId, machine?.deviceId ?? null, legacyMachine])
   return native.rowCount === 0
 }
 
@@ -175,13 +189,18 @@ export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runI
   const candidate = await pool.query(`SELECT 1 FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     JOIN thread_machines m ON m."runId"=r.id AND m."ownerId"=r."userId" AND m."workspaceId"=b."workspaceId"
-    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r.status='queued' AND r."stopRequestedAt" IS NOT NULL
+    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId" AND r.status='queued' AND r."stopRequestedAt" IS NOT NULL
       AND r."startedAt" IS NULL AND r."sessionId" IS NULL AND r."deviceTokenId" IS NULL AND r."leaseExpiresAt" IS NULL AND r."questionContinuation" IS NULL
-      AND m."sandboxId" IS NOT NULL AND m.state<>'ended' AND m."botId"=b."botId" AND m."issueId" IS NOT DISTINCT FROM r."issueId"
+      AND m."sandboxId" IS NOT NULL AND m.state<>'ended' AND m."botId"=b."botId"
+      AND ((m."issueId" IS NOT NULL AND m."issueId"=r."issueId") OR (m."issueId" IS NULL
+        AND m."deviceId"=r."deviceId" AND m."repoId"=r."deviceRepoId"
+        AND EXISTS(SELECT 1 FROM devices d JOIN device_repos repo ON repo."deviceId"=d.id AND repo."userId"=d."ownerId"
+          WHERE d.id=m."deviceId" AND d."ownerId"=r."userId" AND d.kind='cloud' AND repo.id=m."repoId")))
       AND m."workerLeaseId" IS NULL AND (m."workerLeaseUntil" IS NULL OR m."workerLeaseUntil"<=now())
+      AND m.lifecycle->>'requiresNativeExit' IS DISTINCT FROM 'true'
       AND NOT EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=r.id)
       AND NOT EXISTS(SELECT 1 FROM agent_runs source WHERE source.id<>r.id
-        AND source."userId"=r."userId" AND source."issueId" IS NOT DISTINCT FROM r."issueId" AND source."deviceId"=m."deviceId"
+        AND (m."issueId" IS NULL OR (source."userId"=r."userId" AND source."issueId" IS NOT DISTINCT FROM r."issueId")) AND source."deviceId"=m."deviceId"
         AND (source."sessionId" IS NOT NULL OR source."startedAt" IS NOT NULL OR source."deviceTokenId" IS NOT NULL
           OR EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=source.id)))`, [runId, actor.userId, actor.workspaceId])
   if (!candidate.rowCount) return false
@@ -192,7 +211,7 @@ export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runI
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
     const run = (await client.query(`SELECT r.*,b."botId" AS "runtimeBotId"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
-      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
+      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId" FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run) { await client.query('ROLLBACK'); return false }
     const machine = (await client.query(`SELECT * FROM thread_machines
       WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
@@ -319,14 +338,14 @@ async function retainThreadMachineForHandoffLocked(client: PoolClient, actor: Ac
     return true
 }
 
-export async function retainThreadMachineForHandoff(pool: Pool, actor: Actor, runId: string, nextRunId: string): Promise<boolean> {
-  const client = await pool.connect()
+export async function retainThreadMachineForHandoff(pool: Pool, actor: Actor, runId: string, nextRunId: string, existing?: PoolClient): Promise<boolean> {
+  const client = existing ?? await pool.connect()
   try {
-    await client.query('BEGIN')
+    if (!existing) await client.query('BEGIN')
     const retained = await retainThreadMachineForHandoffLocked(client, actor, runId, nextRunId)
-    await client.query('COMMIT')
+    if (!existing) await client.query('COMMIT')
     return retained
-  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  } catch (error) { if (!existing) await client.query('ROLLBACK'); throw error } finally { if (!existing) client.release() }
 }
 
 /**
@@ -478,7 +497,7 @@ async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: s
   if (!identity) return unavailable()
   const { rows: [task] } = await tx.query('SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE', [identity.taskId, actor.userId])
   if (!task || task.status !== 'running') return unavailable()
-  const { rows } = await tx.query(`SELECT to_jsonb(q) AS question,to_jsonb(r) AS run,to_jsonb(origin) AS origin,e."eventId",e.request,e.result
+  const { rows } = await tx.query(`SELECT to_jsonb(q) AS question,to_jsonb(r) AS run,to_jsonb(origin.*) AS origin,e."eventId",e.request,e.result
     FROM factory_questions q
     JOIN factory_attempts a ON a.id=$4 AND a."taskId"=q."taskId" AND a.stage=$5 AND a.status='running'
     JOIN agent_runs r ON r.id=a."runId" AND r.id=q."continuationRunId" AND r."userId"=q."userId" AND r."issueId"=q."issueId"
@@ -574,19 +593,34 @@ async function lockUnclaimedQuestionRuntimeRecovery(client: PoolClient, actor: A
 /** The queued run is moved to a dedicated device before any worker can claim
  * it. Bot workers are denied these runs by claimCloudRun. */
 export async function ensureThreadMachine(...args: Parameters<typeof ensureThreadMachineInternal>) {
-  try {
-    return await cloudStartupSpan('cloud.thread.ensure', cloudStartupRunAttributes(args[2]), () => ensureThreadMachineInternal(...args))
-  } finally {
-    // Every admitted wake, including resume/replay/retained-stage adoption,
-    // leaves the existing durable timer responsible if its request disappears.
-    // The provisioning transaction already stored a deadline before E2B I/O.
-    const [pool, actor, runId] = args
-    await pool.query(`UPDATE thread_machines SET "lifecycleAt"=now()
-      WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3
-        AND (state<>'ended' OR "sandboxId" IS NOT NULL OR "workerLeaseUntil" IS NOT NULL)`, [runId, actor.userId, actor.workspaceId])
-      .catch(() => { /* The previous durable deadline and recovery sweep remain. */ })
-    armDueTimerSoon('run-recovery')
-  }
+  const [pool, actor, runId] = args
+  z.uuid().parse(runId)
+  const { rows: [run] } = await pool.query<typeof agentRuns.$inferSelect>(`SELECT r.* FROM agent_runs r
+    JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId"`, [runId, actor.userId, actor.workspaceId])
+  if (!run) throw new ComputerError(404, 'Thread unavailable')
+  // Admission precedes even retained-machine connect/refresh. A refusal must
+  // not acquire provisioning custody, rewrite its timer, or disturb an old VM.
+  return withRunProjectResources(pool, run, async () => {
+    let resourceRefused = false
+    try {
+      return await cloudStartupSpan('cloud.thread.ensure', cloudStartupRunAttributes(args[2]), () => ensureThreadMachineInternal(...args))
+    } catch (error) {
+      resourceRefused = isProjectExecutionRefusal(error)
+      throw error
+    } finally {
+      // Every admitted wake, including resume/replay/retained-stage adoption,
+      // leaves the existing durable timer responsible if its request disappears.
+      // The provisioning transaction already stored a deadline before E2B I/O.
+      if (!resourceRefused) {
+        await pool.query(`UPDATE thread_machines SET "lifecycleAt"=now()
+          WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3
+            AND (state<>'ended' OR "sandboxId" IS NOT NULL OR "workerLeaseUntil" IS NOT NULL)`, [runId, actor.userId, actor.workspaceId])
+          .catch(() => { /* The previous durable deadline and recovery sweep remain. */ })
+        armDueTimerSoon('run-recovery')
+      }
+    }
+  })
 }
 
 async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: string, provider: typeof threadMachineProvider & { state?: (sandboxId: string, ownerId: string, budget?: RuntimeBudget) => Promise<string> } = threadMachineProvider, desktop = threadDesktop, refreshRuntime = false) {
@@ -627,13 +661,16 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
       unclaimedQuestionRecovery = await lockUnclaimedQuestionRuntimeRecovery(client, actor, runId)
     }
-    const run = (await client.query(`SELECT r.*${refreshRuntime ? ',r."stopRequestedAt"::text AS "registrationStopRequestedAt"' : ''},COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
+    const run = (await client.query(`SELECT r.*${refreshRuntime ? ',r."stopRequestedAt"::text AS "registrationStopRequestedAt"' : ''},r."baseBranch" AS "runBaseBranch",COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       LEFT JOIN agents agent ON agent.id=r."agentId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
-      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
+      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId" FOR UPDATE OF r FOR SHARE OF repo`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    // The public preflight can precede a placement change. Recheck the locked
+    // Run/target on this APP executor, borrowing its already-held WS lease.
+    await assertRunProjectResources(client, { ...run, baseBranch: run.runBaseBranch })
     return await withRunSpan('cloud.thread.provision', { ...cloudStartupRunAttributes(runId), 'mikka.run_id': runId }, async () => {
     if (!refreshRuntime) {
       refreshPhase = timings.next('execution_identity')
@@ -1027,10 +1064,11 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     let definition = current.agentDefinition
     const admission = definition?.repositoryAdmission
     if (current.status === 'queued' && admission) {
-      if (!matchesRepositoryAdmission(admission, {
+      if ((admission.workspaceId != null && (admission.workspaceId !== current.workspaceId || current.workspaceId !== actor.workspaceId)) ||
+        !matchesRepositoryAdmission(admission, {
         userId: actor.userId, issueId: current.issueId, deviceId: current.deviceId, agentId: current.agentId,
         remoteKey: run.repoPath, remoteUrl: run.remoteUrl, targetBranch: admission.targetBranch,
-        ...(current.botId ? { workspaceId: actor.workspaceId } : {}),
+        workspaceId: admission.workspaceId,
         workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
       })) throw new ComputerError(409, 'Repository authority unavailable')
       // Host-owned relocation changes the executor, never the admitted repository or branch.
@@ -1144,6 +1182,9 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // Abort this lease's unpublished broker before start-failure recovery.
     // Preserve the primary admission/upload/registration failure if transport cleanup also fails.
     await workerBroker?.close().catch(() => undefined)
+    // A placement change can invalidate the locked target after preflight.
+    // No provisioning lease was acquired, so there is nothing to clean up.
+    if (isProjectExecutionRefusal(error) && !reservedStartLease) throw error
     if (runtimeRollback) {
       try { await runtimeRollback() } catch (rollbackError) { logRuntimeRefreshFailure(runId, 'rollback', rollbackError) }
     }

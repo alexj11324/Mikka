@@ -1,9 +1,10 @@
+import { eveHeaders, nativeCall, eveResponse } from '../../tests/support/eve-acceptance.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 import { alignServerTimings, cleanupCase, createSessionClient, hasStartupInitialization, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
-  startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from './cloud-startup.mjs'
+  startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, watchRun } from './cloud-startup.mjs'
 import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 import { runSummaryView } from '../../lib/issue-run-conversation.ts'
@@ -183,7 +184,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           assert.equal(input.model, undefined)
           assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
           assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
-          current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
+          current.dispatchInput = input; current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
           assert.equal(chosenModel?.modelId, models[current.harness], 'the coordinator must use the same explicitly chosen small subscription model')
           current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
           assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
@@ -217,14 +218,10 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         profiles.set(profile.id, profile); return json({ profile })
       }
       if (path.startsWith('/api/factory/agent-profiles/')) { assert.equal(init.method, 'DELETE'); return json({ archived: true }) }
-      if (path === '/api/coordinator/stream') {
-        const output = JSON.stringify({ runId: current.runId, arbitraryLongField: 'truncated '.repeat(40), thread: 'new', placement: candidate ? { kind: 'device', deviceId } : { kind: 'cloud' } }).slice(0, 200)
-        const events = [{ type: 'tool', name: 'dispatch_run', call: 'stale', state: 'running', input: JSON.stringify({issueId: id(999)}) },
-          { type: 'tool', name: 'dispatch_run', call: 'stale', state: 'error', errorCode: 'staleDispatch' },
-          { type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'running', quote: `Read README then STARTUP_OK_${current.marker}`, at: 0 },
-          { type: 'tool', name: 'dispatch_run', call: 'call_1', state: 'done', output }]
-        return new Response(events.map(event => JSON.stringify(event)).join('\n') + '\n',
-          { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': current.workflowRunId } })
+      if (path === '/api/agents/eve/v1/session') return json({ ok: true, sessionId: current.workflowRunId })
+      if (/^\/api\/agents\/eve\/v1\/session\/[^/]+\/stream$/.test(path)) {
+        const output = { runId: current.runId, arbitraryLongField: 'full output '.repeat(40), thread: 'new', placement: candidate ? { kind: 'device', deviceId } : { kind: 'cloud' } }
+        return eveResponse([...nativeCall('stale', { issueId: id(999) }, undefined, 'staleDispatch'), ...nativeCall('call_1', current.dispatchInput, output)])
       }
       if (/^\/api\/runs\/.*\/evidence$/.test(path)) return json({ run: { id: current.runId, issueId: current.issueId,
         harness: current.harness, model: models[current.harness], credentialType: badEvidence ? 'api_key' : 'subscription',
@@ -284,12 +281,11 @@ test('the selected dispatch refusal retains its code before queueing and still c
   const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
   io.fetchImpl = async (url, init) => {
     const response = await original(url, init)
-    if (!url.pathname.endsWith('/api/coordinator/stream')) return response
+    if (!url.pathname.endsWith('/stream')) return response
     const events = (await response.text()).trim().split('\n').map(line => {
-      const event = JSON.parse(line)
-      return event.call === 'call_1' && event.state === 'done'
-        ? { type: 'tool', name: 'dispatch_run', call: event.call, state: 'error', errorCode: 'machineUnavailable',
-          errorDetail: 'PRIVATE_DISPATCH_DETAIL', output: 'PRIVATE_DISPATCH_BODY' } : event
+      const value = JSON.parse(line)
+      return { ...value, facts: value.facts.map(event => event.type === 'call.settled' && event.data.callId === 'call_1'
+        ? { ...event, data: { callId: event.data.callId, outcome: 'failed', error: { code: 'machineUnavailable', message: 'PRIVATE_DISPATCH_DETAIL' } } } : event) }
     })
     return new Response(events.map(event => JSON.stringify(event)).join('\n') + '\n', { headers: response.headers })
   }
@@ -309,9 +305,9 @@ test('the selected dispatch refusal retains its code before queueing and still c
 test('a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue', async () => {
   for (const [name, code] of [['AbortError', 'startup_aborted'], ['TimeoutError', 'startup_timeout']]) {
     const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
-    io.fetchImpl = (url, init) => url.pathname.endsWith('/api/coordinator/stream')
+    io.fetchImpl = (url, init) => url.pathname.endsWith('/stream')
       ? new Response(new ReadableStream({ start(controller) { controller.error(new DOMException('PRIVATE_READER_URL?key=PRIVATE_KEY', name)) } }), {
-        headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': 'wrun_FAULT' },
+        headers: eveHeaders,
       }) : original(url, init)
     const report = await runCloudStartup(oneCodexCandidate(), { env, ...io }), sample = report.samples[0]
     assert.equal(report.status, 'failed')
@@ -370,16 +366,16 @@ test('fixed pre-execution entry phases distinguish HTTP, API, RPC and action ref
   }
 })
 
-test('stream refusal, missing workflow identity and completed stream without dispatch retain distinct closed codes', async () => {
+test('stream refusal, incompatible native protocol and completed stream without dispatch retain distinct closed codes', async () => {
   const cases = [
     { response: () => new Response('PRIVATE_BODY', { status: 503 }), failure: { code: 'startup_http_error', httpStatus: 503 } },
     { response: () => new Response('PRIVATE_BODY', { headers: { 'content-type': 'text/plain' } }), failure: { code: 'startup_coordinator_stream_unavailable' } },
-    { response: () => new Response('', { headers: { 'content-type': 'application/x-ndjson' } }), failure: { code: 'startup_workflow_run_missing' } },
-    { response: () => new Response('', { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': 'wrun_NOEVENT' } }), failure: { code: 'startup_dispatch_not_observed' } },
+    { response: () => new Response('', { headers: { ...eveHeaders, 'x-eve-stream-version': '26' } }), failure: { code: 'startup_coordinator_stream_invalid' } },
+    { response: () => new Response('', { headers: eveHeaders }), failure: { code: 'startup_dispatch_not_observed' } },
   ]
   for (const item of cases) {
     const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
-    io.fetchImpl = (url, init) => url.pathname.endsWith('/api/coordinator/stream') ? item.response() : original(url, init)
+    io.fetchImpl = (url, init) => url.pathname.endsWith('/stream') ? item.response() : original(url, init)
     const report = await runCloudStartup(oneCodexCandidate(), { env, ...io }), sample = report.samples[0]
     assert.equal(sample.status, 'failed')
     assert.deepEqual(sample.failure, { phase: 'coordinator_stream', ...item.failure })
@@ -1731,4 +1727,185 @@ test('Codex native outcome checks retain handoff exclusion and explicit error re
     { chunk: { type: 'tool-output-error', toolCallId: 'native', errorText: 'PRIVATE_ERROR' } },
     delta('STARTUP_OK_native-error')] }, epoch), false)
   assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_native-error/)
+})
+
+function liveObserverFixture({ closeAfterProof = false } = {}) {
+  let clock = epoch, detailReads = 0, ownCloses = 0, complete = false, blocked
+  const connected = Promise.withResolvers(), readStarted = Promise.withResolvers()
+  const record = { runId: id(901), issueId: id(902), harness: 'codex', requireReply: false }
+  const detail = () => ({ thread: { id: record.runId, status: 'running' },
+    chunks: complete ? [stage('agent_start', 10), delta('PRIVATE_PROVIDER_OUTPUT', 20)] : [],
+    live: { runs: [{ id: record.runId, workspaceId: workspace }] } })
+  const client = {
+    async json(path) {
+      assert.equal(path, `/api/live/ticket?workspace=${workspace}`)
+      return { url: 'wss://live.example/PRIVATE_CHANNEL', protocol: 'PRIVATE_TICKET', expiresAt: epoch + 60_000 }
+    },
+    async rpc(action, args) {
+      assert.equal(action, 'agents.getIssueThread'); assert.deepEqual(args, [record.issueId, record.runId])
+      detailReads++
+      if (blocked) { readStarted.resolve(); await blocked.promise }
+      return detail()
+    },
+  }
+  const sockets = []
+  class Socket {
+    constructor() { this.readyState = 0; sockets.push(this); connected.resolve(this) }
+    open() { this.readyState = 1; this.onopen?.() }
+    message(value) { this.onmessage?.({ data: JSON.stringify(value) }) }
+    error() { this.readyState = 3; this.onerror?.({ type: 'error', message: 'PRIVATE_ERROR', code: 1011, wasClean: true }) }
+    remoteClose() {
+      this.remoteCloses = (this.remoteCloses ?? 0) + 1; this.remoteCloseHadListener = typeof this.onclose === 'function'
+      this.readyState = 3; this.onclose?.({ code: 1006, wasClean: false, reason: 'PRIVATE_REASON', url: 'PRIVATE_URL' })
+    }
+    close() { ownCloses++; this.readyState = 3; this.onclose?.({ code: 1000, wasClean: true, reason: 'PRIVATE_SELF_CLOSE' }) }
+    send(value) { assert.equal(value, 'ping') }
+  }
+  const outcome = watchRun(client, record, 1000, Socket, () => clock, undefined, closeAfterProof ? {
+    observe(detail) {
+      const complete = observeChunks(record, detail, clock)
+      // Queue a real close callback after the refresh continuation resolves the
+      // outcome, but before its awaiting finally removes socket listeners.
+      if (complete) queueMicrotask(() => queueMicrotask(() => sockets[0].remoteClose()))
+      return complete
+    },
+  } : undefined).then(() => null, error => error)
+  return { record, connected: connected.promise, outcome, sockets, readStarted: readStarted.promise,
+    at(offset) { clock = epoch + offset },
+    blockRead() { blocked = Promise.withResolvers() },
+    finishRead() { complete = true; blocked.resolve() },
+    complete() { complete = true },
+    counts: () => ({ detailReads, ownCloses }),
+  }
+}
+const observerTurn = () => new Promise(resolve => setImmediate(resolve))
+const observerAt = offset => new Date(epoch + offset).toISOString()
+const observerScope = createHash('sha256').update(workspace).digest('hex').slice(0, 16)
+
+test('live observer preserves the first actual close and its bounded read timeline', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.at(10); socket.open()
+  io.at(20); socket.message({ type: 'live_ready', kinds: ['thread', 'run'] })
+  await observerTurn()
+  io.at(30); socket.message({ kind: 'run', id: io.record.runId })
+  await observerTurn()
+  io.at(40); socket.remoteClose()
+  const error = await io.outcome
+  assert.deepEqual(startupFailure(error, 'execution_watch'), { phase: 'execution_watch', code: 'startup_live_disconnected' })
+  assert.deepEqual(io.record.liveObserver, { version: 1,
+    firstFailure: { event: 'close', at: observerAt(40), scopeHash: observerScope, readyState: 3, code: 1006, wasClean: false },
+    openedAt: observerAt(10), readyAt: observerAt(20), lastNotificationAt: observerAt(30),
+    detailReads: { started: 3, completed: 3, lastCompletedAt: observerAt(30), inFlightAtFailure: false },
+    shutdownAt: observerAt(40) })
+  assert.deepEqual(io.counts(), { detailReads: 3, ownCloses: 1 })
+  assert.equal(io.sockets.length, 1)
+  assert.doesNotMatch(JSON.stringify(io.record.liveObserver), /PRIVATE|00000000-0000|reason|message|stack|url|ticket|nativeSID/)
+})
+
+test('live observer keeps error first without fabricating close metadata from a later close', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.at(10); socket.open()
+  io.at(20); socket.error()
+  io.at(30); socket.remoteClose()
+  const error = await io.outcome
+  assert.equal(error.message, 'startup_live_disconnected')
+  assert.deepEqual(io.record.liveObserver.firstFailure,
+    { event: 'error', at: observerAt(20), scopeHash: observerScope, readyState: 3 })
+  assert.equal(io.record.liveObserver.openedAt, observerAt(10))
+  assert.equal(io.record.liveObserver.readyAt, null)
+  assert.equal(io.record.liveObserver.lastNotificationAt, null)
+  assert.equal(io.record.liveObserver.shutdownAt, observerAt(30))
+  assert.equal(io.record.liveObserver.detailReads.inFlightAtFailure, false)
+  assert.equal(io.sockets.length, 1)
+})
+
+test('live observer keeps close first when an error follows before its own shutdown', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.at(10); socket.remoteClose()
+  io.at(20); socket.error()
+  assert.equal((await io.outcome).message, 'startup_live_disconnected')
+  assert.deepEqual(io.record.liveObserver.firstFailure,
+    { event: 'close', at: observerAt(10), scopeHash: observerScope, readyState: 3, code: 1006, wasClean: false })
+  assert.equal(io.record.liveObserver.shutdownAt, observerAt(20))
+})
+
+test('live observer freezes in-flight evidence and a late detail cannot turn disconnect into success', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.blockRead()
+  io.at(10); socket.message({ kind: 'thread', id: io.record.runId })
+  await io.readStarted
+  io.at(20); socket.error()
+  await observerTurn()
+  io.at(30); io.finishRead()
+  assert.equal((await io.outcome).message, 'startup_live_disconnected')
+  assert.equal(io.record.agentStart, undefined)
+  assert.equal(io.record.firstProviderChunk, undefined)
+  assert.deepEqual(io.record.liveObserver.detailReads,
+    { started: 2, completed: 1, lastCompletedAt: observerAt(0), inFlightAtFailure: true })
+  assert.equal(io.record.liveObserver.lastNotificationAt, observerAt(10))
+  assert.equal(io.record.liveObserver.shutdownAt, observerAt(20))
+  assert.deepEqual(io.counts(), { detailReads: 2, ownCloses: 1 })
+  assert.equal(io.sockets.length, 1)
+})
+
+test('live observer own shutdown after actual execution evidence creates no disconnect evidence', async () => {
+  const io = liveObserverFixture(), socket = await io.connected
+  io.complete()
+  socket.message({ kind: 'run', id: io.record.runId })
+  assert.equal(await io.outcome, null)
+  assert.ok(io.record.agentStart)
+  assert.ok(io.record.firstProviderChunk)
+  assert.equal(Object.hasOwn(io.record, 'liveObserver'), false)
+  assert.deepEqual(io.counts(), { detailReads: 2, ownCloses: 1 })
+  assert.equal(io.sockets.length, 1)
+})
+
+test('live observer ignores an asynchronous transport fault after the outcome already settled', async () => {
+  const io = liveObserverFixture({ closeAfterProof: true }), socket = await io.connected
+  io.complete()
+  socket.message({ kind: 'run', id: io.record.runId })
+  assert.equal(await io.outcome, null)
+  assert.equal(socket.remoteCloses, 1)
+  assert.equal(socket.remoteCloseHadListener, true, 'the close really ran before observer shutdown')
+  assert.ok(io.record.agentStart)
+  assert.ok(io.record.firstProviderChunk)
+  assert.equal(Object.hasOwn(io.record, 'liveObserver'), false)
+  assert.deepEqual(io.counts(), { detailReads: 2, ownCloses: 1 })
+})
+
+
+test('native Eve product-host timing requires one exact owned run interval when no Workflow context exists', () => {
+  const runIdHash = 'a'.repeat(16)
+  const make = () => ({ mode: 'baseline', maxStartupMs: 5000, cleanup: { errors: [] }, samples: [{
+    eveSessionId: 'wrun_NATIVE', workflowRunId: 'wrun_NATIVE', runIdHash,
+    execution: { credentialType: 'subscription' }, cleanup: { status: 'passed' },
+    agentStart: { storedAt: new Date(epoch + 3500).toISOString() }, firstProviderChunk: { storedAt: new Date(epoch + 4000).toISOString() },
+  }] })
+  const dispatch = { msg: 'dispatch_timing', workflowRunId: null, boundary: 'dispatch_run_entry', startedAt: epoch, endedAt: epoch + 3000, totalMs: 3000, failed: false }
+  const owned = { msg: 'cloud_startup_timing', stage: 'cloud.thread.ensure', runIdHash, startedAt: epoch + 100, endedAt: epoch + 2900 }
+  assert.equal(alignServerTimings(make(), [dispatch]).samples[0].timing.reason, 'dispatch_log_missing')
+  assert.equal(alignServerTimings(make(), [dispatch, { ...owned, runIdHash: 'b'.repeat(16) }]).samples[0].timing.reason, 'dispatch_log_missing')
+  assert.equal(alignServerTimings(make(), [dispatch, owned]).samples[0].timing.status, 'aligned')
+  assert.equal(alignServerTimings(make(), [dispatch, dispatch, owned]).samples[0].timing.reason, 'ambiguous_dispatch')
+})
+
+
+test('a native completed call carrying a refused business receipt never becomes a dispatched run', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+  io.fetchImpl = async (url, init) => {
+    const response = await original(url, init)
+    if (!url.pathname.endsWith('/stream')) return response
+    const lines = (await response.text()).trim().split('\n').map(line => {
+      const value = JSON.parse(line)
+      return { ...value, facts: value.facts.map(event => event.type === 'call.settled' && event.data.callId === 'call_1'
+        ? { ...event, data: { ...event.data, output: { error: 'subscriptionQuotaExhausted', privateCause: 'PRIVATE_RECEIPT' } } } : event) }
+    })
+    return new Response(lines.map(line => JSON.stringify(line)).join('\n') + '\n', { headers: response.headers })
+  }
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+  assert.equal(report.samples[0].error, 'startup_dispatch_refused')
+  assert.deepEqual(report.samples[0].dispatchRefusal, { code: 'subscriptionQuotaExhausted' })
+  assert.equal(report.samples[0].runId, undefined)
+  assert.equal(io.calls.some(call => call.action === 'agents.pollIssueThreads'), false)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_RECEIPT/)
 })

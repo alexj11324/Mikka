@@ -21,10 +21,10 @@ import type { ProfileCheckWork } from './agent-profile-decision'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
 export const factoryAutomaticRuntime = {
-  park: async (pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, nextRunId?: string) => {
+  park: async (pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, nextRunId?: string, existing?: PoolClient) => {
     const { parkThreadMachine, retainThreadMachineForHandoff } = await import('@/lib/cloud-computer/thread-machines')
-    if (nextRunId && await retainThreadMachineForHandoff(pool, actor, runId, nextRunId)) return
-    await parkThreadMachine(pool, actor, runId)
+    if (nextRunId && await retainThreadMachineForHandoff(pool, actor, runId, nextRunId, existing)) return
+    await parkThreadMachine(pool, actor, runId, undefined, undefined, existing)
   },
   // The durable Factory workflow owns its lifecycle; do not spawn a second,
   // non-idempotent child workflow from its retried handoff step.
@@ -79,7 +79,10 @@ export function automaticFactoryDispatch(pool: Pool) {
     // absent for local runs). Every later role and recovery selection keeps
     // the task/run tenant, including a botless shared task.
     if (!source || !workspaceId || source.workspaceId !== workspaceId || source.userId !== task.userId || source.issueId !== task.issueId ||
-      (source.deviceKind === 'cloud' && source.runtimeWorkspaceId !== workspaceId)) throw new FactoryError('factoryRunMismatch')
+      // A completed source may have released its live cloud binding. The
+      // persisted run/task tenant remains authoritative; only a binding that
+      // still exists can contradict it.
+      (source.deviceKind === 'cloud' && source.runtimeWorkspaceId != null && source.runtimeWorkspaceId !== workspaceId)) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
     const checkStage = task.stage === 'review' || task.stage === 'verify' ? task.stage : undefined
     const candidateId = task.candidateId
@@ -231,7 +234,7 @@ export function automaticFactoryDispatch(pool: Pool) {
           ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
       }
-      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, ...(continueImplementation ? { threadRunId: source.id } : {}), pinnedDeviceId: (checkStart?.run ?? source).agentDefinition?.pinnedDeviceId, readOnly: check || (continueImplementation && source.agentDefinition?.readOnly) }),
+      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, origin: source.origin ?? 'factory', originRef: source.originRef ?? null, ...(continueImplementation ? { threadRunId: source.id } : {}), pinnedDeviceId: (checkStart?.run ?? source).agentDefinition?.pinnedDeviceId, readOnly: check || (continueImplementation && source.agentDefinition?.readOnly) }),
         checkStart ? { ...defaultFactoryDispatchAdapters, configure: { ...defaultFactoryDispatchAdapters.configure,
           review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
           verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
@@ -244,7 +247,10 @@ export function automaticFactoryDispatch(pool: Pool) {
       return async () => { notifyDeviceWork(deviceId) }
     }
     const selectedHarness = checkStart?.run.agentDefinition.harness ?? (profileChoice?.target.kind === 'cloud' ? profileChoice.target.harness : source.harness)
-    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, source.runtimeBotId, selectedHarness, { freshTask: true })
+    // The live computer binding is released when a source run finishes. The
+    // run's own bot is the durable fallback, then the task's bot for legacy rows.
+    const runtimeBotId = source.runtimeBotId ?? source.botId ?? task.botId
+    const runtime = await ensureRecordedBotHarnessRuntime(tx, { userId: task.userId, workspaceId: source.workspaceId }, runtimeBotId, selectedHarness, { freshTask: true })
     if (!runtime || (checkStart && runtime.agentId !== checkStart.run.agentId)) throw new FactoryError('factoryCheckHarnessUnavailable')
     let model: Partial<RunModel> | { error: string } = selection
     if (profileChoice) {
@@ -262,9 +268,12 @@ export function automaticFactoryDispatch(pool: Pool) {
     const { rows: [issue] } = await tx.query('SELECT title,content FROM issues WHERE id=$1', [task.issueId])
     const actor = { userId: task.userId, workspaceId: source.workspaceId as string }
     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
-      botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
+      botId: runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
       withoutBot: task.botId === null, ...(continueImplementation ? { threadRunId: source.id } : {}), readOnly: check || (continueImplementation && source.agentDefinition?.readOnly), idempotencyKey: `factory:${context.attemptId}`,
       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
+      // The stage continues the source run's entry; a legacy source names the
+      // Factory stage that dispatches it rather than guessing 'web'.
+      origin: source.origin ?? 'factory', originRef: source.originRef ?? null,
     }, client, context), { ...defaultFactoryDispatchAdapters, configure: {
       ...defaultFactoryDispatchAdapters.configure,
       review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling),

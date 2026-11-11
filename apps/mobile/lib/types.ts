@@ -44,6 +44,8 @@ export interface RunSource {
 export type CitationSource = IssueSource | RunSource
 
 export interface ChatItem {
+  /** eve mirror identity; native replay is hidden once this historical row arrives. */
+  streamId?: string
   id?: string
   position: number
   from: 'person' | 'coordinator' | 'event'
@@ -62,7 +64,7 @@ export interface ChatItem {
 
 /** lib/coordinator/event-line.ts on the server. */
 export interface EventLine {
-  kind: 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack' | 'issueStatus' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'other'
+  kind: 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack' | 'issueStatus' | 'issueSnapshot' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'scheduleRan' | 'scheduleDue' | 'other'
   runId: string | null
   issueId: string | null
   status: string | null
@@ -252,6 +254,8 @@ export interface Preferences {
 }
 
 export interface Settings {
+  /** Fresh finance entry scope; absent on older servers. */
+  billingScope?: { kind: 'workspace' | 'organization'; id: string } | null
   user: Person
   workspace: Workspace
   workspaces: Workspace[]

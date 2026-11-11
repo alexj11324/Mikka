@@ -400,14 +400,14 @@ test('workflow selects governance before the same two narrow secrets without enr
   assert.deepEqual(secrets.map(step => step.with['secret-name']), ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD'])
   for (const step of secrets) {
     assert.ok(steps.indexOf(step) > selection)
-    assert.equal(step.if, "(steps.attest.outputs.readable == 'true' && (steps.inbox_selection.outputs.core_required == 'true' || steps.inbox_selection.outputs.selected == 'true')) || steps.governance_selection.outputs.selected == 'true'")
+    assert.equal(step.if, "(steps.attest.outputs.core_selected == 'true' || steps.inbox_selection.outputs.selected == 'true' || steps.memory_select.outputs.selected == 'true') || steps.governance_selection.outputs.selected == 'true'")
     assert.equal(step.uses, 'Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d')
     assert.deepEqual(step.with, { method: 'oidc', 'identity-id': '2cf9fa19-b9db-4c08-8ca0-b31859f2cbac', 'oidc-audience': 'mikka-infisical',
       'project-id': '89850d6a-f020-4936-863e-df77380dfe40', 'env-slug': 'prod', 'secret-path': '/',
       'secret-name': step.with['secret-name'], recursive: false, 'include-imports': false })
   }
   const core = steps.find(step => step.run === 'node --import tsx scripts/acceptance/self-hosted-production.mjs')
-  assert.equal(core.if, "steps.attest.outputs.readable == 'true' && steps.inbox_selection.outputs.core_required == 'true'")
+  assert.equal(core.if, "steps.attest.outputs.core_selected == 'true'")
   const governance = steps.find(step => step.run === 'node --import tsx scripts/acceptance/self-hosted-production-governance.mjs')
   assert.equal(governance.name, 'Verify the registered Team Organization owner and audit APIs with exact cleanup')
   assert.equal(governance.if, "steps.governance_selection.outputs.selected == 'true'"); assert.equal(governance['continue-on-error'], undefined)
@@ -420,6 +420,8 @@ test('workflow selects governance before the same two narrow secrets without enr
   assert.deepEqual(guards.run.split(' '), ['node', '--import', 'tsx', '--test',
     'scripts/acceptance/self-hosted-production.test.mjs', 'scripts/ops/production-mobile-daemon.test.mjs',
     'scripts/acceptance/inbox-production.test.mjs', 'scripts/acceptance/inbox-production-target.test.mjs',
-    'scripts/acceptance/inbox-production-recovery.test.mjs', 'scripts/acceptance/self-hosted-production-governance.test.mjs',
+    'scripts/acceptance/inbox-production-recovery.test.mjs', 'scripts/acceptance/memory-production.test.mjs',
+    'scripts/acceptance/memory-production-target.test.mjs', 'scripts/acceptance/memory-production-pending.test.mjs',
+    'scripts/acceptance/memory-production-cases.test.mjs', 'scripts/acceptance/self-hosted-production-governance.test.mjs',
     'scripts/acceptance/self-hosted-production-governance-target.test.mjs', 'scripts/acceptance/self-hosted-production-governance-recovery.test.mjs'])
 })

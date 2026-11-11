@@ -1,3 +1,4 @@
+import { TASK_MCP_HEADER, TASK_MCP_VERSION, type TaskMcpServer } from '@mikka/protocol'
 import { withFactoryQuestionDeliveryContext } from '@/lib/factory/questions/continuation-delivery-context'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { CodedError, causeFields, logCodedError } from '@mikka/protocol/coded-error'
@@ -14,7 +15,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
+import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeLease } from '@mikka/protocol/subscription'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
@@ -39,6 +40,7 @@ import { checkpointRecoveryError, providerContinuationNote, quotaContinuationNot
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
+import { profileSkillRunAssignment } from '@/lib/factory/agent-profile-skills'
 import { claimBenchmarkAssignment, skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
@@ -55,12 +57,14 @@ import { PublicationError } from '@/lib/run-publication-result'
 import { githubMachineConfigured, githubMachineCredential } from '@/lib/github/machine-credential'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
-import { remoteRepositoryRef, taskSecretInjection, taskSecretSnapshot, type TaskSecretInjection } from '@/lib/secrets/runtime'
+import { remoteRepositoryRef, taskSecretInjection, taskSecretSnapshot, environmentSecretInjection, environmentSecretSnapshot, type TaskSecretInjection } from '@/lib/secrets/runtime'
 import { issueTaskSecretAccess } from '@/lib/secrets/task-access'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 import { executionMembersActive } from '@/lib/execution-identity'
 import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan } from '@/lib/computer/startup-tracing'
 import { cloudStartupDiagnosticEnv } from '@/lib/computer/startup-diagnostics'
+import { withRunProjectExecution } from '@/lib/project-resources/run-lease'
+import { ActionFailureError } from '@/lib/action-error'
 
 import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
@@ -101,6 +105,11 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), eq(agentRuns.userId, caller.userId), isNull(agentRuns.stopRequestedAt)))
     .limit(1)
   if (!run) return NextResponse.json({ error: 'Run is not queued for this device.' }, { status: 409 })
+  if (run.agentDefinition?.customMcp?.servers.length && request.headers.get(TASK_MCP_HEADER) !== TASK_MCP_VERSION) {
+    await failRunForDaemonUpgrade(runId,deviceId,caller.userId)
+    return NextResponse.json({error:'Upgrade the Mikka daemon before using native MCP servers.',code:'daemonUpgradeRequired',protocolVersion:DAEMON_PROTOCOL_VERSION,minVersion:MIN_DAEMON_VERSION,daemonVersions:await daemonVersions()},{status:409})
+  }
+
   const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId)).limit(1)
   const [repo] = run.deviceRepoId
     ? await db.select().from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
@@ -118,6 +127,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   if (run.userId !== caller.userId || agent.userId !== caller.userId || repo.userId !== caller.userId || repo.deviceId !== deviceId) return NextResponse.json({ error: 'Run owner mismatch.' }, { status: 409 })
   if (device.kind === 'local' && !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return NextResponse.json({ error: 'Repository identity must be confirmed before scheduling a new thread.' }, { status: 409 })
   if (repo.remoteUrl && request.headers.get(REPO_ORIGIN_HEADER) !== '1') return NextResponse.json({ error: 'Device update required for repository verification.' }, { status: 409 })
+  const issueId = run.issueId
+  const claimAuthorizedProject = async () => {
+  const projectEnvironment = run.agentDefinition?.projectExecution?.environment
+  if (projectEnvironment && request.headers.get(PROJECT_ENVIRONMENT_HEADER) !== '1') return NextResponse.json({ error: 'Device update required for the selected environment.', code: 'projectEnvironmentUnavailable' }, { status: 409 })
   const rejectProfile = async (error: AgentProfileAdmissionError) => {
     logCodedError(error, { runId })
     const summary = 'The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.'
@@ -139,7 +152,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   // Preserve the task-access denial before narrower policy parsing or any
   // claim preparation. Publication and the final response recheck it later.
   timings.next('admission')
-  const claimIssue = await issueForUser(caller.userId, run.issueId)
+  const claimIssue = await issueForUser(caller.userId, issueId)
   if (!claimIssue) return rejectPublication(new PublicationError('issue_unavailable'))
   // Task and Run ownership is persisted host data. Neither a claim token nor
   // an old frozen execution scope can assign the task to another workspace.
@@ -149,10 +162,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
-  if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
+  if (run.retryOf && await blockQuestionRetry(pool, caller.userId, issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
   const [lost] = run.retryOf
     ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, stopReason: agentRuns.stopReason, agentDefinition: agentRuns.agentDefinition, report: agentRuns.report }).from(agentRuns)
-      .where(and(eq(agentRuns.id, run.retryOf), eq(agentRuns.userId, caller.userId), run.issueId === null ? isNull(agentRuns.issueId) : eq(agentRuns.issueId, run.issueId))).limit(1)
+      .where(and(eq(agentRuns.id, run.retryOf), eq(agentRuns.userId, caller.userId), issueId === null ? isNull(agentRuns.issueId) : eq(agentRuns.issueId, issueId))).limit(1)
     : []
   const providerCheckpointUnavailable = lost?.stopReason === 'provider_failure' && lost.report?.providerCheckpoint === 'unavailable'
   // A failed final upload supersedes any older patch. Only the original
@@ -274,13 +287,17 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   let taskSecretNames: string[] = []
   const taskWorkspaceId = run.workspaceId
   const taskRepository = remoteRepositoryRef(repo.remoteUrl)
+  if (projectEnvironment && (!taskWorkspaceId || taskWorkspaceId !== run.workspaceId
+    || run.agentDefinition?.projectExecution?.workspaceId !== taskWorkspaceId)) return NextResponse.json({ error: 'Environment workspace unavailable.', code: 'projectEnvironmentUnavailable' }, { status: 409 })
   const cloudDesktop = device.kind === 'cloud' && device.harnesses.some(info => info.harness === harness && info.computerBroker)
   if (device.kind === 'cloud' && (!cloudComputerTasksEnabled() || !caller.scopeWorkspaceId || caller.scopeDeviceId !== deviceId
     || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey) || !cloudDesktop && !repo.remoteUrl
     || taskWorkspaceId && taskWorkspaceId !== caller.scopeWorkspaceId)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
   let taskInjection: TaskSecretInjection
   try {
-    taskInjection = await taskSecretInjection(taskWorkspaceId, taskRepository, process.env, undefined, run.userId)
+    taskInjection = projectEnvironment
+      ? await environmentSecretInjection(taskWorkspaceId!, taskRepository, projectEnvironment, process.env, run.userId)
+      : await taskSecretInjection(taskWorkspaceId, taskRepository, process.env, undefined, run.userId)
     taskEnv = taskInjection.env
     taskSecretNames = taskInjection.secretNames
   } catch { return NextResponse.json({ code: 'task_secret_unavailable', detail: 'configuration' }, { status: 409 }) }
@@ -359,6 +376,21 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   timings.next('assignment_context')
   const startupAttributes = cloudStartupRunAttributes(runId)
   const githubRepository = /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) && harness !== 'mock'
+  // Resolve native configuration outside the optional hand-in-token catch. A
+  // revoked connection must visibly fail the task, never remove all MCP tools.
+  let servers: TaskMcpServer[] = []
+  if (run.agentDefinition?.customMcp && ['claude_code','codex','cursor'].includes(harness)) {
+    try { servers = await (await import('@/lib/plugins/runtime')).personalPlugins.nativeMcpConnections(caller.userId,run.agentDefinition.customMcp) }
+    catch (error) {
+      logCodedError(new CodedError('mcpUnavailable',{cause:error}),{runId:run.id})
+      const now = new Date()
+      await db.update(agentRuns).set({status:'failed',stopReason:'error',error:'mcpUnavailable',failureDetails:serverRunFailure(runId,now),finishedAt:now,updatedAt:now})
+        .where(and(eq(agentRuns.id,run.id),eq(agentRuns.userId,caller.userId),eq(agentRuns.deviceId,deviceId),eq(agentRuns.status,'preparing')))
+      await Promise.all([runListChanged(db,run.id),runChanged(db,run.id)])
+      await afterRunEnded(caller.userId,run.id)
+      return NextResponse.json({error:'MCP configuration unavailable.',code:'mcpUnavailable'},{status:409})
+    }
+  }
   const preparedCredentials = receivesRunCredentials ? Promise.allSettled([
     cloudStartupSpan('cloud.worker.claim.native_credentials', startupAttributes, async (): Promise<NativeLease | undefined> => {
       if (!subscription) return undefined
@@ -382,16 +414,12 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
         let apps = harness === 'claude_code' || harness === 'codex'
           ? await (await import('@/lib/app-tools-server')).runAppToolkits(caller.userId, run.botId ?? null).catch(() => [])
           : []
-        if ((harness === 'claude_code' || harness === 'codex') && run.agentDefinition?.customMcp) {
-          const { CUSTOM_MCP_TOOLKIT, runMcpAdvertised } = await import('@/lib/plugins/run-mcp')
-          if (await runMcpAdvertised(caller.userId, run.id)) apps = [...apps.filter(app => app !== CUSTOM_MCP_TOOLKIT).slice(0, 63), CUSTOM_MCP_TOOLKIT]
-        }
         return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token,
           decisionCatalogue: RUN_DECISION_CATALOGUE,
           mailboxCatalogue: { version: 1 as const, transport: 'mikka-stateless-2025-06-18' as const, tools },
-          ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}) }
+          ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}), ...(servers.length ? { servers } : {}) }
       })
-      .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
+      .catch((error: unknown) => { if (servers.length) throw new CodedError('mcpUnavailable',{cause:error}); console.error('Could not issue a run token', { name:error instanceof Error ? error.name : typeof error }); return undefined })
   // A retry after a lost lease works on in the lost attempt's worktree and,
   // when the harness can, its session; the daemon falls back to `prompt`.
   // Another machine has no such worktree and starts from the latest
@@ -414,10 +442,12 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   // The next run of a thread after a new dispatch (lib/thread-dispatch.ts) goes on in the thread's last worktree and,
   // on the same device, its session, sent only the new note; elsewhere it starts fresh with the full brief.
   const [earlier] = !run.retryOf && run.continuesRunId
-    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, run.continuesRunId), eq(agentRuns.userId, caller.userId), eq(agentRuns.issueId, run.issueId))).limit(1)
+    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, run.continuesRunId), eq(agentRuns.userId, caller.userId), eq(agentRuns.issueId, issueId))).limit(1)
     : []
   const earlierHarness = earlier?.agentDefinition?.harness ?? (earlier?.agentDefinition == null && earlier?.agentId === run.agentId ? agent.harness : undefined)
-  const followUp = earlier ? continuationFollowUp(run.prompt) : null
+  const followUp = earlier ? run.agentDefinition?.workspaceReview
+    ? await (await import('@/lib/coding-workspace/diff/feedback-brief')).reviewBatchFollowUp(pool, run)
+    : continuationFollowUp(run.prompt) : null
   const threadContinuation = earlier && run.continuesRunId
     ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId && earlierHarness === harness && profileNativeSessionMatches(earlier.agentDefinition, run.agentDefinition) ? { resumeSessionId: earlier.sessionId } : {}) }
     : {}
@@ -488,6 +518,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({
     ...publication,
     ...(initialRepository ? { repo: initialRepository } : {}),
+    // Profile Skills: the frozen pinned bodies for the owner's daemon and the
+    // repository names it pins from its own checkout. Only the daemon sees the
+    // text; the brief carries metadata only.
+    ...profileSkillRunAssignment(current.agentDefinition?.agentProfile?.skills ?? []),
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     ...(run.agentDefinition?.traceContext ? { traceContext: { ...run.agentDefinition.traceContext, runId } } : {}),
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),
@@ -510,6 +544,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(subscriptionLease ? { subscriptionLease } : {}),
     ...(computer && assignmentPolicy.permissions.computer_use !== 'deny' ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
+    ...(projectEnvironment ? { projectEnvironment: { id: projectEnvironment.id, revision: projectEnvironment.revision, ...(projectEnvironment.setup ? { setup: projectEnvironment.setup } : {}) } } : {}),
     ...(Object.keys(assignedEnv).length ? { taskEnv: assignedEnv } : {}),
     ...(taskSecretNames.length ? { taskSecretNames } : {}),
     ...(taskSecrets ? { taskSecrets } : {}),
@@ -527,18 +562,48 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(distribution ? {policySnapshotRequired:distribution.required,policySnapshot:issuePolicySnapshot(distribution,assignmentPolicy)} : {}),
     }, { headers: { 'cache-control': 'private, no-store' } })
   }, async (current, tx) => {
+    const currentEnvironment = current.agentDefinition?.projectExecution?.environment
     const workspaceId = current.workspaceId
     if (!workspaceId || workspaceId !== taskWorkspaceId || current.deviceTokenId !== caller.tokenId || current.attempt !== run.attempt
       || current.agentDefinition?.executionIdentity?.workspaceId !== run.agentDefinition?.executionIdentity?.workspaceId
       || current.agentDefinition?.executionIdentity !== undefined && current.agentDefinition.executionIdentity?.workspaceId !== workspaceId
       || caller.scopeWorkspaceId && caller.scopeWorkspaceId !== workspaceId) return false
+    if (Boolean(currentEnvironment) !== Boolean(projectEnvironment) || currentEnvironment &&
+      (currentEnvironment.id !== projectEnvironment?.id || currentEnvironment.revision !== projectEnvironment?.revision
+        || current.agentDefinition?.projectExecution?.workspaceId !== workspaceId)) return false
     if (taskInjection.snapshot === undefined) return true
     if (workspaceId && !current.agentDefinition?.executionIdentity && !await executionMembersActive(workspaceId, [current.userId])) return false
     const [currentRepo] = await tx.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, repo.id)).limit(1)
     if (!currentRepo || remoteRepositoryRef(currentRepo.remoteUrl) !== taskRepository) return false
-    return await taskSecretSnapshot(workspaceId, taskRepository, current.userId, tx) === taskInjection.snapshot
+    try {
+      const snapshot = currentEnvironment && workspaceId
+        ? await environmentSecretSnapshot(workspaceId, taskRepository, currentEnvironment, current.userId, tx)
+        : await taskSecretSnapshot(workspaceId, taskRepository, current.userId, tx)
+      return snapshot === taskInjection.snapshot
+    } catch (error) {
+      if (error instanceof CodedError && error.code === 'task_secret_unavailable') return false
+      throw error
+    }
   })
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
+  }
+  if (!run.workspaceId) {
+    return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+  }
+  try {
+    return await withRunProjectExecution({ userId: caller.userId, workspaceId: run.workspaceId, issueId: run.issueId,
+      repositoryKey: repo.remoteUrl ? repo.repoPath : null, baseBranch: run.baseBranch, runtime: device.kind === 'cloud' ? 'cloud' : 'local',
+      harness: run.agentDefinition?.harness ?? agent.harness }, run.agentDefinition?.projectExecution, claimAuthorizedProject)
+  } catch (error) {
+    if (!(error instanceof ActionFailureError)) throw error
+    if (error.code === 'workspaceAccessDenied') {
+      // Resource admission runs before the existing task read. Preserve that
+      // read's public denial while issuing no lease, token or completion.
+      const unavailable = new PublicationError('issue_unavailable')
+      return NextResponse.json({ error: unavailable.message, code: unavailable.code }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+    }
+    return NextResponse.json({ error: error.code, code: error.code }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+  }
 }
 
 export const POST = withDeviceRoute(handlePOST)

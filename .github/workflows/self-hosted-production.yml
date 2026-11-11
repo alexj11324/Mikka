@@ -7,6 +7,7 @@ on:
       - 'scripts/acceptance/self-hosted-production*.mjs'
       - 'scripts/acceptance/inbox-production*.mjs'
       - 'scripts/ops/production-mobile-daemon*.mjs'
+      - 'scripts/acceptance/memory-production*.mjs'
   workflow_run:
     workflows: ['Web deploy']
     types: [completed]
@@ -33,7 +34,7 @@ jobs:
       - uses: ./.github/actions/pnpm-install
         with:
           ffmpeg-github-token: ${{ github.token }}
-      - run: node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs scripts/acceptance/inbox-production.test.mjs scripts/acceptance/inbox-production-target.test.mjs scripts/acceptance/inbox-production-recovery.test.mjs scripts/acceptance/self-hosted-production-governance.test.mjs scripts/acceptance/self-hosted-production-governance-target.test.mjs scripts/acceptance/self-hosted-production-governance-recovery.test.mjs
+      - run: node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs scripts/acceptance/inbox-production.test.mjs scripts/acceptance/inbox-production-target.test.mjs scripts/acceptance/inbox-production-recovery.test.mjs scripts/acceptance/memory-production.test.mjs scripts/acceptance/memory-production-target.test.mjs scripts/acceptance/memory-production-pending.test.mjs scripts/acceptance/memory-production-cases.test.mjs scripts/acceptance/self-hosted-production-governance.test.mjs scripts/acceptance/self-hosted-production-governance-target.test.mjs scripts/acceptance/self-hosted-production-governance-recovery.test.mjs
 
   acceptance:
     name: Core production API and gateway acceptance
@@ -66,6 +67,12 @@ jobs:
         run: node --import tsx scripts/acceptance/self-hosted-production.mjs --attest
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Select only Memory PR 1830 ordinary merge and its active release window
+        id: memory_select
+        if: steps.attest.outputs.readable == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --select
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Select only the exact Inbox merge and active release window before credentials
         id: inbox_selection
         run: node --import tsx scripts/acceptance/inbox-production.mjs --select
@@ -77,7 +84,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Read the existing smoke email only
-        if: (steps.attest.outputs.readable == 'true' && (steps.inbox_selection.outputs.core_required == 'true' || steps.inbox_selection.outputs.selected == 'true')) || steps.governance_selection.outputs.selected == 'true'
+        if: (steps.attest.outputs.core_selected == 'true' || steps.inbox_selection.outputs.selected == 'true' || steps.memory_select.outputs.selected == 'true') || steps.governance_selection.outputs.selected == 'true'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -90,7 +97,7 @@ jobs:
           recursive: false
           include-imports: false
       - name: Read the existing smoke password only
-        if: (steps.attest.outputs.readable == 'true' && (steps.inbox_selection.outputs.core_required == 'true' || steps.inbox_selection.outputs.selected == 'true')) || steps.governance_selection.outputs.selected == 'true'
+        if: (steps.attest.outputs.core_selected == 'true' || steps.inbox_selection.outputs.selected == 'true' || steps.memory_select.outputs.selected == 'true') || steps.governance_selection.outputs.selected == 'true'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -103,7 +110,7 @@ jobs:
           recursive: false
           include-imports: false
       - name: Verify cloud discovery, owner flags, live and source-daemon gateways with exact cleanup
-        if: steps.attest.outputs.readable == 'true' && steps.inbox_selection.outputs.core_required == 'true'
+        if: steps.attest.outputs.core_selected == 'true'
         timeout-minutes: 6
         run: node --import tsx scripts/acceptance/self-hosted-production.mjs
         env:
@@ -130,5 +137,33 @@ jobs:
             self-hosted-production-report/*.json
             self-hosted-production-report/inbox-journal.jsonl
             self-hosted-production-report/governance-journal.jsonl
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Verify memory owner APIs and independently observe both subscription prompts
+        id: memory
+        if: always() && steps.memory_select.outputs.selected == 'true'
+        timeout-minutes: 6
+        run: node --import tsx scripts/acceptance/memory-production.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Confirm Memory owner API acceptance
+        if: always() && steps.memory.outputs.owner_passed == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --confirm-case owner
+      - name: Confirm Claude Memory reply and real usage
+        if: always() && steps.memory.outputs.claude_code_passed == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --confirm-case claude_code
+      - name: Confirm Codex Memory reply and real usage
+        if: always() && steps.memory.outputs.codex_passed == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --confirm-case codex
+      - name: Confirm Memory notification pending review
+        if: always() && steps.memory.outputs.pending_passed == 'true'
+        run: node --import tsx scripts/acceptance/memory-production.mjs --confirm-case pending
+      - name: Retain memory acceptance and nonce-bound fixture receipts
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: memory-production-${{ github.run_id }}-${{ github.run_attempt }}
+          path: memory-production-report/*.json
           if-no-files-found: ignore
           retention-days: 14

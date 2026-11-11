@@ -36,7 +36,7 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 // agent gets exactly the validation and access checks the person gets in the
 // UI. A failed action comes back as `{ error }` with the action's code.
 
-type Failure = { error: string }
+type Failure = { error: string; params?: Record<string, string | number>; confirmable?: true }
 
 function scopedUser(userId: string) {
   const workspaceId = taskReaderScope(userId).workspaceId
@@ -53,9 +53,13 @@ async function taskActor(userId: string, actor?: ActivityActor) {
   throw new ActionFailureError('workspaceAccessDenied')
 }
 
-/** Throws a failed action's code so a chain of actions stops at the first failure. */
+/** Throws a failed action's code so a chain of actions stops at the first failure,
+ * keeping the params and confirmation flag the caller needs to replay it. */
 function unwrap<T extends object>(result: T): Exclude<T, { error: string }> {
-  if ('error' in result && typeof result.error === 'string') throw new ActionFailureError(result.error as never)
+  if ('error' in result && typeof result.error === 'string') {
+    const failure = result as { error: string; params?: Record<string, string | number>; confirmable?: true }
+    throw new ActionFailureError(failure.error as never, failure.params, failure.confirmable)
+  }
   return result as Exclude<T, { error: string }>
 }
 
@@ -63,7 +67,10 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
+    // A confirmation request is an answer the caller replays with confirmAccess,
+    // so it carries that flag rather than reading as a plain failure (ALE-26).
+    if (error instanceof ActionFailureError) return { error: error.code, ...(error.params ? { params: error.params } : {}), ...(error.confirmable ? { confirmable: error.confirmable } : {}) }
+    if (error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
     if (error instanceof AgentProfileAdmissionError) return { error: 'agentProfileUnavailable' }
     throw error
   }
@@ -92,6 +99,8 @@ interface IssueChanges {
   status?: string
   priority?: string
   projectId?: string | null
+  /** Replays a project move the server refused as confirmable (ALE-26). */
+  confirmAccess?: boolean
   labels?: string[]
   assigneeUserId?: string | null
   assigneeAgentId?: string | null
@@ -115,16 +124,16 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
     patch.labels = changes.labels.map(name => known.get(name.toLowerCase()) ?? { name, color: 'gray' })
   }
   if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
-  if (changes.assigneeAgentId !== undefined) patch.assignee = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
+  if (changes.assigneeAgentId !== undefined) patch.delegate = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
-  if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId })).issue
+  if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId, confirmAccess: changes.confirmAccess })).issue
   return issue
 }
 
-function issueResult(issue: { id: string; title: string; status: string; priority: string; revision: number; content: Parameters<typeof readIssueMetadata>[0] }) {
-  const metadata = readIssueMetadata(issue.content)
+function issueResult(issue: { id: string; title: string; status: string; priority: string; revision: number; content: Parameters<typeof readIssueMetadata>[0]; metadata?: ReturnType<typeof readIssueMetadata>; projectId?: string | null; identifier?: string | null }) {
+  const metadata = issue.metadata ?? readIssueMetadata(issue.content)
   return {
-    id: issue.id, number: metadata.number ?? null, title: issue.title, status: issue.status, priority: issue.priority,
+    id: issue.id, identifier: issue.identifier ?? null, projectId: issue.projectId ?? null, delegate: metadata.delegate, number: metadata.number ?? null, title: issue.title, status: issue.status, priority: issue.priority,
     project: metadata.project, labels: metadata.labels.map(label => label.name), assignee: metadata.assignee?.name ?? null,
   }
 }
@@ -133,7 +142,6 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
  * application's idempotent creation commits, with its own durable receipt. */
 export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string; teamId?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }, teamId?: string, chatRequest?: { eventId: string; botId: string | null }) {
   return attempt(async () => actAs(await taskActor(userId, actor), async () => {
-    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     // The legacy MCP contract has no human-assignee field. Do not introduce a
     // multi-action write without the durable transaction and access checks.
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
@@ -165,7 +173,6 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
 
 export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor, toolCallId?: string) {
   return attempt(async () => actAs(await taskActor(userId, actor), async () => {
-    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     const { issueId, ...changes } = input
     const mutate = async () => issueResult(await applyChanges(userId, issueId, changes))
@@ -231,7 +238,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, { source: 'mcp', origin: 'api', originRef: { kind: 'api' } })) }),
   }))
 }
 
@@ -285,7 +292,7 @@ export async function getRunEvents(userId: string, input: { runId: string; after
 
 export async function listProjects(userId: string) {
   return actAs(scopedUser(userId), async () => (await readProjects()).map(project => ({
-    id: project.id, name: project.name, summary: project.summary, status: project.status, priority: project.priority,
+    id: project.id, workspaceId: project.workspaceId, createdBy: project.createdBy, leadUserId: project.leadUserId, memberIds: project.properties.members, name: project.name, summary: project.summary, status: project.status, priority: project.priority,
     startDate: project.startDate || null, targetDate: project.targetDate || null, issueIds: project.issueIds,
   })))
 }

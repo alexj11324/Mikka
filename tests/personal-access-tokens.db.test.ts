@@ -1,5 +1,6 @@
 // 设置 › 个人访问令牌 against a real PostgreSQL: hash-only storage, one-time plaintext, list, revoke, scoping.
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
@@ -8,7 +9,7 @@ test('personal access tokens', { skip: !dbUrl }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 2 })
   const { WorkspaceError } = await import('../lib/workspace-access')
   const store = await import('../lib/tokens/store')
-  const { hashPersonalAccessToken, PAT_ACTIVE_LIMIT } = await import('../lib/tokens/format')
+  const { DEFAULT_API_SCOPES, hashPersonalAccessToken, PAT_ACTIVE_LIMIT } = await import('../lib/tokens/format')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
@@ -28,6 +29,78 @@ test('personal access tokens', { skip: !dbUrl }, async t => {
     const listed = await store.listPersonalAccessTokens(owner, ws.id)
     assert.ok(!JSON.stringify(listed).includes(created.token), 'list never returns plaintext')
     assert.ok(!JSON.stringify(listed).includes(rows[0].tokenHash), 'list never returns the hash')
+  })
+
+  await t.test('scopes: new tokens default to public; legacy is only the explicit test helper', async () => {
+    const legacy = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'Legacy shape' })
+    assert.equal(legacy.legacy, true)
+    assert.deepEqual(legacy.scopes, [])
+    assert.deepEqual((await store.verifyPersonalAccessToken(legacy.token))?.scopes, ['legacy:full'])
+    const publicToken = await store.createPersonalAccessToken(owner, ws.id, { name: 'Public shape' })
+    assert.equal(publicToken.legacy, false)
+    assert.deepEqual(publicToken.scopes, [...DEFAULT_API_SCOPES])
+    assert.deepEqual((await store.verifyPersonalAccessToken(publicToken.token))?.scopes, [...DEFAULT_API_SCOPES])
+    // A caller can never request the internal legacy scope through the public input.
+    await assert.rejects(store.createPersonalAccessToken(owner, ws.id, { name: 'No legacy', scopes: ['legacy:full'] }))
+    await assert.rejects(store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'No override', scopes: DEFAULT_API_SCOPES }))
+  })
+
+  await t.test('migration: new rows default to public scopes and mixed audiences are rejected', async () => {
+    const inserted = await pool.query(
+      'insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,$4,$5,$6) returning scopes',
+      [crypto.randomUUID(), owner, ws.id, 'Default scope', hashPersonalAccessToken(crypto.randomUUID()), 'AAAA'],
+    )
+    assert.deepEqual(inserted.rows[0].scopes, [...DEFAULT_API_SCOPES])
+    await assert.rejects(
+      pool.query(
+        `insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,'Mixed scope',$4,'AAAA',ARRAY['legacy:full','tasks:read']::text[])`,
+        [crypto.randomUUID(), owner, ws.id, hashPersonalAccessToken(crypto.randomUUID())],
+      ),
+      (error: unknown) => (error as { code?: string }).code === '23514',
+    )
+  })
+
+  await t.test('migration: the real file backfills pre-M4 rows and defaults new rows to public', async () => {
+    const client = await pool.connect()
+    try {
+      await client.query('begin')
+      await client.query('create schema pat_migration')
+      await client.query('set local search_path to pat_migration')
+      // The pre-M4 shape: scopes/rotatedAt do not exist yet.
+      await client.query(`create table personal_access_tokens (
+        id uuid primary key,
+        "userId" text not null,
+        "workspaceId" uuid not null,
+        name text not null,
+        "tokenHash" text not null,
+        hint text not null,
+        "createdAt" timestamptz not null default now(),
+        "expiresAt" timestamptz,
+        "lastUsedAt" timestamptz,
+        "revokedAt" timestamptz
+      )`)
+      await client.query(
+        'insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,$4,$5,$6)',
+        [crypto.randomUUID(), owner, ws.id, 'pre-M4', hashPersonalAccessToken(crypto.randomUUID()), 'abcd'],
+      )
+      await client.query(await readFile(new URL('../drizzle/20261111080200_api_tokens.sql', import.meta.url), 'utf8'))
+      assert.deepEqual((await client.query('select scopes from personal_access_tokens')).rows[0].scopes, ['legacy:full'])
+      const inserted = await client.query(
+        'insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,$4,$5,$6) returning scopes',
+        [crypto.randomUUID(), owner, ws.id, 'post-M4', hashPersonalAccessToken(crypto.randomUUID()), 'abcd'],
+      )
+      assert.deepEqual(inserted.rows[0].scopes, [...DEFAULT_API_SCOPES])
+      await assert.rejects(
+        client.query(
+          `insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,'Mixed scope',$4,'AAAA',ARRAY['legacy:full','tasks:read']::text[])`,
+          [crypto.randomUUID(), owner, ws.id, hashPersonalAccessToken(crypto.randomUUID())],
+        ),
+        (error: unknown) => (error as { code?: string }).code === '23514',
+      )
+    } finally {
+      await client.query('rollback')
+      client.release()
+    }
   })
 
   await t.test('create and revoke write audit rows in the same transaction (name only, never the token)', async () => {
@@ -76,6 +149,37 @@ test('personal access tokens', { skip: !dbUrl }, async t => {
     assert.equal(await store.verifyPersonalAccessToken(created.token), null)
     const { rows } = await pool.query('select "revokedAt" from personal_access_tokens where id=$1', [created.id])
     assert.ok(rows[0].revokedAt, 'revoked rows are kept')
+  })
+
+  await t.test('rotate in place: same id/scopes/expiry, old secret stops, audit written', async () => {
+    const expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString()
+    const created = await store.createPersonalAccessToken(owner, ws.id, { name: 'Rotate me', scopes: DEFAULT_API_SCOPES, expiresAt })
+    const rotated = await store.rotatePersonalAccessToken(owner, ws.id, { id: created.id }, new Date(), { actorName: 'Owner' })
+    assert.equal(rotated.id, created.id)
+    assert.deepEqual(rotated.scopes, [...DEFAULT_API_SCOPES])
+    assert.equal(rotated.legacy, false)
+    assert.equal(rotated.expiresAt, created.expiresAt)
+    assert.ok(rotated.rotatedAt)
+    assert.notEqual(rotated.token, created.token)
+    assert.equal(await store.verifyPersonalAccessToken(created.token), null, 'the old secret stops immediately')
+    assert.equal((await store.verifyPersonalAccessToken(rotated.token))?.tokenId, created.id)
+    const { rows } = await pool.query(`select action, "targetId", "targetLabel", metadata from workspace_audit_events where "workspaceId"=$1 and action='token.rotated'`, [ws.id])
+    assert.equal(rows.length, 1)
+    assert.deepEqual([rows[0].action, rows[0].targetId, rows[0].targetLabel, rows[0].metadata], ['token.rotated', created.id, 'Rotate me', {}])
+    assert.ok(!JSON.stringify(rows).includes(rotated.token))
+    await rejects(store.rotatePersonalAccessToken(owner, ws.id, { id: '00000000-0000-4000-8000-000000000000' }), 'tokenNotFound')
+    const revokedToken = await store.createPersonalAccessToken(owner, ws.id, { name: 'Rotate revoked' })
+    await store.revokePersonalAccessToken(owner, ws.id, { id: revokedToken.id })
+    await rejects(store.rotatePersonalAccessToken(owner, ws.id, { id: revokedToken.id }), 'tokenNotFound')
+    const expiredToken = await store.createPersonalAccessToken(owner, ws.id, { name: 'Rotate expired' })
+    await pool.query(`UPDATE personal_access_tokens SET "createdAt"=now()-interval '2 hours', "expiresAt"=now()-interval '1 minute' WHERE id=$1`, [expiredToken.id])
+    await rejects(store.rotatePersonalAccessToken(owner, ws.id, { id: expiredToken.id }), 'tokenNotFound')
+    await rejects(store.rotatePersonalAccessToken(member, ws.id, { id: created.id }), 'tokenNotFound')
+    const legacyToken = await store.createLegacyPersonalAccessToken(owner, ws.id, { name: 'Rotate legacy' })
+    const rotatedLegacy = await store.rotatePersonalAccessToken(owner, ws.id, { id: legacyToken.id })
+    assert.equal(rotatedLegacy.legacy, true)
+    assert.deepEqual(rotatedLegacy.scopes, [])
+    assert.deepEqual((await store.verifyPersonalAccessToken(rotatedLegacy.token))?.scopes, ['legacy:full'])
   })
 
   await t.test('verify: unknown or malformed tokens fail; lastUsedAt updates', async () => {

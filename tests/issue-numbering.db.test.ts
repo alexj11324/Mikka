@@ -111,7 +111,7 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
       assert.deepEqual(personalList.map(item => item.id), [id])
       const sharedList = await actAs(other, () => listWorkspaceIssues(shared.id))
       assert.deepEqual(sharedList.map(item => item.id), [sharedId])
-      assert.match(sharedList[0].identifier ?? '', /^MINE-[1-9][0-9]*$/, 'a shared task keeps its creator\'s stable number and prefix')
+      assert.match(sharedList[0].identifier ?? '', /^W[0-9A-F]{12,32}-[1-9][0-9]*$/, 'a new shared task receives its Workspace identifier independently of its creator')
       assert.notEqual(sharedList[0].metadata.number, row.metadata.number, 'number allocation stays unique across the owner\'s workspaces')
     })
     await t.test('the counter owner lock remains compatible with FK KEY SHARE', async () => {
@@ -150,6 +150,25 @@ test('issue numbering: read-only lists and transactional owner counters', { skip
         return allocated
       })
       assert.equal(number, 1)
+    })
+
+    await t.test('subtree ranges and single allocations are disjoint, and a failed range rolls back', async () => {
+      const owner = await user()
+      await assert.rejects(db.transaction(async tx => {
+        assert.equal(await allocateIssueNumbers(tx, owner, 4), 1)
+        throw new Error('range rollback')
+      }), /range rollback/)
+      const sizes = [3, 1, 4, 2]
+      const ranges = await Promise.all(sizes.map(count => db.transaction(async tx => {
+        const first = await allocateIssueNumbers(tx, owner, count)
+        return Array.from({ length: count }, (_, index) => first + index)
+      })))
+      assert.deepEqual(ranges.flat().sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+      assert.equal(await db.transaction(tx => allocateIssueNumbers(tx, owner)), 11)
+      for (const count of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        await assert.rejects(db.transaction(tx => allocateIssueNumbers(tx, owner, count)), /Invalid issue number allocation/)
+      }
+      assert.equal(await db.transaction(tx => allocateIssueNumbers(tx, owner)), 12, 'invalid ranges consume no numbers')
     })
 
     await t.test('allocation does not wait for an existing issue row lock', async () => {

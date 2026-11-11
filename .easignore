@@ -78,6 +78,17 @@ next-env.d.ts
 # Nx Core local graph/task state
 .nx/
 
+# eve compiler, durable local storage and standalone service output.
+/apps/eve/.eve/
+/apps/eve/.output/
+/apps/eve/.vercel/
+
+# Temporary standalone typecheck inputs and compiler artifacts.
+/.cache/typecheck/
+
+# Native Eve session data for the default self-hosted service.
+/.cache/eve-workflow/
+
 # EAS replaces all nested .gitignore files. Preserve the mobile and e2b exclusions.
 /apps/mobile/.expo/
 /apps/mobile/dist/

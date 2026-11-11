@@ -27,6 +27,8 @@ type Authorize = (userId: string, issueId: string, tx: PoolClient) => Promise<bo
 export type BenchmarkSourceRun = CurrentSkillRun & { userId: string; deviceId: string; report: { sourceCommit?: string }; harness: string }
 export type EvaluationDependencies = {
   authorize: Authorize
+  /** Production acquires tenant/resource authority before benchmark APP locks. */
+  withQueueWorkspace?: <T>(userId: string, id: string, training: boolean, work: () => Promise<T>) => Promise<T>
   assess?: RegisteredSkillEvaluator
   queue: QueueFactoryRun
   lockQueuePolicy?: (tx: PoolClient, userId: string, sourceRunId: string) => Promise<void>
@@ -200,6 +202,7 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
     assertBenchmarkExecution({...actual,observedModel:expected.model},expected)
   }
   async function dispatchNext(userId: string,id: string,training = false) {
+    const dispatch = async () => {
     let wakeRun: string | undefined
     const dispatched = await transaction(async tx => {
       const {rows:[hint]}=await tx.query<Pick<Instance,'sourceRunId'|'issueId'>>(training
@@ -226,7 +229,7 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
       const result = await dependencies.queue(tx,userId,{issueId:instance.issueId,agentId:instance.agentId,deviceRepoId:instance.repoId,
         note:`Frozen benchmark ${instance.id} ${slot.arm} ${slot.caseId}`,requestKey:`benchmark:${evaluation?.id ?? instance.id}:${slot.arm}:${slot.caseId}`},instance.sourceRunId)
       if (result.replayed) throw new ImprovementError('conflict')
-      const updated = await tx.query('UPDATE agent_runs SET kind=$2,"baseBranch"=$3,prompt=$4 WHERE id=$1 AND "userId"=$5 AND status=\'queued\' RETURNING id', [result.runId,'implement',instance.sourceCommit,task.prompt,userId])
+      const updated = await tx.query('UPDATE agent_runs SET kind=$2,"baseBranch"=$3,prompt=$4,"promptTaskStart"=0,"promptTaskLength"=0 WHERE id=$1 AND "userId"=$5 AND status=\'queued\' RETURNING id', [result.runId,'implement',instance.sourceCommit,task.prompt,userId])
       if (updated.rowCount !== 1) throw new ImprovementError('runUnavailable')
       if (slot.arm !== 'candidate') await dependencies.selectBaseline(userId,result.runId,tx)
       await tx.query(`INSERT INTO improvement_benchmark_runs("runId","instanceId","evaluationId","caseId",arm,"versionId","userId") VALUES($1,$2,$3,$4,$5,$6,$7)`,
@@ -237,6 +240,8 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
     })
     if (wakeRun) await notifyQueuedLocalRun(pool, userId, wakeRun)
     return dispatched
+    }
+    return dependencies.withQueueWorkspace ? dependencies.withQueueWorkspace(userId, id, training, dispatch) : dispatch()
   }
   async function comparisonState(tx:PoolClient,userId:string,evaluationId:string):Promise<ComparisonState> {
       await lockEvaluationTask(tx,userId,evaluationId)
