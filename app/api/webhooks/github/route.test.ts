@@ -9,12 +9,14 @@ const originalEdition = process.env.MIKKA_EDITION, originalBackend = process.env
 mock.module(new URL('../../../../lib/github/app-config.ts', import.meta.url).href, { namedExports: { readGitHubAppConfig: async () => ({ webhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? null }) } })
 const callbacks: Array<() => Promise<void>> = []
 const refresh = mock.fn(async (_event: string, _payload: unknown) => {})
+const wakeSuite = mock.fn(async (_suite: unknown) => 1)
 const notifications = [{ userId: 'owner', source: 'github', externalId: 'comment:7' }]
 const readNotifications = mock.fn(async (_event: string, _payload: unknown) => notifications)
 const ingest = mock.fn(async (_notifications: unknown[]) => {})
 mock.module('next/server', { namedExports: { after: (callback: () => Promise<void>) => callbacks.push(callback) } })
-const heavyModules = ['lib/github/publication-webhook.ts', 'lib/suggestions/sources.ts', 'lib/suggestions/store.ts']
+const heavyModules = ['lib/github/publication-webhook.ts', 'lib/github/ci-suite-wake.ts', 'lib/suggestions/sources.ts', 'lib/suggestions/store.ts']
 mock.module(new URL('../../../../lib/github/publication-webhook.ts', import.meta.url).href, { namedExports: { refreshPublishedPullRequest: refresh } })
+mock.module(new URL('../../../../lib/github/ci-suite-wake.ts', import.meta.url).href, { namedExports: { wakeLinkedCiSuite: wakeSuite } })
 mock.module(new URL('../../../../lib/suggestions/sources.ts', import.meta.url).href, { namedExports: { githubWebhookNotifications: readNotifications } })
 mock.module(new URL('../../../../lib/suggestions/store.ts', import.meta.url).href, { namedExports: { ingestNotifications: ingest } })
 const loaded: string[] = []
@@ -34,6 +36,8 @@ beforeEach(() => {
   callbacks.length = 0
   refresh.mock.resetCalls()
   refresh.mock.mockImplementation(async () => {})
+  wakeSuite.mock.resetCalls()
+  wakeSuite.mock.mockImplementation(async () => 1)
   readNotifications.mock.resetCalls()
   readNotifications.mock.mockImplementation(async () => notifications)
   ingest.mock.resetCalls()
@@ -140,6 +144,44 @@ test('verified repository-bound check and status events use publication ingestio
   }
   assert.equal(readNotifications.mock.callCount(), 0)
   assert.equal(ingest.mock.callCount(), 0)
+})
+
+
+test('signed completed suite is durably enqueued before webhook ACK, without per-job wakeups', async () => {
+  const hint = {
+    installation: { id: 7 }, repository: { id: 8, full_name: 'acme/app' },
+    action: 'completed',
+    check_suite: {
+      id: 9, status: 'completed', conclusion: 'failure',
+      head_sha: 'a'.repeat(40), pull_requests: [{ number: 10 }],
+    },
+  }
+  assert.equal((await POST(request('check_suite', hint, 'sha256=invalid'))).status, 401)
+  assert.equal(wakeSuite.mock.callCount(), 0)
+  assert.equal((await POST(request('check_suite', hint))).status, 202)
+  assert.equal(wakeSuite.mock.callCount(), 1, 'persist before response, not in afterJob')
+  assert.equal(callbacks.length, 1, 'cloud forwarding remains the official route responsibility')
+  assert.deepEqual(wakeSuite.mock.calls[0].arguments[0], {
+    installationId: 7, repositoryId: 8, repository: 'acme/app', suiteId: 9,
+    headSha: 'a'.repeat(40), conclusion: 'failure', numbers: [10],
+  })
+  assert.equal(refresh.mock.callCount(), 0)
+  assert.equal(readNotifications.mock.callCount(), 0)
+  await callbacks.shift()!()
+  assert.equal(wakeSuite.mock.callCount(), 1)
+})
+
+test('suite persistence failure fails the webhook and can be retried by GitHub', async () => {
+  wakeSuite.mock.mockImplementationOnce(async () => { throw Error('queue unavailable') })
+  const hint = {
+    installation: { id: 7 }, repository: { id: 8, full_name: 'acme/app' },
+    action: 'completed',
+    check_suite: { id: 9, status: 'completed', conclusion: 'failure', head_sha: 'a'.repeat(40), pull_requests: [{ number: 10 }] },
+  }
+  await assert.rejects(POST(request('check_suite', hint)), /queue unavailable/)
+  assert.equal(callbacks.length, 0, 'never acknowledge before queue persistence')
+  assert.equal((await POST(request('check_suite', hint))).status, 202)
+  assert.equal(wakeSuite.mock.callCount(), 2)
 })
 
 test('created comments retain notification ingestion and do not refresh publications', async () => {
