@@ -1039,6 +1039,8 @@
       "changedTitle": "Renamed the task to {title}",
       "assigned": "Assigned to {name}",
       "unassigned": "Cleared the assignee",
+      "delegated": "Delegated to {name}",
+      "undelegated": "Cleared the delegate",
       "addedSubtask": "Added subtask {title}",
       "addedLabel": "Added label {name}",
       "removedLabel": "Removed label {name}",
@@ -1110,6 +1112,15 @@
     "allStatuses": "All statuses"
   },
   "Errors": {
+    "projectRepositoryDenied": "This repository or target branch is not permitted by the workspace or project.",
+    "projectEnvironmentUnavailable": "The selected environment or one of its required resources is unavailable for this run.",
+    "projectResourceConflict": "These resource settings changed. Refresh and try again.",
+    "teamArchived": "This team is archived. Restore it before assigning new work.",
+    "teamPersonalWorkspace": "Teams are available only in shared workspaces.",
+    "teamDeleteReferenced": "This team contains tasks, projects, or execution history. Archive it or remove its grouping to retain that work.",
+    "teamLifecycleConflict": "The team changed. Refresh and review its current impact.",
+    "projectArchived": "This project is archived. Restore it before starting new work.",
+    "projectDeleteNotEmpty": "This project still has tasks, relationships or history. Archive it to preserve that work.",
     "botNotFound": "This bot does not exist in this workspace.",
     "executionPlaceInvalid": "Choose an available device or cloud.",
     "executionHarnessUnavailable": "This Agent is unavailable on the selected device.",
@@ -1688,6 +1699,8 @@
       "readingActivity": "Loading activity…"
     },
     "activity": {
+      "archived": "archived the project",
+      "restored": "restored the project",
       "created": "created the project",
       "updatedOverview": "updated the project properties and overview",
       "updatedFields": "updated {fields}",
@@ -4572,6 +4585,12 @@
         },
         "reason": {
           "needsReply": "Needs your reply",
+          "needs_input": "Needs your reply",
+          "approval": "Needs your confirmation",
+          "pr_review": "Needs review",
+          "offline": "Offline",
+          "blocked_by": "Waiting on a task",
+          "flagged": "Flagged",
           "running": "Running",
           "confirm": "Needs your confirmation",
           "review": "Needs review",

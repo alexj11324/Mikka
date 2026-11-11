@@ -73,6 +73,10 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
     await ws.query('insert into mikka_team_projects("projectId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [project, team, alpha, owner])
     const before = (await app.query('select id,content,"scopeVersion" from issues where id=$1', [task])).rows[0]
     await migrate(files.filter(file => file >= boundary))
+    // Production runs the canonical Project backfill before the ACL backfill;
+    // the legacy project must acquire its Workspace and Task relation first.
+    const { backfillProjectV2 } = await import('../scripts/project-v2-backfill.mjs')
+    await backfillProjectV2(app, ws)
     const backfill = await backfillProjectResourceAccess(app, ws)
     assert.deepEqual(backfill, { registered: 1, quarantined: 0, tasksBound: 1 })
     assert.deepEqual(await backfillProjectResourceAccess(app, ws), { registered: 0, quarantined: 0, tasksBound: 0 })

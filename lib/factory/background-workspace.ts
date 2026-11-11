@@ -7,6 +7,7 @@ import { actingContext } from '@/lib/activity-actor'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { borrowTaskWorkspaceMembership, withTaskWorkspace } from '@/lib/task-workspace'
+import { withProjectResourceLease } from '@/lib/project-resources/store'
 import { FactoryError } from './contract'
 import type { createFactoryStore } from './store'
 import type { createFactoryQuestions } from './questions/store'
@@ -78,7 +79,7 @@ async function inWorkspace<T>(userId: string, workspaceId: string, work: () => P
   if (actor && (actor.userId !== userId || (actor.tokenWorkspaceId && actor.tokenWorkspaceId !== workspaceId))) throw denied()
   const reader = { id: userId, [tokenWorkspace]: workspaceId,
     ...(actor?.enterprisePrincipal ? { [enterprisePrincipal]: actor.enterprisePrincipal } : {}) }
-  const run = () => actAs(reader, work, actor?.actor)
+  const run = () => actAs(reader, () => withProjectResourceLease(reader, workspaceId, () => work(), Boolean(existing || inDatabaseTransaction())), actor?.actor)
   try {
     const borrowed = borrowTaskWorkspaceMembership(userId, workspaceId)
     if (borrowed) {

@@ -36,6 +36,8 @@ export const issueDocuments = pgTable('issue_documents', {
 })
 
 export const issues = pgTable('issues', {
+  /** Immutable issued identity; legacy aliases and publication receipts remain separate. */
+  issuedIdentifier: text('issuedIdentifier'),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
   /** Immutable tenant. NULL is reserved for quarantined historical records. */
   workspaceId: uuid('workspaceId'),

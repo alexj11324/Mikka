@@ -8,29 +8,32 @@ import { intersectRunPolicy } from '../run-assignment-policy'
 import type { MailboxTransactionLease, MailboxTransactionGuard } from '@/lib/mailbox-transaction-guard'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { requireTaskWorkspace } from '@/lib/task-workspace'
+import { borrowTaskWorkspaceMembership, requireTaskWorkspace } from '@/lib/task-workspace'
 import { ActionFailureError } from '@/lib/action-error'
 
 /** Derived from the stored task and its trusted workspace relation, never a tool argument. */
 export interface CliTaskScope { issueId: string; scopeVersion: number; workspaceId: string | null; hierarchy?: CliHierarchy }
 interface CliTaskRow { workspaceId: string | null; ownershipState: string; scopeVersion: number; content: JSONContent }
-const hierarchySchema = z.strictObject({ workspaceId: z.uuid(), teamId: z.uuid(), projectId: z.uuid().nullable() })
+const hierarchySchema = z.strictObject({ workspaceId: z.uuid(), teamId: z.uuid().nullable(), projectId: z.uuid().nullable() })
 export type CliHierarchy = z.infer<typeof hierarchySchema>
 
 /** Resolve stored team/shared-project UUIDs, never a mutable project label. */
 async function cliHierarchy(task: CliTaskScope, frozenHierarchy: unknown): Promise<CliHierarchy | undefined> {
   if (!task.workspaceId) return undefined
   const { workspacePool } = await import('@/lib/workspace-db')
-  const { rows: [team] } = await workspacePool.query<{ teamId: string }>(`SELECT l."teamId" FROM mikka_team_issues l JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId" WHERE l."issueId"=$1 AND l."workspaceId"=$2`,[task.issueId,task.workspaceId])
-  // Teams are optional grouping inside the tenant. Removing a previously
-  // frozen policy hierarchy still requires a fresh admission.
-  if (!team) {
+  // Both relationships belong to WS. Resolve them in one statement snapshot;
+  // an APP task row never becomes a cross-database authorization join.
+  const { rows: [relations] } = await workspacePool.query<{ teamId: string | null; projectIds: string[] }>(`SELECT
+    (SELECT l."teamId" FROM mikka_team_issues l JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId"
+      WHERE l."issueId"=$1 AND l."workspaceId"=$2) AS "teamId",
+    ARRAY(SELECT p.id FROM workspace_project_tasks t JOIN workspace_projects p ON p.id=t."projectId" AND p."workspaceId"=t."workspaceId"
+      WHERE t."issueId"=$1 AND t."workspaceId"=$2) AS "projectIds"`,[task.issueId,task.workspaceId])
+  if (!relations || relations.projectIds.length > 1) throw new Error('agentPolicyUnavailable')
+  if (!relations.teamId && !relations.projectIds.length) {
     if (frozenHierarchy != null) throw new Error('agentPolicyChanged')
     return undefined
   }
-  const { rows: projects } = await workspacePool.query<{ id: string }>(`SELECT DISTINCT p.id FROM workspace_projects p JOIN mikka_team_projects l ON l."projectId"=p.id WHERE p."issueIds" ? $1 AND l."teamId"=$2 AND l."workspaceId"=$3`,[task.issueId,team.teamId,task.workspaceId])
-  if (projects.length > 1) throw new Error('agentPolicyUnavailable')
-  const hierarchy = hierarchySchema.parse({ workspaceId: task.workspaceId,teamId:team.teamId,projectId:projects[0]?.id ?? null })
+  const hierarchy = hierarchySchema.parse({ workspaceId: task.workspaceId, teamId: relations.teamId, projectId: relations.projectIds[0] ?? null })
   if (frozenHierarchy != null) {
     const frozen = hierarchySchema.parse(frozenHierarchy)
     // Membership in a stricter team/project may change without issue.scopeVersion.
@@ -65,6 +68,8 @@ async function requirePolicyWorkspace(userId: string, workspaceId: string) {
 
 export type CliMembershipGuard = (workspaceId: string, userId: string, signal: AbortSignal) => Promise<MailboxTransactionLease>
 export const realCliMembershipGuard: CliMembershipGuard = async (workspaceId, userId, signal) => {
+  const borrowed = borrowTaskWorkspaceMembership(userId, workspaceId)
+  if (borrowed) return { ...borrowed, signal }
   const [{ workspacePool }, { acquireWorkspaceMembership }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/workspace-membership-guard')])
   return acquireWorkspaceMembership(workspacePool, { workspaceId, userId }, signal)
 }
@@ -155,7 +160,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
   // The Bot and task share one tenant; optional team/project policies narrow it.
   for (const id of workspaceIds) inherit('workspace', id, workspaceById.get(id))
   if (hierarchy) {
-    inherit('team', hierarchy.teamId, scopeLayers.team)
+    if (hierarchy.teamId) inherit('team', hierarchy.teamId, scopeLayers.team)
     if (hierarchy.projectId) inherit('project', hierarchy.projectId, scopeLayers.project)
   }
   const configured = mergeCliPolicyValues(defaults, agent)

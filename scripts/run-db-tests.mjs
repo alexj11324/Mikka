@@ -12,6 +12,17 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/task-presentation-read.ts', file: 'tests/task-presentation.db.test.ts', script: 'test:task-presentation-db' },
+  { marker: 'lib/telegram/handler.ts', file: 'tests/telegram-task-link.db.test.ts', script: 'test:task-identity-db' },
+  { marker: 'lib/linear-sync/issue-sync.ts', file: 'tests/linear-responsibility.db.test.ts', script: 'test:task-identity-db' },
+  { marker: 'lib/project-lifecycle.ts', file: 'tests/project-lifecycle.db.test.ts', script: 'test:project-v2-db' },
+  { marker: 'lib/issue-delegation.test.ts', file: 'tests/task-responsibility.db.test.ts', script: 'test:task-identity-db' },
+  { marker: 'lib/project-resources/run-lease.ts', file: 'tests/project-resource-lease.db.test.ts', script: 'test:project-resources-db' },
+  { marker: 'drizzle/20261111030006_project_history_retention.sql', file: 'tests/domain-lifecycle.db.test.ts', script: 'test:domain-lifecycle-db' },
+  { marker: 'lib/project-resources/store.ts', file: 'tests/project-resources.db.test.ts', script: 'test:project-resources-db' },
+  { marker: 'lib/task-identity-store.ts', file: 'tests/task-identity.db.test.ts', script: 'test:task-identity-db' },
+  { marker: 'scripts/project-v2-backfill.mjs', file: 'tests/project-v2.db.test.ts', script: 'test:project-v2-db' },
+  { marker: 'drizzle/20261111030003_team_lifecycle.sql', file: 'tests/team-lifecycle.db.test.ts', script: 'test:workspace-admin-db' },
   { marker: 'lib/inbox/store.ts', file: 'lib/inbox/store.db.test.ts', script: 'test:inbox-db' },
   { marker: 'app/api/factory/tasks/[taskId]/activity/route.ts', file: 'tests/factory-activity-http.db.test.ts', script: 'test:factory-activity-http-db' },
   { marker: 'lib/factory/activity.ts', file: 'lib/factory/activity.db.test.ts', script: 'test:factory-activity-db' },

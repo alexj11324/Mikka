@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test, { mock } from 'node:test'
 import { promisify } from 'node:util'
+import { threadResourcePreflight, withThreadProjectResources } from '../../tests/support/thread-project-resources-fixture'
+import { ActionFailureError } from '../action-error'
 import { CLOUD_PRELOADER_WAKE_COMMAND, CLOUD_PRELOADER_WAKE_RECEIPT } from '../computer/worker-command'
 import { logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } from './thread-worker-logs'
 
@@ -96,8 +98,9 @@ test('runtime refresh failures name their actual phase without logging provider 
   const { ensureThreadMachine } = await import('./thread-machines')
   const id = (n: number) => `41400000-0000-4000-8000-${String(n).padStart(12, '0')}`
   const actor = { userId: 'fixture-owner', workspaceId: id(2) }
-  const run = { id: id(1), userId: actor.userId, issueId: id(3), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
+  const run = { id: id(1), userId: actor.userId, workspaceId: actor.workspaceId, issueId: id(3), agentId: id(9), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
     status: 'failed', sessionId: 'original-session', botSandboxId: 'fixture-parent', repoPath: '/fixture/workspace', remoteUrl: null,
+    baseBranch: null, runHarness: 'codex', agentDefinition: { harness: 'codex' },
     questionContinuation: { requireSessionResume: true, requiredSandboxId: 'fixture-original', originSessionId: 'original-session', originRunId: id(7), questionId: id(8) } }
   const machine = { runId: run.id, ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: run.issueId,
     deviceId: run.deviceId, repoId: run.deviceRepoId, botId: run.runtimeBotId, state: 'paused', sandboxId: 'fixture-original', snapshotId: 'desktop' }
@@ -122,12 +125,19 @@ test('runtime refresh failures name their actual phase without logging provider 
       let released = false
       const query = async (sql: string, values: unknown[] = []) => {
         queries.push(sql)
+        const preflight = threadResourcePreflight(sql, values, run)
+        if (preflight) return preflight
         if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
           assert.deepEqual(values, [run.id, actor.userId])
           return { rows: [{ issueId: run.issueId }], rowCount: 1 }
         }
         if (sql.startsWith('SELECT t.* FROM factory_tasks')) return { rows: [], rowCount: 0 }
-        if (sql.startsWith('SELECT r.*')) return { rows: [{ ...run }], rowCount: 1 }
+        if (sql.startsWith('SELECT r.*')) {
+          assert.match(sql, /r\."baseBranch" AS "runBaseBranch"/)
+          assert.match(sql, /r\."workspaceId"=b\."workspaceId" FOR UPDATE OF r/)
+          assert.deepEqual(values, [run.id, actor.userId, actor.workspaceId])
+          return { rows: [{ ...run, runBaseBranch: run.baseBranch }], rowCount: 1 }
+        }
         if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine }], rowCount: 1 }
         if (sql.startsWith('SELECT status,"stopRequestedAt"')) return { rows: [{ status: 'failed', stopRequestedAt: null }], rowCount: 1 }
         if (/^SELECT 1 FROM (factory_questions|devices|thread_machines)/.test(sql)) return { rows: [{}], rowCount: 1 }
@@ -135,7 +145,8 @@ test('runtime refresh failures name their actual phase without logging provider 
         if (/^(BEGIN|COMMIT|ROLLBACK|SELECT set_config|SELECT pg_advisory_xact_lock)/.test(sql)) return { rows: [], rowCount: 0 }
         assert.fail(`Unexpected diagnostic-fixture SQL: ${sql}`)
       }
-      const pool = { query, connect: async () => ({ query, release: () => { released = true } }) } as never
+      const client = { query, release: () => { released = true } }
+      const pool = { query, connect: async () => client } as never
       const sandbox = { sandboxId: machine.sandboxId,
         files: { read: async () => { if (phase === 'read_worker') throw fault; return 'a'.repeat(40) }, write: async () => assert.fail('no bootstrap credential may be published') },
         commands: { run: async (command: string) => {
@@ -151,7 +162,8 @@ test('runtime refresh failures name their actual phase without logging provider 
         kill: async () => assert.fail('no kill'),
       } as unknown as Parameters<typeof ensureThreadMachine>[3]
       try {
-        await assert.rejects(ensureThreadMachine(pool, actor, run.id, provider, undefined, true), error => error === fault)
+        await assert.rejects(withThreadProjectResources({ pool, client, run }, () =>
+          ensureThreadMachine(pool, actor, run.id, provider, undefined, true)), error => error === fault)
         assert.deepEqual(warnings.map(args => JSON.parse(String(args[0]))), scenario.startsWith('diagnostic_') ? [] : [{
           event: 'thread_runtime_refresh_failed', runId: run.id, phase,
           errorClass: phase === 'stage_release' ? 'CommandExitError' : 'Error',
@@ -175,8 +187,9 @@ test('question wake failures identify the rejecting boundary without exposing pr
   const { ensureThreadMachine } = await import('./thread-machines')
   const id = (n: number) => `41500000-0000-4000-8000-${String(n).padStart(12, '0')}`
   const actor = { userId: 'fixture-owner', workspaceId: id(2) }
-  const run = { id: id(1), userId: actor.userId, issueId: id(3), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
+  const run = { id: id(1), userId: actor.userId, workspaceId: actor.workspaceId, issueId: id(3), agentId: id(9), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
     status: 'queued', botSandboxId: 'fixture-parent', repoPath: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git',
+    baseBranch: null, runHarness: 'codex', agentDefinition: { harness: 'codex' },
     questionContinuation: { requireSessionResume: true, requiredSandboxId: 'fixture-original', originSessionId: 'PRIVATE-NATIVE-SESSION', originRunId: id(7), questionId: id(8) } }
   const machine = { runId: run.id, ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: run.issueId,
     deviceId: run.deviceId, repoId: run.deviceRepoId, botId: run.runtimeBotId, state: 'paused', sandboxId: 'fixture-original', snapshotId: 'codex' }
@@ -200,13 +213,20 @@ test('question wake failures identify the rejecting boundary without exposing pr
       })
       const query = async (sql: string, values: unknown[] = []) => {
         queries.push(sql)
+        const preflight = threadResourcePreflight(sql, values, run)
+        if (preflight) return preflight
         if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
           assert.deepEqual(values, [run.id, actor.userId])
           return { rows: [{ issueId: run.issueId }], rowCount: 1 }
         }
-        if (sql.startsWith('SELECT r.*')) return { rows: phase === 'admission' ? [] : [{ ...run,
-          ...(phase === 'execution_identity' ? { agentDefinition: { executionIdentity: {} } } : {}),
-        }], rowCount: phase === 'admission' ? 0 : 1 }
+        if (sql.startsWith('SELECT r.*')) {
+          assert.match(sql, /r\."baseBranch" AS "runBaseBranch"/)
+          assert.match(sql, /r\."workspaceId"=b\."workspaceId" FOR UPDATE OF r/)
+          assert.deepEqual(values, [run.id, actor.userId, actor.workspaceId])
+          return { rows: phase === 'admission' ? [] : [{ ...run, runBaseBranch: run.baseBranch,
+            ...(phase === 'execution_identity' ? { agentDefinition: { executionIdentity: {} } } : {}),
+          }], rowCount: phase === 'admission' ? 0 : 1 }
+        }
         if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine,
           ...(phase === 'question_machine' ? { sandboxId: 'other-vm' } : {}),
           ...(phase === 'verify_worker' ? { snapshotId: 'legacy-fixture' } : {}),
@@ -217,7 +237,8 @@ test('question wake failures identify the rejecting boundary without exposing pr
         if (/^(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock)/.test(sql)) return { rows: [], rowCount: 0 }
         assert.fail(`Unexpected question diagnostic-fixture SQL: ${sql}`)
       }
-      const pool = { query, connect: async () => ({ query, release: () => { released = true } }) } as never
+      const client = { query, release: () => { released = true } }
+      const pool = { query, connect: async () => client } as never
       const provider = {
         state: async () => { if (phase === 'provider_state') throw fault; return 'paused' },
         connect: async () => {
@@ -230,7 +251,8 @@ test('question wake failures identify the rejecting boundary without exposing pr
         kill: async () => assert.fail('no kill'),
       } as unknown as Parameters<typeof ensureThreadMachine>[3]
       try {
-        await assert.rejects(ensureThreadMachine(pool, actor, run.id, provider), error =>
+        await assert.rejects(withThreadProjectResources({ pool, client, run, lockedAssertions: phase === 'admission' ? 0 : 1 }, () =>
+          ensureThreadMachine(pool, actor, run.id, provider)), error =>
           ['admission', 'execution_identity', 'question_machine', 'question_source', 'verify_worker'].includes(phase)
             ? error instanceof Error && /Thread unavailable|executionIdentityUnavailable|Original question machine unavailable|Worker version mismatch/.test(error.message)
             : error === fault)
@@ -273,12 +295,13 @@ test('runtime guard diagnostics keep their closed phase and never emit a provide
 
 // Exercise the real provisioning orchestration. The SQL/provider boundaries
 // are synthetic here; thread-machine-task.db.test.ts retains real PG coverage.
-async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 'publish_failed' | 'revoked' | 'old_registration' | 'lease_lost') {
+async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 'publish_failed' | 'revoked' | 'old_registration' | 'lease_lost' | 'resources_revoked') {
   const { ensureThreadMachine } = await import('./thread-machines')
   const id = (n: number) => `41700000-0000-4000-8000-${String(n).padStart(12, '0')}`
   const actor = { userId: 'bootstrap-fixture-owner', workspaceId: id(2) }
-  const run = { id: id(1), userId: actor.userId, issueId: id(3), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
-    status: 'queued', stopRequestedAt: null, repoPath: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git', runHarness: 'codex' }
+  const run = { id: id(1), userId: actor.userId, workspaceId: actor.workspaceId, issueId: id(3), agentId: id(9), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
+    status: 'queued', stopRequestedAt: null, repoPath: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git', runHarness: 'codex',
+    baseBranch: null, agentDefinition: { harness: 'codex' } }
   const machine = { runId: run.id, ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: run.issueId,
     botId: run.runtimeBotId, state: 'starting', snapshotId: 'codex', operationId: id(7), sandboxId: null }
   const queries: string[] = [], commands: { command: string; options: Record<string, unknown> }[] = []
@@ -289,8 +312,16 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 
   const result = (rows: unknown[]) => ({ rows, rowCount: rows.length })
   const query = async (sql: string, values: unknown[] = []) => {
     queries.push(sql)
+    const preflight = threadResourcePreflight(sql, values, run)
+    if (preflight) return preflight
     if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') return result([{ issueId: run.issueId }])
-    if (sql.startsWith('SELECT r.*') || sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
+    if (sql.startsWith('SELECT r.*')) {
+      assert.match(sql, /r\."baseBranch" AS "runBaseBranch"/)
+      assert.match(sql, /r\."workspaceId"=b\."workspaceId" FOR UPDATE OF r/)
+      assert.deepEqual(values, [run.id, actor.userId, actor.workspaceId])
+      return result([{ ...run, runBaseBranch: run.baseBranch }])
+    }
+    if (sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
     if (sql.startsWith('SELECT * FROM thread_machines')) return result([{ ...machine }])
     if (sql.startsWith('SELECT 1 FROM devices d JOIN device_tokens')) return result(authenticated ? [{}] : [])
     if (sql.startsWith('SELECT 1 FROM agent_runs r JOIN thread_machines')) return result([{}])
@@ -323,7 +354,8 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 
     if (/^(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock|INSERT INTO (devices|device_repos)|UPDATE (device_tokens|agent_runs|factory_attempts))/.test(sql)) return result([])
     assert.fail(`Unexpected bootstrap-fixture SQL: ${sql}`)
   }
-  const pool = { query, connect: async () => ({ query, release: () => { released = true } }) } as never
+  const client = { query, release: () => { released = true } }
+  const pool = { query, connect: async () => client } as never
   const box = { sandboxId: 'bootstrap-fixture-vm', files: {
     read: async () => 'a'.repeat(40),
     write: async (files: { path: string; data: string }[], options: unknown) => {
@@ -361,7 +393,9 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 
   const warning = mock.method(console, 'warn', () => {})
   const info = mock.method(console, 'info', () => {})
   let error: unknown
-  try { await ensureThreadMachine(pool, actor, run.id, provider) } catch (caught) { error = caught }
+  try { await withThreadProjectResources({ pool, client, run,
+    ...(scenario === 'resources_revoked' ? { lockedRefusal: new ActionFailureError('projectRepositoryDenied') } : {}),
+  }, () => ensureThreadMachine(pool, actor, run.id, provider)) } catch (caught) { error = caught }
   finally {
     clock.mock.restore(); warning.mock.restore(); info.mock.restore()
     if (saved.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = saved.url
@@ -424,6 +458,16 @@ test('a successful wake cannot stand in for a live new credential registration',
     assert.equal(f.commands.filter(row => row.options.background === true).length, 0)
     assert.ok(f.queries.includes('ROLLBACK'))
   }
+})
+
+test('a resource refusal on the locked Run writes no lifecycle timer, credential or provisioning state', async () => {
+  const f = await bootstrapFixture('resources_revoked')
+  assert.ok(f.error instanceof ActionFailureError && f.error.code === 'projectRepositoryDenied')
+  assert.equal(f.commands.length, 0); assert.equal(f.uploads.length, 0)
+  assert.equal(f.finished, false); assert.equal(f.released, true)
+  assert.ok(f.queries.includes('ROLLBACK'))
+  assert.ok(f.queries.every(sql => !/^(INSERT|UPDATE|DELETE)/.test(sql)),
+    'an admission refusal has neither a provisioning lease to clean nor a lifecycle deadline to reschedule')
 })
 
 test('the preloader wake command signals only a live wait-bootstrap process and reports failed signals as fallback', { skip: process.platform !== 'linux', timeout: 10000 }, async () => {

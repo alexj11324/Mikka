@@ -4,21 +4,21 @@ import type { RelationKind, SearchResultItem } from '@/lib/issue-search'
 export const RELATION_SEARCH_DEBOUNCE_MS = 200
 export const RELATION_SEARCH_LIMIT = 50
 const SERVER_NUMBER = /^(?:(?:ORV|MIK)-)?[1-9]\d{0,8}$/i
-const PREFIXED_NUMBER = /^[a-z][a-z0-9]*-([1-9]\d{0,8})$/i
+const PREFIXED_NUMBER = /^[a-z][a-z0-9_]{0,63}-[1-9]\d{0,15}$/i
 const HASH_NUMBER = /^#([1-9]\d{0,8})$/
 const CJK = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]$/u
 
 /**
- * Maps what the user typed to the q the server accepts. A display identifier with another prefix
- * (a personal or Linear prefix such as ALEX-12) searches its number and keeps only that identifier;
- * #12 (an owner without a prefix yet) searches the number.
+ * Complete identifiers are resolved by the server in the authorized Workspace,
+ * including historical aliases. Their numeric suffix is not an owner counter,
+ * and an alias can correctly resolve to a different canonical display value.
+ * #12 retains the old explicit numeric-counter search.
  * One non-CJK character is a 400 on the server, so it shows the recent list until a second one is typed.
  */
 export function relationSearchQuery(raw: string): { q: string; identifier: string | null } {
   const text = raw.trim()
   if (SERVER_NUMBER.test(text)) return { q: text, identifier: null }
-  const prefixed = PREFIXED_NUMBER.exec(text)
-  if (prefixed) return { q: prefixed[1], identifier: text.toUpperCase() }
+  if (PREFIXED_NUMBER.test(text)) return { q: text, identifier: null }
   const hash = HASH_NUMBER.exec(text)
   if (hash) return { q: hash[1], identifier: null }
   if ([...text].length === 1 && !CJK.test(text)) return { q: '', identifier: null }
