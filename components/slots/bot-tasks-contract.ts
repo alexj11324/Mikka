@@ -7,6 +7,9 @@ import type { Thread } from '@/app/actions/task-runs'
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
 export type BotTasksProps = {
+  /** Server-verified workspace and Bot whose dispatch history this panel reads. */
+  workspaceId?: string
+  botId?: string | null
   /** Where the list keeps its scroll and folded groups. */
   stateKey: string
   /** The threads this bot dispatched. */

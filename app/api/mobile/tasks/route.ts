@@ -4,7 +4,8 @@ import { ActionFailureError } from '@/lib/action-error'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { pollIssues, listWorkspaceIssues } from '@/app/actions/issues'
+import { nextTaskListCursor, taskListPageInput } from '@/lib/task-list-page'
+import { pollIssues, listWorkspaceIssues, listWorkspaceTaskPage } from '@/app/actions/issues'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { displayTaskTitle } from '@/lib/short-title'
 import { boardBlocks } from '@/components/blocks/kanban-board-1/components/data'
@@ -23,9 +24,18 @@ async function handleGET(request: Request) {
     return await actAs(user, async () => {
       const tokenWorkspaceId = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
       // Keep the selected workspace already resolved by the existing list read; no extra context query.
-      const { issues, workspaceId } = tokenWorkspaceId
-        ? { issues: await listWorkspaceIssues(tokenWorkspaceId), workspaceId: tokenWorkspaceId }
-        : await pollIssues().then(snapshot => ({ issues: snapshot.items!, workspaceId: snapshot.live.selectedWorkspaceId }))
+      const params = new URL(request.url).searchParams
+      const continuation = params.has('after') || params.has('updatedAt')
+      const dispatchedBy = params.get('dispatchedBy')
+      const page = continuation || dispatchedBy !== null ? taskListPageInput.safeParse({ workspaceId: params.get('workspaceId'),
+        ...(dispatchedBy !== null ? { dispatchedBy } : {}), after: continuation ? { id: params.get('after'), updatedAt: params.get('updatedAt') } : null }) : null
+      if (page && !page.success) return json({ error: 'validationGeneric' }, 400)
+      const nextPage = page?.success ? await listWorkspaceTaskPage(page.data) : null
+      if (nextPage?.reset) return json({ error: 'issueStale' }, 409)
+      const { issues, workspaceId } = nextPage
+        ? { issues: nextPage.items, workspaceId: nextPage.workspaceId }
+        : tokenWorkspaceId ? { issues: await listWorkspaceIssues(tokenWorkspaceId), workspaceId: tokenWorkspaceId }
+          : await pollIssues().then(snapshot => ({ issues: snapshot.items!, workspaceId: snapshot.live.selectedWorkspaceId }))
       // Recheck and hold the exact tenant before decorating or returning the
       // authorized list. A revocation that wins admission cannot return it.
       return withTaskWorkspace(user, workspaceId, async () => {
@@ -36,12 +46,12 @@ async function handleGET(request: Request) {
         const runByIssue = new Map(runs.map(row => [row.issueId, row]))
         const blocks = boardBlocks(issues, runs)
         return json({
-          workspaceId,
+          workspaceId, next: nextTaskListCursor(issues),
           tasks: issues.map(issue => {
             const block = blocks.get(issue.id)
             return {
               // The short title the small model wrote, while the task keeps the title it was written from (lib/short-title.ts).
-              id: issue.id, identifier: issue.identifier, title: displayTaskTitle(issue), status: issue.status, priority: issue.priority,
+              ...(dispatchedBy ? { dispatchedBy } : {}), id: issue.id, identifier: issue.identifier, title: displayTaskTitle(issue), status: issue.status, priority: issue.priority,
               owner: issue.ownerName, updatedAt: issue.updatedAt,
               createdAt: issue.createdAt, ...taskStateOf(issue, runByIssue.get(issue.id), { block, schedule: byIssue.get(issue.id)?.schedule }),
               bot: byIssue.get(issue.id)?.bot ?? null, schedule: byIssue.get(issue.id)?.schedule ?? null,
@@ -53,6 +63,7 @@ async function handleGET(request: Request) {
       })
     })
   } catch (error) {
+    if (error instanceof ActionFailureError && error.code === 'issueStale') return json({ error: 'issueStale' }, 409)
     if (error instanceof WorkspaceError || (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied'))
       return json({ error: 'workspaceAccessDenied' }, 403)
     throw error

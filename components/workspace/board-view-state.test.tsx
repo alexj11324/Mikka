@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
-import { act, type ReactNode } from 'react'
+import { act, createContext, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import { ViewStateProvider } from '@/lib/hooks/view-state'
 import { Button } from '@/components/ui/button'
+import type { BoardMenuItem, BoardScreenProps } from '@/components/slots/board-contract'
 import type { listIssues } from '@/app/actions/issues'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -15,25 +16,27 @@ const empty = () => null
 const Pass = ({ children }: { children?: ReactNode }) => <>{children}</>
 mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
 mock.module('swr', { defaultExport: () => ({ data: undefined }) })
+mock.module('@/hooks/use-task-collection', { namedExports: { TaskPresentationsContext: createContext({}) } })
 mock.module('@/hooks/use-live-lists', { namedExports: { useLiveTaskRunList: () => ({ data: undefined }) } })
 mock.module('@/hooks/use-list-expiry', { namedExports: { useListExpiry: nothing } })
 mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
 mock.module('@/app/actions/linear-sync', { namedExports: { getLinearBoardSync: async () => ({ synced: false }) } })
-mock.module('@/components/person-avatar', { namedExports: { PersonAvatar: empty } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { CoordinatorAvatar: empty } })
 mock.module('@/components/nav/conversation-pill', { namedExports: { ConversationPill: empty } })
 mock.module('@/components/coordinator/coordinator-chat', { namedExports: { CoordinatorChat: empty } })
 mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: empty } })
-mock.module('./issue-assignee-menu', { namedExports: { AgentSphere: empty } })
-mock.module('./issue-metadata-controls', { namedExports: { LabelDot: empty } })
 mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: Pass, SheetHeader: Pass, SheetTitle: Pass } })
-mock.module('@/components/ui/dropdown-menu', { namedExports: {
-  DropdownMenu: Pass, DropdownMenuContent: Pass, DropdownMenuGroup: Pass, DropdownMenuSub: Pass, DropdownMenuSubContent: Pass, DropdownMenuSubTrigger: Pass, DropdownMenuTrigger: Pass,
-  DropdownMenuCheckboxItem: ({ children, checked, onCheckedChange }: { children?: ReactNode; checked: boolean; onCheckedChange: (checked: boolean) => void }) => <Button role="menuitemcheckbox" aria-checked={checked} onClick={() => onCheckedChange(!checked)}>{children}</Button>,
-} })
-mock.module('./issue-board', { namedExports: { IssueBoard: ({ issues }: { issues: Issue[] }) => <div data-board-view="board">{issues.map(issue => <p key={issue.id} data-shown-issue>{issue.title}</p>)}</div> } })
-mock.module('./issue-list', { namedExports: { IssueList: ({ issues }: { issues: Issue[] }) => <div data-board-view="list">{issues.map(issue => <p key={issue.id} data-shown-issue>{issue.title}</p>)}</div> } })
-mock.module('./board-screen', { namedExports: { BoardScreen: null, BoardScreenView: empty } })
+// The test adapter exposes the public slot callbacks. The official renderer
+// is exercised in the companion repository without copying its implementation.
+mock.module('./board-screen', { namedExports: { BoardScreenView: ({ issues, view, onView, filterItems }: Pick<BoardScreenProps, 'view' | 'onView' | 'filterItems'> & { issues: Issue[] }) =>
+  <div data-board-view={view}>
+    <Button aria-label="viewList" aria-pressed={view === 'list'} onClick={() => onView('list')}>List</Button>
+    {filterItems.map((group: BoardMenuItem) => <div key={group.label}>
+      {group.submenu?.map(item => <Button key={item.label} role="menuitemcheckbox" aria-checked={item.checked} onClick={item.onSelect}>{item.label}</Button>)}
+      {group.submenu?.some(item => item.checked) && <span role="group" aria-label={group.label}>{group.submenu.filter(item => item.checked).map(item => item.label).join(', ')}</span>}
+    </div>)}
+    {issues.map(issue => <p key={issue.id} data-shown-issue>{issue.title}</p>)}
+  </div> } })
 
 let BoardPage: typeof import('./board-page')['BoardPage']
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -55,9 +58,9 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 after(() => browser.happyDOM.close())
 function issue(owner: string, workspace: string, suffix: string): Issue {
   const prefix = owner === 'owner-one' ? workspace : `${owner}:${workspace}`
-  return { id: `${workspace}-${suffix}`, title: `${prefix} task ${suffix}`, ownerId: owner, scope: 'workspace', status: 'todo', priority: 'normal',
+  return { id: `${workspace}-${suffix}`, title: `${prefix} task ${suffix}`, ownerId: owner, scope: 'workspace', status: 'todo', priority: 'normal', projectId: `${workspace}-project-${suffix}`,
     createdAt: '2026-11-07T00:00:00Z', updatedAt: '2026-11-07T00:00:00Z', checklist: { total: 0, checked: 0 },
-    metadata: { assignee: { id: owner, kind: 'user', name: owner }, project: `${prefix} private project ${suffix}`, labels: [{ name: `${prefix} private label ${suffix}`, color: null }], pullRequests: [] } } as unknown as Issue
+    metadata: { assignee: { id: owner, kind: 'member', name: owner }, project: `${prefix} private project ${suffix}`, labels: [{ name: `${prefix} private label ${suffix}`, color: null }], pullRequests: [] } } as unknown as Issue
 }
 async function render({ owner = 'owner-one', workspace = 'workspace-one', visible = true, remount = false } = {}) {
   await act(async () => root.render(<ViewStateProvider scope={`${owner}:${workspace}`}>
