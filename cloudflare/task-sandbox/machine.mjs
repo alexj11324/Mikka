@@ -1,0 +1,194 @@
+import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
+import { Files } from '@cloudflare/sandbox'
+import { machineGrant, sameGrant, workspaceName, liveUntil, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
+import { TaskFiles } from './files.mjs'
+import { TaskWorkspace } from './workspace.mjs'
+
+export { DirectoryBackupGateway } from '@cloudflare/sandbox'
+
+// The Node API holds this service binding. HTTP is closed, including the
+// workers.dev hostname. Every operation travels with the frozen Mikka run.
+export default class TaskMachines extends WorkerEntrypoint {
+  fetch() { return new Response(null, { status: 404 }) }
+  #endpoint(identity) {
+    const grant = machineGrant(identity)
+    return this.env.TASKS.getByName(workspaceName(grant))
+  }
+  open(identity) { return this.#endpoint(identity).open(identity) }
+  park(identity) { return this.#endpoint(identity).park(identity) }
+  status(identity) { return this.#endpoint(identity).status(identity) }
+  readFile(identity, path) { return this.#endpoint(identity).readFile(identity, path) }
+  writeFile(identity, path, bytes) { return this.#endpoint(identity).writeFile(identity, path, bytes) }
+}
+
+// Release the slot only after the dedicated compute has confirmed stop.
+export class TaskCapacity extends DurableObject {
+  acquire(task) {
+    return this.ctx.storage.transaction(async tx => {
+      const slots = await tx.list({ prefix: 'running:' })
+      if (slots.has('running:' + task)) return true
+      if (slots.size >= 2) return false
+      await tx.put('running:' + task, true)
+      return true
+    })
+  }
+  release(task) { return this.ctx.storage.delete('running:' + task) }
+}
+
+export class TaskMachine extends DurableObject {
+  queue = Promise.resolve()
+  constructor(ctx, env) {
+    super(ctx, env)
+    this.workspace = new TaskWorkspace(ctx, env.WORKSPACES)
+    ctx.blockConcurrencyWhile(async () => {
+      const run = await ctx.storage.get('run')
+      if (!run || run.stoppedAt) return
+      if (ctx.container?.running) await ctx.container.setInactivityTimeout(this.idleLimit(run))
+      await ctx.storage.setAlarm(Math.max(Date.now() + 1, run.settledAt ? Date.now() : run.expiresAt))
+    })
+  }
+  exclusive(operation) {
+    const next = this.queue.then(operation)
+    this.queue = next.catch(() => {})
+    return next
+  }
+  idleLimit(run) { return Math.max(1, run.hardDeadline + CHECKPOINT_TIME_MS - Date.now()) }
+  admission() { return this.env.CAPACITY.getByName('product-task-machines') }
+  async startImage(run) {
+    const container = this.ctx.container
+    if (!container) throw new Error('Task container unavailable')
+    container.start({ image: container.images.task, instance: 'standard-1', enableInternet: false,
+      entrypoint: ['sleep', String(Math.max(1, Math.ceil(this.idleLimit(run) / 1000)))] })
+    await container.setInactivityTimeout(this.idleLimit(run))
+  }
+  async verifyScope(grant) {
+    if (this.ctx.id.toString() !== this.env.TASKS.idFromName(workspaceName(grant)).toString()) {
+      throw new Error('Task machine scope mismatch')
+    }
+  }
+  open(identity) {
+    const grant = machineGrant(identity)
+    return this.exclusive(async () => {
+      await this.verifyScope(grant)
+      const store = this.ctx.storage, now = Date.now()
+      const prior = await store.get('run')
+      if (prior && sameGrant(prior.grant, grant)) {
+        if (prior.settledAt || prior.stoppedAt) throw new Error('Task machine run already settled')
+        if (!this.ctx.container?.running || prior.state !== 'running') throw new Error('Task machine interrupted')
+        // An expired lease cannot be revived even if its alarm is delayed.
+        liveUntil(prior, now, prior.hardDeadline)
+        const expiresAt = liveUntil(grant, now, prior.hardDeadline)
+        if (expiresAt > prior.expiresAt) {
+          await store.put('run', { ...prior, expiresAt })
+          await store.setAlarm(expiresAt)
+        }
+        return { state: 'running', restored: prior.restored, instanceId: this.ctx.id.toString() }
+      }
+      if (prior && !prior.stoppedAt) throw new Error('Task machine already has a writer')
+      if (await store.get('closed:' + grant.runId)) throw new Error('Task machine run already settled')
+      const hardDeadline = now + MAX_RUN_MS
+      const expiresAt = liveUntil(grant, now, hardDeadline)
+      const run = { state: 'starting', grant, hardDeadline, expiresAt, admittedAt: now }
+      await store.setAlarm(expiresAt)
+      await store.put('run', run)
+      if (!await this.admission().acquire(this.ctx.id.toString())) {
+        if (prior) await store.put('run', prior)
+        else await store.delete('run')
+        await store.deleteAlarm()
+        throw new Error('Product task machine capacity exhausted')
+      }
+      try {
+        await this.startImage(run)
+        const restored = await this.workspace.restore()
+        if (!restored) await new Files(this.ctx.container).mkdir('/workspace', { recursive: true })
+        await store.put('run', { ...run, restored, state: 'running' })
+        return { state: 'running', restored, instanceId: this.ctx.id.toString() }
+      } catch (error) {
+        // No task operation has been authorized. Preserve the prior manifest
+        // if cold restoration failed, and never admit an empty substitute.
+        await this.stop(run, 'start_failed', false)
+        throw error
+      }
+    })
+  }
+  async current(grant) {
+    await this.verifyScope(grant)
+    const run = await this.ctx.storage.get('run')
+    if (!run || !sameGrant(run.grant, grant)) throw new Error('Task machine run mismatch')
+    return run
+  }
+  status(identity) {
+    const grant = machineGrant(identity)
+    return this.exclusive(async () => {
+      await this.verifyScope(grant)
+      const run = await this.ctx.storage.get('run')
+      if (!run || !sameGrant(run.grant, grant)) return { state: 'absent' }
+      if (!run.stoppedAt && run.state === 'running' && !this.ctx.container?.running) {
+        return this.stop(run, 'interrupted', true)
+      }
+      return this.receipt(run)
+    })
+  }
+  withFiles(identity, operation) {
+    const grant = machineGrant(identity)
+    return this.exclusive(async () => {
+      const run = await this.current(grant)
+      liveUntil(grant, Date.now(), Math.min(run.expiresAt, run.hardDeadline))
+      if (run.state !== 'running' || !this.ctx.container?.running) throw new Error('Task machine is not running')
+      return operation(new TaskFiles(this.ctx.container))
+    })
+  }
+  readFile(identity, path) { return this.withFiles(identity, files => files.read(path)) }
+  writeFile(identity, path, bytes) {
+    return this.withFiles(identity, async files => {
+      await files.write(path, bytes)
+      // Do not acknowledge a durable file edit until R2 returned its digest.
+      const checkpoint = await this.workspace.checkpoint()
+      await this.workspace.prune()
+      return checkpoint
+    })
+  }
+  park(identity) {
+    const grant = machineGrant(identity)
+    return this.exclusive(async () => this.stop(await this.current(grant), 'settled', true))
+  }
+  receipt(run) {
+    return { state: run.state, outcome: run.outcome, admittedAt: run.admittedAt, settledAt: run.settledAt,
+      stoppedAt: run.stoppedAt, checkpoint: run.checkpoint, instanceId: this.ctx.id.toString() }
+  }
+  async stop(run, outcome, save) {
+    if (run.stoppedAt) return this.receipt(run)
+    const store = this.ctx.storage, container = this.ctx.container
+    if (!run.settledAt) {
+      run = { ...run, settledAt: Date.now(), outcome, state: 'stopping' }
+      await store.put('run', run)
+    }
+    await store.setAlarm(Date.now() + 15_000)
+    if (save && !run.checkpoint && container?.running) {
+      const checkpoint = await this.workspace.checkpoint()
+      run = { ...run, checkpoint }
+      await store.put('run', run)
+    }
+    if (save && !run.checkpoint && !container?.running) {
+      const saved = await store.get('checkpoint')
+      run = { ...run, outcome: 'interrupted', checkpoint: saved ? { id: saved.id, bytes: saved.size, sha256: saved.sha256 } : null }
+    }
+    if (container?.running) await container.destroy()
+    if (container?.running) throw new Error('Task machine stop unconfirmed')
+    await this.admission().release(this.ctx.id.toString())
+    const stopped = { ...run, state: 'stopped', stoppedAt: Date.now() }
+    await store.put({ run: stopped, ['closed:' + run.grant.runId]: true })
+    await this.workspace.prune()
+    await store.deleteAlarm()
+    return this.receipt(stopped)
+  }
+  alarm() {
+    return this.exclusive(async () => {
+      const run = await this.ctx.storage.get('run')
+      if (!run || run.stoppedAt) { await this.workspace.prune(); return }
+      if (run.settledAt || Date.now() >= run.expiresAt) {
+        await this.stop(run, 'deadline', run.state !== 'starting' && run.outcome !== 'start_failed')
+      } else await this.ctx.storage.setAlarm(run.expiresAt)
+    })
+  }
+}
