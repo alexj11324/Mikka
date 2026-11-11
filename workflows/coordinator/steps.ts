@@ -301,7 +301,7 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
 }
 
 /** Context timings stay beside the prompt, never in its instructions or model options. */
-async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope) {
+async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope, eveOwned = false) {
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
@@ -311,6 +311,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
 
   const conversation = await store.loadConversationForPrompt(userId, botId)
   let { summary, memory, messages } = conversation
+  if (eveOwned) { summary = null; messages = [] }
   if (messages.some(row => 'mikkaUserEvent' in row.message && typeof row.message.content === 'string' && row.message.content.includes('[mikka-file:'))) {
     const { chatFileContent } = await import('@/lib/chat-attachments/store')
     messages = await Promise.all(messages.map(async row => {
@@ -319,7 +320,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
     }))
   }
   const summaryTrust = { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) }
-  const cut = compactionCut(summary, messages, summaryTrust)
+  const cut = eveOwned ? null : compactionCut(summary, messages, summaryTrust)
   if (cut !== null) {
     if (summaryTrust.key.length < 32) throw new Error('Existing host auth secret required for summary provenance')
     const folded = messages.filter(row => row.position <= cut)
@@ -370,6 +371,12 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   // The person's memory and what Mikka knows about them ride together just after it, then live model availability.
   const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
   return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
+}
+
+/** Product policy and memory only. eve owns history, pruning and compaction. */
+export async function prepareEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot) {
+  const withoutSkills = snapshot ? { ...snapshot, personalPlugins: snapshot.personalPlugins ? { ...snapshot.personalPlugins, skills: [] } : undefined } : undefined
+  return (await preparePromptDetails(userId, botId, withoutSkills, [], { hosted: true, readOnly: false, effectiveTools: snapshot?.effectiveTools }, true)).prompt.instructions
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }

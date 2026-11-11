@@ -1,24 +1,16 @@
 import { defaultModelAvailable } from '@/lib/default-model'
 import 'server-only'
-import { start } from 'workflow/api'
 import { releaseAttention } from '@/lib/attention/store'
-import { claimTriageAttempt, completeTriageAttempt, hasWakingEvents, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
+import { claimTriageAttempt, completeTriageAttempt, setEventTier, untriagedEvents, wakingChats } from '@/lib/coordinator/store'
 import { invokeDecision } from '@/lib/coordinator/decide'
 import { tierFromDecision, triageQuestions, triageInput } from '@/lib/coordinator/triage'
-import { coordinatorTurn } from '@/workflows/coordinator/workflow'
-import { coordinatorWakeDeadline } from '@/workflows/coordinator-wake-recovery/workflow'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { runTriageBatch, TRIAGE_BATCH_BUDGET_MS } from './triage-batch'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
-import { createWakeRecovery, deliverWake, type DeadlineWakeClaim, type WakeClaim, type WakeDeadlineTicket, type WakeScope } from './wake-recovery'
-import { failureLine } from './refusal-line'
-import { pushByDecision } from './push-decision'
-import type { InboxEvent } from '@/lib/push-reasons'
 import { coordinatorBot } from './coordinator-bot'
 import { deliverRunCompletion } from './run-completion-delivery'
 
-const recovery = createWakeRecovery(pool)
 
 /**
  * Whether this chat can use a configured default or its own selected
@@ -73,73 +65,40 @@ export async function wakeCoordinator(userId: string): Promise<void> {
   }
 }
 
-async function wakeChat(scope: WakeScope) {
-  const claim = await recovery.claim(scope)
-  if (!claim) return 'deferred' as const
-  const delivered = await deliverClaim(claim)
-  if (delivered.ticket) {
-    // Both claim and failure tickets are returned only after their real COMMIT.
-    // An unknown start outcome is not retried here; the inbox/sweep retains it.
-    try { await start(coordinatorWakeDeadline, [delivered.ticket]) }
-    catch { console.error('Coordinator wake deadline scheduling failed', { eventIds: claim.ids, attempt: claim.attempt }) }
-  }
-  return delivered.result
+/** Product outbox delivery only. eve owns turn queueing, retry and recovery. */
+async function wakeChat(scope: { userId: string; botId: string }) {
+  await triageInbox(scope.userId,scope.botId)
+  const [{rows: events},{rows: bots}] = await Promise.all([
+    pool.query<{id:string}>(`SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2 AND "deliveredAt" IS NULL AND (kind='user_message' OR (tier IS NOT NULL AND tier<>'background')) ORDER BY "createdAt",id LIMIT 50`,[scope.userId,scope.botId]),
+    pool.query<{workspaceId:string}>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2',[scope.botId,scope.userId]),
+  ])
+  if (!bots[0]) return 'deferred' as const
+  const {sendEveEvent} = await import('../eve/server-client')
+  for (const event of events) await sendEveEvent({ownerId:scope.userId,botId:scope.botId,workspaceId:bots[0].workspaceId,surface:'web'},event.id)
+  return events.length ? 'started' as const : 'deferred' as const
 }
 
-async function deliverClaim(claim: DeadlineWakeClaim) {
-  let ticket = claim.ticket
-  const result = await deliverWake(claim, {
-    triage: value => triageInbox(value.userId, value.botId),
-    hasWaking: value => hasWakingEvents(value.userId, value.botId),
-    start: async value => {
-      const run = await start(coordinatorTurn, [value.userId, value.botId, 1])
-      console.info('Coordinator wake accepted', { workflowRunId: run.runId, eventIds: claim.ids, attempt: claim.attempt })
-    },
-    failed: async (value, code) => { ticket = await recovery.failed(value, code) },
-    // The last attempt gave up: no turn will run to say so, so the phone gets the line the chat shows (回复重试已停止).
-    exhausted: value => noticeWakeExhausted(value).catch(() => console.error('Wake failure notice failed', { eventIds: value.ids })),
-  })
-  if (result === 'failed') console.error('Coordinator wake delivery failed', { eventIds: claim.ids, attempt: claim.attempt })
-  return { result, ticket }
+/** Compatibility entry for previously queued wake deadlines; no turn lease survives. */
+export async function recoverWakeDeadline(ticket: import('./wake-recovery').WakeDeadlineTicket): Promise<null> {
+  await wakeCoordinator(ticket.userId)
+  return null
 }
 
-/** Internal durable step: preserve the bounded batch instead of waking an unrestricted chat. */
-export async function recoverWakeDeadline(ticket: WakeDeadlineTicket): Promise<{ ticket: WakeDeadlineTicket; at: string } | null> {
-  if (!await coordinatorEnabled(ticket.userId, ticket.botId)) return null
-  const next = await recovery.resume(ticket)
-  if (next.kind === 'obsolete') return null
-  if (next.kind === 'wait') return { ticket, at: next.at }
-  const delivered = await deliverClaim(next.claim)
-  return delivered.ticket ? { ticket: delivered.ticket, at: delivered.ticket.at } : null
-}
-
-async function noticeWakeExhausted(claim: WakeClaim) {
-  const line = failureLine('wake_exhausted')
-  if (!line) return
-  const events = (await pool.query<InboxEvent>('SELECT kind,tier FROM coordinator_events WHERE "userId"=$1 AND id=ANY($2::uuid[])', [claim.userId, claim.ids])).rows
-  if (events.length) await pushByDecision(claim.userId, claim.botId, line, events)
-}
-
-/** Called every minute by the existing scheduling Worker. The persisted next
- * attempt/lease timestamps make overlapping sweeps converge. */
-export async function retryCoordinatorWakes(deadline = Date.now() + 45_000) {
-  const counts = { due: 0, started: 0, deferred: 0, failed: 0, exhausted: 0, interrupted: 0 }
-  // First, so a turn whose run ended without releasing its chat is retried in this same sweep.
-  try { counts.interrupted = (await (await import('./interrupted-turns')).recoverInterruptedTurns()).recovered } catch { /* the lease expiry still frees it */ }
-  const scopes = await recovery.due()
+/** Existing source-outbox reconciliation; never inspects or restarts an eve workflow. */
+export async function retryCoordinatorWakes(deadline = Date.now()+45_000) {
+  const counts = {due:0,started:0,deferred:0,failed:0,exhausted:0,interrupted:0}
+  const scopes = (await pool.query<{userId:string;botId:string}>(`SELECT DISTINCT "userId","botId" FROM coordinator_events WHERE "deliveredAt" IS NULL AND "botId" IS NOT NULL AND (kind='user_message' OR tier IS NULL OR tier<>'background')`)).rows
   counts.due = scopes.length
   for (const scope of scopes) {
-    if (Date.now() >= deadline) { counts.deferred++; continue }
-    // A wake recorded before chats had bots names none: it was the Coordinator's older chat, now the personal one's.
-    try {
-      const botId = scope.botId ?? (await coordinatorBot(scope.userId, null)).botId
-      if (!await coordinatorEnabled(scope.userId, botId)) { counts.deferred++; continue }
-      counts[await wakeChat({ userId: scope.userId, botId })]++
-    }
-    catch { counts.failed++ }
+    if (Date.now()>=deadline || !await coordinatorEnabled(scope.userId,scope.botId)) {counts.deferred++;continue}
+    try { counts[await wakeChat(scope)]++ } catch {counts.failed++}
   }
-  counts.exhausted = await recovery.exhausted()
   return counts
 }
 
-export const replayCoordinatorWake = (eventId: string) => recovery.replay(eventId)
+export async function replayCoordinatorWake(eventId:string) {
+  const row = (await pool.query<{userId:string}>('SELECT "userId" FROM coordinator_events WHERE id=$1 AND "deliveredAt" IS NULL',[eventId])).rows[0]
+  if (!row) return false
+  await wakeCoordinator(row.userId)
+  return true
+}
