@@ -195,7 +195,7 @@
     "env": {}
   },
   "core-41": {
-    "command": "pnpm test:coordinator-native-relay",
+    "command": "pnpm test:eve",
     "kind": "core",
     "env": {}
   },
@@ -434,11 +434,6 @@
   "integration-factory-activity": {
     "command": "pnpm test:factory-activity",
     "kind": "integration",
-    "env": {}
-  },
-  "core-eve": {
-    "command": "pnpm test:eve",
-    "kind": "core",
     "env": {}
   }
 }
