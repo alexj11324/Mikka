@@ -32,6 +32,14 @@ type HeldTaskWorkspace = {
   parent?: HeldTaskWorkspace;
 }
 const taskWorkspaceLease = new AsyncLocalStorage<HeldTaskWorkspace>()
+/** Creation defaults may use only the kind pinned by the current WS owner. */
+export function requireTaskWorkspaceLease(reader: Reader, workspaceId: string): TaskWorkspace {
+  const scope = taskReaderScope(reader)
+  const held = taskWorkspaceLease.getStore()
+  if (!held || !leaseActive(held) || held.userId !== scope.userId || held.workspaceId !== workspaceId
+    || scope.workspaceId && scope.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  return { id: held.workspaceId, kind: held.kind }
+}
 function leaseActive(lease: HeldTaskWorkspace): boolean {
   return lease.active
     && (!lease.workspaceTransactionKey || workspaceDatabase.workspaceTransactionKey?.() === lease.workspaceTransactionKey)
