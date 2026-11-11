@@ -47,11 +47,7 @@ export async function authenticateEveRequest(request: Request): Promise<EveAuthR
   if (credentials.has('authorization')) credentials.delete('cookie')
   const session = await auth.api.getSession({ headers: credentials, query: { disableCookieCache: true } })
   if (!session) return null
-  const { z } = await import('zod')
-  const botId = z.uuid().safeParse(new URL(request.url).searchParams.get('botId') ?? request.headers.get('x-mikka-bot-id'))
-  if (!botId.success) return null
-  const { pool } = await import('../db')
-  const bot = (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId.data, session.user.id])).rows[0]
+  const bot=await (await import('./auth-bot')).resolveEveRequestBot(request,session)
   if (!bot || !apiWorkspaceAllowed(session, bot.workspaceId)) return null
-  return scopeAuth(await assertEveScope({ ownerId: session.user.id, botId: botId.data, workspaceId: bot.workspaceId, surface: 'web' }))
+  return scopeAuth(await assertEveScope({ ownerId: session.user.id, ...bot, surface: 'web' }))
 }
