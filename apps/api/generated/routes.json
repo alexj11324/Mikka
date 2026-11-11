@@ -865,6 +865,87 @@
       "sourceHash": "89c93bc677ba5938dbc399382cc4e2a50817f09da593a0e135b52d9e9a09923f"
     },
     {
+      "path": "/mikka/api/drive/volumes",
+      "template": "/api/drive/volumes",
+      "source": "app/api/drive/volumes/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "34c8a3ae1270f9cf9fd2520d2e4e791ebf82ecb106aab7c8caa45fbefaf34484"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]",
+      "template": "/api/drive/volumes/[volumeId]",
+      "source": "app/api/drive/volumes/[volumeId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "b98372d049ac5668b2a781ac9dd9ecae11cb9ee35fbe22c2ff99d9c54f5fd0c2"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]/blobs",
+      "template": "/api/drive/volumes/[volumeId]/blobs",
+      "source": "app/api/drive/volumes/[volumeId]/blobs/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "219a404311bc101dd488ffda45e469603ee1a77992852a9170bdd9fe648c728f"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]/entries",
+      "template": "/api/drive/volumes/[volumeId]/entries",
+      "source": "app/api/drive/volumes/[volumeId]/entries/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "1cb65db0c25f1cfcd25f2d4ee981a21c389df20a8ee37866230be578f7184477"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]/files",
+      "template": "/api/drive/volumes/[volumeId]/files",
+      "source": "app/api/drive/volumes/[volumeId]/files/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "29050eb2bd68a33b5ea2f55374f2f36396eff3a301c67674abeab7eb0ea0f64f"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]/restore",
+      "template": "/api/drive/volumes/[volumeId]/restore",
+      "source": "app/api/drive/volumes/[volumeId]/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "2db93bc30c9850d560d9a0c3e2dbc6f477c4510db113173ed91dd3fa7d3f66ee"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]/versions",
+      "template": "/api/drive/volumes/[volumeId]/versions",
+      "source": "app/api/drive/volumes/[volumeId]/versions/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "7f29de0adacd3e4c92b06baff6e45d2d4891d59f98bc21a1a93f9ee36bd7d0ed"
+    },
+    {
+      "path": "/mikka/api/drive/volumes/[volumeId]/versions/[versionId]",
+      "template": "/api/drive/volumes/[volumeId]/versions/[versionId]",
+      "source": "app/api/drive/volumes/[volumeId]/versions/[versionId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "6f106cb5ea17bc21bc285862d881bd705b527b6fc82b1f93681327b2cc3a5da8"
+    },
+    {
       "path": "/mikka/api/enterprise/link",
       "template": "/api/enterprise/link",
       "source": "app/api/enterprise/link/route.ts",

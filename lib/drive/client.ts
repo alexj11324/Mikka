@@ -1,4 +1,4 @@
-import { withBasePath } from '@/lib/base-path'
+import { withBasePath } from '../base-path'
 import { DRIVE_MAX_FILE_BYTES, type DriveManifestEntry } from './contract'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
@@ -11,8 +11,12 @@ export type DriveHead = { volume: DriveVolume; head: { headVersionId: string; he
 export type DriveVersionRead = { version: DriveVersion & { manifest: DriveManifestEntry[] } }
 
 export class DriveRequestError extends Error {
-  constructor(readonly code: string, readonly status?: number, options?: ErrorOptions) {
+  readonly code: string
+  readonly status?: number
+  constructor(code: string, status?: number, options?: ErrorOptions) {
     super(code, options)
+    this.code = code
+    this.status = status
     this.name = 'DriveRequestError'
   }
 }
