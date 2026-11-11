@@ -15,6 +15,7 @@ const reservations: string[] = [],
 let generated = 0,
   streamed = 0,
   cost: unknown = '0.002'
+const workersAiAdmissions: unknown[][] = []
 let managed = false, denyAt: 'prepare' | 'send' | null = null
 let beforeSettlement: ((cost: number | null) => Promise<void>) | undefined, generationFailure: Error | undefined
 const modelOptions: unknown[] = []
@@ -80,7 +81,8 @@ mock.module(new URL('../cloud-services/runtime.ts', import.meta.url).href, {
 mock.module(new URL('../posthog-server.ts', import.meta.url).href, {
   namedExports: { serverPostHog: () => ({ capture: (event: Generation) => captured.push(event) }) },
 })
-const localUsage = { inputTokens: { total: 12, noCache: 4, cacheRead: 6, cacheWrite: 2 }, outputTokens: { total: 3 } }
+const localUsage = { inputTokens: { total: 12, noCache: 4, cacheRead: 6, cacheWrite: 2 }, outputTokens: { total: 3 },
+  raw: { prompt_tokens: 12, completion_tokens: 3, prompt_tokens_details: { cached_tokens: 6 } } }
 mock.module('@ai-sdk/openai-compatible', { namedExports: { createOpenAICompatible: (config: typeof selfHostedTransport) => {
   selfHostedTransport = config
   return { chatModel: (modelId: string) => ({ ...model, modelId,
@@ -101,6 +103,11 @@ mock.module('@ai-sdk/openai-compatible', { namedExports: { createOpenAICompatibl
 } } })
 mock.module('ai', { namedExports: { gateway, createGateway: (options: typeof gatewayConfig) => { gatewayConfig = options; return gateway } } })
 mock.module(new URL('../model-admission/runtime.ts', import.meta.url).href, { namedExports: { modelAdmission: {
+  async workersAi(scope: unknown, model: string, endpoint: string, options: { auditAllowed?: boolean }) {
+    workersAiAdmissions.push([scope,model,endpoint,options.auditAllowed])
+    if (denyAt === (options.auditAllowed === false ? 'prepare' : 'send')) throw Error('modelRouteDenied')
+    return null
+  },
   async selfHosted(...args: unknown[]) {
     selfHostedAdmissions.push(args)
     if (denyAt) throw Error('modelRouteDenied')
@@ -408,4 +415,42 @@ test('server-owned billing adapter reuses the full route and settles in its own 
   assert.deepEqual(costs, [2000])
   assert.equal(reservations.length, 0)
   assert.equal(settlements.length, 0)
+})
+
+test('Workers AI fallback enforces its own route before reserve and before send and meters both SDK paths', async t => {
+  const keys = ['MIKKA_HOSTED_MODEL_FALLBACK','CLOUDFLARE_WORKERS_AI_TOKEN','CLOUDFLARE_WORKERS_AI_ACCOUNT_ID','ZEROCAT_API_KEY','ZEROCAT_BASE_URL'] as const
+  const saved = new Map(keys.map(key => [key,process.env[key]]))
+  t.after(() => { for (const [key,value] of saved) if (value === undefined) delete process.env[key]; else process.env[key]=value })
+  process.env.MIKKA_HOSTED_MODEL_FALLBACK='cloudflare-workers-ai'
+  process.env.CLOUDFLARE_WORKERS_AI_TOKEN='account-model-test'
+  process.env.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID='a'.repeat(32)
+  delete process.env.ZEROCAT_API_KEY
+  delete process.env.ZEROCAT_BASE_URL
+  const selected = await hostedModel('w',COORDINATOR_MODEL,undefined,'owner')
+  const args = {prompt:[],headers:{'x-caller':'discard'},providerOptions:{gateway:{order:['foreign']}}}
+  await selected.doGenerate(args)
+  const streamed = await selected.doStream(args)
+  await streamed.stream.pipeTo(new WritableStream())
+  const endpoint = 'https://api.cloudflare.com/client/v4/accounts/'+'a'.repeat(32)+'/ai/v1'
+  assert.equal(selfHostedTransport?.baseURL,endpoint)
+  assert.equal(selfHostedTransport?.apiKey,'account-model-test')
+  assert.equal(workersAiAdmissions.length,4)
+  assert.deepEqual(workersAiAdmissions[0],[{workspaceId:'w',ownerId:'owner'},COORDINATOR_MODEL,endpoint,false])
+  assert.deepEqual(workersAiAdmissions[1],[{workspaceId:'w',ownerId:'owner'},COORDINATOR_MODEL,endpoint,undefined])
+  assert.deepEqual(settlements.map(x=>x.cost),[6,6])
+  for(const actual of modelOptions as typeof args[]) { assert.equal(actual.headers,undefined); assert.equal(actual.providerOptions,undefined) }
+  denyAt='send'
+  await assert.rejects(selected.doGenerate(args),/modelRouteDenied/)
+  assert.equal(settlements.at(-1)?.cost,0)
+  delete process.env.CLOUDFLARE_WORKERS_AI_TOKEN
+  await assert.rejects(hostedModel('w',COORDINATOR_MODEL),/modelRouteDenied/)
+  await assert.rejects(hostedModel('w','other/vendor'),/modelRouteDenied/)
+})
+
+test('Workers AI settlement requires the original token breakdown even when the SDK supplies defaults', async () => {
+  const {workersAiCost}=await import('./workers-ai')
+  const normalized={inputTokens:{total:10,cacheRead:0},outputTokens:{total:3}}
+  assert.equal(workersAiCost({...normalized,raw:{prompt_tokens:10,completion_tokens:3,prompt_tokens_details:{cached_tokens:0}}}),7)
+  assert.equal(workersAiCost({...normalized,raw:{prompt_tokens:10,completion_tokens:3}}),null)
+  assert.equal(workersAiCost({...normalized,raw:{prompt_tokens:10,completion_tokens:3,prompt_tokens_details:{cached_tokens:8}}}),null)
 })

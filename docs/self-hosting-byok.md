@@ -53,6 +53,12 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 
 只连接个人 Claude / ChatGPT 订阅，或为 Bot 选择自己的 API Key，也可以聊天，不需要服务器默认模型和云连接。聊天启用、消息唤醒和原有后台重试都检查这个 Bot 的真实选项、工作区权限及当前连接状态。暂停、断开、旧版本绑定或已知耗尽的订阅不会启用聊天；过期的额度读数可提交下一次正式检查，执行前仍会重新验证。明确选择「Mikka 默认」时，不会因管理员未配置它就悄悄改用个人订阅。
 
+## Workers AI 默认模型备用路径
+
+由服务端付费的默认模型可使用 Cloudflare Workers AI 作为 ZeroCat 的备用路径。将 `MIKKA_HOSTED_MODEL_FALLBACK` 设为 `cloudflare-workers-ai`，配置对应账户的 `CLOUDFLARE_WORKERS_AI_ACCOUNT_ID` 及已有推理权限的 `CLOUDFLARE_WORKERS_AI_TOKEN`。服务端固定调用该账户的 Workers AI API 和 `@cf/deepseek-ai/deepseek-v4.1-flash-1017`。组织或工作区开启模型准入规则时，需要显式允许此提供商、账户端点和逻辑模型。已有 Gateway 规则不会扩大该权限。
+
+此选项沿用原有的预算预留、首个 token 前的切换和流式结算。每次按供应商实际报告的输入、缓存命中和输出 token 计算用量，Startup Credit 的净额以账户账单为准。配置了 Workers AI 的主机对其他未支持的托管模型会返回准入失败。个人订阅和自行选择的自托管模型继续走各自已有的凭证路径。
+
 ## Decisions
 
 | 变量 | 默认值 / 用途 |
