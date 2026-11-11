@@ -101,6 +101,9 @@ class Netfilter:
             script = options['input'].decode('ascii')
             self.scripts.append(script)
             self.value = native_table((49983, 50005) if 'tcp sport { 49983, 50005 }' in script else (49983,))
+            if 'tcp sport' not in script:
+                rows = self.value['nftables']
+                self.value['nftables'] = rows[:3] + rows[-3:]
             output = None
         elif tail == ['-j', '-n', 'list', 'table', 'inet', 'mikka_review_v1']:
             assert self.value is not None
@@ -133,6 +136,19 @@ class IngressPolicy(unittest.TestCase):
                           patch.object(guard, 'provider_ports', return_value=[49983])):
             installed.start()
             self.addCleanup(installed.stop)
+
+    def test_private_cloudflare_boot_has_no_provider_port_exceptions(self):
+        receipt = guard.prepare(cloudflare=True)
+        self.assertEqual(receipt['provider'], 'cloudflare')
+        self.assertEqual(receipt['providerPorts'], [])
+        self.assertEqual(receipt['rulesVerified'], {'ipv4': True, 'ipv6': True})
+        self.assertNotIn('tcp sport', self.filter.scripts[0])
+        self.assertEqual(guard.prepare(cloudflare=True), receipt)
+        with self.assertRaisesRegex(guard.IngressError, 'provider'):
+            guard.prepare()
+        self.filter.value['nftables'].insert(3, native_table()['nftables'][3])
+        with self.assertRaisesRegex(guard.IngressError, 'rule_order'):
+            guard.verify()
 
     def test_emitted_ack_rules_bind_exact_lengths_to_complete_headers(self):
         # The netfilter fixture is deliberately independent of policy(). Check

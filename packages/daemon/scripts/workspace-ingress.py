@@ -144,10 +144,12 @@ def read_receipt():
         value = json.loads(os.read(fd, 4097))
     finally:
         os.close(fd)
-    refuse(isinstance(value, dict) and set(value) == FIELDS and type(value['version']) is int and value['version'] == VERSION
+    cloudflare = isinstance(value, dict) and value.get('provider') == 'cloudflare'
+    refuse(isinstance(value, dict) and set(value) == (FIELDS | {'provider'} if cloudflare else FIELDS)
+           and type(value['version']) is int and value['version'] == VERSION
            and value['sourceSha256'] == source_hash() and value['bootId'] == boot_id()
            and type(value['installedTicks']) is int and 0 <= value['installedTicks'] <= ticks()
-           and value['providerPorts'] in ([49983], [49983, 50005])
+           and (value['providerPorts'] == [] if cloudflare else value['providerPorts'] in ([49983], [49983, 50005]))
            and value['preparedBeforeWorker'] is True, 'receipt')
     return value
 
@@ -185,8 +187,10 @@ def execute(program, arguments, *, family, operation, check=True, script=None):
             # operation. No source line, arbitrary path or tool text escapes.
             lines = re.findall(rb'(?m)^(?:/dev/stdin|<stdin>|stdin|-):([1-9][0-9]?):[0-9]{1,6}(?:-[0-9]{1,6})?:[ \t]*Error:',
                                result.stderr[:16384])
-            operations = {INSTALL_OPERATIONS[int(line) - 1] for line in lines
-                          if 1 <= int(line) <= len(INSTALL_OPERATIONS)}
+            mapping = INSTALL_OPERATIONS if script != policy([]).encode('ascii') else (
+                'create_table', 'new_chain', 'base_chain', 'reply_rule', 'output_jump')
+            operations = {mapping[int(line) - 1] for line in lines
+                          if 1 <= int(line) <= len(mapping)}
             if len(operations) == 1:
                 operation = next(iter(operations))
         raise IngressCommandError(family, operation, 'exit', result.returncode, result.stderr)
@@ -218,8 +222,15 @@ def ack_policy(ports, family):
 
 
 def policy(ports):
-    refuse(ports in ([49983], [49983, 50005]), 'provider')
+    refuse(ports in ([], [49983], [49983, 50005]), 'provider')
     source_ports = str(ports[0]) if len(ports) == 1 else '{ ' + ', '.join(str(port) for port in ports) + ' }'
+    # The Cloudflare task guest uses private Workers bindings. It has no envd
+    # TCP ports and needs no provider socket or pre-accept ACK exceptions.
+    provider_rules = (
+        f'add rule inet {TABLE} {CHAIN} meta l4proto tcp meta skuid 0 tcp sport {source_ports} return',
+        *ack_policy(ports, 'ipv4'),
+        *ack_policy(ports, 'ipv6'),
+    ) if ports else ()
     # Before accept() attaches a socket file, kernel ACKs have no skuid.
     # Permit only actual provider reply ACKs with zero TCP payload. Each rule
     # proves both skb and IP lengths against one exact TCP header length.
@@ -231,9 +242,7 @@ def policy(ports):
         f'create table inet {TABLE}',
         f'add chain inet {TABLE} {CHAIN}',
         f'add chain inet {TABLE} output {{ type filter hook output priority -1; policy accept; }}',
-        f'add rule inet {TABLE} {CHAIN} meta l4proto tcp meta skuid 0 tcp sport {source_ports} return',
-        *ack_policy(ports, 'ipv4'),
-        *ack_policy(ports, 'ipv6'),
+        *provider_rules,
         f'add rule inet {TABLE} {CHAIN} meta l4proto tcp ct direction reply meta mark != {SOCKET_MARK} reject with tcp reset',
         f'add rule inet {TABLE} output oifname != "lo" meta l4proto tcp jump {CHAIN}',
     )) + '\n'
@@ -286,7 +295,7 @@ def check_absent(executable):
 
 
 def check_rules(executable, ports):
-    refuse(ports in ([49983], [49983, 50005]), 'provider')
+    refuse(ports in ([], [49983], [49983, 50005]), 'provider')
     rows = ruleset_rows(execute(executable, ['-j', '-n', 'list', 'table', 'inet', TABLE],
                                family='inet', operation='list_table').stdout)
     objects = {'table': [], 'chain': [], 'rule': [], 'metainfo': []}
@@ -323,9 +332,13 @@ def check_rules(executable, ports):
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(',', ':'))
     refuse(canonical(objects['table']) == canonical([{'family': 'inet', 'name': TABLE}])
            and sorted(map(canonical, objects['chain'])) == sorted(map(canonical, chains))
-           and len(objects['rule']) == 25, 'rule_order')
+           and len(objects['rule']) == (25 if ports else 2), 'rule_order')
     actual = {name: [row for row in objects['rule'] if row.get('chain') == name] for name in (CHAIN, 'output')}
     expected = lambda name, expr: {**binding, 'chain': name, 'expr': expr}
+    if not ports:
+        refuse(canonical(actual[CHAIN]) == canonical([expected(CHAIN, reply)])
+               and canonical(actual['output']) == canonical([expected('output', jump)]), 'rule_order')
+        return
     refuse(len(actual[CHAIN]) == 24, 'rule_order')
     for offset, family in ((1, 'ipv4'), (12, 'ipv6')):
         for index, doff in enumerate(range(5, 16)):
@@ -343,7 +356,7 @@ def verify():
     return {**value, 'rulesVerified': {'ipv4': True, 'ipv6': True}}
 
 
-def prepare():
+def prepare(*, cloudflare=False):
     private_directory(create=True)
     lock = os.open(ROOT / 'prepare.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
@@ -354,9 +367,17 @@ def prepare():
         if RECEIPT.exists() or RECEIPT.is_symlink():
             # Idempotence only re-verifies the original proof. Never repair
             # rules after a worker started or manufacture a newer timestamp.
-            return verify()
+            existing = verify()
+            refuse((existing.get('provider') == 'cloudflare') == cloudflare, 'provider')
+            return existing
         refuse(not any(path.exists() or path.is_symlink() for path in MACHINE_FILES), 'late_install')
-        ports = provider_ports()
+        if cloudflare:
+            # Called from the trusted task machine before workspace restore and
+            # the first run. Refuse adoption of an already bootstrapped guest.
+            home = Path('/home/node/.mikka')
+            refuse(not any((home / item).exists() or (home / item).is_symlink()
+                           for item in ('bootstrap.json', 'worker/device.json', 'preloaded.pid')), 'late_install')
+        ports = [] if cloudflare else provider_ports()
         executable = program()
         check_absent(executable)
         # One atomic native transaction. Exclusive table creation rejects an
@@ -365,6 +386,8 @@ def prepare():
         check_rules(executable, ports)
         value = {'version': VERSION, 'sourceSha256': source_hash(), 'bootId': boot_id(),
                  'installedTicks': ticks(), 'providerPorts': ports, 'preparedBeforeWorker': True}
+        if cloudflare:
+            value['provider'] = 'cloudflare'
         temporary = ROOT / 'receipt.next'
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         with os.fdopen(fd, 'w') as handle:
@@ -381,9 +404,14 @@ def ready(pid):
     refuse(type(pid) is int and 1 < pid < 2 ** 31, 'worker')
     value = verify()
     process = Path('/proc') / str(pid)
-    refuse(process.stat().st_uid == pwd.getpwnam('user').pw_uid, 'worker')
+    cloudflare = value.get('provider') == 'cloudflare'
+    account = pwd.getpwnam('node' if cloudflare else 'user')
+    if cloudflare:
+        refuse((account.pw_uid, account.pw_gid) == (1000, 1000), 'worker')
+    refuse(process.stat().st_uid == account.pw_uid, 'worker')
     command = (process / 'cmdline').read_bytes().split(b'\0')
-    refuse(WORKER.encode() in command and b'--wait-bootstrap' in command, 'worker')
+    mode = b'--cloudflare-task' if cloudflare else b'--wait-bootstrap'
+    refuse(WORKER.encode() in command and mode in command, 'worker')
     raw = (process / 'stat').read_text()
     start = int(raw[raw.rfind(')') + 2:].split()[19])
     refuse(start >= value['installedTicks'], 'worker_order')
@@ -393,6 +421,8 @@ def ready(pid):
 def main(args):
     if args == ['prepare']:
         value = prepare()
+    elif args == ['prepare-cloudflare']:
+        value = prepare(cloudflare=True)
     elif args == ['verify']:
         value = verify()
     elif len(args) == 2 and args[0] == 'ready' and args[1].isdigit():

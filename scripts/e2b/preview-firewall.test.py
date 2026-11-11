@@ -25,6 +25,18 @@ class FirewallPolicy(unittest.TestCase):
             self.assertEqual(firewall.protect_port(port, run=run), {'protected': True, 'ipv4': True, 'ipv6': True, 'port': port})
         self.assertEqual(calls, [[firewall.sys.executable, firewall.GUARD, 'verify']] * 2)
 
+    def test_cloudflare_requires_its_own_verified_empty_provider_ports(self):
+        cf = self.receipt() | {'provider': 'cloudflare', 'providerPorts': []}
+        for cloudflare, proof, allowed in ((True, cf, True), (True, self.receipt(), False),
+                                           (False, cf, False), (True, cf | {'providerPorts': [49983]}, False)):
+            def run(*_args, **_options):
+                return SimpleNamespace(returncode=0, stdout=json.dumps(proof).encode())
+            if allowed:
+                self.assertTrue(firewall.protect_port(3000, cloudflare=cloudflare, run=run)['protected'])
+            else:
+                with self.assertRaisesRegex(firewall.FirewallError, 'firewall_unsupported'):
+                    firewall.protect_port(3000, cloudflare=cloudflare, run=run)
+
     def test_old_vm_stale_partial_or_malformed_proof_never_installs_rules(self):
         bad = [b'', b'null', b'[]', b'false', b'x' * 4097, b'{"ok":false}']
         for update in ({'preparedBeforeWorker': False}, {'rulesVerified': {'ipv4': True, 'ipv6': False}},
