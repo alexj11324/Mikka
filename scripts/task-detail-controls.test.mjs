@@ -29,6 +29,7 @@ stub('app/actions/team-relations.ts', {
   setIssueTeam: async input => { teamWrites.push(input); return response ?? { ok: true, data: input.teamId } },
 })
 stub('app/actions/teams.ts', { listTeams: async () => teams })
+stub('app/actions/task-domain.ts', { getTaskPresentations: () => { throw new Error('Unexpected Task presentation read in detail controls fixture') } })
 stub('app/actions/issues.ts', {
   setIssueScope: noop, promoteIssueToTeam: noop,
   moveIssue: async input => { moves.push(input); child = { ...child, status: input.status, revision: child.revision + 1 }; return { issue: child } },
@@ -42,7 +43,7 @@ stub('app/actions/issue-operations.ts', {
     return { issue: { ...issue, revision: issue.revision + 1, metadata: { ...issue.metadata, favoriteUserIds: favorites } } }
   },
 })
-stub('hooks/use-live-key.tsx', { useLiveKey: noop })
+stub('hooks/use-live-key.tsx', { useLiveKey: noop, useLiveKeys: noop, useLiveScope: () => null })
 stub('hooks/use-bot-tasks.ts', { localTaskState: () => ({ state: 'todo' }) })
 stub('lib/hooks/use-relation-search.ts', { useRelationSearch: noop })
 stub('lib/use-action-error.ts', { useActionError: () => translate })
