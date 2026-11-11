@@ -5,7 +5,7 @@ import { verifyBusinessWorld, verifyConfiguration, verifyImage } from '../../../
 
 const build = 'a'.repeat(40), overlay = 'b'.repeat(40), id = 'aaaaaaaaaaaa-1949-1'
 const env = {
-  NODE_ENV: 'production', MIKKA_EDITION: 'cloud',
+  NODE_ENV: 'production', MIKKA_EDITION: 'cloud', MIKKA_DEPLOYMENT_STAGE: 'production',
   BETTER_AUTH_URL: 'https://app.example', MIKKA_EVE_ORIGIN: 'https://eve.example',
   BETTER_AUTH_SECRET: 'test', DATABASE_URL: 'postgres://workspace',
   MIKKA_DATABASE_URL: 'postgres://mikka', WORKFLOW_TARGET_WORLD: '@test/durable-world',
@@ -29,6 +29,9 @@ test('the hosted API needs two trusted service origins, existing PostgreSQL conf
     assert.throws(() => verifyConfiguration({ ...env, WORKFLOW_TARGET_WORLD: choice }), /HOSTED_WORLD_REQUIRED/)
   }
   assert.throws(() => verifyConfiguration({ ...env, VERCEL_ENV: 'production' }), /EDITION_INVALID/)
+  for (const stage of [undefined, 'preview', 'development']) {
+    assert.throws(() => verifyConfiguration({ ...env, MIKKA_DEPLOYMENT_STAGE: stage }), /DEPLOYMENT_STAGE_INVALID/)
+  }
 })
 
 import { apiRequest } from '../../../cloudflare/api/ingress/request.mjs'
@@ -138,7 +141,7 @@ test('the private API receives its sign-in and product bindings without inheriti
   const allowed = {
     GOOGLE_CLIENT_ID: 'google', GOOGLE_CLIENT_SECRET: 'google-credential',
     GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential',
-    BETTER_AUTH_SECRET: 'auth', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
+    BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
     OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
   }

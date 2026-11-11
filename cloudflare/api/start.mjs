@@ -28,6 +28,9 @@ export function verifyConfiguration(env) {
   if (env.NODE_ENV !== 'production' || env.MIKKA_EDITION !== 'cloud' || env.VERCEL || env.VERCEL_ENV) {
     throw new Error('CLOUDFLARE_API_EDITION_INVALID')
   }
+  if (env.MIKKA_DEPLOYMENT_STAGE !== 'production') {
+    throw new Error('CLOUDFLARE_API_DEPLOYMENT_STAGE_INVALID')
+  }
   const origin = httpsOrigin(env.BETTER_AUTH_URL)
   const eve = httpsOrigin(env.MIKKA_EVE_ORIGIN)
   if (!origin || !eve || origin === eve) throw new Error('CLOUDFLARE_API_ORIGINS_INVALID')

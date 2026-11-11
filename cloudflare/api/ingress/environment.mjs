@@ -1,7 +1,7 @@
 // These bindings belong to the hosted business API. Deployment credentials,
 // broker decryption authority and managed GitHub App signing stay outside it.
 const applicationBindings = [
-  'BETTER_AUTH_SECRET', 'DATABASE_URL', 'MIKKA_DATABASE_URL', 'MIN_CLIENT_VERSION',
+  'BETTER_AUTH_SECRET', 'TURNSTILE_SECRET_KEY', 'DATABASE_URL', 'MIKKA_DATABASE_URL', 'MIN_CLIENT_VERSION',
   'MIKKA_EVE_ORIGIN', 'WORKFLOW_TARGET_WORLD', 'MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY',
   'MIKKA_DEPLOYMENT_ID', 'MIKKA_CLOUDFLARE_TASK_WORKSPACES',
   'MIKKA_CLOUD_URL', 'MIKKA_CLOUD_BACKEND_URL',

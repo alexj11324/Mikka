@@ -6,7 +6,7 @@ ARG MIKKA_BUILD_REVISION
 ARG MIKKA_UI_OVERLAY_SHA
 ARG MIKKA_DEPLOYMENT_ID
 LABEL org.opencontainers.image.revision=${MIKKA_BUILD_REVISION}
-ENV NODE_ENV=production MIKKA_EDITION=cloud HOST=0.0.0.0 PORT=3000
+ENV NODE_ENV=production MIKKA_EDITION=cloud MIKKA_DEPLOYMENT_STAGE=production HOST=0.0.0.0 PORT=3000
 COPY --from=release --chown=node:node /server/ ./server/
 COPY --from=release --chown=node:node /lib/ ./lib/
 COPY --from=release --chown=node:node /packages/ ./packages/
