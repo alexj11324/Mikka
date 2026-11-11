@@ -39,6 +39,7 @@ import { activeTaskWorkspaces, requireTaskWorkspace } from '@/lib/task-workspace
 import { ActionFailureError } from '@/lib/action-error'
 import type { TaskReviewSummary } from '../coding-workspace/task-review/projection'
 import { taskReviewSourceHint } from '../coding-workspace/task-review/summary-selection'
+import { nativePendingForChat } from '../eve/pending'
 
 // Product history projection, triage, personal memory and retry bookkeeping.
 // eve owns conversation execution, queueing, cancellation and live streams.
@@ -386,11 +387,11 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   // Claiming an inbox atomically changes all three tables. A session read from
   // before that commit with messages/inbox from after it invents a failed turn.
   // One bounded statement keeps their snapshot together without a held lock.
-  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, lastFailure: sessionRead.lastFailure,
+  const [snapshot] = await db.select({ nativePending:nativePendingForChat(userId,botId), leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, lastFailure: sessionRead.lastFailure,
     summary: sessionRead.summary, summaryThrough: sessionRead.summaryThrough, rows: storedRead.rows,
     waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
   }).from(storedRead).leftJoin(sessionRead, sql`true`)
-  const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt, lastFailure: snapshot.lastFailure }
+  const session = { nativePending:snapshot.nativePending, leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt, lastFailure: snapshot.lastFailure }
   const rows = await projectMessageDisplays(db, userId, snapshot.rows.map(row => ({ ...row, createdAt: new Date(row.createdAt) })))
   const hasMore = rows.length > limit
   rows.splice(limit)
@@ -517,11 +518,11 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH).as('chat_waiting')
   type WaitingRow = Pick<typeof coordinatorEvents.$inferSelect, 'id' | 'kind' | 'tier' | 'wakeAttempts' | 'wakeLastError'> & { payloadVersion: string; wakeLeaseUntil: string | null; createdAt: string }
-  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, failureVersion: sessionRead.failureVersion,
+  const [snapshot] = await db.select({ nativePending:nativePendingForChat(userId,botId), leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, failureVersion: sessionRead.failureVersion,
     stored: { last: storedRead.last, hash: storedRead.hash, role: storedRead.role, streamId: storedRead.streamId, createdAt: storedRead.createdAt },
     waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
   }).from(storedRead).leftJoin(sessionRead, sql`true`)
-  const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt }, stored = snapshot.stored
+  const session = { nativePending:snapshot.nativePending, leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt }, stored = snapshot.stored
   const waiting = snapshot.waiting.map(event => ({ ...event, createdAt: new Date(event.createdAt), wakeLeaseUntil: event.wakeLeaseUntil ? new Date(event.wakeLeaseUntil) : null }))
   const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}), ...(stored.createdAt ? { createdAt: new Date(stored.createdAt) } : {}) } : undefined
   const now = new Date()
@@ -555,7 +556,7 @@ export async function botChatSnapshot(reader: IssueReader) {
   const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
   if (!readableBots.length) return { items: {} as Record<string, BotChatSummary>, expiries: [] as Date[], observedAt: Date.now() }
   const botIds = readableBots.map(bot => bot.id)
-  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { id: coordinatorMessages.id, botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
+  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { id: coordinatorMessages.id, botId: coordinatorMessages.botId, nativePending:nativePendingForChat(userId,sql.raw('"coordinator_messages"."botId"')), message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
   const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), inArray(coordinatorSessions.botId, botIds)))
@@ -574,6 +575,7 @@ export async function botChatSnapshot(reader: IssueReader) {
     if (!session.botId) continue
     result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId), now).working }
   }
+  for(const row of latest)if(row.botId&&row.nativePending)result[row.botId]={line:null,at:null,working:true}
   const projected = await projectMessageDisplays(db, userId, latest)
   const lines = projected.flatMap(row => {
     if (!row.botId) return []
