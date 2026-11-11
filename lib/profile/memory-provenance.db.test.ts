@@ -30,7 +30,7 @@ test('real memory producers persist authorized sources across separate applicati
     assert.notEqual(appUrl.href, workspaceUrl.href)
     await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], { env: { ...process.env, MIGRATE: '1' }, maxBuffer: 4 << 20 })
     app = new Pool({ connectionString: appUrl.href, max: 2 }); workspace = new Pool({ connectionString: workspaceUrl.href, max: 2 })
-    const [{ db, pool }, { workspaceDb, workspacePool }, schema, wsSchema, memory, store, { tokenWorkspace }, { eq, and }, { projectDb, projects }, { teamProjects }] = await Promise.all([
+    const [{ db, pool }, { workspaceDb, workspacePool }, schema, wsSchema, memory, store, { tokenWorkspace }, { eq, and }, { projectDb, projects }, { teamProjects, teams }] = await Promise.all([
       import('../db'), import('../workspace-db'), import('../db/schema'), import('../db/workspace-schema'), import('./memory'), import('./store'),
       import('../tokens/principal'), import('drizzle-orm'), import('../db/projects'), import('../db/team-schema'),
     ])
@@ -48,7 +48,10 @@ test('real memory producers persist authorized sources across separate applicati
     // Project v2 requires an owning workspace on insert (drizzle/20261111030000);
     // this project is a team project of `other` (see teamProjects below).
     await projectDb.insert(projects).values({ id: project, workspaceId: other, userId: owner, name: 'Restricted source project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 })
-    await projectDb.insert(teamProjects).values({ projectId: project, teamId: randomUUID(), workspaceId: other, userId: owner })
+    // A team project needs a real team in the same workspace (check_active_team_relation).
+    const teamId = randomUUID()
+    await projectDb.insert(teams).values({ id: teamId, workspaceId: other, userId: owner, name: 'Synthetic team', identifier: 'SYN' })
+    await projectDb.insert(teamProjects).values({ projectId: project, teamId, workspaceId: other, userId: owner })
     const pinned = Object.defineProperty({ id: owner }, tokenWorkspace, { value: home })
     const view = async (id: string, reader: string | { id: string } = owner, workspaceId = home) => {
       const result = await memory.readMemoryView(reader, workspaceId)

@@ -32,7 +32,7 @@ test('memory uses authoritative membership across two real PostgreSQL databases'
     await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], { env: { ...process.env, MIGRATE: '1' }, maxBuffer: 4 << 20 })
     app = new Pool({ connectionString: appUrl.href, max: 2 })
     workspace = new Pool({ connectionString: workspaceUrl.href, max: 2 })
-    const [{ db, pool }, { workspaceDb, workspacePool }, schema, wsSchema, memory, { projectDb, projects }, { teamProjects }, { tokenWorkspace }, { eq }] = await Promise.all([
+    const [{ db, pool }, { workspaceDb, workspacePool }, schema, wsSchema, memory, { projectDb, projects }, { teamProjects, teams }, { tokenWorkspace }, { eq }] = await Promise.all([
       import('../db'), import('../workspace-db'), import('../db/schema'), import('../db/workspace-schema'), import('./memory'),
       import('../db/projects'), import('../db/team-schema'), import('../tokens/principal'), import('drizzle-orm'),
     ])
@@ -65,7 +65,11 @@ test('memory uses authoritative membership across two real PostgreSQL databases'
       { id: ownProject, workspaceId: personal, userId: owner, name: 'Synthetic project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 },
       { id: teamProject, workspaceId: b, userId: owner, name: 'Synthetic team project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 },
     ])
-    await projectDb.insert(teamProjects).values({ projectId: teamProject, teamId: randomUUID(), workspaceId: b, userId: owner })
+    // A team project needs a real team in the same workspace: check_active_team_relation
+    // rejects a teamId that does not resolve, and a personal workspace cannot hold one.
+    const teamId = randomUUID()
+    await projectDb.insert(teams).values({ id: teamId, workspaceId: b, userId: owner, name: 'Synthetic team', identifier: 'SYN' })
+    await projectDb.insert(teamProjects).values({ projectId: teamProject, teamId, workspaceId: b, userId: owner })
     await db.insert(schema.bots).values([
       { id: botId, ownerId: owner, workspaceId: a, name: 'Split database memory' },
       { id: otherBot, ownerId: owner, workspaceId: b, name: 'Other workspace memory' },
