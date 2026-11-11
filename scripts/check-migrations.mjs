@@ -158,6 +158,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const main = mainMigrations()
   if (!main) console.warn('migrations: 拿不到 origin/main，跳过 main 文件内容比对；保留格式、重复 ID 和旧迁移检查')
   const problems = checkMigrations(files, main?.files)
+  const localNames = new Set(files.map(file => file.name))
+  // Include post-fork main names even when this stale branch has not merged
+  // them. Identical filenames are one migration; distinct names cannot share an ID.
+  for (const { slot, names } of slotCollisions([...localNames, ...(main?.names ?? [])])) {
+    if (names.some(name => localNames.has(name)) && names.some(name => !localNames.has(name))) {
+      problems.push(`main 与当前分支的迁移 ID ${slot} 冲突：${names.join('、')}，请用 migration:new 重新生成未执行的迁移`)
+    }
+  }
 
   // --all-refs: report slots that another branch already claimed. Report-only by
   // default because in-flight collisions are not this branch's fault and must not
