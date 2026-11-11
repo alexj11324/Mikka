@@ -28,7 +28,7 @@ before(async () => {
 after(() => browser.happyDOM.close())
 
 test('device commands use the selected id and the removal receipt, and refresh only after a successful write', async () => {
-  const root = createRoot(document.createElement('div'))
+  const root = createRoot(document.body)
   let actions!: ReturnType<typeof useDeviceActions>
   let changed = 0
   function Row({ online }: { online: boolean }) {
