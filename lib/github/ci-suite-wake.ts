@@ -2,27 +2,8 @@ import 'server-only'
 import { db, pool } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import type { CoordinatorEventInput } from '@/lib/coordinator-events'
-import type { CompletedCiSuite } from './ci-suite-event'
+import { linkedCiSuiteRun, type CompletedCiSuite, type LinkedCiSuiteRun } from './ci-suite-event'
 
-export type LinkedCiSuiteRun = {
-  runId: string
-  userId: string
-  botId: string | null
-  issueId: string | null
-  pullUrl: string
-  headSha: string | null
-  state: string | null
-}
-
-/** Validate every DB row again: a webhook never selects a session by itself. */
-export function linkedCiSuiteRun(suite: CompletedCiSuite, row: LinkedCiSuiteRun): boolean {
-  const prefix = `https://github.com/${suite.repository}/pull/`
-  if (!row.botId || !row.runId || !row.userId || !['open', 'draft'].includes(row.state ?? '')
-    || row.headSha?.toLowerCase() !== suite.headSha || !row.pullUrl.startsWith(prefix)) return false
-  const number = row.pullUrl.slice(prefix.length)
-  if (!/^[1-9]\d*$/.test(number) || !Number.isSafeInteger(Number(number))) return false
-  return suite.numbers.length === 0 || suite.numbers.includes(Number(number))
-}
 
 /**
  * A completed suite wakes only the newest published, already-ended Agent run
