@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act } from 'react'
 import type { Root } from 'react-dom/client'
-import type { Cache } from 'swr'
+import type { ReadCacheState } from '@/lib/swr/persistent-cache'
 import { Window } from 'happy-dom'
 import * as groupMessages from '@/lib/group-messages'
 import { ViewStateProvider } from '@/lib/hooks/view-state'
@@ -48,7 +48,7 @@ let useSWRConfig: typeof import('swr')['useSWRConfig']
 let infiniteKey: typeof import('swr/infinite')['unstable_serialize']
 let createRoot: typeof import('react-dom/client')['createRoot']
 let refresh: () => Promise<unknown>
-let root: Root, container: HTMLDivElement, cache: Cache
+let root: Root, container: HTMLDivElement, cache: Map<string, ReadCacheState>
 function ReadControl() {
   const { mutate } = useSWRConfig()
   refresh = () => mutate(infiniteKey(() => ['group-messages', 'group-one', null]))
