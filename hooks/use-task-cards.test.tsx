@@ -5,14 +5,19 @@ import { Window } from 'happy-dom'
 import type { Root } from 'react-dom/client'
 
 const calls: string[][] = []
+const selectedCalls: { workspaceId: string; issueIds: string[] }[] = []
 mock.module(new URL('../app/actions/task-domain.ts', import.meta.url).href, { namedExports: {
-  getTaskPresentations: async ({ workspaceId, issueIds, includeReview }: { workspaceId: string; issueIds: string[]; includeReview?: true }) => {
+  getTaskPresentations: async ({ workspaceId, issueIds, includeReview, includeFactoryIdentity }: { workspaceId: string; issueIds: string[]; includeReview?: true; includeFactoryIdentity?: true }) => {
+    if (includeFactoryIdentity) {
+      selectedCalls.push({ workspaceId, issueIds })
+      return { version: 1, workspaceId, items: workspaceId === 'revoked' ? {} : { [issueIds[0]!]: { state: 'blocked', reason: 'quota', factoryTaskId: 'selected-factory' } } }
+    }
     assert.equal(includeReview, true)
     calls.push(issueIds)
     return { version: 1, workspaceId, items: Object.fromEntries(issueIds.map(id => [id, { state: 'waiting' }])) }
   },
 } })
-mock.module(new URL('./use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKeys() {} } })
+mock.module(new URL('./use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKeys() {}, useLiveScope: () => null } })
 const browser = new Window()
 let createRoot: typeof import('react-dom/client')['createRoot']
 let TaskCardDataProvider: typeof import('./use-task-cards')['TaskCardDataProvider'], useTaskCards: typeof import('./use-task-cards')['useTaskCards']
@@ -46,4 +51,37 @@ test('mounted review/citation cards batch and deduplicate IDs including a task o
       assert.equal(host.textContent, 'waiting'.repeat(count + 1))
     } finally { await act(async () => root.unmount()) }
   }
+})
+
+
+test('the open Task uses its list state or one scoped read for its state and authorized Factory', async () => {
+  const { TaskPresentationsContext } = await import('./use-task-collection')
+  const { useSelectedTaskPresentation } = await import('./use-selected-task-presentation')
+  const { SWRConfig } = await import('swr')
+  const known = { active: { state: 'waiting', reason: 'pr_review', factoryTaskId: 'visible-factory' } } as unknown as Record<string, import('../lib/task-presentation').TaskPresentation>
+  const host = browser.document.createElement('div') as unknown as HTMLDivElement
+  const root = createRoot(host)
+  const cache = new Map()
+  function View({ workspace, id }: { workspace: string; id?: string }) {
+    const { data } = useSelectedTaskPresentation('viewer', workspace, id)
+    return <span>{[data?.state, data?.reason, data?.factoryTaskId].join('/')}</span>
+  }
+  async function show(workspace: string, id?: string) {
+    await act(async () => { root.render(<SWRConfig value={{ provider: () => cache }}>
+      <TaskPresentationsContext value={workspace === 'visible' ? known : {}}><View workspace={workspace} id={id} /></TaskPresentationsContext>
+    </SWRConfig>) })
+  }
+  try {
+    await show('visible', 'active')
+    assert.equal(host.textContent, 'waiting/pr_review/visible-factory')
+    assert.equal(selectedCalls.length, 0)
+    await show('visible', 'older')
+    assert.equal(host.textContent, 'blocked/quota/selected-factory')
+    await show('revoked', 'older')
+    assert.equal(host.textContent, '//')
+    await show('preview')
+    assert.deepEqual(selectedCalls, [
+      { workspaceId: 'visible', issueIds: ['older'] }, { workspaceId: 'revoked', issueIds: ['older'] },
+    ])
+  } finally { await act(async () => root.unmount()) }
 })
