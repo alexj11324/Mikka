@@ -6,7 +6,7 @@
 export type ThreadMachineKind = 'cloud' | 'laptop' | 'server'
 
 /** online/offline for a computer or server; the E2B sandbox's own state for a cloud machine. */
-export type ThreadMachineState = 'online' | 'offline' | 'starting' | 'running' | 'paused' | 'ended' | 'error'
+export type ThreadMachineState = 'online' | 'offline' | 'starting' | 'running' | 'paused' | 'restore' | 'ended' | 'error'
 
 export interface ThreadMachine {
   kind: ThreadMachineKind
@@ -36,7 +36,7 @@ export function deviceMachineKind(device: { kind: string | null; deviceType: str
   return device.platform ? 'server' : 'laptop'
 }
 
-const CLOUD_STATES = new Set<ThreadMachineState>(['starting', 'running', 'paused', 'ended', 'error'])
+const CLOUD_STATES = new Set<ThreadMachineState>(['starting', 'running', 'paused', 'restore', 'ended', 'error'])
 
 /** An ended DB write fences new work before provider cleanup. Until its
  * resource references are cleared, use the existing error state rather than
@@ -56,7 +56,7 @@ export function machineStateWord(machine: Pick<ThreadMachine, 'kind' | 'state' |
 
 /** The dot on the icon (R-24): green while it can work, red on error, grey otherwise. */
 export function machineDot(state: ThreadMachineState): 'running' | 'failed' | 'idle' {
-  if (state === 'online' || state === 'running' || state === 'starting') return 'running'
+  if (state === 'online' || state === 'running' || state === 'starting' || state === 'restore') return 'running'
   if (state === 'error') return 'failed'
   return 'idle'
 }

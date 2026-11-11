@@ -4225,6 +4225,7 @@
       "starting": "Starting",
       "running": "Running",
       "paused": "Sleeping",
+      "restore": "Restoring",
       "ended": "Stopped",
       "error": "Error"
     },

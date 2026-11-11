@@ -13,6 +13,9 @@ export const THREAD_MACHINE_BUDGET_MS = 12 * 60 * 60_000
 export const THREAD_MACHINE_RETENTION_MS = 7 * 24 * 60 * 60_000
 export const CLOSED_TASK_RETENTION_MS = 60 * 60_000
 export const THREAD_MACHINE_STOP_GRACE_MS = 30_000
+/** A restore with no live provisioning lease wakes at this cadence; the
+ * persisted operationId lets the same callback recover a lost create ACK. */
+export const THREAD_MACHINE_RESTORE_MS = 2 * 60_000
 const CLAIM_MS = 60_000
 const TERMINAL = new Set(['succeeded', 'failed', 'stopped', 'cancelled'])
 
@@ -41,6 +44,7 @@ export type ThreadLifecycleRow = {
   lifecycle: ThreadLifecycleMetadata; status: string; stopRequestedAt: Instant
   pauseReason?: string | null; safeExit?: boolean
   issueId: string | null; taskClosed: boolean; checkpointReady: boolean
+  filesystemSnapshotId?: string | null; snapshotState?: string | null; restoreStartedAt?: Instant
 }
 type Dependencies = {
   provider: Pick<typeof threadLifecycleProvider, 'info' | 'keepAlive'> & Partial<Pick<typeof threadLifecycleProvider, 'findCreated'>>
@@ -57,7 +61,7 @@ const live = (value: Instant, now: number) => at(value) > now
 const nextRetry = (now: number, failures: number) => now + Math.min(300_000, 5_000 * 2 ** Math.min(failures - 1, 6))
 const fenceOf = (row: ThreadLifecycleRow): ThreadMachineFence => ({ epoch: row.epoch, sandboxId: row.sandboxId })
 const pendingCreation = (row: ThreadLifecycleRow) => Boolean(row.workerLeaseId || row.workerLeaseUntil
-  || row.lifecycle.phase === 'create_requested' || row.lifecycle.creationMissingAt != null)
+  || row.lifecycle.phase === 'create_requested' || row.lifecycle.phase === 'restore_requested' || row.lifecycle.creationMissingAt != null)
 
 /** A paused interval is not execution time. Recalculate after resume from the
  * persisted billed time instead of expiring a week-old wall-clock deadline. */
@@ -76,6 +80,16 @@ export function threadMachineLifecycleDecision(row: ThreadLifecycleRow, provider
   const bootstrap = live(row.workerLeaseUntil, now)
   if (row.state === 'ended') return { action: row.sandboxId ? 'retire' : 'wait', at: bootstrap ? at(row.workerLeaseUntil) + 1 : null,
     reason: !row.sandboxId && pendingCreation(row) ? 'creation_cleanup_unconfirmed' : 'retirement' }
+  // A restore owns no sandbox while it rebuilds one from the task's own
+  // snapshot. A live provisioning lease is normal; without one the persisted
+  // operation is left to the lost-create reconciler. A closed task stops the
+  // restore instead of retaining the image.
+  if (row.state === 'restore') {
+    if (row.taskClosed && !row.stopRequestedAt) return { action: 'stop', at: now + THREAD_MACHINE_STOP_GRACE_MS, reason: 'task_closed' }
+    if (bootstrap) return { action: 'wait', at: Math.min(at(row.workerLeaseUntil) + 1, now + THREAD_MACHINE_REFRESH_MS), reason: 'provisioning' }
+    const restoreAt = at(row.restoreStartedAt ?? null)
+    return { action: 'wait', at: restoreAt ? restoreAt + THREAD_MACHINE_RESTORE_MS : now + THREAD_MACHINE_REFRESH_MS, reason: 'provisioning' }
+  }
   if (!row.sandboxId) return { action: 'wait', at: bootstrap ? at(row.workerLeaseUntil) + 1 : null,
     reason: bootstrap ? 'provisioning' : pendingCreation(row) ? 'creation_cleanup_unconfirmed' : 'provider_missing' }
   const terminal = TERMINAL.has(row.status)
@@ -289,7 +303,8 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
         UPDATE thread_machines m SET "sandboxId"=$7,
           state=CASE WHEN state='ended' THEN state ELSE $8::text END,
           "runningSince"=CASE WHEN $8::text='running' THEN COALESCE("runningSince",to_timestamp($9::double precision/1000)) ELSE NULL END,
-          "workerLeaseId"=NULL,"workerLeaseUntil"=NULL,
+          "workerLeaseId"=NULL,"workerLeaseUntil"=NULL,"restoreStartedAt"=NULL,
+          "snapshotState"=CASE WHEN state='restore' AND "snapshotState"='ready' THEN 'failed' ELSE "snapshotState" END,
           lifecycle=(lifecycle-'creationMissingAt')||$10::jsonb||CASE WHEN state='ended' THEN '{"phase":"retire_requested"}'::jsonb ELSE '{}'::jsonb END
         FROM parent WHERE m."runId"=parent.id AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND lifecycle->>'reconcileId'=$5
           AND "operationId"=$6 AND "sandboxId" IS NULL

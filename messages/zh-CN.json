@@ -4225,6 +4225,7 @@
       "starting": "启动中",
       "running": "运行中",
       "paused": "休眠",
+      "restore": "恢复中",
       "ended": "已停止",
       "error": "出错"
     },

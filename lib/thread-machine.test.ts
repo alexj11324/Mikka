@@ -19,11 +19,13 @@ test('a device is a server when its daemon says so, a laptop on macOS or Windows
 test('the dot is green while the machine can work, red on error, grey otherwise', () => {
   assert.equal(machineDot('online'), 'running')
   assert.equal(machineDot('running'), 'running')
+  assert.equal(machineDot('restore'), 'running')
   assert.equal(machineDot('paused'), 'idle')
   assert.equal(machineDot('ended'), 'idle')
   assert.equal(machineDot('offline'), 'idle')
   assert.equal(machineDot('error'), 'failed')
   assert.equal(cloudMachineState('surprise'), 'error')
+  assert.equal(cloudMachineState('restore'), 'restore')
 })
 
 test('the system line reads as the OS and its architecture', () => {
