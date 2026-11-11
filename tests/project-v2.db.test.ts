@@ -181,6 +181,20 @@ test('Project v2: split database migration, canonical relationships and live ten
       assert.equal((await actAs(member, () => actions.listProjectEvents(project, alpha))).length, 1)
     })
 
+    await t.test('Project history attributes each event to its actor in this workspace for every authorized viewer', async () => {
+      await workspace.query('UPDATE mikka_workspace_members SET name=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner, 'Alpha author'])
+      await workspace.query('UPDATE mikka_workspace_members SET name=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [beta, owner, 'Other workspace name'])
+      const missingActorEvent = randomUUID()
+      await workspace.query(`INSERT INTO workspace_project_events(id,"projectId","userId",message) VALUES($1,$2,$3,'Prior change')`, [missingActorEvent, project, outsider])
+      for (const viewer of [owner, member]) {
+        const history = await actAs(viewer, () => actions.listProjectEvents(project, alpha))
+        assert.equal(history.length, 2)
+        assert.equal(history.find(event => event.message === 'Existing history')?.actorName, 'Alpha author')
+        assert.equal(history.find(event => event.id === missingActorEvent)?.actorName, null)
+      }
+      await assert.rejects(actAs(outsider, () => actions.listProjectEvents(project, alpha)))
+    })
+
     const draft = { name: 'Same display name', summary: '', description: '', status: 'planned' as const, priority: 'none' as const, lead: '', team: 'Any display text', startDate: '', targetDate: '', properties: { ...properties, members: [] }, workspaceId: alpha }
     const created = await actAs(member, () => actions.saveProject({ ...draft, leadUserId: owner, memberIds: [owner, member] }))
     assert.ok('project' in created, JSON.stringify(created))
