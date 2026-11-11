@@ -58,13 +58,20 @@ secret. Unknown pagination signals produce an incomplete result rather than
 an exhaustive claim. The output contains whitelisted metadata and closed
 status codes; keep credential values and raw provider errors out of logs.
 
-On 2026-11-11, the same existing identity returned 404 for
-`prod:/vercel` `SLACK_BOT_TOKEN` and 200 for `prod:/platform` with the same key;
-`staging:/branches/slackbot-oauth/slack` also resolved `SLACK_APP_ID`. Project
-metadata listed `dev`, `staging` and `prod`. The failure to find Slack credentials
-came from guessing scopes and treating 404 as absence; no Infisical permission
-change was required. Earlier receipts and the environment-specific dev probe
-retain their original scope.
+The public repository owns the reusable tool, required configuration interfaces,
+generic discovery procedure and synthetic examples. Deployment-specific locator
+inventories, identity mappings and investigation records belong in private
+operational documentation; secret values remain in Infisical. The inventory is
+discovered from the service, rather than maintained as a second configuration
+store in documentation. Existing environment-specific probes keep their original
+scope and are not a substitute for discovery.
+
+This uses Infisical's documented [project/environment/folder hierarchy](https://infisical.com/docs/documentation/platform/secrets-mgmt/concepts/secrets-mgmt),
+[metadata-only list API](https://infisical.com/docs/api-reference/endpoints/secrets/list)
+and separate [describeSecret/readValue permissions](https://infisical.com/docs/internals/permissions/project-permissions).
+These sources do not prescribe that every variable name or non-sensitive
+configuration path must be private; keeping live operator inventories private
+is our documentation ownership choice.
 
 ## Verified storage
 
