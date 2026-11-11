@@ -286,7 +286,7 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
     const { BoardPage } = await import('../components/workspace/board-page')
     const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
-    const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed' }, null, () => false)
+    const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed', outcome: null }, null, () => false)
     return <TaskPresentationsContext.Provider value={{ [ISSUE]: failed }}>
       <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
     </TaskPresentationsContext.Provider>
