@@ -12,7 +12,7 @@ export function createLegacyFactoryStore(...args: Parameters<typeof createFactor
     const tx = input[2] ?? args[0]
     await tx.query(`UPDATE factory_tasks SET route=route-'flowVersion' WHERE id=$1`, [result.task.id])
     await tx.query(`UPDATE factory_events SET result=jsonb_set(result,'{task,route}',(result#>'{task,route}')-'flowVersion')
-      WHERE "taskId"=$1 AND request->>'sourceEventId' IS NOT NULL`, [result.task.id])
+      WHERE "taskId"=$1 AND "eventId"=$2`, [result.task.id, result.task.route.eventId])
     delete result.task.route.flowVersion
     return result
   }
