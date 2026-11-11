@@ -60,6 +60,10 @@ mock.module(new URL('components/slots/task-detail.tsx', root).href, { namedExpor
   TaskDetailFrame: (props: import('../components/slots/task-detail-contract').TaskDetailFrameProps) =>
     <section><h1>{props.title}</h1>{props.description({ afterDescription: null, activity: () => null })}{props.panel}{props.dialogs}</section>,
 } })
+// Keep the real, closed NewTaskDialog and its reads; only its required visual
+// export is supplied, as with the other official slots in this public fixture.
+mock.module(new URL('components/slots/new-task.tsx', root).href, { namedExports: { NewTask: () => null } })
+
 // The full Bot container still owns all measured reads. Its official slot only paints data.
 mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) =>
   <section>{entries?.map(entry => <div key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, i) =>
@@ -309,7 +313,7 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
     const { BoardPage } = await import('../components/workspace/board-page')
     const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
-    const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed' }, null, () => false)
+    const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed', outcome: null }, null, () => false)
     return <TaskPresentationsContext.Provider value={{ [ISSUE]: failed }}>
       <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
     </TaskPresentationsContext.Provider>
