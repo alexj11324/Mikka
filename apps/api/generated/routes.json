@@ -1975,7 +1975,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "c117f9998933e20bbd9ac0c602f5fa1b5381c717994e438663da5f771f7e39f5"
+      "sourceHash": "3dbb26c634a17d89496fb59171a2aa0da9cfbaa90c0e672ec9fe611a66765195"
     },
     {
       "path": "/mikka/api/skills",

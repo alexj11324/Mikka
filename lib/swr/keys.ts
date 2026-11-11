@@ -42,6 +42,7 @@ export const settingsKeys = {
   computerPolicy: (id: string) => ['settings:computer-policy', id] as const,
   sharePolicy: (id: string) => ['settings:share-policy', id] as const,
   appPolicy: (id: string) => ['settings:app-policy', id] as const,
+  environments: (id: string) => ['settings:environments', id] as const,
   secrets: (id: string) => ['settings:secrets', id] as const,
   e2bKey: (id: string) => ['settings:e2b-key', id] as const,
   usage: (id: string, month: string) => ['settings:usage', id, month] as const,
