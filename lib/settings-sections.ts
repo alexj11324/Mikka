@@ -6,7 +6,7 @@
 export type SettingsSectionId =
   | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'bot-permissions' | 'models'
   | 'logins' | 'privacy' | 'computers' | 'developer'
-  | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'audit' | 'organization' | 'usage' | 'billing' | 'cloud'
+  | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'environments' | 'audit' | 'organization' | 'usage' | 'billing' | 'cloud'
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
@@ -47,6 +47,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
   // Members see it too and write repository entries (permissions.ts); one page with 密钥与登录 (decision 2026-11-02-2120).
   { id: 'secrets', group: 'workspace', title: 'Secrets and environment' },
+  { id: 'environments', group: 'workspace', title: 'Run environments' },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
   // Enterprise (#1608 P2): the Organization this team is bound to. Only a UI layer that draws it
   // shows it (slot settings-organization, ORGANIZATION_SETTINGS); the open-source UI has none.

@@ -18,6 +18,7 @@ import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
+import { EnvironmentsSettings } from './environments-settings'
 import { CloudSettings } from '@/components/settings/cloud-settings'
 
 import { PrivacySettings } from '@/components/settings/privacy-settings'
@@ -134,6 +135,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'cloud': return userKey ? <CloudSettings userKey={userKey} workspaceId={workspaceId} /> : null
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
 
+    case 'environments': return workspaceId && !preview ? <EnvironmentsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
