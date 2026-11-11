@@ -433,20 +433,34 @@ test('a committed acceptance event refreshes the mounted task status and activit
   assert.equal(writes.length, 0, 'a committed live read performs no save')
 })
 
-test('a confirmed edit from Tasks reaches the Inbox preview while its authorization read is pending', async () => {
+test('every Task entry revalidates the shared saved value and withholds its editor on denial', { timeout: 40_000 }, async () => {
   await mount()
   await input(title(), 'Shared title from Tasks')
   await act(async () => { assert.equal(await flush!(), true) })
-  await renderDetail(false)
-  let allowRead!: () => void
-  const pending = new Promise<void>(resolve => { allowRead = resolve })
-  readOverride = async () => { await pending; return structuredClone(stored) }
-  try {
-    await renderDetail(true, 'Inbox')
-    await until(() => title()?.value === 'Shared title from Tasks', 'the confirmed title is in the shared cache')
-    assert.ok(title().readOnly, 'saved data cannot unlock a new placement')
-  } finally { allowRead() }
-  await until(() => title()?.readOnly === false, 'the server reauthorizes the Inbox editor')
+  for (const origin of ['Board', 'Project', 'Team', 'Search', 'Notifications', 'Inbox', 'Coordinator']) {
+    await renderDetail(false)
+    let allowRead!: () => void
+    const pending = new Promise<void>(resolve => { allowRead = resolve })
+    readOverride = async () => { await pending; return structuredClone(stored) }
+    try {
+      await renderDetail(true, origin)
+      await until(() => title()?.value === 'Shared title from Tasks', origin + ' sees the saved Task')
+      assert.ok(title().readOnly, origin + ' cannot write through cached data')
+    } finally { allowRead() }
+    await until(() => title()?.readOnly === false, origin + ' rechecks the current grant')
+    assert.equal(writes.length, 1, origin + ' opening an entry never replays the edit')
+  }
+  readFailure = 'workspaceAccessDenied'
+  await emit()
+  await until(() => container.textContent?.includes('unavailableTitle') === true, 'a revoked grant removes the refreshed editor')
+  assert.equal(flush, null)
+  for (const origin of ['Notifications', 'Project', 'Search']) {
+    await renderDetail(false)
+    await renderDetail(true, origin)
+    await until(() => container.textContent?.includes('unavailableTitle') === true, origin + ' cannot restore a denied edit')
+    assert.equal(title(), null)
+    assert.equal(flush, null)
+  }
   assert.equal(writes.length, 1)
 })
 
