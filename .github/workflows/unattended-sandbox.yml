@@ -48,6 +48,7 @@ jobs:
         run: pnpm test:unattended
       - name: Install isolated browser acceptance dependencies
         run: |
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
           python3 -m pip install aiohttp==3.13.5 playwright==1.60.0 pillow==11.3.0
           pnpm exec playwright install --with-deps chromium
           node --input-type=module -e "import{chromium}from'@playwright/test';console.log(chromium.executablePath())" > "$RUNNER_TEMP/mikka-chromium-path"
