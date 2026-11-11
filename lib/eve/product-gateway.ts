@@ -119,8 +119,8 @@ const defaultServices: EveProductGatewayServices = {
       const output = await withEveProductAuthority(authorization, input, async () => {
         const call = { ...scope, sessionId: input.sessionId, turnId: input.turnId, executionId: input.executionId, sourceEventId, name: input.name, input: checked.value, callId: input.callId }
         const { reviewEveProductApproval, executeEveApprovedWrite } = await import('./product-approval')
-        if (input.operation === 'approval') return reviewEveProductApproval(call)
-        const approved = await executeEveApprovedWrite(call, input.approvalResponder)
+        if (input.operation === 'approval') return reviewEveProductApproval(call, signal)
+        const approved = await executeEveApprovedWrite(call, input.approvalResponder, signal)
         if (approved) return approved.output
         return tool.execute!(checked.value, { toolCallId: input.callId, messages: [], context: {}, abortSignal: signal })
       })
