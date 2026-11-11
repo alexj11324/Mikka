@@ -134,6 +134,10 @@ these user-selectable coding models and keeps its configured model.
 
 ## Personal Workspace acceptance
 
+Follow the accepted [personal-workflow-first decision](https://github.com/alexj11324/Mikka/blob/74ca8e84cd323c24c479bf64937d696d53d32ffb/docs/design/decisions/2026-11-11-1400-personal-workflow-before-channels.md)
+in [#1875](https://github.com/alexj11324/Mikka/pull/1875), with the existing
+[glossary](design/glossary.md) for product terms.
+
 Use `scripts/acceptance/personal-workflow.mjs` to select an account's own personal
 Workspace explicitly. The existing shared acceptance drivers keep their team
 default. A personal request never falls back to a team or borrows its subscription.
