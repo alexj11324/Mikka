@@ -13,7 +13,7 @@ export type ReconcileDue = { wakes: boolean; schedules: boolean; recovery: boole
  * idle database each part reads an empty index or table and all are false.
  * - wakes: a pending inbox row whose wake is due and unleased (the
  *   coordinator_events_wake_due_idx partial index), or a turn holding a chat
- *   lease that may have ended without letting go (recoverInterruptedTurns).
+ *   event outbox deliveries awaiting the Eve session.
  * - schedules: any schedule work at or past its due time.
  * - recovery: any run-recovery work due within the minute (items that wait on
  *   outside state are re-checked each minute while they exist).

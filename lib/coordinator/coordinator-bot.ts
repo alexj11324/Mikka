@@ -266,7 +266,7 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
 
 /**
  * A compacted summary is signed for its chat ([userId, botId], workflows/coordinator/steps.ts
- * preparePrompt), so the moved one is signed again for the Coordinator's bot row; otherwise
+ * product instruction preparation), so the moved one is signed again for the Coordinator's bot row; otherwise
  * the next turn would drop it as unverified. One that does not verify stays as it was.
  */
 async function movedSummary(ownerId: string, botId: string, summary: string): Promise<string> {

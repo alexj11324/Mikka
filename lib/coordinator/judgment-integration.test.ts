@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
 import { before, beforeEach, after, mock, test } from 'node:test'
 import { DECISION_MODEL, decisionRequestInput, validatedAnswers } from './decision'
-import { deliverWake } from './wake-recovery'
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
 const priorVercel=process.env.VERCEL
 const priorKey=process.env.AI_GATEWAY_API_KEY, priorFetch=globalThis.fetch, priorConsole=console.error
@@ -28,18 +27,16 @@ stub('./store.ts',{
  wakingChats:async()=>[null],hasWakingEvents:async()=>events.some(e=>e.tier!==null&&e.tier!=='background'),
 })
 stub('../attention/store.ts',{releaseAttention:async()=>{}})
-// Model integration uses synthetic inbox IO above. Keep its new durable claim
-// IO synthetic too; the production delivery orchestration still runs here.
-// Real claim/backoff/restart behavior is covered by wake-recovery.db.test.ts.
-stub('./wake-recovery.ts',{
- deliverWake,
- createWakeRecovery:()=>({
-  claim:async(scope:{userId:string;botId:string|null})=>{assert.deepEqual(scope,{userId:'synthetic',botId:null});return events.length?{...scope,ids:events.map(event=>event.id),attempt:1,leaseUntil:new Date(Date.now()+120_000)}:null},
-  failed:async()=>{},due:async()=>[],exhausted:async()=>0,replay:async()=>false,
- }),
-})
-stub('../../workflows/coordinator/workflow.ts',{coordinatorTurn:()=>{}})
-mock.module('workflow/api',{namedExports:{start:async()=>{starts++;return {runId:'synthetic-workflow'}}}})
+// The model boundary is real; only product outbox persistence and Eve delivery
+// are synthetic. No old Workflow loop or lease engine participates.
+stub('../default-model.ts',{defaultModelAvailable:async()=>true,cloudDecisionTarget:async()=>null})
+stub('./coordinator-bot.ts',{coordinatorBot:async()=>({botId:'fixture-bot',workspaceId:'fixture-workspace'})})
+stub('../db/index.ts',{pool:{query:async(sql:string)=>{
+ if(sql.includes('SELECT id FROM coordinator_events'))return {rows:events.filter(e=>e.tier!==null&&e.tier!=='background').map(e=>({id:e.id}))}
+ if(sql.includes('SELECT "workspaceId" FROM bots'))return {rows:[{workspaceId:'fixture-workspace'}]}
+ throw new Error('Unexpected SQL in decision boundary fixture')
+}}})
+stub('../eve/server-client.ts',{sendEveEvent:async()=>{starts++}})
 let wake:typeof import('./wake'),group:typeof import('./route-group'),transport:typeof import('./decide')
 before(async()=>{
  console.error=()=>{}
@@ -51,7 +48,7 @@ after(()=>{if(priorVercel===undefined)delete process.env.VERCEL;else process.env
 test('every runtime event reaches the actual model adapter instead of failed/blocked heuristics',async()=>{
  events=['run_finished','run_question','run_blocked','issue_done'].map((kind,i)=>({id:String(i),kind:kind as 'run_finished',payload:{status:'failed',reason:'already recoverable'},tier:null}))
  await wake.wakeCoordinator('synthetic')
- assert.equal(requests.length,4);assert.ok(events.every(e=>e.tier==='result'));assert.equal(starts,1)
+ assert.equal(requests.length,4);assert.ok(events.every(e=>e.tier==='result'));assert.equal(starts,4)
 })
 test('unavailable or malformed model results leave the event pending and do not wake',async()=>{
  for(const body of [{answers:[]},{answers:[{type:'choice',name:'tier',choice:'forged'}]},{answers:[{type:'predicate',name:'tier',probability:1}]}]){

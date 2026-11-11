@@ -22,7 +22,7 @@ import { botChats, chatVersionState, chatView, citationSources, storedReasoning,
 import * as chatStore from '@/lib/coordinator/store'
 import { refreshChatMetadata, type UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
-import { reasoningText } from '@/lib/coordinator/stream-response'
+import { reasoningText } from '@/lib/coordinator/reasoning-mask'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { and, eq, sql } from 'drizzle-orm'
 import { chatBotId, type openChatBotId } from '@/lib/coordinator/coordinator-bot'
