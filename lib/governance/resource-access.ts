@@ -23,7 +23,9 @@ export async function organizationResourceAllowed(workspaceId: string, kind: Sha
   const query = membership ?? (await import('@/lib/workspace-db')).workspacePool
   const policy = await workspaceResourcePolicy(workspaceId, query)
   if (!policy.organizationId) return true
-  const rule = kind === 'mcp' ? policy.mcpSharing : policy.modelCredentialSharing
+  // Sharing a Skill is a sharing of the owner's integration content, so it
+  // follows the same organization switch as a shared MCP connection.
+  const rule = kind === 'mcp' || kind === 'skill' ? policy.mcpSharing : policy.modelCredentialSharing
   if (rule === 'deny') return false
   const { rows: [approval] } = await query.query<{ status: string }>(`select status from mikka_organization_resource_approvals
     where "organizationId"=$1 and "workspaceId"=$2 and kind=$3 and "resourceId"=$4 and "ownerId"=$5`, [policy.organizationId, workspaceId, kind, resourceId, ownerId])

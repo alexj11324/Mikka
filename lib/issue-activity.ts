@@ -30,6 +30,9 @@ export type IssueActivityEvent = {
   priority?: string
   title?: string
   assigneeName?: string
+  /** Absent means the human assignee. Keep the existing event kinds for old
+   * consumers, but never describe clearing a Delegate as clearing the person. */
+  assignmentTarget?: 'delegate'
   /** `type:id` of whoever made the change; null for rows from before MIK-17 and for subtasks. */
   actorKey?: string | null
   /** Who made the change, as the server resolved it (R-63 names them in front of the row). */
@@ -44,8 +47,18 @@ function timestamp(value: Date | string) {
   return (value instanceof Date ? value : new Date(value)).toISOString()
 }
 
-function assigneeOf(content: JSONContent) {
-  return readIssueMetadata(content).assignee
+function legacyDelegate(content: JSONContent): boolean {
+  const metadata = content.attrs?.mikka ?? content.attrs?.orvilo
+  return Boolean(metadata && typeof metadata === 'object' && !Object.hasOwn(metadata, 'delegate') && metadata.assignee?.kind === 'agent')
+}
+
+function sameDelegate(before: ReturnType<typeof readIssueMetadata>['delegate'], after: ReturnType<typeof readIssueMetadata>['delegate'], previous: JSONContent, current: JSONContent) {
+  if (!before || !after) return before === after
+  if (before.id !== after.id) return false
+  if (before.kind === after.kind) return true
+  // Old Bot references used assignee.kind=agent. Their migration to an
+  // explicit Bot delegate is a representation change, not a new delegation.
+  return (legacyDelegate(previous) && after.kind === 'bot') || (legacyDelegate(current) && before.kind === 'bot')
 }
 
 function labelNames(content: JSONContent) {
@@ -67,11 +80,17 @@ export function deriveIssueActivity(versions: ActivityVersion[], children: Activ
     if (current.status !== previous.status) events.push({ id: `status-${current.id}`, at, actorKey, actor, kind: 'status', status: current.status })
     if (current.priority !== previous.priority) events.push({ id: `priority-${current.id}`, at, actorKey, actor, kind: 'priority', priority: current.priority })
     if (current.title !== previous.title) events.push({ id: `title-${current.id}`, at, actorKey, actor, kind: 'title', title: current.title })
-    const before = assigneeOf(previous.content)
-    const after = assigneeOf(current.content)
+    const beforeMetadata = readIssueMetadata(previous.content)
+    const afterMetadata = readIssueMetadata(current.content)
+    const before = beforeMetadata.assignee
+    const after = afterMetadata.assignee
     if ((before?.id ?? null) !== (after?.id ?? null)) {
       if (after) events.push({ id: `assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assigneeName: after.name })
       else events.push({ id: `unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned' })
+    }
+    if (!sameDelegate(beforeMetadata.delegate, afterMetadata.delegate, previous.content, current.content)) {
+      if (afterMetadata.delegate) events.push({ id: `delegate-assign-${current.id}`, at, actorKey, actor, kind: 'assigned', assignmentTarget: 'delegate', assigneeName: afterMetadata.delegate.name })
+      else events.push({ id: `delegate-unassign-${current.id}`, at, actorKey, actor, kind: 'unassigned', assignmentTarget: 'delegate', assigneeName: beforeMetadata.delegate?.name })
     }
     const beforeLabels = new Set(labelNames(previous.content))
     const afterLabels = new Set(labelNames(current.content))

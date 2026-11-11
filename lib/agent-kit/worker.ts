@@ -1,3 +1,4 @@
+import type { ProjectExecutionSnapshot } from '../project-resources/contracts'
 import type { ExecutionIdentity } from '../execution-identity'
 import type { RunTraceContext } from '@mikka/protocol/trace-context'
 import type { AgentProfileSelection } from '../factory/agent-profile'
@@ -29,6 +30,8 @@ export interface WorkerDefinitionSnapshot {
   traceContext?: RunTraceContext
   /** Trusted dispatch identity; absent on historical runs, never inferred retroactively. */
   executionIdentity?: ExecutionIdentity
+  /** Project/Repository/Environment configuration frozen at admission; never backfilled on old runs. */
+  projectExecution?: ProjectExecutionSnapshot
   /** Copied only from the host's authorized parent execution; legacy workers gain nothing. */
   customMcp?: McpAuthority
   schemaVersion: 1

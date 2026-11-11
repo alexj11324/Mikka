@@ -180,6 +180,29 @@ test('explicit schemas and function map have exactly matching action names', () 
   }
 })
 
+test('Task presentation batch rejects forged authority and oversized input before invoking its reader', async () => {
+  const action = 'task-domain.getTaskPresentations'
+  let calls = 0
+  const handle = createDesktopRpc({
+    authenticate: async () => sessions.get(tokenA)!,
+    scope: withDesktopSession,
+    actions: { [action]: { args: desktopActionSchemas[action], invoke: async () => { calls++; return { version: 1, workspaceId: owner, items: {} } } } },
+  })
+  for (const args of [
+    [{ workspaceId: owner, issueIds: [peer], userId: peer }],
+    [{ workspaceId: owner, issueIds: [peer], includeDeleted: true }],
+    [{ workspaceId: owner, issueIds: [peer] }, { role: 'admin' }],
+    [{ workspaceId: 'invalid', issueIds: [] }],
+    [{ workspaceId: owner, issueIds: ['invalid'] }],
+    [{ workspaceId: owner, issueIds: Array.from({ length: 201 }, () => peer) }],
+  ]) assert.equal((await handle(request(action, args))).status, 400)
+  assert.equal(calls, 0)
+  for (const issueIds of [[], Array.from({ length: 200 }, () => peer)]) {
+    assert.equal((await handle(request(action, [{ workspaceId: owner, issueIds }]))).status, 200)
+  }
+  assert.equal(calls, 2, 'empty and bounded inputs still enter the reader and its membership checks')
+})
+
 test('Coordinator submission accepts an optional captured workspace without widening its authority tuple', () => {
   const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
   const legacy = ['hello', null, null, owner, undefined, undefined, undefined, undefined, undefined]

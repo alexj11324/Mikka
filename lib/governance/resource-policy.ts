@@ -49,7 +49,7 @@ export async function configureOrganizationResourcePolicy(organizationId: string
   return readOrganizationResourcePolicy(organizationId, userId)
 }
 
-const approvalInput = z.object({ workspaceId: z.uuid(), kind: z.enum(['subscription', 'api_key', 'mcp']), resourceId: z.string().min(1).max(200) }).strict()
+const approvalInput = z.object({ workspaceId: z.uuid(), kind: z.enum(['subscription', 'api_key', 'mcp', 'skill']), resourceId: z.string().min(1).max(200) }).strict()
 export async function requestOrganizationResourceApproval(organizationId: string, userId: string, input: unknown) {
   const value = approvalInput.parse(input)
   if (value.kind === 'subscription') {
@@ -58,7 +58,9 @@ export async function requestOrganizationResourceApproval(organizationId: string
     z.uuid().parse(value.resourceId)
     const owned = value.kind === 'mcp'
       ? await pool.query('select 1 from personal_mcp_servers where id=$1 and user_id=$2', [value.resourceId, userId])
-      : await pool.query('select 1 from model_api_keys where id=$1 and "ownerId"=$2', [value.resourceId, userId])
+      : value.kind === 'skill'
+        ? await pool.query('select 1 from personal_skills where id=$1 and user_id=$2', [value.resourceId, userId])
+        : await pool.query('select 1 from model_api_keys where id=$1 and "ownerId"=$2', [value.resourceId, userId])
     if (!owned.rowCount) throw new GovernanceError('access_denied')
   }
   return workspaceDb.transaction(async tx => {

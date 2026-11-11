@@ -1,7 +1,7 @@
 import { withBasePath } from '@/lib/base-path'
 
 // Client side of GET /api/search (#310, docs/backend/131-site-search.md). The
-// route sits under next.config's basePath, so requests go through withBasePath
+// route sits under the app base path, so requests go through withBasePath
 // (/mikka/api/search when deployed). The types mirror lib/federated-search/types.ts
 // on #310; replace them with that import once it is on main.
 
