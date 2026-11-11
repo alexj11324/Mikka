@@ -10,7 +10,7 @@ import { setProjectTeams } from '@/app/actions/team-relations'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Box, ChevronRight, ContactRound, X, LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { DEFAULT_PROJECT_PROPERTIES, type ProjectDraft } from '@/lib/project-input'
+import { DEFAULT_PROJECT_PROPERTIES, projectPeople, type ProjectDraft } from '@/lib/project-input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PROJECT_COLORS, PROJECT_ICON_COLORS, type Project, type ProjectControlField } from './project-properties'
-import { ProjectPicker, ProjectPropertyControl } from './project-property-controls'
+import { ProjectPicker, ProjectPropertyControl, type ProjectDirectory } from './project-property-controls'
 import { ProjectMilestones } from './project-milestones'
 import { WORKSPACE_NAME } from './issue-properties'
 import { ShortcutKeys } from '@/components/shortcut-keys'
@@ -28,11 +28,11 @@ import type { PresenceProps } from '@/lib/use-presence'
 
 const FIELDS: ProjectControlField[] = ['status', 'priority', 'lead', 'members', 'startDate', 'targetDate', 'labels', 'dependencyIds']
 
-export function ProjectForm({ project, initialTeamId = '', projects = [], userName, onClose, onSaved, open = true, onOpenChangeComplete }: { project?: Project; initialTeamId?: string; projects?: Project[]; userName?: string; onClose: () => void; onSaved: (project: Project) => void } & PresenceProps) {
+export function ProjectForm({ project, initialTeamId = '', projects = [], directory, onClose, onSaved, open = true, onOpenChangeComplete }: { project?: Project; initialTeamId?: string; projects?: Project[]; directory: ProjectDirectory; onClose: () => void; onSaved: (project: Project) => void } & PresenceProps) {
   const i18nText = useTranslations();
-  const resolvedUserName = userName ?? i18nText("FeatureCopy.c_34f201bc")
-  const [initial] = useState<ProjectDraft>(() => ({ name: project?.name ?? '', summary: project?.summary ?? '', description: project?.description || project?.summary || '', status: (project?.status ?? 'backlog') as ProjectDraft['status'], priority: (project?.priority ?? 'none') as ProjectDraft['priority'], lead: (project?.lead ?? '') as '' | 'me', team: WORKSPACE_NAME, startDate: project?.startDate ?? '', targetDate: project?.targetDate ?? '', properties: project?.properties ?? DEFAULT_PROJECT_PROPERTIES }))
+  const [initial] = useState<ProjectDraft>(() => ({ name: project?.name ?? '', summary: project?.summary ?? '', description: project?.description || project?.summary || '', status: (project?.status ?? 'backlog') as ProjectDraft['status'], priority: (project?.priority ?? 'none') as ProjectDraft['priority'], lead: project?.lead ?? '', ...(project ? projectPeople(project, project.userId) : { memberIds: [], leadUserId: null }), team: WORKSPACE_NAME, startDate: project?.startDate ?? '', targetDate: project?.targetDate ?? '', properties: project?.properties ?? DEFAULT_PROJECT_PROPERTIES }))
   const { data: teams = [], error: teamsError } = useSWR('teams', listTeams)
+  const [baseRevision] = useState(project?.revision)
   const [teamId, setTeamId] = useState(initialTeamId)
   const [draft, setDraft] = useState(initial)
   const [error, setError] = useState('')
@@ -50,7 +50,7 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], userNa
     if (submitting.current) return
     submitting.current = true; setPending(true); setError('')
     try {
-      const result = await saveProject({ ...draft, id: project?.id, revision: project?.revision })
+      const result = await saveProject({ ...draft, id: project?.id, revision: baseRevision, workspaceId: project?.workspaceId ?? directory?.workspaceId })
       if (!('project' in result) || !result.project) { setError(('error' in result ? result.error : undefined) ?? i18nText("FeatureCopy.c_052ebc86")); return }
       if (!project && teamId) {
         try {
@@ -69,7 +69,7 @@ export function ProjectForm({ project, initialTeamId = '', projects = [], userNa
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5 sm:px-7">
         <div className="self-start"><ProjectPicker label={i18nText("Projects.form.iconColor")} title={i18nText("Projects.form.iconColor")} choices={PROJECT_COLORS.map(item => ({ value: item.value, label: ({ green: i18nText("Projects.color.green"), purple: i18nText("Projects.color.purple"), yellow: i18nText("Projects.color.yellow"), gray: i18nText("Projects.color.gray") } as const)[item.value], icon: Box }))} selected={[draft.properties.color]} onChange={value => setDraft(current => ({ ...current, properties: { ...current.properties, color: value as ProjectDraft['properties']['color'] } }))} disabled={pending} plain><span className={cn('flex size-8 items-center justify-center rounded-md', PROJECT_ICON_COLORS[draft.properties.color])}><Box data-icon="inline-start" /></span></ProjectPicker></div>
         <FieldGroup><Field className="gap-0"><FieldLabel className="sr-only" htmlFor="project-name">{i18nText("Projects.textEditor.namePlaceholder")}</FieldLabel><Input id="project-name" className="h-10 rounded-none border-0 bg-transparent! px-0 text-2xl font-semibold shadow-none md:text-2xl focus-visible:ring-0" value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} maxLength={200} required disabled={pending} placeholder={i18nText("Projects.textEditor.namePlaceholder")} /></Field></FieldGroup>
-        <div className="flex flex-wrap items-center gap-2">{FIELDS.map(field => <ProjectPropertyControl key={field} field={field} value={draft} userName={resolvedUserName} projects={projects} projectId={project?.id} disabled={pending} onChange={changes => setDraft(current => ({ ...current, ...changes }))} />)}</div>
+        <div className="flex flex-wrap items-center gap-2">{FIELDS.map(field => <ProjectPropertyControl key={field} field={field} value={{ ...draft, workspaceId: project?.workspaceId ?? directory?.workspaceId, canEditProperties: project?.canEditProperties }} directory={directory} projects={projects} projectId={project?.id} disabled={pending} onChange={changes => setDraft(current => ({ ...current, ...changes }))} />)}</div>
         {!project && <FieldGroup><Field><FieldLabel htmlFor="new-project-team">{i18nText("FeatureCopy.c_7968c9e3")}</FieldLabel><NativeSelect id="new-project-team" value={teamId} disabled={pending || !!teamsError} onChange={event => setTeamId(event.target.value)}><NativeSelectOption value="">{i18nText("FeatureCopy.c_479e026f")}</NativeSelectOption>{teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{team.identifier} · {team.name}</NativeSelectOption>)}</NativeSelect></Field></FieldGroup>}
         <section aria-labelledby="project-form-description-heading" className="flex min-w-0 flex-col gap-4 pt-4"><h2 id="project-form-description-heading" className="text-sm font-medium text-muted-foreground">{i18nText("Projects.form.descriptionHeading")}</h2><IssueEditor layout="description" label={i18nText("Projects.textEditor.descriptionLabel")} content={readProjectDescription(initial.description)} disabled={pending} onChange={content => setDraft(current => ({ ...current, description: JSON.stringify(content) }))} /></section>
         <ProjectMilestones value={draft.properties.milestones} disabled={pending} onChange={milestones => setDraft(current => ({ ...current, properties: { ...current.properties, milestones } }))} />

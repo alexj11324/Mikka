@@ -1801,6 +1801,9 @@
       "leadUnset": "未指定",
       "leadNone": "未指定负责人",
       "currentAccount": "当前账号",
+      "directoryUnavailable": "无法读取成员目录",
+      "unavailablePerson": "原成员",
+      "inactivePerson": "{name}（已暂停）",
       "memberCurrentAccount": "当前可访问账号",
       "dependencyCount": "{count} 个依赖"
     },
