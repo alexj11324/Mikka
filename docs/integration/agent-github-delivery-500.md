@@ -61,10 +61,15 @@ The existing signature-verified GitHub App webhook accepts completed
 generate additional Agent wakeups; the existing per-check and commit-status
 UI projections remain independent. A suite identifies only a current published
 PR head for a source-bound repository and an already finished Agent run.
-Unknown, stale, closed, cross-repository, unbound and unsigned inputs never
-create a Coordinator message. Suites lacking PR numbers (for example, fork
-checkouts) are matched by their exact head SHA and repository within already
-published PRs, never by a broad GitHub search.
+Unknown, closed, cross-repository, unbound and unsigned inputs never
+create a Coordinator message. When a suite lists PRs, its
+`pull_requests[].head.sha` is checked against the stored PR head when
+provided; `check_suite.head_sha` may be a synthetic merge commit and must
+not be equated with the PR head. With a listed PR but no head SHA, the signal
+is a hint only and the Agent must re-read the live PR before acting. Suites
+lacking PR numbers (for example, fork checkouts) are matched by their exact
+suite SHA and repository within already published PRs, never by a broad
+GitHub search.
 
 A successful match creates a `run_report` in the existing deduplicated
 Coordinator outbox, bound to the run's user, bot and task. The Coordinator
