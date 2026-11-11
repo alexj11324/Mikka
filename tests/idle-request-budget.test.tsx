@@ -60,6 +60,10 @@ mock.module(new URL('components/slots/task-detail.tsx', root).href, { namedExpor
   TaskDetailFrame: (props: import('../components/slots/task-detail-contract').TaskDetailFrameProps) =>
     <section><h1>{props.title}</h1>{props.description({ afterDescription: null, activity: () => null })}{props.panel}{props.dialogs}</section>,
 } })
+// The full Bot container still owns all measured reads. Its official slot only paints data.
+mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) =>
+  <section>{entries?.map(entry => <div key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, i) =>
+    part.kind === 'text' ? <span key={i}>{part.node || part.text}</span> : null)}</div>)}</section> } })
 
 // Feature flags come from PostHog, not from Mikka's server.
 mock.module('posthog-js', { defaultExport: { getFeatureFlag: () => undefined, onFeatureFlags: () => () => {}, capture: () => {}, isFeatureEnabled: () => false } })
@@ -265,6 +269,7 @@ routes['/api/approved-writes'] = () => ({ enabled: false })
 // Sub-agent login prompts: one read on mount, then only on a subagent_events push.
 routes['/api/computer/events'] = url => ({ events: [], cursor: url.searchParams.get('after') ?? '0', hasMore: false })
 routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, workspaceId: url.searchParams.get('workspaceId') })
+routes['/api/factory/questions'] = () => ({ questions: [] })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })

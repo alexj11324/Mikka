@@ -31,7 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel, type IssueThreadsRead } from './issue-threads'
-import * as threadSlot from '@ui-slot/thread'
+import { ThreadScreen } from '@ui-slot/thread'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
 import { navigate } from './workspace-navigation'
@@ -353,11 +353,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   </>
   // A layer's thread screen (slot `thread`) draws the conversation from these rows: each part as Mikka renders it, the
   // run's Agent as the author line, its steps as tool rows.
-  const Screen = threadSlot.ThreadScreen ?? null
   const author = detail?.harness ? { id: detail.harness, name: harnessName(detail.harness), mark: <HarnessMark harness={detail.harness} /> } : undefined
   const at = (value: number | string | Date | undefined) => (value === undefined ? 0 : new Date(value).getTime()) || (data ? new Date(data.thread.createdAt).getTime() : Date.now())
   const entries: ThreadEntry[] = []
-  if (Screen && data) {
+  if (data && (collect || (!bare && !transcriptOnly && detail))) {
     // The run's own rows read as one message until the person speaks; each person message starts the next.
     let open: Extract<ThreadEntry, { role: 'bot' }> | null = null
     const bot = (id: string, parts: ThreadEntryPart[], extra?: Partial<Extract<ThreadEntry, { role: 'bot' }>>) => {
@@ -401,10 +400,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   }
   // Re-publish the admitted read itself. Identical message lengths or tool
   // counts do not prove the content, grant or attempt result is unchanged.
-  useEffect(() => { if (collect && Screen) collect(runId, entries) }, [collect, Screen, runId, data, active, canRetry, sending, view?.status, retryLabel]) // eslint-disable-line react-hooks/exhaustive-deps
-  if (collect && Screen) return null
+  useEffect(() => { if (collect) collect(runId, entries) }, [collect, runId, data, active, canRetry, sending, view?.status, retryLabel]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (collect) return null
   if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
-  const screen = Screen && !bare && detail ? <Screen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}
+  const conversation = !bare && detail ? <ThreadScreen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
     composer={{ ref: inputRef, label: replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) }), value: draft, onChange: setDraft, onSubmit: () => { void send() },
       attachmentScope: { kind: 'thread', id: liveRunId }, sending: sending || stopPending, editableWhileSending: true, submitDisabled: changeRequest ? false : replyBlocked || stopRequested || question === 'resuming',
@@ -415,7 +414,27 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </>}
-    questions={[]} onAnswer={() => {}} running={0} onOpenTask={() => onOpenTask?.()} onOpenInbox={() => navigate({ section: 'suggestions' })} /> : null
+    questions={[]} onAnswer={() => {}} running={0} onOpenTask={() => onOpenTask?.()} onOpenInbox={() => navigate({ section: 'suggestions' })} /> : <>
+    <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+      {before}
+      <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
+      {after}
+    </div>
+    {data?.thread.quota?.paused && <div className="shrink-0 p-3">
+      <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />
+    </div>}
+    {/* R-10: an open thread always ends in the composer, finished or not. A message to an ended thread runs it
+        again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
+    {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
+      {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
+      <ChatComposer ref={inputRef} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
+        quote={changeRequest ? <QuoteChip slot="change-request-chip" text={changeRequest.label} icon={<MessageSquareDiff aria-hidden="true" className="size-3.5 shrink-0" />} onRemove={changeRequest.onCancel} />
+          : replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
+        sending={sending || stopPending} editableWhileSending submitDisabled={changeRequest ? false : replyBlocked || stopRequested || question === 'resuming'} running={working || (question === 'resuming' && !data?.thread.questionWake)} thread onStop={working && canStop ? () => { void stop() } : undefined} />
+      {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
+      {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
+    </div>}
+    </>
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
   return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
     {!bare && <ThreadHeader issueId={issueId} runId={runId} title={title} headingRef={headingRef} onBack={onBack} onClose={onClose}
@@ -437,27 +456,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {viewingChanges ? (changes.state === 'ready'
       ? <ThreadChangesPane stateKey={`thread:${runId}:changes`} changes={changes.changes} />
       : <p className="p-4 text-sm text-muted-foreground">{t('changesTooLarge')}</p>)
-    : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : screen ?? <>
-    <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
-      {before}
-      <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
-      {after}
-    </div>
-    {data?.thread.quota?.paused && <div className="shrink-0 p-3">
-      <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />
-    </div>}
-    {/* R-10: an open thread always ends in the composer, finished or not. A message to an ended thread runs it
-        again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
-    {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
-      {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
-      <ChatComposer ref={inputRef} label={replyBlocked ? t('checkEnded') : t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
-        quote={changeRequest ? <QuoteChip slot="change-request-chip" text={changeRequest.label} icon={<MessageSquareDiff aria-hidden="true" className="size-3.5 shrink-0" />} onRemove={changeRequest.onCancel} />
-          : replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
-        sending={sending || stopPending} editableWhileSending submitDisabled={changeRequest ? false : replyBlocked || stopRequested || question === 'resuming'} running={working || (question === 'resuming' && !data?.thread.questionWake)} thread onStop={working && canStop ? () => { void stop() } : undefined} />
-      {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
-      {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
-    </div>}
-    </>}
+    : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : conversation}
     {detail && <SelectionQuote root={rootRef} onQuote={text => { setReplyQuote(text); inputRef.current?.focus() }} />}
   </section>
 }

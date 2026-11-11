@@ -50,7 +50,7 @@ import { ThreadCard } from './thread-card'
 import { firstThreadCards, staleEventPositions, visibleDivider } from '@/lib/coordinator/chat-dedupe'
 import { ActivityExpansionContext, ReplyActivity, useActivityExpansion, useThreadToolRows } from './reply-activity'
 import { CHAT_SURFACE, ChatMessage, ChatWaiting } from '@ui-slot/chat-message'
-import * as threadSlot from '@ui-slot/thread'
+import { ThreadScreen } from '@ui-slot/thread'
 import { useConversationPanels, useWorkTabs } from '@/components/coordinator/conversation-panels'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { useFactoryQuestions } from '@/hooks/use-factory-questions'
@@ -418,11 +418,10 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   const sources = data?.sources
   // A layer that draws the conversation as one screen (slot `thread`) gets the same rows as data and nodes.
   // The board's chat column (compact) is a conversation too; only an artifact's chat (embedded) keeps its chips.
-  const Screen = !embedded ? threadSlot.ThreadScreen ?? null : null
   // The Overview and the browser, when the frame's work area holds them (FRAME_OWNS_PANEL).
   const panels = useConversationPanels()
   // Tasks and threads opened from this chat open as tabs of that work area (decision 2026-11-10), named by their code.
-  const work = useWorkTabs(Boolean(Screen && panels && !compact), {
+  const work = useWorkTabs(Boolean(!embedded && panels && !compact), {
     task: id => {
       const source = Object.values(sources ?? {}).find(item => item.kind === 'issue' ? item.id === id : item.issue?.id === id)
       const issue = source?.kind === 'issue' ? source : source?.issue
@@ -526,8 +525,8 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   const tMessage = useTranslations('AiElements.message')
   const tNavAll = useTranslations()
   // The Coordinator's chat docks the person's pending Factory questions; a read follows the chat's own version.
-  const factory = useFactoryQuestions(data?.version ?? data?.cursor ?? null, Boolean(Screen && !botId && data))
-  if (Screen) {
+  const factory = useFactoryQuestions(data?.version ?? data?.cursor ?? null, Boolean(!embedded && !botId && data))
+  if (!embedded) {
     // The live failure as the thread's error line: a plain failure says 回复失败 (or why the wake failed) once, on the
     // line, with 重试 under it; a failure with its own reason (cloud, refusal, subscription, API balance) keeps its notice.
     const plainFailure = Boolean(data?.error && !working && !cloudCode && !refusal && !declined && !apiBalance)
@@ -604,7 +603,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       {/* The page's floating title pill sits over the top 56px on wide screens: the screen starts below it. Without one (the
           hosted shell owns the header and the thread names itself) no band is left. */}
       <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col', pill && 'md:pt-14')}>
-        <Screen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty} panels={compact ? undefined : panels} work={work.work}
+        <ThreadScreen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty} panels={compact ? undefined : panels} work={work.work}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
           composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: sending || resuming, editableWhileSending: resuming && !sending, onSubmit: () => { void send() },
