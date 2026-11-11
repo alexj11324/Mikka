@@ -431,6 +431,11 @@
     "kind": "core",
     "env": {}
   },
+  "core-infisical-discovery": {
+    "command": "pnpm test:infisical-discovery",
+    "kind": "core",
+    "env": {}
+  },
   "integration-factory-activity": {
     "command": "pnpm test:factory-activity",
     "kind": "integration",

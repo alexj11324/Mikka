@@ -50,6 +50,11 @@ test('Eve model changes select native unit tests and schedule authority selects 
   assert(database.db_suites.includes('test:eve-db'))
   assert(database.affected.includes(dbId('test:eve-db')))
 })
+test('Infisical metadata discovery has an explicit core task covering the CLI and subprocess tests', () => {
+  const dependencies = plan.graph.dependencies['ci-core-infisical-discovery'].map(edge => edge.target)
+  for (const file of ['scripts/ops/infisical-discover.py', 'scripts/ops/infisical-discover.test.py'])
+    assert(dependencies.includes(sourceId(file)), file)
+})
 for (const file of ['pnpm-lock.yaml','pnpm-workspace.yaml','tsconfig.json','.github/workflows/ui-policy.yml','scripts/ci/select.mjs','lib/db/schema.ts','lib/auth.ts','lib/credentials/store.ts','unmapped.bin']) test(`high risk or unmapped input expands: ${file}`, async () => {
   const r = await pick(file)
   assert(r.full)

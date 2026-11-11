@@ -15,6 +15,57 @@ only main to production ([deployment guide](operations/web-deploy.md)).
 - 不为了选择身份而新建 identity、增加身份数量、触碰免费额度或升级套餐。某一个身份不可用时，先核对其他现有可用身份；只有确认现有身份都不能完成必要操作时，才报告具体缺项，请用户决定后续处理。
 - 不能把执行审核或规则保存失败写成用户禁止使用非 admin 身份；用户授权与执行限制必须分别记录。身份选择不改变当前任务的其他授权边界。
 
+## Find credential metadata
+
+Before reporting absent credentials, use the existing Universal Auth bindings
+(`INFISICAL_API_URL`, `INFISICAL_PROJECT_ID`, `INFISICAL_CLIENT_ID` and protected
+`INFISICAL_CLIENT_SECRET`) to locate their metadata:
+
+```bash
+python3 scripts/ops/infisical-discover.py --query SLACK
+```
+
+Repeat `--query` to match several key/path fragments. The CLI uses Python's
+standard library and the environment's HTTPS proxy and verified CA trust. Its
+authentication destination is exactly `https://app.infisical.com`; redirects
+and proxy bypasses for that host are rejected. It supports existing Universal
+Auth only, keeps the resulting token in memory, and requests no secret values.
+It does not depend on a workspace-specific helper or credential file.
+
+The CLI verifies the configured project's metadata and reads its actual
+environment slugs before requesting recursive secret metadata from `/` with
+`viewSecretValue=false`, `includeImports=true` and reference expansion disabled.
+It reports every matching environment/path/key locator. Imported secrets retain
+the source environment/path inherited from their import parent, separately from
+the environment that was queried. Use these locators to choose the scope for
+the already-authorized operation; discovery does not fetch values or choose a
+cross-environment fallback.
+
+Interpret the closed results before deciding what to do:
+
+| Observation | Meaning |
+| --- | --- |
+| `action_denied` (403) | This identity cannot perform this request. It does not establish organization-wide denial. |
+| `resource_unresolved` (404) | This resource, route or scope was not resolved for this request. Check the discovered locator and visibility. |
+| `request_rejected` (422) | The API rejected the request; check the documented request shape/version. Do not guess a folder endpoint. |
+| `visible_empty` / `no_visible_match` | The completed requests returned no visible entries/matches. ACL-filtered absence remains possible. |
+| `incomplete` | At least one request, locator or pagination signal remains unresolved. Keep the partial matches and name the limitation. |
+
+Exit 0 means the visible traversal completed, including an empty result; exit 2
+means it was incomplete or unavailable. `permissionCompleteness` remains
+`not_proven`: a successful metadata list does not prove visibility into every
+secret. Unknown pagination signals produce an incomplete result rather than
+an exhaustive claim. The output contains whitelisted metadata and closed
+status codes; keep credential values and raw provider errors out of logs.
+
+On 2026-11-11, the same existing identity returned 404 for
+`prod:/vercel` `SLACK_BOT_TOKEN` and 200 for `prod:/platform` with the same key;
+`staging:/branches/slackbot-oauth/slack` also resolved `SLACK_APP_ID`. Project
+metadata listed `dev`, `staging` and `prod`. The failure to find Slack credentials
+came from guessing scopes and treating 404 as absence; no Infisical permission
+change was required. Earlier receipts and the environment-specific dev probe
+retain their original scope.
+
 ## Verified storage
 
 All 89 application/database records were read back and compared to their prepared source values or expanded references. Environment/path counts include repeated names. Seven platform records and ten Worker secret references are stored separately. These counts establish storage, not deployed acceptance.
