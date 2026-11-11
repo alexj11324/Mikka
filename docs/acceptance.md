@@ -144,10 +144,11 @@ in process for an attested loopback environment. That path requires the private
 bound descriptor, matching compiled deployment SHA and database attestation; it does
 not admit ordinary account credentials on a production origin.
 
+The package command supplies the required `tsx` loader for the protocol TypeScript imports.
 Start with metadata readiness against the isolated local application:
 
 ```sh
-node --import tsx scripts/acceptance/personal-workflow.mjs \
+corepack pnpm acceptance:personal \
   --origin http://127.0.0.1:3000 --workspace PERSONAL_WORKSPACE_UUID
 ```
 
@@ -163,7 +164,7 @@ An execution attempt requires an existing enabled, online local device, its
 matching Agent, source pins and one explicit harness:
 
 ```sh
-node --import tsx scripts/acceptance/personal-workflow.mjs \
+corepack pnpm acceptance:personal \
   --origin http://127.0.0.1:3000 --workspace PERSONAL_WORKSPACE_UUID \
   --operation execute --harness codex --device-id DEVICE_UUID --agent-id CODEX_AGENT_UUID \
   --expected-build APPLICATION_SHA --revision DRIVER_SHA
