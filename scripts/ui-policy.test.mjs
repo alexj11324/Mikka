@@ -251,27 +251,6 @@ test('lint permits imported components but fails handwritten business UI without
   }
   try {
     execFileSync('git', ['init', '--quiet'], { cwd })
-    // The repository lint also checks the canonical business graph. Give this
-    // isolated UI fixture its required exports and native routes.
-    const contractExports = new Map()
-    for (const contract of entityContracts) {
-      for (const [file, ...names] of [contract.detail, ...(contract.adapters ?? []), ...contract.sources].filter(Boolean)) {
-        const exports = contractExports.get(file) ?? new Set()
-        for (const name of names) exports.add(name)
-        contractExports.set(file, exports)
-      }
-    }
-    const contractSources = new Map([...contractExports].map(([file, names]) => [file, [...names].map(name => `export function ${name}() { return null }`).join('\n')]))
-    for (const contract of entityContracts) {
-      for (const [file, name, module] of contract.routes ?? []) contractSources.set(file, module
-        ? `export { ${name} as default } from '${module}'`
-        : `export default function ${name}() { return null }`)
-    }
-    contractSources.set('components/coordinator/conversation-panels.tsx', "import { TaskDetail } from '../workspace/task-detail'; export function EmbeddedTaskDetail() { return <TaskDetail /> }")
-    for (const [file, source] of contractSources) {
-      mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true })
-      writeFileSync(path.join(cwd, file), source)
-    }
     for (const library of policy.componentRoots) {
       mkdirSync(path.join(cwd, library), { recursive: true })
       writeFileSync(path.join(cwd, library, 'example.tsx'), !['components/ui/', 'components/reui/'].includes(library) ? 'import { Button } from "@/components/ui/button"; export const LibraryComponent = ({ onSave }) => <Button onClick={onSave}>Save</Button>' : 'export const LibraryComponent = ({ onSave }) => <button className="text-[13px]" onClick={onSave}>Save</button>')
@@ -294,13 +273,16 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(composed.status, 0, JSON.stringify(composed.report.diagnostics))
     assert.equal(composed.report.errors, 0)
     assert.equal(composed.report.libraryFiles, policy.componentRoots.length)
-    assert.equal(composed.report.files, 1 + [...contractSources.keys()].filter(file => !file.startsWith('apps/')).length)
+    assert.equal(composed.report.files, 1)
     const commandFile = 'app/actions/issues.ts'
-    writeFileSync(path.join(cwd, commandFile), contractSources.get(commandFile).replace('export function saveIssue', 'function saveIssue'))
+    const commandSource = readFileSync(path.join(cwd, commandFile), 'utf8')
+    const missingExport = commandSource.replace('export async function saveIssue(', 'async function saveIssue(')
+    assert.notEqual(missingExport, commandSource)
+    writeFileSync(path.join(cwd, commandFile), missingExport)
     const missingCommand = await execute()
     assert.equal(missingCommand.status, 1)
     assert.ok(missingCommand.report.diagnostics.some(d => d.file === commandFile && d.rule === 'entity/contract-export'))
-    writeFileSync(path.join(cwd, commandFile), contractSources.get(commandFile))
+    writeFileSync(path.join(cwd, commandFile), commandSource)
     writeFileSync(path.join(cwd, filename), 'export const Example = () => <button>Save</button>')
     const handwritten = await execute()
     assert.equal(handwritten.status, 1)
