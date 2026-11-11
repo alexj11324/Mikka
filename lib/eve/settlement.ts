@@ -47,8 +47,12 @@ export async function finishEveTurn(scope:EveScope,input:EveTurnSettlement) {
       receipt = (await client.query<Receipt>('INSERT INTO eve_turn_settlements(session_id,turn_id,request_digest,occurrence)VALUES($1,$2,$3,$4)RETURNING *',[input.sessionId,input.turnId,requestDigest,occurrence])).rows[0]
     }
     if (input.messages !== undefined) {
+      // A very fast native turn may settle before its accepting HTTP request
+      // returns. Publish its owned source first so the failure/result cannot
+      // precede the user's message in the product history.
+      if(source&&scope.surface==='web')await (await import('./submission')).markEventAccepted(scope,source.source_event_id)
       if (receipt.occurrence && source) await settleSchedule(scope,input,source.source_event_id,receipt.occurrence)
-      else await projectTurnState(scope,input.sessionId,input.turnId,false,input.messages)
+      else await projectTurnState(scope,input.sessionId,input.turnId,false,input.messages,{outcome:input.outcome,sourceEventId:source?.source_event_id})
     }
     if (execution) await (await import('../../workflows/coordinator/agent-kit-steps')).finishAgentExecution(scope.ownerId,scope.botId,execution.id,input.outcome === 'failed' ? 'turn_failed' : undefined)
     await client.query('UPDATE eve_turn_settlements SET completed_at=now() WHERE session_id=$1 AND turn_id=$2',[input.sessionId,input.turnId])

@@ -80,6 +80,71 @@ test('host settlement receipts preserve product publication across native RPC re
       await assert.rejects(finishEveTurn(scope,{...input,executionId:randomUUID()}),/agentExecutionClosed/)
       await assert.rejects(finishEveTurn({...scope,ownerId:'other-owner'},input))
     })
+    await t.test('failed native turn marks only its owned source and never overwrites a newer session',async()=>{
+      const {projectEveTurn,projectTurnState}=await import('./projection')
+      const {emptySessionView,foldEvents}=await import('eve/events')
+      const {chatItems}=await import('../coordinator/context')
+      const sessionId=await nativeSession(),source=randomUUID(),newerSource=randomUUID()
+      for(const id of [source,newerSource])await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,"deliveredAt")VALUES($1,$2,$3,'user_message',($1::uuid)::text,$4,now())`,[id,ownerId,botId,{text:id===source?'Failed request':'Newer queued request',source:'person'}])
+      await pool.query('INSERT INTO eve_turn_sources(session_id,turn_id,source_event_id)VALUES($1,$2,$3)',[sessionId,'turn_0',source])
+      const position=Number((await pool.query('SELECT coalesce(max(position),0) last FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2',[ownerId,botId])).rows[0].last)
+      for(const [index,id]of [source,newerSource].entries())await pool.query('INSERT INTO coordinator_messages(id,"userId","botId",position,message)VALUES($1,$2,$3,$4,$5)',[randomUUID(),ownerId,botId,position+index+1,{role:'user',content:id===source?'Failed request':'Newer queued request',mikkaUserEvent:{id}}])
+      await projectTurnState(scope,sessionId,'turn_0',true)
+      const view=foldEvents(emptySessionView(),[
+        {type:'turn.started',data:{turnId:'turn_0',cause:{deliveryId:'delivery_0'},follows:null},meta:{position:{line:0,index:0},at:'2026-11-11T00:00:00Z',endOfLine:true}},
+        {type:'turn.settled',data:{turnId:'turn_0',outcome:'failed',error:{code:'rate_limit_exceeded',message:'Do not show raw provider diagnostic'}},meta:{position:{line:1,index:0},at:'2026-11-11T00:00:01Z',endOfLine:true}},
+      ])
+      await finishEveTurn(scope,{sessionId,turnId:'turn_0',outcome:'failed',messages:projectEveTurn(view,sessionId,'turn_0','failed')})
+      const rows=(await pool.query('SELECT position,message,"createdAt" FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2 ORDER BY position',[ownerId,botId])).rows
+      const items=chatItems(rows)
+      assert.equal(items.find(item=>item.text==='Failed request')?.failure?.raw,'rate_limit_exceeded')
+      assert.equal(items.find(item=>item.text==='Newer queued request')?.failure,undefined)
+      assert.equal((await pool.query('SELECT "lastError" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2',[ownerId,botId])).rows[0].lastError,'rate_limit_exceeded')
+      const fresh=await nativeSession()
+      await projectTurnState(scope,fresh,'turn_0',true)
+      const stale=await nativeSession()
+      await pool.query('INSERT INTO eve_turn_sources(session_id,turn_id,source_event_id)VALUES($1,$2,$3)',[stale,'turn_0',source])
+      await finishEveTurn(scope,{sessionId:stale,turnId:'turn_0',outcome:'failed',messages:projectEveTurn(view,stale,'turn_0','failed')})
+      const state=(await pool.query('SELECT "lastError","leaseHolder" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2',[ownerId,botId])).rows[0]
+      assert.equal(state.lastError,null);assert.equal(state.leaseHolder,fresh)
+      const newer=(await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 AND message#>>\'{mikkaUserEvent,id}\'=$2',[ownerId,newerSource])).rows[0]
+      assert.equal(newer.message.mikkaFailure,undefined)
+    })
+    await t.test('native resend marks an owned failed row and recovers only the original submission receipt',async()=>{
+      const {acceptEveMessage,commitEveIngress}=await import('./submission')
+      const {chatItems}=await import('../coordinator/context')
+      const position=Number((await pool.query('SELECT coalesce(max(position),0) last FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2',[ownerId,botId])).rows[0].last)+1
+      const original=randomUUID()
+      await pool.query('INSERT INTO coordinator_messages(id,"userId","botId",position,message)VALUES($1,$2,$3,$4,$5)',[original,ownerId,botId,position,{role:'user',content:'Original failed resend',mikkaFailure:'turn_failed'}])
+      const submissionId=randomUUID()
+      const request=(id:string)=>new Request('https://app.test/eve/v1/session/wrun_fixture',{method:'POST',headers:{'x-mikka-submission-id':id}})
+      const firstRequest=request(submissionId)
+      const first=await acceptEveMessage(scope,'Retry replacement',{retryOf:position},firstRequest)
+      await commitEveIngress(firstRequest)
+      const repeated=request(submissionId)
+      assert.equal((await acceptEveMessage(scope,'Retry replacement',{retryOf:position},repeated)).eventId,first.eventId)
+      await commitEveIngress(repeated)
+      await assert.rejects(acceptEveMessage(scope,'Retry replacement',{retryOf:position},request(randomUUID())),/submissionConflict/)
+      await assert.rejects(acceptEveMessage(scope,'Changed replacement',{retryOf:position},request(submissionId)),/submissionConflict/)
+      const prior=(await pool.query('SELECT message FROM coordinator_messages WHERE id=$1',[original])).rows[0]
+      assert.equal(prior.message.mikkaRetried,true)
+      const rows=(await pool.query('SELECT position,message,"createdAt" FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2 ORDER BY position',[ownerId,botId])).rows
+      assert.equal(chatItems(rows).filter(item=>item.text==='Original failed resend').length,0)
+      assert.equal(chatItems(rows).filter(item=>item.text==='Retry replacement').length,1)
+      assert.equal((await pool.query('SELECT payload->>\'retryOf\' retry FROM coordinator_events WHERE id=$1',[first.eventId])).rows[0].retry,String(position))
+    })
+    await t.test('a native failure before HTTP acknowledgement still follows its original user message',async()=>{
+      const {projectTurnState}=await import('./projection')
+      const sessionId=await nativeSession(),source=randomUUID()
+      await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload)VALUES($1,$2,$3,'user_message',($1::uuid)::text,$4)`,[source,ownerId,botId,{text:'Fast failed request',source:'person'}])
+      await pool.query('INSERT INTO eve_turn_sources(session_id,turn_id,source_event_id)VALUES($1,$2,$3)',[sessionId,'turn_0',source])
+      await projectTurnState(scope,sessionId,'turn_0',true)
+      await finishEveTurn(scope,{sessionId,turnId:'turn_0',outcome:'failed',messages:[{role:'assistant',content:[],mikkaFailure:'turn_failed',mikkaStreamId:`eve:${sessionId}:turn_0`}]})
+      const rows=(await pool.query('SELECT position,message FROM coordinator_messages WHERE "userId"=$1 AND (message#>>\'{mikkaUserEvent,id}\'=$2 OR message->>\'mikkaStreamId\'=$3) ORDER BY position',[ownerId,source,`eve:${sessionId}:turn_0`])).rows
+      assert.equal(rows.length,2)
+      assert.equal(rows[0].message.role,'user');assert.equal(rows[0].message.content,'Fast failed request')
+      assert.equal(rows[0].message.mikkaFailure,'turn_failed');assert.equal(rows[1].message.role,'assistant')
+    })
   } finally {
     await pool.query('DELETE FROM user_schedules WHERE id=ANY($1::uuid[])',[scheduleIds])
     await pool.query('DELETE FROM bots WHERE id=$1',[botId])
