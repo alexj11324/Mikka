@@ -76,6 +76,12 @@ mock.module(at('components/coordinator/chat-composer.tsx'), { namedExports: { Ch
   return <><textarea data-composer="" aria-label={props.label} value={props.value} onChange={event => props.onChange(event.currentTarget.value)} /><button data-composer-send="" disabled={props.submitDisabled}>Send</button></>
 } } })
 
+// The bare pane mounted below is the shared Artifact/Review transcript and composer.
+const { ChatComposer } = await import('../components/coordinator/chat-composer')
+mock.module(at('components/slots/thread.tsx'), { namedExports: {
+  ThreadScreen: (props: import('../components/slots/thread-contract').ThreadScreenProps) =>
+    <section data-required-thread-screen=""><ChatComposer {...props.composer} />{props.notices}</section>,
+} })
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
 let createRoot: typeof import('react-dom/client')['createRoot']
 let root: Root | null = null
@@ -89,7 +95,7 @@ beforeEach(() => { thread = { ...base }; acceptance = null; composer = null; rep
 afterEach(async () => { if (root) { await act(async () => root!.unmount()); root = null; container.remove() } })
 after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
-  <IssueThreadPanel issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
+  <IssueThreadPanel bare issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
 </IntlProvider>)
 
 function ReadControl() {
@@ -218,7 +224,7 @@ test('an open thread ends in the composer whether it runs or has ended', () => {
 
 test('the Artifact window and the thread column keep the composer', () => {
   assert.match(render({ bare: true }), /data-composer=""/, 'Artifact window (bare)')
-  assert.match(render({ issueId: null, onOpenTask: undefined }), /data-composer=""/, 'thread column, a thread with no task')
+  assert.match(render({ bare: false, issueId: null, onOpenTask: undefined }), /data-required-thread-screen=""[\s\S]*data-composer=""/, 'the full thread column without a Task uses the required screen')
 })
 
 test('a thread the viewer cannot read in full has no composer', () => {
