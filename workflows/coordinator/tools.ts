@@ -266,13 +266,14 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: input => steps.stopRun(userId, input, scope, botId),
     }),
     load_skill:tool({ description:'Load an assigned, version-pinned skill from this execution.',inputSchema:z.object({skillId:z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/)}),execute:input=>kit.loadAgentSkill(userId,botId,execution?.id,input.skillId,scope) }),
+    read_personal_skill:tool({ description:'Read the full instructions of one skill the person installed. The skills list in your system prompt carries only each skill\'s name and a description; its body is not there. Call this with the skill id before relying on a skill, and do not assume what a skill says from its name.',inputSchema:z.object({skillId:z.uuid()}),execute:input=>kit.readPersonalSkill(userId,botId,execution?.id,input.skillId,scope) }),
   }
   return withToolDisplayNames(options.readOnly ? scheduledReadTools(registry, options.readToolIds) : registry)
 }
 export function coordinatorTools(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   const registry = createCoordinatorRegistry(userId,botId,scope,options)
   const { execution } = options
-  if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill'))
+  if (!execution) return Object.fromEntries(Object.entries(registry).filter(([name]) => name !== 'load_skill' && name !== 'read_personal_skill'))
   // A rollout gate can narrow a frozen grant; enabling it never adds tool IDs
   // absent from this execution's immutable effectiveTools.
   const requested = execution.snapshot.effectiveTools.filter(name =>

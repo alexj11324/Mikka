@@ -28,7 +28,7 @@ export type CoordinatorMessageContext = {
 export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
   const t = useTranslations('Coordinator')
   const tErrors = useTranslations('Errors')
-  const operation = useRef<{ body: string; id: string } | null>(null)
+  const operations = useRef(new Map<string, { id: string; conflict?: true }>())
   const submit = useCallback(async (text: string, context?: CoordinatorMessageContext): Promise<SubmitOutcome> => {
     const trimmed = text.trim()
     if (!trimmed || trimmed.length > 10_000) return { kind: 'rejected', error: 'messageRequired' }
@@ -37,8 +37,12 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
     if (error) return { kind: 'uncertain' }
     if (!data?.user.id) return { kind: 'authRequired' }
     const body = JSON.stringify([data.user.id, trimmed, context ?? null])
-    if (operation.current?.body !== body) operation.current = { body, id: crypto.randomUUID() }
-    const options: SendTurnOptions = { headers: { 'x-mikka-submission-id': operation.current.id },
+    // Another message may be sent before this one's uncertain result is retried.
+    // Retain each unresolved key; the native server remains the dedupe authority.
+    let operation = operations.current.get(body)
+    if (operation?.conflict) return { kind: 'conflict' }
+    if (!operation) { operation = { id: crypto.randomUUID() }; operations.current.set(body, operation) }
+    const options: SendTurnOptions = { headers: { 'x-mikka-submission-id': operation.id },
       clientContext: JSON.parse(JSON.stringify(context ?? {})) as NonNullable<SendTurnOptions['clientContext']> }
     try {
       if (agent) await agent.send(trimmed, options)
@@ -46,11 +50,12 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
         const { session } = await coordinatorAgentClient(context?.botId ?? null).sessions.create()
         await session.send(trimmed, options)
       }
-      operation.current = null
+      operations.current.delete(body)
       return { kind: 'accepted', enabled: true, sourceEventId: null, replayed: false }
     } catch (error) {
       const outcome = coordinatorSendFailure(error)
-      if (outcome.kind !== 'uncertain' && outcome.kind !== 'authRequired') operation.current = null
+      if (outcome.kind === 'conflict') operations.current.set(body, { ...operation, conflict: true })
+      else if (outcome.kind !== 'uncertain' && outcome.kind !== 'authRequired') operations.current.delete(body)
       return outcome
     }
   }, [agent?.send])

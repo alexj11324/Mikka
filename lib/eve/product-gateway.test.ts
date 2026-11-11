@@ -50,6 +50,40 @@ test('tool arguments and cancellation signal reach the authorized product servic
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })
 
+test('approval review and native resumption use separate strict host operations', async () => {
+  const responder = { authenticator: 'mikka', principalType: 'user', principalId: scope.ownerId,
+    attributes: { botId: scope.botId, workspaceId: scope.workspaceId, surface: scope.surface } }
+  const seen: unknown[] = []
+  const services: EveProductGatewayServices = { authorize: async () => scope, assertSession: async () => {}, run: async (_scope, input, _signal, authorization) => {
+    assert.equal(authorization, 'Bearer trusted-service-fixture')
+    seen.push(input)
+    return input.operation === 'approval' ? { status: 'user-approval' } : { output: 'sent' }
+  } }
+  for (const value of [{ ...body, operation: 'approval' }, { ...body, approvalResponder: responder }]) {
+    const req = request(value)
+    req.headers.set('authorization', 'Bearer trusted-service-fixture')
+    assert.equal((await handleEveProductRequest(req, services)).status, 200)
+  }
+  assert.equal(seen.length, 2)
+  for (const value of [
+    { ...body, operation: 'approval', approvalResponder: responder },
+    { ...body, approvalResponder: { ...responder, getToken: 'model-chosen' } },
+    { ...body, approvalResponder: { ...responder, attributes: { ...responder.attributes, sourceEventId: 'forged' } } },
+  ]) assert.equal((await handleEveProductRequest(request(value), services)).status, 400)
+  assert.equal(seen.length, 2)
+})
+
+test('native settlement is scoped and cannot supply its own event or schedule authority', async () => {
+  const seen: unknown[] = []
+  const services: EveProductGatewayServices = { authorize: async () => scope, assertSession: async () => {}, run: async (_scope, input) => { seen.push(input); return { ok: true } } }
+  const finish = { operation: 'finish', sessionId: body.sessionId, turnId: body.turnId, outcome: 'completed', messages: [] }
+  assert.equal((await handleEveProductRequest(request(finish), services)).status, 200)
+  assert.equal((await handleEveProductRequest(request({ ...finish, sourceEventId: 'forged' }), services)).status, 400)
+  assert.equal((await handleEveProductRequest(request({ ...finish, scheduledRead: { leaseToken: 'forged' } }), services)).status, 400)
+  assert.equal((await handleEveProductRequest(request({ ...finish, outcome: 'invented' }), services)).status, 400)
+  assert.equal(seen.length, 1)
+})
+
 test('malformed and oversized arguments fail before execution; raw provider failures never leave', async () => {
   const services: EveProductGatewayServices = { authorize: async () => scope, assertSession: async () => {}, run: async () => { throw new Error('provider body: private fixture token') } }
   const failed = await handleEveProductRequest(request(body), services)
