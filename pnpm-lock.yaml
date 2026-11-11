@@ -34,12 +34,6 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^3.0.75
         version: 3.0.75(zod@4.6.7)
-      '@ai-sdk/react':
-        specifier: ^4.0.152
-        version: 4.0.152(react@19.3.1)(zod@4.6.7)
-      '@ai-sdk/workflow':
-        specifier: 2.0.80
-        version: 2.0.80(workflow@5.2.3(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.10.0)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(typescript@5.9.3)(ws@8.22.0))(zod@4.6.7)
       '@base-ui/react':
         specifier: latest
         version: 1.9.0(@date-fns/tz@1.2.0)(@types/react@19.3.0)(date-fns@4.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -914,19 +908,6 @@ packages:
   '@ai-sdk/provider@4.0.31':
     resolution: {integrity: sha512-3wJnwVTFg8SwOyoZCv+ov7Re2GB+7IQnU5a5MYJACrtiWDDUHgqTBeeesq2MB2ddgojzL8hgWleltwpAgtUqfg==}
     engines: {node: '>=22'}
-
-  '@ai-sdk/react@4.0.152':
-    resolution: {integrity: sha512-2A4bttJJgDmdiCTXO6qM6J28q1C3ucAVAwbWzYuaQ4ZF1PUy7GwelNtMGMf2FoRl8krCeHYAdAhRnJlnfciKpQ==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      react: ^18 || ~19.0.1 || ~19.1.2 || ^19.2.1
-
-  '@ai-sdk/workflow@2.0.80':
-    resolution: {integrity: sha512-P9TwqqqSm3nNz+utZAYdyY55K9qECn5LE9wSKSGnIItWRClT4ZiFHUq/OGKw2r4jSgfKAzhlhmyN25AKXfp5OA==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      workflow: ^5.1.0
-      zod: ^3.25.76 || ^4.1.8
 
   '@alloc/quick-lru@5.3.0':
     resolution: {integrity: sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA==}
@@ -12509,27 +12490,6 @@ snapshots:
   '@ai-sdk/provider@4.0.31':
     dependencies:
       json-schema: 0.4.0
-
-  '@ai-sdk/react@4.0.152(react@19.3.1)(zod@4.6.7)':
-    dependencies:
-      '@ai-sdk/mcp': 2.0.81(zod@4.6.7)
-      '@ai-sdk/provider': 4.0.31
-      '@ai-sdk/provider-utils': 5.0.65(zod@4.6.7)
-      ai: 7.0.148(zod@4.6.7)
-      react: 19.3.1
-      swr: 2.5.1(react@19.3.1)
-      throttleit: 2.1.0
-    transitivePeerDependencies:
-      - zod
-
-  '@ai-sdk/workflow@2.0.80(workflow@5.2.3(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.10.0)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(typescript@5.9.3)(ws@8.22.0))(zod@4.6.7)':
-    dependencies:
-      '@ai-sdk/provider': 4.0.31
-      '@ai-sdk/provider-utils': 5.0.65(zod@4.6.7)
-      ai: 7.0.148(zod@4.6.7)
-      ajv: 8.20.0
-      workflow: 5.2.3(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.10.0)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(typescript@5.9.3)(ws@8.22.0)
-      zod: 4.6.7
 
   '@alloc/quick-lru@5.3.0': {}
 

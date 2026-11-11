@@ -97,6 +97,8 @@ export type TaskActivityItem =
   | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; excerpt: string | null; time: (at: string) => string }
 
 export type TaskDetailFrameProps = {
+  /** The loaded task's identity, for task-specific navigation such as Review. Absent in older callers. */
+  taskId?: string
   rootRef: RefObject<HTMLDivElement | null>
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
   /** The page's accessible name: the title, or the title field's label while it is empty. */

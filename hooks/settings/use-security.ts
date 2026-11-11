@@ -23,8 +23,8 @@ export function useSecurity() {
   const [signOutError, setSignOutError] = useState<string | null>(null)
 
   const passwordStatus = password.data && !('error' in password.data) ? password.data : null
-  const passwordError = password.data && 'error' in password.data ? actionError(password.data.error) : null
-  const hasPassword = passwordStatus?.hasPassword ?? false
+  const passwordError = password.data && 'error' in password.data ? actionError(password.data.error) : password.error ? actionError() : null
+  const hasPassword = passwordStatus?.hasPassword ?? null
   const devices: SignedInDevice[] = sessions.data && !('error' in sessions.data) ? sessions.data.sessions : []
   const devicesLoading = !sessions.data && !sessions.error
   /** Why the device list could not be read, or a fixed message when the read itself failed */
@@ -32,6 +32,7 @@ export function useSecurity() {
 
   /** Sets or changes the password; the error to show, or null once saved and read again. */
   async function savePassword({ current, next, revokeOthers }: NewPassword): Promise<string | null> {
+    if (hasPassword === null) return passwordError ?? actionError()
     try {
       const result = hasPassword
         ? await changePassword({ currentPassword: current, newPassword: next, revokeOtherSessions: revokeOthers })
@@ -75,7 +76,7 @@ export function useSecurity() {
   }
 
   return {
-    passwordLoading: password.isLoading, passwordError, hasPassword, savePassword,
+    passwordLoading: password.isLoading, passwordError, hasPassword, savePassword, reloadPassword: () => password.mutate(),
     devices, devicesLoading, devicesError, pendingSession, signOutError, signOut, signOutOthers,
   }
 }

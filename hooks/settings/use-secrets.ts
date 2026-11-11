@@ -257,9 +257,9 @@ export function useSavedLogins() {
   return {
     logins: data && !('error' in data) ? data.logins : [],
     loading: isLoading,
-    failed: Boolean(error),
+    failed: Boolean(error || (data && 'error' in data)),
     deleteError, clearDeleteError: () => setDeleteError(null), remove,
-    reload: () => { void mutate() },
+    reload: () => mutate(),
   }
 }
 
@@ -290,9 +290,9 @@ export function useSavedLoginEditor(login: SavedLogin | null) {
 
 /** Which bots used a saved login, and how it went. */
 export function useSavedLoginUsage(id: string) {
-  const { data, error, isLoading } = useSWR(['account:saved-login-usage', id], () => listSavedLoginUsage(id))
+  const { data, error, isLoading, mutate } = useSWR(['account:saved-login-usage', id], () => listSavedLoginUsage(id))
   const uses: SavedLoginUse[] = data && !('error' in data) ? data.uses : []
-  return { uses, loading: isLoading, failed: Boolean(error) }
+  return { uses, loading: isLoading, failed: Boolean(error || (data && 'error' in data)), reload: () => mutate() }
 }
 
 export const withoutScheme = (site: string): string => site.replace(/^https?:\/\//, '')

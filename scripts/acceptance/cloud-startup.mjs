@@ -3,6 +3,7 @@ import { observeEveSession } from './eve-session.mjs'
 /** #1505: real, normal-session repository dispatch. No provider tokens or DB access.
  *
  * SMOKE_OWNER_EMAIL / SMOKE_OWNER_PASSWORD come from the existing prod:/ identity.
+ * The issue #1918 owned Codex case opts into its separately authorized actor.
  * The Coordinator is the public repository-dispatch entry. Its tool stream has
  * no server timestamp (tool.at is a text offset), so a live report deliberately
  * remains unaligned until the operator supplies the matching dispatch_timing
@@ -15,6 +16,7 @@ import { pathToFileURL } from 'node:url'
 import { readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { selectTeamWorkspace } from './team-workspace.mjs'
 import { isSmokeAccountEmail } from '../../lib/smoke-account.ts'
+import { OWNED_CODEX_ACTOR, isOwnedCodexEmail, ownedCodexAccount, selectOwnedCodexWorkspace } from './owned-codex-actor.mjs'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MODELS = { claude_code: 'claude-haiku-5-5', codex: 'gpt-6-luna' }
@@ -31,7 +33,7 @@ const PREPARATION_PHASES = new Set([...STARTUP_PHASES, 'daemon.adapter.cli_init.
 const sha = value => createHash('sha256').update(value).digest('hex')
 const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cause } : undefined) }
 export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
-  'team_selection', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
+  'team_selection', 'workspace_selection', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
   'chat_model_selection', 'issue_create', 'coordinator_submit', 'coordinator_stream', 'thread_lookup', 'coordinator_stop',
   'subscription_proof', 'bootstrap_publication', 'execution_watch', 'execution_receipt', 'cleanup'])
 // These are driver-owned codes, never a prefix rule accepting arbitrary error
@@ -55,6 +57,9 @@ export const STARTUP_FAILURE_CODES = Object.freeze([
   'vercel_token_required', 'version_pin_required', 'worker_configuration_invalid', 'worker_configuration_missing', 'worker_pin_invalid',
   'worker_release_changed', 'worker_release_mismatch', 'workflow_run_missing', 'workspace_identity_mismatch', 'workspace_invalid',
   'workspace_restore_failed',
+  'owned_account_required', 'owned_actor_model_invalid', 'owned_workspace_mismatch', 'acceptance_actor_invalid',
+  'owned_subscription_model_missing_or_ambiguous', 'owned_subscription_identity_mismatch',
+  'owned_chat_model_ambiguous', 'owned_chat_model_unavailable',
 ].map(code => `startup_${code}`))
 const failureCodes = new Set(STARTUP_FAILURE_CODES)
 export function startupFailure(error, phase = 'unknown') {
@@ -259,19 +264,22 @@ export async function acceptanceBot(client, botId, fixtureId, { issue = 1505, re
   return { botId, created, retention: 'retained_no_delete_api' }
 }
 
-export async function chooseSharedChatModel(client, botId, harness) {
+export async function chooseSharedChatModel(client, botId, harness, owned = false) {
   const provider = harness === 'codex' ? 'codex' : 'claude'
   const menu = await client.rpc('execution-settings.getBotModelMenu', [botId])
+  // BotModelMenu uses owner only for another member's shared credential;
+  // ownSubscriptionOption uses this same undefined-owner contract.
   const matches = (menu.groups ?? []).filter(group => group.kind === 'subscription' && group.provider === provider
-    && typeof group.owner === 'string' && group.owner.trim().length > 0).flatMap(group => group.options ?? [])
+    && (owned ? group.owner === undefined : typeof group.owner === 'string' && group.owner.trim().length > 0)).flatMap(group => group.options ?? [])
     .filter(option => option.provider === provider && option.modelId === MODELS[harness] && UUID.test(option.id ?? ''))
-  assert(matches.length === 1, 'shared_chat_model_ambiguous')
+  assert(matches.length === 1, owned ? 'owned_chat_model_ambiguous' : 'shared_chat_model_ambiguous')
   const chosen = await client.rpc('execution-settings.chooseBotModel', [botId, matches[0].id]), current = chosen.current
-  // A successful shared choice creates a bot binding; catalogue de-duplication
-  // may expose that clone's ID on readback. The frozen run proves the source.
+  // A successful choice creates a bot binding; catalogue de-duplication
+  // may expose that clone's ID on readback. Chat ownership comes from the
+  // selected menu group, independently of the later task's source proof.
   assert(current?.kind === 'subscription' && current.chosen === true && UUID.test(current.id ?? '') && current.fallback === undefined
     && current.provider === provider && current.modelId === MODELS[harness]
-    && (current.available === true || current.availability === 'checking'), 'shared_chat_model_unavailable')
+    && (current.available === true || current.availability === 'checking'), owned ? 'owned_chat_model_unavailable' : 'shared_chat_model_unavailable')
 }
 
 /** A bounded NDJSON read, never a polling loop. Only safe identifiers/times leave. */
@@ -732,6 +740,8 @@ function safeIdentity(identity) {
 }
 
 export async function subscriptionProof(client, record, scope, profile) {
+  const owned = scope.actor === OWNED_CODEX_ACTOR
+  const payerId = owned ? scope.ownerId : scope.adminId, access = owned ? 'owner' : 'workspace_share'
   const evidence = await client.json(`/api/runs/${record.runId}/evidence`), run = evidence.run
   assert(run?.id === record.runId && run.issueId === record.issueId && run.harness === record.harness
     && run.model === MODELS[record.harness] && run.credentialType === 'subscription'
@@ -751,17 +761,17 @@ export async function subscriptionProof(client, record, scope, profile) {
     && identity.billingAccount.runtime.ownerId === scope.ownerId
     && identity.billingAccount.runtime.resourceId === (record.placement.kind === 'cloud' ? scope.ownerId : device.id)
     && subscriptions.length === 1 && UUID.test(subscription?.id ?? '')
-    && subscription.ownerId === scope.adminId && subscription.access === 'workspace_share'
+    && subscription.ownerId === payerId && subscription.access === access
     && /^(0|[1-9][0-9]*)$/.test(subscription.revision ?? '')
-    && payer.ownerId === scope.adminId && payer.resourceId === subscription.id
+    && payer.ownerId === payerId && payer.resourceId === subscription.id
     && run.agentProfile.version === profile.version && run.agentProfile.digest === profile.digest && run.agentProfile.source === 'explicit',
-  'shared_subscription_identity_mismatch')
+  owned ? 'owned_subscription_identity_mismatch' : 'shared_subscription_identity_mismatch')
   record.execution = { harness: run.harness, model: run.model, credentialType: run.credentialType,
     deviceId: device.id, subscriptionRoute: run.subscriptionRoute, identity: safeIdentity(identity),
-    sharedScope: { verified: true, requesterHash: sha(scope.ownerId).slice(0, 16), payerHash: sha(scope.adminId).slice(0, 16),
-      workspaceHash: scope.evidence.teamWorkspaceHash, connectionHash: sha(profile.model.source.connectionId).slice(0, 16),
+    [owned ? 'ownedScope' : 'sharedScope']: { verified: true, requesterHash: sha(scope.ownerId).slice(0, 16), payerHash: sha(payerId).slice(0, 16),
+      workspaceHash: owned ? scope.evidence.workspaceHash : scope.evidence.teamWorkspaceHash, connectionHash: sha(profile.model.source.connectionId).slice(0, 16),
       bindingHash: sha(subscription.id).slice(0, 16), connectionRevision: subscription.revision,
-      profileVersion: profile.version, profileDigest: profile.digest, access: 'workspace_share' } }
+      profileVersion: profile.version, profileDigest: profile.digest, access } }
 }
 
 export async function cleanupCase(client, record, target, { timeoutMs = 60000, WebSocketImpl = globalThis.WebSocket, now = Date.now, preserveIssue = false } = {}) {
@@ -868,12 +878,16 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
-  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued, createCaseProbe }) {
+  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued, createCaseProbe, onFixture }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
-  assert(scope?.ownerId && scope.adminId && scope.ownerId !== scope.adminId && scope.botId === botId
-    && UUID.test(scope.workspaceId ?? '') && profile?.id === profileId && /^[a-f0-9]{64}$/.test(profile.digest ?? ''), 'shared_scope_required')
+  const owned = scope?.actor === OWNED_CODEX_ACTOR
+  assert(scope?.ownerId && (owned ? scope.evidence?.kind === 'personal' && scope.evidence.membershipVerified === true
+    : scope.adminId && scope.ownerId !== scope.adminId) && scope.botId === botId
+    && UUID.test(scope.workspaceId ?? '') && profile?.id === profileId && /^[a-f0-9]{64}$/.test(profile.digest ?? ''),
+  owned ? 'owned_workspace_mismatch' : 'shared_scope_required')
   assert(Object.hasOwn(MODELS, harness) && model === MODELS[harness], 'model_invalid')
+  assert(!owned || harness === 'codex', 'owned_actor_model_invalid')
   assert(repository === REPOSITORY && titlePrefix.includes('测试') && titlePrefix.length <= 80, 'fixture_scope_invalid')
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
@@ -899,7 +913,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     initialPinPassed = true
     record.phase = 'session_identity'
     const identity = await client.json('/api/auth/get-session')
-    assert(identity.user?.id === scope.ownerId && isSmokeAccountEmail(identity.user.email), 'session_identity_mismatch')
+    assert(identity.user?.id === scope.ownerId && (owned ? isOwnedCodexEmail(identity.user.email) : isSmokeAccountEmail(identity.user.email)), 'session_identity_mismatch')
     record.phase = 'workspace_identity'
     const workspace = await client.json('/api/workspace')
     assert(workspace.currentUserId === scope.ownerId && workspace.workspace?.id === scope.workspaceId, 'workspace_identity_mismatch')
@@ -907,7 +921,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     const bot = await client.json(`/api/bots/${botId}`)
     assert(bot.id === botId && /^测试\s*1505(?:\s|$)/.test(bot.name ?? ''), 'test_bot_required')
     record.phase = 'chat_model_selection'
-    await chooseSharedChatModel(client, botId, harness)
+    await chooseSharedChatModel(client, botId, harness, owned)
     record.phase = 'issue_create'
     const leaseDriver = leaseAudit ? await import('./cloud-lease-audit.mjs') : null
     const leaseInstructions = leaseDriver ? await leaseDriver.leaseAuditInstructions(sampleId, harness) : ''
@@ -916,7 +930,9 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     } }
     const created = probe ? await probe.createIssue(issueInput) : await client.rpc('issues.saveIssue', [issueInput])
     assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
+    await onFixture?.({ kind: 'issue', id: record.issueId, profileId })
     await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit, probe }, now)
+    await onFixture?.({ kind: 'run', id: record.runId, issueId: record.issueId, profileId })
     record.phase = 'coordinator_stop'
     await client.rpc('coordinator.stopCoordinatorTurn', [botId])
     record.coordinatorStopped = true
@@ -991,11 +1007,14 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
 }
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
-  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued, createCaseProbe, caseProfileInstructions } = {}) {
-  const { email, password } = smokeAcceptanceAccount(env)
+  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued, createCaseProbe, caseProfileInstructions, onFixture } = {}) {
+  const actor = options.actor ?? 'shared_smoke', owned = actor === OWNED_CODEX_ACTOR
+  assert(owned || actor === 'shared_smoke', 'acceptance_actor_invalid')
+  assert(!owned || options.harness === 'codex', 'owned_actor_model_invalid')
+  const { email, password } = owned ? ownedCodexAccount(env) : smokeAcceptanceAccount(env)
   assert(typeof WebSocketImpl === 'function', 'node_websocket_required')
   const client = createSessionClient(options.origin, fetchImpl), fixtureId = randomUUID()
-  const report = { schemaVersion: 1, issue: 1505, fixtureId, startedAt: iso(now()), mode: options.mode,
+  const report = { schemaVersion: 1, issue: 1505, actor, fixtureId, startedAt: iso(now()), mode: options.mode,
     origin: options.origin, repository: REPOSITORY, requestedStrategy: options.strategy,
     strategyEvidence: 'operator_label_requires_template_or_pool_log_evidence', revision: options.revision ?? null,
     target: options.deviceId ? 'candidate_device' : 'cloud', maxStartupMs: options.maxStartupMs,
@@ -1028,9 +1047,10 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
     assert(identity.user?.email?.toLowerCase() === email.toLowerCase() && typeof identity.user.id === 'string' && identity.user.id.length > 0, 'session_identity_mismatch')
     ownerId = identity.user.id
     report.accountHash = sha(identity.user.id).slice(0, 16)
-    report.phase = 'team_selection'
-    scope = await selectAcceptanceTeam(client, { ownerId, workspace: options.workspace }, value => { originalWorkspaceId = value })
-    report.team = scope.evidence
+    report.phase = owned ? 'workspace_selection' : 'team_selection'
+    scope = await (owned ? selectOwnedCodexWorkspace : selectAcceptanceTeam)(client, { ownerId, workspace: options.workspace }, value => { originalWorkspaceId = value })
+    if (owned) report.workspace = scope.evidence
+    else report.team = scope.evidence
     report.phase = 'timing_configuration'
     if (options.officialTiming === 'enabled') {
       if (options.mode === 'candidate') {
@@ -1061,6 +1081,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
     report.phase = 'bot_create'
     const fixture = await acceptanceBot(client, botId, fixtureId)
     botId = fixture.botId
+    if (fixture.created) await onFixture?.({ kind: 'bot', id: botId })
     if (fixture.created) report.createdBotId = botId
     report.botRetention = fixture.retention
     scope.botId = botId
@@ -1074,7 +1095,8 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       try {
         const candidates = (order.candidates ?? []).filter(item => item.harness === harness && item.model === MODELS[harness]
           && item.source?.kind === 'subscription' && UUID.test(item.source.connectionId ?? ''))
-        assert(candidates.length === 1 && candidates[0].credentialOwnerId === scope.adminId, 'shared_subscription_model_missing_or_ambiguous')
+        assert(candidates.length === 1 && candidates[0].credentialOwnerId === (owned ? scope.ownerId : scope.adminId),
+          owned ? 'owned_subscription_model_missing_or_ambiguous' : 'shared_subscription_model_missing_or_ambiguous')
         const candidate = candidates[0]
         phase = 'profile_create'
         const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
@@ -1085,6 +1107,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         phase = 'profile_validation'
         assert(UUID.test(created.profile?.id ?? '') && Number.isInteger(created.profile.version) && created.profile.version > 0, 'profile_create_failed')
         profiles.set(harness, created.profile)
+        await onFixture?.({ kind: 'profile', id: created.profile.id, harness, workspaceId: scope.workspaceId })
         assert(/^[a-f0-9]{64}$/.test(created.profile.digest ?? '') && created.profile.harness === harness
           && created.profile.model?.mode === 'fixed' && created.profile.model.harness === harness && created.profile.model.model === MODELS[harness]
           && created.profile.model.source?.kind === 'subscription' && created.profile.model.source.connectionId === candidate.source.connectionId, 'profile_source_mismatch')
@@ -1102,7 +1125,7 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       }
       report.phase = 'profile_validation'
       const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
-        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued, createCaseProbe })
+        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued, createCaseProbe, onFixture })
       report.samples.push(sample)
       const versionFailure = sample.versionPinFailure?.code ?? (['startup_build_mismatch', 'startup_build_changed',
         'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error) ? sample.error : null)

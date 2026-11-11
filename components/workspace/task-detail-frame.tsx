@@ -223,6 +223,7 @@ export function FramedTask(props: FramedTaskProps) {
 
   const created = new Date(task.createdAt)
   return <Frame
+    taskId={preview ? undefined : task.id}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}
