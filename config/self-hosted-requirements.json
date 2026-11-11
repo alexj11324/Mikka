@@ -238,7 +238,7 @@
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Only a committed, source-bound CI result for an existing finished Run may take the model-free Coordinator transport path. It grants neither GitHub permissions nor merge authority.",
+    "behavior": "Only a committed CI suite notification bound to the finished run can bypass paid semantic triage. The transport grants no GitHub authority.",
     "test": "lib/coordinator/ci-suite-transport.test.mjs"
   },
   "lib/coordinator/decision-provider.ts": {
@@ -376,18 +376,18 @@
     "suite": "test:task-presentation-db"
   },
   "lib/github/ci-suite-event.ts": {
-    "mode": "built-in",
+    "mode": "operator-configured",
     "environment": [],
-    "behavior": "Validate a bounded completed GitHub suite hint and match only the installation publication for its repository, open PR and associated source head. A hint is not a required-check rollup or approval.",
+    "behavior": "A configured GitHub App projects verified completed check suites into bounded notifications and validates the associated pull-request head.",
     "test": "lib/github/ci-suite-event.test.ts",
     "suite": "test:github"
   },
   "lib/github/ci-suite-wake.ts": {
-    "mode": "optional-cloud",
+    "mode": "operator-configured",
     "environment": [],
-    "behavior": "A configured signed GitHub webhook persists a deduplicated hint only for the installation existing finished Run and publication. It uses the local Coordinator outbox and never acknowledges a failed persistence write or creates a polling or merge authority path.",
-    "test": "app/api/webhooks/github/route.test.ts",
-    "suite": "test:suggestions"
+    "behavior": "For a configured GitHub App, use the installation PostgreSQL publication and run records to enqueue a Coordinator wake only for an ended run on the same repository and pull-request head.",
+    "test": "lib/github/publication-webhook.db.test.ts",
+    "suite": "test:run-publication-db"
   },
   "lib/github/comment-mention.ts": {
     "mode": "built-in",
