@@ -4,8 +4,8 @@ name: E2B additive runtime release
 on:
   push:
     branches: [main]
-    # An unrelated merge can obsolete an in-flight publication. Recheck the
-    # live worker on every main push; failed input fingerprints skip retries.
+    # The cheap check compares canonical installed-worker/template inputs
+    # across the complete push. Unrelated app edits never acquire the release queue.
   pull_request:
     paths: &runtime_paths
       - 'package.json'
@@ -42,7 +42,7 @@ on:
       - 'scripts/release/web-deploy.mjs'
       - 'scripts/release/build-vercel.mjs'
       - 'scripts/release/web-deploy.test.mjs'
-      # This issue's acceptance requires a same-application-SHA runtime proof.
+      # These paths select offline PR checks, not paid runtime build eligibility.
       - '.github/workflows/model-provider-fallback-acceptance.yml'
       - 'scripts/acceptance/model-provider-fallback.mjs'
       - 'scripts/acceptance/model-provider-fallback.test.mjs'
@@ -93,9 +93,8 @@ jobs:
     permissions:
       contents: read
       actions: read
-      id-token: write
     outputs:
-      changed: ${{ steps.compare.outputs.changed || 'false' }}
+      changed: ${{ steps.history.outputs.changed || 'false' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -108,40 +107,12 @@ jobs:
         run: node scripts/release/web-deploy.mjs main
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Check publication-control changes across this push
-        id: control
-        run: node scripts/release/web-deploy.mjs runtime-refresh
-        env:
-          RUNTIME_REFRESH: ${{ inputs.runtime-refresh }}
-      - name: Fingerprint runtime inputs and suppress a previously failed automatic retry
+      - name: Compare canonical worker inputs across this push and check failed attempts
         id: history
         run: node scripts/e2b/runtime-inputs.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RETRY_REASON: ${{ inputs.reason }}
-      - name: Read the Vercel team token through Infisical workload identity
-        if: steps.history.outputs.skip != 'true'
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          include-imports: false
-      - name: Compare the worker hash with production
-        if: steps.history.outputs.skip != 'true'
-        id: compare
-        run: |
-          wanted="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
-          live="$(node scripts/e2b/publish-template-env.mjs --current)"
-          echo "worker hash $wanted; production $live"
-          if [ "$MANUAL_RETRY" = true ] || [ "$RUNTIME_REFRESH" = true ] || [ "$wanted" != "$live" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
-        env:
-          RUNTIME_REFRESH: ${{ steps.control.outputs.refresh }}
-          MANUAL_RETRY: ${{ github.event_name == 'workflow_dispatch' }}
   release:
     needs: [test, check]
     if: needs.check.outputs.changed == 'true'

@@ -2,6 +2,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { validateTarget } from '../scripts/run-db-tests.mjs'
 
@@ -11,6 +16,71 @@ import { validateTarget } from '../scripts/run-db-tests.mjs'
 validateTarget(process.env)
 const { Client } = await import('pg')
 const NOTX = '-- migrate: no-transaction\n'
+
+test('PG17: the real runner converges fresh and upgraded databases with an older missing migration', async t => {
+  const client = new Client({ connectionString: process.env.E2E_DATABASE_URL })
+  await client.connect()
+  const databases = []
+  t.after(async () => {
+    try { for (const name of databases) await client.query('DROP DATABASE ' + name) }
+    finally { await client.end() }
+  })
+  const root = mkdtempSync(join(tmpdir(), 'migration-ledger-'))
+  const scripts = join(root, 'scripts'), directory = join(root, 'drizzle')
+  mkdirSync(scripts); mkdirSync(directory)
+  const actualScripts = fileURLToPath(new URL('../scripts/', import.meta.url))
+  const actualMigrations = fileURLToPath(new URL('../drizzle/', import.meta.url))
+  // The actual command, helpers, audited source SQL and pg stay intact. Only
+  // independent fixture migrations and disposable target databases are added.
+  writeFileSync(join(scripts, 'migrate.mjs'), readFileSync(new URL('../scripts/migrate.mjs', import.meta.url)))
+  for (const name of readdirSync(actualScripts).filter(name => name.endsWith('.mjs') && name !== 'migrate.mjs')) symlinkSync(join(actualScripts, name), join(scripts, name))
+  symlinkSync(fileURLToPath(new URL('../node_modules/', import.meta.url)), join(root, 'node_modules'), 'dir')
+  const existing = readdirSync(actualMigrations).filter(name => name.endsWith('.sql'))
+  for (const name of existing) writeFileSync(join(directory, name), readFileSync(join(actualMigrations, name)))
+  const older = '20261112000000_rails_ledger_older.sql', newer = '20261112040000_rails_ledger_newer.sql'
+  const olderSql = 'CREATE TABLE rails_older_feature(id integer); INSERT INTO rails_older_feature VALUES (1);'
+  writeFileSync(join(directory, newer), 'CREATE TABLE rails_newer_feature(id integer); INSERT INTO rails_newer_feature VALUES (2);')
+  const target = name => { const url = new URL(process.env.E2E_DATABASE_URL); url.pathname = '/' + name; return url.href }
+  const run = name => {
+    const url = target(name)
+    const result = spawnSync(process.execPath, [join(scripts, 'migrate.mjs')], {
+      cwd: root, encoding: 'utf8', env: { ...process.env, MIGRATE: '1', VERCEL: '', VERCEL_ENV: '',
+        E2E_DATABASE_URL: url, MIKKA_DATABASE_URL: url, DATABASE_URL: url },
+    })
+    assert.equal(result.status, 0, result.stderr)
+    return [...result.stdout.matchAll(/migrate: applied (\S+) to/g)].map(match => match[1])
+  }
+  const snapshot = async name => {
+    const connection = new Client({ connectionString: target(name) })
+    await connection.connect()
+    try { return {
+      columns: (await connection.query("SELECT table_name,column_name,data_type FROM information_schema.columns WHERE table_schema='public' AND table_name LIKE 'rails_%' ORDER BY table_name,ordinal_position")).rows,
+      rows: (await connection.query("SELECT 'older' kind,id FROM rails_older_feature UNION ALL SELECT 'newer' kind,id FROM rails_newer_feature ORDER BY kind")).rows,
+      applied: (await connection.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(row => row.name),
+    } } finally { await connection.end() }
+  }
+  const results = []
+  for (const mode of ['fresh', 'upgrade']) {
+    const name = 'rails_migration_' + mode + '_' + randomUUID().replaceAll('-', '') + '_e2e'
+    assert.match(name, /^rails_migration_(fresh|upgrade)_[a-f0-9]{32}_e2e$/)
+    await client.query('CREATE DATABASE ' + name)
+    databases.push(name)
+    if (mode === 'fresh') writeFileSync(join(directory, older), olderSql)
+    else unlinkSync(join(directory, older))
+    run(name)
+    if (mode === 'upgrade') {
+      writeFileSync(join(directory, older), olderSql)
+      assert.deepEqual(run(name), [older], 'only the lower-timestamp missing file runs after a newer file was recorded')
+    }
+    const complete = await snapshot(name)
+    assert.deepEqual(complete.applied, [...existing, older, newer].sort())
+    assert.deepEqual(run(name), [], 'a retry replays no recorded file')
+    assert.deepEqual(await snapshot(name), complete)
+    results.push(complete)
+  }
+  assert.deepEqual(results[0], results[1], 'fresh replay and the lower-timestamp upgrade converge')
+  console.log('Retained real migration runner fixture: ' + root)
+})
 
 test('PG17: nontransactional indexes, invalid retry, ledger and separate validation', async (t) => {
   const client = new Client({ connectionString: process.env.E2E_DATABASE_URL })

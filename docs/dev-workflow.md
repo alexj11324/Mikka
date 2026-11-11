@@ -194,13 +194,38 @@ contract in [`acceptance.md`](acceptance.md). Pull requests and branches have no
 runs on GitHub Actions, and only `main` deploys, to production
 ([decision 2026-11-05-1632](design/decisions/2026-11-05-1632-no-vercel-preview.md)).
 
-## 6. Numbers
+## 6. Rule IDs and migrations
 
-Rule ids (`R-xx`) and migration timestamps are assigned by the coordinator
-when it writes the issue, so parallel branches do not collide. A session
-that needs one and has none asks the coordinator. The coordinator assigns
-increasing timestamps. `scripts/check-migrations.mjs` refuses a timestamp at or below the newest one on `main`, so if they merge out
-of order, whoever merges the later one renames it.
+The coordinator assigns rule IDs (`R-xx`) when it writes the issue. Migration
+IDs are generated automatically, following the
+[Rails-style migration decision](design/decisions/2026-11-11-1151-automatic-migration-ids.md).
+
+To add a database migration:
+
+1. From the repository root, run `pnpm migration:new add_project_notes`.
+   It creates `drizzle/YYYYMMDDHHMMSS_add_project_notes.sql`.
+2. Write the SQL in that file. The generated header targets
+   `MIKKA_DATABASE_URL`; use `-- target: DATABASE_URL` for the workspace database.
+3. Run `pnpm check:migrations` and `pnpm test:migrations`. Verify the SQL against
+   an isolated database, covering both a fresh replay and an upgrade from the
+   preceding deployed schema.
+
+The generator takes the later of the current UTC second and the latest local
+migration ID plus one second. It reserves IDs atomically across this clone's
+Git worktrees and advances automatically on a collision, including concurrent
+invocations. There are no Agent ranges or manually allocated timestamps.
+
+The runner sorts pending files and checks each full filename against that
+database's `schema_migrations` ledger. A missing file runs even if its timestamp
+is older than an already executed file. Independent branches can merge in
+either order without renumbering; SQL dependencies still need to merge first.
+
+Keep inherited `main` migrations and every executed migration under their
+original names with their original SQL. Add a corrective migration for changes.
+The checker rejects malformed or duplicate IDs and changes to inherited history.
+Independent clones can still collide: regenerate an unexecuted migration with
+the command before merging, while retaining every executed file. Existing
+historical aliases and transaction rules remain in force.
 
 ## 7. E2B templates
 
