@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { completedCiSuite, linkedCiSuiteRun } from './ci-suite-event'
+import { GITHUB_APP_MANIFEST_TEMPLATE } from './manifest-template'
 
 const sha = 'a'.repeat(40)
 const payload = {
@@ -64,4 +65,12 @@ test('only an already-bound open PR on exactly that head and repository receives
   assert(linkedCiSuiteRun(fork, row))
   assert(!linkedCiSuiteRun(fork, { ...row, headSha: 'c'.repeat(40) }))
   assert(!linkedCiSuiteRun(fork, { ...row, pullUrl: 'https://github.com/foreign/repo/pull/7' }))
+})
+
+test('new self-hosted GitHub Apps subscribe to aggregate CI results without more permissions', () => {
+  assert(GITHUB_APP_MANIFEST_TEMPLATE.events.includes('check_suite'))
+  assert(GITHUB_APP_MANIFEST_TEMPLATE.events.includes('status'))
+  assert.equal(GITHUB_APP_MANIFEST_TEMPLATE.permissions.checks, 'read')
+  assert.equal(GITHUB_APP_MANIFEST_TEMPLATE.permissions.statuses, 'read')
+  assert(!GITHUB_APP_MANIFEST_TEMPLATE.events.includes('workflow_run'))
 })
