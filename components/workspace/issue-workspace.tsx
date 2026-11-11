@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { useSearchParams } from 'next/navigation'
@@ -43,6 +43,7 @@ import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { BrowserPane } from '@/components/browser/browser-pane'
+import { browserAddressRequest, browserAddressVersion, subscribeBrowserAddress } from '@/lib/browser/navigation'
 import { ThreadColumn } from './thread-column'
 import { AllThreadsColumn, AllThreadsToggle, waitingCount } from '@/components/nav/all-threads'
 import { pendingTaskCount } from '@/hooks/use-bot-tasks'
@@ -75,7 +76,7 @@ import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { InlineLoadError } from '@/components/load-error'
 import { PluginsPage as DefaultPluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
-import { backToTaskOrigin, dropQueryKeys, goTo, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
+import { backToTaskOrigin, dropQueryKeys, goTo, navigate as navigateWorkspace, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest, appHrefBeforeSettings, rememberAppHref } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
@@ -251,6 +252,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const [panelOpen, setPanelOpen] = useState(true)
   // FRAME_OWNS_PANEL: which of the chat's work-area tabs the page last asked to show, counting up each time.
   const [panelReveal, setPanelReveal] = useState<{ reveal: number; revealId: 'overview' | 'browser' | null }>({ reveal: 0, revealId: null })
+  const browserRequestVersion = useSyncExternalStore(subscribeBrowserAddress, browserAddressVersion, () => 0)
+  const handledBrowserRequest = useRef(browserAddressRequest() ? 0 : browserRequestVersion)
   useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
   // Below xl the column has no room, so 打开右栏 shows it in a Sheet instead.
   const [panelSheet, setPanelSheet] = useState(false)
@@ -593,6 +596,16 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // conversation's own work area; nothing stands beside the chat. Both wait folded until asked for: the work area's
   // + (its Tools), ⌘⇧B for the browser, or the phone's chat pill for the Overview.
   const panelsInFrame = FRAME_OWNS_PANEL && isConversation
+  // One address opener serves chat tabs and the existing browser column on other pages.
+  useEffect(() => {
+    if (!browserRequestVersion || handledBrowserRequest.current === browserRequestVersion) return
+    handledBrowserRequest.current = browserRequestVersion
+    if (panelsInFrame) setPanelReveal(value => ({ reveal: value.reveal + 1, revealId: 'browser' }))
+    else {
+      if (threadId || taskId || threadsView) navigateWorkspace({ thread: null, task: null, threads: null }, 'replace')
+      showBrowser(true)
+    }
+  }, [browserRequestVersion, panelsInFrame, threadId, taskId, threadsView])
   const conversationPanels = panelsInFrame ? { ...panelReveal, tabs: [
     { id: 'overview' as const, title: i18nText('Shell.panel.overview'), content: <ContextPanel key="context-panel" sheet frameTab workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => {}}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: botChatSummaries && coordinatorBot ? botChatSummaries.items[coordinatorBot.id]?.at ?? undefined : undefined }} /> },

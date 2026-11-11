@@ -6922,6 +6922,7 @@
     "modeAskText": "Writes follow the settings above, then the Decision API; agents follow their run permissions",
     "modeReadOnlyText": "Reads and reports, changes nothing",
     "unsetText": "Nothing set: an app write goes to the Decision API; an agent action follows the run policy",
+    "toolsComponentUnavailable": "This version cannot display the tool list",
     "runTitle": "Agent run permissions",
     "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here"
   },
