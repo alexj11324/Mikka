@@ -80,6 +80,7 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
   async function copyDiagnostics() {
     const text = JSON.stringify({ run: evidence.id, harness: evidence.harness, model: evidence.model, credentialType: evidence.credentialType,
       subscriptionRoute: evidence.subscriptionRoute, executionIdentity: evidence.executionIdentity, modelRouting: evidence.modelRouting ?? null,
+      skillPrompt: evidence.skillPrompt ?? null,
       agentProfile: profile ? { profileId: profile.profileId, version: profile.version, source: profile.source } : null }, null, 2)
     try { await navigator.clipboard.writeText(text); toast.success(t('diagnosticsCopied')) }
     catch { toast.error(t('diagnosticsCopyFailed')) }
@@ -168,6 +169,18 @@ export function ThreadExecutionIdentityContent({ evidence }: { evidence: ThreadE
         <ValueRow label={t('billing')}><span>{cost()}</span></ValueRow>
       </dl>
     </>}
+    {evidence.skillPrompt && <dl className="flex flex-col gap-3"><ValueRow label={t('skills')}>
+      <Line>
+        <span>{t('skillsInlined')}</span>
+        <Quiet>· {evidence.skillPrompt.inlined.length === 0 ? t('unknown') : evidence.skillPrompt.inlined.join(t('roleSeparator'))}</Quiet>
+      </Line>
+      {/* A body the prompt could not hold is a real difference in what ran; name every skill it left out. */}
+      {evidence.skillPrompt.deferred.length > 0 && <Line>
+        <span>{t('skillsDeferred')}</span>
+        <Quiet>· {evidence.skillPrompt.deferred.join(t('roleSeparator'))}</Quiet>
+      </Line>}
+      <Quiet>{t('skillsBudget', { used: evidence.skillPrompt.usedChars, budget: evidence.skillPrompt.budgetChars })}</Quiet>
+    </ValueRow></dl>}
     <div><Button variant="ghost" size="sm" onClick={() => { void copyDiagnostics() }}><Copy data-icon="inline-start" />{t('copyDiagnostics')}</Button></div>
   </div>
 }
