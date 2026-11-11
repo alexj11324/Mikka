@@ -50,6 +50,7 @@ import { useInboxCount } from '@/hooks/use-inbox-count'
 import { TaskColumn } from './task-column'
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
 import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
+import { BROWSER_COLUMN_EVENT, type BrowserColumnRequest } from '@/lib/browser/column'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
 import type { BotView } from '@/app/actions/bots'
 import { chatPreview } from '@/lib/agent-history'
@@ -280,7 +281,22 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // Below lg the toggle is hidden, so the browser counts as closed and the right panel stays.
   const browserFits = useBrowserFits()
   const browserShown = browserOpen && browserFits
-  function showBrowser(next: boolean) { setBrowserOpen(next); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
+  const [browserAt, setBrowserAt] = useState<{ url: string; width?: number; id: number } | null>(null)
+  function showBrowser(next: boolean) { setBrowserOpen(next); if (!next) setBrowserAt(null); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
+  // The review page's ⋯ 预览 asks for the column (lib/browser/column.ts), on a page when it names one.
+  useEffect(() => {
+    const request = (event: Event) => {
+      const { open, url, width } = (event as CustomEvent<BrowserColumnRequest>).detail
+      if (open && url) {
+        setBrowserAt(previous => ({ url, width, id: (previous?.id ?? 0) + 1 }))
+        // A frame that owns the panel (FRAME_OWNS_PANEL) shows the browser as a work-area tab; reveal that tab.
+        if (FRAME_OWNS_PANEL) setPanelReveal(previous => ({ reveal: previous.reveal + 1, revealId: 'browser' }))
+      }
+      showBrowser(open)
+    }
+    window.addEventListener(BROWSER_COLUMN_EVENT, request)
+    return () => window.removeEventListener(BROWSER_COLUMN_EVENT, request)
+  }, [])
   const [teamId, setTeamId] = useState<string | null>(() => readLocation(params).team)
   const activeTeam = teams.find(team => team.id === teamId)
   const [section, setSection] = useState<WorkspaceSection>(() => { const at = readLocation(params); return at.team || at.group ? at.section : initialSection })
@@ -562,6 +578,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // The task in front of the person, for ⌘⇧B and ⌘K 「审阅 #N」: the task beside the centre, the open thread's, else the task page.
   const reviewTarget = taskShown ?? shownThread?.issueId ?? selected
   const review = useReviewPage()
+  // The review page covers the card except the browser column (R10b): with the browser open, the page narrows beside it,
+  // and the right of the card is the browser alone; the globe then only opens and closes it.
+  // A frame that owns the panel (FRAME_OWNS_PANEL) shows the browser as a work-area tab instead, not an aside.
+  const reviewOpen = reviewEnabled && !!review.taskId
   useEffect(() => {
     if (!reviewEnabled || !reviewTarget) return
     const target = reviewTarget
@@ -582,10 +602,11 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // conversation's own work area; nothing stands beside the chat. Both wait folded until asked for: the work area's
   // + (its Tools), ⌘⇧B for the browser, or the phone's chat pill for the Overview.
   const panelsInFrame = FRAME_OWNS_PANEL && isConversation
+  const besideReview = reviewOpen && browserShown && !panelsInFrame
   const conversationPanels = panelsInFrame ? { ...panelReveal, tabs: [
     { id: 'overview' as const, title: i18nText('Shell.panel.overview'), content: <ContextPanel key="context-panel" sheet frameTab workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => {}}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: botChatSummaries && coordinatorBot ? botChatSummaries.items[coordinatorBot.id]?.at ?? undefined : undefined }} /> },
-    { id: 'browser' as const, title: i18nText('Browser.label'), content: <BrowserPane inTab onClose={() => showBrowser(false)} /> },
+    { id: 'browser' as const, title: i18nText('Browser.label'), content: <BrowserPane inTab openAt={browserAt} onClose={() => showBrowser(false)} /> },
   ] } : undefined
   const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
   for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })
@@ -642,7 +663,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
-    bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
+    bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && (reviewOpen || !threadsView)} onToggle={settingsShown ? browserFromSettings : reviewOpen ? () => showBrowser(!browserShown) : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
     rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, entries: chatNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreatingGroup(true) }} onSearch={searchFromBar} inboxCount={inboxItems} />}>
     {settingsShown ? settingsContent
       : <>
@@ -659,10 +680,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={openFromList} onCreate={() => create()} />
       </>}
     </AppShellContent>
-    {browserShown && !threadShown && !threadsView && !panelsInFrame && <BrowserPane onClose={() => showBrowser(false)} />}
-    {threadShown && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
-    {taskShown && !threadShown && <TaskColumn issueId={taskShown} issue={tasks.find(task => task.id === taskShown)} threads={threads} overList={!!threadsView} />}
-    {threadsView && !threadShown && !taskShown && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} loading={threadsLoading} />}
+    {browserShown && (besideReview || (!threadShown && !threadsView)) && !panelsInFrame && <BrowserPane openAt={browserAt} onClose={() => showBrowser(false)} />}
+    {threadShown && !besideReview && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
+    {taskShown && !threadShown && !besideReview && <TaskColumn issueId={taskShown} issue={tasks.find(task => task.id === taskShown)} threads={threads} overList={!!threadsView} />}
+    {threadsView && !threadShown && !taskShown && !besideReview && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} loading={threadsLoading} />}
     {/* Opening, closing and handing the column to a thread are instant (R-37). */}
     {isConversation && !panelsInFrame && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: coordinatorUpdatedAt }} />}

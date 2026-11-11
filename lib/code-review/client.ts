@@ -11,9 +11,12 @@ import {
   type ReviewDiff,
   type ReviewFile,
   type ReviewFileRead,
+  type ReviewPreview,
   type ReviewRead,
   type ReviewSubmission,
   type ReviewSummary,
+  type ReviewTerminalEvent,
+  type ReviewTerminalRefusal,
   type SendToAgentResult,
 } from './contract'
 
@@ -33,6 +36,12 @@ export const REVIEW_ENDPOINTS = {
   send: (taskId: string) => `${task(taskId)}/send`,
   /** POST { confirmFailedChecks } → 200 { merged: true } | 409 { error: 'needs_confirm', failing } | 403 { error: reason, reason, message? } */
   merge: (taskId: string) => `${task(taskId)}/merge`,
+  /** GET, text/event-stream → `output` { text } … `ended` { exitCode } | 404 (no terminal) | 403 { error: 'not_owner_terminal' } | 409 (reclaimed) */
+  terminal: (taskId: string) => `${task(taskId)}/terminal`,
+  /** POST { data } → 204 */
+  terminalInput: (taskId: string) => `${task(taskId)}/terminal/input`,
+  /** GET → { running: true, url } | { running: false } | 404 (no preview: read as not running) */
+  preview: (taskId: string) => `${task(taskId)}/preview`,
 } as const
 
 /** A review response that was not what the contract says: a failed request, or a body of the wrong shape. */
@@ -179,4 +188,84 @@ export async function mergeReview(taskId: string, options: { confirm: boolean })
   }
   parse(mergedSchema, reply)
   return { kind: 'merged' }
+}
+
+const terminalEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('output'), text: z.string() }),
+  z.object({ type: z.literal('ended'), exitCode: z.number().int().nullable() }),
+]) satisfies z.ZodType<ReviewTerminalEvent>
+
+/** One server-sent event block (`event:` and `data:` lines) as a terminal event; anything else is skipped. */
+export function terminalEvent(block: string): ReviewTerminalEvent | null {
+  let type = 'message'
+  const data: string[] = []
+  for (const line of block.split(/\r?\n/)) {
+    if (line.startsWith('event:')) type = line.slice(6).trim()
+    else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''))
+  }
+  if (!data.length) return null
+  try {
+    const parsed = terminalEventSchema.safeParse({ ...JSON.parse(data.join('\n')), type })
+    return parsed.success ? parsed.data : null
+  } catch { return null }
+}
+
+async function* terminalEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<ReviewTerminalEvent> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let end: number
+      while ((end = buffer.search(/\r?\n\r?\n/)) >= 0) {
+        const block = buffer.slice(0, end)
+        buffer = buffer.slice(end).replace(/^\r?\n\r?\n/, '')
+        const event = terminalEvent(block)
+        if (event) yield event
+      }
+    }
+    // A stream that ends without the final blank line still carries its last event (often `ended`).
+    buffer += decoder.decode()
+    if (buffer.trim()) {
+      const event = terminalEvent(buffer)
+      if (event) yield event
+    }
+  } finally {
+    await reader.cancel().catch(() => {})
+    reader.releaseLock()
+  }
+}
+
+/**
+ * Opens the task's terminal (R5): its events as they arrive, or why it did not open. The stream ends when the server
+ * closes it; abort `signal` to leave.
+ */
+export async function openReviewTerminal(taskId: string, signal: AbortSignal): Promise<{ kind: 'open'; events: AsyncGenerator<ReviewTerminalEvent> } | { kind: 'refused'; reason: ReviewTerminalRefusal }> {
+  const response = await fetch(withBasePath(REVIEW_ENDPOINTS.terminal(taskId)), { credentials: 'same-origin', cache: 'no-store', headers: { accept: 'text/event-stream' }, signal })
+  if (response.status === 404) return { kind: 'refused', reason: 'no_endpoint' }
+  if (response.status === 403) return { kind: 'refused', reason: 'denied' }
+  if (response.status === 409) return { kind: 'refused', reason: 'reclaimed' }
+  if (!response.ok || !response.body) throw new ReviewRequestError(response.status, await response.text().catch(() => null))
+  return { kind: 'open', events: terminalEvents(response.body) }
+}
+
+/** Types into the task's terminal. */
+export async function sendReviewTerminalInput(taskId: string, data: string): Promise<void> {
+  const reply = await request(REVIEW_ENDPOINTS.terminalInput(taskId), { method: 'POST', json: { data } })
+  if (reply.status < 200 || reply.status >= 300) throw new ReviewRequestError(reply.status, reply.body)
+}
+
+const previewSchema = z.union([
+  z.object({ running: z.literal(true), url: z.string().url() }),
+  z.object({ running: z.literal(false) }),
+]) satisfies z.ZodType<ReviewPreview>
+
+/** The task's dev preview (R10a, R10b): its address, or no dev server (also when the server has no preview, 404). */
+export async function getReviewPreview(taskId: string): Promise<ReviewPreview> {
+  const reply = await request(REVIEW_ENDPOINTS.preview(taskId))
+  if (reply.status === 404) return { running: false }
+  return parse(previewSchema, reply)
 }

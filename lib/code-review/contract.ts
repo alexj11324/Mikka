@@ -142,3 +142,23 @@ export type SendToAgentResult = { kind: 'sent'; messageId: string; attempt: numb
 
 /** 批准合并: with failing checks the server asks first (R7 「还有 1 项检查失败，确定合并？」); then R8 已合并. */
 export type MergeResult = { kind: 'needs_confirm'; failing: number } | { kind: 'merged' } | ReviewDenial
+
+/**
+ * The review page's terminal (R5, #1723/#1733), one shell on the task's machine. GET …/review/terminal streams it as
+ * server-sent events: `output` with `{ text }`, then `ended` with `{ exitCode }` when the shell exits or the machine
+ * goes. Planned; confirm against the backend before it lands.
+ */
+export type ReviewTerminalEvent = { type: 'output'; text: string } | { type: 'ended'; exitCode: number | null }
+
+/**
+ * Why the terminal did not open: the server has no terminal (404), the viewer may not use it (403, R11), or the machine
+ * was reclaimed (409).
+ */
+export type ReviewTerminalRefusal = 'no_endpoint' | 'denied' | 'reclaimed'
+
+/**
+ * The task's dev preview (R10a, R10b; #1724, #1733): GET …/review/preview. With a dev server running on the task's
+ * machine, its address for the browser column; without one, R10a 「没有运行中的开发服务器」. Planned; a server without
+ * the endpoint (404) reads as no dev server. Starting one (启动预览) needs POST …/review/preview/start, not planned yet.
+ */
+export type ReviewPreview = { running: true; url: string } | { running: false }
