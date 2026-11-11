@@ -42,6 +42,7 @@ test('Factory store selects marker-backed suites and real downstream imports', a
   for (const suite of ['test:factory','test:factory-routing-db']) assert(result.db_suites.includes(suite), suite)
   assert(result.affected.includes(dbId('test:factory')))
   assert(result.db_suites.length < plan.db.scripts.length)
+  assert(result.image, 'a new backend capability must validate self-hosted dependencies and exercise the image')
 })
 test('Eve model changes select native unit tests and schedule authority selects its database gate', async () => {
   const unit = await pick('lib/eve/streaming-model.ts')
@@ -67,6 +68,7 @@ test('a migration keeps every DB suite without turning on the packaged desktop b
   assert(!r.full)
   assert.equal(r.db_suites.length, plan.db.scripts.length)
   assert(!r.desktop)
+  assert(r.image, 'a schema migration must validate the real self-hosted image')
 })
 test('deletes, renames, executable modes, symlinks and empty diffs run all', async () => {
   for(const extra of [{status:'D'},{status:'R100'},{mode:'100755'},{mode:'120000'},{oldMode:'100755'}]) assert((await pick('README.md', extra)).full)

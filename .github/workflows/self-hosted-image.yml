@@ -13,8 +13,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: self-hosted-image-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: self-hosted-image-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 jobs:
   changes:
     if: ${{ !inputs.selected }}
@@ -25,6 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      # Reusable jobs inherit the caller's workflow_ref. Only this repository's
+      # standalone push workflow has authority to write its registry tags.
+      PUBLISH_IMAGE: ${{ github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.workflow_ref == format('{0}/.github/workflows/self-hosted-image.yml@{1}', github.repository, github.ref) }}
       COMPOSE_FILE: docker-compose.yml:tests/self-hosted/compose.services.yml
       COMPOSE_PROJECT_NAME: mikka-selfhost-ci
     permissions:
@@ -32,14 +35,44 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Validate backend and migration dependencies for self-hosted installations
+        run: |
+          node --test scripts/ci/self-hosted-requirements.test.mjs scripts/release/self-hosted-stable.test.mjs
+          node scripts/ci/self-hosted-requirements.mjs
       - name: Verify disposable acceptance target guards and model fixture
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
+      - name: Verify stable release webhook and safe self-hosted update policy
+        run: node --test scripts/self-hosted-update.test.mjs scripts/self-hosted-update-smoke.test.mjs scripts/self-hosted-update-events.test.mjs
       - name: Verify managed PostgreSQL Compose contract (offline)
         run: node --test scripts/acceptance/self-hosted-neon-compose.test.mjs
+      - name: Restore backup from the host updater into a fresh PostgreSQL database
+        run: node --test scripts/acceptance/self-hosted-update-backup.test.mjs
+      - name: Reuse an already-published immutable SHA image on tag builds and reruns
+        id: existing
+        if: env.PUBLISH_IMAGE == 'true'
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          image=ghcr.io/alexj11324/mikka
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          if digest=$(skopeo inspect --format '{{.Digest}}' "docker://$image:$GITHUB_SHA" 2>"$RUNNER_TEMP/registry-status"); then
+            docker pull "$image@$digest"
+            revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image@$digest")
+            test "$revision" = "$GITHUB_SHA"
+            docker tag "$image@$digest" mikka-self-hosted:check
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          elif ! grep -Eiq 'manifest unknown|manifest_unknown|name unknown' "$RUNNER_TEMP/registry-status"; then
+            cat "$RUNNER_TEMP/registry-status" >&2
+            exit 1
+          fi
       - name: Build the public standalone application
+        if: steps.existing.outputs.digest == ''
         run: |
           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
           docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --build-arg MIKKA_BUILD_WORKER_SHA="$mikka_image_worker_sha" --tag mikka-self-hosted:check .
@@ -68,6 +101,8 @@ jobs:
         run: node scripts/self-hosted-smoke.mjs
         env:
           MIKKA_EXPECTED_REVISION: ${{ github.sha }}
+      - name: Exercise the host updater's post-activation API checks on this image
+        run: docker compose exec -T -e "MIKKA_EXPECTED_REVISION=$GITHUB_SHA" app node scripts/self-hosted-update-smoke.mjs
       - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 app node scripts/acceptance/self-hosted-services.mjs
@@ -80,6 +115,8 @@ jobs:
         uses: ./.github/actions/pnpm-install
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Execute declared self-hosted compatibility tests in community mode
+        run: node scripts/ci/self-hosted-requirements.mjs --run-tests
       - name: Exercise the real daemon against the registered community user
         timeout-minutes: 6
         run: |
@@ -162,20 +199,21 @@ jobs:
           MIKKA_COMMUNITY_UI=0 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
           node scripts/self-hosted-smoke.mjs
       - name: Publish the tested revision
-        if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
+        if: env.PUBLISH_IMAGE == 'true'
         env:
-          REGISTRY_TOKEN: ${{ github.token }}
+          EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
         run: |
-          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          set -euo pipefail
           image=ghcr.io/alexj11324/mikka
-          docker tag mikka-self-hosted:check "$image:$GITHUB_SHA"
-          docker push "$image:$GITHUB_SHA"
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            docker tag mikka-self-hosted:check "$image:$GITHUB_REF_NAME"
-            docker push "$image:$GITHUB_REF_NAME"
-          elif [ "$GITHUB_REF" = refs/heads/main ]; then
-            docker tag mikka-self-hosted:check "$image:latest"
-            docker push "$image:latest"
+          if [[ -z "$EXISTING_DIGEST" ]]; then
+            docker tag mikka-self-hosted:check "$image:$GITHUB_SHA"
+            docker push "$image:$GITHUB_SHA"
+          fi
+          digest=$(skopeo inspect --format '{{.Digest}}' "docker://$image:$GITHUB_SHA")
+          if [[ -n "$EXISTING_DIGEST" ]]; then test "$digest" = "$EXISTING_DIGEST"; fi
+          skopeo copy --preserve-digests "docker://$image@$digest" "docker://$image:ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [[ "$GITHUB_REF" == refs/heads/main && "$(git ls-remote origin refs/heads/main | cut -f1)" == "$GITHUB_SHA" ]]; then
+            skopeo copy --preserve-digests "docker://$image@$digest" "docker://$image:latest"
           fi
       - name: Retain startup diagnostics on failure
         if: failure()
@@ -183,3 +221,4 @@ jobs:
       - name: Stop disposable services
         if: always()
         run: docker compose down --volumes --remove-orphans
+
