@@ -43,6 +43,12 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { withBasePath } from "@/lib/base-path";
 
+/**
+ * The message for each skip reason. Written out rather than built from the
+ * reason, so every key is one the catalogue really holds.
+ */
+const SKIP_COPY = { alreadyMember: 'skippedAlreadyMember', duplicate: 'skippedDuplicate' } as const
+
 export function InviteMembersDialog({
   workspaceId,
   workspaceName,
@@ -303,7 +309,7 @@ export function InviteMembersDialog({
                     {skipped.map((entry) => (
                       <li key={`${entry.email}-${entry.reason}`} className="flex flex-wrap items-baseline gap-2">
                         <span className="break-all">{entry.email}</span>
-                        <span className="text-muted-foreground">{t(`skipped${entry.reason[0].toUpperCase()}${entry.reason.slice(1)}`)}</span>
+                        <span className="text-muted-foreground">{t(SKIP_COPY[entry.reason])}</span>
                       </li>
                     ))}
                   </ul>
