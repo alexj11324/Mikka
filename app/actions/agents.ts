@@ -5,7 +5,6 @@ import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { deploymentSwitch } from '@/lib/deployment-switches'
-import { ownerListChanged } from '@/lib/live/lists'
 
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
@@ -27,7 +26,7 @@ import { withDevicePresence } from '@/lib/live/presence-read'
 import type { PresenceDevice } from '@/lib/live/presence'
 import { devicePresenceView, type PresenceReason } from '@/lib/device-scheduling'
 import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
-import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
+import { removeOwnedDevice, renameOwnedDevice, setOwnedDeviceEnabled } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
@@ -182,11 +181,7 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     const userId = await getUserId()
     const parsed = z.object({ deviceId: z.uuid(), enabled: z.boolean() }).safeParse(input)
     if (!parsed.success) return { error: 'deviceNotFound' }
-    const changed = await db.update(devices)
-      .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
-      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt))).returning({ id: devices.id })
-    if (changed.length) await ownerListChanged(db, userId, ['thread_list', 'device_list'])
-    return { success: true }
+    return setOwnedDeviceEnabled(userId, parsed.data.deviceId, parsed.data.enabled)
   })
 }
 

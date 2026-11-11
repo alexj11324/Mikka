@@ -27,3 +27,20 @@ test('real frontend builds retain incremental files without fingerprinting them 
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test('the public server ships its real handoff pages without the workspace or private providers', { timeout: 120_000 }, async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-server-pages-'))
+  try {
+    const result = await buildFrontend({ target: 'web', serverPages: true, outdir: directory })
+    const manifest = JSON.parse(await readFile(join(directory, 'renderer-manifest.json'), 'utf8'))
+    assert.deepEqual(manifest, result)
+    assert.equal(manifest.serverPages, true)
+    for (const required of ['components/auth-form.tsx', 'components/device-authorization.tsx',
+      'components/oauth-consent.tsx', 'components/plugins/github-settings.tsx', 'apps/desktop/src/renderer/deep-link-routes.tsx']) {
+      assert.ok(manifest.inputs.includes(required), required)
+    }
+    const forbidden = /(?:^|\/)(?:\.hosted-ui\/|apps\/desktop\/src\/renderer\/workspace(?:-loader)?\.tsx?$|components\/(?:workspace\/issue-workspace|slots\/(?:app-frame|tasks|task-detail|inbox|board))\.tsx?$)/
+    assert.deepEqual(manifest.inputs.filter(path => forbidden.test(path)), [])
+    assert.ok(manifest.inputs.includes('apps/frontend/src/web/server-workspace-loader.ts'))
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

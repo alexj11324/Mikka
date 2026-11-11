@@ -67,7 +67,7 @@ function fileLoader(plugin) {
   return loader
 }
 
-export async function applicationPlugin(target, { deploymentId = '' } = {}) {
+export async function applicationPlugin(target, { deploymentId = '', serverPages = false } = {}) {
   if (!['web', 'desktop'].includes(target)) throw new Error('FRONTEND_TARGET_INVALID')
   const allowed = registryActionNames(await readFile(resolve(repository, 'lib/desktop-rpc/registry.ts'), 'utf8'))
   const actions = new Map()
@@ -113,6 +113,10 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
       const resolved = await this.resolve(candidate, importer, { ...options, skipSelf: true })
       if (!resolved) return null
       const id = resolved.id.split('?')[0]
+      // This module is the single lazy boundary between server handoff pages
+      // and the installed workspace. Resolve its imports before bundling so
+      // the self-hosted distribution never ships a dormant workspace chunk.
+      if (serverPages && id === resolve(renderer, 'workspace-loader.ts')) return resolve(frontend, 'src/web/server-workspace-loader.ts')
       if (serverFile(id)) throw new Error(`FRONTEND_SERVER_MODULE: ${slash(relative(repository, id))}`)
       if (target === 'web' && id === resolve(renderer, 'rpc.ts') && importer?.split('?')[0] !== webRpc) return webRpc
       if (isAbsolute(id) && dirname(id) === actionDirectory && id.endsWith('.ts')) return `${virtualAction}${id.slice(actionDirectory.length + 1, -3)}`
