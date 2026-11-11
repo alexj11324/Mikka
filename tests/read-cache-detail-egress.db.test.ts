@@ -268,14 +268,18 @@ test('detail and activity revalidate current access while returning only changed
       // Frozen same-fixture measurements on main 3c32675c: a changed linked
       // control cannot make an upstream SQL/payload regression pass. The Task
       // review hint adds a bounded boolean column (and its correlated SQL) to
-      // the citation reads; statement counts are unchanged.
+      // the citation reads; statement counts are unchanged. `issueLatestRun`
+      // now also carries stopReason, so the chat can tell a run that ended on
+      // a question from one the judge moved on: +13 written (the projection
+      // text) and +6 read (the extra null element) on each citation read. The
+      // connection reads keep their old numbers: the history budget absorbs it.
       const originalIdentifierReadMetrics = {
         linkedConnections: { statements: 14, read: 3490, written: 5497 },
         unlinkedConnections: { statements: 14, read: 3192, written: 5346 },
-        linkedCitation: { statements: 4, read: 1188, written: 1934 },
-        unlinkedCitation: { statements: 5, read: 1403, written: 2257 },
+        linkedCitation: { statements: 4, read: 1194, written: 1947 },
+        unlinkedCitation: { statements: 5, read: 1409, written: 2270 },
         linkedRunCitation: { statements: 9, read: 3157, written: 6581 },
-        unlinkedRunCitation: { statements: 10, read: 2708, written: 6897 },
+        unlinkedRunCitation: { statements: 10, read: 2714, written: 6910 },
       } as const
       for (const [label, result, statementLimit] of [
         ['linkedConnections', linkedConnections, 14],
@@ -403,10 +407,11 @@ test('detail and activity revalidate current access while returning only changed
       // Captured on the same fixture against old main 3c32675c; these are
       // actual revoked-owner measurements, not inferred from the linked case.
       // The direct citation carries the nine-byte codingReview hint from the
-      // Task review feature; its statement count is unchanged.
+      // Task review feature; its statement count is unchanged. It also carries
+      // `issueLatestRun`'s stopReason now (+13 written, the projection text).
       for (const [label, result, statementLimit, originalTotal] of [
         ['revokedConnections', revokedConnections, 12, 7464],
-        ['revokedCitation', revokedCitation, 3, 2106],
+        ['revokedCitation', revokedCitation, 3, 2119],
         ['revokedRunCitation', revokedRunCitation, 7, 7700],
       ] as const) {
         await t.test(label + ' stays within its frozen old-source budget', () => {
