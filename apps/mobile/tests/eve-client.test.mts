@@ -71,3 +71,39 @@ test('web public Client leaves Origin and cookies to the browser', async () => {
     assert.equal(request.credentials, 'include')
   }
 })
+
+test('native Task creation uses the shared manual command and re-reads an accepted dispatch without another send', async t => {
+  const { submitMobileTask } = await import('../lib/task-create.ts')
+  platform.OS = 'ios'
+  requests.length = 0
+  const prior = globalThis.fetch
+  t.after(() => { globalThis.fetch = prior })
+  const captured: { action: string; args: Record<string, unknown>[] }[] = []
+  globalThis.fetch = async (input, init) => {
+    if (!String(input).endsWith('/api/rpc')) return prior(input, init)
+    assert.equal(String(input), first.server.url + '/api/rpc')
+    const headers = new Headers(init?.headers)
+    assert.equal(headers.get('x-mikka-rpc'), '1')
+    assert.equal(headers.get('origin'), new URL(first.server.url).origin)
+    assert.match(headers.get('cookie') ?? '', /fixture-a/)
+    const body = JSON.parse(String(init?.body))
+    captured.push(body)
+    return Response.json({ version: 1, ok: true, result: captured.length === 2 ? null : { taskId: 'task1' } })
+  }
+  const connection = { account: first, client: { getCookie: async () => 'better-auth.session_token=fixture-a' } } as unknown as ApiConnection
+  const draft = { workspaceId: 'workspace-a', description: 'Line one\n\nLine two', title: '' }
+  assert.equal(await submitMobileTask({ ...draft, intent: 'create_only' }, { id: 'manual' }, connection), 'task1')
+  assert.equal(requests.length, 0)
+  assert.equal(captured[0].action, 'issues.createTaskOnly')
+  assert.deepEqual(captured[0].args, [{ version: 1, intent: 'create_only', workspaceId: 'workspace-a', requestId: 'manual',
+    title: 'Line one', content: { type: 'doc', content: [
+      { type: 'paragraph', content: [{ type: 'text', text: 'Line one' }] }, { type: 'paragraph' }, { type: 'paragraph', content: [{ type: 'text', text: 'Line two' }] },
+    ] }, priority: 'normal', status: 'todo' }])
+  const operation = { id: 'stable-dispatch' }
+  const dispatch = { ...draft, intent: 'create_and_dispatch' as const }
+  await assert.rejects(submitMobileTask(dispatch, operation, connection), /receiptUnavailable/)
+  assert.equal(await submitMobileTask(dispatch, operation, connection), 'task1')
+  assert.equal(requests.length, 2, 'one Eve session and one turn')
+  assert.equal(requests[1].headers.get('x-mikka-submission-id'), operation.id)
+  assert.deepEqual(captured.slice(1).map(({ action, args }) => [action, args]), Array(2).fill(['issues.getDispatchedTaskReceipt', [{ workspaceId: 'workspace-a', botId: null, requestId: operation.id }]]))
+})

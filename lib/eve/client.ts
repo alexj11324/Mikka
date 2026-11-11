@@ -1,9 +1,10 @@
 import { Client, ClientError } from 'eve/client'
 import { withBasePath } from '@/lib/base-path'
 import { ACTION_ERROR_CODES, type ActionErrorCode } from '@/lib/action-result'
+import type { DispatchedTaskReceipt } from '@/lib/task-create-command'
 export type SubmitOutcome =
   // Stored. Not an approval of anything the message asks for.
-  | { kind: 'accepted'; enabled: boolean; sourceEventId: string | null; replayed: boolean }
+  | { kind: 'accepted'; enabled: boolean; sourceEventId: string | null; replayed: boolean; task?: DispatchedTaskReceipt }
   // The result is unknown (timeout, network error, 5xx). Sending again reuses the id.
   | { kind: 'uncertain' }
   // Signed out. Sending again as the same account reuses the id; another account starts anew.

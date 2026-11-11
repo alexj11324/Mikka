@@ -335,6 +335,17 @@ export async function createIssue(userId: string, input: CreateIssueInput, toolC
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
+  if (taskEventId) {
+    const explicit = await pool.query(`SELECT c."taskId" FROM coordinator_events e JOIN task_creation_receipts c ON c."taskId"=e."issueId"
+      AND c."userId"=e."userId" AND c."requestId"::text=e.payload->>'taskCreationRequestId'
+      WHERE e.id=$1 AND e."userId"=$2 AND e."botId"=$3 AND e."deliveredAt" IS NOT NULL
+      AND e.payload#>>'{taskCommand,intent}'='create_and_dispatch'`, [taskEventId, userId, botId])
+    if (explicit.rowCount) {
+      // This is the Task the person created in the form. A model's team guess
+      // cannot promote it. Its original relationship survives repeated tool calls.
+      return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId), toolCallId, { eventId: taskEventId, botId })
+    }
+  }
   // A team workspace's bot creates the task in that workspace's team, not as its owner's personal task.
   const team = await (await import('@/lib/coordinator/issue-team')).coordinatorIssueTeam(userId, botId, input.teamId)
   if ('error' in team) return team
@@ -397,10 +408,16 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' as const }
   const { newThread, sourceEventId, target: offeredTarget, ...request } = input
   let target = offeredTarget
+  let creation: { eventId: string; botId: string; workspaceId: string } | undefined
   requestEventId ??= sourceEventId
   try {
     const workspaceId = await timedPhase('executionWorkspace', async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, botId))
     const selection = await timedPhase('requestedAgentProfile', async () => (await import('@/lib/factory/profile-request')).requestedTaskSelection(pool, { ownerId: userId, botId, workspaceId }, requestEventId, request.profileId))
+    if (selection.commandIssueId && requestEventId) {
+      if (selection.commandIssueId !== request.issueId || !await (await import('@/lib/issue-access')).issueForUser(userId, request.issueId, false, undefined, { withoutBody: true })) return { error: 'issueNotFound' as const }
+      creation = { eventId: requestEventId, botId, workspaceId }
+      request.requestKey = `task-command:${requestEventId}`
+    }
     request.profileId = selection.profileId
     if (selection.taskDestination?.kind === 'cloud') target = 'cloud'
   } catch (error) { if (error instanceof AgentProfileError) return { error: error.code }; throw error }
@@ -434,7 +451,7 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
     return repositoryMove
   }
   return asToolResult(async () => placed(await dispatchToTask(userId, request.issueId, {
-    note: request.note, newThread, sourceEventId: requestEventId,
+    note: request.note, newThread, sourceEventId: requestEventId, creation,
     // A named place other than the thread's own is a move, which only the person's explicit request grants. So is a
     // repository the person named that is not the thread's ("It's in the mikka-web repo"): the work goes there, in a new thread.
     moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)) || await movesRepository(previous),
@@ -916,9 +933,12 @@ export async function intakeFactoryRequest(userId: string, input: import('@/lib/
     const { factoryForBot, factoryRequestSource } = await import('@/lib/factory/server')
     const { intakeRequest } = await import('@/lib/factory/intake')
     const store=factoryForBot(botId)
+    const [source] = await factoryRequestSource(userId, botId, input.sourceEventId)
     return intakeRequest(input, {
-      source:id=>factoryRequestSource(userId,botId,id),
-      create:async(body,key)=>(await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId),key),
+      source:async () => source,
+      create:async(body,key)=> source?.commandTaskId
+        ? { id: (await (await import('@/lib/coordinator/issue-create')).createIssueFromRequest(userId, { sourceEventId: input.sourceEventId, title: body.title })).issueId }
+        : (await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId),key),
       route:async route=>publicFactoryReceipt(await store.route(userId,route)),
     })
   })
