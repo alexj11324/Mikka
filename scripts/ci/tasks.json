@@ -194,6 +194,11 @@
     "kind": "core",
     "env": {}
   },
+  "core-41": {
+    "command": "pnpm test:eve",
+    "kind": "core",
+    "env": {}
+  },
   "core-42": {
     "command": "pnpm test:coordinator-native-scope",
     "kind": "core",
@@ -429,11 +434,6 @@
   "integration-factory-activity": {
     "command": "pnpm test:factory-activity",
     "kind": "integration",
-    "env": {}
-  },
-  "core-eve": {
-    "command": "pnpm test:eve",
-    "kind": "core",
     "env": {}
   }
 }
