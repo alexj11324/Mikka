@@ -142,6 +142,25 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       assert.doesNotMatch(JSON.stringify(own), /private body|private prompt|private reason/)
     })
 
+    await t.test('the shell reads dispatch membership once per batch and only for the reader’s own Bots', async () => {
+      const task = await makeTask(), bot = await makeBot(), peerBot = await makeBot(peer)
+      const ownerRun = await makeRun(task), peerRun = await makeRun(task, { userId: peer })
+      await application.query('UPDATE agent_runs SET "botId"=$1 WHERE id=$2', [bot, ownerRun])
+      await application.query('UPDATE agent_runs SET "botId"=$1 WHERE id=$2', [peerBot, peerRun])
+      const ids = [task]
+      for (let index = 0; index < 15; index++) ids.push(await makeTask())
+      const index = (reader: string, issueIds: string[]) => as(reader, shared, () =>
+        getTaskPresentations({ workspaceId: shared, issueIds, includeFactoryIdentity: true, includeBotDispatches: true }))
+      const one = await counted(() => index(owner, [task])), many = await counted(() => index(owner, ids))
+      assert.deepEqual(many.result.items[task].botDispatches, [{ botId: bot, runId: ownerRun, name: 'Synthetic bot '+bot, harness: 'codex' }])
+      assert.deepEqual(many.result.items[ids[1]].botDispatches, [])
+      assert.deepEqual((await index(peer, [task])).items[task].botDispatches, [{ botId: peerBot, runId: peerRun, name: 'Synthetic bot '+peerBot, harness: 'codex' }])
+      assert.equal(one.statements.length, many.statements.length)
+      const membershipReads = many.statements.filter(q => /select distinct .*from "agent_runs" inner join "bots"/i.test(q.sql))
+      assert.equal(membershipReads.length, 1)
+      t.diagnostic(JSON.stringify({ tasks: [1, 16], statements: [one.statements.length, many.statements.length], dispatchReads: membershipReads.length }))
+    })
+
     await t.test('evidence directory counts preserve submitted versions and require the authorized Factory source', async () => {
       const issue = await makeTask(), factory = await makeFactory(issue), run = await makeRun(issue)
       const unrelated = await makeTask(), invalid = await makeFactory(unrelated, { sourceKind: 'assistant_message' })
