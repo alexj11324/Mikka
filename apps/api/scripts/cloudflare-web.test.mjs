@@ -74,6 +74,47 @@ test('gateway honors retained asset/API pins, uses current for version and navig
   assert.equal((await go('/mikka/api/version')).status, 503)
 })
 
+test('encoded route and asset names retain the same deployment and cache contract', async () => {
+  const env = { CURRENT_RELEASE: 'new', RELEASES: { old: 'OLD', new: 'NEW' } }
+  const seen = []
+  for (const [id, binding] of Object.entries(env.RELEASES)) {
+    const releaseEnv = services()
+    releaseEnv.RELEASE_SHA = id
+    releaseEnv.OVERLAY_SHA = id + '-ui'
+    releaseEnv.API.fetch = async req => {
+      const path = new URL(req.url).pathname
+      seen.push([id, path])
+      if (path === '/mikka/api/version') {
+        assert.equal(req.method, 'GET')
+        assert.equal(req.headers.has('cookie'), false)
+        return Response.json({ build: id, overlaySha: id + '-ui', minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null })
+      }
+      assert.equal(await req.text(), 'existing stream request')
+      return new Response(id)
+    }
+    releaseEnv.ASSETS.fetch = () => new Response(id)
+    env[binding] = { fetch: req => release.fetch(req, releaseEnv) }
+  }
+  const stream = '/mikka/%61pi/agents/stream'
+  const retained = await gateway.fetch(request(stream, { method: 'POST', headers: { 'x-deployment-id': 'old' }, body: 'existing stream request' }), env)
+  assert.equal(await retained.text(), 'old')
+  assert.deepEqual(seen, [['old', stream]])
+  const stale = await gateway.fetch(request(stream + '?dpl=retired'), env)
+  assert.equal(stale.status, 409)
+  const conflict = await gateway.fetch(request(stream + '?dpl=new', { headers: { 'x-deployment-id': 'old' } }), env)
+  assert.equal(conflict.status, 400)
+  const file = await gateway.fetch(request('/mikka/assets/example%2Ejs?dpl=old'), env)
+  assert.equal(await file.text(), 'old')
+  assert.equal(file.headers.get('cache-control'), 'public, max-age=31536000, immutable')
+  for (const [route, method] of [['/mikka/%61pi/version', 'GET'], ['/mikka/api/%76ersion', 'HEAD']]) {
+    const result = await gateway.fetch(request(route + '?dpl=old', { method, headers: { cookie: 'fixture' } }), env)
+    assert.equal(result.headers.get('cache-control'), 'no-store, max-age=0')
+    if (method === 'GET') assert.equal((await result.json()).build, 'new')
+    else assert.equal(await result.text(), '')
+  }
+  assert.deepEqual(seen, [['old', stream], ['new', '/mikka/api/version']])
+})
+
 test('release config requires the official compiled shell, matching pins and private service bindings', async t => {
   const assets = await mkdtemp(join(tmpdir(), 'cf-web-'))
   t.after(() => rm(assets, { recursive: true, force: true }))
