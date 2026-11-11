@@ -81,8 +81,13 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
       {
         const receipt = payload as {provider_metadata?:unknown; usage?:unknown}
         const cost = gatewayCost(receipt.provider_metadata)
-        report({ usage: decisionTokenUsage(receipt.usage), totalCostUsd: cost === null ? null : cost / 1_000_000 })
-        if (store) await store.settle(callId,cost,0,0,gatewayGenerationId(receipt.provider_metadata))
+        const tokens = decisionTokenUsage(receipt.usage)
+        report({ usage: tokens, totalCostUsd: cost === null ? null : cost / 1_000_000 })
+        // The receipt already carries the real counts; settle them instead of the
+        // zeros this used to record, which made every routing decision look free.
+        if (store) await store.settle(callId,cost,decisionTokenCount(tokens.inputTokens),decisionTokenCount(tokens.outputTokens),
+          gatewayGenerationId(receipt.provider_metadata),
+          { read: decisionTokenCount(tokens.inputTokenDetails.cacheReadTokens, null), write: decisionTokenCount(tokens.inputTokenDetails.cacheWriteTokens, null) })
         if (store && isCloudEdition()) await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
       }
       const answers = validatedAnswers(payload, requestedQuestions)
@@ -129,6 +134,17 @@ function decisionTokenUsage(value: unknown) {
     outputTokens: usage.outputTokens ?? usage.output_tokens ?? usage.completion_tokens,
     inputTokenDetails: { cacheReadTokens: details.cached_tokens, cacheWriteTokens: usage.cache_creation_input_tokens },
   }
+}
+
+/**
+ * A ledger count, or `fallback` when the envelope carried no usable number.
+ * Input and output totals fall back to 0 because the ledger column has always
+ * meant "this call ran"; cache detail falls back to null because absent there
+ * means the provider reported none, which is not the same as reporting zero.
+ */
+function decisionTokenCount(value: unknown, fallback: number | null = 0): number | null {
+  const count = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN
+  return Number.isSafeInteger(count) && count >= 0 ? count : fallback
 }
 /** Compatibility for callers that need answers only. Use invokeDecision when
  * binding a downstream operation/evaluation to the actual model invocation. */
