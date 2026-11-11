@@ -83,7 +83,7 @@ test('personal access tokens', { skip: !dbUrl }, async t => {
         'insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,$4,$5,$6)',
         [crypto.randomUUID(), owner, ws.id, 'pre-M4', hashPersonalAccessToken(crypto.randomUUID()), 'abcd'],
       )
-      await client.query(await readFile(new URL('../drizzle/20261110230000_api_tokens.sql', import.meta.url), 'utf8'))
+      await client.query(await readFile(new URL('../drizzle/20261111080200_api_tokens.sql', import.meta.url), 'utf8'))
       assert.deepEqual((await client.query('select scopes from personal_access_tokens')).rows[0].scopes, ['legacy:full'])
       const inserted = await client.query(
         'insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,$4,$5,$6) returning scopes',
