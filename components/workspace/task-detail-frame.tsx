@@ -18,7 +18,7 @@ import { useActionError } from '@/lib/use-action-error'
 import type { IssueDetailNavigation } from './issue-detail-header'
 import { useIssueDetailMenu, type IssueActionRequest } from './issue-detail-actions'
 import { overdue } from './issue-detail-properties'
-import { IssueMetadataControls, useIssueMetadataSave, type MetadataRequest } from './issue-metadata-controls'
+import { AccessChangeDialog, IssueMetadataControls, useIssueMetadataSave, type MetadataRequest } from './issue-metadata-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useIssueScope } from './issue-scope-control'
@@ -249,7 +249,7 @@ export function FramedTask(props: FramedTaskProps) {
     rowsError={metadata.error || team.failed}
     meta={[task.identifier, tFrame('created', { when: format.relativeTime(created, now) })].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
-    dialogs={<>{props.dialogs}{menu.dialogs}<IssueMetadataControls task={task} section="dialog" disabled={preview} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
+    dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={preview} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />
 }
 

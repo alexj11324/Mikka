@@ -7,6 +7,7 @@
 // the daemon builds `RunReport`s with it, the server validates them with it,
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
+import { profileSkillRunReportSchema } from "./skill"
 import { providerFailureSchema } from "./provider-failure"
 import { runFailureSchema } from "./run-failure"
 
@@ -170,6 +171,9 @@ export const runReport = z.object({
   /** Daemon-created local snapshot of a non-repository delivery; never a published code candidate. */
   deliverableCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
   skillMount: runSkillMount.optional(),
+  /** Profile Skills the run selected and the ones its agent actually loaded
+   * through `load_skill`. Daemon-authored; assigned is never loaded. */
+  profileSkills: profileSkillRunReportSchema.optional(),
   execution: runExecution.optional(),
   runtime: runRuntime.optional(),
   /** What was done, in a few sentences. Empty when the run crashed early. */

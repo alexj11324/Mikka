@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { ActionFailureError } from '@/lib/action-error'
+import { actionErrorStatus } from '@/lib/action-status'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { createDesktopRpc } from '@/lib/desktop-rpc/handler'
 import { desktopActions } from '@/lib/desktop-rpc/registry'
@@ -26,7 +27,7 @@ export const POST = withRequestLog('/api/desktop/rpc', createDesktopRpc({
   })),
   actions: desktopActions,
   error: error => {
-    if (error instanceof ActionFailureError) return { status: error.code === 'authRequired' ? 401 : 400, code: error.code }
+    if (error instanceof ActionFailureError) return { status: actionErrorStatus(error.code), code: error.code }
     if (error instanceof WorkspaceError) return { status: 403, code: 'workspaceAccessDenied' }
     console.error('desktop_rpc_failed', { causes: causeFields(error) })
     return { status: 500, code: 'desktop_rpc_failed' }

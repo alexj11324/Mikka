@@ -39,6 +39,7 @@ import { checkpointRecoveryError, providerContinuationNote, quotaContinuationNot
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
+import { profileSkillRunAssignment } from '@/lib/factory/agent-profile-skills'
 import { claimBenchmarkAssignment, skillAssignments } from '@/lib/self-improvement/server'
 import { ImprovementError } from '@/lib/self-improvement/contract'
 import { claimCloudRun, claimLocalRun } from '@/lib/computer/claim'
@@ -490,6 +491,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({
     ...publication,
     ...(initialRepository ? { repo: initialRepository } : {}),
+    // Profile Skills: the frozen pinned bodies for the owner's daemon and the
+    // repository names it pins from its own checkout. Only the daemon sees the
+    // text; the brief carries metadata only.
+    ...profileSkillRunAssignment(current.agentDefinition?.agentProfile?.skills ?? []),
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     ...(run.agentDefinition?.traceContext ? { traceContext: { ...run.agentDefinition.traceContext, runId } } : {}),
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),

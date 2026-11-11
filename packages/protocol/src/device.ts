@@ -23,7 +23,7 @@ import { signedPolicySnapshotSchema } from "./policy-snapshot"
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotSchema } from "./quota"
 import { runStopReason, runBenchmarkContext } from "./run"
-import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
+import { MAX_PROFILE_SKILLS_PER_RUN, MAX_SKILLS_PER_RUN, profileRunSkillSchema, runSkillSchema } from "./skill"
 import { skillAssignmentReceiptSchema } from './skill-artifact'
 import { sanitizeTraceContext } from './trace-context'
 import { nativeLeaseSchema } from './subscription'
@@ -554,6 +554,17 @@ export const runAssignmentSchema = z.object({
   skills: z.array(runSkillSchema).max(MAX_SKILLS_PER_RUN).optional(),
   /** Server-minted assignment provenance; does not grant any policy permission. */
   skillReceipt: skillAssignmentReceiptSchema.optional(),
+  /**
+   * The frozen Profile's selected capabilities, with the exact pinned bodies
+   * the `load_skill` Mikka tool serves. Only metadata enters the brief. Absent
+   * from an older server: the run has no Profile Skills.
+   */
+  profileSkills: z.array(profileRunSkillSchema).max(MAX_PROFILE_SKILLS_PER_RUN).optional(),
+  /**
+   * Repository Skill names declared by the Profile. The daemon pins them from
+   * its own authorized checkout; the server never reads a repository here.
+   */
+  repositorySkills: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)).max(MAX_PROFILE_SKILLS_PER_RUN).optional(),
   /** Frozen by the server benchmark ledger; never extracted from model output. */
   benchmark: runBenchmarkContext.optional(),
 }).refine(value => !(value.modelCredential && value.subscriptionBinding), { message: "A run has one model credential", path: ["modelCredential"] })
