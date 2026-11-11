@@ -22,8 +22,8 @@ const businessFiles = files.filter(file => !isComponentLibrarySource(file, polic
 for (const file of businessFiles) {
   const text = readFileSync(file, 'utf8')
   diagnostics.push(...exemptAsShipped(file, file.endsWith('.css') ? auditCss(file, text, policy) : auditSource(file, text, policy), policy))
-  if (!file.endsWith('.css')) diagnostics.push(...auditBasePath(file, text))
-  if (/\.[jt]sx$/.test(file)) diagnostics.push(...auditSettingsSurface(file, text), ...auditSplitPanes(file, text), ...auditEntityDetail(file, text), ...auditTaskEntry(file, text))
+  if (!file.endsWith('.css')) diagnostics.push(...auditBasePath(file, text), ...auditEntityDetail(file, text), ...auditTaskEntry(file, text))
+  if (/\.[jt]sx$/.test(file)) diagnostics.push(...auditSettingsSurface(file, text), ...auditSplitPanes(file, text))
 }
 for (const file of tracked.filter(file => /^apps\/(?:mobile|desktop)\/.*\.[jt]sx?$/.test(file) && existsSync(file))) {
   diagnostics.push(...auditEntityDetail(file, readFileSync(file, 'utf8')))

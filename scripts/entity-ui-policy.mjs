@@ -4,10 +4,10 @@ import ts from 'typescript'
 // Public business operations, their authorized sources, and the detail components
 // permitted to present them. "adapters" reuse an operation or represent it natively.
 export const entityContracts = [
-  { entity: 'Task', detail: ['components/workspace/task-detail.tsx', 'TaskDetail'],
+  { entity: 'Task', routes: [['apps/mobile/app/task/[id]/index.tsx', 'TaskScreen', '@/features/tasks/screens/task-screen']], detail: ['components/workspace/task-detail.tsx', 'TaskDetail'],
     sources: [['app/actions/issues.ts', 'pollIssue', 'saveIssue'], ['lib/task-presentation-read.ts', 'readTaskPresentations']],
     adapters: [['components/coordinator/conversation-panels.tsx', 'EmbeddedTaskDetail'], ['apps/mobile/features/tasks/screens/task-screen.tsx', 'TaskScreen']] },
-  { entity: 'Thread', detail: ['components/workspace/issue-thread-panel.tsx', 'IssueThreadPanel'],
+  { entity: 'Thread', routes: [['apps/mobile/app/thread/[id].tsx', 'ThreadScreen']], detail: ['components/workspace/issue-thread-panel.tsx', 'IssueThreadPanel'],
     adapters: [['apps/mobile/app/thread/[id].tsx', 'ThreadScreen']],
     sources: [['app/actions/agents.ts', 'getIssueThread', 'sendIssueThreadReply', 'stopRun']] },
   { entity: 'Review diff', detail: ['components/workspace/thread-changes.tsx', 'ThreadChangesView'],
@@ -17,8 +17,12 @@ export const entityContracts = [
     sources: [['components/workspace/use-project-update.ts', 'useProjectUpdate'], ['app/actions/projects.ts', 'listProjectEvents', 'updateProjectProperties']] },
   { entity: 'Connected app', detail: ['components/plugins/connected-apps.tsx', 'ConnectedAppDetail'],
     sources: [['components/plugins/connected-apps.tsx', 'useAppDetail']] },
-  { entity: 'Artifact', detail: ['components/artifacts/artifact-viewer.tsx', 'ArtifactViewer'],
+  { entity: 'Artifact', routes: [['apps/mobile/app/artifact/[id].tsx', 'ArtifactScreen']], detail: ['components/artifacts/artifact-viewer.tsx', 'ArtifactViewer'],
     sources: [['app/actions/artifacts.ts', 'getArtifact', 'getArtifactText', 'shareArtifact', 'stopSharingArtifact']] },
+  { entity: 'Bot conversation', routes: [['apps/mobile/app/bots/[id]/index.tsx', 'BotChat']],
+    sources: [['apps/mobile/features/chat/screens/chat-screen.tsx', 'ChatScreen']] },
+  { entity: 'Group conversation', routes: [['apps/mobile/app/groups/[id].tsx', 'GroupChat']],
+    sources: [['lib/group-messages.ts', 'groupMessagesUrl', 'postGroupMessage']] },
   { entity: 'Bot name', detail: ['components/nav/bot-name-editor.tsx', 'BotNameEditor'],
     sources: [['components/nav/use-save-bot.ts', 'useSaveBot'], ['app/actions/bots.ts', 'updateBot']] },
   { entity: 'Settings device', sources: [['components/devices/use-device-actions.ts', 'useDeviceActions'],
@@ -29,7 +33,10 @@ const taskDetail = entityContracts[0].detail[0]
 const registered = new Set(entityContracts.flatMap(contract => [contract.detail, ...(contract.adapters ?? [])]
   .filter(Boolean).map(([file, name]) => file + '#' + name)))
 const detailName = /^[A-Z][A-Za-z0-9]*Detail(?:Page|Panel|Screen)?$/
-const taskController = /^(?:TaskPanel|TaskForm|TaskDetailController|IssueDetailController)$/
+const taskController = /^(?:(?:use)?(?:Task|Issue)(?:Detail|Panel)Controller|TaskPanel|TaskForm)$/
+const nativeDetailPath = /^apps\/mobile\/app\/(?:[^/]+\/)*\[[^/]+\](?:\/index)?\.tsx$/
+const nativeRoutes = new Map(entityContracts.flatMap(contract => (contract.routes ?? []).map(route => [route[0], route])))
+
 const sourceFile = (file, text) => ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const exported = node => node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)
 
@@ -51,14 +58,33 @@ function declarations(source) {
   return names
 }
 
+function auditNativeRoute(file, text) {
+  const route = nativeRoutes.get(file)
+  const missing = { file, line: 1, column: 1, rule: 'entity/native-detail-route',
+    message: 'Register this native detail route and its implementation in the entity contract.' }
+  if (!route) return [missing]
+  const [, name, module] = route
+  const source = sourceFile(file, text)
+  const matches = source.statements.some(node => {
+    if (!module) return ts.isFunctionDeclaration(node) && node.name?.text === name && exported(node) &&
+      node.modifiers.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword)
+    if (!ts.isExportDeclaration(node) || node.isTypeOnly || node.moduleSpecifier?.text !== module ||
+      !node.exportClause || !ts.isNamedExports(node.exportClause)) return false
+    return node.exportClause.elements.some(binding => !binding.isTypeOnly && binding.name.text === 'default' && binding.propertyName?.text === name)
+  })
+  return matches ? [] : [missing]
+}
+
 export function auditEntityDetail(file, text) {
-  if (!/^(?:components|apps\/mobile\/(?:features|app)|apps\/desktop\/src\/renderer)\//.test(file)
-    || /\.(?:test|spec|stories)\./.test(file) || !/(?:Detail|TaskPanel|TaskForm)/.test(text)) return []
+  if (/\.(?:test|spec|stories)\./.test(file)) return []
+  if (nativeDetailPath.test(file)) return auditNativeRoute(file, text)
+  if (!/^(?:components|hooks|lib|apps\/mobile\/(?:features|app)|apps\/desktop\/src\/renderer)\//.test(file)
+    || !/(?:Detail|TaskPanel|TaskForm|PanelController)/.test(text)) return []
   const source = sourceFile(file, text)
   const violations = []
   for (const entry of declarations(source)) {
     const duplicate = taskController.test(entry.name) && file !== taskDetail
-    const unregistered = entry.exported && detailName.test(entry.name) && !registered.has(file + '#' + entry.name)
+    const unregistered = !file.startsWith('lib/') && entry.exported && detailName.test(entry.name) && !registered.has(file + '#' + entry.name)
     if (!duplicate && !unregistered) continue
     const position = source.getLineAndCharacterOfPosition(entry.node.getStart(source))
     violations.push({ file, line: position.line + 1, column: position.character + 1, rule: 'entity/detail-source',
@@ -70,6 +96,8 @@ export function auditEntityDetail(file, text) {
 export function verifyEntityContracts(read) {
   const diagnostics = []
   for (const contract of entityContracts) {
+    for (const [file] of contract.routes ?? []) if (read(file) === undefined) diagnostics.push({ file, line: 1, column: 1,
+      rule: 'entity/native-detail-route', message: `${contract.entity} requires its registered native detail route.` })
     for (const [file, ...names] of [contract.detail, ...(contract.adapters ?? []), ...contract.sources].filter(Boolean)) {
       const text = read(file)
       const actual = new Set(text === undefined ? [] : declarations(sourceFile(file, text)).filter(item => item.exported).map(item => item.name))

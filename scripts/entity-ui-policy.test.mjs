@@ -37,3 +37,12 @@ test('the manifest resolves actual value exports and catches an erased command',
   const missing = verifyEntityContracts(file => file === 'app/actions/issues.ts' ? 'export type saveIssue = never' : read(file))
   assert.ok(missing.some(d => d.message.includes('saveIssue')))
 })
+
+test('an unregistered mobile entity route and a false Task re-export cannot bypass registration', () => {
+  const task = 'apps/mobile/app/task/[id]/index.tsx'
+  assert.deepEqual(auditEntityDetail(task, readFileSync(task, 'utf8')), [])
+  assert.equal(auditEntityDetail('apps/mobile/app/invoice/[slug].tsx', 'export default function Screen() {}')[0].rule, 'entity/native-detail-route')
+  assert.equal(auditEntityDetail(task, "export { TaskScreen as default } from './copy'")[0].rule, 'entity/native-detail-route')
+  assert.equal(auditEntityDetail('hooks/use-detail.ts', 'export function useTaskPanelController() {}')[0].rule, 'entity/detail-source')
+  assert.equal(auditEntityDetail('lib/task-flow.ts', 'function TaskDetailController() {}')[0].rule, 'entity/detail-source')
+})
