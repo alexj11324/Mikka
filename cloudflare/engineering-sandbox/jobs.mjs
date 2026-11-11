@@ -15,6 +15,8 @@ export const sourceSuites = {
     'scripts/acceptance/cloud-startup-report.test.mjs',
     'scripts/acceptance/cloud-startup-report.mjs',
     'scripts/acceptance/cloud-startup.mjs',
+    'scripts/acceptance/personal-workspace.mjs',
+    'packages/daemon/harness/pins.json',
     'scripts/acceptance/cloud-startup-evidence.mjs',
     'scripts/acceptance/eve-session.mjs',
     'scripts/acceptance/owned-codex-actor.mjs',
