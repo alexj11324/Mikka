@@ -4,10 +4,11 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import type { CoordinatorEventInput } from '@/lib/coordinator-events'
 import { linkedCiSuiteRun, type CompletedCiSuite, type LinkedCiSuiteRun } from './ci-suite-event'
 
-
 /**
  * A completed suite wakes only the newest published, already-ended Agent run
- * associated with the current PR head. No new dispatcher or polling loop.
+ * bound to a PR. An associated PR head SHA is checked when GitHub provides
+ * one; the suite SHA may instead be a synthetic merge commit.
+ * No new dispatcher or polling loop.
  * The existing Coordinator outbox is durable, deduplicated and wakes Eve after
  * commit. It requests a fresh GitHub read; it does not grant merge authority.
  */
