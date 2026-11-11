@@ -125,3 +125,13 @@ uses a private service binding to release its subscription on cancellation,
 including when an idle HTTP client disconnects. Reconnects use the native
 chunk cursor. The named `WorldStreamService` entrypoint is for a trusted
 host binding and the default Worker accepts no stream requests.
+
+## Workflow inventory
+
+`inventoryWorkflowRuns(listRuns)` scans the supplied Workflow World's pending
+and running views. It groups Eve, Mikka and unclassified workflows, deduplicates
+status transitions and returns deployment identifiers with hashed run identifiers.
+Use a read-only storage client and retain unclassified workflows during a drain.
+
+Authorized operators can find the managed deployment procedure in the
+[private operations entry](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/README.md).
