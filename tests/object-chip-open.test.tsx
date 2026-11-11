@@ -5,6 +5,7 @@ import { Window } from 'happy-dom'
 import { NextIntlClientProvider } from 'next-intl'
 import messages from '../messages/en.json'
 import type { CitationSource } from '../lib/coordinator/citations'
+import { taskPresentation } from '../lib/task-presentation'
 
 const browser = new Window({ url: 'https://mikka.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -29,33 +30,49 @@ sources[RUNS.succeeded] = { ...sources[RUNS.succeeded], outcome: 'done' } as Cit
 
 const issue = (id: string, patch: Partial<Extract<CitationSource, { kind: 'issue' }>>): CitationSource => ({ kind: 'issue', id, number: 5, identifier: 'ZHIX-5', title: 'Task', status: 'doing', priority: 'normal', ...patch })
 
-test('a task chip is its own state icon and code (localTaskState); the title, state and priority are in the hover card', async () => {
+test('a task chip uses the same authorized presentation as its detail, including a threadless task and Factory review', async () => {
   const { AgentCitationsContext, CitationChip } = citations
+  const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
   const ids = Array.from({ length: 7 }, (_, n) => `00000000-0000-4000-8000-0000000000b${n}`)
   const tasks: Record<string, CitationSource> = {
     [ids[0]]: issue(ids[0], { run: { status: 'running', outcome: null } }),
     [ids[1]]: issue(ids[1], { run: { status: 'succeeded', outcome: 'failed' } }),
     [ids[2]]: issue(ids[2], { run: { status: 'succeeded', outcome: 'blocked' } }),
-    [ids[3]]: issue(ids[3], { run: { status: 'waiting_input', outcome: null } }),
+    [ids[3]]: issue(ids[3], { run: null }),
     // A done run whose PR is open waits for review: the task's state, never the run's result.
     [ids[4]]: issue(ids[4], { run: { status: 'succeeded', outcome: 'done' }, pullRequests: [{ url: 'https://github.com/a/b/pull/1', state: 'open' }] }),
     [ids[5]]: issue(ids[5], { status: 'backlog', run: null }),
-    // An older payload with no run: its board status alone; no code falls back to the title.
+    // An older citation retains its title when it has no code.
     [ids[6]]: issue(ids[6], { status: 'done', identifier: null, title: 'Ship it' }),
   }
+  const current = { status: 'doing' as const, metadata: { pullRequests: [] } }
+  const projections = [
+    taskPresentation(current, { runId: 'r', status: 'running', outcome: null }, null, () => false),
+    taskPresentation(current, { runId: 'r', status: 'failed', outcome: 'failed' }, null, () => false),
+    taskPresentation(current, { runId: 'r', status: 'succeeded', outcome: 'blocked' }, null, () => false),
+    taskPresentation(current, undefined, { stage: 'handoff', needsYou: { kind: 'spec_review', since: '2026-11-01' } }, () => false),
+    taskPresentation(current, undefined, { stage: 'handoff', needsYou: { kind: 'pr_review', since: '2026-11-01' } }, () => false),
+    taskPresentation({ ...current, status: 'backlog' }, undefined, null, () => false),
+    taskPresentation({ ...current, status: 'done' }, undefined, null, () => false),
+  ]
+  const opened: string[] = []
   const container = browser.document.createElement('div') as unknown as HTMLElement
   document.body.append(container)
   const root = createRoot(container)
   await act(async () => {
     root.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}>
-      <AgentCitationsContext value={{ sources: tasks, previews: {}, onOpenIssue: () => {} }}>
+      <TaskPresentationsContext value={Object.fromEntries(ids.map((id, index) => [id, projections[index]]))}>
+      <AgentCitationsContext value={{ sources: tasks, previews: {}, onOpenIssue: id => opened.push(id) }}>
         {ids.map(id => <CitationChip key={id} id={id} kind="issue" />)}
       </AgentCitationsContext>
+      </TaskPresentationsContext>
     </NextIntlClientProvider>)
   })
   try {
     const chips = [...container.querySelectorAll('[data-slot="inline-citation-trigger"]')] as HTMLElement[]
-    assert.deepEqual(chips.map(chip => chip.querySelector('[data-task-state]')?.getAttribute('data-task-state')), ['running', 'failed', 'blocked', 'waiting', 'waiting', 'idle', 'done'])
+    assert.deepEqual(chips.map(chip => chip.querySelector('[data-task-state]')?.getAttribute('data-task-state')), ['running', 'failed', 'blocked', 'waiting', 'waiting', 'todo', 'done'])
+    await act(async () => { chips[3].click(); chips[5].click() })
+    assert.deepEqual(opened, [ids[3], ids[5]])
     assert.deepEqual(chips.map(chip => chip.textContent), ['ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'Ship it'])
     assert.ok(chips[0].querySelector('svg')?.getAttribute('class')?.includes('lucide-circle-dot'), 'running is the ring')
     assert.ok(chips[3].querySelector('svg')?.getAttribute('class')?.includes('lucide-hand'), 'waiting is the hand')
