@@ -17,6 +17,7 @@ const submitted: { text: string; context: { retryOf?: number } | undefined }[] =
 let chatItems: import('@/lib/coordinator/context').ChatItem[] = []
 let chatError: string | null = null
 let chatEnabled = false
+let streamStatus: 'idle' | 'resuming' = 'idle'
 let welcomeReply: unknown = { queued: true }
 let welcomeCalls = 0
 const modelPicks: (string | null)[] = []
@@ -31,7 +32,7 @@ let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }
 const notices: unknown[] = []
 const notes = [{ n: 1, kind: 'region' as const, url: 'https://example.com', label: 'fixture', note: 'keep this note', rect: { x: 0, y: 0, width: 1, height: 1, viewportWidth: 1, viewportHeight: 1 } }]
-let composer: { value: string; onChange: (value: string) => void; onSubmit: () => void }
+let composer: { sending?: boolean; editableWhileSending?: boolean; value: string; onChange: (value: string) => void; onSubmit: () => void }
 const plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const nothing = () => null
 // Portal primitives cache DOM availability on import; this fixture imports the
@@ -67,7 +68,7 @@ mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedEx
 mock.module('sonner', { namedExports: { toast: Object.assign((...args: unknown[]) => { notices.push(args) }, { error: nothing }) } })
 mock.module('swr', { defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'bot-model-menu' ? { data: menu, mutate: async () => {} } : ({ data: chatData ?? { items: chatItems, enabled: chatEnabled, working: false, error: chatError, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: { useCoordinatorSubmit: () => ({ submit: async (text: string, context?: { retryOf?: number }) => { submissions++; submitted.push({ text, context }); return { kind: 'accepted' } }, failureMessage: () => 'fixture failed' }) } })
-mock.module(new URL('./use-coordinator-agent.ts', import.meta.url).href, { namedExports: { useCoordinatorAgent: () => ({ replies: [], error: false, reconnect: nothing, status: 'idle', view: emptySessionView(), session: { sessionId: 'wrun_fixture' } }) } })
+mock.module(new URL('./use-coordinator-agent.ts', import.meta.url).href, { namedExports: { useCoordinatorAgent: () => ({ replies: [], error: false, reconnect: nothing, status: streamStatus, view: emptySessionView(), session: { sessionId: 'wrun_fixture' } }) } })
 mock.module(new URL('./chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: (props: { value: string; onChange: (value: string) => void; onSubmit: () => void; ref: Ref<HTMLTextAreaElement>; quote?: ReactNode }) => {
   composer = props
   return <div>{props.quote}<Textarea ref={props.ref} value={props.value} onChange={event => props.onChange(event.target.value)} /><Button onClick={props.onSubmit}>fixture-send</Button></div>
@@ -119,7 +120,7 @@ before(async () => {
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
 })
-beforeEach(() => { welcomeCalls = 0; welcomeReply = { queued: true }; chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { streamStatus = 'idle'; welcomeCalls = 0; welcomeReply = { queued: true }; chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
@@ -477,4 +478,26 @@ test('a rejected automatic welcome recovery retains its stored refusal and never
   assert.doesNotMatch(container.textContent ?? '', /private recovery transport detail/)
   await act(async () => chat())
   assert.equal(calls, 1)
+})
+
+test('a reconnect keeps the first draft editable without sending or stopping the recovering turn', async () => {
+  chatEnabled = true
+  const show = () => act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await show()
+  assert.equal(composer.sending, false)
+  streamStatus = 'resuming'
+  await show()
+  assert.equal(composer.sending, true)
+  assert.equal(composer.editableWhileSending, true)
+  await act(async () => composer.onChange('first reconnect draft'))
+  await act(async () => composer.onSubmit())
+  assert.equal(submissions, 0)
+  assert.equal(composer.value, 'first reconnect draft')
+  streamStatus = 'idle'
+  await show()
+  assert.equal(composer.sending, false)
+  assert.equal(composer.editableWhileSending, false)
+  await act(async () => composer.onSubmit())
+  assert.equal(submissions, 1)
+  assert.equal(submitted[0].text, 'first reconnect draft')
 })
