@@ -26,6 +26,67 @@ test('keeps fixed numeric phases, rejects foreign identities, and drops private 
   assert.equal(sanitizeTimingLog({ ...dispatch, boundary: 'PRIVATE' }, scope), null)
 })
 
+test('null-context dispatch requires a successful entry containing an owned server interval', () => {
+  const owned = { msg: 'cloud_startup_timing', stage: 'cloud.thread.ensure', runIdHash: hash,
+    startedAt: epoch + 100, endedAt: epoch + 1900, ms: 1800 }
+  const nativeDispatch = { ...dispatch, workflowRunId: null, stepId: null, attempt: null, boundary: 'dispatch_run_entry' }
+  const scoped = { ...scope, ownedIntervals: [owned] }
+  assert.deepEqual(sanitizeTimingLog({ ...nativeDispatch, PRIVATE: 'PRIVATE' }, scoped), nativeDispatch)
+  assert.equal(sanitizeTimingLog(nativeDispatch, scope), null)
+  for (const interval of [{ ...owned, runIdHash: 'f'.repeat(16) }, { ...owned, stage: 'cloud.worker.claim' },
+    { ...owned, startedAt: epoch - 1 }, { ...owned, endedAt: epoch + 2001 }, { ...owned, endedAt: epoch }]) {
+    assert.equal(sanitizeTimingLog(nativeDispatch, { ...scope, ownedIntervals: [interval] }), null)
+  }
+  for (const value of [{ ...nativeDispatch, workflowRunId: 'wrun_FOREIGN' }, { ...nativeDispatch, failed: true },
+    { ...nativeDispatch, boundary: undefined }, { ...nativeDispatch, phases: [{ phase: 'PRIVATE', ms: 1 }] }]) {
+    assert.equal(sanitizeTimingLog(value, scoped), null)
+  }
+})
+
+test('collects null-context dispatch across pages without retaining unrelated or private records', async () => {
+  const nativeDispatch = { ...dispatch, workflowRunId: null, stepId: null, attempt: null, boundary: 'dispatch_run_entry' }
+  const owned = { msg: 'cloud_startup_timing', stage: 'cloud.thread.ensure', runIdHash: hash,
+    startedAt: epoch + 100, endedAt: epoch + 1900, ms: 1800 }
+  const input = report(); input.samples[0].eveSessionId = workflow
+  let pages = 0
+  const read = async (path, body) => {
+    if (path.startsWith('/v13/')) return { gitSource: { sha: input.build }, readyState: 'READY', target: 'production' }
+    assert.equal(path, '/v1/observability/events')
+    assert.match(body.filter, /AND \(dispatch_timing OR \(/)
+    assert.match(body.filter, new RegExp(hash)); assert.match(body.filter, new RegExp(workflow))
+    assert.deepEqual(body.timeRange, { start: new Date(epoch - 5000).toISOString(), end: new Date(epoch + 10000).toISOString() })
+    const records = pages++ === 0 ? [nativeDispatch, { ...nativeDispatch, workflowRunId: 'wrun_FOREIGN' },
+      { ...nativeDispatch, startedAt: epoch + 5000, endedAt: epoch + 7000 }, { ...nativeDispatch, failed: true },
+      { ...owned, runIdHash: 'f'.repeat(16) }] : [owned, native]
+    return { events: records.map(log => ({ deploymentId, environment: 'production', message: JSON.stringify({ ...log, PRIVATE: 'PRIVATE' }) })),
+      pagination: pages === 1 ? { hasMore: true, nextCursor: 'next' } : { hasMore: false } }
+  }
+  const result = await collectProductionTimings(input, { token: 'PRIVATE', deploymentId, now: () => epoch + 10000, read })
+  assert.equal(pages, 2)
+  assert.equal(result.status, 'baseline_recorded')
+  assert.equal(result.samples[0].timing.dispatchBoundary, 'dispatch_run_entry')
+  assert.deepEqual(result.serverTimingLogs.filter(log => log.msg === 'dispatch_timing'), [nativeDispatch])
+  assert.equal(result.serverLogCollection.status, 'partial')
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE|FOREIGN|ffffffffffffffff/)
+})
+
+test('unscoped and ambiguous null-context dispatch cannot become timing proof', async () => {
+  const nativeDispatch = { ...dispatch, workflowRunId: null, stepId: null, attempt: null, boundary: 'dispatch_run_entry' }
+  const owned = { msg: 'cloud_startup_timing', stage: 'cloud.thread.ensure', runIdHash: hash,
+    startedAt: epoch + 100, endedAt: epoch + 1900, ms: 1800 }
+  for (const [nativeSession, records, reason] of [[false, [nativeDispatch, owned], 'dispatch_log_missing'],
+    [true, [nativeDispatch], 'dispatch_log_missing'],
+    [true, [nativeDispatch, { ...nativeDispatch, startedAt: epoch - 10 }, owned], 'ambiguous_dispatch']]) {
+    const input = report()
+    if (nativeSession) input.samples[0].eveSessionId = workflow
+    const result = await collectProductionTimings(input, { token: 'PRIVATE', deploymentId, now: () => epoch + 10000,
+      read: async path => path.startsWith('/v13/') ? { gitSource: { sha: input.build }, readyState: 'READY', target: 'production' }
+        : { events: records.map(log => ({ deploymentId, environment: 'production', message: JSON.stringify(log) })), pagination: { hasMore: false } } })
+    assert.equal(result.status, 'failed')
+    assert.equal(result.samples[0].timing.reason, reason)
+  }
+})
+
 test('aligns exact dispatch evidence and reports raw median/max with honest proxy lower-bound semantics', () => {
   const aligned = summarizeTimings(report(), [dispatch, native])
   assert.equal(aligned.status, 'baseline_recorded')
