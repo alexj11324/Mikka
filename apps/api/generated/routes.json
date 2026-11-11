@@ -97,6 +97,18 @@
       "sourceHash": "66f8f6e5665a0367cb6238ed92333505998927de8953d18d9fc2e768a854dddb"
     },
     {
+      "path": "/mikka/api/agents/[...path]",
+      "template": "/api/agents/[...path]",
+      "source": "app/api/agents/[...path]/route.ts",
+      "methods": [
+        "GET",
+        "OPTIONS",
+        "POST"
+      ],
+      "maxDuration": 800,
+      "sourceHash": "1bd809a804324c88a4e8166ad71166e2d8c3e27963b49eb68b3c102559caccfc"
+    },
+    {
       "path": "/mikka/api/approved-writes",
       "template": "/api/approved-writes",
       "source": "app/api/approved-writes/route.ts",
