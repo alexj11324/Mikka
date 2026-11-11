@@ -60,7 +60,9 @@ test('a missing or outside overlay fails the bundle; @hosted without one fails',
 test('an installed official mobile layer may never substitute the public avatar', () => {
   const dir = mkdtempSync(join(repository, '.hosted-ui-test-'))
   try {
-    assert.throws(() => mobileOverlay(app, { EAS_BUILD_PROFILE: 'hosted-production' }), /MOBILE_OVERLAY_DIR_REQUIRED_FOR_RELEASE/)
+    for (const profile of ['production', 'hosted-production']) {
+      assert.throws(() => mobileOverlay(app, { EAS_BUILD_PROFILE: profile }), /MOBILE_OVERLAY_DIR_REQUIRED_FOR_RELEASE/)
+    }
     const env = { MIKKA_MOBILE_OVERLAY_DIR: dir }
     assert.throws(() => mobileOverlay(app, env), /MOBILE_SLOT_REQUIRED: bot-avatar/)
     mkdirSync(join(dir, 'slots'))

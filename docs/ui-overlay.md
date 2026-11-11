@@ -101,6 +101,8 @@ Record the caller and contract here and verify both revisions together.
 
 ## iOS app
 
+Both App Store profiles select the private mobile checkout, including the default `production` profile used by the EAS CLI. The official release workflow also checks the contents of the source archive before invoking EAS. To recover a completed build, provide its EAS build ID and main source commit. The workflow finds the original native run and checks its protected archive, private revision and runtime fingerprint against the EAS build before submitting. A failed TestFlight submission remains recoverable while the original artifact is available.
+
 The iOS app (`apps/mobile`) has its own slots, filled from the layer's
 `mobile/` folder. They are React Native components, so they share nothing with
 the web slots but the idea.
