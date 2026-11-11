@@ -24,6 +24,51 @@ bindings. Current workflow files define the triggers and selected coverage.
   them with a new aggregate check until the GitHub branch-protection settings
   have been migrated and verified.
 
+## Focused governance acceptance and superseded PR runs
+
+- `Workspace governance HTTP (Item 11)` now runs as a reusable job of
+  `ui-policy.yml` for PRs and merge groups that the trusted Nx selector
+  classifies as database-affecting. Global, permission, auth, schema,
+  workflow and unknown inputs expand coverage rather than silently skip it.
+  The required `UI policy (strict)` gate checks the selected job's actual
+  conclusion, and requires an intentional skip when unselected. Unrelated
+  UI PRs do not allocate an extra PostgreSQL-backed governance workflow.
+  On every `main` push, independent postmerge governance acceptance remains.
+- Browser compatibility, E2B PR runtime, E2B BYOS and SSH device workflows
+  cancel obsolete **same-PR** attempts. They never cancel main or manually
+  dispatched production publication or recovery.
+- All protected check names remain stable. In particular,
+  `Browser tests (before merge)` must remain until GitHub branch protection
+  is read and migrated; a read-only connector's 403 is not authorization
+  to remove it.
+
+See [test ownership and CI cost](../../docs/ci/test-ownership.md) before
+adding or duplicating regression suites.
+
+## Draft pull requests
+
+There are two intentionally different classes of PR checks:
+
+- **Required checks always run**, even on drafts: `UI policy (strict)`,
+  `Production build and browser interactions`, `Browser tests (before merge)`
+  and external GitGuardian. A skipped required job can be reported as
+  successful by GitHub, so draft status must never authorize a bypass.
+- **Non-required specialized acceptances** (`E2B additive runtime release`
+  offline PR test, E2B subscription custody, Read cache API acceptance,
+  SSH device backend, Site search read contract and Unattended sandbox
+  acceptance) skip their runner jobs while the PR is a draft. Each workflow
+  explicitly handles `ready_for_review` to execute its real proof on the
+  same code even without an extra commit. On `converted_to_draft`, the
+  six jobs skip. The E2B offline job cancels an older eligible check when its
+  replacement enters the same PR group. An already running E2B check may
+  finish after conversion to draft.
+- Mobile OTA preview publication remains available on drafts for UI evidence
+  and TestFlight-oriented review. Other specialized evidence may have its
+  own intentional manual or source-version trigger.
+
+This reduces runner allocation without mistaking a draft-only skipped result
+for proof that a ready PR is safe to merge.
+
 ## Main pushes: postmerge checks
 
 - A push to `main` triggers the required `ui-policy.yml` checks again. Daemon
