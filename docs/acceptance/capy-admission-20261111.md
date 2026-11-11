@@ -101,3 +101,19 @@ the owner's final APP query. Root/API typechecking and the frontend package's
 Factory policies and whitespace checks. The startup and dispatch fixtures retain
 all 116 and 29 assertion lines from main. This source-bound local evidence does
 not establish new-head CI, deployed behavior or live model acceptance.
+
+## Observing physical connection shutdown
+
+An inherited run of the new dispatch fixture on privacy #1952 observed one
+backend immediately after `scope.close()`, then its ordinary DROP DATABASE
+succeeded. pg-pool removes idle clients from its logical owners before their
+asynchronous Client end callbacks finish; both pools had received termination.
+The fixture now observes real Client end events for its unique test database
+before making the unchanged zero-backend assertion. Production code is unchanged.
+
+A real-PG driver gate makes the boundary deterministic: the old observation sees
+two pending sockets and fails; waiting for their actual end events sees zero and
+passes. A control that omits derived-pool termination still sees one backend and
+fails the same assertion. No sleep, polling, backend termination or assertion
+relaxation is used. The corrected dispatch fixture passes 5/5 with its original
+six assertion lines intact; earlier broader results remain bound to their sources.
