@@ -118,7 +118,7 @@ export function parseOptions(args, env = process.env) {
     'max-startup-ms': 'maxStartupMs', 'timeout-ms': 'timeoutMs', 'expected-build': 'expectedBuild', revision: 'revision', output: 'output',
     'device-id': 'deviceId', 'agent-id': 'agentId', 'bot-id': 'botId', 'align-report': 'alignReport', 'dispatch-timings': 'dispatchTimings',
     'expected-worker-sha': 'expectedWorkerSha', 'expected-worker-source': 'expectedWorkerSource',
-    'runtime-evidence': 'runtimeEvidence', 'official-timing': 'officialTiming' }
+    'runtime-evidence': 'runtimeEvidence', 'official-timing': 'officialTiming', 'task-provider': 'taskProvider' }
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--help') return { help: true }
     const key = names[args[i].replace(/^--/, '')]
@@ -136,7 +136,13 @@ export function parseOptions(args, env = process.env) {
   assert(['enabled', 'disabled'].includes(options.officialTiming), 'official_timing_invalid')
   assert(options.officialTiming !== 'enabled' || options.runtimeEvidence === 'required', 'runtime_evidence_required')
   assert(['official', 'derived', 'pool', 'combined'].includes(options.strategy), 'strategy_invalid')
-  assert(Number.isInteger(options.runs) && options.runs >= (options.mode === 'candidate' ? 1 : 3) && options.runs <= 20, 'runs_invalid')
+  if (options.taskProvider !== undefined) {
+    assert(options.taskProvider === 'cloudflare' && options.mode === 'acceptance' && options.harness === 'both'
+      && options.runs === 2 && !options.deviceId && !options.agentId && !options.expectedWorkerSha && !options.expectedWorkerSource
+      && options.runtimeEvidence === 'required' && options.officialTiming === 'enabled', 'option_invalid')
+    assert(new URL(options.origin).origin === 'https://app.aspectlylabs.com', 'origin_invalid')
+  }
+  assert(Number.isInteger(options.runs) && options.runs >= (options.mode === 'candidate' ? 1 : options.taskProvider ? 2 : 3) && options.runs <= 20, 'runs_invalid')
   assert(Number.isSafeInteger(options.maxStartupMs) && options.maxStartupMs > 0 && options.maxStartupMs <= 60000, 'threshold_invalid')
   assert(Number.isSafeInteger(options.timeoutMs) && options.timeoutMs >= 1000 && options.timeoutMs <= 600000, 'timeout_invalid')
   assert(!options.botId || UUID.test(options.botId), 'bot_invalid')
@@ -282,22 +288,52 @@ export async function chooseSharedChatModel(client, botId, harness, owned = fals
     && (current.available === true || current.availability === 'checking'), owned ? 'owned_chat_model_unavailable' : 'shared_chat_model_unavailable')
 }
 
+async function verifyTaskFormIssue(client, scope, title, id) {
+  assert(UUID.test(id ?? ''), 'issue_create_failed')
+  const { issue } = await client.rpc('issues.getIssue', [id])
+  assert(issue?.id === id && issue.title === title && issue.userId === scope.ownerId
+    && issue.workspaceId === scope.workspaceId, 'cleanup_scope_mismatch')
+  return id
+}
+
+async function recoverTaskFormReceipt(client, record, scope) {
+  if (!record.messageSubmittedAt) return
+  if (!record.issueId) {
+    const path = '/api/issues/search?workspaceId=' + scope.workspaceId + '&limit=50&q=' + encodeURIComponent(record.title)
+    const result = await client.json(path)
+    assert(Array.isArray(result.items) && result.truncated === false && !result.nextCursor, 'cleanup_scope_mismatch')
+    const exact = result.items.filter(item => item.title === record.title)
+    assert(exact.length <= 1, 'cleanup_scope_mismatch')
+    if (!exact.length) return
+    record.issueId = await verifyTaskFormIssue(client,scope,record.title,exact[0].id)
+  }
+  if (!record.runId) {
+    const {threads} = await client.rpc('agents.pollIssueThreads',[record.issueId])
+    assert(Array.isArray(threads) && threads.length <= 1 && threads.every(t => t.ownedByCurrentUser && UUID.test(t.id)), 'cleanup_scope_mismatch')
+    if (threads.length) record.runId = threads[0].id
+  }
+}
+
 /** A bounded NDJSON read, never a polling loop. Only safe identifiers/times leave. */
-async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false, probe }, now) {
+async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false, probe, scope }, now) {
   const marker = `STARTUP_OK_${record.sampleId}`
   const toolInput = { issueId: record.issueId, repo: REPOSITORY, target: deviceId ? { deviceId } : 'cloud', profileId,
     // The owned lease probe executes Python; read-only runs intentionally have
     // no native shell. Ordinary startup checks keep their read-only policy.
     ...(agentId ? { agentId } : {}), readOnly: !(leaseAudit || probe),
     note: probe?.instructions ?? `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
-  const text = `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用已固定模型的指定 Profile，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
+  const sponsored = record.taskProvider === 'cloudflare'
+  const text = sponsored
+    ? `请用当前来源事件创建一个标题为「${record.title}」的测试任务，再调用一次 dispatch_run。issueId 必须是刚创建的任务，其余参数为 ${JSON.stringify(toolInput)}。使用该固定 Profile 与所选订阅，工作仅限读取该仓库的 README，返回 ${marker}。不要推送、发布、对外发消息或创建额外任务。`
+    : `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用已固定模型的指定 Profile，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
   const trace = sampledRequestTrace()
   record.requestTraceId = trace.traceId
   record.requestTraceScope = 'submission_http_only_workflow_may_use_another_trace'
   record.messageSubmittedAt = iso(now())
   record.phase = 'coordinator_submit'
   await client.rpc('coordinator.sendCoordinatorMessage', [text, null, botId, randomUUID(),
-    deviceId ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId],
+    deviceId ? { kind: 'device', deviceId } : sponsored ? {kind:'cloud',provider:'cloudflare'} : { $mikka: 'undefined' },
+    null, [], { $mikka: 'undefined' }, profileId, ...(sponsored ? [scope.workspaceId, record.title] : [])],
   { headers: { traceparent: trace.traceparent } })
   record.phase = 'coordinator_stream'
   let selectedCall, completed = false
@@ -312,6 +348,9 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
       record.workflowRunId = sessionId
       if (event.type === 'call.requested' && event.data.capability?.name === 'dispatch_run') {
         const input = event.data.input
+        if (sponsored && !record.issueId && input?.note?.includes(marker) && input.profileId === profileId) {
+          record.issueId = await verifyTaskFormIssue(client, scope, record.title, input.issueId)
+        }
         if (input?.issueId !== record.issueId || !input.note?.includes(marker)) return false
         assert(input.profileId === profileId, 'placement_mismatch')
         assert(!selectedCall || selectedCall === event.data.callId, 'multiple_dispatches')
@@ -750,16 +789,21 @@ export async function subscriptionProof(client, record, scope, profile) {
   const identity = run.executionIdentity
   const device = identity?.resourceBindings?.find(resource => resource.kind === 'device')
   assert(UUID.test(device?.id ?? '') && identity.billingAccount?.model?.kind === 'subscription'
-    && (record.placement.kind === 'cloud' ? identity.billingAccount?.runtime?.kind === 'e2b'
+    && (record.placement.kind === 'cloud' ? identity.billingAccount?.runtime?.kind === (record.taskProvider === 'cloudflare' ? 'cloudflare_sponsored' : 'e2b')
       : device.id === record.placement.deviceId), 'execution_device_mismatch')
+  if (record.taskProvider === 'cloudflare') {
+    assert(identity.resourceBindings.some(r => r.kind === 'cloudflare_sponsored' && r.id === scope.workspaceId
+      && r.workspaceId === scope.workspaceId && r.ownerId === 'mikka-hosted' && r.access === 'workspace_share'), 'execution_device_mismatch')
+    assert(!identity.resourceBindings.some(r=>r.kind==='e2b'), 'execution_device_mismatch')
+  }
   const subscriptions = identity.resourceBindings.filter(resource => resource.kind === 'subscription')
   const subscription = subscriptions[0], payer = identity.billingAccount.model
   assert(identity.version === 1 && identity.requester === scope.ownerId && identity.executionPrincipal === scope.ownerId
     && identity.botId === scope.botId && identity.botOwner === scope.ownerId && identity.outputOwner === scope.ownerId
     && identity.workspaceId === scope.workspaceId && identity.personalResourcePolicy === 'requester_only'
     && device.ownerId === scope.ownerId && device.access === 'owner'
-    && identity.billingAccount.runtime.ownerId === scope.ownerId
-    && identity.billingAccount.runtime.resourceId === (record.placement.kind === 'cloud' ? scope.ownerId : device.id)
+    && identity.billingAccount.runtime.ownerId === (record.taskProvider === 'cloudflare' ? 'mikka-hosted' : scope.ownerId)
+    && identity.billingAccount.runtime.resourceId === (record.taskProvider === 'cloudflare' ? scope.workspaceId : record.placement.kind === 'cloud' ? scope.ownerId : device.id)
     && subscriptions.length === 1 && UUID.test(subscription?.id ?? '')
     && subscription.ownerId === payerId && subscription.access === access
     && /^(0|[1-9][0-9]*)$/.test(subscription.revision ?? '')
@@ -875,7 +919,7 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
  * Profiles, account sessions and candidate devices remain the caller's scope.
  * Returns sanitized evidence even on failure, after cleaning only this issue. */
 export async function runSubscriptionCase({ client, botId, profileId, profile, scope, harness, model = MODELS[harness],
-  deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
+  deviceId, agentId, sourceCommit, expectedBuild, taskProvider, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
   now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued, createCaseProbe, onFixture }) {
@@ -892,8 +936,8 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
   assert(onCandidateRunQueued === undefined || typeof onCandidateRunQueued === 'function' && deviceId && agentId, 'candidate_target_invalid')
-  const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
-    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId) || leaseAudit, requireOfficialTiming: officialTiming === 'enabled',
+  const record = { sampleId, harness, requestedModel: model, ...(taskProvider ? {taskProvider} : {}), title: `${titlePrefix} ${sampleId} ${harness}`,
+    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId || taskProvider), requireTerminal: Boolean(deviceId || taskProvider) || leaseAudit, requireOfficialTiming: officialTiming === 'enabled',
     requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required' || leaseAudit),
     stages: [], status: 'running', phase: 'build_pin', ...(sourceCommit ? { sourceCommit } : {}) }
   const pin = pinBuild ?? (async () => {
@@ -928,10 +972,13 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     const issueInput = { title: record.title, status: 'todo', priority: 'low', content: {
       type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.\n${leaseInstructions}` }] }],
     } }
-    const created = probe ? await probe.createIssue(issueInput) : await client.rpc('issues.saveIssue', [issueInput])
-    assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
-    await onFixture?.({ kind: 'issue', id: record.issueId, profileId })
-    await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit, probe }, now)
+    if (!taskProvider) {
+      const created = probe ? await probe.createIssue(issueInput) : await client.rpc('issues.saveIssue', [issueInput])
+      assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
+      await onFixture?.({ kind: 'issue', id: record.issueId, profileId })
+    }
+    await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit, probe, scope }, now)
+    if (taskProvider) await onFixture?.({kind:'issue',id:record.issueId,profileId})
     await onFixture?.({ kind: 'run', id: record.runId, issueId: record.issueId, profileId })
     record.phase = 'coordinator_stop'
     await client.rpc('coordinator.stopCoordinatorTurn', [botId])
@@ -990,6 +1037,13 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
         record.failure ??= record.stopFailure; record.error ??= record.failure.code
       }
     }
+    if (taskProvider && !record.runId) {
+      try { await recoverTaskFormReceipt(client,record,scope) }
+      catch (error) {
+        record.cleanup ??= {status:'running',errors:[]}
+        record.cleanup.errors.push({step:'recover_task_form_receipt',code:safeError(error)})
+      }
+    }
     await cleanupCase(client, record, deviceId ? 'device' : 'cloud', { timeoutMs, WebSocketImpl, now, ...(probe ? { preserveIssue: true } : {}) })
     if (probe) {
       try { await probe.afterRelease() }
@@ -1008,6 +1062,12 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
   readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued, createCaseProbe, caseProfileInstructions, onFixture } = {}) {
+  if (options.taskProvider) {
+    assert(options.taskProvider === 'cloudflare' && options.origin === 'https://app.aspectlylabs.com'
+      && options.mode === 'acceptance' && options.harness === 'both' && options.runs === 2 && options.expectedBuild
+      && /^[0-9a-f]{40}$/.test(options.revision) && options.runtimeEvidence === 'required' && options.officialTiming === 'enabled'
+      && !options.deviceId && !options.agentId && !options.expectedWorkerSha && !options.expectedWorkerSource, 'option_invalid')
+  }
   const actor = options.actor ?? 'shared_smoke', owned = actor === OWNED_CODEX_ACTOR
   assert(owned || actor === 'shared_smoke', 'acceptance_actor_invalid')
   assert(!owned || options.harness === 'codex', 'owned_actor_model_invalid')
@@ -1164,6 +1224,8 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
   report.finishedAt = iso(now())
   report.status = report.error || report.cleanup.errors.length || report.samples.length !== options.runs
     || report.samples.some(sample => sample.status === 'failed' || sample.cleanup.status !== 'passed') ? 'failed'
+      : options.taskProvider === 'cloudflare' && report.samples.every(sample => sample.replyVerified && sample.runtimeEvidence?.status === 'passed')
+        ? 'sponsored_subscriptions_verified'
       : options.mode === 'candidate' && report.samples.every(sample => sample.replyVerified) ? 'candidate_subscription_proved'
         : 'awaiting_server_timings'
   return report
@@ -1244,7 +1306,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       await mkdir(dirname(output), { recursive: true })
       await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 })
       console.log(JSON.stringify({ status: report.status, samples: report.samples.length, report: output }))
-      if (report.status === 'failed' || (options.mode === 'acceptance' && report.status !== 'passed')) process.exitCode = 1
+      if (report.status === 'failed' || (options.mode === 'acceptance' && !['passed','sponsored_subscriptions_verified'].includes(report.status))) process.exitCode = 1
     }
   } catch (error) {
     console.error(JSON.stringify({ status: 'failed', code: safeError(error), ...(output ? { report: output } : {}) }))
