@@ -59,7 +59,9 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
       { workspaceId: wsForeign, userId: outsider, name: 'Outsider', email: `${outsider}@example.invalid`, role: 'admin' },
     ])
     await db.insert(projects).values({
-      id: projectId, userId: owner, name: 'Private project', summary: '', description: '',
+      // Project v2 requires an owning workspace on insert (drizzle/20261111030000);
+      // this fixture only needs a project the owner can scope a fact to.
+      id: projectId, workspaceId: wsA, userId: owner, name: 'Private project', summary: '', description: '',
       status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '',
       issueIds: [], revision: 1,
     })
@@ -196,7 +198,7 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
 
 pgTest('memory migration is additive and idempotent on an empty old fact table', async () => {
   const [{ pool }, { readFile }] = await Promise.all([import('../db'), import('node:fs/promises')])
-  const sqlText = await readFile(new URL('../../drizzle/20261109151500_memory_provenance_scope.sql', import.meta.url), 'utf8')
+  const sqlText = await readFile(new URL('../../drizzle/20261111080000_memory_provenance_scope.sql', import.meta.url), 'utf8')
   const client = await pool.connect()
   try {
     await client.query('begin')

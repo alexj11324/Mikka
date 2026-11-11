@@ -59,7 +59,12 @@ test('memory uses authoritative membership across two real PostgreSQL databases'
     await app.query(`CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid NOT NULL,"userId" text NOT NULL,name text NOT NULL,email text NOT NULL,role text NOT NULL,status text NOT NULL DEFAULT 'active',"createdAt" timestamptz NOT NULL DEFAULT now(),PRIMARY KEY("workspaceId","userId"))`)
     await app.query(`INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$4,'Stale A'),($2,$4,'Stale suspended'),($3,$4,'Stale foreign')`, [a, suspended, foreign, owner])
     await app.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$4,'Synthetic','synthetic@example.invalid','admin','suspended'),($2,$4,'Synthetic','synthetic@example.invalid','admin','active'),($3,$4,'Synthetic','synthetic@example.invalid','admin','active')`, [a, suspended, foreign, owner])
-    await projectDb.insert(projects).values([ownProject, teamProject].map(id => ({ id, userId: owner, name: 'Synthetic project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 })))
+    // Project v2 requires an owning workspace on insert (drizzle/20261111030000).
+    // The team project lives in `b`; the owner's own project in their personal workspace.
+    await projectDb.insert(projects).values([
+      { id: ownProject, workspaceId: personal, userId: owner, name: 'Synthetic project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 },
+      { id: teamProject, workspaceId: b, userId: owner, name: 'Synthetic team project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 },
+    ])
     await projectDb.insert(teamProjects).values({ projectId: teamProject, teamId: randomUUID(), workspaceId: b, userId: owner })
     await db.insert(schema.bots).values([
       { id: botId, ownerId: owner, workspaceId: a, name: 'Split database memory' },

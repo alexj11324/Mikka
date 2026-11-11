@@ -22,7 +22,7 @@ export async function enqueue(userId: string, holder: string, round: number, sel
   'use step'
   const { summary, memory, messages } = await loadConversation(userId, botId)
   const { memoryForBotPrompt } = await import('@/lib/profile/memory')
-  const profile = await memoryForBotPrompt(userId, botId)
+  const approvedFacts = await memoryForBotPrompt(userId, botId)
   const base = snapshot ? withCoordinatorPresentation(executionInstructions(snapshot)) : await botInstructions(userId, botId, personalCoordinatorInstructions())
   const permitted = snapshotMailboxTools(snapshot).filter(name => tools.some(tool => tool.name === name))
   const { githubContext, usedRepositoriesForBot } = await import('@/lib/coordinator/github-context')
@@ -42,7 +42,7 @@ export async function enqueue(userId: string, holder: string, round: number, sel
       // tool it tells the model to call. A native round is never a scheduled
       // read here (those run on the hosted path).
       canReadPersonalSkill: deploymentSwitch('personalSkillOnDemand') && grantReadsPersonalSkill(snapshot?.effectiveTools) && tools.some(item => item.name === 'read_personal_skill'),
-    }), cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), memory, '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile).instructions,
+    }), cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), [memory, approvedFacts].filter(Boolean).join('\n'), '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile).instructions,
     context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }

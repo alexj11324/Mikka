@@ -45,7 +45,9 @@ test('real memory producers persist authorized sources across separate applicati
     ])
     await db.insert(schema.bots).values([{ id: homeBot, ownerId: owner, workspaceId: home, name: 'Source Coordinator' },
       { id: otherBot, ownerId: owner, workspaceId: other, name: 'Other source' }, { id: peerBot, ownerId: peer, workspaceId: other, name: 'Peer source' }])
-    await projectDb.insert(projects).values({ id: project, userId: owner, name: 'Restricted source project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 })
+    // Project v2 requires an owning workspace on insert (drizzle/20261111030000);
+    // this project is a team project of `other` (see teamProjects below).
+    await projectDb.insert(projects).values({ id: project, workspaceId: other, userId: owner, name: 'Restricted source project', summary: '', description: '', status: 'started', priority: 'normal', lead: '', team: '', startDate: '', targetDate: '', issueIds: [], revision: 1 })
     await projectDb.insert(teamProjects).values({ projectId: project, teamId: randomUUID(), workspaceId: other, userId: owner })
     const pinned = Object.defineProperty({ id: owner }, tokenWorkspace, { value: home })
     const view = async (id: string, reader: string | { id: string } = owner, workspaceId = home) => {
