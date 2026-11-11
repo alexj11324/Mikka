@@ -205,7 +205,7 @@ test('workspace and Bot lists use the authorized Task presentation, including wo
 test('Tasks, Bot dispatches and Inbox consume the same canonical outcome table', () => {
   const at = '2026-11-07T10:00:00Z'
   type Case = {
-    name: string; primary: Parameters<typeof taskPresentation>[0]['status']; run?: string; outcome?: string;
+    name: string; primary: Parameters<typeof taskPresentation>[0]['status']; run?: TaskStateRun['status']; outcome?: NonNullable<TaskStateRun['outcome']>;
     factory?: Parameters<typeof taskPresentation>[2]; pr?: true; state: CanonicalTaskState; reason?: TaskReason; pending?: true
   }
   const cases: Case[] = [
