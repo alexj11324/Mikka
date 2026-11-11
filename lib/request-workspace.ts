@@ -22,5 +22,8 @@ export async function effectiveRequestWorkspace(user: RequestWorkspaceUser): Pro
   if (!choices.length) return null
   if (selection.present) return choices.find(workspace => workspace.id === selection.workspaceId)?.id ?? null
   const selected = (await cookies()).get('mikka-workspace')?.value
-  return choices.find(workspace => workspace.id === selected)?.id ?? choices[0].id
+  // Match the ordinary workspace context for a fresh, cookie-less session,
+  // including people who joined a team before creating their personal space.
+  return choices.find(workspace => workspace.id === selected)?.id
+    ?? choices.find(workspace => workspace.kind === 'personal')?.id ?? choices[0].id
 }
