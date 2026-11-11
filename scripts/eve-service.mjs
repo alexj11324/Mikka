@@ -20,6 +20,7 @@ export async function startEveService({ root = process.cwd(), env = process.env,
   const port = await allocatePort()
   const origin = `http://127.0.0.1:${port}`
   const childEnv = { ...env, HOST: '127.0.0.1', NITRO_HOST: '127.0.0.1', PORT: String(port), NITRO_PORT: String(port),
+    MIKKA_RUNTIME_RESOURCE_ROOT: development ? root : directory,
     // For the local World its delivery base already contains the mount.
     // An additional prefix would duplicate it in browser callback URLs.
     EVE_PUBLIC_ROUTE_PREFIX: '',
