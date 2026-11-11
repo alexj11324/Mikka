@@ -147,6 +147,9 @@ test('registered service identity routes enforce a fresh Workspace admin through
     assert.equal((await request(admin.token, first.id, 'POST', credential, rotate(1))).status, 403)
     assert.equal((await request({ cookie }, first.id, 'POST', credential, rotate(1))).status, 403)
     assert.equal((await request({ cookie, origin }, second.id, 'POST', credential, rotate(1))).status, 404)
+    const expired = await request({ cookie, origin }, first.id, 'POST', credential, { ...rotate(1), expiresAt: new Date(0).toISOString() })
+    assert.equal(expired.status, 400)
+    assert.equal(expired.body.error.detail, 'invalid_request')
     const issued = await request({ cookie, origin }, first.id, 'POST', credential, rotate(1))
     assert.equal(issued.status, 200)
     const firstKey: string = issued.body.token

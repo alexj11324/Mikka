@@ -37,7 +37,7 @@ export function manageServiceCredential(workspaceId: string, actor: EnterpriseRe
     if (change.action === 'rotate' && !state.enabled) throw new GovernanceError('service_identity_disabled')
     let expiry: Date | null = null
     if (change.action === 'rotate') {
-      try { expiry = checkExpiry(change.expiresAt, new Date()) } catch { throw new GovernanceError('invalid_request') }
+      try { expiry = checkExpiry(change.expiresAt, new Date()) } catch (cause) { throw new GovernanceError('invalid_request', cause) }
     }
     if (change.action === 'rotate') {
       const link = await organizationLink(workspace, workspaceId)
