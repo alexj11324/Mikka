@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises'
 import { createInterface } from 'node:readline'
 import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
-import { TEAM } from './deployment-regression.mjs'
 
 const iso = value => new Date(value).toISOString()
 const decimal = value => {
@@ -125,7 +124,7 @@ async function main([provider, first, last, application, ...files]) {
   if (from >= to) throw new Error('The exclusive end must be after the start')
   if (provider === 'vercel' && !application) {
     const url = new URL('https://api.vercel.com/v1/billing/charges')
-    url.search = new URLSearchParams({ teamId: TEAM, from, to })
+    url.search = new URLSearchParams({ teamId: token('VERCEL_TEAM_ID'), from, to })
     const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(120_000),
       headers: { authorization: 'Bearer ' + token('VERCEL_TEAM_TOKEN') } })
     if (!response.ok) throw new Error('Vercel FOCUS HTTP ' + response.status)
