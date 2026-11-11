@@ -8,7 +8,6 @@ import { QUIET_REPLY } from '../attention/handoff'
 import { readIssueMetadata } from '../issue-metadata'
 import { splitTelegramText } from '../telegram/messages'
 import type { InboxEvent } from '../push-reasons'
-import chineseMessages from '../../messages/zh-CN.json'
 import type { EveScope } from './scope'
 import { eveStreamId } from './projection'
 
@@ -94,12 +93,13 @@ export function createEveOutcomeDelivery(app:Query,workspace:Query,overrides:Par
     const failure=input.outcome==='failed'?failureLine(typeof source.message.mikkaFailure==='string'?source.message.mikkaFailure:null):null
     if(input.outcome==='failed'&&!failure)return
     const reply=failure??text
-    if(reply)await services.safe(scope.ownerId,reply)
+    if(!reply.trim())return
+    await services.safe(scope.ownerId,reply)
     const code=carriesCode(source)
     const targets=code?[]:telegramReplyTargets([source])
     for(const target of targets) {
       const targetKey=digest([target.threadId,target.telegramUserId])
-      const chunks=splitTelegramText(reply.trim()?reply:chineseMessages.Coordinator.failedTitle)
+      const chunks=splitTelegramText(reply)
       for(const [index,chunk]of chunks.entries()) {
         const current=await load(scope,input)
         if(!current||current.sourceId!==source.sourceId||!await telegramAllowed(scope,current,target))break
