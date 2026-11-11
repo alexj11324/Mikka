@@ -122,8 +122,10 @@ function apiResponse(url) {
   if (path.endsWith('/api/auth/get-session')) return json(session)
   if (path === '/api/version') return json({})
   if (path === '/api/mobile/home') return json(home)
-  if (path === '/api/mobile/tasks') return json({ tasks })
-  if (path.startsWith('/api/mobile/tasks/')) return json(detail)
+  if (path === '/api/mobile/task-presentations') return json({ version: 1, workspaceId: WORKSPACE, items: Object.fromEntries(tasks.map(task =>
+    [task.id, { version: 1, state: task.state, group: task.group, reason: task.reason, blockedBy: task.blockedBy ?? null, primaryStatus: task.status }])) })
+  if (path === '/api/mobile/tasks') return json({ workspaceId: WORKSPACE, tasks })
+  if (path.startsWith('/api/mobile/tasks/')) return json({ ...detail, live: { workspaceId: WORKSPACE } })
   if (path.startsWith('/api/mobile/threads/')) return json(threads[path.split('/').pop()] ?? threads[RUN2])
   if (path === '/api/mobile/chat-order') return json({ chats: [] })
   if (path === '/api/pending-actions') return json([])

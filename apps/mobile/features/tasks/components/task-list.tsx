@@ -17,12 +17,14 @@ import { useHome } from '@/lib/home'
 import { tap } from '@/lib/haptics'
 import { colors, LIST_INSET, ROW_SURFACE_INSET, SPACE } from '@/lib/theme'
 import { rowState, taskListRows, type TaskFilter, type TaskListRow } from '../model/task-groups'
+import { readPresentedTasks } from '../model/task-presentation-read'
 import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
 
 /** The person's tasks (GET /api/mobile/tasks), read again when a task or one of its threads changes (the live channel). */
 export function useTasks(enabled = true) {
   const home = useHome().data
-  return useLiveApi<{ tasks: Task[] }>(enabled ? '/api/mobile/tasks' : null, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
+  return useLiveApi<{ tasks: Task[]; workspaceId: string }>(enabled ? '/api/mobile/tasks' : null,
+    list => tasksLive(home?.live?.workspaceId, list?.workspaceId ?? home?.workspace.id, list?.tasks.map(task => task.id)), readPresentedTasks)
 }
 
 /**
