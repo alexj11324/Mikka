@@ -10,7 +10,7 @@ import { applicationPlugin, repository } from './application-plugin.mjs'
 import { sharedStylePlugins } from './shared-styles.mjs'
 
 let sequence = 0
-async function compile(source, target = 'web') {
+async function compile(source, target = 'web', external = []) {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-vite-contract-'))
   const entry = join(directory, 'contract.ts')
   await writeFile(entry, source)
@@ -20,7 +20,7 @@ async function compile(source, target = 'web') {
       configFile: false, root: repository, publicDir: false, envDir: false, envPrefix: [], logLevel: 'silent',
       plugins: [plugin],
       define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}' },
-      build: { write: false, minify: false, target: 'es2023', rolldownOptions: { input: entry, preserveEntrySignatures: 'strict' } },
+      build: { write: false, minify: false, target: 'es2023', rolldownOptions: { input: entry, external, preserveEntrySignatures: 'strict' } },
     })
     const entryChunk = output.output.find(chunk => chunk.type === 'chunk' && chunk.isEntry)
     assert.ok(entryChunk)
@@ -105,16 +105,29 @@ test('Vite uses the same existing Lightning CSS color space and neutral mixing a
 })
 
 test('official namespace consumers cannot silently render an alternate task detail after an export disappears', async t => {
-  const { UI_SLOTS, PUBLIC_CONTRACT_SLOTS } = await import('../../../lib/ui-overlay.mjs')
+  const { UI_SLOTS, UI_SLOT_EXPORTS, PUBLIC_CONTRACT_SLOTS } = await import('../../../lib/ui-overlay.mjs')
   const dir = await mkdtemp(join(repository, '.hosted-test-'))
   t.after(() => rm(dir, { recursive: true, force: true }))
   await mkdir(join(dir, 'slots'))
-  for (const name of UI_SLOTS) if (!PUBLIC_CONTRACT_SLOTS.has(name)) await writeFile(join(dir, 'slots', name + '.tsx'), 'export {}')
+  for (const name of UI_SLOTS) {
+    if (PUBLIC_CONTRACT_SLOTS.has(name)) continue
+    const exports = UI_SLOT_EXPORTS[name].map(value => `export const ${value} = true`)
+    await writeFile(join(dir, 'slots', name + '.tsx'), exports.join('\n'))
+  }
   const before = process.env.MIKKA_UI_OVERLAY_DIR
   process.env.MIKKA_UI_OVERLAY_DIR = dir
   t.after(() => { if (before === undefined) delete process.env.MIKKA_UI_OVERLAY_DIR; else process.env.MIKKA_UI_OVERLAY_DIR = before })
   const consumer = 'import * as slot from "@ui-slot/task-detail"; export const detail = slot.TaskDetailFrame ?? "alternate"'
+  await writeFile(join(dir, 'slots/task-detail.tsx'), 'export {}')
   for (const target of ['web', 'desktop']) await assert.rejects(compile(consumer, target), /MISSING_EXPORT|not exported/)
   await writeFile(join(dir, 'slots/task-detail.tsx'), 'export const TaskDetailFrame = "official"')
   for (const target of ['web', 'desktop']) assert.match((await compile(consumer, target)).code, /official/)
+
+  const entry = 'import "mikka:frontend-runtime"; export const ready = true'
+  const platformRuntime = ['apps/frontend/src/web/runtime.ts', 'apps/desktop/src/renderer/installed-startup.ts'].map(file => resolve(repository, file))
+  const unusedProvider = join(dir, 'slots/settings-usage.tsx')
+  await writeFile(unusedProvider, 'export type UsagePage = string')
+  for (const target of ['web', 'desktop']) await assert.rejects(compile(entry, target, platformRuntime), /MISSING_EXPORT|not exported/)
+  await writeFile(unusedProvider, 'globalThis.unusedProviderSideEffect = 1; export const UsagePage = "unusedProviderValue"')
+  for (const target of ['web', 'desktop']) assert.doesNotMatch((await compile(entry, target, platformRuntime)).code, /unusedProviderSideEffect|unusedProviderValue/)
 })
