@@ -9,6 +9,7 @@ import { POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST, POSTER_BINARY_MAX_BYTES,
 import { configuredDeploymentId } from '../../../lib/deployment-id.mjs'
 import { nodeRuntimePackages } from '../build-contract.mjs'
 import { cloudServiceRewrite } from '../cloud-service-rewrite.mjs'
+import { deduplicateVercelFunctions } from './dedupe-functions.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const compress = promisify(gzip)
@@ -128,6 +129,10 @@ export async function finalizeBuild({ root, output, preset, revision }) {
       await copyResources(directory)
       evidence.functions.push({ path: relative(output, directory), ...contract })
     }
+    // Compare complete, final runtime bytes, including tracing and resources.
+    evidence.functionPackaging = await deduplicateVercelFunctions(join(output, 'functions'))
+    const implementations = new Set(await functionDirectories(join(output, 'functions')))
+    evidence.functions = evidence.functions.filter(entry => implementations.has(resolve(output, entry.path)))
     await writeFile(path, `${JSON.stringify(config, null, 2)}\n`)
   } else if (preset === 'node-server') {
     evidence.overlaySha = process.env.MIKKA_UI_OVERLAY_SHA || null
