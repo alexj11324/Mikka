@@ -50,6 +50,29 @@ test('the frozen Agent 配置 words its selection reason in the reader\'s langua
   assert.doesNotMatch(legacy,/Declared capabilities/)
 })
 
+test('configured Skills are listed separately from the ones the run actually loaded', () => {
+  const agentProfile = { profileId: '00000000-0000-4000-8000-000000000009', name: 'Reviewer', version: 1, digest: 'd'.repeat(64), source: 'explicit' as const, reason: 'explicit' }
+  const configuredSkills = [
+    { id: 'independent-review', name: 'Independent review', version: 1, digest: 'a'.repeat(64), source: 'official' as const },
+    { id: 'personal:00000000-0000-4000-8000-000000000010', name: 'Deploy check', version: 1, digest: 'b'.repeat(64), source: 'personal' as const },
+  ]
+  const loadedSkills = [{ id: 'official:independent-review', name: 'Independent review', source: 'official' as const, digest: 'a'.repeat(64), loadedAt: '2026-11-10T00:00:00.000Z' }]
+  const html = renderToStaticMarkup(<Content evidence={{ ...evidence, agentProfile, configuredSkills, loadedSkills }} />)
+  for (const value of ['Independent review', 'Deploy check', 'skillSources.official', 'skillSources.personal']) assert.ok(html.includes(value), value)
+  // A configured Skill without a daemon receipt is not claimed as used.
+  assert.equal(html.match(/skillLoaded/g)?.length, 1)
+  assert.equal(html.match(/skillNotLoaded/g)?.length, 1)
+  assert.doesNotMatch(html, /00000000-0000-4000-8000-000000000010/)
+})
+
+test('a run without Profile Skills shows the empty state, not an invented list', () => {
+  const agentProfile = { profileId: '00000000-0000-4000-8000-000000000009', name: 'Reviewer', version: 1, digest: 'd'.repeat(64), source: 'decision' as const, reason: 'stage_fit' }
+  const html = renderToStaticMarkup(<Content evidence={{ ...evidence, agentProfile, configuredSkills: null, loadedSkills: null }} />)
+  assert.match(html, /skillsNone/)
+  assert.doesNotMatch(html, /skillLoaded|skillNotLoaded/)
+})
+
+
 test('the judged model strength, selected model, effort and reason are visible independently of the run model', () => {
   const html = renderToStaticMarkup(<Content evidence={{ ...evidence, modelRouting: {
     version: 2, required: 'light', model: 'gpt-6-luna', harness: 'codex', tier: 'light', effort: 'low', reason: 'difficulty_fit',

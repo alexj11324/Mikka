@@ -44,10 +44,16 @@ test('controlled Skills freeze actual content and version with the canonical dig
   assert.notEqual(agentProfileDigest({ ...definition, instructions: 'A revised rule.' }, skills), hash)
   assert.notEqual(agentProfileDigest(definition, skills.map(skill => ({ ...skill, version: 2 }))), hash)
   const instructions = agentProfileInstructions(definition, skills)
-  assert.ok(instructions.includes(definition.instructions)); assert.ok(instructions.includes(skills[0].content))
-  assert.ok(instructions.includes(skills[0].digest))
+  assert.ok(instructions.includes(definition.instructions))
+  // Progressive disclosure: the brief names the capability and its loader, not the body.
+  assert.ok(!instructions.includes(skills[0].content), 'an assigned Skill body must not be inlined into the brief')
+  assert.ok(instructions.includes('load_skill'))
+  assert.ok(instructions.includes('official:systematic-debugging'))
+  assert.ok(instructions.includes(skills[0].description))
   assert.throws(() => resolveAgentProfileSkills(['unreviewed-skill']), { code: 'agentProfileSkillUnavailable' })
   assert.ok(agentProfileSkillsCatalog().every(skill => !('content' in skill)))
+  // The official envelope keeps its pre-existing fields so frozen digests survive.
+  assert.ok(skills.every(skill => !('source' in skill)))
 })
 
 const catalog = [

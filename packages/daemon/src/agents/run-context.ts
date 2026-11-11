@@ -7,11 +7,13 @@ import { runAppsHost, type RunApps, type RunMcp } from './run-apps'
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
 // the instructions that tell the agent how a run ends.
 import { execFileSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import {
   lstatSync,
   mkdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs"
@@ -22,11 +24,17 @@ import type { Harness, RunKind } from "@mikka/protocol"
 import { runQuestion, runRepositorySelection, type RunQuestion } from "@mikka/protocol/run"
 import { planHandoff, planSplitProblem } from "@mikka/protocol/plan"
 import {
+  MAX_PROFILE_SKILL_INSTRUCTIONS_LENGTH,
+  MAX_PROFILE_SKILLS_PER_RUN,
+  PROFILE_SKILLS_DIR,
+  PROFILE_SKILL_MANIFEST_FILE,
   SKILL_BODY_FILE,
   SKILLS_DIR,
+  profileRunSkillSchema,
   skillMarkdown,
   skillSlug,
   skillsPromptSection,
+  type ProfileRunSkill,
   type RunSkill,
   type SkillAssignmentReceipt,
 } from "@mikka/protocol/skill"
@@ -135,6 +143,10 @@ export interface RunContextOptions {
   /** The skills the run was given; none when the assignment carries none. */
   skills?: readonly RunSkill[]
   skillReceipt?: SkillAssignmentReceipt
+  /** Frozen Profile capabilities whose bodies the `load_skill` tool serves. */
+  profileSkills?: readonly ProfileRunSkill[]
+  /** Repository Skill names the Profile declared; pinned from this checkout. */
+  repositorySkills?: readonly string[]
   /** Extra writable paths (the harness's own session store). */
   extraWrite?: readonly string[]
   /** Per-worktree git metadata, object store and this run's branch ref. */
@@ -232,6 +244,65 @@ export function runPaths(stateDir: string, runId: string) {
   }
 }
 
+/** A declared repository Skill from this checkout's standard directories.
+ * Precedence is fixed, symlinks and hard links are refused, and an unsafe
+ * entry wins over a same-named one elsewhere rather than being skipped. */
+function repositorySkill(worktree: string, slug: string): ProfileSkillManifestEntry {
+  const id = `repository:${slug}`
+  const missing = (reason: string): ProfileSkillManifestEntry => ({ id, name: slug, description: '', source: 'repository', digest: null, instructions: null, available: false, reason })
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(slug)) return missing('invalid')
+  for (const root of ['.claude/skills', '.agents/skills']) {
+    const file = join(worktree, root, slug, SKILL_BODY_FILE)
+    const meta = lstatSync(file, { throwIfNoEntry: false })
+    if (!meta) continue
+    if (!meta.isFile() || meta.isSymbolicLink() || meta.nlink !== 1 ||
+      meta.size < 1 || meta.size > MAX_PROFILE_SKILL_INSTRUCTIONS_LENGTH) return missing('invalid')
+    let body: string
+    try {
+      const bytes = readFileSync(file)
+      if (bytes.length !== meta.size || bytes.includes(0)) return missing('invalid')
+      const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+      if (!decoded.trim()) return missing('invalid')
+      body = decoded
+    } catch { return missing('invalid') }
+    const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(body)?.[1] ?? ''
+    const declaredName = /^name:\s*([^\r\n]+)$/m.exec(frontmatter)?.[1]?.trim().replace(/^["']|["']$/g, '')
+    const description = /^description:\s*([^\r\n]+)$/m.exec(frontmatter)?.[1]?.trim().replace(/^["']|["']$/g, '') ?? ''
+    return {
+      id, name: (declaredName || slug).slice(0, 80), description: description.slice(0, 500), source: 'repository',
+      digest: createHash('sha256').update(body, 'utf8').digest('hex'), instructions: body, available: true,
+    }
+  }
+  return missing('not_found')
+}
+
+/** Write the manifest `load_skill` reads. Preparation has no checkout yet, so
+ * it lists declared repository names as pending; the final RunContext rewrites
+ * the manifest after the clone with the pinned bodies. Writes are atomic, and
+ * the directory is created before the MCP child resolves it. */
+function writeProfileSkillManifest(options: RunContextOptions, runDir: string, worktree: string, includeRepository: boolean) {
+  const assigned = (options.profileSkills ?? []).map(skill => profileRunSkillSchema.parse(skill))
+  const declared = [...new Set(options.repositorySkills ?? [])]
+  if (assigned.length === 0 && declared.length === 0) return
+  if (assigned.length > MAX_PROFILE_SKILLS_PER_RUN || declared.length > MAX_PROFILE_SKILLS_PER_RUN) throw new Error('Profile Skill assignment limit')
+  const entries: ProfileSkillManifestEntry[] = []
+  for (const skill of assigned) {
+    const digest = createHash('sha256').update(skill.instructions, 'utf8').digest('hex')
+    if (digest !== skill.digest) throw new Error('Profile Skill artifact digest mismatch')
+    entries.push({ id: skill.id, name: skill.name, description: skill.description, source: skill.source, digest, instructions: skill.instructions, available: true })
+  }
+  for (const slug of declared) entries.push(includeRepository ? repositorySkill(worktree, slug)
+    : { id: `repository:${slug}`, name: slug, description: '', source: 'repository', digest: null, instructions: null, available: false, reason: 'pending' })
+  const unique = [...new Map(entries.map(entry => [entry.id, entry])).values()]
+  const dir = join(runDir, PROFILE_SKILLS_DIR)
+  ownDir(dir)
+  const manifest = { version: 1, skills: unique }
+  const file = join(dir, PROFILE_SKILL_MANIFEST_FILE)
+  const tmp = `${file}.${process.pid}.tmp`
+  writeFileSync(tmp, `${JSON.stringify(manifest)}\n`, { encoding: 'utf8', mode: 0o600 })
+  renameSync(tmp, file)
+}
+
 /** Only run-owned files and fixed MCP configuration. It does not stat or create
  * the future checkout; the final RunContext still validates realpath and Git. */
 export function prepareRunContextFiles(options: RunContextOptions) {
@@ -241,6 +312,10 @@ export function prepareRunContextFiles(options: RunContextOptions) {
   const files = { worktree: resolve(options.worktree), runDir, handoffFile: join(runDir, 'handoff.json'),
     tmpDir: join(runDir, 'tmp'), capturesDir: join(runDir, CAPTURES_DIR) }
   ownDir(files.tmpDir); ownDir(files.capturesDir)
+  // The prewarmed MCP child resolves this directory at construction; it must
+  // exist before the future checkout is ready. Assigned bodies are frozen
+  // already, so writing them here changes nothing later.
+  writeProfileSkillManifest(options, runDir, files.worktree, false)
   return { ...files, mcpServer: () => runMcpServer(options, files),
     tempEnv: (): Record<string, string> => options.policyHash ? { MIKKA_POLICY_HASH: options.policyHash } : {} }
 }
@@ -253,7 +328,20 @@ function decisionMcpEnvironment(mcp: RunContextOptions['mcp']): Record<string, s
   } : {}) }
 }
 
-function runMcpServer(options: RunContextOptions, files: Pick<RunContext, 'worktree' | 'handoffFile' | 'capturesDir' | 'tmpDir'>): McpServerSpec {
+/** What `load_skill` may serve; `instructions` is null when the source was
+ * declared but is unavailable in this checkout. */
+type ProfileSkillManifestEntry = {
+  id: string
+  name: string
+  description: string
+  source: 'official' | 'personal' | 'workspace' | 'repository'
+  digest: string | null
+  instructions: string | null
+  available: boolean
+  reason?: string
+}
+
+function runMcpServer(options: RunContextOptions, files: Pick<RunContext, 'worktree' | 'handoffFile' | 'capturesDir' | 'tmpDir' | 'runDir'>): McpServerSpec {
     const command = options.nodeBinary ?? process.execPath
     const repositoryExecution = !options.factoryCheck && ['implement', 'fix'].includes(options.kind ?? '')
     const readOnlyInspection = !options.factoryCheck && ['implement', 'fix', 'plan'].includes(options.kind ?? '') && runPolicy(options.policy).readOnly === true
@@ -262,6 +350,7 @@ function runMcpServer(options: RunContextOptions, files: Pick<RunContext, 'workt
       args: [
         MCP_SERVER_SCRIPT, "--handoff", files.handoffFile,
         "--captures", files.capturesDir, "--capture-root", files.worktree, "--capture-root", files.tmpDir,
+        ...(options.profileSkills?.length || options.repositorySkills?.length ? ['--profile-skills', join(files.runDir, PROFILE_SKILLS_DIR)] : []),
         ...(options.factoryCheck && (!options.factoryCheck.reportOnly || options.factoryCheck.inferCommand) ? ['--factory-verify', JSON.stringify({ cwd: files.worktree, command: options.verifyCommand ?? null, infer: options.factoryCheck.inferCommand })] : []),
         ...(options.factoryCheck?.reportOnly || readOnlyInspection ? ['--factory-artifacts', files.worktree] : []),
         ...(repositoryExecution ? ['--repository-selection', files.worktree] : []),
@@ -309,6 +398,8 @@ export class RunContext {
   readonly tmpDir: string
   /** Screenshots and recordings `submit_capture` queued; the daemon uploads them (`captures.ts`). */
   readonly capturesDir: string
+  /** The run's pinned Profile Skills and the manifest the `load_skill` tool reads. */
+  readonly profileSkillsDir: string
 
   constructor(private readonly options: RunContextOptions) {
     if (options.policyHash && (!options.policy || policySnapshotHash(options.policy) !== options.policyHash)) throw new Error('Run child policy hash mismatch')
@@ -328,7 +419,9 @@ export class RunContext {
     ownDir(this.tmpDir)
     this.capturesDir = join(this.runDir, CAPTURES_DIR)
     ownDir(this.capturesDir)
+    this.profileSkillsDir = join(this.runDir, PROFILE_SKILLS_DIR)
     this.writeSkills()
+    this.writeProfileSkills()
     // The owner's own GitHub credential reaches every run that has one, read-only and plan runs included.
     if (options.github && !options.machineEnvironment) {
       this.githubEnv = options.githubEnvironment ?? prepareGitHubEnvironment(this.runDir, options.github, options.childPath ?? process.env.PATH ?? '', options.githubRuntime)
@@ -375,6 +468,17 @@ export class RunContext {
         writeFileSync(target, file.content, "utf8")
       }
     }
+  }
+
+  /**
+   * The run's Profile Skills: metadata and the exact pinned bodies, plus the
+   * repository-declared names this checkout actually contains. The brief has
+   * only metadata; `load_skill` reads this manifest. Nothing is written into
+   * the worktree, and a repository file is pinned once at start so a later
+   * edit cannot change what the agent loads.
+   */
+  private writeProfileSkills(): void {
+    writeProfileSkillManifest(this.options, this.runDir, this.worktree, true)
   }
 
   get harness() {

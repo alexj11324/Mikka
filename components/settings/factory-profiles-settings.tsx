@@ -2,8 +2,9 @@
 
 import { useId, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, KeyRound, MoreHorizontal, Pencil, Plus, UserRound } from 'lucide-react'
+import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, KeyRound, MoreHorizontal, Pencil, Plus, Share2, UserRound } from 'lucide-react'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
+import { AGENT_PROFILE_TEMPLATES } from '@/lib/factory/agent-profile-templates'
 import { HarnessLabel, ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { ProfileMark, ProfileMarkPicker } from '@/components/labels/profile-mark'
 import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
@@ -19,12 +20,13 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from './primitives'
-import { profileAvailabilityKey, profileModelKey, type AgentProfilesView } from './factory-profiles-data'
-import { useAgentProfileEditor, useAgentProfileList, type ProfileEditor } from '@/hooks/settings/use-agent-profiles'
+import { profileAvailabilityKey, profileModelKey, shareWorkspaceSkill, type AgentProfilesView, type ProfileSkillView } from './factory-profiles-data'
+import { useAgentProfileEditor, useAgentProfileList, profileFailure, type ProfileEditor, type ProfileFailure } from '@/hooks/settings/use-agent-profiles'
 
 const EFFORTS = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] as const
-const SKILL_COPY = ['implementation-evidence', 'independent-review', 'systematic-debugging'] as const
+const SKILL_COPY = ['implementation-evidence', 'independent-review', 'systematic-debugging', 'test-driven-development', 'verification-before-completion', 'performance-investigation', 'security-review'] as const
 const skillCopyKey = (id: string) => (SKILL_COPY as readonly string[]).includes(id) ? id as typeof SKILL_COPY[number] : null
+const REPOSITORY_SKILL = /^repository:([a-z0-9][a-z0-9-]{0,63})$/i
 
 function modelSourceName(model: AgentProfilesView['catalog']['models'][number], t: ReturnType<typeof useTranslations<'Settings.agentProfiles'>>) {
   return model.sourceLabel || (model.sourceOrdinal ? t('numberedSource', { source: t(`sources.${model.source.kind}`), number: model.sourceOrdinal }) : t(`sources.${model.source.kind}`))
@@ -46,7 +48,13 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
 
   return <>
     <SettingsSection id="factory-profiles-heading" title={t('title')}
-      action={<Button {...settingsSectionAction} disabled={!data || !!list.error || !!pending} onClick={() => { setFailure(null); setEditor({}) }}><Plus data-icon="inline-start" />{t('add')}</Button>}>
+      action={<DropdownMenu>
+        <DropdownMenuTrigger render={<Button {...settingsSectionAction} disabled={!data || !!list.error || !!pending} />}><Plus data-icon="inline-start" />{t('add')}</DropdownMenuTrigger>
+        <DropdownMenuContent align="end"><DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => { setFailure(null); setEditor({}) }}>{t('blankProfile')}</DropdownMenuItem>
+          {AGENT_PROFILE_TEMPLATES.map(template => <DropdownMenuItem key={template.id} onClick={() => { setFailure(null); setEditor({ template: template.id }) }}>{t(`templates.${template.id}.name`)}</DropdownMenuItem>)}
+        </DropdownMenuGroup></DropdownMenuContent>
+      </DropdownMenu>}>
       {!data && !list.error ? <SettingsLoading bare rows={2} label={t('loading')} />
         : !data ? <div className="p-4"><SettingsSaveError message={t('loadFailed')} retryLabel={common('retry')} onRetry={() => { void list.mutate() }} /></div>
         : <>
@@ -88,7 +96,8 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
     </SettingsSection>
     <span role="status" className="sr-only">{announce}</span>
     {(failure || (data && list.error)) && <SettingsSaveError message={t(failure ?? 'loadFailed')} retryLabel={t('reload')} onRetry={() => { setFailure(null); void list.mutate() }} />}
-    {editor && data && <ProfileEditorDialog key={(editor.duplicate ? 'copy:' : 'edit:') + (editor.profile?.id ?? 'new')} workspaceId={workspaceId} editor={editor} catalog={data.catalog}
+    {editor && data && <ProfileEditorDialog key={(editor.template ?? '') + (editor.duplicate ? 'copy:' : 'edit:') + (editor.profile?.id ?? 'new')} workspaceId={workspaceId} editor={editor} catalog={data.catalog}
+      onCatalogReload={() => { void list.mutate() }}
       onClose={() => { setEditor(null); void list.mutate() }} onSaved={() => { setEditor(null); void list.mutate() }} onReload={() => { setEditor(null); void list.mutate() }} />}
     <AlertDialog open={!!archiving} onOpenChange={open => { if (!open && !pending) setArchiving(null) }}>
       <AlertDialogContent aria-describedby={undefined}>
@@ -103,15 +112,36 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
   </>
 }
 
-function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, onReload }: {
+function ProfileEditorDialog({ workspaceId, editor, catalog, onCatalogReload, onClose, onSaved, onReload }: {
   workspaceId: string; editor: ProfileEditor; catalog: AgentProfilesView['catalog']
-  onClose: () => void; onSaved: () => void; onReload: () => void
+  onCatalogReload: () => void; onClose: () => void; onSaved: () => void; onReload: () => void
 }) {
   const t = useTranslations('Settings.agentProfiles')
   const common = useTranslations('Common')
   const id = useId()
+  const [repositoryInput, setRepositoryInput] = useState('')
+  const [sharing, setSharing] = useState<string | null>(null)
+  const [shareError, setShareError] = useState<ProfileFailure | null>(null)
   const { original, draft, change, mark, changeMark, roles, setRoles, modelMode, setModelMode, modelKey, setModelKey, models, selectedModel, frozen, pending, error, setError, save } = useAgentProfileEditor({ workspaceId, editor, catalog, onSaved })
   const sourceName = (model: AgentProfilesView['catalog']['models'][number]) => modelSourceName(model, t)
+  const catalogIds = new Set(catalog.skills.map(skill => skill.id))
+  const repositorySelected = draft.skills.filter(skill => REPOSITORY_SKILL.test(skill))
+  const missingSelected = draft.skills.filter(skill => !catalogIds.has(skill) && !REPOSITORY_SKILL.test(skill))
+  const blockedSkill = draft.skills.some(skill => catalog.skills.some(item => item.id === skill && !item.available))
+  function addRepositorySkills() {
+    const slugs = repositoryInput.split(/[,，\s]+/).map(value => value.trim().toLowerCase()).filter(Boolean)
+    if (!slugs.length || slugs.some(slug => !REPOSITORY_SKILL.test(`repository:${slug}`))) { setError('invalid'); return }
+    change({ skills: [...new Set([...draft.skills.filter(skill => !REPOSITORY_SKILL.test(skill)), ...slugs.map(slug => `repository:${slug}`)])] })
+    setRepositoryInput('')
+  }
+  async function toggleShare(skill: ProfileSkillView) {
+    const skillId = skill.id.startsWith('personal:') ? skill.id.slice('personal:'.length) : null
+    if (!skillId) return
+    setSharing(skill.id); setShareError(null)
+    try { await shareWorkspaceSkill(workspaceId, skillId, !skill.shared); onCatalogReload() }
+    catch (failure) { setShareError(profileFailure(failure)) }
+    finally { setSharing(null) }
+  }
 
   return <Dialog open onOpenChange={open => { if (!open && !pending) onClose() }}>
     <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col sm:max-w-2xl" aria-describedby={undefined} closeLabel={common('close')}>
@@ -165,25 +195,55 @@ function ProfileEditorDialog({ workspaceId, editor, catalog, onClose, onSaved, o
           <Field><FieldLabel htmlFor={id + '-instructions'}>{t('instructions')}</FieldLabel><Textarea id={id + '-instructions'} className="min-h-28 resize-y" value={draft.instructions} maxLength={24_000} disabled={pending || frozen} onChange={event => change({ instructions: event.target.value })} /></Field>
           <FieldSet className="gap-3"><FieldLegend className="text-sm">{t('skills')}</FieldLegend>
             <FieldGroup className="gap-3">
-              {catalog.skills.length === 0 ? <p className="text-sm text-muted-foreground">{t('noSkills')}</p> : catalog.skills.map(skill => { const key = skillCopyKey(skill.id); return <Field key={skill.id} orientation="horizontal">
-                <Checkbox id={id + '-skill-' + skill.id} checked={draft.skills.includes(skill.id)} disabled={pending || frozen} onCheckedChange={checked => change({ skills: checked ? [...draft.skills, skill.id] : draft.skills.filter(value => value !== skill.id) })} />
-                <FieldLabel htmlFor={id + '-skill-' + skill.id} className="flex min-w-0 flex-col items-start gap-0.5">
-                  <span>{key ? t(`skillNames.${key}`) : skill.name} <span className="font-normal text-muted-foreground">{t('version', { version: skill.version })}</span></span>
-                  <span className="text-xs font-normal text-muted-foreground">{key ? t(`skillDescriptions.${key}`) : skill.description}</span>
-                </FieldLabel>
-              </Field> })}
-              {draft.skills.filter(skill => !catalog.skills.some(item => item.id === skill)).map(skill => <Field key={skill} orientation="horizontal">
-                <Checkbox id={id + '-missing-' + skill} checked disabled={pending || frozen} onCheckedChange={() => change({ skills: draft.skills.filter(value => value !== skill) })} />
+              {catalog.skills.length === 0 ? <p className="text-sm text-muted-foreground">{t('noSkills')}</p> : catalog.skills.map(skill => {
+                const key = skillCopyKey(skill.id), checked = draft.skills.includes(skill.id)
+                const label = key ? t(`skillNames.${key}`) : skill.name, description = key ? t(`skillDescriptions.${key}`) : skill.description
+                return <Field key={skill.id} orientation="horizontal">
+                  <Checkbox id={id + '-skill-' + skill.id} checked={checked} disabled={pending || frozen || (!skill.available && !checked)} onCheckedChange={value => change({ skills: value ? [...draft.skills, skill.id] : draft.skills.filter(item => item !== skill.id) })} />
+                  <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+                    <FieldLabel htmlFor={id + '-skill-' + skill.id} className="flex min-w-0 flex-col items-start gap-0.5">
+                      <span>{label} <span className="font-normal text-muted-foreground">{t(`skillSources.${skill.source}`)} · {t('version', { version: skill.version })}</span></span>
+                      {description && <span className="text-xs font-normal text-muted-foreground">{description}</span>}
+                      {!skill.available && <span className="text-xs font-normal text-destructive-foreground">{t(`skillStates.${skill.reason ?? 'missing'}`)}</span>}
+                    </FieldLabel>
+                    {skill.source === 'personal' && skill.shareable && <Button type="button" variant="ghost" size="sm" className="shrink-0" disabled={pending || frozen || sharing === skill.id} onClick={() => { void toggleShare(skill) }}>
+                      <Share2 data-icon="inline-start" />{skill.shared ? t('unshareSkill') : t('shareSkill')}
+                    </Button>}
+                  </div>
+                </Field>
+              })}
+              {missingSelected.map(skill => <Field key={skill} orientation="horizontal">
+                <Checkbox id={id + '-missing-' + skill} checked onCheckedChange={() => change({ skills: draft.skills.filter(value => value !== skill) })} />
                 <FieldLabel htmlFor={id + '-missing-' + skill} className="text-destructive-foreground">{(key => key ? t('unavailableNamed', { name: t(`skillNames.${key}`) }) : t('removedSkill'))(skillCopyKey(skill))}</FieldLabel>
               </Field>)}
             </FieldGroup>
           </FieldSet>
+          <FieldSet className="gap-3"><FieldLegend className="text-sm">{t('repositorySkills')}</FieldLegend>
+            <Field><FieldLabel htmlFor={id + '-repository'}>{t('repositorySkillName')}</FieldLabel>
+              <div className="flex gap-2">
+                <Input id={id + '-repository'} value={repositoryInput} maxLength={200} placeholder={t('repositorySkillPlaceholder')} disabled={pending || frozen}
+                  onChange={event => setRepositoryInput(event.target.value)}
+                  onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addRepositorySkills() } }} />
+                <Button type="button" variant="secondary" disabled={pending || frozen || !repositoryInput.trim()} onClick={addRepositorySkills}>{t('addRepositorySkill')}</Button>
+              </div>
+            </Field>
+            {repositorySelected.length > 0 && <FieldGroup className="gap-2">
+              {repositorySelected.map(skill => { const slug = REPOSITORY_SKILL.exec(skill)?.[1] ?? skill; return <Field key={skill} orientation="horizontal">
+                <Checkbox id={id + '-repo-' + slug} checked disabled={pending || frozen} onCheckedChange={() => change({ skills: draft.skills.filter(value => value !== skill) })} />
+                <FieldLabel htmlFor={id + '-repo-' + slug} className="flex min-w-0 flex-col items-start gap-0.5">
+                  <span>{slug} <span className="font-normal text-muted-foreground">{t('skillSources.repository')}</span></span>
+                  <span className="text-xs font-normal text-muted-foreground">{t('repositorySkillHint')}</span>
+                </FieldLabel>
+              </Field> })}
+            </FieldGroup>}
+          </FieldSet>
+          {shareError && <FieldError>{t(shareError)}</FieldError>}
         </FieldGroup>
         {error && <FieldError>{t(error)}</FieldError>}
         <DialogFooter className="shrink-0">
           {(error === 'versionConflict' || error === 'profileMissing' || frozen) && <Button type="button" variant="secondary" disabled={pending} onClick={onReload}>{t('reload')}</Button>}
           <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>{common('cancel')}</Button>
-          <Button type="submit" disabled={pending || (modelMode === 'fixed' && !selectedModel) || !draft.name.trim() || draft.skills.some(skill => !catalog.skills.some(item => item.id === skill))}>{pending ? t('saving') : frozen ? common('retry') : t('save')}</Button>
+          <Button type="submit" disabled={pending || (modelMode === 'fixed' && !selectedModel) || !draft.name.trim() || blockedSkill || missingSelected.length > 0}>{pending ? t('saving') : frozen ? common('retry') : t('save')}</Button>
         </DialogFooter>
       </form>
     </DialogContent>

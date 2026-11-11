@@ -885,7 +885,12 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.ok(selected.target.subscriptionBindingId)
     const binding = (await pool.query('SELECT "connectionId"::text,"modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
     assert.deepEqual(binding, { connectionId: exactClaude, modelId: 'claude-haiku-5-5' })
-    assert.ok(selected.agentProfile!.instructions.includes('Start from the observed failure'))
+    // Progressive disclosure: the brief names the capability and how to load
+    // it, while the frozen body stays in the pinned envelope.
+    assert.ok(selected.agentProfile!.instructions.includes('load_skill'))
+    assert.ok(selected.agentProfile!.instructions.includes('official:systematic-debugging'))
+    assert.ok(!selected.agentProfile!.instructions.includes('Start from the observed failure'))
+    assert.ok(selected.agentProfile!.skills[0]?.content.includes('Start from the observed failure'))
     assert.equal(selected.agentProfile!.effort, 'low')
     await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, asked: { harness: 'codex', model: 'gpt-6-luna' } }), { code: 'agentProfilePinConflict' })
   })

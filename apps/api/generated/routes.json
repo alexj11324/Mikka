@@ -1898,6 +1898,15 @@
       "sourceHash": "25176c47f725d048467bed224881baea31439c18a62a299d05cd8bfe96c55bff"
     },
     {
+      "path": "/mikka/api/skills/share",
+      "template": "/api/skills/share",
+      "source": "app/api/skills/share/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "459a3f020beb59d39e3415bec882835af825b51bb5e27cf0d06d7305749424cc"
+    },
+    {
       "path": "/mikka/api/subscriptions",
       "template": "/api/subscriptions",
       "source": "app/api/subscriptions/route.ts",
@@ -2461,7 +2470,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "33627d8252edd79e412cc110663a1de9a2f449263c3d85eea70feaa3611af542"
+      "sourceHash": "6b923afd3fcebb4590bf5c86ed26fc293bd3804e7908de002241337d0d8b9991"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
