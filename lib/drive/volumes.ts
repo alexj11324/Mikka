@@ -70,9 +70,9 @@ export const newDriveVersionId = () => `vver_${nextVersionId()}`
 /**
  * Creates a volume with its first, empty version.
  *
- * The unique index on (scope, scope id, scope user, name) is what actually
- * enforces "one name per scope"; this maps its violation to a typed error
- * instead of leaking a constraint name, so a caller can offer a rename.
+ * Folder names are unique within their Drive scope. For personal folders,
+ * the selected workspace is part of that scope. A duplicate becomes a
+ * typed error so the caller can offer a rename.
  */
 export async function createDriveVolume(
   database: { connect: Pool['connect'] },

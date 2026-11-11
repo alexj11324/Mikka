@@ -129,6 +129,14 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     assert.equal((await call(suffix, { token: peerToken, workspaceId: team.id })).status, 404)
   }
   assert.equal((await call(`/${volume.id}`, { workspaceId: team.id })).status, 404, 'a PAT cannot select another tenant of its owner')
+  const sameNameInTeam = await call('', { token: sharedToken, workspaceId: team.id, method: 'POST', body: { name: volume.name } })
+  assert.equal(sameNameInTeam.status, 201, 'one owner can reuse a private folder name in another workspace')
+  const teamFolder = (await sameNameInTeam.json()).volume
+  assert.notEqual(teamFolder.id, volume.id)
+  assert.equal((await call(`/${teamFolder.id}`)).status, 404)
+  const duplicateInTeam = await call('', { token: sharedToken, workspaceId: team.id, method: 'POST', body: { name: volume.name } })
+  assert.equal(duplicateInTeam.status, 409)
+  assert.deepEqual(await duplicateInTeam.json(), { error: 'drive_volume_exists' })
   const sharedCreate = await call('', { token: sharedToken, workspaceId: team.id, method: 'POST', body: { name: `Other tenant ${randomUUID()}` } })
   const otherVolume = (await sharedCreate.json()).volume
   assert.equal((await call(`/${otherVolume.id}/versions/${first.headVersionId}`, { token: sharedToken, workspaceId: team.id })).status, 404)
