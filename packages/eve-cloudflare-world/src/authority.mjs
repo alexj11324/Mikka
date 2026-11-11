@@ -1,3 +1,5 @@
+export { EveQueueClaim, WorldQueueService } from './queue-service.mjs'
+import { consumeWorldQueue } from './queue-transport.mjs'
 export { EveWorldStream } from './streams.mjs'
 import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 import { serveStreamRequest } from './streams.mjs'
@@ -24,4 +26,4 @@ export class WorldStreamService extends WorkerEntrypoint {
   fetch(request) { return serveStreamRequest(request, this.env.EVE_STREAMS) }
 }
 
-export default { fetch() { return new Response(null, { status: 404 }) } }
+export default { queue: consumeWorldQueue, fetch() { return new Response(null, { status: 404 }) } }

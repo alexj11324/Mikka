@@ -11,6 +11,9 @@ patchedDependencies:
   '@better-auth/sso@1.7.12':
     hash: df295fc634aab5294da3c99dda5d8fe160e24af563a9f32d67240699cb1e36d2
     path: patches/@better-auth__sso@1.7.12.patch
+  '@fantasticfour/world-cloudflare@2.4.3':
+    hash: da4dc318dc16ce6d434ff2cd59756fea55dde9e99a8d2177978923af29dca3e6
+    path: patches/@fantasticfour__world-cloudflare@2.4.3.patch
   '@novnc/novnc@1.6.0':
     hash: 4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573
     path: patches/@novnc__novnc@1.6.0.patch
@@ -804,7 +807,7 @@ importers:
     dependencies:
       '@fantasticfour/world-cloudflare':
         specifier: 2.4.3
-        version: 2.4.3
+        version: 2.4.3(patch_hash=da4dc318dc16ce6d434ff2cd59756fea55dde9e99a8d2177978923af29dca3e6)
       '@workflow/errors':
         specifier: 5.0.5
         version: 5.0.5
@@ -14432,7 +14435,7 @@ snapshots:
       chalk: 4.1.2
       js-yaml: 4.3.2
 
-  '@fantasticfour/world-cloudflare@2.4.3':
+  '@fantasticfour/world-cloudflare@2.4.3(patch_hash=da4dc318dc16ce6d434ff2cd59756fea55dde9e99a8d2177978923af29dca3e6)':
     dependencies:
       '@workflow/errors': 4.2.1
       '@workflow/utils': 4.1.4
