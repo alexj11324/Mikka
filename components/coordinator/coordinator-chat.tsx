@@ -36,6 +36,7 @@ import { navigate, openTask, openThread } from '@/components/workspace/workspace
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
+import { CoordinatorContextUsage } from './coordinator-context-usage'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { useLiveKey, useLiveKeys, useLiveScope, watchPageVisibility } from '@/hooks/use-live-key'
@@ -712,7 +713,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
-        model={<BotModelPicker botId={botId ?? null} running={working || sending} />}
+        model={<div className="flex min-w-0 items-center gap-1">
+          <BotModelPicker botId={botId ?? null} running={working || sending} />
+          {/* How near the next fold is (lib/coordinator/context-usage.ts). Beside the model chip,
+              because both describe the next turn rather than anything already in the list. */}
+          {data?.context && <CoordinatorContextUsage usage={data.context} />}
+        </div>}
         quote={embedded?.quote || replyQuote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
           {embedded?.quote && <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} />}
           {replyQuote && <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} />}
