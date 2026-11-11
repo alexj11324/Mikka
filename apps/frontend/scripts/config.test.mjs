@@ -40,7 +40,7 @@ test('the production explicit computer rollout follows VERCEL_ENV without requir
 }))
 
 test('desktop remains unpinned and does not initialize browser analytics or browser auth configuration', async () => environment({ MIKKA_DEPLOYMENT_ID: 'release-1', NEXT_PUBLIC_MIKKA_BUILD: 'a'.repeat(40), NEXT_PUBLIC_POSTHOG_KEY: 'public-canary', NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'public-widget' }, async () => {
-  const config = await frontendConfig({ target: 'desktop' })
+  const config = await frontendConfig({ target: 'desktop', publicTestFixture: true })
   for (const key of ['MIKKA_DEPLOYMENT_ID', 'NEXT_PUBLIC_MIKKA_BUILD', 'NEXT_PUBLIC_POSTHOG_KEY', 'NEXT_PUBLIC_TURNSTILE_SITE_KEY']) assert.equal(config.define[`process.env.${key}`], '""')
   assert.deepEqual(config.experimental, {})
 }))
@@ -73,4 +73,19 @@ test('a server-pages build cannot package a private release or a desktop rendere
       await assert.rejects(frontendConfig({ serverPages: true }), /SERVER_PAGES_REQUIRE_PUBLIC_WEB_BUILD/)
     })
   }
+})
+
+test('standalone package entry points require a private revision for official Desktop and Web', async () => {
+  await environment({ MIKKA_UI_OVERLAY_DIR: undefined, MIKKA_UI_OVERLAY_SHA: undefined, VERCEL: undefined, VERCEL_ENV: undefined }, async () => {
+    await assert.rejects(frontendConfig({ target: 'desktop' }), /OFFICIAL_DESKTOP_UI_CHECKOUT_REQUIRED/)
+    await frontendConfig({ target: 'desktop', publicTestFixture: true })
+    await environment({ VERCEL: '1', VERCEL_ENV: 'production' }, async () => {
+      await assert.rejects(frontendConfig(), /OFFICIAL_UI_CHECKOUT_AND_REVISION_REQUIRED/)
+      await assert.rejects(frontendConfig({ publicTestFixture: true }), /PUBLIC_FIXTURE_REQUIRES_NON_RELEASE_BUILD/)
+    })
+    await environment({ MIKKA_UI_OVERLAY_DIR: '.missing-official-checkout' }, async () => {
+      await assert.rejects(frontendConfig({ target: 'desktop' }), /OFFICIAL_UI_CHECKOUT_AND_REVISION_REQUIRED/)
+      await assert.rejects(frontendConfig({ publicTestFixture: true }), /PUBLIC_FIXTURE_REQUIRES_NON_RELEASE_BUILD/)
+    })
+  })
 })

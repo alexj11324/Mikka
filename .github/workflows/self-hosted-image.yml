@@ -45,7 +45,7 @@ jobs:
           node --test scripts/ci/self-hosted-requirements.test.mjs scripts/release/self-hosted-stable.test.mjs
           node scripts/ci/self-hosted-requirements.mjs
       - name: Verify disposable acceptance target guards and model fixture
-        run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
+        run: node --test scripts/self-hosted-source.test.mjs scripts/acceptance/self-hosted-fixtures.test.mjs
       - name: Verify stable release webhook and safe self-hosted update policy
         run: node --test scripts/self-hosted-update.test.mjs scripts/self-hosted-update-smoke.test.mjs scripts/self-hosted-update-events.test.mjs
       - name: Verify managed PostgreSQL Compose contract (offline)
@@ -138,7 +138,7 @@ jobs:
           node apps/desktop/scripts/install-electron.mjs
       - name: Build one packaged acceptance desktop with an independent default server
         run: |
-          pnpm --filter @mikka/desktop build
+          pnpm --filter @mikka/desktop build --public-test-fixture
           pnpm --filter @mikka/desktop exec electron-builder --dir --linux --config electron-builder.acceptance.yml --config.linux.executableName=mikka-selfhost-acceptance --publish never
           sudo chown root:root apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
           sudo chmod 4755 apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
@@ -191,12 +191,6 @@ jobs:
         run: |
           docker compose restart app
           docker compose up --detach --wait --wait-timeout 120
-          node scripts/self-hosted-smoke.mjs
-      - name: Verify the older built-in UI remains opt-in with the same data
-        run: |
-          MIKKA_COMMUNITY_UI=1 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
-          MIKKA_EXPECT_COMMUNITY_UI=1 node scripts/self-hosted-smoke.mjs
-          MIKKA_COMMUNITY_UI=0 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
           node scripts/self-hosted-smoke.mjs
       - name: Publish the tested revision
         if: env.PUBLISH_IMAGE == 'true'

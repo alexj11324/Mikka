@@ -121,21 +121,17 @@ WebSocket updates and daemon work on your own origin.
 
 ## Server entry and initial account
 
-`GET /mikka/api/server` is the public server-info contract. In this backend delivery, the default root entry returns the same JSON viewmodel; the minimal HTML layout is supplied by the UI owner using this contract. It includes the configured name/address, running version, client entry links, initial-account state and login-method configuration. A healthy response means the configured origin is valid and the auth-user existence query succeeded; it does not claim to have checked external providers, workers or every subsystem. A failed query returns HTTP 503 and `setup.state: unavailable`, never an empty-installation state.
+`GET /mikka/api/server` is the public server-info contract. Opening the server in a browser shows its status, server address, and official client links. JSON clients receive the same public installation information. It includes the configured name/address, running version, client entry links, initial-account state and login-method configuration. A healthy response means the configured origin is valid and the auth-user existence query succeeded; it does not claim to have checked external providers, workers or every subsystem. A failed query returns HTTP 503 and `setup.state: unavailable`, never an empty-installation state.
 
 On an empty database, `setup.state` is `required`. Configure SMTP/Resend or your own OAuth client, then use `setup.signUpUrl` to create the initial account. Registration uses the existing authentication flow and creates that person's workspace with the `admin` membership. There is no installation-wide administrator role and no special access to other people's workspaces. Existing installations report `ready`; upgrading does not assign a new administrator or alter existing accounts. Email/password being enabled is separate from the `emailDeliveryConfigured` flag, which reports configuration presence rather than a successful delivery test.
 
-The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry, so authentication does not accidentally open the older built-in workspace UI.
+The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry.
 
-### Optional older built-in UI
+### Connect an official client
 
-For compatibility, add `MIKKA_COMMUNITY_UI=1` to your private Compose configuration and recreate the app:
+Open the official Web app and choose **Change** on the sign-in screen or under account settings. Select **Self-hosted server**, enter the HTTPS address from `/mikka/api/server`, and continue to sign in on your server. The app lists saved accounts with their server addresses. Choose **Mikka Cloud** to return to the Cloud account. Official Desktop and iOS clients also accept a server address.
 
-```sh
-MIKKA_COMMUNITY_UI=1 docker compose up -d --force-recreate app
-```
-
-Unset the variable or set it to `0`, then recreate the app to restore server mode. Only the exact value `1` enables the older built-in UI; cloud deployments keep the official app regardless of this setting. This is a presentation switch, not an API authorization rule. It does not change your data, credentials, migrations, scheduler or gateway. The public UI source and its compilation stay in the repository; BoardUI/affectUI source and bundles do not enter the public image.
+The public image contains the API, daemon integration, and the pages needed for sign-in, password recovery, invitations, consent, and app handoffs. Upgrading uses the existing database and installation keys. Remove `MIKKA_COMMUNITY_UI` from older Compose configurations.
 
 ## Installation secrets and backups
 
@@ -165,7 +161,7 @@ Use your own Google or GitHub OAuth clients. Register callbacks on your exact or
 
 ## Connect an official app
 
-Use a release with server selection and enter your server address from `GET /mikka/api/server`. The backend and shared connection contract are delivered independently from the official connection UI.
+Use a client with server selection. Enter the address shown on the server status page or returned by `GET /mikka/api/server`. The client checks protocol and minimum version compatibility before sign-in.
 
 | Client | Entry and address requirement |
 | --- | --- |
@@ -351,7 +347,7 @@ To use your newly stored App for GitHub sign-in too, set `GITHUB_SIGN_IN_USE_APP
 
 Subscription connections use your own Infisical project or self-hosted Infisical instance to hold provider OAuth grants. PostgreSQL stores their metadata and references. A Mikka account or connection to Mikka cloud services is not required. The `CREDENTIAL_MASTER_KEY` used by the password vault does not configure subscription storage, and an existing Claude Code or Codex login on a machine is not imported into the server.
 
-The Linux x64 Docker build includes the pinned `mikka-subscription-worker` and `mikka-subscription-enrollment` binaries. It sets their paths through `MIKKA_BYOS_WORKER_BINARY` and `MIKKA_BYOS_ENROLLMENT_BINARY`; keep those image defaults. A non-Docker build must run `MIKKA_BUILD_BYOS_WORKER=1 node scripts/build-subscription-worker.mjs` before `pnpm build:app` with the same variable set, so packaging rejects missing binaries. The build verifies the existing Go compiler checksum and CPA source commit and does not use provider or Infisical credentials.
+The Linux x64 Docker build includes the pinned `mikka-subscription-worker` and `mikka-subscription-enrollment` binaries. It sets their paths through `MIKKA_BYOS_WORKER_BINARY` and `MIKKA_BYOS_ENROLLMENT_BINARY`; keep those image defaults. A non-Docker build must run `MIKKA_BUILD_BYOS_WORKER=1 node scripts/build-subscription-worker.mjs` before `pnpm build:server` with the same variable set, so packaging rejects missing binaries. The build verifies the existing Go compiler checksum and CPA source commit and does not use provider or Infisical credentials.
 
 Configure these server-only variables with values from **your own** Infisical installation. The standard two-identity configuration is:
 
@@ -407,3 +403,5 @@ The **Self-hosted image** workflow builds the image, starts a clean PostgreSQL 1
 The server works without a Mikka account. For optional official GitHub, iOS push and hosted models, set `MIKKA_SERVER_ADMIN_USER_IDS` to the explicit local administrator IDs and use Settings → Mikka Cloud. Each person binds their own cloud account under Settings → Account, or the administrator supplies a team server key. The account settings show which credits apply. See [the public API contract](cloud-services-api.md).
 
 See [BYOK services](self-hosting-byok.md) for SMTP, S3, local vault and default-model configuration, and [builtin realtime](self-hosting-realtime.md) for multi-instance operation.
+
+A public checkout selects the server-only renderer for `pnpm build`, `pnpm build:app` and `pnpm --filter @mikka/frontend build`. Official Web and Desktop builds require a separate private Git checkout and its matching revision. Public CI explicitly requests `--public-test-fixture` for the unlicensed renderer used by the existing loopback and package tests. Its manifest identifies it as a test fixture.
