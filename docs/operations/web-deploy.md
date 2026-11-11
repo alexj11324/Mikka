@@ -183,7 +183,7 @@ as a recovery step.
 ## Official private UI overlay
 
 Builds without `mikka-hosted-ui`, including every public/fork PR check, leave
-`MIKKA_UI_OVERLAY_DIR` unset and use the public slot implementations. Only the
+`MIKKA_UI_OVERLAY_DIR` unset. These jobs verify public server, protocol and authentication code. Public CI must never receive the private checkout or its credentials. Only the
 trusted `main` official release jobs check out `alexj11324/mikka-hosted-ui`.
 They read `HOSTED_UI_READ_KEY` from Infisical `prod:/platform` with the existing
 GitHub OIDC identity. This is a GitHub
@@ -196,7 +196,7 @@ record step clears the key from subsequent job steps before any build runs.
 
 Web checks out private `main` into ignored `.hosted-ui/`, records the exact
 commit in `MIKKA_UI_OVERLAY_SHA`, then exports `MIKKA_UI_OVERLAY_DIR` before
-building. Private runtime dependencies are installed with `--ignore-workspace
+building. The release linker requires each declared workspace provider and its named runtime exports. A missing provider or incompatible export stops the build before deployment. Private runtime dependencies are installed with `--ignore-workspace
 --prod --ignore-scripts --frozen-lockfile`: the library remains standalone and
 its license-writing postinstall never runs. Install diagnostics stay on the
 ephemeral runner. Nitro inlines that SHA into `/mikka/api/version` as `overlaySha`;

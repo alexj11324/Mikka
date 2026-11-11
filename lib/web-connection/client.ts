@@ -268,7 +268,17 @@ export class WebServerDirectory {
     const intent = selecting ? sequence : undefined
     if (intent !== undefined && intent !== this.workspaceIntent) throw new WebConnectionError('web_connection_session_changed')
     const signal = AbortSignal.any([source.signal, this.requests.signal])
-    let response = await this.options.fetch(new Request(new Request(target, source), { headers, credentials: 'omit', redirect: 'error', cache: 'no-store', signal }))
+    // A Request exposes its body as a stream. Forwarding that stream directly
+    // makes Chromium require HTTP/2 even for a small JSON POST. Preserve the
+    // original reusable body where possible and serialize prebuilt requests
+    // and multipart data with the boundary from the normalized source.
+    const supplied = init?.body
+    const body = !source.body ? undefined
+      : supplied != null && !(supplied instanceof ReadableStream) && !(supplied instanceof FormData)
+        ? supplied : await source.blob()
+    let response = await this.options.fetch(target, {
+      method: source.method, headers, body, signal, credentials: 'omit', redirect: 'error', cache: 'no-store', referrerPolicy: 'no-referrer',
+    })
     const current = () => version === this.generation && workspace === this.workspaceGeneration && (intent === undefined || intent === this.workspaceIntent)
     if (!current()) { await response.body?.cancel(); throw new WebConnectionError('web_connection_session_changed') }
     if (selecting && response.ok && response.headers.has(WORKSPACE_SELECTION_HEADER)) {

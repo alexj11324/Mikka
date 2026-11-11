@@ -56,3 +56,23 @@ test('a missing or outside overlay fails the bundle; @hosted without one fails',
   assert.throws(() => resolveRequest({ originModulePath: join(app, 'x.tsx') }, '@hosted/x', 'ios'), /MOBILE_OVERLAY_IMPORT_WITHOUT_OVERLAY/)
   assert.throws(() => resolveRequest({ originModulePath: join(app, 'x.tsx') }, '@ui-slot/nope', 'ios'), /MOBILE_SLOT_UNKNOWN/)
 })
+
+test('an installed official mobile layer may never substitute the public avatar', () => {
+  const dir = mkdtempSync(join(repository, '.hosted-ui-test-'))
+  try {
+    assert.throws(() => mobileOverlay(app, { EAS_BUILD_PROFILE: 'hosted-production' }), /MOBILE_OVERLAY_DIR_REQUIRED_FOR_RELEASE/)
+    const env = { MIKKA_MOBILE_OVERLAY_DIR: dir }
+    assert.throws(() => mobileOverlay(app, env), /MOBILE_SLOT_REQUIRED: bot-avatar/)
+    mkdirSync(join(dir, 'slots'))
+    const provider = join(dir, 'slots/bot-avatar.tsx')
+    writeFileSync(join(dir, 'native-avatar.tsx'), 'export function NativeAvatar() { return null }')
+    for (const source of ['export const OtherAvatar = 1',
+      "export type { NativeAvatar as BotAvatar } from '../native-avatar'",
+      "export { MissingAvatar as BotAvatar } from '../native-avatar'"]) {
+      writeFileSync(provider, source)
+      assert.throws(() => mobileOverlay(app, env), /MOBILE_SLOT_EXPORT_REQUIRED: bot-avatar.BotAvatar/)
+    }
+    writeFileSync(provider, "export { NativeAvatar as BotAvatar } from '../native-avatar'")
+    assert.equal(mobileOverlay(app, env).slots['bot-avatar'], provider)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})

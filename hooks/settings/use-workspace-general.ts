@@ -6,7 +6,7 @@ import { deleteWorkspace, listArchivedBots, takeOverArchivedBot, transferWorkspa
 import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
 import { withBasePath } from '@/lib/base-path'
-import { publicAppOrigin } from '@/lib/platform/public-origin'
+import { publicServiceLink } from '@/lib/platform/public-origin'
 import { useActionError } from '@/lib/use-action-error'
 
 // 常规 (V10): the workspace's icon, name and address, transferring and deleting
@@ -41,7 +41,7 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
   const inFlight = useRef(false)
   // A save asked for while another runs goes next; dropping it would leave a draft that looks saved.
   const queued = useRef<{ field: Field; value: string | null } | null>(null)
-  const host = typeof window === 'undefined' ? '' : `${new URL(publicAppOrigin()).host}${withBasePath('/w/')}`
+  const host = typeof window === 'undefined' ? '' : publicServiceLink('/w/').replace(/^https?:\/\//, '')
 
   function clearDraft(field: Field) {
     if (field === 'name') setName(null)

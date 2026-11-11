@@ -347,7 +347,7 @@ To use your newly stored App for GitHub sign-in too, set `GITHUB_SIGN_IN_USE_APP
 
 Subscription connections use your own Infisical project or self-hosted Infisical instance to hold provider OAuth grants. PostgreSQL stores their metadata and references. A Mikka account or connection to Mikka cloud services is not required. The `CREDENTIAL_MASTER_KEY` used by the password vault does not configure subscription storage, and an existing Claude Code or Codex login on a machine is not imported into the server.
 
-The Linux x64 Docker build includes the pinned `mikka-subscription-worker` and `mikka-subscription-enrollment` binaries. It sets their paths through `MIKKA_BYOS_WORKER_BINARY` and `MIKKA_BYOS_ENROLLMENT_BINARY`; keep those image defaults. A non-Docker build must run `MIKKA_BUILD_BYOS_WORKER=1 node scripts/build-subscription-worker.mjs` before `pnpm build:app` with the same variable set, so packaging rejects missing binaries. The build verifies the existing Go compiler checksum and CPA source commit and does not use provider or Infisical credentials.
+The Linux x64 Docker build includes the pinned `mikka-subscription-worker` and `mikka-subscription-enrollment` binaries. It sets their paths through `MIKKA_BYOS_WORKER_BINARY` and `MIKKA_BYOS_ENROLLMENT_BINARY`; keep those image defaults. A non-Docker build must run `MIKKA_BUILD_BYOS_WORKER=1 node scripts/build-subscription-worker.mjs` before `pnpm build:server` with the same variable set, so packaging rejects missing binaries. The build verifies the existing Go compiler checksum and CPA source commit and does not use provider or Infisical credentials.
 
 Configure these server-only variables with values from **your own** Infisical installation. The standard two-identity configuration is:
 
@@ -403,3 +403,5 @@ The **Self-hosted image** workflow builds the image, starts a clean PostgreSQL 1
 The server works without a Mikka account. For optional official GitHub, iOS push and hosted models, set `MIKKA_SERVER_ADMIN_USER_IDS` to the explicit local administrator IDs and use Settings → Mikka Cloud. Each person binds their own cloud account under Settings → Account, or the administrator supplies a team server key. The account settings show which credits apply. See [the public API contract](cloud-services-api.md).
 
 See [BYOK services](self-hosting-byok.md) for SMTP, S3, local vault and default-model configuration, and [builtin realtime](self-hosting-realtime.md) for multi-instance operation.
+
+Building from this public repository with `pnpm build` selects the same server-only renderer as Docker. Official application releases provide both the private checkout directory and its pinned Git revision. A configured official release fails when that pair is incomplete.

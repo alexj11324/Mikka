@@ -326,3 +326,24 @@ for (const order of ['before', 'after'] as const) {
     assert.equal(cloud.headers.has('authorization'), false)
   })
 }
+
+test('self-host POST bodies remain replayable over HTTP/1.1, including prepared Requests and multipart uploads', async () => {
+  const forwarded: RequestInit[] = []
+  const f = fixture(fetch => (input, init) => {
+    if (init?.headers && new Headers(init.headers).has('authorization')) forwarded.push(init)
+    return fetch(input, init)
+  })
+  await f.signIn()
+  await f.directory.fetch('/mikka/api/rpc', { method: 'POST', body: '{"action":"desktop.bootstrap"}' })
+  assert.equal(forwarded.at(-1)?.body, '{"action":"desktop.bootstrap"}')
+  const parts = new FormData()
+  parts.append('content', new Blob([new Uint8Array([0, 255, 17])]), 'example.bin')
+  await f.directory.fetch(new Request('https://app.aspectlylabs.com/mikka/api/files', { method: 'POST', body: parts }))
+  assert.ok(forwarded.at(-1)?.body instanceof Blob)
+  const remote = f.calls.at(-1)!
+  assert.equal(remote.credentials, 'omit')
+  assert.equal(remote.redirect, 'error')
+  const file = (await remote.formData()).get('content') as File
+  assert.equal(file.name, 'example.bin')
+  assert.deepEqual([...new Uint8Array(await file.arrayBuffer())], [0, 255, 17])
+})
