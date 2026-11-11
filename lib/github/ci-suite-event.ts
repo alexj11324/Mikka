@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 // This projection is only a wake hint after the caller has verified GitHub's
 // raw-body signature. It is not a required-check rollup or an approval.
-const id = z.number().int().positive().safe()
+const id = z.number().int().positive().refine(Number.isSafeInteger)
 const source = z.object({
   action: z.literal('completed'),
   installation: z.object({ id }),
