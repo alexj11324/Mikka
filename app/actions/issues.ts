@@ -27,6 +27,8 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { issueShortTitle } from '@/lib/short-title-sql'
 import { createTeamIssueForUser } from '@/lib/team-issue-create'
+import { createUnstartedTask } from '@/lib/task-create-only'
+import type { CreateOnlyCommand } from '@/lib/task-create-command'
 import { promoteExistingIssueForUser } from '@/lib/team-issue-promotion'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
@@ -310,6 +312,10 @@ export async function createIssueForTeam(input: { requestId: string; teamId: str
     const userId = await getUserId()
     return createTeamIssueForUser(userId, input)
   })
+}
+
+export async function createTaskOnly(input: CreateOnlyCommand) {
+  return runAction(() => createUnstartedTask(input))
 }
 
 /** Attach an existing task to a team in the task's immutable workspace. */

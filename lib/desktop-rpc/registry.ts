@@ -142,6 +142,7 @@ const functions = {
   'issues.getIssue': actions14.getIssue,
   'issues.pollIssue': actions14.pollIssue,
   'issues.saveIssue': actions14.saveIssue,
+  'issues.createTaskOnly': actions14.createTaskOnly,
   'issues.promoteIssueToTeam': actions14.promoteIssueToTeam,
   'issues.moveIssue': actions14.moveIssue,
   'issues.changeIssuePriority': actions14.changeIssuePriority,
