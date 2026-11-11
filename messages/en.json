@@ -1058,7 +1058,15 @@
       "addedLabel": "Added label {name}",
       "removedLabel": "Removed label {name}",
       "unknownAssignee": "someone",
-      "separator": ", "
+      "separator": ", ",
+      "edited": "Edited",
+      "deletedComment": "{author} deleted this comment",
+      "editComment": "Edit {author}'s comment",
+      "deleteComment": "Delete {author}'s comment",
+      "editLabel": "Edit comment",
+      "saveEdit": "Save",
+      "cancelEdit": "Cancel",
+      "downloadFile": "Download {name}"
     },
     "detail": {
       "readFailed": "Could not load this task. Please try again.",

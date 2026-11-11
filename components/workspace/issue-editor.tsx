@@ -28,7 +28,7 @@ import { RichTextTableBubble, RICH_TEXT_TABLE_PROSE } from "@/components/blocks/
 import { DeleteTableDialog } from "@/components/blocks/rich-text-editor-2/components/delete-table-dialog"
 import { RICH_TEXT_MENTION_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-mention"
 import { useRichTextChanges, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_MARKUP_VIEW, type RichTextMarkupView } from "@/components/blocks/rich-text-editor-3/components/rich-text-changes"
-import { addThread, createThreadStore, replyToThread, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
+import { addThread, createThreadStore, replyToThread, editThreadMessage, deleteThreadMessage, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
 import { FieldError } from '@/components/ui/field'
 import { ResizablePane } from "@/components/ui/resizable-pane"
 
@@ -41,10 +41,17 @@ export { createEditorExtensions, createDocumentSeed } from './issue-editor-schem
 export type IssueDiscussions = {
   issueId: string
   author: string
+  /** The reader's user id; edit and delete appear only on their own comments. */
+  viewerId?: string
   threads: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadRecord[]
   anchors: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").CommentAnchor[]
   onComment: (body: string) => void
-  onReply: (id: string, body: string) => void
+  /** Answers one message; `replyTo` is the message id, absent to answer the thread. */
+  onReply: (id: string, body: string, replyTo?: string) => void
+  /** Rewrites one message's body; the server refuses anyone but its author. */
+  onEdit: (threadId: string, messageId: string, body: string) => void
+  /** Removes one message; the server refuses anyone but its author. */
+  onDelete: (threadId: string, messageId: string) => void
   onResolve: (id: string, resolved: boolean) => void
   /** Selects the text a discussion is about. */
   onSelect: (id: string) => void
@@ -168,13 +175,15 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
   const threadList = Object.values(threads)
   const openCount = threadList.filter(thread => !thread.resolved).length
 
-  const discussions: Omit<IssueDiscussions, 'issueId'> = {
-    author, threads: threadList, anchors,
+  const discussions: IssueDiscussions = {
+    issueId: issueId ?? '', author, viewerId: authorUserId, threads: threadList, anchors,
     onComment: body => {
       const now = new Date().toISOString()
       addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
     },
-    onReply: (id, body) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() }) },
+    onReply: (id, body, replyTo) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString(), ...(replyTo ? { replyTo } : {}) }) },
+    onEdit: (threadId, messageId, body) => { editThreadMessage(threadDoc, threadId, messageId, body) },
+    onDelete: (threadId, messageId) => { deleteThreadMessage(threadDoc, threadId, messageId) },
     onResolve: (id, resolved) => { setThreadResolved(threadDoc, id, resolved) },
     onSelect: id => {
       if (!editor) return
@@ -205,7 +214,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       </div>}</>}
     </section>
     {layout === 'issue' && !compact && afterDescription}
-    {layout === 'issue' && !compact && issueId && (renderActivity ? renderActivity({ issueId, ...discussions }) : <IssueActivity issueId={issueId} events={activity} {...discussions} />)}
+    {layout === 'issue' && !compact && issueId && (renderActivity ? renderActivity(discussions) : <IssueActivity events={activity} {...discussions} />)}
     <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
   </TooltipProvider>
 

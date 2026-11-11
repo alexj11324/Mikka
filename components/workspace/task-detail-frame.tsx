@@ -213,7 +213,7 @@ export function FramedTask(props: FramedTaskProps) {
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, createdAt: row.createdAt }))
   const events = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows)
   const discussions = useRef<IssueDiscussions | null>(null)
-  const drafts = useActivityDrafts(task.id, body => discussions.current?.onComment(body), (id, body) => discussions.current?.onReply(id, body))
+  const drafts = useActivityDrafts(task.id, body => discussions.current?.onComment(body), (id, body, replyTo) => discussions.current?.onReply(id, body, replyTo))
   const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   const activityItems = (current: IssueDiscussions): TaskActivityItem[] => [
     ...events.map((item): TaskActivityItem => ({ kind: 'event', id: item.id, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),

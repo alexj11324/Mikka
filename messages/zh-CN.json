@@ -1058,7 +1058,15 @@
       "addedLabel": "添加了标签 {name}",
       "removedLabel": "移除了标签 {name}",
       "unknownAssignee": "某人",
-      "separator": "，"
+      "separator": "，",
+      "edited": "已编辑",
+      "deletedComment": "{author} 删除了这条评论",
+      "editComment": "编辑 {author} 的评论",
+      "deleteComment": "删除 {author} 的评论",
+      "editLabel": "编辑评论",
+      "saveEdit": "保存",
+      "cancelEdit": "取消",
+      "downloadFile": "下载 {name}"
     },
     "detail": {
       "readFailed": "任务读取失败，请重试。",

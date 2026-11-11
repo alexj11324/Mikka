@@ -219,3 +219,106 @@ test('IssueEditor: a cached preview does not restore activity drafts before rece
     } finally { await editor.done() }
   } finally { await fixture.done() }
 })
+
+test('IssueActivity: a reply to a reply renders indented under the message it answers', async () => {
+  const { IssueActivity } = await import('../components/workspace/issue-activity')
+  const nested: ThreadRecord[] = [{
+    id: 'discussion-n', author: 'Owner', createdAt: '2026-11-07T08:00:00Z', resolved: false,
+    messages: [
+      { id: 'n-1', author: 'Owner', authorUserId: 'owner', body: 'Root', at: '2026-11-07T08:00:00Z' },
+      { id: 'n-2', author: 'Owner', authorUserId: 'owner', body: 'First answer', at: '2026-11-07T08:01:00Z', replyTo: 'n-1' },
+      { id: 'n-3', author: 'Owner', authorUserId: 'owner', body: 'Answer to the answer', at: '2026-11-07T08:02:00Z', replyTo: 'n-2' },
+    ],
+  }]
+  const { container, done } = await render(<ViewStateProvider scope="owner:workspace-a"><IssueActivity issueId="issue-n" author="Owner" viewerId="owner" threads={nested} anchors={[]} onComment={() => {}} onReply={() => {}} onResolve={() => {}} onSelect={() => {}} /></ViewStateProvider>, '#issue-comment')
+  try {
+    const bodies = [...container.querySelectorAll('p')].map(node => node.textContent).filter(body => ['Root', 'First answer', 'Answer to the answer'].includes(body ?? ''))
+    // Every message draws once, and the deep answer follows the answer it belongs to.
+    assert.deepEqual(bodies, ['Root', 'First answer', 'Answer to the answer'])
+  } finally { await done() }
+})
+
+test('IssueActivity: edit and delete appear only on the reader\'s own comment', async () => {
+  const { IssueActivity } = await import('../components/workspace/issue-activity')
+  const mine: ThreadRecord[] = [{
+    id: 'discussion-o', author: 'Owner', createdAt: '2026-11-07T08:00:00Z', resolved: false,
+    messages: [{ id: 'o-1', author: 'Owner', authorUserId: 'owner', body: 'Mine', at: '2026-11-07T08:00:00Z' }],
+  }]
+  const view = (viewerId?: string) => <ViewStateProvider scope="owner:workspace-a"><IssueActivity issueId="issue-o" author="Owner" viewerId={viewerId} threads={mine} anchors={[]} onComment={() => {}} onReply={() => {}} onResolve={() => {}} onSelect={() => {}} /></ViewStateProvider>
+  const asOwner = await render(view('owner'), '#issue-comment')
+  try {
+    assert.ok(asOwner.container.querySelector('[aria-label="editComment"]'), 'the author is offered edit')
+    assert.ok(asOwner.container.querySelector('[aria-label="deleteComment"]'), 'the author is offered delete')
+  } finally { await asOwner.done() }
+  const asOther = await render(view('someone-else'), '#issue-comment')
+  try {
+    assert.equal(asOther.container.querySelector('[aria-label="editComment"]'), null, 'another reader is not offered edit')
+    assert.equal(asOther.container.querySelector('[aria-label="deleteComment"]'), null, 'another reader is not offered delete')
+  } finally { await asOther.done() }
+})
+
+test('IssueActivity: the author edits a comment in place and the change reaches the caller', async () => {
+  const { IssueActivity } = await import('../components/workspace/issue-activity')
+  const edits: { threadId: string; messageId: string; body: string }[] = []
+  const mine: ThreadRecord[] = [{
+    id: 'discussion-e', author: 'Owner', createdAt: '2026-11-07T08:00:00Z', resolved: false,
+    messages: [{ id: 'e-1', author: 'Owner', authorUserId: 'owner', body: 'Before', at: '2026-11-07T08:00:00Z' }],
+  }]
+  const view = (onEdit: (threadId: string, messageId: string, body: string) => void) => <ViewStateProvider scope="owner:workspace-a"><IssueActivity issueId="issue-e" author="Owner" viewerId="owner" threads={mine} anchors={[]} onComment={() => {}} onReply={() => {}} onEdit={onEdit} onResolve={() => {}} onSelect={() => {}} /></ViewStateProvider>
+  const { container, update, done } = await render(view((threadId, messageId, body) => { edits.push({ threadId, messageId, body }) }), '#issue-comment')
+  const editField = () => container.querySelector<HTMLTextAreaElement>('#edit-e-1')
+  try {
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="editComment"]')!.dispatchEvent(new browser.MouseEvent('click', { bubbles: true }) as unknown as Event)
+    })
+    const box = editField()
+    assert.ok(box, 'the author opens the edit field')
+    await act(async () => {
+      box.focus()
+      Object.getOwnPropertyDescriptor(browser.HTMLTextAreaElement.prototype, 'value')!.set!.call(box, 'After')
+      box.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
+    })
+    await act(async () => {
+      box.closest('form')!.dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }) as unknown as Event)
+    })
+    assert.deepEqual(edits, [{ threadId: 'discussion-e', messageId: 'e-1', body: 'After' }])
+    await update(view(() => {}))
+    // Leaving the edit closes the field; nothing is written twice.
+    assert.equal(editField(), null)
+    assert.equal(edits.length, 1)
+  } finally { await done() }
+})
+
+test('IssueActivity: writing a reply under one message sends that message as the target', async () => {
+  const { IssueActivity } = await import('../components/workspace/issue-activity')
+  const replies: { id: string; body: string; replyTo?: string }[] = []
+  const thread: ThreadRecord[] = [{
+    id: 'discussion-r', author: 'Owner', createdAt: '2026-11-07T08:00:00Z', resolved: false,
+    messages: [
+      { id: 'r-1', author: 'Owner', authorUserId: 'owner', body: 'Root', at: '2026-11-07T08:00:00Z' },
+      { id: 'r-2', author: 'Owner', authorUserId: 'owner', body: 'Reply', at: '2026-11-07T08:01:00Z', replyTo: 'r-1' },
+    ],
+  }]
+  const { container, done } = await render(<ViewStateProvider scope="owner:workspace-a"><IssueActivity issueId="issue-r" author="Owner" viewerId="owner" threads={thread} anchors={[]} onComment={() => {}} onReply={(id, body, replyTo) => replies.push({ id, body, replyTo })} onResolve={() => {}} onSelect={() => {}} /></ViewStateProvider>, '#issue-comment')
+  try {
+    // The message's own 回复 opens a box that answers that message, not the thread.
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-expanded="false"]')!.dispatchEvent(new browser.MouseEvent('click', { bubbles: true }) as unknown as Event)
+    })
+    const box = [...container.querySelectorAll<HTMLTextAreaElement>('textarea')].find(node => node.id.startsWith('reply-r-'))
+    assert.ok(box, 'the message under the reply opens its own box')
+    await act(async () => {
+      box.focus()
+      Object.getOwnPropertyDescriptor(browser.HTMLTextAreaElement.prototype, 'value')!.set!.call(box, 'Nested answer')
+      box.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
+    })
+    await act(async () => {
+      box.closest('form')!.dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }) as unknown as Event)
+    })
+    assert.equal(replies.length, 1)
+    assert.equal(replies[0].body, 'Nested answer')
+    assert.equal(replies[0].id, 'discussion-r')
+    assert.equal(replies[0].replyTo, 'r-1')
+    assert.equal(container.querySelector<HTMLTextAreaElement>('#reply-discussion-r')?.value, '', 'the thread footer box is untouched')
+  } finally { await done() }
+})
