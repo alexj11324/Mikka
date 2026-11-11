@@ -198,7 +198,7 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
 
 pgTest('memory migration is additive and idempotent on an empty old fact table', async () => {
   const [{ pool }, { readFile }] = await Promise.all([import('../db'), import('node:fs/promises')])
-  const sqlText = await readFile(new URL('../../drizzle/20261111170000_memory_provenance_scope.sql', import.meta.url), 'utf8')
+  const sqlText = await readFile(new URL('../../drizzle/20261111210000_memory_provenance_scope.sql', import.meta.url), 'utf8')
   const client = await pool.connect()
   try {
     await client.query('begin')
