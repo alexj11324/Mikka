@@ -26,3 +26,24 @@ test('same-title evidence retains each immutable version, producing run and cand
     ['artifact:same:v1:attempt', 'same', 1, 'run', 'candidate'], ['artifact:same:v2:attempt', 'same', 2, 'run', 'candidate'],
   ])
 })
+
+test('the mobile handoff addresses the selected Task and immutable version after reopening', async () => {
+  const { taskEvidenceHref, readTaskEvidenceTarget } = await import('./task-factory-events')
+  const { mobileWebTarget } = await import('./mobile-web-target')
+  const issue = '11000000-0000-4000-8000-000000000001', factory = '21000000-0000-4000-8000-000000000001'
+  const artifact = '31000000-0000-4000-8000-000000000001', attempt = '41000000-0000-4000-8000-000000000001'
+  const receipt = `artifact:${artifact}:v2:${attempt}`
+  const href = taskEvidenceHref(issue, factory, receipt)!
+  assert.equal(mobileWebTarget(href), href)
+  assert.deepEqual(readTaskEvidenceTarget(new URL(href, 'https://mikka.example').searchParams), { issueId: issue, factoryTaskId: factory, receiptId: receipt })
+  assert.equal(taskEvidenceHref(issue, factory, 'https://example.test'), null)
+  assert.equal(readTaskEvidenceTarget(new URLSearchParams({ issue, factoryTask: factory, evidence: `artifact:${artifact}:latest:${attempt}` })), null)
+})
+
+test('revoked, foreign and malformed Factory receipts do not become Task activity', async () => {
+  const { presentedFactoryEvents } = await import('./task-factory-events')
+  const event = { kind: 'evidence', id: 'evidence:active:report', at: '2026-01-01T00:00:00Z', sourceId: 'report',
+    factoryTaskId: 'active', runId: 'producer', candidateId: 'candidate', attemptId: 'attempt', artifactId: 'artifact', version: 2, title: 'Report', evidenceKind: 'document' }
+  assert.deepEqual(presentedFactoryEvents([event, { ...event, version: -1 }, { ...event, runId: null }, { ...event, factoryTaskId: 'other' }], 'active'), [event])
+  assert.deepEqual(presentedFactoryEvents([event], undefined), [])
+})

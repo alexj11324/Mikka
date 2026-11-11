@@ -216,7 +216,7 @@ export function FramedTask(props: FramedTaskProps) {
   const discussions = useRef<IssueDiscussions | null>(null)
   const drafts = useActivityDrafts(task.id, body => discussions.current?.onComment(body), (id, body) => discussions.current?.onReply(id, body))
   const time = (at: string) => format.dateTime(new Date(at), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-  const activityItems = (current: IssueDiscussions, expandReplies = false): TaskActivityItem[] => {
+  const activityItems = (current: IssueDiscussions, expandReplies = false, additional: readonly TaskActivityItem[] = []): TaskActivityItem[] => {
     const anchors = new Map(current.anchors.map(anchor => [anchor.id, anchor.excerpt]))
     const byId = new Map(current.threads.map(thread => [thread.id, thread]))
     const excerpt = (id: string) => id.startsWith('discussion-') ? null : anchors.get(id) ?? tActivity('anchorRemoved')
@@ -227,17 +227,17 @@ export function FramedTask(props: FramedTaskProps) {
           message: { record: { id: fact.messageId, body: fact.body, author: fact.author, at: fact.at }, first: fact.kind === 'comment', last: fact.messageId === thread.messages.at(-1)?.id } }
       })
       : current.threads.map(thread => ({ kind: 'comment', id: thread.id, at: thread.createdAt, thread, time, excerpt: excerpt(thread.id) }))
-    const history = eventsFor([...props.agentActivity.items, ...comments])
+    const history = eventsFor([...props.agentActivity.items, ...comments, ...additional])
     return chronologicalActivity<TaskActivityItem>([
       ...history.map((item): TaskActivityItem => ({ kind: 'event', id: `history:${item.id}`, at: item.at, who: item.actor?.name ?? null, mark: item.actor?.name ? (item.actor.type === 'agent' ? { kind: 'node', node: <AgentSphere name={item.actor.name} compact /> } : { kind: 'person', name: item.actor.name }) : undefined, text: item.text, time: item.time })),
       ...props.agentActivity.items.map((item): TaskActivityItem => ({ kind: 'agent', id: item.id, at: item.at, who: item.name, mark: { kind: 'node', node: item.mark }, text: item.result, time: item.time, open: item.open, onOpen: item.onOpen, openLabel: tFrame('openThread', { name: item.name }) })),
-      ...comments,
+      ...comments, ...additional,
     ])
   }
 
   const created = new Date(task.createdAt)
   return <Frame
-    taskId={preview ? undefined : task.id}
+    taskId={preview ? undefined : task.id} workspaceId={preview ? undefined : task.workspaceId}
     rootRef={props.rootRef} onKeyDown={props.onKeyDown} label={props.label} busy={preview}
     origin={props.origin} identifier={task.identifier} title={props.title} saveLabel={props.saveLabel} saved={props.saved} saveHint={t('autosaveHint')}
     navigation={props.navigation} onClose={props.onClose}
@@ -256,7 +256,7 @@ export function FramedTask(props: FramedTaskProps) {
     copyLink={menu.copyLink}
     subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: createChild, disabled: connections.pending, failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
-      items: activityItems, timeline: current => activityItems(current, true),
+      items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
       failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : []],
       drafts, subscribed: menu.subscribed, onSubscribe: menu.toggleSubscribed, subscribeLabel: menu.subscribed ? tFrame('unsubscribe') : tFrame('subscribe'),
     }}

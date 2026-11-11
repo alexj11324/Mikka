@@ -143,7 +143,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.deepEqual(body.task.agent, { harness: 'codex', model: 'fixture-model' })
     assert.deepEqual(body.task.place, { kind: 'cloud', name: 'Cloud' })
     assert.equal(body.task.schedule, null)
-    assert.deepEqual(body.live, { workspaceId: teamWorkspace.id })
+    assert.deepEqual(body.live, { workspaceId: teamWorkspace.id, factoryActivityVersion: 1 })
     assert.deepEqual(body.activity.map((row: { kind: string }) => row.kind), ['attempt', 'replaced', 'attempt', 'created'])
     assert.deepEqual(body.activity.filter((row: { kind: string }) => row.kind === 'attempt').map((row: { runId: string; n: number }) => [row.runId, row.n]), [[latest, 2], [first, 1]])
     assert.equal(body.activity[0].state, 'done')

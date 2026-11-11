@@ -102,6 +102,6 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     },
     timeline,
     activity: mobileTaskActivity(task, attempts, { by: creation?.actor ? creation.actor.name : decoration?.owner ?? null, createdAt: issue.createdAt }),
-    live: { workspaceId },
+    live: { workspaceId, factoryActivityVersion: 1 as const },
   }
 }

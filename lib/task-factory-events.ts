@@ -41,3 +41,46 @@ export function taskFactoryEvents(factoryTaskId: string, transitions: readonly T
   }
   return result.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
 }
+
+const uuid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+const uuidPattern = new RegExp('^' + uuid + '$')
+const receiptPattern = new RegExp('^(?:' + uuid + '|pr:' + uuid + '|artifact:' + uuid + ':v[1-9][0-9]{0,9}:' + uuid + ')$')
+
+/** A link contains only the selected Task and immutable receipt. The existing
+ * Factory/Artifact readers still authenticate the account after following it. */
+export function taskEvidenceHref(issueId: string, factoryTaskId: string, receiptId: string): string | null {
+  if (!uuidPattern.test(issueId) || !uuidPattern.test(factoryTaskId) || !receiptPattern.test(receiptId)) return null
+  return '/?' + new URLSearchParams({ issue: issueId, factoryTask: factoryTaskId, evidence: receiptId })
+}
+
+export function readTaskEvidenceTarget(params: URLSearchParams) {
+  const issueId = params.get('issue'), factoryTaskId = params.get('factoryTask'), receiptId = params.get('evidence')
+  if (!issueId || !factoryTaskId || !receiptId || !taskEvidenceHref(issueId, factoryTaskId, receiptId)) return null
+  return { issueId, factoryTaskId, receiptId }
+}
+
+export function presentedFactoryEvents(value: unknown, factoryTaskId: string | undefined): TaskFactoryEvent[] {
+  if (!factoryTaskId || !Array.isArray(value)) return []
+  const textOrNull = (value: unknown) => value === null || typeof value === 'string'
+  return value.filter((event): event is TaskFactoryEvent => {
+    if (!event || typeof event !== 'object' || event.factoryTaskId !== factoryTaskId ||
+        typeof event.sourceId !== 'string' || typeof event.at !== 'string' || !Number.isFinite(Date.parse(event.at)) ||
+        !textOrNull(event.runId) || !textOrNull(event.attemptId) || !textOrNull(event.candidateId)) return false
+    if (event.kind === 'factory_gate') return event.id === `gate:${factoryTaskId}:${event.sourceId}` &&
+      Number.isSafeInteger(event.revision) && typeof event.stage === 'string' && typeof event.status === 'string'
+    return event.kind === 'evidence' && event.id === `evidence:${factoryTaskId}:${event.sourceId}` &&
+      ['plan', 'acceptance', 'document', 'image', 'video', 'pull_request'].includes(event.evidenceKind) &&
+      typeof event.runId === 'string' && textOrNull(event.title) && textOrNull(event.artifactId) &&
+      (event.version === null || (Number.isSafeInteger(event.version) && event.version > 0))
+  })
+}
+
+export function taskFactoryLabel(event: TaskFactoryEvent, labels: {
+  stage: Readonly<Record<string, string>>; status: Readonly<Record<string, string>>
+  report: string; screenshot: string; video: string; pullRequest: string
+}) {
+  if (event.kind === 'factory_gate') return [labels.stage[event.stage] ?? event.stage, labels.status[event.status] ?? event.status].join(' · ')
+  const fallback = event.evidenceKind === 'image' ? labels.screenshot : event.evidenceKind === 'video' ? labels.video :
+    event.evidenceKind === 'pull_request' ? labels.pullRequest : labels.report
+  return [event.title || fallback, event.version === null ? null : `v${event.version}`].filter(Boolean).join(' · ')
+}

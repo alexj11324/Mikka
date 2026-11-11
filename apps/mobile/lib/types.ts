@@ -224,6 +224,7 @@ export interface TaskDetail {
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
     /** Authorized conversation head, null for read-only evidence. Absent on older servers. */
     replyRunId?: string | null
+    factoryTaskId?: string
     bot: TaskBot | null
     schedule: TaskSchedule | null
     description: string | null
@@ -236,9 +237,11 @@ export interface TaskDetail {
   }
   /** Canonical, oldest-first history and discussions. Absent on older servers. */
   timeline?: import('../../../lib/task-activity-timeline').TaskActivityFact[]
+  /** Raw, authorized receipts from the selected Factory response. The UI decodes its supported DTO version. */
+  factoryEvents?: unknown[]
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */
-  live?: { workspaceId: string }
+  live?: { workspaceId: string; factoryActivityVersion?: 1 }
 }
 
 export interface Preferences {
