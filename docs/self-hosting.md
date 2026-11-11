@@ -109,11 +109,14 @@ For an existing local installation, first plan an explicit PostgreSQL
 `pg_dump`/`pg_restore` using **direct** connections and a stopped writer;
 this guide does not perform data migration automatically.
 
-The image CI validates the external-database Compose contract without paid
-Neon credentials, while its existing runtime tests use isolated PostgreSQL 17.
-An actual Neon deployment should additionally verify signup, bot chat,
-WebSocket updates and daemon work on its own origin; the offline contract test
-alone is not a live managed-database acceptance.
+Image CI checks the external Compose configuration offline, then starts the
+published Compose file with a private environment file against an independent
+PostgreSQL 17 database. The query role has no DDL privileges. The direct role
+runs migrations, and the server API reads the migrated database using the
+query role. The bundled PostgreSQL quickstart also runs the real daemon and
+packaged desktop tests. These checks use isolated PostgreSQL. On a live Neon
+deployment, also verify its TLS and pooler settings, signup, bot chat,
+WebSocket updates and daemon work on your own origin.
 
 
 ## Server entry and initial account

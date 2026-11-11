@@ -58,6 +58,8 @@ jobs:
           }
           appendFileSync(process.env.GITHUB_ENV, 'MIKKA_IMAGE=mikka-self-hosted:check\n')
           JS
+      - name: Start an independent external Compose installation against isolated PG17
+        run: bash scripts/acceptance/self-hosted-external-postgres.sh
       - name: Build the pinned upstream MinIO fixture
         run: docker compose build minio
       - name: Apply migrations and wait for health
