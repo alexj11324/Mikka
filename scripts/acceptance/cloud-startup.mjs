@@ -267,13 +267,16 @@ export async function acceptanceBot(client, botId, fixtureId, { issue = 1505, re
 export async function chooseSharedChatModel(client, botId, harness, owned = false) {
   const provider = harness === 'codex' ? 'codex' : 'claude'
   const menu = await client.rpc('execution-settings.getBotModelMenu', [botId])
+  // BotModelMenu uses owner only for another member's shared credential;
+  // ownSubscriptionOption uses this same undefined-owner contract.
   const matches = (menu.groups ?? []).filter(group => group.kind === 'subscription' && group.provider === provider
-    && (owned || typeof group.owner === 'string' && group.owner.trim().length > 0)).flatMap(group => group.options ?? [])
+    && (owned ? group.owner === undefined : typeof group.owner === 'string' && group.owner.trim().length > 0)).flatMap(group => group.options ?? [])
     .filter(option => option.provider === provider && option.modelId === MODELS[harness] && UUID.test(option.id ?? ''))
   assert(matches.length === 1, owned ? 'owned_chat_model_ambiguous' : 'shared_chat_model_ambiguous')
   const chosen = await client.rpc('execution-settings.chooseBotModel', [botId, matches[0].id]), current = chosen.current
   // A successful choice creates a bot binding; catalogue de-duplication
-  // may expose that clone's ID on readback. The frozen run proves the source.
+  // may expose that clone's ID on readback. Chat ownership comes from the
+  // selected menu group, independently of the later task's source proof.
   assert(current?.kind === 'subscription' && current.chosen === true && UUID.test(current.id ?? '') && current.fallback === undefined
     && current.provider === provider && current.modelId === MODELS[harness]
     && (current.available === true || current.availability === 'checking'), owned ? 'owned_chat_model_unavailable' : 'shared_chat_model_unavailable')

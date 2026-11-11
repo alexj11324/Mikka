@@ -77,7 +77,7 @@ test('v3 requires an exact observed claim catalogue before accepting zero physic
 
 function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false,
   wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false,
-  workspaceRole = 'member', timingSecret = false, leaseAudit = false, ownedCodex = false } = {}) {
+  workspaceRole = 'member', timingSecret = false, leaseAudit = false, ownedCodex = false, ownedChatMenu = 'own' } = {}) {
   const caseWorkspace = ownedCodex ? personalWorkspace : workspace
   const calls = [], samples = [], profiles = new Map(), sockets = []
   let current, clock = epoch, profileCount = 0
@@ -165,13 +165,17 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         }
         if (action === 'execution-settings.getBotModelMenu' || action === 'execution-settings.chooseBotModel') {
           assert.equal(args[0], botId)
+          const groups = Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: ownedCodex ? undefined : 'Shared member',
+            options: [{ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] }))
+          const sharedGroups = groups.map((group, index) => ({ ...group, owner: 'Shared member', options: [{ ...group.options[0], id: id(70 + index) }] }))
+          const chatGroups = ownedCodex && ownedChatMenu === 'shared' ? sharedGroups
+            : ownedCodex && ownedChatMenu === 'both' ? [...sharedGroups, ...groups] : groups
           if (action === 'execution-settings.chooseBotModel') {
             if (withdrawShare) return rpc({ ok: false, error: 'executionAccountUnavailable' })
-            chosenModel = Object.entries(models).map(([harness, modelId], index) => ({ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' })).find(item => item.id === args[1])
+            chosenModel = chatGroups.flatMap(group => group.options).find(item => item.id === args[1])
             assert.ok(chosenModel)
           }
-          return rpc({ groups: Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: ownedCodex ? undefined : 'Shared member',
-            options: [{ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] })),
+          return rpc({ groups: chatGroups,
             current: chosenModel ? { ...chosenModel, ...(remapCurrentId ? { id: id(850) } : {}), ...(fallbackMenu ? { fallback: 'quota' } : {}),
               kind: 'subscription', chosen: true, available: !checkingMenu, availability: checkingMenu ? 'checking' : 'available' } : null })
         }
@@ -313,6 +317,29 @@ test('the owned actor never invokes Claude or accepts another credential owner, 
     assert.equal(io.calls.filter(call => call.init.body?.includes('coordinator.sendCoordinatorMessage')).length <= 1, true)
     assert.ok(report.samples.every(sample => sample.execution?.sharedScope === undefined))
   }
+})
+
+test('an owned native profile does not authorize a Coordinator call through shared-only Luna', async () => {
+  const io = fixture({ ownedCodex: true, ownedChatMenu: 'shared' })
+  const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io })
+  assert.equal(io.calls.filter(call => call.path === '/api/factory/agent-profiles' && call.init.method === 'POST').length, 1, 'the native profile already selected an owned source')
+  assert.equal(report.status, 'failed')
+  assert.equal(report.samples[0].error, 'startup_owned_chat_model_ambiguous')
+  assert.equal(report.samples[0].phase, 'chat_model_selection')
+  assert.equal(io.calls.filter(call => call.init.body?.includes('execution-settings.chooseBotModel')).length, 0)
+  assert.equal(io.calls.filter(call => call.init.body?.includes('coordinator.sendCoordinatorMessage')).length, 0)
+  assert.equal(io.samples.length, 0, 'no task is created before chat source ownership is verified')
+  assert.equal(report.cleanup.workspaceRestored, true)
+})
+
+test('the owned actor selects its own Luna when a shared Luna is listed first', async () => {
+  const io = fixture({ ownedCodex: true, ownedChatMenu: 'both' })
+  const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io })
+  assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
+  const choices = io.calls.filter(call => call.init.body?.includes('execution-settings.chooseBotModel')).map(call => JSON.parse(call.init.body).args)
+  assert.deepEqual(choices, [[botId, id(61)]], 'the Coordinator uses the owned catalogue binding, not the first shared match')
+  assert.equal(io.calls.filter(call => call.init.body?.includes('coordinator.sendCoordinatorMessage')).length, 1)
+  assert.equal(report.samples[0].execution.ownedScope.verified, true)
 })
 
 test('the selected dispatch refusal retains its code before queueing and still cleans the owned issue', async () => {
