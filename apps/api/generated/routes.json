@@ -10,7 +10,7 @@
         "GET",
         "OPTIONS"
       ],
-      "sourceHash": "ada6dfad26735edfba08872ae321977c36862204de22afcdea5f751c73c45ef0"
+      "sourceHash": "3df05db25c12cc7faf0464cc30b50af6aa4b3360488482d554df4160bce39c1d"
     },
     {
       "path": "/mikka/.well-known/oauth-protected-resource",
@@ -20,7 +20,7 @@
         "GET",
         "OPTIONS"
       ],
-      "sourceHash": "de6070f812d8535742c0cc1dc22c9edd5a38cdfd9dbbbbe42d3da4a97bcd8dfb"
+      "sourceHash": "5ab3dcd550234bdbe962c19453826e1d383be0dcc4a6b485bf0732c91367c1cd"
     },
     {
       "path": "/mikka/api/acceptance",
@@ -67,7 +67,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "19862adf06437994a520dd9189c704b59ab01c32ea0dc5b1c3f6c58fab7b530b"
+      "sourceHash": "22e6f1033ad134b32a9e4a300851ff050fc14ef5ddf4a16a715be459c1477658"
     },
     {
       "path": "/mikka/api/agent/images",
@@ -189,6 +189,15 @@
         "PATCH"
       ],
       "sourceHash": "942486a5b184a947fedd5fccaf9f01231244c226d087f2cc277848a9fcf69c19"
+    },
+    {
+      "path": "/mikka/api/bots/[botId]/app-tools",
+      "template": "/api/bots/[botId]/app-tools",
+      "source": "app/api/bots/[botId]/app-tools/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "f423e367d98169aa3d6c776f92ecba4f82e0746cccdd5e2a7a622fc42c780a6b"
     },
     {
       "path": "/mikka/api/bots/[botId]/computer",
@@ -794,7 +803,7 @@
         "POST"
       ],
       "maxDuration": 300,
-      "sourceHash": "1e10e4d68acb421783e54f4cc8d7e0a8ee3455f444f59b27bd8cb36cc9fae2f8"
+      "sourceHash": "74502e3d569ca2c8d3ac76d6772a1856d43d290d205ddc1c760f9475de606e58"
     },
     {
       "path": "/mikka/api/device-tokens",
@@ -939,7 +948,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "6c84f889ccb33e59c75cac7fc6b324e55010b6df67178aa9e7b6dfac40af0eac"
+      "sourceHash": "57ebcd52bb3b71b75a8b4fa49ec677c31557cd3080cd73a153e6d463c238116e"
     },
     {
       "path": "/mikka/api/factory/tasks/route",
@@ -1188,16 +1197,6 @@
       "sourceHash": "7eaa7d4da7df0917328fb6ee3f352eb121ea21f357885d83db46fccec2d9c623"
     },
     {
-      "path": "/mikka/api/integrations/github/permissions",
-      "template": "/api/integrations/github/permissions",
-      "source": "app/api/integrations/github/permissions/route.ts",
-      "methods": [
-        "GET",
-        "PATCH"
-      ],
-      "sourceHash": "907c0bb40a8c70c9faefe5adbefec58ba35ad61b70091c17202d9e4fe4703d61"
-    },
-    {
       "path": "/mikka/api/integrations/github/repositories/verification",
       "template": "/api/integrations/github/repositories/verification",
       "source": "app/api/integrations/github/repositories/verification/route.ts",
@@ -1283,7 +1282,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "2d7a9689d2950876251582474f08a57b1a605fc61cb71d1e4a60ab7fa823cdfa"
+      "sourceHash": "24bc15ef2265252770c47005cb51af35f2bee36bd481ae74d57acaf769e27106"
     },
     {
       "path": "/mikka/api/mobile/artifacts/[id]",
@@ -1447,13 +1446,22 @@
       "sourceHash": "0a7f4d96a0a9c554222ae3a1718cbfba4f79e193ac5a03c3fe6f6c29081c94f9"
     },
     {
+      "path": "/mikka/api/mobile/task-presentations",
+      "template": "/api/mobile/task-presentations",
+      "source": "app/api/mobile/task-presentations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "523320ae8a8aac677c1d76b16e5a6980ff2358f7291441c1b427ada14354d5ca"
+    },
+    {
       "path": "/mikka/api/mobile/tasks",
       "template": "/api/mobile/tasks",
       "source": "app/api/mobile/tasks/route.ts",
       "methods": [
         "GET"
       ],
-      "sourceHash": "d11e0922e0c939bc07ecea520e0c0a577a5a2774e84030ca9cc44bf64ac048e4"
+      "sourceHash": "320d7c8da26b0552b1eb66bc4eecc7a5aa25bdcf418e1bd1001c39905197d590"
     },
     {
       "path": "/mikka/api/mobile/tasks/[id]",
@@ -1979,6 +1987,15 @@
       "sourceHash": "25176c47f725d048467bed224881baea31439c18a62a299d05cd8bfe96c55bff"
     },
     {
+      "path": "/mikka/api/skills/share",
+      "template": "/api/skills/share",
+      "source": "app/api/skills/share/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "459a3f020beb59d39e3415bec882835af825b51bb5e27cf0d06d7305749424cc"
+    },
+    {
       "path": "/mikka/api/subscriptions",
       "template": "/api/subscriptions",
       "source": "app/api/subscriptions/route.ts",
@@ -2387,7 +2404,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "a442da7db3ad144a94c7fb93a4100f27846137ce86b699f48eb1c3564275a7ce"
+      "sourceHash": "caa390a789f43529092d96d3e40adb3c41225bb9f4bb015ed88564c71885adb4"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/model-admission",
@@ -2542,7 +2559,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "a4161f568a71d5a7ce69f244b25f86917a4054f535d0a2c96c431d94f37cad07"
+      "sourceHash": "6b923afd3fcebb4590bf5c86ed26fc293bd3804e7908de002241337d0d8b9991"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",

@@ -195,4 +195,29 @@ test('Stripe purchased points ledger', { skip: !dbUrl }, async t => {
     await applyStripeEvent(event('checkout.session.completed', session()), options)
     assert.ok((await pool.query('select "reconciledAt" from billing_refund_receipts where id=$1', [receipt])).rows[0].reconciledAt)
   })
+
+  await t.test('a foreign entitlement backlog cannot fail this webhook', async () => {
+    const foreign = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const prefix = 'evt' + randomUUID().replaceAll('-', '')
+    await pool.query(`insert into stripe_webhook_events (id,type) select $1||g,'customer.subscription.updated' from generate_series(1,100) g`, [prefix])
+    // Revisions are unique per Workspace, so the full batch must differ by revision.
+    await pool.query(`insert into billing_entitlement_outbox ("eventId","workspaceId","subscriptionId",plan,"expiresAt",revision,"billingModel")
+      select $1||g,$2,$3,'pro',now()+interval '30 days',g,'resource_v1' from generate_series(1,100) g`, [prefix, foreign.id, id('sub')])
+    const pending = async () => (await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId" like $1 and "deliveredAt" is null', [prefix + '%'])).rows[0].n
+    const delivered = async () => (await pool.query('select count(*)::int n from billing_entitlement_outbox where "eventId" like $1 and "deliveredAt" is not null', [prefix + '%'])).rows[0].n
+    const trigger = `synthetic_billing_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`create function ${trigger}() returns trigger language plpgsql as $$ begin if NEW."workspaceId"='${foreign.id}'::uuid then raise exception 'synthetic_workspace_outage'; end if; return NEW; end $$;
+      create trigger ${trigger} before insert or update on mikka_workspace_entitlements for each row execute function ${trigger}()`)
+    try {
+      // A full batch of 100 foreign rows all fails but is swallowed; this webhook still succeeds.
+      assert.equal(await applyStripeEvent(event('checkout.session.completed', session()), options), true)
+      assert.equal(await pending(), 100)
+    } finally {
+      await pool.query(`drop trigger if exists ${trigger} on mikka_workspace_entitlements; drop function if exists ${trigger}()`)
+    }
+    // The same full batch now delivers; no own row remains, so it is not a backlog failure.
+    for (let attempt = 0; attempt < 3 && await delivered() < 100; attempt++)
+      assert.equal(await applyStripeEvent(event('checkout.session.completed', session()), options), true)
+    assert.equal(await delivered(), 100)
+  })
 })

@@ -147,7 +147,7 @@ test('a legacy stored ask is not a human gate; concurrent replay produces one ef
  assert.ok('error' in await execute(pool,'bob',original,true));assert.equal(effects,1)
  assert.ok('error' in await execute(pool,actor.userId,{...original,mutation:{action:'click',x:999,y:999}},true));assert.equal(effects,1)
 })
-test('deny blocks: an explicit effect deny wins over agent allow, and a workspace computer deny blocks every effect',{skip:!enabled},async()=>{
+test('deny blocks: a workspace effect deny wins over a Bot allow, and a workspace computer deny blocks every effect',{skip:!enabled},async()=>{
  await pool.query(`UPDATE agent_kit_heads SET external_write_permissions='{"browser_payment":"allow"}'`)
  await pool.query(`UPDATE workspace_computer_policies SET external_write_permissions='{"browser_payment":"deny"}'`)
  await assert.rejects(propose('payment'),/Browser action denied/);assert.equal(effects,0)

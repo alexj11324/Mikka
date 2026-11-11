@@ -5,6 +5,9 @@ import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
 import { makeSnapshot } from './agent-kit/definition'
 import { personalWorkerMailboxScopeMatches } from './personal-mailbox-capability'
 import { overrideDeploymentSwitch } from './deployment-switches'
+import { ActionFailureError } from './action-error'
+import type { ProjectExecutionSnapshot } from './project-resources/contracts'
+import type { ProjectExecutionInput } from './project-resources/store'
 
 // Real dispatch functions, controlled persistence. These tests never open a
 // database or invoke a provider and do not prove FK/locking behavior.
@@ -18,6 +21,35 @@ before(async () => {
 })
 
 const repoUrl = 'https://github.com/example/fixture.git'
+// The cloud producer uses the Bot's desktop repository; the separate local
+// producer above uses its explicit remote URL. No GitHub push grant is mocked.
+const cloudRepository = { repoPath: '/workspace', remoteUrl: null, baseBranch: 'main' }
+const projectSnapshot: ProjectExecutionSnapshot = { version: 1, workspaceId, projectId: null, projectRevision: null, policyRevision: 0, repositoryKey: null, baseBranch: cloudRepository.baseBranch, environment: null }
+let projectLeaseActive = false, projectDenied = false
+const requireFixtureProjectLease = (userId: string, selectedWorkspace: string) => {
+  assert.deepEqual([userId, selectedWorkspace], [owner, workspaceId])
+  if (!projectLeaseActive) throw new ActionFailureError('projectEnvironmentUnavailable')
+}
+mock.module(new URL('./project-resources/store.ts', import.meta.url).href, { namedExports: {
+  withProjectExecution: async (input: ProjectExecutionInput, operation: (snapshot: ProjectExecutionSnapshot) => Promise<unknown>, requireExisting: boolean) => {
+    assert.deepEqual(input, { userId: owner, workspaceId, issueId, repositoryKey: null, baseBranch: 'main', runtime: 'cloud', harness: 'codex' })
+    assert.equal(requireExisting, false)
+    assert.equal(projectLeaseActive, false)
+    if (projectDenied) throw new ActionFailureError('projectRepositoryDenied')
+    projectLeaseActive = true
+    try { return await operation(structuredClone(projectSnapshot)) } finally { projectLeaseActive = false }
+  },
+  requireProjectResourceLease: requireFixtureProjectLease,
+  assertProjectExecutionTarget: (snapshot: ProjectExecutionSnapshot, target: Omit<ProjectExecutionInput, 'issueId' | 'baseBranch'>) => {
+    requireFixtureProjectLease(target.userId, target.workspaceId)
+    assert.deepEqual(target, { userId: owner, workspaceId, repositoryKey: null, runtime: 'cloud', harness: 'codex' })
+    assert.deepEqual(snapshot, projectSnapshot)
+  },
+  assertFrozenProjectExecution: (frozen: ProjectExecutionSnapshot, admitted: ProjectExecutionSnapshot) => {
+    requireFixtureProjectLease(owner, workspaceId)
+    assert.deepEqual(frozen, projectSnapshot); assert.deepEqual(admitted, projectSnapshot)
+  },
+} })
 const execution = { status: 'running' as const, id: '28700000-0000-4000-8000-000000000016', snapshot: makeSnapshot('28700000-0000-4000-8000-000000000017', 1, { ...DEFAULT_AGENT_DEFINITION, tools: ['mailbox_inbox'] }, 'HOST', { harness: 'ai_sdk', model: 'synthetic' }) }
 let ownedBot = true, botQueries = 0
 const inserted: Record<string, unknown>[] = []
@@ -86,10 +118,34 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
   const queries: string[] = []
   const client = { release() {}, async query(sql: string, params: unknown[] = []) {
     queries.push(sql)
+    requireFixtureProjectLease(owner, workspaceId)
+    if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql)) return { rows: [] }
+    if (sql.startsWith('SELECT pg_advisory_xact_lock')) {
+      assert.deepEqual(params, [`computer-policy:${workspaceId}`])
+      return { rows: [] }
+    }
     if (sql.startsWith('SELECT m."deviceId"')) {
       assert.deepEqual(params, [botId, owner, workspaceId, agentId, repoId])
       assert.ok(sql.includes('b."ownerId"=$2 AND b."workspaceId"=$3'))
       return { rows: [{ deviceId: 'device', harness: 'codex', instructions: 'Fixture', baseBranch: 'main' }] }
+    }
+    if (sql.startsWith('SELECT "repoPath","remoteUrl" FROM device_repos')) {
+      assert.deepEqual(params, [repoId, owner, 'device'])
+      assert.ok(sql.endsWith('FOR SHARE'))
+      return { rows: [cloudRepository] }
+    }
+    if (sql === 'SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1') {
+      assert.deepEqual(params, [workspaceId])
+      return { rows: [] }
+    }
+    if (sql === `SELECT id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi",to_jsonb(model_api_keys)->'modelSettings' AS "modelSettings" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`) {
+      assert.deepEqual(params, [owner])
+      return { rows: [] }
+    }
+    if (sql === `SELECT k.id,k."ownerId",k.provider,k.name,k."baseUrl",k.protocol,k.last4,k.models,k."modelsError",k."responsesApi",to_jsonb(k)->'modelSettings' AS "modelSettings" FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
+    WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`) {
+      assert.deepEqual(params, [workspaceId, owner])
+      return { rows: [] }
     }
     if (sql.startsWith('SELECT "ownerId","workspaceId" FROM bots')) return { rows: [{ ownerId: owner, workspaceId }] }
     if (sql.startsWith('SELECT "ownerId",kind,enabled FROM devices')) return { rows: [{ ownerId: owner, kind: 'cloud', enabled: true }] }
@@ -100,12 +156,40 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
       assert.ok(sql.includes('c."ownerId"=$2') && sql.includes('c.epoch=$3'))
       return { rows: [{}], rowCount: 1 }
     }
-    if (sql.startsWith('INSERT INTO agent_runs')) snapshot = JSON.parse(params[9] as string)
-    return { rows: [] }
+    if (sql.startsWith('SELECT 1 FROM device_repos')) {
+      assert.deepEqual(params, [repoId, owner])
+      assert.ok(sql.includes('"repoPath" LIKE \'v2/github.com/%\''))
+      return { rows: [], rowCount: 0 }
+    }
+    if (sql.startsWith('INSERT INTO agent_runs')) {
+      assert.deepEqual([params[1], params[2], params[3], params[5], params[8], params[12]], [owner, issueId, agentId, repoId, botId, workspaceId])
+      snapshot = JSON.parse(params[9] as string)
+      return { rows: [] }
+    }
+    if (sql.startsWith('INSERT INTO computer_run_bindings')) { assert.deepEqual(params.slice(1), [botId, workspaceId, owner]); return { rows: [] } }
+    if (sql.startsWith('INSERT INTO thread_machines')) { assert.deepEqual(params.slice(1, 4), [workspaceId, owner, botId]); return { rows: [] } }
+    throw new Error(`Unexpected mailbox producer query: ${sql}`)
   } }
+  const queuePool = { connect: async () => { requireFixtureProjectLease(owner, workspaceId); return client }, query: async (sql: string, params: unknown[]) => {
+    queries.push(sql)
+    assert.equal(projectLeaseActive, false)
+    assert.ok(sql.startsWith('SELECT repo."repoPath",repo."remoteUrl",a.harness,'))
+    assert.ok(sql.includes('i."workspaceId"=$5') && sql.includes('i."ownershipState"=\'bound\'') && sql.includes('repo."userId"=$3'))
+    assert.deepEqual(params, [repoId, agentId, owner, issueId, workspaceId, null])
+    return { rows: [{ ...cloudRepository, harness: 'codex' }] }
+  } } as unknown as Parameters<typeof queueCloudRun>[0]
   const untrusted = { workspaceId: 'forged-body-namespace' }
-  await queueCloudRun({ connect: async () => client } as unknown as Parameters<typeof queueCloudRun>[0], { userId: owner, workspaceId },
-    { botId, issueId, agentId, deviceRepoId: repoId, title: 'Fixture', body: '', model: 'fixture', execution, ...untrusted })
+  const input = { botId, issueId, agentId, deviceRepoId: repoId, title: 'Fixture', body: '', model: 'fixture', execution, ...untrusted }
+  await queueCloudRun(queuePool, { userId: owner, workspaceId }, input)
   assert.equal(personalWorkerMailboxScopeMatches('codex', snapshot, { botId, workspaceId }), true)
+  assert.deepEqual((snapshot as { projectExecution: ProjectExecutionSnapshot }).projectExecution, projectSnapshot)
+  assert.equal(projectLeaseActive, false)
   assert.equal(queries.at(-1), 'COMMIT')
+  const beforeRefusal = queries.length, beforeSnapshot = snapshot
+  projectDenied = true
+  try { await assert.rejects(queueCloudRun(queuePool, { userId: owner, workspaceId }, input), { code: 'projectRepositoryDenied' }) }
+  finally { projectDenied = false }
+  assert.equal(queries.length, beforeRefusal + 1, 'Project refusal permits only the authorized-namespace preflight, no APP write or identity freeze')
+  assert.equal(snapshot, beforeSnapshot)
+  assert.equal(projectLeaseActive, false)
 })

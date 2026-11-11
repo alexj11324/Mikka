@@ -303,12 +303,20 @@ export class HostedUsageStore {
     )
     if (!result.rowCount) throw new PaidResourceError('usage_cost_unavailable')
   }
+  /**
+   * `cache` is a breakdown of `inputTokens`, never an addition to it: the
+   * provider's input total already includes cached input. Omitted or null means
+   * "this receipt carried no cache figures", which is stored as NULL and must
+   * never be read as zero. A call that never got a finish receipt (interrupted,
+   * cancelled, provider unknown) leaves both columns NULL for that reason.
+   */
   async settle(
     id: string,
     cost: number | null,
     inputTokens = 0,
     outputTokens = 0,
     generationId?: string,
+    cache?: { read: number | null; write: number | null } | null,
   ) {
     if (!this.metered) return
     return this.transaction(async (tx) => {
@@ -335,6 +343,13 @@ export class HostedUsageStore {
       }
       if (!Number.isSafeInteger(cost) || cost < 0)
         throw new Error('invalid_usage_cost')
+      // Never invent cache figures. Only finite nonnegative integers reach the
+      // ledger; anything else is "not collected" and stays NULL.
+      const cacheRead = cache?.read ?? null
+      const cacheWrite = cache?.write ?? null
+      const cacheValue = (value: number | null) =>
+        typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+      const cacheColumns = [cacheValue(cacheRead), cacheValue(cacheWrite)]
       // A call admitted just before the period ended keeps access to that paid
       // period's remaining grant; it never consumes a future period's allowance.
       const available = await this.balance(row.workspaceId, tx, row.createdAt)
@@ -343,8 +358,8 @@ export class HostedUsageStore {
       // never as a debt the workspace's allowance would repay once a card is verified.
       if (!legacyRow && !available.verified && available.purchased <= 0) {
         await tx.query(
-          `UPDATE hosted_usage SET state='settled',"costMicroUsd"=$2,"freeMicroUsd"=0,"purchasedMicroUsd"=0,"inputTokens"=$3,"outputTokens"=$4,"generationId"=COALESCE($5,"generationId"),"unpaidMicroUsd"=$2,"settledAt"=now() WHERE id=$1`,
-          [id, cost, inputTokens, outputTokens, generationId ?? null],
+          `UPDATE hosted_usage SET state='settled',"costMicroUsd"=$2,"freeMicroUsd"=0,"purchasedMicroUsd"=0,"inputTokens"=$3,"outputTokens"=$4,"generationId"=COALESCE($5,"generationId"),"unpaidMicroUsd"=$2,"cacheReadTokens"=$6,"cacheWriteTokens"=$7,"settledAt"=now() WHERE id=$1`,
+          [id, cost, inputTokens, outputTokens, generationId ?? null, ...cacheColumns],
         )
         return
       }
@@ -386,7 +401,7 @@ export class HostedUsageStore {
         [row.workspaceId, Number(row.reservedFree), free],
       )
       await tx.query(
-        `UPDATE hosted_usage SET state='settled',"costMicroUsd"=$2,"freeMicroUsd"=$3,"purchasedMicroUsd"=$4,"inputTokens"=$5,"outputTokens"=$6,"generationId"=COALESCE($7,"generationId"),"unpaidMicroUsd"=$8,"planMicroUsd"=$9,"planAllocations"=$10,"settledAt"=now() WHERE id=$1`,
+        `UPDATE hosted_usage SET state='settled',"costMicroUsd"=$2,"freeMicroUsd"=$3,"purchasedMicroUsd"=$4,"inputTokens"=$5,"outputTokens"=$6,"generationId"=COALESCE($7,"generationId"),"unpaidMicroUsd"=$8,"planMicroUsd"=$9,"planAllocations"=$10,"cacheReadTokens"=$11,"cacheWriteTokens"=$12,"settledAt"=now() WHERE id=$1`,
         [
           id,
           cost,
@@ -398,6 +413,7 @@ export class HostedUsageStore {
           unpaid,
           plan,
           JSON.stringify(allocations),
+          ...cacheColumns,
         ],
       )
     })

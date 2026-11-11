@@ -1,90 +1,159 @@
 import 'server-only'
-import { sql, and, eq, inArray, ne } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { agentRuns, issues, teamIssueCreateRequests, teamIssuePromotions } from '@/lib/db/schema'
-import { projectEvents, projects } from '@/lib/db/project-schema'
-import { teamIssueCreateReceipts, teamIssuePromotionReceipts, teamIssues, teamMembers, teamProjects, teams } from '@/lib/db/team-schema'
+import { issues } from '@/lib/db/schema'
+import { projects } from '@/lib/db/project-schema'
+import { teamIssueCreateReceipts, teamIssuePromotionReceipts, teamIssues, teamLifecycleEvents, teamMembers, teamProjects, teams } from '@/lib/db/team-schema'
 import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { lockTeamRelations } from '@/lib/team-access'
 import { workspaceDb } from '@/lib/workspace-db'
-import { ownerListChanged, workspaceListChanged } from '../live/lists'
+import { workspaceListChanged } from '../live/lists'
 
-export interface TeamDeletionImpact { teamId: string; name: string; tasks: number; projects: number }
+export interface TeamDeletionImpact {
+  teamId: string; name: string; tasks: number; projects: number; runs: number; pullRequests: number
+  archivedAt: string | null; canDelete: boolean; recovery: 'restore_archive'
+}
+export type TeamLifecycleImpact = TeamDeletionImpact
+export interface TeamLifecycleChange { teamId: string; archivedAt: string | null; auditId: string | null }
+export interface TeamGroupingRemoval { removed: { teamId: string; tasks: number; projects: number }; auditId: string }
+export interface TeamDeletion { deleted: { tasks: number; projects: number }; auditId: string }
 
-/** The team, locked, in the workspace the caller administers. */
+/** Workspace/member, relation lock, Team: the canonical task/project lock order. */
 async function lockTeam(tx: WorkspaceTransaction, actorId: string, teamId: string) {
   z.uuid().parse(teamId)
-  const [team] = await tx.select({ id: teams.id, name: teams.name, workspaceId: teams.workspaceId }).from(teams).where(eq(teams.id, teamId)).for('update').limit(1)
+  const [scope] = await tx.select({ workspaceId: teams.workspaceId }).from(teams).where(eq(teams.id, teamId)).limit(1)
+  if (!scope) throw new WorkspaceError('teamNotFound')
+  await requireWorkspace(tx, scope.workspaceId, actorId, true)
+  await lockTeamRelations(tx)
+  const [team] = await tx.select().from(teams).where(and(eq(teams.id, teamId), eq(teams.workspaceId, scope.workspaceId))).for('update').limit(1)
   if (!team) throw new WorkspaceError('teamNotFound')
-  await requireWorkspace(tx, team.workspaceId, actorId, true)
   return team
 }
 
-/**
- * Tasks are the team's issues that still exist; projects are the ones linked
- * only to this team (a project shared with another team just loses the link).
- */
-async function teamContents(tx: WorkspaceTransaction, teamId: string) {
-  const issueIds = (await tx.select({ id: teamIssues.issueId }).from(teamIssues).where(eq(teamIssues.teamId, teamId))).map(row => row.id)
-  const linked = (await tx.select({ id: teamProjects.projectId }).from(teamProjects).where(eq(teamProjects.teamId, teamId))).map(row => row.id)
-  const shared = linked.length ? new Set((await tx.select({ id: teamProjects.projectId }).from(teamProjects)
-    .where(and(inArray(teamProjects.projectId, linked), ne(teamProjects.teamId, teamId)))).map(row => row.id)) : new Set<string>()
-  return { issueIds, projectIds: linked.filter(id => !shared.has(id)) }
+async function teamContents(tx: WorkspaceTransaction, team: typeof teams.$inferSelect) {
+  const issueLinks = await tx.select().from(teamIssues).where(eq(teamIssues.teamId, team.id))
+  const projectLinks = await tx.select().from(teamProjects).where(eq(teamProjects.teamId, team.id))
+  const members = await tx.select({ userId: teamMembers.userId, role: teamMembers.role }).from(teamMembers).where(eq(teamMembers.teamId, team.id))
+  const issueIds = issueLinks.map(link => link.issueId)
+  const taskRows = issueIds.length ? await db.select({ id: issues.id, workspaceId: issues.workspaceId, ownershipState: issues.ownershipState }).from(issues).where(inArray(issues.id, issueIds)) : []
+  const scopedTaskIds = taskRows.filter(task => task.ownershipState === 'bound' && task.workspaceId === team.workspaceId).map(task => task.id)
+  const projectIds = projectLinks.map(link => link.projectId)
+  const projectRows = projectIds.length ? await tx.select({ id: projects.id, workspaceId: projects.workspaceId }).from(projects).where(inArray(projects.id, projectIds)) : []
+  // Count frozen team provenance too: moving a task must not hide its old runs.
+  const references = await db.execute<{ runs: number; pullRequests: number }>(sql`
+    select count(distinct r.id)::int as runs,
+      count(distinct p."pullRequest"->>'url') filter (where p."pullRequest" is not null)::int as "pullRequests"
+    from agent_runs r left join run_publications p on p."runId" = r.id
+    where (r."workspaceId" = ${team.workspaceId}::uuid
+        or (r."workspaceId" is null and r."issueId" = any(${sql.param(scopedTaskIds)}::uuid[])))
+      and (r."issueId" = any(${sql.param(scopedTaskIds)}::uuid[]) or r.cli_policy_hierarchy->>'teamId' = ${team.id})`)
+  const runs = references.rows[0]?.runs ?? 0, pullRequests = references.rows[0]?.pullRequests ?? 0
+  const impact: TeamDeletionImpact = {
+    teamId: team.id, name: team.name, tasks: scopedTaskIds.length, projects: projectRows.filter(project => project.workspaceId === team.workspaceId).length, runs, pullRequests,
+    archivedAt: team.archivedAt?.toISOString() ?? null,
+    canDelete: !issueLinks.length && !projectLinks.length && !runs && !pullRequests,
+    recovery: 'restore_archive',
+  }
+  return { issueLinks, projectLinks, members, taskRows, projectRows, impact }
+}
+type TeamContents = Awaited<ReturnType<typeof teamContents>>
+
+async function recordLifecycle(tx: WorkspaceTransaction, team: typeof teams.$inferSelect, actorId: string, action: typeof teamLifecycleEvents.$inferInsert['action'], contents: TeamContents) {
+  const id = crypto.randomUUID()
+  await tx.insert(teamLifecycleEvents).values({ id, teamId: team.id, workspaceId: team.workspaceId, actorId, action, snapshot: {
+    team: { name: team.name, identifier: team.identifier, archivedAt: team.archivedAt?.toISOString() ?? null, lastIssueNumber: team.lastIssueNumber },
+    tasks: contents.issueLinks.map(link => ({ id: link.issueId, number: link.number })),
+    projects: contents.projectLinks.map(link => ({ id: link.projectId, isPrimary: link.isPrimary })),
+    members: contents.members, runs: contents.impact.runs, pullRequests: contents.impact.pullRequests,
+  } })
+  return id
 }
 
-async function existingIssues(ids: string[]) {
-  if (!ids.length) return []
-  return (await db.select({ id: issues.id }).from(issues).where(inArray(issues.id, ids))).map(row => row.id)
+/** All project links count, including projects collaborated on by several teams. */
+export async function teamLifecycleImpact(actorId: string, teamId: string): Promise<TeamLifecycleImpact> {
+  return workspaceDb.transaction(async tx => (await teamContents(tx, await lockTeam(tx, actorId, teamId))).impact)
 }
+export const teamDeletionImpact = teamLifecycleImpact
 
-/** What the delete dialog shows: 「删除团队和它的 N 个任务、M 个项目」. Admins only. */
-export async function teamDeletionImpact(actorId: string, teamId: string): Promise<TeamDeletionImpact> {
+/** Archive keeps all grouping links, object IDs, published identities and history. */
+export async function archiveTeamData(actorId: string, teamId: string): Promise<TeamLifecycleChange> {
   return workspaceDb.transaction(async tx => {
     const team = await lockTeam(tx, actorId, teamId)
-    const { issueIds, projectIds } = await teamContents(tx, team.id)
-    return { teamId: team.id, name: team.name, tasks: (await existingIssues(issueIds)).length, projects: projectIds.length }
+    if (team.archivedAt) return { teamId: team.id, archivedAt: team.archivedAt.toISOString(), auditId: null }
+    const auditId = await recordLifecycle(tx, team, actorId, 'archived', await teamContents(tx, team))
+    const archivedAt = new Date()
+    await tx.update(teams).set({ archivedAt, archivedBy: actorId, updatedAt: archivedAt }).where(eq(teams.id, team.id))
+    await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
+    return { teamId: team.id, archivedAt: archivedAt.toISOString(), auditId }
   })
 }
 
-export interface TeamDeletion { deleted: { tasks: number; projects: number } }
+/** Restoring an archive does not change any task/project or prior run snapshot. */
+export async function restoreTeamData(actorId: string, teamId: string): Promise<TeamLifecycleChange> {
+  return workspaceDb.transaction(async tx => {
+    const team = await lockTeam(tx, actorId, teamId)
+    if (!team.archivedAt) return { teamId: team.id, archivedAt: null, auditId: null }
+    const auditId = await recordLifecycle(tx, team, actorId, 'restored', await teamContents(tx, team))
+    await tx.update(teams).set({ archivedAt: null, archivedBy: null, updatedAt: new Date() }).where(eq(teams.id, team.id))
+    await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
+    return { teamId: team.id, archivedAt: null, auditId }
+  })
+}
+
+async function removeGroupingRows(tx: WorkspaceTransaction, team: typeof teams.$inferSelect) {
+  await tx.delete(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.teamId, team.id))
+  await tx.delete(teamIssuePromotionReceipts).where(eq(teamIssuePromotionReceipts.teamId, team.id))
+  await tx.delete(teamIssues).where(eq(teamIssues.teamId, team.id))
+  await tx.delete(teamProjects).where(eq(teamProjects.teamId, team.id))
+  await tx.delete(teamMembers).where(eq(teamMembers.teamId, team.id))
+  await tx.delete(teams).where(and(eq(teams.id, team.id), eq(teams.workspaceId, team.workspaceId)))
+  await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
+}
+
+/** Explicit remove-grouping operation. Business objects and their histories stay. */
+export async function removeTeamGroupingData(actorId: string, teamId: string, confirmName: string): Promise<TeamGroupingRemoval> {
+  const typed = z.string().max(200).parse(confirmName).trim()
+  return workspaceDb.transaction(async tx => {
+    const team = await lockTeam(tx, actorId, teamId)
+    if (typed !== team.name) throw new WorkspaceError('teamDeleteNameMismatch')
+    const contents = await teamContents(tx, team)
+    // Never erase the only provenance of a legacy, unbound or conflicting object.
+    if (contents.taskRows.some(task => task.ownershipState !== 'bound' || task.workspaceId !== team.workspaceId)
+      || contents.projectRows.some(project => project.workspaceId !== team.workspaceId)
+      || contents.issueLinks.some(link => link.workspaceId !== team.workspaceId)
+      || contents.projectLinks.some(link => link.workspaceId !== team.workspaceId)) throw new WorkspaceError('teamLifecycleConflict')
+    const auditId = await recordLifecycle(tx, team, actorId, 'grouping_removed', contents)
+    await removeGroupingRows(tx, team)
+    return { removed: { teamId: team.id, tasks: contents.impact.tasks, projects: contents.impact.projects }, auditId }
+  })
+}
 
 /**
- * 删除团队 with its tasks and its own projects. The name must match. Tasks live
- * in the app database and are deleted in their own transaction first (the two
- * databases cannot share one); the team row stays locked meanwhile, and a
- * retry after a failure finishes the rest.
+ * This still means hard delete. A referenced team is explicitly refused instead
+ * of silently reinterpreting a legacy delete request as archive/remove-grouping.
+ * No recoverable business-object recycle bin exists, so only empty teams qualify.
  */
 export async function deleteTeamData(actorId: string, teamId: string, confirmName: string): Promise<TeamDeletion> {
   const typed = z.string().max(200).parse(confirmName).trim()
   return workspaceDb.transaction(async tx => {
     const team = await lockTeam(tx, actorId, teamId)
     if (typed !== team.name) throw new WorkspaceError('teamDeleteNameMismatch')
-    await lockTeamRelations(tx)
-    const { issueIds, projectIds } = await teamContents(tx, team.id)
-    const tasks = await db.transaction(async main => {
-      if (projectIds.length) await main.execute(sql`delete from project_decisions where "projectId" in ${projectIds}`)
-      await main.delete(teamIssueCreateRequests).where(eq(teamIssueCreateRequests.teamId, team.id))
-      await main.delete(teamIssuePromotions).where(eq(teamIssuePromotions.teamId, team.id))
-      if (!issueIds.length) return 0
-      const owners = await main.selectDistinct({ userId: agentRuns.userId }).from(agentRuns).where(inArray(agentRuns.issueId, issueIds))
-      const deleted = await main.delete(issues).where(inArray(issues.id, issueIds)).returning({ id: issues.id })
-      for (const { userId } of owners) await ownerListChanged(main, userId, ['thread_list', 'task_run_list', 'bot_chat_list'])
-      if (deleted.length) await workspaceListChanged(main, team.workspaceId, ['issue_list'])
-      return deleted.length
-    })
-    await tx.delete(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.teamId, team.id))
-    await tx.delete(teamIssuePromotionReceipts).where(eq(teamIssuePromotionReceipts.teamId, team.id))
-    await tx.delete(teamIssues).where(eq(teamIssues.teamId, team.id))
-    await tx.delete(teamProjects).where(eq(teamProjects.teamId, team.id))
-    let deletedProjects = 0
-    if (projectIds.length) {
-      await tx.delete(projectEvents).where(inArray(projectEvents.projectId, projectIds))
-      deletedProjects = (await tx.delete(projects).where(inArray(projects.id, projectIds)).returning({ id: projects.id })).length
-    }
-    await tx.delete(teamMembers).where(eq(teamMembers.teamId, team.id))
-    await tx.delete(teams).where(and(eq(teams.id, team.id), eq(teams.workspaceId, team.workspaceId)))
-    await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
-    return { deleted: { tasks, projects: deletedProjects } }
+    const contents = await teamContents(tx, team)
+    if (!contents.impact.canDelete) throw new WorkspaceError('teamDeleteReferenced')
+    const auditId = await recordLifecycle(tx, team, actorId, 'deleted', contents)
+    await removeGroupingRows(tx, team)
+    return { deleted: { tasks: 0, projects: 0 }, auditId }
+  })
+}
+
+/** Admin-only journal remains discoverable after the team row has been removed. */
+export async function readTeamLifecycleAudit(actorId: string, workspaceId: string, teamId: string) {
+  z.uuid().parse(teamId)
+  return workspaceDb.transaction(async tx => {
+    await requireWorkspace(tx, workspaceId, actorId, true)
+    return tx.select().from(teamLifecycleEvents)
+      .where(and(eq(teamLifecycleEvents.workspaceId, workspaceId), eq(teamLifecycleEvents.teamId, teamId)))
+      .orderBy(desc(teamLifecycleEvents.createdAt)).limit(100)
   })
 }

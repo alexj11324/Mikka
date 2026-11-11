@@ -1,3 +1,4 @@
+import { resourceBoundDispatchConstructor } from '../../tests/helpers/factory-resource-boundary'
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -504,9 +505,10 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   })
 
   await t.test('public Factory Default dispatch requires the original user pin without changing UUID or host-selected paths', async () => {
-    const [{ db }, { recordPersonalSubmission }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun }, order] = await Promise.all([
+    const [{ db }, { recordPersonalSubmission }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun }, order] = await Promise.all([
       import('../db'), import('../coordinator-submission'), import('./store'), import('./dispatch'), import('../agent-runs'), import('../model-order'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
     const botId = await seedBot(pool, scope.workspaceId, scope.ownerId), repoId = randomUUID()
     const repository = normalizeRepository(`https://github.com/synthetic/default-task-${randomUUID()}.git`)
     await pool.query(`INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,'main')`, [repoId, scope.ownerId, deviceId, repository.key, repository.remoteUrl])
@@ -883,7 +885,12 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.ok(selected.target.subscriptionBindingId)
     const binding = (await pool.query('SELECT "connectionId"::text,"modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
     assert.deepEqual(binding, { connectionId: exactClaude, modelId: 'claude-haiku-5-5' })
-    assert.ok(selected.agentProfile!.instructions.includes('Start from the observed failure'))
+    // Progressive disclosure: the brief names the capability and how to load
+    // it, while the frozen body stays in the pinned envelope.
+    assert.ok(selected.agentProfile!.instructions.includes('load_skill'))
+    assert.ok(selected.agentProfile!.instructions.includes('official:systematic-debugging'))
+    assert.ok(!selected.agentProfile!.instructions.includes('Start from the observed failure'))
+    assert.ok(selected.agentProfile!.skills[0]?.content.includes('Start from the observed failure'))
     assert.equal(selected.agentProfile!.effort, 'low')
     await assert.rejects(profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: ui.id, asked: { harness: 'codex', model: 'gpt-6-luna' } }), { code: 'agentProfilePinConflict' })
   })
@@ -1046,12 +1053,13 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal((await store.history(scope, ui.id)).at(-1)!.digest, frozen.digest)
   })
   for (const mode of ['fixed', 'inherit', 'legacy', 'botless'] as const) await t.test(mode === 'legacy' ? 'watchdog preserves historical absence of Profile through queue and first claim on B' : `watchdog ${mode} Profile uses B's real source and retains the started role through queue and first claim`, async () => {
-    const [{ createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun }, { automaticFactoryDispatch },
+    const [{ createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun }, { automaticFactoryDispatch },
       { sweepFactoryWatchdog }, { claimLocalRun }, { assertRunProfileClaim, admitProfileSelection }, { profileNativeSessionMatches },
       { DAEMON_PROTOCOL_VERSION }, { workerDefinitionDigest }] = await Promise.all([
       import('./store'), import('./dispatch'), import('../agent-runs'), import('./automatic-dispatch'), import('./watchdog'),
       import('../computer/claim'), import('./profile-admission'), import('./profile-native-session'), import('@mikka/protocol/daemon'), import('../agent-kit/worker-digest'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
     const who = await person(`watchdog-profile-${mode}`)
     const botId = mode === 'botless' ? null : await seedBot(pool, who.workspaceId, who.ownerId)
     if (mode === 'botless') {

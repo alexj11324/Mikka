@@ -1,4 +1,5 @@
 import { chatProjectionHash } from './chat-projection-version'
+import { conversationUsage, type ConversationUsage } from './context-usage'
 import { captureRunFailure, readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { APP_BUILD } from '@/lib/app-build'
 import { sourcedEventMessage } from './message-safety'
@@ -673,6 +674,13 @@ export interface ChatView {
   /** Response-only, consumed before the snapshot enters SWR or persistence. */
   toolMetadata?: ChatToolMetadata
   historyBefore?: number
+  /**
+   * How full this conversation is, in the same estimate the fold uses
+   * (lib/coordinator/context-usage.ts). An estimate from stored text, never a
+   * provider count; it shows how near the next fold is, not a share of a
+   * window Mikka does not store.
+   */
+  context?: ConversationUsage
 }
 
 /** The reasoning text of this person's stored messages at `positions` in one chat, in order; stored messages are already masked (appendMessages). */
@@ -698,7 +706,7 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   // Numbering is a separate bounded read after the visible tasks are known.
   const visibility = issueIds.length
     ? await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, withTeamLinks: false }) : null
-  const issueRows = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, run: issueLatestRun, codingReview: taskReviewSourceHint })
+  const issueRows = issueIds.length ? await db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, run: issueLatestRun, codingReview: taskReviewSourceHint, issuedIdentifier: issues.issuedIdentifier })
     .from(issues)
     .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
@@ -719,9 +727,9 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   const steps = new Map(ownedRuns.map(row => [row.id, row.steps]))
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
-    ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
-    ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number })),
-  ], db)
+    ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })),
+    ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier })),
+  ])
   // The hint keeps the Review loader off reads whose tasks have no source.
   const reviewIds = [...new Set([
     ...issueRows.filter(row => row.codingReview).map(row => row.id),
@@ -730,7 +738,7 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   const reviews = reviewIds.length
     ? await (await import('../coding-workspace/task-review/summaries')).taskReviewSummaries(reader, reviewIds)
     : new Map<string, TaskReviewSummary>()
-  for (const { content, ownerId: _owner, scope: _scope, codingReview: _codingReview, ...row } of issueRows) {
+  for (const { content, ownerId: _owner, scope: _scope, issuedIdentifier: _issued, codingReview: _codingReview, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)
     const review = reviews.get(row.id)
     if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null,
@@ -744,7 +752,7 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
     const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null, identifier: identifiers.get(task.id) ?? null, status: task.status, run: task.latestRun, ...(review ? { review } : {}) } : null
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
-    sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,
+    sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, stopReason: row.stopReason ?? null, group, issue,
       pullRequests,
       name: threadName(prompts.get(row.id) ?? '', row.agentName), summary: runSummaryText(row), steps: steps.get(row.id) ?? 0,
       createdAt: row.createdAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null }
@@ -796,7 +804,9 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
 /** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
 export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
   const reader = await chatReader(userId, botId)
-  const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, lastFailure: coordinatorSessions.lastFailure })
+  const sessionRead = db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt, lastFailure: coordinatorSessions.lastFailure,
+    // Read alongside the session so the context figure measures the same fold boundary the prompt uses.
+    summary: coordinatorSessions.summary, summaryThrough: coordinatorSessions.summaryThrough })
     .from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1).as('chat_session')
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
   const messagesRead = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage.as('message'), createdAt: coordinatorMessages.createdAt })
@@ -814,7 +824,8 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
   // Claiming an inbox atomically changes all three tables. A session read from
   // before that commit with messages/inbox from after it invents a failed turn.
   // One bounded statement keeps their snapshot together without a held lock.
-  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, lastFailure: sessionRead.lastFailure, rows: storedRead.rows,
+  const [snapshot] = await db.select({ leaseHolder: sessionRead.leaseHolder, leaseUntil: sessionRead.leaseUntil, lastError: sessionRead.lastError, lastErrorAt: sessionRead.lastErrorAt, lastFailure: sessionRead.lastFailure,
+    summary: sessionRead.summary, summaryThrough: sessionRead.summaryThrough, rows: storedRead.rows,
     waiting: sql<WaitingRow[]>`coalesce((select jsonb_agg(to_jsonb(${sql.identifier('chat_waiting')}) order by ${waitingRead.createdAt}) from ${waitingRead}), '[]'::jsonb)`,
   }).from(storedRead).leftJoin(sessionRead, sql`true`)
   const session = { leaseHolder: snapshot.leaseHolder, leaseUntil: snapshot.leaseUntil, lastError: snapshot.lastError, lastErrorAt: snapshot.lastErrorAt, lastFailure: snapshot.lastFailure }
@@ -847,6 +858,12 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
     artifacts: await artifactSummaries(reader, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
     continuation: { after, prefix: await chatPrefix(userId, botId, after), cursor: last },
     ...(hasMore && rows[0] ? { historyBefore: rows[0].position } : {}),
+    // How full this conversation is, in the same estimate the fold uses. Measured
+    // over the turns after the last fold, which is what the next prompt carries.
+    context: conversationUsage(
+      typeof snapshot.summary === 'string' ? snapshot.summary : null,
+      rows.filter(row => row.position > (snapshot.summaryThrough ?? 0)).map(row => ({ position: row.position, message: row.message as unknown as ModelMessage })),
+    ),
   }
   return { chat, ...chatReadObservation(session, waiting, now) }
 }

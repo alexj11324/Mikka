@@ -195,11 +195,12 @@ const handler = createMcpHandler(instance => {
 
   const issueChanges = {
     workspaceId: id.optional().describe('Workspace selected for this request; must match any token workspace.'),
+    confirmAccess: z.boolean().optional().describe('Only to replay a call that returned error accessChangeConfirmationRequired: the call would change who can read the task, and this confirms it. Nothing is written without it.'),
     status: z.enum(ISSUE_STATUS_CODES).optional(),
     priority: z.enum(ISSUE_PRIORITY_CODES).optional(),
     projectId: id.nullable().optional().describe('A project id from list_projects; null takes the issue out of its project.'),
     labels: z.array(z.string().trim().min(1).max(40)).max(12).optional().describe('The full set of label names; a known name keeps its color.'),
-    assigneeAgentId: id.nullable().optional().describe('An agent id from list_agents; null unassigns.'),
+    assigneeAgentId: id.nullable().optional().describe('Legacy field for the Agent Delegate only: use an agent id from list_agents. Null clears the delegate and preserves the human assignee.'),
   }
 
   server.registerTool('create_issue', {

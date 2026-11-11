@@ -2,13 +2,24 @@
 // workspace, how failures become codes, and the current-workspace cookie.
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
+import type { SQL } from 'drizzle-orm'
+import { PgDialect } from 'drizzle-orm/pg-core'
+import { teams } from '../lib/db/team-schema'
+import { tokenWorkspace } from '../lib/tokens/principal'
 
 class WorkspaceError extends Error { constructor(readonly code: string) { super(code) } }
 const calls: Array<[string, ...unknown[]]> = []
+const workspaceContextCalls: Array<string | undefined> = []
 const auditContext = { ip: null, geoCity: null, geoCountry: null, geoRegion: null }
 const cookieJar = new Map<string, string>()
 let failure: Error | null = null
 const actor = { userId: 'admin-1', email: 'a@example.invalid', name: 'A', workspaceId: '11111111-1111-4111-8111-111111111111', role: 'admin' as const }
+const teamId = '44444444-4444-4444-8444-444444444444'
+const auditId = '55555555-5555-4555-8555-555555555555'
+const emptyTeamImpact = { teamId, name: 'Platform', tasks: 0, projects: 0, runs: 0, pullRequests: 0, archivedAt: null, canDelete: true, recovery: 'restore_archive' as const }
+const dialect = new PgDialect()
+let teamExists = true
+let tokenWorkspaceId: string | undefined
 const respond = <T>(name: string, value: T) => async (...args: unknown[]) => {
   calls.push([name, ...args])
   if (failure) throw failure
@@ -26,10 +37,30 @@ before(async () => {
     cookies: async () => ({ set: (name: string, value: string) => cookieJar.set(name, value), delete: (name: string) => cookieJar.delete(name), get: (name: string) => cookieJar.has(name) ? { value: cookieJar.get(name) } : undefined }),
     headers: async () => new Headers(),
   } })
-  mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, requireWorkspace: async () => { throw new Error('unexpected') }, loadWorkspaceContext: async () => ({ workspace: { id: actor.workspaceId } }) } })
+  mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, requireWorkspace: async () => { throw new Error('unexpected') }, loadWorkspaceContext: async (workspaceId?: string) => { workspaceContextCalls.push(workspaceId); return { workspace: { id: workspaceId ?? actor.workspaceId } } } } })
+  mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { listOwnerBots: async (ownerId: string, workspaceId: string) => { calls.push(['listOwnerBots', ownerId, workspaceId]); return [{ id: 'bot-in-shown-workspace', name: 'Bot', color: 'encre', shape: 'cercle', coordinator: true }] } } })
   mock.module('@/lib/workspace-admin/current', { namedExports: { currentWorkspaceActor: async (workspaceId?: string) => { calls.push(['currentWorkspaceActor', workspaceId]); return workspaceId ? { ...actor, workspaceId } : actor } } })
   mock.module('@/lib/audit/record', { namedExports: { auditRequestContext: () => ({ ip: null, geoCity: null, geoCountry: null, geoRegion: null }) } })
-  mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name }) } })
+  mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name, [tokenWorkspace]: tokenWorkspaceId }) } })
+  mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: {
+    select: (fields: Record<string, unknown>) => {
+      assert.deepEqual(Object.keys(fields), ['workspaceId'])
+      assert.equal(fields.workspaceId, teams.workspaceId)
+      return { from: (table: unknown) => {
+        assert.equal(table, teams)
+        return { where: (condition: SQL) => {
+          const query = dialect.sqlToQuery(condition)
+          assert.equal(query.sql, '"mikka_teams"."id" = $1')
+          assert.deepEqual(query.params, [teamId])
+          return { limit: async (count: number) => {
+            assert.equal(count, 1)
+            calls.push(['teamWorkspace', teamId])
+            return teamExists ? [{ workspaceId: actor.workspaceId }] : []
+          } }
+        } }
+      } }
+    },
+  } } })
   mock.module('@/lib/workspace-admin/general', { namedExports: {
     updateWorkspaceGeneral: respond('updateWorkspaceGeneral', { id: actor.workspaceId, name: 'New', slug: 'new', icon: null }),
     readWorkspaceGeneral: async (...args: unknown[]) => { calls.push(['readWorkspaceGeneral', ...args]); return { id: args[1], name: 'Old', slug: 'old', icon: null, canEdit: true, canTransfer: true, personal: false } },
@@ -40,8 +71,13 @@ before(async () => {
   } })
   mock.module('@/lib/workspace-admin/members', { namedExports: { removeMember: respond('removeMember', { removed: true, transferred: { bots: 2 }, label: 'Mia' }), transferOnSuspend: respond('transferOnSuspend', { bots: 0 }), releaseDepartingMember: respond('releaseDepartingMember', undefined), restoreReturningMember: respond('restoreReturningMember', undefined), archivedBots: respond('archivedBots', []), takeOverBot: respond('takeOverBot', { bots: 1 }) } })
   mock.module('@/lib/workspace-admin/teams', { namedExports: {
-    teamDeletionImpact: respond('teamDeletionImpact', { teamId: 't', name: 'Platform', tasks: 42, projects: 5 }),
-    deleteTeamData: respond('deleteTeamData', { deleted: { tasks: 42, projects: 5 } }),
+    teamDeletionImpact: respond('teamDeletionImpact', emptyTeamImpact),
+    deleteTeamData: respond('deleteTeamData', { deleted: { tasks: 0, projects: 0 }, auditId }),
+    archiveTeamData: () => assert.fail('unexpected archive'),
+    restoreTeamData: () => assert.fail('unexpected restore'),
+    removeTeamGroupingData: () => assert.fail('unexpected grouping removal'),
+    readTeamLifecycleAudit: () => assert.fail('unexpected lifecycle audit read'),
+    teamLifecycleImpact: () => assert.fail('unexpected lifecycle impact read'),
   } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name }, session: { id: 'workspace-fixture-session' } }) } } } })
   mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } }, db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
@@ -60,7 +96,7 @@ before(async () => {
   teamActions = await import('../app/actions/teams')
 })
 
-function reset() { calls.length = 0; cookieJar.clear(); failure = null }
+function reset() { calls.length = 0; workspaceContextCalls.length = 0; cookieJar.clear(); failure = null; teamExists = true; tokenWorkspaceId = undefined }
 const relevant = () => calls.filter(([name]) => name !== 'currentWorkspaceActor')
 
 test('updateWorkspace delegates the real slug change and audit context to one backend transaction', async () => {
@@ -119,13 +155,38 @@ test('removeWorkspaceMember passes the optional new owner', async () => {
   assert.equal((await actions.removeWorkspaceMember(actor.userId)).error, 'workspaceCannotRemoveSelf')
 })
 
-test('getTeamDeletionImpact and deleteTeam', async () => {
+test('getTeamDeletionImpact and deleteTeam resolve the canonical workspace before an empty-team deletion', async () => {
   reset()
-  assert.deepEqual(await teamActions.getTeamDeletionImpact('t'), { teamId: 't', name: 'Platform', tasks: 42, projects: 5 })
-  assert.deepEqual(await teamActions.deleteTeam('t', 'Platform'), { deleted: { tasks: 42, projects: 5 } })
-  assert.deepEqual(relevant(), [['teamDeletionImpact', actor.userId, 't'], ['deleteTeamData', actor.userId, 't', 'Platform']])
+  tokenWorkspaceId = actor.workspaceId
+  assert.deepEqual(await teamActions.getTeamDeletionImpact(teamId), emptyTeamImpact)
+  assert.deepEqual(await teamActions.deleteTeam(teamId, 'Platform'), { deleted: { tasks: 0, projects: 0 }, auditId })
+  assert.deepEqual(relevant(), [['teamWorkspace', teamId], ['teamDeletionImpact', actor.userId, teamId], ['teamWorkspace', teamId], ['deleteTeamData', actor.userId, teamId, 'Platform']])
   failure = new WorkspaceError('teamDeleteNameMismatch')
-  assert.equal((await teamActions.deleteTeam('t', 'x')).error, 'teamDeleteNameMismatch')
+  assert.equal((await teamActions.deleteTeam(teamId, 'x')).error, 'teamDeleteNameMismatch')
+})
+
+test('deleteTeam preserves the backend refusal for a referenced team without falling back to another lifecycle operation', async () => {
+  reset()
+  failure = new WorkspaceError('teamDeleteReferenced')
+  assert.deepEqual(await teamActions.deleteTeam(teamId, 'Platform'), { error: 'teamDeleteReferenced', params: undefined })
+  assert.deepEqual(relevant(), [['teamWorkspace', teamId], ['deleteTeamData', actor.userId, teamId, 'Platform']])
+})
+
+test('team lifecycle actions refuse invalid or missing teams before invoking the backend', async () => {
+  reset()
+  assert.equal((await teamActions.getTeamDeletionImpact('t')).error, 'validationGeneric')
+  assert.deepEqual(relevant(), [])
+  teamExists = false
+  assert.equal((await teamActions.deleteTeam(teamId, 'Platform')).error, 'teamNotFound')
+  assert.deepEqual(relevant(), [['teamWorkspace', teamId]])
+})
+
+test('team lifecycle actions refuse a PAT bound to a different workspace before invoking the backend', async () => {
+  reset()
+  tokenWorkspaceId = '33333333-3333-4333-8333-333333333333'
+  assert.equal((await teamActions.getTeamDeletionImpact(teamId)).error, 'workspaceAccessDenied')
+  assert.equal((await teamActions.deleteTeam(teamId, 'Platform')).error, 'workspaceAccessDenied')
+  assert.deepEqual(relevant(), [['teamWorkspace', teamId], ['teamWorkspace', teamId]])
 })
 
 test('createBot uses the workspace defaults only for omitted fields', async () => {
@@ -151,6 +212,14 @@ test('createBot refuses a repository the workspace has not installed', async () 
   await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', repository: 'other/secret' }), /botDefaultRepositoryUnavailable/)
   assert.equal(inserted.length, 1)
   assert.deepEqual(calls.filter(call => call[0] === 'repositoryAvailable').map(call => call[2]), ['acme/app', 'other/secret'])
+})
+
+test('the Bot list for a shown workspace is read from that workspace, not the session active one', async () => {
+  reset()
+  const shown = '33333333-3333-4333-8333-333333333333'
+  assert.deepEqual(await botActions.listBotsForWorkspace(shown), [{ id: 'bot-in-shown-workspace', name: 'Bot', color: 'encre', shape: 'cercle', coordinator: true }])
+  assert.deepEqual(workspaceContextCalls, [shown])
+  assert.deepEqual(relevant(), [['listOwnerBots', actor.userId, shown]])
 })
 
 test('bot defaults and workspace bot list actions', async () => {

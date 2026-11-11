@@ -23,7 +23,9 @@ test('every SWR hook gets the site defaults: focus behind the freshness gate, po
   assert.match(defaults, /focusThrottleInterval: FRESH_FOR_MS/)
   assert.match(defaults, /refreshWhenHidden: false/)
   assert.match(defaults, /FRESH_FOR_MS = 60_000/)
-  assert.match(readFileSync('app/[locale]/layout.tsx', 'utf8'), /<SWRDefaults>\{children\}<\/SWRDefaults>/)
+  // Both runtimes mount the same application shell; the web app renders
+  // apps/frontend/src/index.tsx through it too.
+  assert.match(readFileSync('apps/desktop/src/renderer/app.tsx', 'utf8'), /<SWRDefaults><RendererBoundary><SessionApplication \/><\/RendererBoundary><\/SWRDefaults>/)
 })
 
 test('third-party status files exist and turn focus off', () => {

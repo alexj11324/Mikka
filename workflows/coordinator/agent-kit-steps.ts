@@ -68,6 +68,30 @@ export async function loadAgentSkill(userId: string, botId: string, executionId:
   const skill = execution.snapshot.definition.skills.find(item => item.id === skillId)
   return skill ? { id:skill.id,name:skill.name,body:skill.body,definitionVersion:execution.snapshot.revision,definitionDigest:execution.snapshot.definitionDigest } : { error:'skillNotAssigned' }
 }
+/**
+ * One personally installed skill's body, for `read_personal_skill` (ALE-75).
+ *
+ * Not `loadAgentSkill`: that reads `execution.snapshot.definition.skills`, the
+ * agent-kit definition, which is empty for everyone who only installed skills
+ * in the personal plugin store. This reads `personal_skills` through the same
+ * store the prompt's section is built from, so the list the model sees and the
+ * body it fetches come from one source.
+ *
+ * The execution is still required and still checked: the tool is only granted
+ * to a running execution, so a fetch belongs to a live round and a closed one
+ * must not serve a body. It does not gate on the snapshot's skill list, which
+ * would deny exactly the skills this tool exists to serve.
+ */
+export async function readPersonalSkill(userId: string, botId: string, executionId: string | undefined, skillId: string, nativeScope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,nativeScope)
+  if (!executionId) return { error:'noSkillsInstalled' }
+  const execution = await agentKitStore.readExecution(await agentScope(userId,botId),executionId)
+  if (execution.status !== 'running') return { error:'agentExecutionClosed' }
+  const { personalPlugins } = await import('@/lib/plugins/runtime')
+  const skill = await personalPlugins.readSkillBody(userId, skillId)
+  return skill ? { id:skill.id,name:skill.name,body:skill.body } : { error:'skillNotInstalled' }
+}
 export async function finishAgentExecution(userId: string, botId: string, executionId: string | undefined, failure?: FailureCode) {
   'use step'
   if (!executionId) return

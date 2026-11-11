@@ -83,6 +83,21 @@ export class PersonalPluginStore {
   async deleteSkill(userId: string, id: string) {
     if (!(await this.pool.query('DELETE FROM personal_skills WHERE id=$1 AND user_id=$2', [id, userId])).rowCount) throw new PluginError('skillNotFound', 404)
   }
+  /**
+   * One enabled skill's body, for `read_personal_skill` (ALE-75).
+   *
+   * Read from the table rather than from the execution snapshot on purpose:
+   * the snapshot's skill list is frozen when the round begins, so it answers
+   * "which skills did this round start with". A fetch is a read of the
+   * person's current installation, and a skill they switched off mid-turn
+   * must not still hand its body over. `enabled=true` and the owner check in
+   * one statement, so a body is never served for another person's row.
+   */
+  async readSkillBody(userId: string, id: string): Promise<{ id: string; name: string; body: string } | null> {
+    const row = (await this.pool.query<{ id: string; name: string; body: string }>(
+      'SELECT id,name,body FROM personal_skills WHERE id=$1 AND user_id=$2 AND enabled=true', [id, userId])).rows[0]
+    return row ?? null
+  }
   async snapshot(userId: string, client: Pick<PoolClient, 'query'> = this.pool, workspaceId?: string | null): Promise<PersonalPluginSnapshot> {
     const mcpAuthority = workspaceId ? await new WorkspaceMcpStore(this.pool, this.membership).freeze(userId, workspaceId, client) : undefined
     const servers = mcpAuthority ? mcpAuthority.servers.map(({ id, name, revision }) => ({ id, name, revision }))

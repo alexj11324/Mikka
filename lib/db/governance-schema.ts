@@ -104,7 +104,7 @@ export const organizationResourcePolicies = pgTable('mikka_organization_resource
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export type SharedResourceKind = 'subscription' | 'api_key' | 'mcp'
+export type SharedResourceKind = 'subscription' | 'api_key' | 'mcp' | 'skill'
 export const organizationResourceApprovals = pgTable('mikka_organization_resource_approvals', {
   id: uuid('id').primaryKey(),
   organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
