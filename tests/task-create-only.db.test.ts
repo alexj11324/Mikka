@@ -51,3 +51,59 @@ test('a create-only command has one durable Task receipt and no dispatch or infe
     await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[user, stranger]])
   }
 })
+
+test('an explicit automatic-destination dispatch is bound before execution and can recover one accepted receipt', { skip: !enabled }, async () => {
+  const { pool } = await import('../lib/db')
+  const { acceptEveMessage, commitEveIngress } = await import('../lib/eve/submission')
+  const { getDispatchedTaskReceipt, createTaskOnly } = await import('../app/actions/issues')
+  const user = 'task-dispatch-' + randomUUID()
+  await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,true,now(),now())', [user, user + '@example.invalid'])
+  try {
+    const { botId, workspaceId } = await seedCoordinator(user)
+    const scope = { ownerId: user, workspaceId, botId, surface: 'web' as const }
+    const requestId = randomUUID(), text = 'Create and dispatch: Check the release notes'
+    const args = { workspaceId, requestId, botId }
+    const context = { expectedWorkspaceId: workspaceId, taskCommand: { version: 1, intent: 'create_and_dispatch', description: 'Check the release notes' } }
+    const request = () => new Request('http://localhost/agent', { headers: { 'x-mikka-submission-id': requestId } })
+    const read = () => withActivitySession(user, () => getDispatchedTaskReceipt(args), workspaceId)
+    assert.equal(await read(), null)
+    const first = request(), second = request()
+    const [{ eventId }, replay] = await Promise.all([acceptEveMessage(scope, text, context, first), acceptEveMessage(scope, text, context, second)])
+    assert.equal(eventId, replay.eventId)
+    assert.equal(await read(), null, 'creation alone is not an accepted delivery')
+    await Promise.all([commitEveIngress(first), commitEveIngress(second)])
+    const receipt = await read()
+    assert.ok(receipt?.identifier && receipt.taskId)
+    assert.deepEqual(receipt.dispatch, { sourceEventId: eventId, botId })
+    assert.deepEqual((await pool.query('select title,content from issues where id=$1', [receipt.taskId])).rows[0].content.content,
+      [{ type: 'paragraph', content: [{ type: 'text', text: context.taskCommand.description }] }])
+    assert.equal((await pool.query('select count(*)::int n from coordinator_messages where "userId"=$1', [user])).rows[0].n, 1)
+    assert.equal((await pool.query('select count(*)::int n from issues where "userId"=$1', [user])).rows[0].n, 1)
+    assert.equal((await acceptEveMessage(scope, text, context, request())).eventId, eventId)
+    assert.deepEqual(await read(), receipt)
+    await assert.rejects(acceptEveMessage(scope, text + '!', context, request()), /submissionConflict/)
+    await assert.rejects(acceptEveMessage(scope, text, { ...context, expectedWorkspaceId: randomUUID() }, request()), /workspaceAccessDenied/)
+    const changed = await withActivitySession(user, () => createTaskOnly({ version: 1, intent: 'create_only', requestId, workspaceId,
+      title: 'Different intent', content: { type: 'doc' }, status: 'todo', priority: 'normal' }), workspaceId)
+    assert.equal(changed.error, 'submissionConflict')
+    const { actAs } = await import('../lib/acting-user')
+    const { tokenWorkspace } = await import('../lib/tokens/principal')
+    const tools = await import('../workflows/coordinator/steps')
+    const asOwner = <T,>(run: () => Promise<T>) => actAs({ id: user, [tokenWorkspace]: workspaceId }, run)
+    const regenerated = await asOwner(() => tools.createIssue(user, { title: 'Regenerated model title' }, randomUUID(), undefined, botId, eventId))
+    assert.equal('id' in regenerated && regenerated.id, receipt.taskId)
+    const route = { sourceEventId: eventId, title: 'Another generated title', body: 'Generated details', rationale: 'Explicit human command', needsSpec: false,
+      missingInformation: [], missingPermissions: [] }
+    const factory = await Promise.all([1, 2].map(() => asOwner(() => tools.intakeFactoryRequest(user, route, undefined, botId))))
+    for (const result of factory) assert.ok(result && !('error' in result), JSON.stringify(result))
+    assert.equal((await pool.query('select count(*)::int n from issues where "userId"=$1', [user])).rows[0].n, 1)
+    assert.deepEqual((await pool.query('select "issueId" from factory_tasks where "userId"=$1', [user])).rows, [{ issueId: receipt.taskId }])
+    await pool.query('delete from factory_tasks where "userId"=$1', [user])
+    // Deletion retains the command tombstone even if the owning user event cascades.
+    await pool.query('delete from issues where id=$1', [receipt.taskId])
+    assert.equal(await read(), null)
+    await assert.rejects(acceptEveMessage(scope, text, context, request()), /submissionConflict|issueNotFound/)
+  } finally {
+    await pool.query('delete from "user" where id=$1', [user])
+  }
+})

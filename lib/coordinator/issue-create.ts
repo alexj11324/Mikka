@@ -7,6 +7,8 @@ import { bots, coordinatorEvents, issues } from '@/lib/db/schema'
 import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
+import { dispatchTaskIntent } from '@/lib/task-create-command'
+import { withTaskCreationReceipt } from '@/lib/task-creation-receipt'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { compactTaskTitle } from '@/lib/short-title'
 import { withTaskWorkspace } from '@/lib/task-workspace'
@@ -40,16 +42,22 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
     }
     // A title the person typed in the task form wins over the model's: it is stored on the user's own event.
     const typed = taskTitleInputSchema.safeParse(event.payload.taskTitle)
-    const issue = await createIssueForUserInTransaction(tx, userId, {
-      title: typed.success ? typed.data : parsed.data.title,
-      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: event.payload.text }] }] },
-      status: 'todo',
-      priority: 'normal',
-    }, systemActor('coordinator'), { workspaceId: source.workspaceId })
-    if (!issue) throw new FactoryError('factoryInvalid')
-    // Preserve the person's full title; its derived navigation label obeys the shared compact-title limit.
-    if (typed.success) await tx.update(issues).set({ shortTitle: compactTaskTitle({ title: typed.data }), shortTitleFrom: typed.data }).where(eq(issues.id, issue.id))
-    await tx.update(coordinatorEvents).set({ issueId: issue.id }).where(eq(coordinatorEvents.id, event.id))
-    return { issueId: issue.id, title: issue.title }
+    const command = dispatchTaskIntent.optional().parse(event.payload.taskCommand)
+    const title = typed.success ? typed.data : parsed.data.title
+    const create = async () => {
+      const issue = await createIssueForUserInTransaction(tx, userId, {
+        title,
+        content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: command?.description ?? event.payload.text as string }] }] },
+        status: 'todo', priority: 'normal',
+      }, systemActor('coordinator'), { workspaceId: source.workspaceId!, deriveShortTitle: !command })
+      if (!issue?.identifier) throw new FactoryError('factoryInvalid')
+      // Preserve the full title while deriving a compact navigation label locally.
+      if (typed.success || command) await tx.update(issues).set({ shortTitle: compactTaskTitle({ title }), shortTitleFrom: title }).where(eq(issues.id, issue.id))
+      return { taskId: issue.id, identifier: issue.identifier }
+    }
+    const receipt = command ? await withTaskCreationReceipt(tx, userId, source.workspaceId!,
+      z.uuid().parse(event.payload.taskCreationRequestId), { ...command, sourceEventId: event.id, botId: event.botId }, create) : await create()
+    await tx.update(coordinatorEvents).set({ issueId: receipt.taskId }).where(eq(coordinatorEvents.id, event.id))
+    return { issueId: receipt.taskId, title }
   }))
 }

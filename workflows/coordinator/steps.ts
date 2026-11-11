@@ -916,9 +916,12 @@ export async function intakeFactoryRequest(userId: string, input: import('@/lib/
     const { factoryForBot, factoryRequestSource } = await import('@/lib/factory/server')
     const { intakeRequest } = await import('@/lib/factory/intake')
     const store=factoryForBot(botId)
+    const [source] = await factoryRequestSource(userId, botId, input.sourceEventId)
     return intakeRequest(input, {
-      source:id=>factoryRequestSource(userId,botId,id),
-      create:async(body,key)=>(await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId),key),
+      source:async () => source,
+      create:async(body,key)=> source?.commandTaskId
+        ? { id: (await (await import('@/lib/coordinator/issue-create')).createIssueFromRequest(userId, { sourceEventId: input.sourceEventId, title: body.title })).issueId }
+        : (await import('@/lib/mcp/actions')).createIssue(userId,body,systemActor(botId),key),
       route:async route=>publicFactoryReceipt(await store.route(userId,route)),
     })
   })
