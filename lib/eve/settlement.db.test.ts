@@ -145,6 +145,54 @@ test('host settlement receipts preserve product publication across native RPC re
       assert.equal(rows[0].message.role,'user');assert.equal(rows[0].message.content,'Fast failed request')
       assert.equal(rows[0].message.mikkaFailure,'turn_failed');assert.equal(rows[1].message.role,'assistant')
     })
+    await t.test('user retry forwards current credentials, full original task payload and canonical request identity',async()=>{
+      const {retryEveTurn,eveRetrySubmission}=await import('./retry')
+      const {loadEveRetrySource,eveTaskRequestSource}=await import('./retry-source')
+      const {projectTurnState,projectEveTurn}=await import('./projection')
+      const {markEventAccepted,acceptEveMessage,commitEveIngress}=await import('./submission')
+      const {recordPersonalSubmission}=await import('../coordinator-submission')
+      const {db}=await import('../db')
+      const sessionId=await nativeSession(),text='Original task\n\nQuoted text and browser notes'
+      const images=[{dataUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='}]
+      const first=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:randomUUID(),images,taskDestination:{kind:'cloud'},profileId:'default',taskTitle:'Original task title',humanSessionId:'original-fixture-session'})
+      await markEventAccepted(scope,first.eventId)
+      await pool.query('INSERT INTO eve_turn_sources(session_id,turn_id,source_event_id)VALUES($1,$2,$3)',[sessionId,'turn_retry',first.eventId])
+      const events=[
+        {type:'turn.started',data:{turnId:'turn_retry',cause:{deliveryId:'delivery_retry'},follows:null},meta:{position:{line:0,index:0},at:'2026-11-11T00:00:00Z',endOfLine:true}},
+        {type:'turn.settled',data:{turnId:'turn_retry',outcome:'failed',error:{code:'turn_failed'}},meta:{position:{line:1,index:0},at:'2026-11-11T00:00:01Z',endOfLine:true}},
+      ]
+      const {emptySessionView,foldEvents}=await import('eve/events')
+      const view=foldEvents(emptySessionView(),events)
+      await projectTurnState(scope,sessionId,'turn_retry',true)
+      await finishEveTurn(scope,{sessionId,turnId:'turn_retry',outcome:'failed',messages:projectEveTurn(view,sessionId,'turn_retry','failed')})
+      const position=Number((await pool.query('SELECT position FROM coordinator_messages WHERE "userId"=$1 AND message#>>\'{mikkaUserEvent,id}\'=$2',[ownerId,first.eventId])).rows[0].position)
+      const source=await loadEveRetrySource(scope,position);assert.ok(source)
+      const sent:Array<ReturnType<typeof eveRetrySubmission>>=[]
+      const services:import('./retry').EveRetryServices={async open(actual,headers){
+        assert.deepEqual(actual,scope)
+        assert.deepEqual(headers,{cookie:'current-fixture=session',origin:'https://app.test','x-mikka-workspace-id':workspaceId})
+        return {id:sessionId,snapshot:async()=>({events:events as never,session:{sessionId,streamIndex:0}}),send:async(message,options)=>{sent.push({message,options} as ReturnType<typeof eveRetrySubmission>);return {} as never}}
+      }}
+      const credentials=new Headers({cookie:'current-fixture=session',origin:'https://app.test','x-mikka-workspace-id':workspaceId,'content-length':'999'})
+      assert.deepEqual(await retryEveTurn(ownerId,botId,credentials,services),{queued:true})
+      assert.deepEqual(await retryEveTurn(ownerId,botId,credentials,services),{queued:true})
+      assert.equal(sent.length,2);assert.deepEqual(sent[0],sent[1])
+      assert.deepEqual(sent[0],eveRetrySubmission(sessionId,'turn_retry',source))
+      const request=new Request('https://app.test/eve/v1/session/'+sessionId,{method:'POST',headers:sent[0].options.headers})
+      const accepted=await acceptEveMessage(scope,sent[0].message,sent[0].options.clientContext,request)
+      await commitEveIngress(request)
+      assert.ok(accepted.context.some(text=>text.includes('completed tool receipts')))
+      const payload=(await pool.query('SELECT payload FROM coordinator_events WHERE id=$1',[accepted.eventId])).rows[0].payload
+      assert.equal(payload.text,text);assert.equal(payload.profileId,'default');assert.equal(payload.taskTitle,'Original task title')
+      assert.deepEqual(payload.taskDestination,{kind:'cloud'});assert.equal(payload.images[0].dataUrl,images[0].dataUrl)
+      assert.equal(payload.humanSessionId,undefined,'original human session is never impersonated by the adapter')
+      assert.equal(await eveTaskRequestSource(scope,accepted.eventId,payload),first.eventId)
+      assert.notEqual(accepted.eventId,first.eventId,'a resend has fresh immutable user provenance and retains its original task intent')
+      const repeated=new Request(request.url,{method:'POST',headers:sent[0].options.headers})
+      assert.equal((await acceptEveMessage(scope,sent[0].message,sent[0].options.clientContext,repeated)).eventId,accepted.eventId)
+      await commitEveIngress(repeated)
+      assert.equal((await pool.query('SELECT count(*)::int count FROM coordinator_events WHERE "userId"=$1 AND payload->>\'taskRequestSourceEventId\'=$2',[ownerId,first.eventId])).rows[0].count,1)
+    })
   } finally {
     await pool.query('DELETE FROM user_schedules WHERE id=ANY($1::uuid[])',[scheduleIds])
     await pool.query('DELETE FROM bots WHERE id=$1',[botId])

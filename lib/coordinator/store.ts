@@ -123,44 +123,6 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
 }
 
 /**
- * Appends the turn's new messages and renews the lease. `warning` says why the
- * reply may be cut short; it shows in the chat until a turn ends cleanly.
- */
-/** The kind of host event the last stored message records (lib/coordinator/message-safety.ts), or null. */
-/**
- * 重试 on a failed reply: runs the same turn again over the conversation as it
- * stands, so the person's message is not sent twice. The event never becomes a
- * chat message, and one failure can be retried once; a new failure can be
- * retried again. A turn that ended with no reply and no recorded error (its
- * lease ran out) counts as failed too. False when nothing failed or a turn is
- * already running.
- */
-export async function retryFailedTurn(userId: string, botId: string): Promise<boolean> {
-  return db.transaction(async tx => {
-    await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
-    const [session] = await tx.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
-    if (!session || coordinatorLeaseActive(session)) return false
-    // A recorded failure, or a turn that ended with neither a reply nor an error (its lease ran out):
-    // the person's message is the newest one, so nothing answered it.
-    let failure = session.lastError && session.lastErrorAt ? session.lastErrorAt.toISOString() : null
-    if (!failure) {
-      const [last] = await tx.select({ position: coordinatorMessages.position, role: sql<string>`${coordinatorMessages.message}->>'role'` })
-        .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(1)
-      const waiting = await tx.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt))).limit(1)
-      if (last?.role === 'user' && !waiting.length) failure = `unanswered:${last.position}`
-    }
-    if (!failure) return false
-    const inserted = await tx.insert(coordinatorEvents).values({
-      id: crypto.randomUUID(), userId, botId, kind: 'user_message', issueId: null, runId: null,
-      dedupeKey: `turn_retry:${userId}:${botId}:${failure}`,
-      payload: { text: '', postedToChat: true, retry: true },
-    }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
-    if (inserted.length) await botChatChanged(tx, userId, botId)
-    return inserted.length === 1
-  })
-}
-
-/**
  * 重新发送 on a failed message: marks it retried (`mikkaRetried`) and sends its
  * text again in one transaction, so the chat and the model's history keep only
  * the new attempt. The mark is set only on this person's own user message in

@@ -93,7 +93,7 @@ const defaultServices: EveProductGatewayServices = {
         WHERE t.session_id=$1 AND t.turn_id=$2`, [input.sessionId, input.turnId, scope.ownerId, scope.botId])).rows[0]
       if (source && !source.id) throw new Error('notFound')
       const sourceEventId = source?.source_event_id
-      const taskEventId = source && (source.payload.taskDestination || source.payload.profileId || source.payload.taskTitle) ? source.source_event_id : undefined
+      const taskEventId = source ? await (await import('./retry-source')).eveTaskRequestSource(scope,source.source_event_id,source.payload) : undefined
       const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope, sourceEventId) : null
       if (input.operation === 'instructions') {
         if (scheduledRead) return { instructions: `This is a scheduled read-only task. Use only its allowed read tools, perform no writes and request no approval.\n${scheduledRead.prompt}` }
