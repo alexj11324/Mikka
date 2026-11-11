@@ -1,0 +1,33 @@
+# Use managed PostgreSQL (Neon recommended) rather than the bundled postgres service.
+# Run: docker compose -f docker-compose.neon.yml up -d --wait
+# See docs/self-hosting.md#managed-postgresql-neon-recommended.
+# Keep the two real connection URIs only in a private .env file.
+services:
+  app:
+    image: ${MIKKA_IMAGE:-ghcr.io/alexj11324/mikka:latest}
+    restart: unless-stopped
+    init: true
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "127.0.0.1:${MIKKA_PORT:-3000}:3000"
+    environment:
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      # Transaction-pooled SQL traffic. Workspace and app schemas share the
+      # same database, matching the bundled PostgreSQL Compose configuration.
+      MIKKA_DATABASE_URL: ${MIKKA_DATABASE_URL:?Set MIKKA_DATABASE_URL to the PostgreSQL pooled URI in .env}
+      DATABASE_URL: ${MIKKA_DATABASE_URL:?Set MIKKA_DATABASE_URL to the PostgreSQL pooled URI in .env}
+      # Dedicated session-based LISTEN/advisory locks MUST bypass the pooler.
+      MIKKA_DATABASE_URL_UNPOOLED: ${MIKKA_DATABASE_URL_UNPOOLED:?Set MIKKA_DATABASE_URL_UNPOOLED to the PostgreSQL direct URI in .env}
+      MIKKA_EMAIL_FROM: ${MIKKA_EMAIL_FROM:-}
+      SMTP_URL: ${SMTP_URL:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MIKKA_DEFAULT_MODEL_BASE_URL: ${MIKKA_DEFAULT_MODEL_BASE_URL:-}
+      MIKKA_DEFAULT_MODEL_API_KEY: ${MIKKA_DEFAULT_MODEL_API_KEY:-}
+      MIKKA_DEFAULT_MODEL_ID: ${MIKKA_DEFAULT_MODEL_ID:-}
+    volumes:
+      - app-data:/data
+    stop_grace_period: 60s
+volumes:
+  app-data:
