@@ -64,12 +64,19 @@ export async function getArtifactObjectStream(key: string, signal: AbortSignal):
   return response.body
 }
 
+export class ObjectStorageReadError extends Error {
+  constructor(readonly code: number) {
+    super(`Object storage get failed: ${code}`)
+    this.name = 'ObjectStorageReadError'
+  }
+}
+
 /** The object's bytes, for binary files such as run captures. */
 export async function getArtifactObjectBytes(key: string): Promise<Uint8Array<ArrayBuffer>> {
   const config = objectStorageConfig()
   if (!config) throw new Error('Object storage is not configured')
   const response = await config.client.fetch(objectUrl(config, key), { redirect: 'error' })
-  if (!response.ok) throw new Error(`Object storage get failed: ${response.status}`)
+  if (!response.ok) throw new ObjectStorageReadError(response.status)
   return new Uint8Array(await response.arrayBuffer())
 }
 
