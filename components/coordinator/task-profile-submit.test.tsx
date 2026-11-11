@@ -20,8 +20,15 @@ mock.module(new URL('../ui/select.tsx', import.meta.url).href, { namedExports: {
   },
   SelectContent: Wrap, SelectGroup: Wrap, SelectLabel: Wrap, SelectSeparator: () => null, SelectTrigger: Wrap, SelectValue: () => null,
 } })
-mock.module(new URL('../ui/dialog.tsx', import.meta.url).href, { namedExports: {
-  Dialog: Wrap, DialogContent: Wrap, DialogTitle: Wrap, DialogDescription: Wrap,
+// Check the controller's inputs and callbacks without requiring the private renderer.
+mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExports: {
+  NewTask: (props: import('../slots/new-task-contract').NewTaskProps) => <>
+    <input id="new-task-name" value={props.title} maxLength={props.titleMax} onChange={event => props.onTitle(event.target.value)} />
+    {props.notices}
+    {props.intent !== 'create_only' && props.profile.choices.map(choice => <Button key={choice.value} data-option={choice.value}
+      disabled={choice.disabled || props.profile.disabled} onClick={() => props.profile.onChange(choice.value)}>{choice.label}</Button>)}
+    <Button aria-keyshortcuts="Control+Enter Meta+Enter" disabled={!props.canSubmit || props.sending} onClick={props.onSubmit}>Shell.newTaskDialog.create</Button>
+  </>,
 } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 
@@ -51,7 +58,6 @@ mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { name
   }, failureMessage: () => null }),
 } })
 mock.module(new URL('../../hooks/use-computer.ts', import.meta.url).href, { namedExports: { useComputer: () => ({ data: undefined }) } })
-mock.module(new URL('../../hooks/use-focus-return.ts', import.meta.url).href, { namedExports: { useOpenerFocus: () => undefined } })
 mock.module(new URL('../../lib/settings-read.ts', import.meta.url).href, { namedExports: { settingsRead: async () => undefined } })
 mock.module(new URL('../../lib/use-presence.ts', import.meta.url).href, { namedExports: { usePresence: () => ({ value: false, open: false, onOpenChangeComplete: () => {} }) } })
 mock.module(new URL('../settings/e2b-key-dialog.tsx', import.meta.url).href, { namedExports: {
@@ -189,10 +195,6 @@ const typeTitle = async (value: string) => act(async () => {
   Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')!.set!.call(input, value)
   input.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
 })
-const press = async (init: { metaKey?: boolean }) => act(async () => {
-  titleInput().dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init }) as unknown as Event)
-})
-
 test('a written title is sent as taskTitle beside the description', async () => {
   await render(dialog())
   assert.equal(titleInput().maxLength, 60)
@@ -220,17 +222,6 @@ test('a title alone enables submit and becomes the request text', async () => {
   assert.equal(submitted.length, 1)
   assert.equal(submitted[0].text, 'Shell.newTaskDialog.prompt', 'the request text is built from the title')
   assert.equal(submitted[0].context?.taskTitle, 'Only a title')
-})
-
-test('Enter in the title moves focus to the description; Ctrl or Cmd+Enter submits', async () => {
-  await render(dialog())
-  await typeTitle('Named task')
-  await press({})
-  assert.equal(submitted.length, 0)
-  assert.equal(browser.document.activeElement?.id, 'new-issue-title')
-  await press({ metaKey: true })
-  assert.equal(submitted.length, 1)
-  assert.equal(submitted[0].context?.taskTitle, 'Named task')
 })
 
 test('manual creation survives uncertain results, bypasses dispatch settings, and opens the returned Task', async () => {
