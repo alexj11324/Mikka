@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 /** Host-only upgrade controller. Never mount the Docker socket in the Mikka app.
  * No timer, registry polling, remote command execution, or destructive DB rollback. */
-import { spawn, execFileSync } from 'node:child_process'
-import { openSync, closeSync, unlinkSync, mkdirSync, readFileSync, writeFileSync, renameSync, statSync, statfsSync, lstatSync, realpathSync } from 'node:fs'
-import { createWriteStream } from 'node:fs'
-import { pipeline } from 'node:stream/promises'
+import { execFileSync } from 'node:child_process'
+import { openSync, closeSync, fsyncSync, unlinkSync, mkdirSync, readFileSync, writeFileSync, renameSync, statSync, statfsSync, lstatSync, realpathSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
@@ -81,19 +79,38 @@ function saveAtomic(path, contents) {
   writeFileSync(temporary, contents, { mode: 0o600, flag: 'wx' })
   renameSync(temporary, path)
 }
-async function dumpLocalPostgres(destination) {
-  const output = createWriteStream(destination, { mode: 0o600, flags: 'wx' })
-  const process = spawn('docker', ['compose', '--project-directory', root, '-f', composeFile, 'exec', '-T', 'postgres', 'pg_dumpall', '-U', 'mikka'], {
-    cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe']
-  })
-  let error = ''
-  process.stderr.on('data', chunk => { error += chunk.toString().slice(0, 100) })
-  const completed = new Promise((accept, reject) => {
-    process.on('error', reject)
-    process.on('close', code => code === 0 ? accept() : reject(new Error('SELF_HOSTED_UPDATE_DATABASE_BACKUP_FAILED')))
-  })
-  await Promise.all([pipeline(process.stdout, output), completed])
-  if (statSync(destination).size < 256) fail('SELF_HOSTED_UPDATE_DATABASE_BACKUP_EMPTY')
+// Retain only a completely restored archive. The verification database is
+// created by this invocation on the bundled server and never serves traffic.
+function dumpLocalPostgres(directory) {
+  const archive = join(directory, 'postgres.dump')
+  const staging = archive + '.partial'
+  const verifyDatabase = 'mikka_verify_' + randomUUID().replaceAll('-', '')
+  const postgres = ['compose', '--project-directory', root, '-f', composeFile, 'exec', '-T', 'postgres']
+  const output = openSync(staging, 'wx', 0o600)
+  try {
+    try {
+      execFileSync('docker', [...postgres, 'pg_dump', '-U', 'mikka', '-Fc', '-d', 'mikka'], {
+        cwd: root, stdio: ['ignore', output, 'pipe']
+      })
+      fsyncSync(output)
+    } finally { closeSync(output) }
+    docker([...postgres, 'createdb', '-U', 'mikka', '-T', 'template0', verifyDatabase])
+    try {
+      const input = openSync(staging, 'r')
+      try {
+        execFileSync('docker', [...postgres, 'pg_restore', '-U', 'mikka', '--exit-on-error', '--single-transaction', '-d', verifyDatabase], {
+          cwd: root, stdio: [input, 'ignore', 'pipe']
+        })
+      } finally { closeSync(input) }
+    } finally {
+      docker([...postgres, 'dropdb', '-U', 'mikka', verifyDatabase])
+    }
+    renameSync(staging, archive)
+    return archive
+  } catch (cause) {
+    unlinkSync(staging)
+    throw new Error('SELF_HOSTED_UPDATE_DATABASE_BACKUP_FAILED', { cause })
+  }
 }
 function restoreOldApp(envText, oldImage) {
   saveAtomic(environmentFile, envText)
@@ -152,7 +169,7 @@ async function performUpgrade(release, opts) {
     mkdirSync(backupDirectory, { mode: 0o700 })
     const originalEnvironment = statSync(environmentFile, { throwIfNoEntry: false }) ? readFileSync(environmentFile, 'utf8') : ''
     saveAtomic(join(backupDirectory, 'env.original'), originalEnvironment)
-    if (localDatabase) await dumpLocalPostgres(join(backupDirectory, 'postgres.sql'))
+    if (localDatabase) dumpLocalPostgres(backupDirectory)
     else runHook('MIKKA_EXTERNAL_DB_BACKUP_HOOK', backupDirectory)
     // Closing traffic and proving no active task are operator-supplied gates.
     // Stop before copying app-data so the snapshot is not racing its writer.
@@ -198,6 +215,13 @@ async function performUpgrade(release, opts) {
 
 async function main() {
   const [command, tag, ...flags] = process.argv.slice(2)
+  if (command === 'backup' && !tag) {
+    if (!config().localDatabase) fail('SELF_HOSTED_UPDATE_LOCAL_BACKUP_REQUIRED')
+    mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
+    const directory = join(stateDirectory, 'backup-' + randomUUID())
+    mkdirSync(directory, { mode: 0o700 })
+    return { status: 'restore-verified', archive: dumpLocalPostgres(directory) }
+  }
   if (!['check', 'apply'].includes(command) || !tag || !STABLE_TAG.test(tag)) fail('SELF_HOSTED_UPDATE_USAGE')
   const opts = { auto: flags.includes('--auto'), ackIdle: flags.includes('--ack-idle'), allowMigrations: flags.includes('--allow-migrations') }
   if (flags.some(x => !['--auto', '--ack-idle', '--allow-migrations'].includes(x)) || (opts.auto && (opts.ackIdle || opts.allowMigrations))) fail('SELF_HOSTED_UPDATE_USAGE')
@@ -213,4 +237,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exitCode = 1
   }
 }
-export { replaceImage, performUpgrade, imageMigrations, hashProgram }
+export { githubRelease, replaceImage, performUpgrade, imageMigrations, hashProgram }

@@ -3,7 +3,7 @@
  * Operator must have an authenticated upstream event delivery mechanism.
  * Binds loopback; terminate TLS at a reverse proxy. No registry polling. */
 import { createServer } from 'node:http'
-import { mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
+import { mkdirSync, writeFileSync, renameSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { resolve, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
