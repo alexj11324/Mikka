@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { verifyConfiguration, verifyImage } from '../../../cloudflare/api/start.mjs'
+import { createHash } from 'node:crypto'
+import { verifyBusinessWorld, verifyConfiguration, verifyImage } from '../../../cloudflare/api/start.mjs'
 
 const build = 'a'.repeat(40), overlay = 'b'.repeat(40), id = 'aaaaaaaaaaaa-1949-1'
 const env = {
@@ -57,6 +58,7 @@ test('ingress binds only the immutable account image with a private route and a 
   assert.equal(config.preview_urls, false)
   assert.equal(config.containers[0].max_instances, 1)
   assert.equal(config.containers[0].image, input.image)
+  assert.equal(config.vars.MIKKA_DEPLOYMENT_ID, input.release)
   for (const changed of [{ release: 'main' }, { image: input.image.split('@')[0] + ':latest' }, { origin: 'https://user@app.example' }]) {
     assert.throws(() => ingressConfig({ ...input, ...changed }))
   }
@@ -128,4 +130,130 @@ test('the task process handshake requires the private host capability, binding a
   assert.equal((await send(url + '?run=x', { headers })).status, 404)
   assert.equal((await send(url.replace('task-machine.internal', 'another.internal'), { headers })).status, 404)
   assert.equal((await send(url, { headers }, {})).status, 503)
+})
+
+test('the private API receives its sign-in and product bindings without inheriting deployment or broker authority', async () => {
+  const { applicationEnvironment } = await import('../../../cloudflare/api/ingress/environment.mjs')
+  const origin = 'https://app.example'
+  const allowed = {
+    GOOGLE_CLIENT_ID: 'google', GOOGLE_CLIENT_SECRET: 'google-credential',
+    GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential',
+    BETTER_AUTH_SECRET: 'auth', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
+    MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
+    OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
+  }
+  const unexpected = {
+    GITHUB_APP_PRIVATE_KEY: 'app-signing', AWS_ACCESS_KEY_ID: 'aws', AWS_SECRET_ACCESS_KEY: 'aws-secret',
+    CREDENTIAL_BROKER_ROLE_ARN: 'broker', EVE_QUEUE_SIGNING_KEY: 'world-signing',
+    INFISICAL_CLIENT_SECRET: 'deploy', CLOUDFLARE_API_TOKEN: 'deploy', VERCEL_OIDC_TOKEN: 'legacy',
+    NODE_OPTIONS: '--inspect', BETTER_AUTH_URL: 'https://incorrect.example', MIKKA_API_INGRESS: 'other',
+    STRIPE_WEBHOOK_SECRET: {}, SMTP_URL: '', TASK_MACHINE: { destroy() {} },
+  }
+  assert.deepEqual(applicationEnvironment({ PUBLIC_ORIGIN: origin, ...allowed, ...unexpected }), {
+    BETTER_AUTH_URL: origin, MIKKA_API_INGRESS: 'cloudflare', ...allowed,
+  })
+})
+
+test('private World calls require the instance capability and forward only WDK payload and media headers', async () => {
+  const { businessWorldRequest } = await import('../../../cloudflare/api/ingress/services.mjs')
+  const token = 'instance-token'
+  const calls = []
+  const binding = { fetch: async req => { calls.push(req); return new Response('receipt') } }
+  const options = { method: 'POST', body: 'cbor', headers: {
+    'content-type': 'application/cbor', 'x-mikka-world-capability': token,
+    authorization: 'internal', cookie: 'session=x', 'x-forwarded-host': 'external.example',
+  } }
+  const url = 'https://world.internal/world/rpc'
+  for (const [target, init, expected] of [
+    ['https://other.example/world/rpc', options, 404],
+    ['http://world.internal/world/rpc', options, 404],
+    ['https://world.internal/unknown', options, 404],
+    [url, {}, 404], [url, { ...options, headers: {} }, 403],
+  ]) assert.equal((await businessWorldRequest(new Request(target, init), binding, token)).status, expected)
+  assert.equal(calls.length, 0)
+  const result = await businessWorldRequest(new Request(url, options), binding, token)
+  assert.equal(await result.text(), 'receipt')
+  assert.deepEqual([...calls[0].headers.keys()], ['content-type'])
+  assert.equal(await calls[0].text(), 'cbor')
+  assert.equal(calls[0].redirect, 'manual')
+})
+
+test('the private Eve API preserves session, signed body, stream cancellation and query while removing hop authority', async () => {
+  const { eveServiceRequest } = await import('../../../cloudflare/api/ingress/services.mjs')
+  const controller = new AbortController()
+  const origin = 'https://eve.internal'
+  const product = { 'x-mikka-submission-id': 'submit', 'x-mikka-evaluation-id': 'evaluation',
+    'x-mikka-workspace-id': 'workspace', 'x-mikka-locale': 'en', 'x-mikka-bot-id': 'bot' }
+  const options = { method: 'POST', body: ' signed bytes ', signal: controller.signal, headers: {
+    ...product, authorization: 'Bearer sample', cookie: 'session=fixture', origin: 'https://app.example',
+    'x-slack-signature': 'fixture', 'x-forwarded-host': 'other.example', 'x-mikka-world-capability': 'other',
+    connection: 'x-hop', 'x-hop': 'drop',
+  } }
+  let sent
+  const stream = new TransformStream()
+  const binding = { fetch: async req => { sent = req; return new Response(stream.readable) } }
+  for (const url of [origin + '/.well-known/workflow/v1/flow', origin + '/eve/v1/a%2fb',
+    'https://other.example/eve/v1/session']) assert.equal((await eveServiceRequest(new Request(url, options), binding)).status, 404)
+  const res = await eveServiceRequest(new Request(origin + '/eve/v1/session?botId=sample', options), binding)
+  assert.equal(new URL(sent.url).search, '?botId=sample')
+  assert.equal(sent.headers.get('authorization'), 'Bearer sample')
+  assert.equal(sent.headers.get('x-slack-signature'), 'fixture')
+  assert.equal(sent.headers.get('cookie'), 'session=fixture')
+  for (const [name, value] of Object.entries(product)) assert.equal(sent.headers.get(name), value)
+  for (const name of ['connection','x-hop','x-forwarded-host','x-mikka-world-capability']) assert.equal(sent.headers.has(name), false)
+  assert.equal(await sent.text(), ' signed bytes ')
+  const write = stream.writable.getWriter().write(new Uint8Array([42]))
+  assert.deepEqual((await res.body.getReader().read()).value, new Uint8Array([42]))
+  await write
+  controller.abort()
+  assert.equal(sent.signal.aborted, true)
+})
+
+test('only the named business workflow callback forwards signed bytes to the matching private release', async () => {
+  const { businessWorkflowDelivery, publicWorkflowDispatch } = await import('../../../cloudflare/api/ingress/services.mjs')
+  const env = { PUBLIC_ORIGIN: 'https://app.example', MIKKA_DEPLOYMENT_ID: id, BUSINESS_WORLD: {} }
+  const url = 'https://business-workflow.internal/.well-known/workflow/v1/flow'
+  const headers = { 'x-mikka-eve-release': id, 'x-mikka-queue-time': '123',
+    'x-mikka-queue-signature': 'signature', 'cf-queue-retry-count': '0', 'content-type': 'application/json',
+    cookie: 'unwanted', authorization: 'unwanted', 'x-forwarded-host': 'untrusted.example' }
+  const options = { method: 'POST', body: ' {"event":1}\n', headers }
+  let calls = 0
+  const send = async req => {
+    calls++
+    assert.equal(req.url, 'https://app.example/.well-known/workflow/v1/flow')
+    assert.equal(req.headers.get('x-forwarded-host'), 'app.example')
+    assert.equal(req.headers.get('cookie'), null)
+    assert.equal(req.headers.get('authorization'), null)
+    assert.equal(req.headers.get('x-mikka-queue-signature'), 'signature')
+    assert.equal(await req.text(), options.body)
+    return new Response('receipt', { headers: { 'x-mikka-eve-release': id } })
+  }
+  const run = (target, init) => businessWorkflowDelivery(new Request(target, init), env, send)
+  assert.equal((await run(url.replace('flow/v1/flow', 'flow/v1/step'), options)).status, 404)
+  assert.equal((await run(url, {})).status, 404)
+  assert.equal((await run(url, { ...options, headers: { ...headers, 'x-mikka-eve-release': 'old' } })).status, 409)
+  assert.equal((await run(url, { ...options, headers: { ...headers, 'x-mikka-queue-signature': '' } })).status, 403)
+  assert.equal(calls, 0)
+  assert.equal((await run(url, options)).headers.get('x-mikka-eve-release'), id)
+  assert.equal(calls, 1)
+  assert.equal(publicWorkflowDispatch('https://app.example/mikka/%2ewell-known/workflow/v1/flow'), true)
+  assert.equal(publicWorkflowDispatch('https://app.example/.well-known/workflow/v1/step'), true)
+  assert.equal(publicWorkflowDispatch('https://app.example/.well-known/openid-configuration'), false)
+})
+
+test('the hosted image verifies its bundled WDK business client and requires scoped private bindings', () => {
+  const bytes = Buffer.from('qualification module')
+  const evidence = { businessWorld: { path: 'world-business.mjs', sha256: createHash('sha256').update(bytes).digest('hex') } }
+  verifyBusinessWorld(evidence, bytes)
+  assert.throws(() => verifyBusinessWorld({}, bytes), /BUSINESS_WORLD_MISMATCH/)
+  assert.throws(() => verifyBusinessWorld(evidence, Buffer.from('different')), /BUSINESS_WORLD_MISMATCH/)
+  const bindings = { ...env, MIKKA_API_INGRESS: 'cloudflare', MIKKA_EVE_ORIGIN: 'https://eve.internal',
+    MIKKA_DEPLOYMENT_ID: id, WORKFLOW_TARGET_WORLD: '/app/world-business.mjs',
+    MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: Buffer.alloc(32, 2).toString('base64'),
+    MIKKA_BUSINESS_WORLD_TOKEN: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'.repeat(2) }
+  verifyConfiguration(bindings)
+  for (const key of ['MIKKA_DEPLOYMENT_ID','MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY','MIKKA_BUSINESS_WORLD_TOKEN','WORKFLOW_TARGET_WORLD']) {
+    assert.throws(() => verifyConfiguration({ ...bindings, [key]: '' }), /PRIVATE_BINDINGS_REQUIRED/)
+  }
+  assert.throws(() => verifyConfiguration({ ...bindings, MIKKA_EVE_ORIGIN: 'https://other.example' }), /PRIVATE_BINDINGS_REQUIRED/)
 })

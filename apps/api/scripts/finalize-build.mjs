@@ -132,6 +132,12 @@ export async function finalizeBuild({ root, output, preset, revision }) {
   } else if (preset === 'node-server') {
     evidence.overlaySha = process.env.MIKKA_UI_OVERLAY_SHA || null
     evidence.deploymentId = configuredDeploymentId() ?? null
+    if (process.env.MIKKA_EDITION === 'cloud' && evidence.overlaySha && evidence.deploymentId) {
+      const { buildCloudflareWorld } = await import('../../../scripts/build-cloudflare-world.mjs')
+      const path = 'world-business.mjs'
+      const file = await buildCloudflareWorld('business', join(output, path))
+      evidence.businessWorld = { path, sha256: hash(await readFile(file)) }
+    }
     const server = join(output, 'server')
     await readFile(join(server, 'index.mjs'))
     const dockerApplication = await readFile(join(server, 'docker-entry.mjs'))
