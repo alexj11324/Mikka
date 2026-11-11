@@ -7,7 +7,7 @@ import { buildGraph, dbId, taskId } from './graph.mjs'
 import { isDocsOnly } from '../ci-docs-only.mjs'
 import tasks from './tasks.json' with { type: 'json' }
 
-export const GLOBAL = /^(?:\.github\/(?!workflows\/README\.md$)|scripts\/|tests\/(?:helpers|support)\/|drizzle\/|patches\/|packages\/(?:config|protocol|subscription-worker)\/|services\/|cloudflare\/|(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|[^/]*config[^/]*|[^/]*lock[^/]*|Dockerfile|docker-compose[^/]*|\.dockerignore|\.npmrc)$|lib\/(?:db(?:\/|\.)|auth|api-auth|fresh-session|credentials\/|secrets\/|permissions|.*authorization|.*tenant|.*scope))/
+export const GLOBAL = /^(?:\.github\/(?!workflows\/README\.md$)|scripts\/|tests\/(?:helpers|support)\/|patches\/|packages\/(?:config|protocol|subscription-worker)\/|services\/|cloudflare\/|(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|[^/]*config[^/]*|[^/]*lock[^/]*|Dockerfile|docker-compose[^/]*|\.dockerignore|\.npmrc)$|lib\/(?:db(?:\/|\.)|auth|api-auth|fresh-session|credentials\/|secrets\/|permissions|.*authorization|.*tenant|.*scope))/
 // Keep the expression readable without a trailing whitespace token.
 const globalPath = file => !isDocsOnly([file]) && (GLOBAL.test(file) || /(?:^|\/)(?:package\.json|tsconfig[^/]*\.json)$/.test(file))
 export function area(file) {
@@ -55,6 +55,13 @@ export async function select(plan, changes, { force = false } = {}) {
   // Server paths without a proven suite mapping must never silently skip DB.
   if (!docs && areas.includes('api/factory/coordinator') && suites.length === 0) {
     suites = plan.db.scripts; reasons.push('server change without proven DB coverage: all DB suites')
+  }
+  // A migration changes the schema every suite runs against, so it keeps the
+  // full DB inventory. It is deliberately not a GLOBAL input: GLOBAL also turns
+  // on the macOS packaged acceptance, and a new table says nothing about UI
+  // rendering. `test:migrations` stays in the unit set through `always`.
+  if (!docs && areas.includes('database/migrations')) {
+    suites = plan.db.scripts; reasons.push('migration: all DB suites')
   }
   const shardCount = Math.min(4, Math.ceil(suites.length / 8))
   const flags = {

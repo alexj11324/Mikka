@@ -44,12 +44,14 @@ import { fixedCheckSnapshot } from "./check"
 import { retainDeliverable } from '../agents/publish'
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
+import { profileSkillLoadReceiptSchema, PROFILE_SKILLS_DIR, PROFILE_SKILL_LOADS_DIR, type ProfileSkillLoadReceipt, type ProfileSkillRef, type ProfileSkillRunReport } from '@mikka/protocol/skill'
+import { lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { runPaths } from "../agents/run-context"
 import { removeRunCredentials } from "../run-scratch"
 import { createRunMasker, type RunMasker } from "../secret-mask"
 import { stdSerializers } from 'pino'
-import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
-import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
+import { SKILLS_DIR, SKILL_BODY_FILE, skillPromptPlan, skillSlug } from "@mikka/protocol/skill"
+import { runQuestion, runSkillMount, runExecution, runRuntime, type RunSkillPrompt } from "@mikka/protocol/run"
 import { ProviderFailureError, providerFailureSchema, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import { CodedError } from "@mikka/protocol/coded-error"
 import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
@@ -1006,13 +1008,16 @@ export class RunSupervisor {
       entry.assignment.preserveQuestionWorktree = true
     const readOnlyTask = entry && (isReadOnlyTask(entry.assignment) || entry.assignment.factoryCheck?.reportOnly === true || entry.assignment.factoryExecuteKind === 'deliverable')
     // Never copy trusted evidence from an adapter/model report.
-    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, safePoint: _safePoint, ...content } = report
+    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, skillPrompt: _prompt, execution: _execution, runtime: _runtime, safePoint: _safePoint, ...content } = report
     report = {
       ...content,
       ...(active?.safePoint ? { safePoint: active.safePoint } : {}),
       ...(entry?.baseCommit && /^[a-f0-9]{40}$/.test(entry.baseCommit)
         ? { sourceCommit: entry.baseCommit } : {}),
       ...(entry?.assignment.factoryExecuteKind === 'deliverable' && entry.deliverableCommit ? { deliverableCommit: entry.deliverableCommit } : {}),
+      // What the prompt actually carried of the run's skills; a deferred body
+      // is a fact the person needs to see, not something to leave unsaid.
+      ...(entry && skillPromptOf(entry.assignment) ? { skillPrompt: skillPromptOf(entry.assignment) } : {}),
       ...(entry?.skillMount && entry.skillMount.sessionId === entry.sessionId &&
         entry.skillMount.receiptId === entry.assignment.skillReceipt?.id &&
         entry.skillMount.versionId === entry.assignment.skillReceipt?.artifact.versionId &&
@@ -1172,6 +1177,38 @@ export class RunSupervisor {
   }
 
   /**
+   * What the frozen Profile selected and what its agent actually loaded. The
+   * load receipts are written by the `load_skill` tool itself; a configured
+   * Skill without a receipt is not reported as used. Digests must match the
+   * configured pinned body, so a tampered manifest cannot mint a receipt.
+   */
+  private profileSkillReport(runId: string, assignment: RunAssignment): ProfileSkillRunReport | undefined {
+    const configured: ProfileSkillRef[] = (assignment.profileSkills ?? []).map(skill => ({ id: skill.id, name: skill.name, source: skill.source, digest: skill.digest }))
+    for (const slug of assignment.repositorySkills ?? []) {
+      if (!configured.some(ref => ref.id === `repository:${slug}`)) configured.push({ id: `repository:${slug}`, name: slug, source: 'repository', digest: null })
+    }
+    if (configured.length === 0) return undefined
+    const loaded: ProfileSkillLoadReceipt[] = []
+    if (this.deps.adapterStateDir) {
+      const dir = join(runPaths(this.deps.adapterStateDir, runId).runDir, PROFILE_SKILLS_DIR, PROFILE_SKILL_LOADS_DIR)
+      try {
+        for (const name of readdirSync(dir).sort()) {
+          if (!name.endsWith('.json') || loaded.length >= configured.length) continue
+          const file = join(dir, name), meta = lstatSync(file, { throwIfNoEntry: false })
+          if (!meta?.isFile() || meta.isSymbolicLink() || meta.nlink !== 1 || meta.size < 2 || meta.size > 4096) continue
+          const receipt = profileSkillLoadReceiptSchema.safeParse(JSON.parse(readFileSync(file, 'utf8')))
+          if (!receipt.success || loaded.some(item => item.id === receipt.data.id)) continue
+          // A declared repository Skill has no server-side digest; its receipt
+          // carries the digest the tool checked against the pinned body.
+          if (!configured.some(ref => ref.id === receipt.data.id && (ref.digest === null || ref.digest === receipt.data.digest))) continue
+          loaded.push(receipt.data)
+        }
+      } catch { /* No loads yet, or an unreadable receipt: nothing is claimed as used. */ }
+    }
+    return { configured, loaded }
+  }
+
+  /**
    * The handoff report: the agent's own words (summary, questions, next
    * step, blocker) plus what only the daemon may state: changed files and,
    * after a submit, the verify result. Anything else the agent sent
@@ -1188,9 +1225,11 @@ export class RunSupervisor {
     agent: AgentReport | undefined,
     signal: AbortSignal,
   ): Promise<{ report: HandoffReport; verifyError?: string; tree?: string }> {
+    const profileSkills = this.profileSkillReport(runId, assignment)
     let report: HandoffReport = {
       ...baseReport(error),
       ...pickAgentReport(agent),
+      ...(profileSkills ? { profileSkills } : {}),
     }
     const filesChanged = (
       await this.deps.worktrees.changedFiles(worktree, this.deps.journal.get(runId)?.baseCommit).catch(() => [])
@@ -1588,6 +1627,8 @@ export class RunSupervisor {
       policyHash: assignment.policySnapshot?.payload.policyHash,
       skills: assignment.skills,
       skillReceipt: assignment.skillReceipt,
+      profileSkills: assignment.profileSkills,
+      repositorySkills: assignment.repositorySkills,
       onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
         const current = this.deps.journal.get(runId)
         if (!current?.runtime || isTerminalRunState(current.state) || current.sessionId !== sessionId ||
@@ -2198,6 +2239,24 @@ function isReadOnlyTask(assignment: RunAssignment): boolean {
   // Investigations hand in a report. Acceptance checks and benchmarks still
   // run their host-owned verification against the fixed candidate.
   return runPolicy(assignment.policy).readOnly === true && assignment.kind !== "acceptance" && !assignment.benchmark
+}
+
+/**
+ * The skills section the agent was actually given, as the report states it.
+ * Only a run that carried skills has one; a deferred body is reported so the
+ * app can show it instead of leaving the person to guess why a skill did not
+ * take effect.
+ */
+function skillPromptOf(assignment: RunAssignment): RunSkillPrompt | undefined {
+  const skills = assignment.skills
+  if (!skills?.length) return undefined
+  const plan = skillPromptPlan(skills)
+  return {
+    budgetChars: plan.budgetChars,
+    usedChars: plan.usedChars,
+    inlined: plan.inlined.map(entry => entry.name),
+    deferred: plan.degraded.map(entry => entry.name),
+  }
 }
 
 /** Existing acceptance runs remain compatible; Factory checks are exact-SHA read-only runs. */

@@ -58,6 +58,10 @@ test('real preparePrompt consumes provenance wrapper; native and Coordinator use
   assert.match(steps, /summary = preserveMessageSources\(text, folded, summary, summaryTrust\)/)
   assert.match(steps, /saveSummary\(userId, summary, cut/)
   const native = readFileSync('packages/daemon/src/agents/run-context.ts', 'utf8')
+  // The skills section still comes from the shared pure builder, and still sits
+  // between the run rules and the host's personal-message policy.
+  assert.match(native, /const skills = skillsPromptSection\(/)
+  assert.match(native, /skillPromptPlan\(this\.options\.skills \?\? \[\]\)/)
   assert.match(native, /skills,\s+PERSONAL_MESSAGE_INSTRUCTIONS,/)
   assert.doesNotMatch(native, /mailbox_recipients|mailbox_send/)
 })

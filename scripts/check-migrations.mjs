@@ -83,12 +83,103 @@ function mainMigrationNames() {
   return null
 }
 
+/**
+ * Every migration name that exists on any ref, not only on main.
+ *
+ * The main-only check cannot see a collision that is still in flight: it compares a
+ * branch's file against main's watermark, so two branches claiming one timestamp both
+ * pass while main is behind them. That is how 20261110200000_agent_profile_skill_shares
+ * looked green against a main that still stopped at 20261110150013.
+ *
+ * `git log --all` visits every commit once and lists the .sql files it added or
+ * renamed, which is one process instead of one `ls-tree` per ref (2300 refs cost
+ * ~30s the other way). Adds alone are not enough: a migration that was renamed into
+ * its final timestamp is never "added" under that name, so --diff-filter=A misses
+ * exactly the renamed slots this check exists to find (a8f5b82f9 renumbered
+ * 20261110220000_thread_modes.sql into place and A alone did not see it).
+ *
+ * The list is historical, so it keeps a name whose branch has since dropped it; that
+ * over-reports a slot as busy rather than missing a real race, which is the safe
+ * direction for a report-only check.
+ */
+export function allRefMigrationNames(root = process.cwd()) {
+  try {
+    return execFileSync('git', ['log', '--all', '--diff-filter=AR', '--name-only', '--format=', '--', 'drizzle/*.sql'],
+      { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\n').filter(Boolean).map((p) => p.slice('drizzle/'.length)).filter(Boolean)
+  } catch { return null }
+}
+
+/**
+ * Timeslots claimed by more than one distinct filename across every ref.
+ *
+ * Same-timestamp files on a single branch are already rejected by checkMigrations;
+ * this answers the different question of two branches racing for one slot, which no
+ * single-branch check can see.
+ */
+export function slotCollisions(names) {
+  const bySlot = new Map()
+  for (const name of names) {
+    if (!name.endsWith('.sql') || /^\d{4}_/.test(name)) continue
+    const ts = parseTimestamp(name)
+    if (!ts) continue
+    const held = bySlot.get(ts) ?? []
+    if (!held.includes(name)) held.push(name)
+    bySlot.set(ts, held)
+  }
+  return [...bySlot].filter(([, held]) => held.length > 1).map(([slot, held]) => ({ slot, names: held.sort() }))
+}
+
+/**
+ * Collisions that are still a race: every name at that slot is absent from main.
+ *
+ * A slot where one file already merged is settled — the other file is either an
+ * abandoned branch or a duplicate that will fail its own check — and failing CI on
+ * it would punish every unrelated pull request. Only two unmerged files claiming one
+ * slot is a live race, and that is what --enforce rejects.
+ */
+export function liveCollisions(collisions, mainFiles) {
+  const merged = new Set(mainFiles ?? [])
+  return collisions.filter(({ names }) => names.every((name) => !merged.has(name)))
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const dir = new URL('../drizzle/', import.meta.url)
   const files = readdirSync(dir).filter((n) => n.endsWith('.sql')).map((name) => ({ name, content: readFileSync(new URL(name, dir), 'utf8') }))
   const mainFiles = mainMigrationNames()
   if (!mainFiles) console.warn('migrations: 拿不到 origin/main，跳过「晚于 main 最新迁移」这一项')
   const problems = checkMigrations(files, mainFiles)
+
+  // --all-refs: report slots that another branch already claimed. Report-only by
+  // default because in-flight collisions are not this branch's fault and must not
+  // turn its CI red; --enforce makes it fail for a release gate. `--all-refs` scans
+  // locally-known refs, so fetch first to see the newest branches.
+  if (process.argv.includes('--all-refs')) {
+    const names = allRefMigrationNames()
+    if (!names) console.warn('migrations: --all-refs 拿不到 git 历史，跳过跨分支检查')
+    else {
+      const collisions = slotCollisions(names)
+      const mine = new Set(files.map((f) => f.name))
+      const merged = new Set(mainFiles ?? [])
+      const live = liveCollisions(collisions, mainFiles)
+      // Every collision is listed, this branch's own marked, because a race that
+      // does not touch this branch today is still why a slot is not free tomorrow.
+      if (collisions.length) {
+        console.error(`migrations: --all-refs 在历史上发现 ${collisions.length} 个 slot 被多个文件名争用（✓ 本分支占用，! 仍在飞）\n${collisions.map(({ slot, names: held }) => `  - ${slot}：${held.map((n) => `${live.some((l) => l.slot === slot) ? '!' : ' '}${mine.has(n) ? '✓' : ' '}${n}${merged.has(n) ? '（已在 main）' : ''}`).join(' / ')}`).join('\n')}`)
+      } else console.log('migrations: --all-refs 没有发现跨分支 slot 争用')
+      if (live.length) {
+        console.error(`migrations: --all-refs ${live.length} 个 slot 上所有文件名都还没进 main，是真争用`)
+        // --enforce judges this branch only: failing on a race between two unrelated
+        // branches would red CI for a pull request that has nothing wrong with it.
+        const mineLive = live.filter(({ names: held }) => held.some((n) => mine.has(n)))
+        if (mineLive.length) {
+          console.error(`migrations: --all-refs 本分支占用的 ${mineLive.length} 个 slot 仍在飞：${mineLive.map((c) => c.slot).join('、')}，请换一个时间戳`)
+          if (process.argv.includes('--enforce')) process.exit(1)
+        } else console.log('migrations: --all-refs 本分支占用的 slot 不在这些争用里')
+      } else console.log(`migrations: --all-refs 扫了 ${new Set(names).size} 个历史迁移名，没有仍在飞的 slot 争用`)
+    }
+  }
+
   if (problems.length) {
     console.error(`migrations: ${problems.length} 个问题\n${problems.map((p) => `  - ${p}`).join('\n')}`)
     process.exit(1)

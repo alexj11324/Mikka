@@ -19,6 +19,7 @@ import { db, pool, withDatabaseTransaction } from '@/lib/db'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { withResourceAccess, lockResourcesAccess } from '@/lib/resource-access/store'
 import { registerProjectAccess, bindProjectTasks } from '@/lib/resource-access/projects'
+import { assertAccessConfirmation } from '@/lib/resource-access/confirm-access'
 import type { IssueReader } from '@/lib/issue-visibility'
 import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
 
@@ -85,10 +86,10 @@ export async function saveProject(input: z.input<typeof projectInput>) {
 export async function updateProjectProperties(input: { id: string; revision: number; changes: ProjectChanges }) {
   return persistProject(await projectUser(), input, true)
 }
-export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null }) {
+export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null; confirmAccess?: boolean }) {
   const i18nText = await getTranslations()
   const reader = await projectUser()
-  const parsed = z.object({ issueId: z.uuid(), revision: z.number().int().positive(), projectId: z.uuid().nullable() }).safeParse(input)
+  const parsed = z.object({ issueId: z.uuid(), revision: z.number().int().positive(), projectId: z.uuid().nullable(), confirmAccess: z.boolean().optional() }).safeParse(input)
   if (!parsed.success) return { error: i18nText("Errors.projectMoveInvalid") }
   const { issue } = await requireIssueAccess(input.issueId)
   if (!issue.workspaceId) throw new ActionFailureError('issueNotFound')
@@ -111,10 +112,17 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
         ], true)
         const result = await updateIssueMetadata({ id: input.issueId, revision: input.revision, patch: { project: destination?.name ?? null } })
         if (!('issue' in result) || !result.issue) return result
+        // Stopping runs below uses the other pool and outlives a rollback, so the
+        // confirmAccess answer is settled before it: a refused move must leave
+        // every run alone (ALE-26).
+        await assertAccessConfirmation(app, workspaceId, affected.map(project => ({
+          reference: { kind: 'task' as const, id: input.issueId },
+          parent: project.id === input.projectId ? { kind: 'project', id: project.id } : null,
+        })), parsed.data.confirmAccess === true)
         if ((previousProject?.id ?? null) !== input.projectId) await stopRunsForPolicyChange(pool, { kind: 'task', issueId: input.issueId })
         for (const project of affected) {
           const issueIds = project.id === input.projectId ? [...new Set([...project.issueIds, input.issueId])] : project.issueIds.filter(id => id !== input.issueId)
-          await bindProjectTasks(app, reader, { kind: 'project', id: project.id, workspaceId }, project.issueIds, issueIds)
+          await bindProjectTasks(app, reader, { kind: 'project', id: project.id, workspaceId }, project.issueIds, issueIds, { confirmAccess: parsed.data.confirmAccess })
           await tx.update(projects).set({ issueIds, revision: project.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, project.id), eq(projects.userId, project.userId)))
           await tx.insert(projectEvents).values({ id: crypto.randomUUID(), userId: project.userId, projectId: project.id, message: project.id === input.projectId ? i18nText("Projects.activity.tasksAdded") : i18nText("Projects.activity.tasksRemoved") })
           await (await import('@/lib/live/project-map')).projectMapChanged(tx, project.id)
@@ -123,6 +131,8 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
       }))
     }))
   } catch (error) {
+    // A confirmation request is an answer the caller replays, not a failure.
+    if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
     if (error instanceof ActionFailureError) throw error
     return { error: i18nText("Errors.projectMoveFailed") }
   }
@@ -138,10 +148,10 @@ export async function listProjectEvents(id: string) {
     return projectDb.select().from(projectEvents).where(and(eq(projectEvents.projectId, id), eq(projectEvents.userId, project.userId))).orderBy(desc(projectEvents.createdAt)).limit(100)
   })
 }
-export async function setProjectIssues(input: { id: string; revision: number; issueIds: string[] }) {
+export async function setProjectIssues(input: { id: string; revision: number; issueIds: string[]; confirmAccess?: boolean }) {
   const i18nText = await getTranslations();
   const reader = await projectUser()
-  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), issueIds: z.array(z.uuid()).max(100) }).safeParse(input)
+  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), issueIds: z.array(z.uuid()).max(100), confirmAccess: z.boolean().optional() }).safeParse(input)
   if (!parsed.success) return { error: i18nText("Errors.projectIssuesInvalid") }
   const ids = [...new Set(parsed.data.issueIds)]
   try {
@@ -164,7 +174,14 @@ export async function setProjectIssues(input: { id: string; revision: number; is
       }
       if (current.revision !== input.revision) return { error: i18nText("Errors.projectSaveConflict") }
       return withResourceAccess(reader, reference, 'canSteer', () => db.transaction(app => withDatabaseTransaction(app, async () => {
-      await bindProjectTasks(app, reader, reference, current.issueIds, ids)
+      // Runs with revoked access stop on the other pool and outlive a rollback, so
+      // the confirmAccess answer is settled before any of it (ALE-26).
+      const moves = [...new Set([...current.issueIds, ...ids])].map(id => ({
+        reference: { kind: 'task' as const, id },
+        parent: ids.includes(id) ? { kind: 'project', id: current.id } : null,
+      }))
+      await assertAccessConfirmation(app, reference.workspaceId, moves, parsed.data.confirmAccess === true)
+      await bindProjectTasks(app, reader, reference, current.issueIds, ids, { confirmAccess: parsed.data.confirmAccess })
       const [project] = await tx.update(projects).set({ issueIds: ids, revision: input.revision + 1, updatedAt: new Date() }).where(and(eq(projects.id, input.id), eq(projects.userId, current.userId), eq(projects.revision, input.revision))).returning()
       if (!project) return { error: i18nText("Errors.projectSaveConflict") }
       const changedIssues = [...new Set([...current.issueIds, ...ids])].filter(id => current.issueIds.includes(id) !== ids.includes(id))
@@ -175,6 +192,8 @@ export async function setProjectIssues(input: { id: string; revision: number; is
       })))
     }))
   } catch (error) {
+    // A confirmation request is an answer the caller replays, not a failure.
+    if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
     if (error instanceof ActionFailureError) throw error
     return { error: i18nText("Errors.projectIssuesSaveFailed") }
   }
