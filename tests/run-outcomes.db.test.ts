@@ -2,14 +2,38 @@
 // model; a run it did not answer keeps no outcome and is asked again after as
 // long as it has waited, at least an hour (#1371). The judge is substituted; no model is called.
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { promisify } from 'node:util'
+import { dropTestDatabase } from './support/drop-test-database'
 import test from 'node:test'
 import { dbUrl, seedAgent, seedIssue, seedRun, seedUser } from './support/workspace-admin-db'
 
 test('ended runs get a judged outcome', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
-  const pool = new Pool({ connectionString: dbUrl, max: 2 })
+  // The real sweep selects all owners. A different file in the same required
+  // suite must never have its fixtures judged or its retry timestamps changed.
+  const admin = new Pool({ connectionString: dbUrl, max: 1 })
+  const database = 'run_outcomes_' + randomUUID().replaceAll('-', '') + '_e2e'
+  const target = new URL(dbUrl!); target.pathname = '/' + database
+  const pool = new Pool({ connectionString: target.href, max: 2 })
+  const modulePools: InstanceType<typeof Pool>[] = []
+  const settings = ['E2E_DATABASE_URL', 'MIKKA_DATABASE_URL', 'DATABASE_URL'] as const
+  const previous = settings.map(name => process.env[name])
+  t.after(async () => {
+    try { await dropTestDatabase(admin, database, pool, ...modulePools) }
+    finally {
+      settings.forEach((name, i) => { const old = previous[i]; if (old === undefined) delete process.env[name]; else process.env[name] = old })
+      await admin.end()
+    }
+  })
+  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  for (const name of settings) process.env[name] = target.href
+  await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], {
+    env: { ...process.env, MIGRATE: '1' }, maxBuffer: 4 * 1024 * 1024,
+  })
   const { pool: appPool } = await import('../lib/db')
-  t.after(async () => { await Promise.all([pool.end(), appPool.end()]) })
+  modulePools.push(appPool)
   const { judgeRunOutcome, judgePendingOutcomes } = await import('../lib/run-outcome-judge')
   type Judges = Parameters<typeof judgeRunOutcome>[1] & object
   const seen: string[] = []
