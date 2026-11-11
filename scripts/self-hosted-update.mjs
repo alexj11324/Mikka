@@ -18,10 +18,10 @@ const hashProgram = [
   "walk('drizzle');const h=crypto.createHash('sha256');for(const f of files.sort()){h.update(path.relative('drizzle',f).replaceAll('\\\\','/'));h.update('\\0');h.update(fs.readFileSync(f));h.update('\\0')};process.stdout.write(h.digest('hex'));"
 ].join('')
 
-function fail(code) { throw new Error(code) }
+function fail(code, cause) { throw new Error(code, { cause }) }
 function docker(args, env = process.env, { maxBuffer = 8 * 1024 * 1024 } = {}) {
   try { return execFileSync('docker', args, { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer, timeout: 20 * 60_000 }).trim() }
-  catch { fail('SELF_HOSTED_UPDATE_DOCKER_FAILED') }
+  catch (cause) { fail('SELF_HOSTED_UPDATE_DOCKER_FAILED', cause) }
 }
 function compose(args, env = process.env) {
   return docker(['compose', '--project-directory', root, '-f', composeFile, ...args], env)
@@ -30,7 +30,7 @@ function runHook(name, phase = '') {
   const executable = process.env[name]
   if (!executable || !executable.startsWith('/') || realpathSync(executable) !== executable) fail('SELF_HOSTED_UPDATE_HOOK_REQUIRED')
   try { execFileSync(executable, phase ? [phase] : [], { cwd: root, env: process.env, stdio: ['ignore', 'ignore', 'pipe'], timeout: 60_000 }) }
-  catch { fail('SELF_HOSTED_UPDATE_HOOK_FAILED') }
+  catch (cause) { fail('SELF_HOSTED_UPDATE_HOOK_FAILED', cause) }
 }
 function imageInfo(image) {
   const info = JSON.parse(docker(['image', 'inspect', image]))[0]
@@ -48,7 +48,8 @@ function activeImage() {
   const container = JSON.parse(docker(['inspect', containerId]))[0]
   if (!/^sha256:[0-9a-f]{64}$/.test(container?.Image || '')) fail('SELF_HOSTED_UPDATE_RUNNING_IMAGE_INVALID')
   const info = imageInfo(container.Image)
-  return { id: containerId, image: container.Image, revision: info.revision, migrations: imageMigrations(container.Image) }
+  const pinned = info.digests.find(name => name.startsWith(IMAGE_REPOSITORY + '@sha256:'))
+  return { id: containerId, image: pinned ? assertPinnedImage(pinned) : container.Image, revision: info.revision, migrations: imageMigrations(container.Image) }
 }
 function config() {
   if (!['docker-compose.yml', 'docker-compose.neon.yml'].includes(composeFile)) fail('SELF_HOSTED_UPDATE_COMPOSE_NOT_SUPPORTED')
@@ -56,12 +57,20 @@ function config() {
   if (!conf?.services?.app || !conf.services.app.volumes?.length) fail('SELF_HOSTED_UPDATE_COMPOSE_UNSUPPORTED')
   return { localDatabase: !!conf.services.postgres }
 }
+async function upstream(path, failure) {
+  try {
+    const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/' + path, {
+      headers: { accept: 'application/vnd.github+json', 'user-agent': 'mikka-self-hosted-updater' },
+      redirect: 'error', signal: AbortSignal.timeout(12_000)
+    })
+    if (!response.ok) throw new Error('HTTP ' + response.status)
+    return await response.json()
+  } catch (cause) { fail(failure, cause) }
+}
+
 async function githubRelease(tag) {
   if (!STABLE_TAG.test(tag)) fail('SELF_HOSTED_UPDATE_RELEASE_NOT_STABLE')
-  const url = 'https://api.github.com/repos/alexj11324/Mikka/releases/tags/' + encodeURIComponent(tag)
-  const response = await fetch(url, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'mikka-self-hosted-updater' }, signal: AbortSignal.timeout(12_000) })
-  if (!response.ok) fail('SELF_HOSTED_UPDATE_RELEASE_FETCH_FAILED')
-  const json = await response.json()
+  const json = await upstream('releases/tags/' + encodeURIComponent(tag), 'SELF_HOSTED_UPDATE_RELEASE_FETCH_FAILED')
   const release = parseStableRelease(json)
   if (release.tag !== tag) fail('SELF_HOSTED_UPDATE_RELEASE_TAG_MISMATCH')
   return release
@@ -76,7 +85,7 @@ function replaceImage(text, image) {
 }
 function saveAtomic(path, contents) {
   const temporary = path + '.' + randomUUID() + '.tmp'
-  writeFileSync(temporary, contents, { mode: 0o600, flag: 'wx' })
+  writeFileSync(temporary, contents, { mode: 0o600, flag: 'wx', flush: true })
   renameSync(temporary, path)
 }
 // Retain only a completely restored archive. The verification database is
@@ -113,21 +122,107 @@ function dumpLocalPostgres(directory) {
   }
 }
 function restoreOldApp(envText, oldImage) {
-  saveAtomic(environmentFile, envText)
+  saveAtomic(environmentFile, replaceImage(envText, oldImage))
   compose(['up', '-d', '--no-deps', '--wait', '--wait-timeout', '240', 'app'], { ...process.env, MIKKA_IMAGE: oldImage })
   compose(['exec', '-T', 'app', 'node', 'scripts/self-hosted-health.mjs'], { ...process.env, MIKKA_IMAGE: oldImage })
 }
 function assertOption(value) { if (!value) fail('SELF_HOSTED_UPDATE_EXPLICIT_IDLE_ACK_REQUIRED') }
-async function performUpgrade(release, opts) {
+function privateStateDirectory() {
   mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
   const state = lstatSync(stateDirectory)
   if (!state.isDirectory() || state.isSymbolicLink() || (state.mode & 0o077) !== 0) fail('SELF_HOSTED_UPDATE_STATE_PERMISSIONS_INVALID')
-  const available = statfsSync(stateDirectory)
-  if (BigInt(available.bavail) * BigInt(available.bsize) < 512n * 1024n * 1024n) fail('SELF_HOSTED_UPDATE_DISK_SPACE_LOW')
+}
+
+function optionalRecord(path) {
+  try { return JSON.parse(readFileSync(path, 'utf8')) }
+  catch (cause) {
+    if (cause.code === 'ENOENT') return null
+    fail('SELF_HOSTED_UPDATE_STATE_INVALID', cause)
+  }
+}
+
+function verifyArtifact(release) {
+  const digest = assertPinnedImage(release.image)
+  docker(['pull', digest])
+  const pulled = imageInfo(digest)
+  if (!pulled.digests.includes(digest)) fail('SELF_HOSTED_UPDATE_RELEASE_DIGEST_MISMATCH')
+  if (pulled.revision !== release.revision || imageMigrations(digest) !== release.migrations) fail('SELF_HOSTED_UPDATE_RELEASE_IMAGE_MISMATCH')
+}
+
+function verifyRunningRelease(release) {
+  const deployed = { ...process.env, MIKKA_IMAGE: release.image }
+  compose(['exec', '-T', '-e', 'MIKKA_EXPECTED_REVISION=' + release.revision, 'app', 'node', 'scripts/self-hosted-update-smoke.mjs'], deployed)
+  if (process.env.MIKKA_UPDATE_VERIFY_HOOK) runHook('MIKKA_UPDATE_VERIFY_HOOK', release.tag)
+}
+
+function startRelease(release) {
+  compose(['up', '-d', '--no-deps', '--wait', '--wait-timeout', '240', 'app'], { ...process.env, MIKKA_IMAGE: release.image })
+  verifyRunningRelease(release)
+}
+
+// Run inside the operator's app network. A one-shot container also works if
+// the previous activation stopped before the application became healthy.
+function assertIdle(recovery = false) {
+  const program = `const { Client } = require('pg');
+    (async () => {
+      const client = new Client({connectionString: process.env.MIKKA_DATABASE_URL || process.env.DATABASE_URL, connectionTimeoutMillis: 10000});
+      await client.connect();
+      try {
+        const {rowCount} = await client.query("SELECT 1 FROM agent_runs WHERE status IN ('queued','preparing','running','paused','waiting_input','finishing') LIMIT 1");
+        process.stdout.write(rowCount ? 'active' : 'idle');
+      } finally { await client.end() }
+    })().catch(() => { process.exitCode = 1 })`
+  const args = recovery ? ['run', '--rm', '--no-deps', '-T', '--entrypoint', 'node', 'app'] : ['exec', '-T', 'app', 'node']
+  const status = compose([...args, '-e', program])
+  if (status === 'active') fail('SELF_HOSTED_UPDATE_ACTIVE_TASKS')
+  if (status !== 'idle') fail('SELF_HOSTED_UPDATE_IDLE_UNKNOWN')
+}
+
+function recordSuccess(release, migrated) {
+  saveAtomic(join(stateDirectory, 'last-success.json'), JSON.stringify({
+    tag: release.tag, revision: release.revision, image: release.image, migrated, installedAt: new Date().toISOString()
+  }) + '\n')
+}
+
+async function withUpgradeLock(operation) {
+  privateStateDirectory()
   const lockPath = join(stateDirectory, 'upgrade.lock')
   let lock
   try { lock = openSync(lockPath, 'wx', 0o600) }
-  catch { fail('SELF_HOSTED_UPDATE_ALREADY_RUNNING') }
+  catch (cause) { fail('SELF_HOSTED_UPDATE_ALREADY_RUNNING', cause) }
+  try { return await operation() }
+  finally { closeSync(lock); unlinkSync(lockPath) }
+}
+
+function enroll() {
+  ensureRegularEnvFile(environmentFile)
+  config()
+  if (optionalRecord(join(stateDirectory, 'recovery.json'))) fail('SELF_HOSTED_UPDATE_MANUAL_RECOVERY_REQUIRED')
+  const original = activeImage()
+  const digest = assertPinnedImage(original.image)
+  if (!/^[0-9a-f]{40}$/.test(original.revision || '')) fail('SELF_HOSTED_UPDATE_INSTALLED_REVISION_UNKNOWN')
+  verifyArtifact({ ...original, image: digest })
+  const last = optionalRecord(join(stateDirectory, 'last-success.json'))
+  if (last && (last.image !== digest || last.revision !== original.revision)) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
+  const envText = statSync(environmentFile, { throwIfNoEntry: false }) ? readFileSync(environmentFile, 'utf8') : ''
+  saveAtomic(environmentFile, replaceImage(envText, digest))
+  const baseline = { revision: original.revision, image: digest, migrations: original.migrations }
+  saveAtomic(join(stateDirectory, 'enrolled-image.json'), JSON.stringify(baseline) + '\n')
+  return { status: 'enrolled', ...baseline }
+}
+
+export async function validateEnrollment(enrolled, running, release, lookup = upstream) {
+  if (!enrolled || !/^[0-9a-f]{40}$/.test(enrolled.revision) || enrolled.revision !== running.revision ||
+      enrolled.image !== running.image || enrolled.migrations !== running.migrations) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
+  if (!/^[0-9a-f]{40}$/.test(release.revision)) fail('SELF_HOSTED_UPDATE_RELEASE_IMAGE_MISMATCH')
+  if (enrolled.revision === release.revision) return
+  const relation = await lookup('compare/' + enrolled.revision + '...' + release.revision + '?per_page=1', 'SELF_HOSTED_UPDATE_ANCESTRY_UNAVAILABLE')
+  if (relation.status !== 'ahead' || relation.merge_base_commit?.sha !== enrolled.revision) fail('SELF_HOSTED_UPDATE_DOWNGRADE_REFUSED')
+}
+
+async function performUpgrade(release, opts) {
+  const available = statfsSync(stateDirectory)
+  if (BigInt(available.bavail) * BigInt(available.bsize) < 512n * 1024n * 1024n) fail('SELF_HOSTED_UPDATE_DISK_SPACE_LOW')
   let drained = false
   let recoveryRequired = false
   try {
@@ -135,18 +230,56 @@ async function performUpgrade(release, opts) {
     if (opts.auto && (!process.env.MIKKA_UPDATE_IDLE_GUARD || !process.env.MIKKA_UPDATE_DRAIN_HOOK)) fail('SELF_HOSTED_UPDATE_DRAIN_REQUIRED')
     if (!opts.auto) assertOption(opts.ackIdle)
     const { localDatabase } = config()
+    const journal = join(stateDirectory, 'recovery.json')
+    const pending = optionalRecord(journal)
+    if (opts.recover) {
+      if (!pending || !STABLE_TAG.test(pending.tag) || compareStableTags(release.tag, pending.tag) < 0) fail('SELF_HOSTED_UPDATE_FORWARD_TARGET_REQUIRED')
+      if ((release.tag === pending.tag && release.image !== pending.image) ||
+        (release.migrations !== pending.migrations && !opts.allowMigrations)) fail('SELF_HOSTED_UPDATE_FORWARD_TARGET_INCOMPATIBLE')
+      recoveryRequired = true
+      verifyArtifact(release)
+      if (pending.managedDrain && !process.env.MIKKA_UPDATE_DRAIN_HOOK) fail('SELF_HOSTED_UPDATE_DRAIN_REQUIRED')
+      if (process.env.MIKKA_UPDATE_DRAIN_HOOK) { runHook('MIKKA_UPDATE_DRAIN_HOOK', 'enable'); drained = true }
+      if (process.env.MIKKA_UPDATE_IDLE_GUARD) runHook('MIKKA_UPDATE_IDLE_GUARD')
+      assertIdle(true)
+      if (release.migrations !== pending.migrations) {
+        const directory = join(stateDirectory, 'forward-backup-' + randomUUID())
+        mkdirSync(directory, { mode: 0o700 })
+        if (localDatabase) dumpLocalPostgres(directory)
+        else runHook('MIKKA_EXTERNAL_DB_BACKUP_HOOK', directory)
+      }
+      const next = { ...pending, tag: release.tag, image: release.image, migrations: release.migrations }
+      saveAtomic(journal, JSON.stringify(next))
+      saveAtomic(environmentFile, replaceImage(readFileSync(environmentFile, 'utf8'), release.image))
+      startRelease(release)
+      recordSuccess(release, true)
+      unlinkSync(journal)
+      recoveryRequired = false
+      return { status: 'recovered-forward', tag: release.tag, revision: release.revision, image: release.image, backup: pending.backup }
+    }
+    if (pending) fail('SELF_HOSTED_UPDATE_MANUAL_RECOVERY_REQUIRED')
     const original = activeImage()
     const lastPath = join(stateDirectory, 'last-success.json')
-    let last = null
-    try { last = JSON.parse(readFileSync(lastPath, 'utf8')) }
-    catch { /* Legacy installs must be moved to the stable channel manually. */ }
+    const last = optionalRecord(lastPath)
     if (opts.auto) {
-      if (!last || !STABLE_TAG.test(last.tag || '') || last.revision !== original.revision) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
-      if (compareStableTags(release.tag, last.tag) <= 0) return { status: 'ignored-older-release', tag: release.tag }
+      if (last) {
+        if (!STABLE_TAG.test(last.tag || '') || last.revision !== original.revision || last.image !== original.image) fail('SELF_HOSTED_UPDATE_STABLE_BASELINE_REQUIRED')
+        if (compareStableTags(release.tag, last.tag) <= 0) return { status: 'ignored-older-release', tag: release.tag }
+      } else {
+        await validateEnrollment(optionalRecord(join(stateDirectory, 'enrolled-image.json')), original, release)
+      }
     } else if (last && STABLE_TAG.test(last.tag || '') && compareStableTags(release.tag, last.tag) < 0) {
       fail('SELF_HOSTED_UPDATE_DOWNGRADE_REFUSED')
     }
-    if (original.revision === release.revision) return { status: 'already-current', tag: release.tag }
+    if (original.revision === release.revision) {
+      if (original.image !== release.image) fail('SELF_HOSTED_UPDATE_RELEASE_DIGEST_MISMATCH')
+      verifyArtifact(release)
+      verifyRunningRelease(release)
+      const envText = statSync(environmentFile, { throwIfNoEntry: false }) ? readFileSync(environmentFile, 'utf8') : ''
+      saveAtomic(environmentFile, replaceImage(envText, release.image))
+      recordSuccess(release, false)
+      return { status: 'already-current', tag: release.tag, image: release.image }
+    }
     const backupHook = localDatabase || !!process.env.MIKKA_EXTERNAL_DB_BACKUP_HOOK
     const assessment = assessUpgrade(original, release, {
       unattended: opts.auto, allowMigrations: opts.allowMigrations,
@@ -154,80 +287,73 @@ async function performUpgrade(release, opts) {
       backupHook
     })
     if (!localDatabase && !backupHook) fail('SELF_HOSTED_UPDATE_EXTERNAL_BACKUP_REQUIRED')
-    if (opts.auto && !backupHook) fail('SELF_HOSTED_UPDATE_EXTERNAL_BACKUP_REQUIRED')
-    docker(['pull', release.image])
-    const pulled = imageInfo(release.image)
-    if (pulled.revision !== release.revision || imageMigrations(release.image) !== release.migrations) fail('SELF_HOSTED_UPDATE_RELEASE_IMAGE_MISMATCH')
-    const digest = pulled.digests.find(x => x.startsWith(IMAGE_REPOSITORY + '@sha256:'))
-    assertPinnedImage(digest)
+    verifyArtifact(release)
+    const digest = release.image
     if (process.env.MIKKA_UPDATE_DRAIN_HOOK) {
       runHook('MIKKA_UPDATE_DRAIN_HOOK', 'enable')
       drained = true
     }
     if (process.env.MIKKA_UPDATE_IDLE_GUARD) runHook('MIKKA_UPDATE_IDLE_GUARD')
+    assertIdle()
     const backupDirectory = join(stateDirectory, new Date().toISOString().replace(/[:.]/g, '-') + '-' + release.tag)
     mkdirSync(backupDirectory, { mode: 0o700 })
     const originalEnvironment = statSync(environmentFile, { throwIfNoEntry: false }) ? readFileSync(environmentFile, 'utf8') : ''
     saveAtomic(join(backupDirectory, 'env.original'), originalEnvironment)
     if (localDatabase) dumpLocalPostgres(backupDirectory)
     else runHook('MIKKA_EXTERNAL_DB_BACKUP_HOOK', backupDirectory)
-    // Closing traffic and proving no active task are operator-supplied gates.
     // Stop before copying app-data so the snapshot is not racing its writer.
     let activated = false
     try {
       compose(['stop', '-t', '60', 'app'])
       mkdirSync(join(backupDirectory, 'app-data'), { mode: 0o700 })
       docker(['cp', original.id + ':/data/.', join(backupDirectory, 'app-data')])
+      saveAtomic(journal, JSON.stringify({ tag: release.tag, image: digest, migrations: release.migrations,
+        backup: backupDirectory, previousImage: original.image, managedDrain: drained }))
       saveAtomic(environmentFile, replaceImage(originalEnvironment, digest))
       activated = true
-      const deployment = { ...process.env, MIKKA_IMAGE: digest }
-      compose(['up', '-d', '--no-deps', '--wait', '--wait-timeout', '240', 'app'], deployment)
-      compose(['exec', '-T', '-e', 'MIKKA_EXPECTED_REVISION=' + release.revision, 'app', 'node', 'scripts/self-hosted-update-smoke.mjs'], deployment)
-      saveAtomic(join(stateDirectory, 'last-success.json'), JSON.stringify({
-        tag: release.tag, revision: release.revision, image: digest, migrated: assessment.migrationChanged,
-        installedAt: new Date().toISOString()
-      }) + '\n')
-      return { status: 'updated', tag: release.tag, revision: release.revision, backup: backupDirectory }
-    } catch {
+      startRelease(release)
+      recordSuccess(release, assessment.migrationChanged)
+      unlinkSync(journal)
+      return { status: 'updated', tag: release.tag, revision: release.revision, image: digest, backup: backupDirectory }
+    } catch (cause) {
       if (!activated || !assessment.migrationChanged) {
         let restored = false
         try { restoreOldApp(originalEnvironment, original.image); restored = true }
         catch { /* Preserve backup for manual recovery. */ }
-        if (restored) fail('SELF_HOSTED_UPDATE_REVERTED_TO_PREVIOUS_IMAGE')
+        if (restored) {
+          if (lstatSync(journal, { throwIfNoEntry: false })) unlinkSync(journal)
+          fail('SELF_HOSTED_UPDATE_REVERTED_TO_PREVIOUS_IMAGE', cause)
+        }
         recoveryRequired = true
         fail('SELF_HOSTED_UPDATE_MANUAL_RECOVERY_REQUIRED')
       }
       // DDL may already have run. Keep traffic drained and preserve the
       // candidate plus the private backups for explicit forward recovery.
       recoveryRequired = true
-      fail('SELF_HOSTED_UPDATE_MIGRATION_RECOVERY_REQUIRED')
+      fail('SELF_HOSTED_UPDATE_MIGRATION_RECOVERY_REQUIRED', cause)
     }
   } finally {
-    try {
-      if (drained && !recoveryRequired) runHook('MIKKA_UPDATE_DRAIN_HOOK', 'disable')
-      else if (drained) console.error('SELF_HOSTED_UPDATE_TRAFFIC_REMAINS_DRAINED')
-    } finally {
-      closeSync(lock)
-      unlinkSync(lockPath)
-    }
+    if (drained && !recoveryRequired) runHook('MIKKA_UPDATE_DRAIN_HOOK', 'disable')
+    else if (drained) console.error('SELF_HOSTED_UPDATE_TRAFFIC_REMAINS_DRAINED')
   }
 }
 
 async function main() {
   const [command, tag, ...flags] = process.argv.slice(2)
+  if (command === 'enroll' && !tag) return withUpgradeLock(enroll)
   if (command === 'backup' && !tag) {
     if (!config().localDatabase) fail('SELF_HOSTED_UPDATE_LOCAL_BACKUP_REQUIRED')
-    mkdirSync(stateDirectory, { recursive: true, mode: 0o700 })
+    privateStateDirectory()
     const directory = join(stateDirectory, 'backup-' + randomUUID())
     mkdirSync(directory, { mode: 0o700 })
     return { status: 'restore-verified', archive: dumpLocalPostgres(directory) }
   }
-  if (!['check', 'apply'].includes(command) || !tag || !STABLE_TAG.test(tag)) fail('SELF_HOSTED_UPDATE_USAGE')
-  const opts = { auto: flags.includes('--auto'), ackIdle: flags.includes('--ack-idle'), allowMigrations: flags.includes('--allow-migrations') }
-  if (flags.some(x => !['--auto', '--ack-idle', '--allow-migrations'].includes(x)) || (opts.auto && (opts.ackIdle || opts.allowMigrations))) fail('SELF_HOSTED_UPDATE_USAGE')
+  if (!['check', 'apply', 'recover'].includes(command) || !tag || !STABLE_TAG.test(tag)) fail('SELF_HOSTED_UPDATE_USAGE')
+  const opts = { recover: command === 'recover', auto: flags.includes('--auto'), ackIdle: flags.includes('--ack-idle'), allowMigrations: flags.includes('--allow-migrations') }
+  if (flags.some(x => !['--auto', '--ack-idle', '--allow-migrations'].includes(x)) || (opts.auto && (opts.recover || opts.ackIdle || opts.allowMigrations))) fail('SELF_HOSTED_UPDATE_USAGE')
   const release = await githubRelease(tag)
   if (command === 'check') return { status: 'available', tag: release.tag, revision: release.revision, image: release.image }
-  return performUpgrade(release, opts)
+  return withUpgradeLock(() => performUpgrade(release, opts))
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -237,4 +363,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exitCode = 1
   }
 }
-export { githubRelease, replaceImage, performUpgrade, imageMigrations, hashProgram }
+export { githubRelease, replaceImage, imageMigrations, hashProgram }

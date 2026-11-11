@@ -1,62 +1,83 @@
 name: Publish self-hosted stable release
 on:
   workflow_run:
-    workflows: [Self-hosted image]
+    workflows: [CI, Self-hosted image]
     types: [completed]
 permissions:
   contents: read
+concurrency:
+  group: self-hosted-stable-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
 jobs:
   publish:
-    name: Promote tested tag to stable release
-    if: ${{ github.repository == 'alexj11324/Mikka' && github.event.workflow_run.repository.full_name == 'alexj11324/Mikka' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && startsWith(github.event.workflow_run.head_branch, 'v') }}
+    name: Promote accepted revision to stable
+    if: ${{ github.repository == 'alexj11324/Mikka' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.event == 'push' && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'v')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     permissions:
+      actions: read
       contents: write
+      packages: write
+    outputs:
+      tag: ${{ steps.promote.outputs.tag }}
+      digest: ${{ steps.promote.outputs.digest }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - name: Require a trusted commit reachable from main
+        env:
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          git fetch origin main --tags
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          git checkout --detach "$SOURCE_SHA"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Validate upstream push, immutable tag, SHA, and image acceptance
+      - id: promote
+        name: Check source CI, image job, immutable digest and release identity
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
-          TAG: ${{ github.event.workflow_run.head_branch }}
-          IMAGE_RUN_ID: ${{ github.event.workflow_run.id }}
-        run: |
-          set -euo pipefail
-          if ! [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "SELF_HOSTED_UPDATE_RELEASE_NOT_STABLE"
-            exit 1
-          fi
-          git fetch origin main --no-tags
-          git fetch origin "refs/tags/$TAG:refs/tags/$TAG" --no-tags
-          if [ "$(git rev-parse "$TAG^{commit}")" != "$SOURCE_SHA" ]; then
-            echo "SELF_HOSTED_UPDATE_RELEASE_TAG_SHA_MISMATCH"
-            exit 1
-          fi
-          if ! git merge-base --is-ancestor "$SOURCE_SHA" origin/main; then
-            echo "SELF_HOSTED_UPDATE_RELEASE_NOT_ON_MAIN"
-            exit 1
-          fi
-          jobs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$IMAGE_RUN_ID/jobs?per_page=100")"
-          if ! jq -e 'any(.jobs[]; .name == "image" and .conclusion == "success")' <<< "$jobs" >/dev/null; then
-            echo "SELF_HOSTED_UPDATE_IMAGE_ACCEPTANCE_REQUIRED"
-            exit 1
-          fi
-          git checkout --detach "$SOURCE_SHA"
-          fingerprint="$(node scripts/self-hosted-update-policy.mjs migrations-hash)"
-          marker="<!-- mikka-self-hosted-release-v1 sha=$SOURCE_SHA migrations=$fingerprint protocol=0-1 -->"
-          printf '%s\n\n%s\n' "$marker" "Image: ghcr.io/alexj11324/mikka:$TAG. This source was accepted in the Docker self-hosted image workflow. Review docs/self-hosted-updates.md before upgrading." > "$RUNNER_TEMP/self-hosted-release-notes.md"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            actual="$(gh release view "$TAG" --json body --jq '.body')"
-            if ! grep -Fq "$marker" <<< "$actual"; then
-              echo "SELF_HOSTED_UPDATE_RELEASE_ALREADY_PUBLISHED_DIFFERENT"
-              exit 1
-            fi
-          else
-            gh release create "$TAG" --verify-tag --title "Mikka self-hosted $TAG" --notes-file "$RUNNER_TEMP/self-hosted-release-notes.md"
-          fi
+          TRIGGER_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: bash scripts/release/self-hosted-stable.sh
+  accept-upgrade:
+    name: Upgrade and recover a persisted install on the released digest
+    needs: publish
+    if: needs.publish.outputs.tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Accept the MTA pipe against the actual published release in an independent installation
+        env:
+          RELEASE_TAG: ${{ needs.publish.outputs.tag }}
+          EXPECTED_RELEASE_DIGEST: ${{ needs.publish.outputs.digest }}
+          MIKKA_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
+        run: python3 scripts/acceptance/self-hosted-stable-delivery.py "$RELEASE_TAG" "$EXPECTED_RELEASE_DIGEST" "$MIKKA_EXPECTED_REVISION"
+      - name: Run persisted upgrade, rollback and forward recovery
+        if: success() || failure()
+        env:
+          RELEASE_TAG: ${{ needs.publish.outputs.tag }}
+          EXPECTED_RELEASE_DIGEST: ${{ needs.publish.outputs.digest }}
+          MIKKA_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/acceptance/self-hosted-stable-upgrade.mjs "$RELEASE_TAG"
+      - name: Retain upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: self-hosted-upgrade-${{ needs.publish.outputs.tag }}
+          path: |
+            .artifacts/self-hosted/upgrade.json
+            .artifacts/self-hosted/delivery.json
+          if-no-files-found: error
