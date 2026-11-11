@@ -32,7 +32,7 @@ test('eve bootstraps the mapped session and owns replay, stop, and cancellation 
     streams.push(entry)
     return new Response(body, { headers })
   }
-  const container = document.createElement('div')
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container)
   const root = createRoot(container)
   let output!: ReturnType<typeof useCoordinatorAgent>
