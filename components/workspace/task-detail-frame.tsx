@@ -15,6 +15,7 @@ import { formatDateOnly } from '@/lib/date-only'
 import type { ExplicitTeamChoice } from '@/lib/issue-team-intent'
 import { isIssueListKey } from '@/lib/live/list-read'
 import { issueKeys } from '@/lib/swr/keys'
+import { taskProjectOptions } from '@/lib/task-project-options'
 import { useActionError } from '@/lib/use-action-error'
 import type { IssueDetailNavigation } from './issue-detail-header'
 import { useIssueDetailMenu, type IssueActionRequest } from './issue-detail-actions'
@@ -146,8 +147,11 @@ export function FramedTask(props: FramedTaskProps) {
     { id: 'create', label: `${tProperty('createLabel')}…`, mark: { kind: 'icon', icon: 'plus' }, divider: true, onSelect: () => props.requestProperty('labels') },
   ]
   const projectItems: TaskMenuItem[] = [
-    { id: 'none', label: tProperty('noProject'), mark: { kind: 'icon', icon: 'project' }, checked: !meta.project, onSelect: () => { if (meta.project) void metadata.project(null, options?.projectRecords) } },
-    ...options ? options.projects.map(name => ({ id: name, label: name, mark: { kind: 'icon', icon: 'project' } as const, checked: meta.project === name, onSelect: () => { if (meta.project !== name) void metadata.project(name, options.projectRecords) } })) : loading(),
+    { id: 'none', label: tProperty('noProject'), mark: { kind: 'icon', icon: 'project' }, checked: !task.projectId && !meta.project, onSelect: () => { if (task.projectId || meta.project) void metadata.project(null) } },
+    ...options ? taskProjectOptions(options.projectRecords ?? [], task.projectId).map(item => ({
+      ...item, mark: { kind: 'icon', icon: 'project' } as const,
+      onSelect: () => { if (!item.checked) void metadata.project(item.id) },
+    })) : loading(),
   ]
 
   const rows: TaskDetailRow[] = [
