@@ -7,8 +7,9 @@ import type { ThreadItem } from './issue-run-conversation'
  *
  * This is NOT the document outline. `issue-editor.tsx` already has one
  * (`useRichTextOutline`), and it expands the headings of a task's description.
- * Naming this `outline` too would repeat the `threadMode` mistake: one word,
- * two meanings.
+ * Naming this `outline` too would repeat the older mistake where one word meant
+ * two things: a reader searching for the description's headings would land on
+ * the conversation's index instead.
  *
  * It is a pure projection of items `threadItems()` has already built, never a
  * second fold of the chunk stream: a second cursor over the same data is how

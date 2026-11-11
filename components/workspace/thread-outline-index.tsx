@@ -36,14 +36,14 @@ export function ThreadOutlineIndex({ entries }: { entries: readonly ThreadOutlin
     <PopoverContent align="end" className="flex max-h-80 w-72 flex-col gap-1 overflow-y-auto p-2">
       <ol className="flex flex-col">
         {entries.map(entry => <li key={entry.id}>
-          <button type="button" onClick={() => reveal(entry.id)}
-            className="flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-start outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+          <Button variant="ghost" size="sm" onClick={() => reveal(entry.id)}
+            className="h-auto w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-start">
             <span className="flex min-w-0 items-baseline justify-between gap-2">
               <span className="truncate text-xs font-medium text-foreground">{entry.author || t('outlineUnknownAuthor')}</span>
               {entry.mine && <span className="shrink-0 text-xs text-muted-foreground">{t('outlineYou')}</span>}
             </span>
             <span className="line-clamp-2 text-xs text-muted-foreground">{entry.text}</span>
-          </button>
+          </Button>
         </li>)}
       </ol>
     </PopoverContent>
