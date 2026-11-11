@@ -9,6 +9,7 @@ export const PERSONAL_FAILURE_CODES = Object.freeze([
   'subscription_metadata_unavailable', 'subscription_missing', 'subscription_not_ready', 'subscription_identity_mismatch', 'model_metadata_unavailable',
   'model_missing_or_ambiguous', 'device_metadata_unavailable', 'device_required', 'device_unavailable',
   'native_runtime_unavailable', 'agent_metadata_unavailable', 'agent_unavailable', 'readiness_blocked', 'options_invalid',
+  'fallback_metadata_unavailable', 'fallback_policy_unavailable', 'paid_fallback_enabled',
 ].map(code => `startup_personal_${code}`))
 const check = (ok, code) => { if (!ok) throw new Error(`startup_personal_${code}`) }
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -17,6 +18,15 @@ const personal = (value, ownerId, workspaceId) => value?.currentUserId === owner
 const ownMembership = (value, ownerId) => Array.isArray(value.members)
   && value.members.some(member => member.userId === ownerId && member.role === 'admin' && member.status === 'active')
   && value.members.every(member => member.userId === ownerId || member.status !== 'active')
+
+/** Match the existing subscription-only acceptance policy without changing it. */
+export async function personalFallbackPolicy(client, workspaceId) {
+  let value
+  try { value = await client.json('/api/settings/api-keys?workspace=' + workspaceId) }
+  catch { return { code: 'startup_personal_fallback_metadata_unavailable' } }
+  return value?.apiKeyAfterQuota === false ? { apiKeyAfterQuota: false }
+    : { code: value?.apiKeyAfterQuota === true ? 'startup_personal_paid_fallback_enabled' : 'startup_personal_fallback_policy_unavailable' }
+}
 
 /** Select one explicit, authorized personal Workspace through the normal cookie/RPC path.
  * A query response never substitutes for the subsequent cookie-based readback. */
@@ -56,16 +66,17 @@ export async function personalReadiness(client, scope, { harness = 'both', devic
   const read = async (operation, code) => {
     try { return { value: await operation() } } catch { return { code: `startup_personal_${code}` } }
   }
-  const [subscriptions, devices, agents] = await Promise.all([
+  const [subscriptions, devices, agents, fallback] = await Promise.all([
     read(() => client.json('/api/subscriptions?workspace=' + scope.workspaceId), 'subscription_metadata_unavailable'),
     read(() => client.rpc('agents.listDevices', []), 'device_metadata_unavailable'),
     read(() => client.rpc('agents.listAgents', []), 'agent_metadata_unavailable'),
+    personalFallbackPolicy(client, scope.workspaceId),
   ])
   const order = subscriptions.value?.enabled === true
     ? await read(() => client.rpc('model-order.getModelOrder', [scope.workspaceId]), 'model_metadata_unavailable') : {}
   const checks = (harness === 'both' ? Object.keys(PERSONAL_MODELS) : [harness]).map(kind => {
     const codes = []
-    for (const result of [subscriptions, devices, agents, order]) if (result.code) codes.push(result.code)
+    for (const result of [subscriptions, devices, agents, order, fallback]) if (result.code) codes.push(result.code)
     const provider = kind === 'codex' ? 'codex' : 'claude'
     if (subscriptions.value) {
       if (subscriptions.value.enabled !== true) codes.push('startup_personal_runtime_unavailable')

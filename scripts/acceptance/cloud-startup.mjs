@@ -15,7 +15,7 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { selectTeamWorkspace } from './team-workspace.mjs'
-import { PERSONAL_FAILURE_CODES, selectAcceptancePersonal, personalReadiness } from './personal-workspace.mjs'
+import { PERSONAL_FAILURE_CODES, selectAcceptancePersonal, personalReadiness, personalFallbackPolicy } from './personal-workspace.mjs'
 import { isSmokeAccountEmail } from '../../lib/smoke-account.ts'
 import { OWNED_CODEX_ACTOR, isOwnedCodexEmail, ownedCodexAccount, selectOwnedCodexWorkspace } from './owned-codex-actor.mjs'
 
@@ -961,6 +961,11 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'bot_identity'
     const bot = await client.json(`/api/bots/${botId}`)
     assert(bot.id === botId && /^测试\s*1505(?:\s|$)/.test(bot.name ?? ''), 'test_bot_required')
+    if (personal) {
+      record.phase = 'personal_readiness'
+      const fallback = await personalFallbackPolicy(client, scope.workspaceId)
+      if (fallback.code) throw Error(fallback.code)
+    }
     record.phase = 'chat_model_selection'
     await chooseSharedChatModel(client, botId, harness, owned || personal)
     record.phase = 'issue_create'

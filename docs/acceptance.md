@@ -161,6 +161,9 @@ admin membership, reads back the ordinary Workspace cookie and session, and
 restores the original selection before signing out. It reads subscription/model
 and local device/Agent metadata. It creates no Bot, profile, task, machine or
 provider lease. `ready_for_attempt` always carries `executionVerified: false`.
+It requires the existing `apiKeyAfterQuota` policy to be explicitly false and
+rechecks it before task creation; the driver preserves the setting. Enabled or
+unavailable policy metadata blocks the subscription attempt.
 The report contains closed status/error codes rather than account labels,
 credentials, device names or Agent instructions.
 

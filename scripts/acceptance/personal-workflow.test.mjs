@@ -23,6 +23,7 @@ function fixture(change = {}) {
     assert.match(init.headers.cookie ?? '', /session=fixture-only/)
     if (path === '/api/auth/get-session') return json({ user: { id: change.sessionChanged ? 'other' : ownerId, email: env.SMOKE_OWNER_EMAIL } })
     if (path === '/api/auth/sign-out') return json({})
+    if (path === '/api/settings/api-keys') return json({ ...(change.unknownFallback ? {} : { apiKeyAfterQuota: change.paidFallback === true }), keys: [{ name: 'PRIVATE_KEY_METADATA' }] })
     if (path === '/api/workspace') {
       const selected = url.searchParams.get('workspace') ?? (/mikka-workspace=([^;]+)/.exec(init.headers.cookie)?.[1] ?? (change.noTeam ? workspace : team))
       return json({ currentUserId: ownerId, workspace: { id: selected, kind: selected === workspace && !change.wrongKind ? 'personal' : 'team' }, role: 'admin',
@@ -98,7 +99,7 @@ test('metadata readiness restores the original Workspace and never creates work 
   assert.deepEqual(report.samples, [])
   assert.deepEqual([...new Set(io.calls.filter(call => call.method === 'POST').map(call => call.action ?? call.path))].sort(),
     ['/api/auth/sign-in/email', '/api/auth/sign-out', 'agents.listAgents', 'agents.listDevices', 'model-order.getModelOrder', 'workspace.switchWorkspace'].sort())
-  for (const value of ['fixture-only', env.SMOKE_OWNER_EMAIL, 'PRIVATE_ACCOUNT_METADATA', 'PRIVATE_DEVICE_METADATA', 'PRIVATE_AGENT_METADATA']) {
+  for (const value of ['fixture-only', env.SMOKE_OWNER_EMAIL, 'PRIVATE_ACCOUNT_METADATA', 'PRIVATE_DEVICE_METADATA', 'PRIVATE_AGENT_METADATA', 'PRIVATE_KEY_METADATA']) {
     assert.equal(JSON.stringify(report).includes(value), false)
   }
 })
@@ -109,7 +110,8 @@ test('missing runtime, own subscription, exact model, device and native capabili
     [{ foreignSource: true }, 'model_missing_or_ambiguous'], [{ wrongModel: true }, 'model_missing_or_ambiguous'],
     [{ noDevice: true }, 'device_unavailable'], [{ offline: true }, 'device_unavailable'], [{ disabled: true }, 'device_unavailable'],
     [{ noBroker: true }, 'native_runtime_unavailable'], [{ preflight: true }, 'native_runtime_unavailable'],
-    [{ oldCli: true }, 'native_runtime_unavailable'], [{ agentHarness: 'claude_code' }, 'agent_unavailable']]) {
+    [{ oldCli: true }, 'native_runtime_unavailable'], [{ agentHarness: 'claude_code' }, 'agent_unavailable'],
+    [{ paidFallback: true }, 'paid_fallback_enabled'], [{ unknownFallback: true }, 'fallback_policy_unavailable']]) {
     const io = fixture(change), client = await io.client()
     const scope = await selectAcceptancePersonal(client, { ownerId, workspace })
     const report = await personalReadiness(client, scope, { harness: 'codex', deviceId, agentId })
@@ -128,6 +130,17 @@ test('a blocked personal execute stops before Bot/profile/run creation and keeps
   assert.equal(report.readiness.checks[0].model, 'gpt-6-luna')
   assert.deepEqual(report.samples, [])
   assert.equal(io.calls.some(call => call.action === 'bots.createBot' || call.path.includes('agent-profiles')), false)
+})
+
+test('an API-key quota fallback setting stops personal execution before any Bot/profile/run without changing the setting', async () => {
+  const io = fixture({ paidFallback: true })
+  const report = await runCloudStartup(options(['--operation', 'execute', '--harness', 'codex', '--device-id', deviceId,
+    '--agent-id', agentId, '--expected-build', build, '--revision', build]), { ...io, env })
+  assert.equal(report.status, 'failed')
+  assert.ok(report.readiness.checks[0].codes.includes('startup_personal_paid_fallback_enabled'))
+  assert.deepEqual(report.samples, [])
+  assert.equal(io.calls.some(call => call.action === 'bots.createBot' || call.path.includes('agent-profiles')), false)
+  assert.equal(io.calls.filter(call => call.path === '/api/settings/api-keys').every(call => call.method === 'GET'), true)
 })
 
 test('personal subscription evidence requires requester ownership and owner access, preserving the shared proof fence', async () => {
@@ -152,10 +165,12 @@ test('personal cases select the own subscription menu for each fixed harness bef
   for (const [harness, modelId] of Object.entries(PERSONAL_MODELS)) {
     const botId = id(70), profileId = id(71), ownOption = id(72), sharedOption = id(73)
     const provider = harness === 'codex' ? 'codex' : 'claude', chosen = []
+    let paidFallback = false
     const scope = { ownerId, adminId: ownerId, botId, workspaceId: workspace, workspaceKind: 'personal',
       acceptanceEmailHash: createHash('sha256').update(env.SMOKE_OWNER_EMAIL).digest('hex'), evidence: { personalWorkspaceConfirmed: true } }
     const client = { request() { throw Error('unexpected request') },
       json: async path => {
+        if (path.startsWith('/api/settings/api-keys?')) return { apiKeyAfterQuota: paidFallback }
         if (path === '/api/auth/get-session') return { user: { id: ownerId, email: env.SMOKE_OWNER_EMAIL } }
         if (path === '/api/workspace') return { currentUserId: ownerId, workspace: { id: workspace, kind: 'personal' }, role: 'admin' }
         assert.equal(path, '/api/bots/' + botId); return { id: botId, name: '测试1505 personal' }
@@ -170,11 +185,17 @@ test('personal cases select the own subscription menu for each fixed harness bef
         assert.equal(action, 'issues.saveIssue')
         throw Error('startup_issue_create_failed')
       } }
-    const record = await runSubscriptionCase({ client, scope, botId, profileId, profile: { id: profileId, digest: 'a'.repeat(64) },
-      harness, deviceId, agentId, pinBuild: async () => {} })
+    const input = { client, scope, botId, profileId, profile: { id: profileId, digest: 'a'.repeat(64) },
+      harness, deviceId, agentId, pinBuild: async () => {} }
+    const record = await runSubscriptionCase(input)
     assert.deepEqual(chosen, [ownOption])
     assert.equal(record.error, 'startup_issue_create_failed')
     assert.equal(record.runId, undefined)
+    paidFallback = true; chosen.length = 0
+    const denied = await runSubscriptionCase(input)
+    assert.equal(denied.error, 'startup_personal_paid_fallback_enabled')
+    assert.deepEqual(chosen, [])
+    assert.equal(denied.runId, undefined)
   }
 })
 
