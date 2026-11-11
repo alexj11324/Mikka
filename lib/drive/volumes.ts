@@ -114,7 +114,8 @@ export async function createDriveVolume(
 export async function listDriveVolumes(
   database: Pick<PoolClient, 'query'>,
   actor: { ownerId: string },
-  scope: { driveScope: DriveScope; scopeId: string; scopeUserId?: string | null },
+  scope: { driveScope: DriveScope; scopeId: string; scopeUserId?: string | null; workspaceId?: string },
+  page?: { beforeId?: string; limit: number },
 ): Promise<DriveVolumeSummary[]> {
   const { rows } = await database.query<{
     id: string; driveScope: DriveScope; scopeId: string; scopeUserId: string | null; name: string
@@ -122,7 +123,9 @@ export async function listDriveVolumes(
   }>(`SELECT id,"driveScope","scopeId","scopeUserId",name,"headVersionId","headDigest","entryCount","totalBytes","createdAt","updatedAt"
       FROM drive_volumes
       WHERE "ownerId"=$1 AND "driveScope"=$2 AND "scopeId"=$3 AND coalesce("scopeUserId",'')=coalesce($4,'')
-      ORDER BY "updatedAt" DESC, id DESC`, [actor.ownerId, scope.driveScope, scope.scopeId, scope.scopeUserId ?? null])
+        AND ($5::uuid IS NULL OR "workspaceId"=$5) AND ($6::text IS NULL OR id<$6)
+      ORDER BY ${page ? 'id DESC' : '"updatedAt" DESC, id DESC'} LIMIT $7`,
+  [actor.ownerId, scope.driveScope, scope.scopeId, scope.scopeUserId ?? null, scope.workspaceId ?? null, page?.beforeId ?? null, page?.limit ?? null])
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
 }
 
