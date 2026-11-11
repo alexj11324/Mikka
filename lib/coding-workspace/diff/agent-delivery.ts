@@ -14,6 +14,8 @@ import { FactoryError } from '../../factory/contract'
 import { factoryRuntimeForBot } from '../../factory/runtime'
 import { automaticFactoryDispatch } from '../../factory/automatic-dispatch'
 import { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } from '../../factory/transaction'
+import { withTaskWorkspace } from '../../task-workspace'
+import { tokenWorkspace } from '../../tokens/principal'
 import { ActionFailureError } from '../../action-error'
 import { resolveReviewScope, withReviewTransaction, type ReviewActor, type ReviewScope } from './authority'
 import { readDiffSnapshot } from './store'
@@ -130,7 +132,7 @@ export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewAc
   let receipt: ReviewBatchReceipt
   try {
     const witness = await reviewSourceWitness(deps, actor, scope, snapshot, requestSignal, row.input.agent?.factory)
-    receipt = await withReviewTransaction(deps.database, deps.membership, actor, runId, repoId, async (tx, fresh, lease) => {
+    const transaction = () => withReviewTransaction(deps.database, deps.membership, actor, runId, repoId, async (tx, fresh, lease) => {
       owner(actor, fresh)
       await lockReviewBoard(tx, fresh)
       const current = await readReviewBatch(tx, actor, fresh, row.id)
@@ -207,6 +209,12 @@ export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewAc
           check: async () => { requestSignal.throwIfAborted(); await workspace.query('SELECT 1') } }),
         rollback: rollbackFactoryTransaction, finish: forgetFactoryTransaction,
       } })
+    // The task workspace lease must precede the APP transaction. The Factory
+    // store borrows that live lease when it applies the repair and dispatches
+    // the child Run; it refuses an inverted checkout on an open APP transaction.
+    receipt = row.input.agent?.factory
+      ? await withTaskWorkspace({ id: actor.userId, [tokenWorkspace]: actor.workspaceId }, actor.workspaceId, transaction)
+      : await transaction()
   } catch (error) {
     const reason = refusal(error)
     if (reason && !requestSignal.aborted) return reject(deps, actor, row, reason, requestSignal)

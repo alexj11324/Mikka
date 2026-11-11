@@ -7,23 +7,26 @@
 
 # Mikka
 
-**AI agent coordination across your computers and the cloud.**
+### The AI lead for ambitious work.
 
-Mikka organizes work for Claude Code, Codex and supported Cursor runners, with bots that coordinate tasks and agents that execute them.
+Every agent, from laptop to cloud, working as one team.
 
 [Open Mikka](https://app.aspectlylabs.com/mikka) · [Documentation](https://aspectlylabs.com/mikka/docs) · [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
 
 **English** · [简体中文](README.zh-CN.md)
 
 </div>
 
+Mikka organizes work for Claude Code, Codex and supported Cursor runners, with bots that coordinate tasks and agents that execute them.
+
 Describe a task to a bot. Mikka dispatches coding work to agents on your Mac, Linux machine, SSH server or an eligible cloud sandbox, then brings their progress, questions and results back into one place. Use it in the web, macOS or iOS app.
 
 ## Get started
 
-**Mikka Cloud (early access).** [Open the app](https://app.aspectlylabs.com/mikka). If you need access, email [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com), then follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
+**Mikka Cloud.** [Open the app](https://app.aspectlylabs.com/mikka), create an account and start using Mikka. Follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart) to get set up.
 
 **Self-hosted server.** Mikka can run on your own Linux host with Docker and PostgreSQL. Follow the [self-hosting guide](docs/self-hosting.md) to configure credentials, download the matching Compose file and start the server:
 
@@ -106,10 +109,34 @@ Commercial licenses are available from Aspectly Labs at [legal@aspectlylabs.com]
 
 <p>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
-    <img src="docs/assets/openai-mark-light.svg" alt="OpenAI mark" width="28" height="28">
-  </picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI logo" width="32" height="32">
+    </picture>
   <strong>OpenAI · Codex for Open Source</strong>
 </p>
 
-Mikka's maintainer received six months of ChatGPT Pro access through the [Codex for Open Source](https://openai.com/form/codex-for-oss/) program. Mikka is independent and is not affiliated with or endorsed by OpenAI. The OpenAI name and logo are trademarks of OpenAI.
+Mikka is proudly developed with support from the [Codex for Open Source](https://openai.com/form/codex-for-oss/) program.
+
+A heartfelt thank-you to OpenAI and the Codex team for providing Mikka's maintainer with six months of ChatGPT Pro access. This support gives us more room to explore ambitious ideas, improve engineering and user experience, and give back to the open-source community.
+
+Mikka is an independent open-source project and is not affiliated with or endorsed by OpenAI. The OpenAI name and logo are trademarks of OpenAI.
+
+## License
+
+Mikka is copyright © 2026 Aspectly Labs and licensed under
+[AGPL-3.0-only](LICENSE). Third-party components keep their own licenses; see
+[`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md).
+
+Commercial licenses for use without the AGPL's obligations are available from
+Aspectly Labs: [legal@aspectlylabs.com](mailto:legal@aspectlylabs.com).
+
+If you run a modified version of Mikka as a network service, the AGPL requires
+you to offer its users the source code of your version.
+
+## Contributing
+
+Contributions are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first.
+Contributors keep the copyright in their work and license it under
+[AGPL-3.0-only](LICENSE); by submitting it they also allow Aspectly Labs to
+offer it under other terms, including commercial licenses. There is no form to
+sign. The terms are in [`CONTRIBUTING.md`](CONTRIBUTING.md#license).

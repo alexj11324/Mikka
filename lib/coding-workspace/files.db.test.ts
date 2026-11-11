@@ -74,7 +74,7 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
       for (const user of [owner, member]) await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'member\',\'active\')', [id, user, `${user}@example.invalid`])
     }
     const actor = { userId: owner, workspaceId }
-    async function fixture(cloud = false, tenant = workspaceId) {
+    async function fixture(cloud = false, tenant: string = workspaceId) {
       const runId = randomUUID(), repoId = randomUUID(), deviceId = randomUUID(), tokenId = randomUUID(), agentId = randomUUID()
       const worktree = join(root, runId), remote = `https://github.com/mikka-fixtures/${runId}.git`, repositoryKey = remoteKey(remote)
       await mkdir(join(worktree, 'src'), { recursive: true })
@@ -343,7 +343,10 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
       await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [personalRun.runId, legacyIssueId])
       assert.equal((await resolve(personalRun, personalActor)).identity.workspaceId, personalId)
       await pool.query('UPDATE issues SET "userId"=$2,scope=\'personal\' WHERE id=$1', [legacyIssueId, member])
-      await assert.rejects(() => resolve(personalRun, personalActor), errorCode('workspace_not_found'))
+      // The owner remains an admin of their personal workspace; another user
+      // who is not a member cannot resolve the legacy task.
+      assert.equal((await resolve(personalRun, personalActor)).identity.workspaceId, personalId)
+      await assert.rejects(() => resolve(personalRun, { userId: member, workspaceId: personalId }), errorCode('workspace_not_found'))
     })
 
     await t.test('every nonempty frozen workspace source must agree; repository substitution fails closed', async () => {

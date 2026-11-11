@@ -984,7 +984,10 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
 
     await t.test('account deletion retains shared Bot snapshots, removes private history and authored review rows, and preserves other reviewers', async () => {
       const departing = await user(), where = await workspace(owner, [departing, member])
-      const kept = await fixture({ person: departing, where, bot: true }), discarded = await fixture({ person: departing, where })
+      // A solo workspace is private history; the shared workspace Run with a
+      // Bot is the retained history this test distinguishes from it.
+      const solo = await workspace(departing, [])
+      const kept = await fixture({ person: departing, where, bot: true }), discarded = await fixture({ person: departing, where: solo })
       const keptSnapshot = (await capture(kept, true)).snapshot, discardedSnapshot = (await capture(discarded, true)).snapshot
       const { scope } = await reviewRows(kept, keptSnapshot, departing.id)
       const memberRows = await reviewRows(kept, keptSnapshot, member.id)
