@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, lstatSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 export const UPSTREAM_REPOSITORY = 'alexj11324/Mikka'
@@ -79,7 +79,7 @@ export function assertPinnedImage(image) {
 }
 
 export function ensureRegularEnvFile(path) {
-  const info = statSync(path, { throwIfNoEntry: false })
+  const info = lstatSync(path, { throwIfNoEntry: false })
   if (info && (!info.isFile() || info.isSymbolicLink())) throw new Error('SELF_HOSTED_UPDATE_ENV_NOT_REGULAR')
 }
 
