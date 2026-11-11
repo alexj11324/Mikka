@@ -49,6 +49,11 @@ unit tests resolves that problem.
   files are refused. Runtime credentials are individual Worker secret bindings
   prefixed `EVE_ENV_`, delivered to the child at runtime, not image build args.
 
+The platform must explicitly provide `EVE_ENV_MIKKA_DEPLOYMENT_STAGE` as
+`preview` or `production`. `NODE_ENV` is not a substitute for deployment stage.
+The stage-aware product guards are in separate draft #1964 and must be composed
+with the matching runtime before any production acceptance.
+
 The configuration has no routes, preview URLs or Workers.dev endpoint. Its
 default name identifies a candidate. Do not add production routes here.
 

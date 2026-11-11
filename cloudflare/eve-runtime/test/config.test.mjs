@@ -11,6 +11,7 @@ function environment() {
     EVE_ENV_WORKFLOW_POSTGRES_URL: 'postgres://fixture:private-password@127.0.0.1/world_e2e',
     EVE_ENV_MIKKA_DATABASE_URL: 'postgres://fixture:private-password@127.0.0.1/product_e2e',
     EVE_ENV_BETTER_AUTH_URL: 'https://app.example.test',
+    EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'preview',
     EVE_ENV_BETTER_AUTH_SECRET: 'private-fixture-auth-key-at-least-thirty-two',
   }
 }
@@ -43,6 +44,7 @@ test('missing durable storage, unsafe origins or incompatible hosting fail witho
     { EVE_ENV_SLACK_BOT_TOKEN: 'private-bot-token' },
     { EVE_HOST_WARM_UNTIL: undefined }, { EVE_HOST_WARM_UNTIL: '' },
     { EVE_HOST_WARM_UNTIL: new Date(Date.now() + 25 * 60 * 60_000).toISOString() },
+    { EVE_ENV_MIKKA_DEPLOYMENT_STAGE: undefined }, { EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'development' },
   ]) {
     assert.throws(() => hostConfiguration({ ...environment(), ...change }), error => {
       assert.equal(error.message, 'CF_EVE_HOST_CONFIGURATION_INVALID')

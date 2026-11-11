@@ -9,6 +9,7 @@ const env = {
   EVE_ENV_WORKFLOW_POSTGRES_URL: 'postgres://fixture:private-password@127.0.0.1/world_e2e',
   EVE_ENV_MIKKA_DATABASE_URL: 'postgres://fixture:private-password@127.0.0.1/product_e2e',
   EVE_ENV_BETTER_AUTH_URL: 'https://app.example.test',
+  EVE_ENV_MIKKA_DEPLOYMENT_STAGE: 'preview',
   EVE_ENV_BETTER_AUTH_SECRET: 'private-fixture-auth-key-at-least-thirty-two',
   EVE_RUNTIME: {},
 }

@@ -36,7 +36,8 @@ export function hostConfiguration(env) {
   if (typeof runtime.WORKFLOW_POSTGRES_URL !== 'string' || !URL.canParse(runtime.WORKFLOW_POSTGRES_URL)
     || !['postgres:', 'postgresql:'].includes(new URL(runtime.WORKFLOW_POSTGRES_URL).protocol)
     || typeof runtime.BETTER_AUTH_SECRET !== 'string' || runtime.BETTER_AUTH_SECRET.length < 32
-    || !(runtime.MIKKA_DATABASE_URL || runtime.DATABASE_URL)) return invalid()
+    || !(runtime.MIKKA_DATABASE_URL || runtime.DATABASE_URL)
+    || !['production', 'preview'].includes(runtime.MIKKA_DEPLOYMENT_STAGE)) return invalid()
   httpsOrigin(runtime.BETTER_AUTH_URL)
   return {
     releaseId: env.EVE_RELEASE_ID, sourceSha: env.EVE_SOURCE_SHA, uiSha: env.EVE_UI_SHA,
