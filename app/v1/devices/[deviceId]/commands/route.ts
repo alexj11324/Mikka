@@ -7,6 +7,7 @@ import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, 
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 import { WORKSPACE_REQUEST_HEADER } from '@mikka/protocol/coding-workspace'
 import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
+import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-git'
 import { pendingWorkspaceReads } from '@/lib/coding-workspace/requests'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
@@ -63,7 +64,8 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
       const { commands, queuedRuns: queued } = check.work ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
       const workspaceRequests = !obsolete && request.headers.get(WORKSPACE_REQUEST_HEADER) === '1'
         ? await pendingWorkspaceReads(pool, workspacePool, caller, deviceId, list('skipWorkspaceRequests', 8).filter(id => z.uuid().safeParse(id).success),
-          { diff: request.headers.get(WORKSPACE_DIFF_REQUEST_HEADER) === '1' }) : []
+          { diff: request.headers.get(WORKSPACE_DIFF_REQUEST_HEADER) === '1',
+            git: request.headers.get(WORKSPACE_GIT_REQUEST_HEADER) === '1' }) : []
       if (request.signal.aborted) break
       // Memory only: a release published mid-poll ends it once this instance's cache has it.
       if (knownRelease) releases = cachedDaemonVersions() ?? releases

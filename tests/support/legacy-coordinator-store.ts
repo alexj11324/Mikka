@@ -23,6 +23,8 @@ import { attentionQuestionsFromEvents, type AttentionQuestion } from '@/lib/coor
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import type { InboxEvent } from '@/lib/push-reasons'
 import type { ScheduledRead } from '@/lib/schedules/contract'
+import type { RunOrigin, RunOriginRef } from '@/lib/run-origin'
+import { telegramRunOriginRef } from '@/lib/run-origin'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 import { botChatChanged } from '@/lib/live/chats'
 import type { CoordinatorStartupReceipt, CoordinatorStartupSettingsCandidate, CoordinatorStartupSettings, CoordinatorStartupTake } from './legacy-coordinator-startup'
@@ -125,6 +127,8 @@ export interface InboxTake {
   /** Durable human handoffs already chosen by this inbox's Decision receipts. */
   attentionQuestions?: AttentionQuestion[]
   scheduledRead?: ScheduledRead
+  origin?: RunOrigin
+  originRef?: RunOriginRef
 }
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushEvents: [], pushHidesText: false }
@@ -229,12 +233,14 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       const receipt = codec.readStartupReceipt(1, settings, inbox)
       const stored = codec.encodeStoredStartupReceipt(receipt)
       const storedSettings = JSON.stringify(stored.settings), storedInbox = JSON.stringify(stored.inbox)
+      const { o: _origin, r: _originRef, ...ordinaryInbox } = stored.inbox
+      const storedOrdinaryInbox = JSON.stringify(ordinaryInbox)
       // Only a small ordinary inbox needs a receipt for preparation inside
       // this step. Larger/new non-combined takes return their complete inbox
       // directly at the original durable boundary, with no fallible work
       // after COMMIT. Existing receipts were replayed above before this choice.
       if (inbox.added > 0 && (inbox.scheduledRead || !settings.agentKitEnabled ||
-        Buffer.byteLength(storedSettings, 'utf8') + Buffer.byteLength(storedInbox, 'utf8') > 256)) {
+        Buffer.byteLength(storedSettings, 'utf8') + Buffer.byteLength(storedOrdinaryInbox, 'utf8') > 256)) {
         return { inbox: receipt.inbox, startup: { kind: 'inbox-only', ...receipt } }
       }
       const inserted = await tx.execute(sql`INSERT INTO coordinator_startup_receipts("userId","botId",holder,round,version,settings,inbox) VALUES(${userId},${botId}::uuid,${holder},0,1,${storedSettings}::jsonb,${storedInbox}::jsonb) ON CONFLICT("userId","botId",holder,round) DO NOTHING`)
@@ -286,6 +292,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
     const source = due.findLast(event => event.kind === 'user_message' && event.payload.postedToChat !== true)
       ?? due.findLast(event => event.kind === 'user_message')
     let sourceEventId = scheduled ? undefined : source?.id
+    let entryPayload = source?.payload
     if (!scheduled && source?.payload.retry === true && source.payload.postedToChat === true) {
       // A retry is a wake, not another human request. Resolve server-written
       // provenance on the last actual person message, within this owned chat.
@@ -295,6 +302,7 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
         .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.message}->>'role' = 'user'`)).orderBy(desc(coordinatorMessages.position)).limit(1)
       if (original) {
         sourceEventId = original.id
+        entryPayload = original.payload
         if (original.payload.taskDestination !== undefined) { taskEventId = original.id; due = [source] }
       }
     }
@@ -326,11 +334,14 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       .orderBy(asc(coordinatorEvents.createdAt), asc(coordinatorEvents.id)).limit(100)
     const handoffs = events.filter(event => isHandoff(event.kind))
     const attentionQuestions = scheduledRead ? [] : attentionQuestionsFromEvents(events)
+    const entryRef = scheduled ? null : telegramRunOriginRef(entryPayload?.telegram)
     return finish({
       held: true, added: events.length,
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
       ...(scheduledRead ? { scheduledRead } : {}),
+      origin: scheduled ? 'schedule' : entryRef ? 'telegram' : 'web',
+      ...(entryRef ? { originRef: entryRef } : {}),
       ...(attentionQuestions.length ? { attentionQuestions } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),

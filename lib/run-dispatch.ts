@@ -8,6 +8,7 @@ import { agentRuns, type RunStatus } from './db/schema'
 import { notifyDeviceWork } from './device-gateway-notify'
 import { runListChanged } from './live/lists'
 import { runChanged } from './live/panels'
+import type { RunOrigin, RunOriginRef } from './run-origin'
 
 /** Reuse this key for retries of one logical dispatch, including after a lost response. */
 export const dispatchRequestKey = z.string().trim().min(1).max(200)
@@ -40,7 +41,8 @@ export function dispatchFingerprint(input: DispatchInput & DispatchCredential): 
  * Lock order is always request key, then issue; unkeyed calls take only issue.
  */
 export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, userId: string, input: DispatchInput,
-  brief: { deviceId: string; baseBranch: string; prompt: string; botId?:string|null; agentDefinition?:typeof agentRuns.$inferInsert.agentDefinition }): Promise<DispatchResult> {
+  brief: { deviceId: string; baseBranch: string; prompt: string; botId?:string|null; agentDefinition?:typeof agentRuns.$inferInsert.agentDefinition
+    /** Evidence-only entry provenance; this legacy path is host/tests only. */ origin?: RunOrigin; originRef?: RunOriginRef | null }): Promise<DispatchResult> {
   const result = await database.transaction(async tx => {
     const hash = input.requestKey ? dispatchFingerprint(input) : null
     if (input.requestKey) {
@@ -62,6 +64,7 @@ export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, us
       id: runId, userId, issueId: input.issueId, agentId: input.agentId, deviceId: brief.deviceId,
       deviceRepoId: input.deviceRepoId, status: 'queued', kind: 'implement', baseBranch: brief.baseBranch,
       botId:brief.botId??null, agentDefinition:brief.agentDefinition??null, prompt: brief.prompt, dispatchKey: input.requestKey ?? null, dispatchFingerprint: hash,
+      origin: brief.origin ?? 'factory', originRef: brief.originRef ?? null,
     })
     await runListChanged(tx, runId)
     await runChanged(tx, runId)

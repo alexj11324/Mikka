@@ -2562,6 +2562,7 @@
         },
         "token": {
           "created": "created token {target}",
+          "rotated": "rotated the secret for token {target}",
           "revoked": "revoked token {target}"
         },
         "auth": {

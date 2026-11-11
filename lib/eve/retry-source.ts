@@ -2,7 +2,7 @@ import {z} from 'zod'
 import type {EveScope} from './scope'
 
 export interface EveRetrySource {position:number;id:string;payload:Record<string,unknown>;taskRequestSourceEventId:string}
-async function canonical(scope:EveScope,id:string,payload:Record<string,unknown>) {
+export async function eveOriginalRequestSource(scope:EveScope,id:string,payload:Record<string,unknown>) {
   if(payload.taskRequestSourceEventId===undefined)return {id,payload}
   const parsed=z.uuid().safeParse(payload.taskRequestSourceEventId)
   if(!parsed.success)throw new Error('notFound')
@@ -22,10 +22,10 @@ export async function loadEveRetrySource(scope:EveScope,position:number):Promise
     JOIN bots b ON b.id=e."botId" AND b."ownerId"=e."userId" AND b."workspaceId"=$4
     WHERE m."userId"=$1 AND m."botId"=$2 AND m.position=$3 AND m.message->>'role'='user' AND m.message ? 'mikkaFailure' AND e.kind='user_message'`,[scope.ownerId,scope.botId,position,scope.workspaceId])).rows[0]
   if(!row)return null
-  return {position,...row,taskRequestSourceEventId:(await canonical(scope,row.id,row.payload)).id}
+  return {position,...row,taskRequestSourceEventId:(await eveOriginalRequestSource(scope,row.id,row.payload)).id}
 }
 
 export async function eveTaskRequestSource(scope:EveScope,id:string,payload:Record<string,unknown>) {
-  const root=await canonical(scope,id,payload)
+  const root=await eveOriginalRequestSource(scope,id,payload)
   return root.payload.taskDestination||root.payload.profileId||root.payload.taskTitle?root.id:undefined
 }

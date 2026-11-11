@@ -195,7 +195,7 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
   })
   await t.test('removing Org membership suspends only its Workspaces and revokes scoped PATs without deleting identity', async () => {
     const scoped = randomUUID(), other = randomUUID()
-    for (const [id, workspaceId] of [[scoped, wsA], [other, unrelated]]) await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,\'Fixture\',$4,\'test\')', [id, member.id, workspaceId, identityTokenHash(randomUUID())])
+    for (const [id, workspaceId] of [[scoped, wsA], [other, unrelated]]) await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,\'Fixture\',$4,\'test\',ARRAY[\'legacy:full\']::text[])', [id, member.id, workspaceId, identityTokenHash(randomUUID())])
     await org.removeOrganizationMember(organizationId, admin.id, member.id)
     assert.equal((await pool.query('select count(*) from mikka_workspace_members where "userId"=$1 and "workspaceId"=any($2::uuid[]) and status=\'suspended\'', [member.id, [wsA, wsB]])).rows[0].count, '2')
     assert.equal((await pool.query('select status from mikka_workspace_members where "userId"=$1 and "workspaceId"=$2', [member.id, unrelated])).rows[0].status, 'active')
