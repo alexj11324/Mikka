@@ -94,14 +94,14 @@ test('local fonts are the registered files bound to their CSS variables', () => 
   // The rule itself still rejects an unregistered file or variable.
   const approved = `import localFont from 'next/font/local';
     const fontSans = localFont({ src: '../fonts/InterVariable.woff2', variable: '--font-inter', weight: '100 900' });`
-  assert.deepEqual(auditSource('components/example-font.tsx', approved, policy), [])
+  assert.deepEqual(auditSource('app/[locale]/example-font.tsx', approved, policy), [])
   for (const source of [approved.replace('InterVariable.woff2', 'Other-Variable.woff2'), approved.replace('--font-inter', '--font-other')]) {
-    assert.ok(auditSource('components/example-font.tsx', source, policy).some(d => d.rule === 'typography/font-family'))
+    assert.ok(auditSource('app/[locale]/example-font.tsx', source, policy).some(d => d.rule === 'typography/font-family'))
   }
   const pair = `import localFont from 'next/font/local';
     const fontSans = localFont({ src: [{ path: '../fonts/InterVariable.woff2', style: 'normal' }, { path: '../fonts/InterVariable-Italic.woff2', style: 'italic' }], variable: '--font-inter' });`
-  assert.deepEqual(auditSource('components/example-font.tsx', pair, policy), [])
-  assert.ok(auditSource('components/example-font.tsx', pair.replace('InterVariable-Italic.woff2', 'Other-Italic.woff2'), policy).some(d => d.rule === 'typography/font-family'))
+  assert.deepEqual(auditSource('app/[locale]/example-font.tsx', pair, policy), [])
+  assert.ok(auditSource('app/[locale]/example-font.tsx', pair.replace('InterVariable-Italic.woff2', 'Other-Italic.woff2'), policy).some(d => d.rule === 'typography/font-family'))
 })
 
 test('component composition + business data/event wiring + layout are allowed', () => {
