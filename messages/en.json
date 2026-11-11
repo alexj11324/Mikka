@@ -5148,6 +5148,11 @@
     "mine": "{emoji}: {others, plural, =0 {just you} one {you and # other} other {you and # others}}"
   },
   "GroupChat": {
+    "leave": "Leave group",
+    "leaveConfirm": "Leave {name}?",
+    "reinvite": "The group owner will need to invite you to return.",
+    "leaveDenied": "You can’t leave this group with your current membership.",
+    "leaveError": "Couldn’t leave the group. Try again.",
     "untitled": "Untitled group chat",
     "composer": "Message {name}",
     "messages": "Group chat messages",

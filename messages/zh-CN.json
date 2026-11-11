@@ -5148,6 +5148,11 @@
     "mine": "{emoji}：{others, plural, =0 {你} other {你和另外 # 人}}"
   },
   "GroupChat": {
+    "leave": "退出群聊",
+    "leaveConfirm": "退出「{name}」？",
+    "reinvite": "退出后需要群主再次邀请才能加入。",
+    "leaveDenied": "当前成员身份无法退出此群聊。",
+    "leaveError": "未能退出群聊，请重试。",
     "untitled": "未命名群聊",
     "composer": "给 {name} 发消息",
     "messages": "群聊消息",

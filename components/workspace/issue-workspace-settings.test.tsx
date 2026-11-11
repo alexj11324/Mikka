@@ -21,6 +21,9 @@ let user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
 let workspaceId = 'workspace-one'
 let workspaceReady = true
 let workspaceError: Error | undefined
+let groupList: { id: string; title: string; workspaceId: string }[] = []
+let groupListError: Error | undefined
+let groupListRetries = 0
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
 const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
@@ -42,7 +45,11 @@ mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: not
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
   useLiveIssueList: () => emptyList, useLiveThreadList: () => emptyList,
-  useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({ data: [] }),
+  useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({
+    data: groupList,
+    error: groupListError,
+    mutate: async () => { groupListRetries++; groupListError = undefined },
+  }),
 } })
 for (const [file, names] of [
   ['../../app/actions/projects.ts', ['listProjects', 'listWorkspaceProjects']], ['../../app/actions/teams.ts', ['listTeams']],
@@ -65,10 +72,13 @@ for (const [file, names] of [
   ['../nav/context-panel.tsx', ['ContextPanel']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
   ['../nav/group-avatar.tsx', ['GroupPillAvatar']],
-  ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']], ['./group-chat-view.tsx', ['GroupChatView']],
+  ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']],
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
+mock.module('./group-chat-view', { namedExports: {
+  GroupChatView: ({ group }: { group: { id: string } }) => <section data-open-group={group.id} />,
+} })
 mock.module('../browser/browser-pane', { namedExports: { BrowserPane: () => <section data-browser-pane="" /> } })
 mock.module('@/components/nav/bot-list', { namedExports: { BotList: empty, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
@@ -161,6 +171,9 @@ beforeEach(() => {
   workspaceId = 'workspace-one'
   workspaceReady = true
   workspaceError = undefined
+  groupList = []
+  groupListError = undefined
+  groupListRetries = 0
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
@@ -214,6 +227,31 @@ async function go(href: string) {
   browser.history.pushState({}, '', href)
   await render()
 }
+
+test('a group absent from stale rows offers retry until a successful membership read', async () => {
+  const id = '8055a7ae-204f-4045-8780-66b9c93ce228'
+  groupList = [{ id: 'other-group', title: 'Another group', workspaceId }]
+  groupListError = new Error('offline during the reload after creation')
+  browser.history.replaceState({}, '', `/?workspace=${workspaceId}&group=${id}`)
+  await render()
+
+  const alert = container.querySelector('[role="alert"]')
+  assert.ok(alert?.textContent?.includes('GroupChat.loadError'))
+  assert.doesNotMatch(container.textContent ?? '', /GroupChat\.notFound/)
+  const retry = alert.querySelector('button')
+  assert.ok(retry)
+  await act(async () => retry.click())
+  assert.equal(groupListRetries, 1)
+  await render()
+  assert.match(container.textContent ?? '', /GroupChat\.notFound/)
+  assert.equal(container.querySelector('[data-open-group]'), null)
+
+  groupList = [...groupList, { id, title: 'New group', workspaceId }]
+  groupListError = new Error('a subsequent refresh failed')
+  await render()
+  assert.equal(container.querySelector('[data-open-group]')?.getAttribute('data-open-group'), id)
+  assert.doesNotMatch(container.textContent ?? '', /GroupChat\.loadError/)
+})
 
 test('a cached conversation cannot accept a draft before its authenticated workspace scope resolves', async () => {
   workspaceReady = false

@@ -53,6 +53,15 @@ function useViewStore() {
   return provided ?? local
 }
 
+/** A confirmed loss of group membership also retires this tab's saved drafts. */
+export function useForgetGroupDrafts() {
+  const store = useViewStore()
+  return useCallback((id: string) => {
+    store.set(`group:${id}:draft`, '')
+    store.set(`group:${id}:pending`, [])
+  }, [store])
+}
+
 /** A keyed state cell: changing objects reads that object's state immediately. */
 export function useViewState<T,>(key: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
   const store = useViewStore()
