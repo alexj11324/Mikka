@@ -1,0 +1,14 @@
+{
+  "result": "passed",
+  "browserDrained": true,
+  "generatedWorkspaceName": {
+    "phase": "restored",
+    "restored": true,
+    "initialOwnerMatchesSealedBaseline": true,
+    "peerMatchesSealedBaseline": true,
+    "onlyGeneratedNameDifference": true,
+    "ownerMatchesSealedBaseline": true
+  },
+  "release": "released",
+  "localRuntimeStopped": true
+}

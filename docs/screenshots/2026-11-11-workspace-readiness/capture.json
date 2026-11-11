@@ -1,0 +1,39 @@
+{
+  "source": "d58ea6c90fc2ad1ad322256ffa0d5c34875c1ffd",
+  "overlay": "0a6e897339d4f4834d78846e55dc4cda4ed2a599",
+  "rendererBuild": "83caa8922c90a71d8c0063fb46f4f997752cc5ae1acb2b75cfbdabd88eabd35b",
+  "browser": "154.0.8037.57",
+  "runtime": "Official complete local Node production build, isolated PostgreSQL17, normal leased email-auth cookies and loopback SMTP",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "checks": [
+    "light: no editable composer while the real workspace request is held",
+    "light: draft retained after real native empty-create response and workspace readiness",
+    "light: scoped draft restored after a full document reload",
+    "dark: no editable composer while the real workspace request is held",
+    "dark: draft retained after real native empty-create response and workspace readiness",
+    "dark: scoped draft restored after a full document reload"
+  ],
+  "boundaries": [
+    "Only the real workspace request was delayed, then continued unchanged; no response fixture or private component/SDK state injection",
+    "No message, welcome, task, native send or answer was submitted; ordinary auth and realtime transport stayed real"
+  ],
+  "pageErrors": [],
+  "screenshots": [
+    "workspace-loading-light-1440.png",
+    "workspace-ready-draft-light-1440.png",
+    "workspace-loading-dark-1440.png",
+    "workspace-ready-draft-dark-1440.png"
+  ],
+  "result": "passed",
+  "capturedAt": "2026-11-11T10:19:12.822400+00:00",
+  "build": {
+    "command": "pnpm build",
+    "pnpm": "10.34.3",
+    "result": "passed",
+    "nodeProductionPreset": "node-server",
+    "database": "mikka_ui_draft_20261111_e2e"
+  }
+}
