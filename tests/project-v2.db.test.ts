@@ -49,7 +49,7 @@ test('Project v2: split database migration, canonical relationships and live ten
   const globals = globalThis as unknown as { mikkaPool?: Pool; workspacePool?: Pool }
   const previousPools = { app: globals.mikkaPool, workspace: globals.workspacePool }
   globals.mikkaPool = application; globals.workspacePool = workspace
-  let applicationModule: Pool | undefined, workspaceModule: Pool | undefined
+  let workspaceModule: Pool | undefined
   let selectedWorkspace: string | undefined
   const framework = await import('next/headers')
   const headersMock = mock.module('next/headers', { namedExports: { ...framework,
@@ -157,8 +157,9 @@ test('Project v2: split database migration, canonical relationships and live ten
     // backfill reads the canonical Workspace and relation columns above.
     await backfillProjectResourceAccess(application, workspace)
 
-    const { pool } = await import('../lib/db'); applicationModule = pool
+    // Import the Workspace module so this run resolves it against the Pools injected above.
     const { workspacePool } = await import('../lib/workspace-db'); workspaceModule = workspacePool
+    await import('../lib/db')
     const { accessibleProjects, projectViewsForTasks, requireProjectWrite } = await import('../lib/project-access')
     const { projectDb } = await import('../lib/db/projects')
     const { withTaskWorkspace } = await import('../lib/task-workspace')
