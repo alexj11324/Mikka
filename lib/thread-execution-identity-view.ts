@@ -52,6 +52,16 @@ const evidence = z.object({ run: z.object({
   executionIdentity: identity.nullable(),
   labels: executionIdentityLabelsSchema.nullable().optional().catch(null),
   modelRouting: modelRoutingEvidenceSchema.nullable().optional().catch(null),
+  // What this run's prompt carried of its workspace skills: the bodies it
+  // inlined, and the ones it only named because the section would not hold
+  // them whole. Separate from `configuredSkills`/`loadedSkills` below, which
+  // describe Profile Skills the agent fetches on demand instead.
+  skillPrompt: z.object({
+    budgetChars: z.number().int().nonnegative(),
+    usedChars: z.number().int().nonnegative(),
+    inlined: z.array(z.string().max(80)),
+    deferred: z.array(z.string().max(80)),
+  }).nullable().optional().catch(null),
   /** Frozen selected Skills, without their bodies. */
   configuredSkills: z.array(profileSkill).max(24).nullable().optional().catch(null),
   /** Daemon receipted loads only; absent on a run that loaded none or predates this field. */

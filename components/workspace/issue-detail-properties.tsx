@@ -48,7 +48,10 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
   return <aside id="issue-properties" aria-label={t('properties')} className="order-1 w-full min-w-0 lg:sticky lg:top-20 lg:order-2 lg:self-start">
     <Button variant="ghost" className="min-h-11 w-full justify-between lg:hidden" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(value => !value)}><SlidersHorizontal data-icon="inline-start" /><span className="flex-1 text-left">{tDetail('propertiesRelations')}</span><ChevronDown data-icon="inline-end" className={cn(expanded && 'rotate-180')} /></Button>
     <div id={contentId} className={cn('flex-col gap-6 lg:flex lg:py-0', expanded ? 'flex py-4' : 'hidden')}>
-    <section className="flex flex-col gap-3 [&_button]:min-h-11 lg:[&_button]:min-h-0"><h2 className="hidden text-xs font-medium text-muted-foreground lg:block">{tDetail('propertiesHeading')}</h2>
+    {/* No descendant min-height utility on this group: it forced every nested button (chips, the property menus'
+        triggers) to 44px and broke the 28px row rhythm. Button and SelectTrigger already grow to a 44px hit area on a
+        coarse pointer through lib/touch-target.ts, which moves nothing. */}
+    <section className="flex flex-col gap-3"><h2 className="hidden text-xs font-medium text-muted-foreground lg:block">{tDetail('propertiesHeading')}</h2>
       <FieldGroup className="gap-1">
         <PropertyRow label={t('statusLabel')}><IssuePropertyMenu variant="row" label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} displayValue={stateLabel(own.state, own.reason)} valueIcon={<TaskStateIcon state={own.state} />} onChange={onStatus} /></PropertyRow>
         <PropertyRow label={t('priorityLabel')}><IssuePropertyMenu variant="row" label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></PropertyRow>
@@ -64,7 +67,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
       </FieldGroup>
     </section>
     {task.metadata.pullRequests.length === 0 && request?.target === 'pullRequests' && <IssueMetadataControls {...control} section="pullRequests" />}
-    <div className="flex min-w-0 flex-col gap-6">{relations}</div>
+    <div data-slot="issue-relations" className="flex min-w-0 flex-col gap-6">{relations}</div>
     </div>
   </aside>
 }

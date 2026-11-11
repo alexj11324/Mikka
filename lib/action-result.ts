@@ -74,6 +74,8 @@ export const ACTION_ERROR_CODES = [
   'issueOutdated',
   'issueTargetUnavailable',
   'issueAccessChanged',
+  /** A relation edit would change who can read the task; replay with confirmAccess. */
+  'accessChangeConfirmationRequired',
   'issueParentCycle',
   'issueDuplicateCycle',
   'issueBlockCycle',
@@ -206,6 +208,8 @@ export interface ActionFailure<E extends string = ActionErrorCode> {
   params?: ActionErrorParams
   /** Stable operation ID for retrying a team action, including unknown outcomes. */
   requestId?: string
+  /** The action changed who can read a resource and did nothing: replay it with `confirmAccess: true`. */
+  confirmable?: true
 }
 
 export type ActionResult<T, E extends string = ActionErrorCode> = (T & { error?: undefined }) | ActionFailure<E>

@@ -794,7 +794,7 @@
         "POST"
       ],
       "maxDuration": 300,
-      "sourceHash": "1e10e4d68acb421783e54f4cc8d7e0a8ee3455f444f59b27bd8cb36cc9fae2f8"
+      "sourceHash": "74502e3d569ca2c8d3ac76d6772a1856d43d290d205ddc1c760f9475de606e58"
     },
     {
       "path": "/mikka/api/device-tokens",
@@ -1283,7 +1283,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "fe52357a984946c4578c0d56c653e01f15be49bae10c07386ea628afd0b3cbbc"
+      "sourceHash": "24bc15ef2265252770c47005cb51af35f2bee36bd481ae74d57acaf769e27106"
     },
     {
       "path": "/mikka/api/mobile/artifacts/[id]",

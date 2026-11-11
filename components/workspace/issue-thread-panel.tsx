@@ -36,6 +36,7 @@ import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-con
 import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
 import { navigate } from './workspace-navigation'
 import { ThreadHeader, ThreadStatusLine } from './thread-header'
+import { ThreadContextUsage } from './thread-context-usage'
 import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
@@ -294,9 +295,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {error && !data ? <InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} data-thread-loading className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
-          <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
-            issueId={issueId} runId={runId} harness={detail?.harness ?? null}
-            {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
+              issueId={issueId} runId={runId} harness={detail?.harness ?? null}
+              {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
+            {/* What the run holds (lib/context-usage.ts). Its own row keeps the shared status-line slot unchanged. */}
+            {data.context && <ThreadContextUsage usage={data.context} />}
+          </div>
           {/* In a task's one conversation the dispatch is the status line's, not a person's bubble (#1681). */}
           {!attempt && (data.thread.prompt.trim() || data.thread.hasInstructions) && <div className="group/message flex flex-col gap-1">{data.thread.prompt.trim() && <PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />}{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">

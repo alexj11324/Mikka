@@ -36,7 +36,7 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 // agent gets exactly the validation and access checks the person gets in the
 // UI. A failed action comes back as `{ error }` with the action's code.
 
-type Failure = { error: string }
+type Failure = { error: string; params?: Record<string, string | number>; confirmable?: true }
 
 function scopedUser(userId: string) {
   const workspaceId = taskReaderScope(userId).workspaceId
@@ -53,9 +53,13 @@ async function taskActor(userId: string, actor?: ActivityActor) {
   throw new ActionFailureError('workspaceAccessDenied')
 }
 
-/** Throws a failed action's code so a chain of actions stops at the first failure. */
+/** Throws a failed action's code so a chain of actions stops at the first failure,
+ * keeping the params and confirmation flag the caller needs to replay it. */
 function unwrap<T extends object>(result: T): Exclude<T, { error: string }> {
-  if ('error' in result && typeof result.error === 'string') throw new ActionFailureError(result.error as never)
+  if ('error' in result && typeof result.error === 'string') {
+    const failure = result as { error: string; params?: Record<string, string | number>; confirmable?: true }
+    throw new ActionFailureError(failure.error as never, failure.params, failure.confirmable)
+  }
   return result as Exclude<T, { error: string }>
 }
 
@@ -63,7 +67,10 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
+    // A confirmation request is an answer the caller replays with confirmAccess,
+    // so it carries that flag rather than reading as a plain failure (ALE-26).
+    if (error instanceof ActionFailureError) return { error: error.code, ...(error.params ? { params: error.params } : {}), ...(error.confirmable ? { confirmable: error.confirmable } : {}) }
+    if (error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
     if (error instanceof AgentProfileAdmissionError) return { error: 'agentProfileUnavailable' }
     throw error
   }
@@ -92,6 +99,8 @@ interface IssueChanges {
   status?: string
   priority?: string
   projectId?: string | null
+  /** Replays a project move the server refused as confirmable (ALE-26). */
+  confirmAccess?: boolean
   labels?: string[]
   assigneeUserId?: string | null
   assigneeAgentId?: string | null
@@ -117,7 +126,7 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
   if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
   if (changes.assigneeAgentId !== undefined) patch.delegate = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
-  if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId })).issue
+  if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId, confirmAccess: changes.confirmAccess })).issue
   return issue
 }
 

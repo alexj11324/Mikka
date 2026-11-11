@@ -20,6 +20,7 @@ import { lockTeamRelations } from '@/lib/team-access'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { withResourceAccess, lockResourcesAccess } from '@/lib/resource-access/store'
 import { registerProjectAccess, bindProjectTasks } from '@/lib/resource-access/projects'
+import { assertAccessConfirmation } from '@/lib/resource-access/confirm-access'
 import { notifyStoppedPolicyRuns, runPolicyStopSQL, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 import { deleteProjectData, projectLifecycleImpact, setProjectArchive } from '@/lib/project-lifecycle'
 
@@ -141,9 +142,9 @@ async function persistProject(input: unknown, partial: boolean) {
 export async function saveProject(input: z.input<typeof projectInput>) { return persistProject(input, false) }
 export async function updateProjectProperties(input: { id: string; revision: number; changes: ProjectChanges; workspaceId?: string }) { return persistProject(input, true) }
 
-export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null; workspaceId?: string }) {
+export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null; workspaceId?: string; confirmAccess?: boolean }) {
   const i18nText = await getTranslations()
-  const parsed = z.object({ issueId: z.uuid(), revision: z.number().int().positive(), projectId: z.uuid().nullable(), workspaceId: z.uuid().optional() }).safeParse(input)
+  const parsed = z.object({ issueId: z.uuid(), revision: z.number().int().positive(), projectId: z.uuid().nullable(), workspaceId: z.uuid().optional(), confirmAccess: z.boolean().optional() }).safeParse(input)
   if (!parsed.success) return { error: i18nText('Errors.projectMoveInvalid') }
   const context = await projectContext(parsed.data.workspaceId)
   try {
@@ -171,16 +172,23 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
         if (!task) throw new ActionFailureError('issueNotFound')
         if (task.revision !== parsed.data.revision) throw new ActionFailureError('issueOutdated')
         if ((previous?.projectId ?? null) === parsed.data.projectId) return task
+        // Refuse before stopping runs or changing canonical Workspace relations.
+        await assertAccessConfirmation(application, context.workspaceId, [{
+          reference: { kind: 'task', id: task.id },
+          parent: parsed.data.projectId ? { kind: 'project', id: parsed.data.projectId } : null,
+        }], parsed.data.confirmAccess === true)
         const stopped = await application.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId: task.id }))
         notifyStoppedPolicyRuns(application, stopped.rows)
         await tx.delete(projectTasks).where(eq(projectTasks.issueId, task.id))
         if (parsed.data.projectId) await tx.insert(projectTasks).values({ issueId: task.id, projectId: parsed.data.projectId, workspaceId: context.workspaceId })
-        for (const project of linked) {
+        // Locks were acquired by ID; remove the old ACL parent before attaching
+        // the new one so a destination sorting first cannot invalidate removal.
+        for (const project of linked.toSorted((left, right) => Number(left.id === parsed.data.projectId) - Number(right.id === parsed.data.projectId))) {
           const before = priorByProject.get(project.id) ?? []
           const after = project.id === parsed.data.projectId
             ? [...before.filter(id => id !== task.id), task.id].sort()
             : before.filter(id => id !== task.id)
-          await bindProjectTasks(application, context.user, { kind: 'project', id: project.id, workspaceId: context.workspaceId }, before, after)
+          await bindProjectTasks(application, context.user, { kind: 'project', id: project.id, workspaceId: context.workspaceId }, before, after, { confirmAccess: parsed.data.confirmAccess })
           await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date() }).where(eq(projects.id, project.id))
           await emitProjectChange(tx, project.id, context.user.id, i18nText(project.id === parsed.data.projectId ? 'Projects.activity.tasksAdded' : 'Projects.activity.tasksRemoved'))
         }
@@ -195,6 +203,7 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
     })
     return { issue: await issueView(result) }
   } catch (error) {
+    if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
     return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectMoveFailed') }
   }
 }
@@ -210,9 +219,9 @@ export async function listProjectEvents(id: string, workspaceId?: string) {
   })
 }
 
-export async function setProjectIssues(input: { id: string; revision: number; issueIds: string[]; workspaceId?: string }) {
+export async function setProjectIssues(input: { id: string; revision: number; issueIds: string[]; workspaceId?: string; confirmAccess?: boolean }) {
   const i18nText = await getTranslations()
-  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), issueIds: z.array(z.uuid()), workspaceId: z.uuid().optional() }).safeParse(input)
+  const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), issueIds: z.array(z.uuid()), workspaceId: z.uuid().optional(), confirmAccess: z.boolean().optional() }).safeParse(input)
   if (!parsed.success) return { error: i18nText('Errors.projectIssuesInvalid') }
   const context = await projectContext(parsed.data.workspaceId)
   const reference = (await accessibleProjectReferences(context.user, context.workspaceId)).find(item => item.id === parsed.data.id)
@@ -236,11 +245,18 @@ export async function setProjectIssues(input: { id: string; revision: number; is
             .where(and(inArray(projectTasks.issueId, batch), ne(projectTasks.projectId, current.id))).limit(1)
           if (conflicts.length) throw new ActionFailureError('projectIssueAlreadyLinked')
         }
+        await lockResourcesAccess(application, context.user.id, changed.map(id => ({
+          reference: { kind: 'task' as const, id, workspaceId: context.workspaceId }, action: 'canSteer' as const,
+        })))
+        await assertAccessConfirmation(application, context.workspaceId, changed.map(id => ({
+          reference: { kind: 'task' as const, id },
+          parent: after.has(id) ? { kind: 'project', id: current.id } : null,
+        })), parsed.data.confirmAccess === true)
         if (changed.length) {
           const stopped = await application.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'tasks', issueIds: changed }))
           notifyStoppedPolicyRuns(application, stopped.rows)
         }
-        await bindProjectTasks(application, context.user, reference, [...before].sort(), ids)
+        await bindProjectTasks(application, context.user, reference, [...before].sort(), ids, { confirmAccess: parsed.data.confirmAccess })
         await tx.delete(projectTasks).where(eq(projectTasks.projectId, current.id))
         for (let offset = 0; offset < ids.length; offset += batchSize) {
           await tx.insert(projectTasks).values(ids.slice(offset, offset + batchSize).map(issueId => ({ issueId, projectId: current.id, workspaceId: context.workspaceId })))
@@ -252,6 +268,7 @@ export async function setProjectIssues(input: { id: string; revision: number; is
       }))
     })
   } catch (error) {
+    if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
     return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectIssuesSaveFailed') }
   }
 }

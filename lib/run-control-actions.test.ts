@@ -147,6 +147,18 @@ before(async () => {
       assert.match(sql,/r\."userId"=\$1/);assert.match(sql,/q\."userId"=\$1/);assert.match(sql,/t\."userId"=\$1/);
       return {rows:current.recovery?[current.recovery]:[]};
     }
+    // The thread's context usage (lib/context-usage.ts) counts characters in
+    // SQL and returns no text, so it never re-sends the brief.
+    if (sql.includes('AS "conversationAscii"')) {
+      // The real query, so this fixture cannot silently drift from it.
+      const { CONTEXT_CHARS_SQL } = await import('./context-usage')
+      assert.equal(sql, CONTEXT_CHARS_SQL, 'the context read is the shipped query')
+      assert.ok(sql.includes('ANY($1::uuid[])'), 'context reads bind the run chain')
+      assert.equal(params[1], current.run.id, 'context reads the root brief')
+      assert.ok((params[0] as string[]).includes(current.run.id))
+      return { rows: [{ conversationAscii: 0, conversationOther: 0, messageAscii: 0, messageOther: 0,
+        promptAscii: 14, promptOther: 0, taskAscii: 14, taskOther: 0, model: null }] }
+    }
     if (!/FROM factory_questions/.test(sql)) return runChainQuery(sql, params)
     // Factory questions are the other pool read on the thread path (lib/issue-thread-questions.ts).
     current.questionReads.push(params)

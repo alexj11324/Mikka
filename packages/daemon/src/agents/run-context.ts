@@ -32,6 +32,7 @@ import {
   SKILLS_DIR,
   profileRunSkillSchema,
   skillMarkdown,
+  skillPromptPlan,
   skillSlug,
   skillsPromptSection,
   type ProfileRunSkill,
@@ -533,14 +534,18 @@ export class RunContext {
 
   /**
    * The run's rules for the agent, with this workspace's permissions and the
-   * workspace's skills. The skill bodies are inlined, so a harness that
-   * reads nothing but its prompt still applies them; the directory is named
-   * so the attached files can be opened.
+   * workspace's skills. A skill body that fits the prompt budget is inlined,
+   * so a harness that reads nothing but its prompt still applies it; one that
+   * does not is listed by description, and the file holding its text is named
+   * (`skillBodyPath`). The directory is named so attached files can be opened.
    */
   instructions(): string {
+    // The same pure plan the report is derived from, so what the app shows and
+    // what the agent was given cannot disagree.
     const skills = skillsPromptSection(
       this.options.skills ?? [],
       this.skillsDir,
+      skillPromptPlan(this.options.skills ?? []),
     )
     return [
       runInstructions(this.worktree, this.options.policy, this.options.github, this.options.kind),

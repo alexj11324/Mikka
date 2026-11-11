@@ -61,7 +61,7 @@ test('Project v2: split database migration, canonical relationships and live ten
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const names = orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))
-    const boundary = '20261111010000_project_v2.sql'
+    const boundary = '20261111030000_project_v2.sql'
     for (const pool of [application, workspace]) await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
     const migrate = async (files: string[]) => {
       for (const name of files) {
@@ -277,6 +277,47 @@ test('Project v2: split database migration, canonical relationships and live ten
       const concurrent = await Promise.all(['First update', 'Second update'].map(name => actAs(member, () => actions.updateProjectProperties({ id: createdId, revision: row.revision, changes: { name }, workspaceId: alpha }))))
       assert.equal(concurrent.filter(result => 'project' in result).length, 1)
       assert.equal(concurrent.filter(result => 'error' in result).length, 1)
+    })
+
+    await t.test('Project audience confirmation precedes all writes and moves detach before attaching regardless of ID order', async () => {
+      const candidates = await Promise.all(['First destination', 'Second destination'].map(name =>
+        actAs(member, () => actions.saveProject({ ...draft, name }))))
+      for (const candidate of candidates) assert.ok('project' in candidate, JSON.stringify(candidate))
+      const [destination, source] = candidates.map(candidate => {
+        assert.ok('project' in candidate, JSON.stringify(candidate))
+        return candidate.project
+      }).sort((a, b) => a.id.localeCompare(b.id))
+      const [task, batchTask] = await makeTasks(alpha, 2)
+      const assigned = await actAs(member, () => actions.setProjectIssues({ id: source.id, revision: source.revision, issueIds: [task], workspaceId: alpha }))
+      assert.ok('project' in assigned, JSON.stringify(assigned))
+      const { changeResourceAccess } = await import('../lib/resource-access/store')
+      const policy = (await application.query(`SELECT revision FROM resource_access_policies WHERE kind='project' AND id=$1`, [destination.id])).rows[0]
+      await changeResourceAccess(member, { kind: 'project', id: destination.id, workspaceId: alpha }, { expectedRevision: policy.revision, visibility: 'private', grants: [] })
+      const snapshot = async () => ({
+        projects: (await workspace.query('SELECT to_jsonb(p) AS row FROM workspace_projects p WHERE id=ANY($1::uuid[]) ORDER BY id', [[source.id, destination.id]])).rows,
+        links: (await workspace.query('SELECT * FROM workspace_project_tasks WHERE "issueId"=ANY($1::uuid[]) ORDER BY "issueId"', [[task, batchTask]])).rows,
+        tasks: (await application.query('SELECT to_jsonb(i) AS row FROM issues i WHERE id=ANY($1::uuid[]) ORDER BY id', [[task, batchTask]])).rows,
+        policies: (await application.query(`SELECT to_jsonb(p) AS row FROM resource_access_policies p WHERE kind='task' AND id=ANY($1::uuid[]) ORDER BY id`, [[task, batchTask]])).rows,
+        events: (await workspace.query('SELECT * FROM workspace_project_events WHERE "projectId"=ANY($1::uuid[]) ORDER BY id', [[source.id, destination.id]])).rows,
+      })
+      const before = await snapshot()
+      const refusedMove = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 1, projectId: destination.id, workspaceId: alpha }))
+      assert.equal(refusedMove.error, 'accessChangeConfirmationRequired')
+      assert.equal(refusedMove.confirmable, true)
+      assert.deepEqual(await snapshot(), before, 'refused move leaves both databases unchanged')
+      const refusedBatch = await actAs(member, () => actions.setProjectIssues({ id: destination.id, revision: destination.revision, issueIds: [batchTask], workspaceId: alpha }))
+      assert.equal(refusedBatch.error, 'accessChangeConfirmationRequired')
+      assert.equal(refusedBatch.confirmable, true)
+      assert.deepEqual(await snapshot(), before, 'refused batch leaves both databases unchanged')
+      const moved = await actAs(member, () => actions.moveIssueToProject({ issueId: task, revision: 1, projectId: destination.id, workspaceId: alpha, confirmAccess: true }))
+      assert.ok(moved.issue, JSON.stringify(moved))
+      assert.equal((await workspace.query('SELECT "projectId" FROM workspace_project_tasks WHERE "issueId"=$1', [task])).rows[0].projectId, destination.id)
+      assert.deepEqual((await application.query(`SELECT "parentKind","parentId",visibility FROM resource_access_policies WHERE kind='task' AND id=$1`, [task])).rows[0],
+        { parentKind: 'project', parentId: destination.id, visibility: 'shared' })
+      const current = (await accessibleProjects(member, projectDb, alpha)).find(project => project.id === destination.id)!
+      const batched = await actAs(member, () => actions.setProjectIssues({ id: destination.id, revision: current.revision, issueIds: [task, batchTask], workspaceId: alpha, confirmAccess: true }))
+      assert.ok('project' in batched, JSON.stringify(batched))
+      assert.deepEqual(batched.project!.issueIds.sort(), [task, batchTask].sort())
     })
 
     await t.test('fresh membership and pinned Workspace gate writes, including the creator', async () => {

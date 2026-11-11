@@ -97,12 +97,12 @@ try {
     const { backfillTaskWorkspaces } = await import('./task-workspace-backfill.mjs')
     const ownership = await backfillTaskWorkspaces(application, workspace)
     console.log(`migrate: task workspace ownership bound=${ownership.bound} pending=${ownership.pending}`)
-    if (files.includes('20261111010001_task_identity.sql') && files.includes('20261111010002_task_identity_aliases.sql')) {
+    if (files.includes('20261111030001_task_identity.sql') && files.includes('20261111030002_task_identity_aliases.sql')) {
       const { backfillTaskIdentifiers } = await import('./task-identity-backfill.mjs')
       const identifiers = await backfillTaskIdentifiers(application, workspace)
       console.log(`migrate: stable task identifiers issued=${identifiers.issued}`)
     }
-    if (files.includes('20261111010000_project_v2.sql')) {
+    if (files.includes('20261111030000_project_v2.sql')) {
       const { backfillProjectV2 } = await import('./project-v2-backfill.mjs')
       const projects = await backfillProjectV2(application, workspace)
       console.log(`migrate: projects bound=${projects.projectsBound} tasks=${projects.projectTasksBound} pending=${projects.projectsPending}`)
