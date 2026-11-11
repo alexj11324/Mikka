@@ -8,6 +8,7 @@ on:
       - 'cloudflare/eve-runtime/**'
       - 'scripts/build-eve.mjs'
       - 'scripts/package-cf-eve-host.mjs'
+      - 'scripts/build-cloudflare-eve-image.sh'
       - 'patches/@fantasticfour*'
       - 'pnpm-lock.yaml'
       - '.github/workflows/cloudflare-eve-image.yml'
@@ -20,6 +21,7 @@ on:
       - 'cloudflare/eve-runtime/**'
       - 'scripts/build-eve.mjs'
       - 'scripts/package-cf-eve-host.mjs'
+      - 'scripts/build-cloudflare-eve-image.sh'
       - 'patches/@fantasticfour*'
       - 'pnpm-lock.yaml'
       - '.github/workflows/cloudflare-eve-image.yml'
@@ -38,16 +40,15 @@ jobs:
       MIKKA_UI_OVERLAY_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/pnpm-install
         with:
           skip-electron: 'true'
       - name: Bind the existing release format
         run: echo "MIKKA_DEPLOYMENT_ID=$(node lib/deployment-id.mjs)" >> "$GITHUB_ENV"
-      - name: Compile the official Eve runtime and shared product resources
-        run: |
-          pnpm generate:agent-ui
-          pnpm build:app
-          node scripts/package-cf-eve-host.mjs
+      - name: Compile the official Eve runtime and shared product resources offline
+        run: bash scripts/build-cloudflare-eve-image.sh
       - name: Build the portable Node 24 image
         run: docker build -f cloudflare/eve-runtime/Dockerfile -t mikka-eve-qualification .
       - name: Start the compiled host and require the native World
