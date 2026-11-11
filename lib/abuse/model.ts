@@ -13,6 +13,7 @@ import type { HostedUsageStore } from './store'
 import { withSharedCredits } from '@/lib/credit-shares'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { observedModel, recordAiRoute, recordAiUsage, type AiMetadata } from '@/lib/tracing/ai'
+import { modelTokenUsage } from '@/lib/model-call-timing'
 import { createZeroCatModel, gatewayCredential, pauseZeroCat, recordModelRoute, zeroCatConfig, zeroCatCost, zeroCatErrorStatus, zeroCatFailureReason, zeroCatPaused, ZEROCAT_FIRST_TOKEN_TIMEOUT_MS, type ZeroCatFallbackReason } from './zerocat'
 import {
   gatewayCost,
@@ -202,12 +203,14 @@ export async function hostedModel(
             const cost = served === 'zerocat' ? zeroCatCost(result.usage) : gatewayCost(result.providerMetadata)
             recordAiUsage(result.usage)
             recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
+            const tokens = modelTokenUsage(result.usage)
             await hostedUsage.settle(
               id,
               cost,
               result.usage.inputTokens.total ?? 0,
               result.usage.outputTokens.total ?? 0,
               served === 'gateway' ? gatewayGenerationId(result.providerMetadata) : undefined,
+              { read: tokens.cacheReadTokens, write: tokens.cacheWriteTokens },
             )
             if (hostedUsage.metered !== false) await checkAbuseAlerts()
             if (hostedUsage.metered !== false && cost === null)
@@ -311,12 +314,14 @@ export async function hostedModel(
                       const cost = served === 'zerocat' ? zeroCatCost(chunk.usage) : gatewayCost(chunk.providerMetadata)
                       recordAiUsage(chunk.usage)
                       recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
+                      const tokens = modelTokenUsage(chunk.usage)
                       await hostedUsage.settle(
                         id,
                         cost,
                         chunk.usage.inputTokens.total ?? 0,
                         chunk.usage.outputTokens.total ?? 0,
                         served === 'gateway' ? gatewayGenerationId(chunk.providerMetadata) ?? generationId : undefined,
+                        { read: tokens.cacheReadTokens, write: tokens.cacheWriteTokens },
                       )
                       finished = true
                       if (hostedUsage.metered !== false) await checkAbuseAlerts()

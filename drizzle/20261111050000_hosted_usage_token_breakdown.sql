@@ -1,0 +1,37 @@
+-- target: MIKKA_DATABASE_URL
+--
+-- Cache-token breakdown for one hosted model call. The receipt ledger keeps the
+-- provider's own numbers; it never estimates them.
+--
+-- READ THIS BEFORE SUMMING TOKENS:
+--   "inputTokens" is the provider's input total and ALREADY INCLUDES cache
+--   tokens (AI SDK v7 public usage and v4 provider usage both report it that
+--   way; see lib/model-call-timing.ts). "cacheReadTokens" and "cacheWriteTokens"
+--   are a BREAKDOWN OF that total, not additions to it:
+--
+--       cacheReadTokens + cacheWriteTokens <= inputTokens
+--
+--   Adding all three double-counts the cached input. A call's whole input is
+--   "inputTokens"; the cache columns answer "how much of it was cached".
+--
+-- NULL is "not collected", 0 is "collected, and it was zero". They are different
+-- facts and must never be collapsed:
+--   * null  - this receipt recorded no cache figures. Every row written before
+--             this migration is null, and stays null: the figures were only ever
+--             emitted as model_call_timing log lines (lib/model-call-timing.ts),
+--             which no table persisted, so they cannot be recovered. Backfilling
+--             0 would assert that those calls read and wrote no cache, which is
+--             false and unauditable.
+--   * 0     - the provider reported a real zero.
+-- Readers that aggregate these columns must use
+-- sum(x) FILTER (WHERE x IS NOT NULL) and report how many rows were collected,
+-- so a mostly-null column cannot be mistaken for a cheap one.
+--
+-- Deliberately no CHECK constraint: settlement must not fail because a provider
+-- reported an unexpected cache shape. The Anthropic and OpenAI receipts disagree
+-- about whether cache tokens are inside the input total, so normalization belongs
+-- at the read edge, not in a write-time constraint that would reject a real
+-- receipt and leave a call unsettled.
+ALTER TABLE hosted_usage
+  ADD COLUMN "cacheReadTokens" bigint,
+  ADD COLUMN "cacheWriteTokens" bigint;
