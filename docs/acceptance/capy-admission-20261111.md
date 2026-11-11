@@ -1,10 +1,11 @@
-# ALE-88: live notifications retain a Workspace transaction
+# ALE-88: independent jobs must own their database transactions
 
-The Factory admission suite can pass while a live notification fails in a
-transaction borrowed from its writer. APP commit observers start notifications
-before the outer Workspace transaction necessarily finishes. A send can open a
-nested Workspace savepoint, outlive the writer and then release that savepoint
-after COMMIT. The failure can also interfere with the writer's later statements.
+APP commit observers can start background work before the writer's outer
+Workspace transaction finishes. The job can borrow that transaction, open its
+own savepoint, and then lose it when the writer releases an enclosing savepoint
+or commits. The subsequent release fails before the visible aborted-transaction
+error. Independent work now retains routing and identity while acquiring its
+own Workspace transaction and resource lease.
 
 ## Evidence
 
@@ -25,20 +26,51 @@ No production database or external model request was used.
   the writer has committed. Before the fix it borrows the writer's transaction
   identity and fails; after the fix it completes on an independent transaction.
 
-The originally reported `25P02`/`release savepoint sp1` failure itself did not
-recur in these runs. This change fixes the independently reproduced transaction
-lifetime defect; it does not claim that every possible admission failure is gone.
+The original direct admission runs did not reproduce `25P02`. A later real CI
+failure on `83e67472f` supplied the missing first error: the same PostgreSQL
+backend reported `release savepoint sp2` / `3B001`, then the membership read
+reported `25P02`. An earlier `40P01` belonged to a separate passing failure-injection
+case. The CI environment had no live gateway, so the notification-only fix was
+insufficient evidence for this path.
+
+A controlled probe uses the unmodified production commit-wake entry and its
+existing scheduling/consumer seam, with real APP and Workspace transactions.
+On main, the notification-only patch, and `83e67472f`, it records
+`BEGIN -> SP1 -> SP2 -> RELEASE SP1 -> SELECT 1 -> RELEASE SP2`, borrows the
+same Workspace transaction, and fails with `3B001`. The unchanged probe passes
+with the shared-boundary fix: its consumer has a different transaction and
+finishes successfully. No frozen source, model or Coordinator runtime is changed.
+This proves the controlled lifetime defect; the entire original cancellation
+route was not reliably reproduced, and no claim that all Factory flakes are
+eliminated is made.
 
 ## Change and validation
 
-`scheduleLive` exits both APP client and Workspace transaction contexts before
-running deferred work. It retains request database routing and device authority.
-Enterprise membership and capability checks still acquire their ordinary locks.
-No task, model, credential or tenant authorization is broadened.
+`withoutDatabaseClient` establishes a fresh logical transaction boundary in a
+pure AsyncLocalStorage module. Workspace transactions and derived Project
+resource leases are reusable only while active in the same boundary. Synchronous
+composition still uses its own nested savepoints. The parent lease is not
+invalidated by its child, and independent work performs the existing membership,
+token-tenant and Enterprise checks again. Request database routing and device
+authority remain unchanged. The earlier explicit live-notification detachment
+is retained.
 
 The regression, Factory admission and Enterprise live authority suites passed
 31/31. Three additional admission runs passed 22/22 each with no PostgreSQL query
 error captured by the same diagnostic hook. The DB runner inventory passed 25/25.
-Targeted lint passed. Full typechecking is recorded separately in the PR.
+The shared-boundary runtime source is `e7d0773f7`. New behavior regressions fail
+2/2 before the fix and pass 2/2 afterward. Scope/resource/device regressions pass
+24/24; official live suites 183/183; Factory routing 305/305; Linear 41/41 and
+commit/background units 5/5. Root typechecking, targeted lint, policy checks and
+the complete 83-suite DB inventory pass. A direct Enterprise run initially
+reported 65/68 because its command omitted the fixture's CI/loopback environment;
+only the two failing files were rerun with the existing CI configuration and
+passed 50/50. The other three files passed initially; no assertion was changed.
+
+| action | 合并前 | 合并后 | 放宽了？ | 依据 |
+| --- | --- | --- | --- | --- |
+| 独立后台 DB 操作 | 可借仍 active 的父 Workspace 事务 | 身份与路由保留；重新取得事务及原有权限锁 | 否 | `lib/db/request-scope.ts`, `lib/workspace-db.ts` |
+| 借 Project 资源 lease | active、user、Workspace 匹配 | 还须同一事务边界；缺 lease 的 requireExisting 继续拒绝 | 收紧 | `lib/project-resources/store.ts` |
+| 新建后台资源 lease | 原成员、PAT、Enterprise 与资源锁 | 全部保留并重新校验；父与子同步组合各复用自己的 lease | 否 | `tests/background-database-boundary.db.test.ts` |
 
 Revert the code change to roll back; no schema or persisted data changes exist.
