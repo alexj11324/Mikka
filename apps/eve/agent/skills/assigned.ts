@@ -1,7 +1,9 @@
+import {evaluationBindingId} from '../../../../lib/eve/evaluation-context'
 import { defineDynamic, defineSkill } from 'eve/skills'
 import { executionForSession } from '../../../../lib/eve/runtime'
 
 export default defineDynamic(async ctx => {
+  if(evaluationBindingId(ctx.session.auth.current))return null
   const { execution } = await executionForSession(ctx)
   const assigned = execution?.snapshot.definition.skills ?? []
   const personal = execution?.snapshot.personalPlugins?.skills ?? []
