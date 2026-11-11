@@ -4,6 +4,7 @@ import { useCallback, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import type { UseEveAgentReturn } from 'eve/react'
 import type { SendTurnOptions } from 'eve/client'
+import { acceptTaskDelivery } from '@/lib/task-create-form'
 import { authClient } from '@/lib/auth-client'
 import { coordinatorAgentClient, coordinatorSendFailure, type SubmitOutcome } from '@/lib/eve/client'
 import type { ArtifactQuote } from '@/lib/artifacts/quote'
@@ -47,14 +48,13 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
     const options: SendTurnOptions = { headers: { 'x-mikka-submission-id': operation.id },
       clientContext: JSON.parse(JSON.stringify(context ?? {})) as NonNullable<SendTurnOptions['clientContext']> }
     try {
-      if (!operation.delivered) {
+      await acceptTaskDelivery(operation, async () => {
         if (agent) await agent.send(trimmed, options)
         else {
           const { session } = await coordinatorAgentClient(context?.botId ?? null).sessions.create()
           await session.send(trimmed, options)
         }
-        operation.delivered = true
-      }
+      })
       let task: DispatchedTaskReceipt | null = null
       if (context?.taskCommand && context.expectedWorkspaceId) {
         const { getDispatchedTaskReceipt } = await import('@/app/actions/issues')

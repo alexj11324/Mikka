@@ -9,6 +9,7 @@ import { listDevices } from '@/app/actions/agents'
 import { listBots } from '@/app/actions/bots'
 import { issueCreationAvailable } from '@/app/actions/coordinator'
 import { useActionError } from '@/lib/use-action-error'
+import { backlogTaskDraft } from '@/lib/task-create-form'
 import { TASK_TITLE_MAX } from '@/lib/task-title-input'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import type { TaskDestination } from '@/lib/task-destination'
@@ -173,9 +174,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
         createRequests.current.set(fingerprint, requestId)
         const { createTaskOnly } = await import('@/app/actions/issues')
         const result = await createTaskOnly({ version: 1, intent: 'create_only', workspaceId, requestId,
-          title: name || text.split(/\r?\n/, 1)[0]!.slice(0, TITLE_MAX).trim(),
-          content: { type: 'doc', content: text.split(/\r?\n/).map(line => ({ type: 'paragraph', ...(line ? { content: [{ type: 'text', text: line }] } : {}) })) },
-          status: 'todo', priority: 'normal' })
+          ...backlogTaskDraft(name, text) })
         if (result.error || !('taskId' in result)) { toast.error(actionError(result.error)); return }
         createRequests.current.delete(fingerprint)
         setDraft('')
