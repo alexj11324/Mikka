@@ -199,4 +199,4 @@ inputs change on main; dispatch it to repopulate evicted or changed-image keys.
 
 ## Engineering sandbox
 
-`engineering-sandbox.yml` deploys the dedicated Cloudflare Worker from checked main and runs the Factory handoff and startup-timing suites there. External agents can dispatch either suite on a committed source SHA using the [engineering runner instructions](../../docs/operations/engineering-sandbox.md).
+`engineering-sandbox.yml` authenticates explicitly dispatched main jobs to the configured engineering Worker and runs the Factory handoff and startup-timing suites there. External agents can dispatch either suite on a committed source SHA using the [engineering runner instructions](../../docs/operations/engineering-sandbox.md).

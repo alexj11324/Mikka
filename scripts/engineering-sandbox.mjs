@@ -3,7 +3,10 @@ import { AUDIENCE, validJob } from '../cloudflare/engineering-sandbox/jobs.mjs'
 
 // This client runs in the repository's trusted Actions workflow. Candidate files
 // execute only in the Container. No Cloudflare admin token is needed to run a job.
-const endpoint = 'https://mikka-engineering-sandbox.orvilo-preview.workers.dev'
+const endpoint = new URL(process.env.ENGINEERING_SANDBOX_URL)
+if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.pathname !== '/') {
+  throw new Error('Configure ENGINEERING_SANDBOX_URL with the HTTPS origin of the engineering Worker')
+}
 async function request(path, job) {
   const tokenUrl = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
   tokenUrl.searchParams.set('audience', AUDIENCE)

@@ -136,7 +136,7 @@ export default {
       const { payload } = await jwtVerify(header.slice(7), keys, {
         issuer, audience: AUDIENCE, algorithms: ['RS256'], requiredClaims: ['iat', 'exp', 'sub'],
       })
-      owner = githubRun(payload)
+      owner = githubRun(payload, env.CALLER_REPOSITORY, env.CALLER_REPOSITORY_ID)
     } catch {
       return new Response(null, { status: 401 })
     }
