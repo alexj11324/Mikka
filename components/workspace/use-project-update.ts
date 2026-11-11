@@ -23,8 +23,11 @@ export function useProjectUpdate(onUpdated: () => void) {
       try {
         const cached = latest.current.get(project.id)
         const current = cached && cached.revision > project.revision ? cached : project
-        const result = await updateProjectProperties({ id: project.id, revision: current.revision, changes })
-        if ('error' in result) { setError(translateError(result.error)); return false }
+        // An unrelated property patch still carries the compatibility members array.
+        // Keep the latest canonical membership if an earlier queued edit changed it.
+        const patch = changes.properties && !changes.memberIds ? { ...changes, memberIds: current.memberIds } : changes
+        const result = await updateProjectProperties({ id: project.id, revision: current.revision, workspaceId: project.workspaceId, changes: patch })
+        if ('error' in result) { setError(translateError(result.error)); onUpdated(); return false }
         const saved = result.project
         latest.current.set(saved.id, saved)
         await mutate(key => Array.isArray(key) && key[0] === 'projects', (items: Project[] | undefined) => items?.map(item => item.id === saved.id ? saved : item), { revalidate: false })
