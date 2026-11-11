@@ -18,12 +18,14 @@ import { formatDateOnly } from '@/lib/date-only'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { AgentSphere } from './issue-assignee-menu'
 import { useIssueThreads } from './issue-threads'
+import { useTaskWorkspace } from '@/hooks/use-task-workspace'
+import { TaskWorkspace } from '@ui-slot/task-workspace'
 import { TaskStateIcon, newestThreadRun, useTaskStateLabel } from './task-state-icon'
 import { localTaskState } from '@/hooks/use-bot-tasks'
 import type { ExplicitTeamChoice } from '@/lib/issue-team-intent'
 
 export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled, onMetadataBusy, status, priority, pending, onStatus, onPriority, request, relations, onDate, onEstimate }: {
-  task: { id: string; revision: number; scope: TaskScope; scopeSetBy: 'agent' | 'user'; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
+  task: { id: string; revision: number; workspaceId?: string | null; scope: TaskScope; scopeSetBy: 'agent' | 'user'; metadata: IssueMetadata }; onMetadataSaved: (issue: MetadataSavedIssue) => void; metadataDisabled: boolean; onMetadataBusy: (busy: boolean) => void
   status: string; priority: string; pending: boolean; onStatus: (value: string) => void; onPriority: (value: string) => void
   request: MetadataRequest | null; relations: ReactNode; onDate: () => void; onEstimate: () => void
 }) {
@@ -45,6 +47,11 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
   const stateLabel = useTaskStateLabel()
   const own = localTaskState({ status, metadata: task.metadata }, newestThreadRun(threads))
   const control = { task, disabled: metadataDisabled, onSaved: onMetadataSaved, onBusyChange: onMetadataBusy, request }
+  // A task is readable only in its own workspace, so it is the one shown; a mismatch means another tab switched.
+  // The persisted id is the target; an older server without it leaves nothing to compare.
+  const fixed = useTaskWorkspace(task.workspaceId ?? null)
+  const state = task.workspaceId ? fixed.state : { status: 'loading' as const }
+  const workspace = state.status === 'ready' ? state.workspace : null
   return <aside id="issue-properties" aria-label={t('properties')} className="order-1 w-full min-w-0 lg:sticky lg:top-20 lg:order-2 lg:self-start">
     <Button variant="ghost" className="min-h-11 w-full justify-between lg:hidden" aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(value => !value)}><SlidersHorizontal data-icon="inline-start" /><span className="flex-1 text-left">{tDetail('propertiesRelations')}</span><ChevronDown data-icon="inline-end" className={cn(expanded && 'rotate-180')} /></Button>
     <div id={contentId} className={cn('flex-col gap-6 lg:flex lg:py-0', expanded ? 'flex py-4' : 'hidden')}>
@@ -53,6 +60,7 @@ export function IssueDetailProperties({ task, onMetadataSaved, metadataDisabled,
         coarse pointer through lib/touch-target.ts, which moves nothing. */}
     <section className="flex flex-col gap-3"><h2 className="hidden text-xs font-medium text-muted-foreground lg:block">{tDetail('propertiesHeading')}</h2>
       <FieldGroup className="gap-1">
+        <TaskWorkspace variant="detail" workspace={workspace} state={state} onRetry={fixed.retry} workspaceId={task.workspaceId ?? null} row={(label, value) => <PropertyRow label={label}>{value}</PropertyRow>} />
         <PropertyRow label={t('statusLabel')}><IssuePropertyMenu variant="row" label={t('statusLabel')} value={status} options={statusOptions} icon={CircleDashed} disabled={pending} displayValue={stateLabel(own.state, own.reason)} valueIcon={<TaskStateIcon state={own.state} />} onChange={onStatus} /></PropertyRow>
         <PropertyRow label={t('priorityLabel')}><IssuePropertyMenu variant="row" label={t('priorityLabel')} value={priority} options={priorityOptions} icon={ChartNoAxesColumnIncreasing} disabled={pending} onChange={onPriority} /></PropertyRow>
         <PropertyRow label={t('scope.label')}><IssueScopeControl task={task} disabled={metadataDisabled} onSaved={onMetadataSaved} teamChoice={teamChoice} /></PropertyRow>

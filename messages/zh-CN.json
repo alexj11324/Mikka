@@ -4774,7 +4774,9 @@
       "botRow": "交给",
       "details": "详情",
       "expand": "放大窗口",
-      "collapse": "缩小窗口"
+      "collapse": "缩小窗口",
+      "workspaceChanged": "打开此对话框后工作区已切换，任务没有创建。请重新打开新建任务，在当前显示的工作区创建。",
+      "workspaceUnconfirmed": "无法确认工作区，任务没有创建。已保留你输入的内容。"
     },
     "board": {
       "toolbar": "看板工具栏",
@@ -6191,7 +6193,7 @@
       "memberNote": "只有工作区管理员能把此工作区绑定到组织。",
       "body": "绑定后，组织的登录要求和资源策略会作用于此工作区；席位按组织内全部工作区的活跃成员去重计算。工作区的成员、任务和资源仍各自独立。",
       "bodyTitle": "绑定后会发生什么",
-        "bindLabel": "绑定到已有组织",
+      "bindLabel": "绑定到已有组织",
       "bindNote": "需要你同时是该组织的所有者或管理员，以及此工作区的管理员。",
       "bind": "绑定",
       "createLabel": "新建组织",
@@ -7142,5 +7144,21 @@
     "content": "内容",
     "readFailed": "{label}加载失败。",
     "refreshFailed": "{label}更新失败，仍显示上次内容。"
+  },
+  "MobileTaskPush": {
+    "workspaceUnconfirmed": "无法确认工作区"
+  },
+  "TaskWorkspace": {
+    "label": "工作区",
+    "createIn": "创建到 {name}",
+    "fixed": "任务创建时已确定归属，不能转到其他工作区。",
+    "otherWorkspace": "其他工作区",
+    "loading": "正在读取工作区",
+    "error": "无法读取工作区",
+    "retry": "重试",
+    "mismatchCreate": "现在是 {current}",
+    "mismatchCreateHint": "此对话框是在 {target} 打开的。重新打开新建任务，才会创建到 {current}。",
+    "mismatchDetail": "不是当前显示的工作区（{current}）。切换到 {target} 后再处理此任务。",
+    "unknownWorkspace": "其他工作区"
   }
 }

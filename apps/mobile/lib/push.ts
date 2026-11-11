@@ -4,7 +4,7 @@ import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
 import * as SecureStore from 'expo-secure-store'
 import { api, apiConnection, type ApiConnection } from '@/lib/api'
-import { pushBelongsToAccount, pushTarget } from '@/lib/push-route'
+import { pushBelongsToAccount, pushTarget, pushTaskTarget, type TaskPushTarget } from '@/lib/push-route'
 import { pushState, setPushState as set, type PushState } from '@/lib/push-state'
 import { currentAccount, onServerChange } from './config'
 import { accountStorageKey } from './server-store'
@@ -132,9 +132,11 @@ export async function forgetPushToken(accountId = currentAccount().id): Promise<
  * Opens what a tapped push points at (lib/push-route.ts). A tap that launched
  * the app from closed is read once with getLastNotificationResponseAsync, then
  * cleared so it does not open again; later taps arrive through the listener.
- * Also refreshes the push state whenever the app comes to the front.
+ * A full task push goes to `openTask`, which confirms its workspace before opening it (lib/task-push.ts); a push
+ * that names a workspace but no valid task target goes to `refuseTask` and opens nothing; every other push keeps its
+ * entry. Also refreshes the push state whenever the app comes to the front.
  */
-export function watchPushes(open: (href: string) => void) {
+export function watchPushes(open: (href: string) => void, openTask: (target: TaskPushTarget) => void, refuseTask: () => void) {
   let handled: string | null = null
   const route = (response: Notifications.NotificationResponse | null) => {
     if (!response || response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return
@@ -142,7 +144,11 @@ export function watchPushes(open: (href: string) => void) {
     const key = response.notification.request.identifier
     if (key === handled) return
     handled = key
-    open(pushTarget(response.notification.request.content.data))
+    const data = response.notification.request.content.data
+    const task = pushTaskTarget(data)
+    if (task === 'invalid') refuseTask()
+    else if (task) openTask(task)
+    else open(pushTarget(data))
     void Notifications.clearLastNotificationResponseAsync().catch(() => undefined)
   }
   void Notifications.getLastNotificationResponseAsync().then(route).catch(() => undefined)

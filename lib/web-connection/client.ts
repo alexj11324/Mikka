@@ -114,6 +114,10 @@ export class WebServerDirectory {
   getActiveAccount(): WebServerAccount | null { return this.snapshot.account }
   getVersion() { return this.generation }
   getWorkspaceVersion() { return this.workspaceGeneration }
+  /** The selected server's confirmed Workspace choice (the id its last switch
+   * response acknowledged), or null when the server's own default applies.
+   * A preference only: the server still checks membership on every request. */
+  getConfirmedWorkspaceId(): string | null { return this.active()?.workspaceId ?? null }
   isCurrentResponse(response: Response) {
     const version = this.responseVersions.get(response)
     return version?.account === this.generation && version.workspace === this.workspaceGeneration

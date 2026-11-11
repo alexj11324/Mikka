@@ -4774,7 +4774,9 @@
       "botRow": "Hand to",
       "details": "Details",
       "expand": "Bigger window",
-      "collapse": "Smaller window"
+      "collapse": "Smaller window",
+      "workspaceChanged": "The workspace changed after this dialog opened. Nothing was created; reopen New task to create it in the workspace shown now.",
+      "workspaceUnconfirmed": "Couldn't confirm the workspace, so nothing was created. Your text is kept."
     },
     "board": {
       "toolbar": "Board toolbar",
@@ -7142,5 +7144,21 @@
     "content": "Content",
     "readFailed": "Unable to load {label}.",
     "refreshFailed": "Unable to refresh {label}. Previous content is shown."
+  },
+  "MobileTaskPush": {
+    "workspaceUnconfirmed": "Couldn't confirm workspace"
+  },
+  "TaskWorkspace": {
+    "label": "Workspace",
+    "createIn": "Create in {name}",
+    "fixed": "Fixed when the task was created. A task can't move to another workspace.",
+    "otherWorkspace": "Another workspace",
+    "loading": "Loading workspace",
+    "error": "Couldn't load the workspace",
+    "retry": "Try again",
+    "mismatchCreate": "Now in {current}",
+    "mismatchCreateHint": "This dialog was opened for {target}. Reopen New task to create it in {current}.",
+    "mismatchDetail": "Not the workspace shown now ({current}). Switch to {target} to work on this task.",
+    "unknownWorkspace": "another workspace"
   }
 }

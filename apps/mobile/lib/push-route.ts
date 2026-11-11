@@ -30,3 +30,23 @@ export function pushTarget(data: unknown): string {
   if (run) return `/thread/${run}`
   return chat
 }
+
+/** A task push's target (#1659 item 4): the task, the workspace it lives in and, for a thread, the attempt. */
+export interface TaskPushTarget { workspaceId: string; issueId: string; runId: string | null }
+
+/**
+ * The task a full task push points at (#1659 item 4), in this order:
+ * - a proposal (`pendingActionId`) keeps its chat card: null;
+ * - no `workspaceId` field at all (a generic push, a privacy-mode reminder with serverUrl, userId and botId only, or a
+ *   legacy server's task push): null, so pushTarget keeps the old entry;
+ * - a `workspaceId` field, with both it and `issueId` valid: the target;
+ * - a `workspaceId` field with either one empty, null or not a UUID: 'invalid'. It is refused, never degraded into
+ *   the legacy task or thread entry, so nothing opens without confirming a workspace.
+ */
+export function pushTaskTarget(data: unknown): TaskPushTarget | 'invalid' | null {
+  const fields = data && typeof data === 'object' ? data as Record<string, unknown> : {}
+  if (id(fields.pendingActionId)) return null
+  if (fields.workspaceId === undefined) return null
+  const workspaceId = id(fields.workspaceId), issueId = id(fields.issueId)
+  return workspaceId && issueId ? { workspaceId, issueId, runId: id(fields.runId) } : 'invalid'
+}

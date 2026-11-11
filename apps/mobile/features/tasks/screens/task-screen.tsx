@@ -1,5 +1,5 @@
 import { mobileMessages } from '@/lib/messages'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -15,6 +15,8 @@ import { HARNESS } from '@/lib/harness'
 import { useHome } from '@/lib/home'
 import { tasksLive } from '@/lib/live-keys'
 import type { TaskActivity, TaskDetail } from '@/lib/types'
+import { api } from '@/lib/api'
+import { readPushedTask } from '@/lib/task-push-app'
 import { useLiveApi } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
 import { shortWhen } from '@/lib/clock'
@@ -28,7 +30,8 @@ import { reviewHref } from '@/features/review/model/routes'
 
 
 /** Where an attempt opens: the task's one conversation, scrolled to that attempt (2026-11-07). */
-export const conversationHref = (taskId: string, attempt?: string): Href => ({ pathname: '/task/[id]/conversation', params: attempt ? { id: taskId, attempt } : { id: taskId } })
+export const conversationHref = (taskId: string, attempt?: string, workspace?: string): Href => ({ pathname: '/task/[id]/conversation',
+  params: { id: taskId, ...(attempt ? { attempt } : {}), ...(workspace ? { workspace } : {}) } })
 
 /**
  * A task's detail (decisions/2026-11-07-2045-tasks-only-threads-inside.md, Figma 1085:2 M2): its number and title,
@@ -37,12 +40,15 @@ export const conversationHref = (taskId: string, attempt?: string): Href => ({ p
  * with `attempt` and opens it once. 「+ 评论」 floats at the foot.
  */
 export function TaskScreen() {
-  const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
+  // `workspace`: a push opened it after confirming the task's workspace (lib/task-push.ts); it reads only there.
+  const { id, attempt, workspace } = useLocalSearchParams<{ id: string; attempt?: string; workspace?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const bar = useScrolledUnderBar()
   const home = useHome().data
-  const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
+  const read = useCallback((path: string) => workspace ? readPushedTask(id, workspace) : api<TaskDetail>(path), [id, workspace])
+  const { data, error, loading, reload } = useLiveApi<TaskDetail>(workspace ? `/api/mobile/tasks/${id}?workspace=${workspace}` : `/api/mobile/tasks/${id}`,
+    () => tasksLive(home?.live?.workspaceId, home?.workspace.id), read)
   const task = data?.task
   // The task's own state: its current attempt's in 等待你 and 进行中, else its board status (2026-11-07-2230).
   const shown = task ? rowState(task) : null
@@ -55,8 +61,8 @@ export function TaskScreen() {
     if (opened.current || !attempt || !data) return
     opened.current = true
     const found = data.activity.some(item => item.kind === 'attempt' && item.runId === attempt)
-    router.push(found ? conversationHref(data.task.id, attempt) : `/thread/${attempt}`)
-  }, [attempt, data, router])
+    router.push(found ? conversationHref(data.task.id, attempt, workspace) : `/thread/${attempt}`)
+  }, [attempt, data, router, workspace])
 
   return (
     <View style={styles.screen}>
@@ -83,7 +89,7 @@ export function TaskScreen() {
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>{mobileMessages.MobileCore.activity}</Text> : null}
             {activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} first={index === 0} last={index === activity.length - 1}
 
-              onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId)) : undefined} />)}
+              onOpen={item.kind === 'agent' ? () => router.push(conversationHref(task.id, item.run.attempts[0]!.runId, workspace)) : undefined} />)}
           </>
         ) : null}
       </ScrollView>
