@@ -78,7 +78,7 @@ function providerEffort(args: Pick<CallArgs, 'providerOptions'>): string | undef
 
 export interface ObservedModelOptions extends AiRoute, AiMetadata {
   modelId?: string
-  provider?: 'openai' | 'anthropic'
+  provider?: 'openai' | 'anthropic' | 'mikka-cloud'
   userId?: string
   /** Injected sinks and clock make privacy and cancellation testable without sending any telemetry. */
   posthog?: Pick<ServerPostHog, 'capture'> | null

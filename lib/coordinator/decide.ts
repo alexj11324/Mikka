@@ -1,5 +1,5 @@
 import 'server-only'
-import { decisionProviderReceipt, decisionTransport, gatewayEndpoint } from './decision-provider'
+import { decisionProviderReceipt, decisionTraceTarget, decisionTransport, gatewayEndpoint } from './decision-provider'
 import { isCloudEdition } from '@/lib/edition'
 import { cloudDecisionTarget } from '@/lib/default-model'
 import { CloudServiceError } from '@/lib/cloud-services/errors'
@@ -52,7 +52,7 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   }
   let requestStarted = false
   try {
-    return await observeAiRequest({ modelId: DECISION_MODEL, userId: scope.ownerId, route: native ? 'api_key' : 'gateway', provider: native ? 'openai' : undefined, operation: 'decision' }, async report => {
+    return await observeAiRequest({ modelId: DECISION_MODEL, userId: scope.ownerId, ...decisionTraceTarget(DECISIONS_URL, Boolean(cloud)), operation: 'decision' }, async report => {
       const requestInput = decisionRequestInput(input)
       const requestedQuestions = structuredClone(questions)
       const logicalBody = JSON.stringify({ model: DECISION_MODEL, input: requestInput, questions: requestedQuestions })
