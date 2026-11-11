@@ -591,7 +591,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
             ...(replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: tMessage('quote'), onRemove: () => setReplyQuote(null) }] : []),
             ...(browser?.notes ?? []).map(note => ({ id: `note-${note.n}`, name: noteChipText(note), meta: tNavAll('Editor.richText.annotate'), onRemove: () => browser?.remove(note.n) })),
           ]}
-          notices={notices}
+          notices={<>{notices}{factory.error && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1">{actionError()}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void factory.reload() }}>{tCommon('retry')}</Button></Alert>}</>}
           questions={factory.questions.map(question => ({ id: question.questionId, question: question.question, task: question.task, taskId: question.issueId ?? undefined,
             kind: question.type === 'permission' ? 'approval' : question.options.length ? 'decision' : 'question', ...(question.options.length ? { options: question.options.map(option => ({ id: option.value, title: option.label })) } : {}) }))}
           onAnswer={(id, text) => { const question = factory.questions.find(item => item.questionId === id); if (question) void factory.answer(question, text).then(error => { if (error) toast.error(actionError(error)) }) }}
