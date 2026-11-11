@@ -58,6 +58,17 @@ Reduce workflow fan-out and obsolete PR attempts before buying more runners.
 Benchmark faster lint/type-check executables only when the previous semantic
 coverage remains intact. Blanket test-isolation disablement is not acceptable.
 
+## Draft PRs and proof
+
+Required merge checks never skip work merely because a PR is a draft:
+GitHub treats a conditionally skipped required job as successful. The
+independent specialized PR HTTP/CLI, E2B, search, SSH and unattended sandbox
+checks may postpone runner allocation while drafting. Each retained workflow
+responds to `ready_for_review` and reruns real selected proof on the current
+head, including when no new commit was pushed. Production pushes, merge-group
+checks and manual recovery remain authoritative. Keep Mobile OTA previews
+available for draft UI evidence.
+
 ## Merge bar
 
 Required checks remain authoritative on the exact PR merge candidate.
