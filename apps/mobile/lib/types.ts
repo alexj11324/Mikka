@@ -222,6 +222,7 @@ export type TaskActivity =
 /** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
+    factoryTaskId?: string
     bot: TaskBot | null
     schedule: TaskSchedule | null
     description: string | null
@@ -232,9 +233,11 @@ export interface TaskDetail {
     /** A factory task's flow: its stage, what it needs from the person, 审阅's verdict (2026-11-04-2200). Not sent yet. */
     flow?: import('../features/tasks/model/task-flow').TaskFlow | null
   }
+  /** Raw, authorized receipts from the selected Factory response. The UI decodes its supported DTO version. */
+  factoryEvents?: unknown[]
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */
-  live?: { workspaceId: string }
+  live?: { workspaceId: string; factoryActivityVersion?: 1 }
 }
 
 export interface Preferences {
