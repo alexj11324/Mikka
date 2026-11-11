@@ -200,6 +200,16 @@ test('Project v2: split database migration, canonical relationships and live ten
     assert.ok('project' in created, JSON.stringify(created))
     const createdId = created.project.id
 
+    await t.test('task Project options retain every visible project UUID and the selected tenant', async () => {
+      const { getIssuePropertyOptions } = await import('../app/actions/issue-metadata')
+      const choices = await actAs(member, () => getIssuePropertyOptions(initialTasks[0]))
+      assert.deepEqual(choices.projectRecords.filter(item => item.name === 'Same display name').map(item => item.id).sort(),
+        [project, empty, createdId].sort())
+      assert.equal(choices.projects.filter(name => name === 'Same display name').length, 1, 'legacy names remain readable')
+      await assert.rejects(actAs(outsider, () => getIssuePropertyOptions(initialTasks[0])))
+      await assert.rejects(actAs({ id: owner, [tokenWorkspace]: beta }, () => getIssuePropertyOptions(initialTasks[0])))
+    })
+
     await t.test('upgraded database rejects old inserts and canonical legacy-only writes without altering evidence', async () => {
       const before = (await workspace.query('SELECT to_jsonb(p) AS snapshot FROM workspace_projects p WHERE id=$1', [project])).rows[0].snapshot
       for (const [sql, params] of [
