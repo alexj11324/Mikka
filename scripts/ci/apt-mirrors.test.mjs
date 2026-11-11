@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -61,13 +61,43 @@ test('the real CLI reports only its closed outcome, not configured mirror conten
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
-test('all three affected jobs prepare mirrors before unchanged native dependency installation', async () => {
-  for (const file of ['desktop.yml', 'analytics-ssr.yml', 'unattended-sandbox.yml']) {
-    const source = await readFile(new URL('../../.github/workflows/' + file, import.meta.url), 'utf8')
-    const prepare = source.indexOf('sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs')
-    assert.ok(prepare >= 0 && prepare < source.indexOf('pnpm exec playwright install --with-deps chromium'), file)
-    assert.ok(!source.slice(prepare, source.indexOf('pnpm exec playwright install --with-deps chromium')).includes('continue-on-error'), file)
+test('every workflow APT callsite has mirror preparation in the same Linux job after checkout and Node', async () => {
+  const root = new URL('../../.github/workflows/', import.meta.url), covered = new Set()
+  const pnpm = await readFile(new URL('../../.github/actions/pnpm-install/action.yml', import.meta.url), 'utf8')
+  assert.match(pnpm, /uses: actions\/setup-node@/, 'the composite dependency action also prepares Node')
+  for (const file of (await readdir(root)).filter(file => /\.ya?ml$/.test(file))) {
+    const source = await readFile(new URL(file, root), 'utf8')
+    const jobs = [...source.matchAll(/^  ([\w-]+):\s*$/gm)]
+    for (const [index, start] of jobs.entries()) {
+      const job = source.slice(start.index, jobs[index + 1]?.index ?? source.length)
+      if (!job.includes('\n    steps:')) continue
+      const boundaries = [...job.matchAll(/^      - .+$/gm)]
+      const prepared = [], checkedOut = [], nodeReady = []
+      for (const [stepIndex, boundary] of boundaries.entries()) {
+        const step = job.slice(boundary.index, boundaries[stepIndex + 1]?.index ?? job.length)
+        const guard = /^        if: (.+)$/m.exec(step)?.[1] ?? ''
+        const available = entries => entries.some(entry => !entry || entry === guard)
+        const priorPreparation = available(prepared)
+        if (/uses: actions\/checkout@/.test(step)) checkedOut.push(guard)
+        if (/uses: (?:actions\/setup-node@|\.\/\.github\/actions\/pnpm-install)/.test(step)) nodeReady.push(guard)
+        if (step.includes('sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs')) {
+          assert.match(job, /^    runs-on: ubuntu-/m, `${file}/${start[1]} must prepare mirrors only on Linux`)
+          assert.ok(available(checkedOut) && available(nodeReady), `${file}/${start[1]} requires checkout and Node before mirror preparation`)
+          prepared.push(guard)
+        }
+        const commands = step.split('\n').filter(line => !line.trim().startsWith('#')).join('\n')
+        const install = /\bapt-get\s|\bsudo apt\s|\bplaywright (?:install[^\n]*--with-deps|install-deps)\b/.exec(commands)
+        if (!install) continue
+        const sameStepPreparation = commands.indexOf('sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs')
+        assert.ok(priorPreparation || sameStepPreparation >= 0 && sameStepPreparation < install.index,
+          `${file}/${start[1]} has an unprepared APT callsite or a mismatched conditional`)
+        covered.add(file)
+      }
+    }
   }
+  for (const file of ['desktop.yml', 'analytics-ssr.yml', 'unattended-sandbox.yml',
+    'self-hosted-image.yml', 'run-trace-acceptance.yml', 'self-hosting-ui.yml', 'cloud-computer.yml',
+    'read-cache-production.yml', 'issue1415-deployed-production.yml', 'ui-policy.yml']) assert.ok(covered.has(file), file)
   const tasks = await readFile(new URL('./tasks.json', import.meta.url), 'utf8')
   assert.ok(tasks.includes('node --test scripts/ci/*.test.mjs'), 'the existing CI inventory executes these offline guards')
 })

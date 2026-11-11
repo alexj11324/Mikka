@@ -27,6 +27,7 @@ import { waitForNativeDevice } from './native-device-ready.mjs'
 import { signInBundledAccount } from './bundled-sign-in.mjs'
 import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
 import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
+import { observeComposerDiagnostics, readComposerDiagnostics } from './composer-diagnostics.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -110,6 +111,7 @@ async function launch(mode, extraArgs = []) {
   const navigation = { mode, launch: evidence.nativeViewports.length + 1, events: [], overflow: false }
   evidence.navigation.push(navigation)
   observeNativeNavigation(page, navigation)
+  await observeComposerDiagnostics(page)
   const errors = []
   page.on('pageerror', error => errors.push(error.name))
   evidence.nativeViewports.push({ mode, launch: evidence.nativeViewports.length + 1, ...await setNativeViewport(app, page, viewport) })
@@ -146,8 +148,13 @@ async function usable(page, draft = '') {
     const input = document.querySelector('textarea[data-chat-composer]')
     return input instanceof HTMLTextAreaElement && !input.disabled && !input.readOnly && input.getBoundingClientRect().width > 100
   })
-  await input.fill(draft)
-  assert.equal(await input.inputValue(), draft)
+  try {
+    await input.fill(draft)
+    assert.equal(await input.inputValue(), draft)
+  } catch (error) {
+    evidence.composerFailure = { expectedLength: draft.length, ...await readComposerDiagnostics(page) }
+    throw error
+  }
   await assertNativeViewport(page, viewport)
 }
 
