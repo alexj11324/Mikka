@@ -2,6 +2,7 @@
 // Postgres (both database targets on one URL) and seed helpers.
 import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
+import { registeredTask } from '../helpers/registered-task'
 
 export const dbUrl = process.env.E2E_DATABASE_URL
 if (dbUrl) {
@@ -61,8 +62,8 @@ export async function seedPersonalWorkspace(pool: Pool, userId: string) {
 export async function seedIssue(pool: Pool, userId: string, workspaceId?: string) {
   const id = randomUUID()
   const tenant = workspaceId ?? await seedPersonalWorkspace(pool, userId)
-  await pool.query(`insert into issues (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
-    select $1,$2,w.id,'bound',case when w.kind='personal' then 'personal' else 'workspace' end,'disabled',true,'Task','{"type":"doc"}','todo','normal' from mikka_workspaces w where w.id=$3`, [id, userId, tenant])
+  await registeredTask(pool, userId, tenant, id, client => client.query(`insert into issues (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+    select $1,$2,w.id,'bound',case when w.kind='personal' then 'personal' else 'workspace' end,'disabled',true,'Task','{"type":"doc"}','todo','normal' from mikka_workspaces w where w.id=$3`, [id, userId, tenant]))
   return id
 }
 
