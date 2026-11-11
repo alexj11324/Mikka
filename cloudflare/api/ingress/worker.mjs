@@ -1,5 +1,7 @@
 import { Container, getContainer } from '@cloudflare/containers'
 import { apiRequest } from './request.mjs'
+import { configureTaskBridge, taskMachine } from './task-machine.mjs'
+export { ContainerProxy } from '@cloudflare/containers'
 
 export class BusinessApi extends Container {
   defaultPort = 3000
@@ -16,8 +18,12 @@ export class BusinessApi extends Container {
       'R2_ACCOUNT_ID', 'R2_ARTIFACTS_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']) {
       if (env[key]) this.envVars[key] = env[key]
     }
+    if (env.TASK_MACHINE) configureTaskBridge(this, ctx)
   }
 }
+
+// Use the SDK setter so ContainerProxy registers the handler under this class.
+BusinessApi.outboundHandlers = { taskMachine }
 
 export default {
   fetch(request, env) {

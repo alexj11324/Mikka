@@ -61,3 +61,51 @@ test('ingress binds only the immutable account image with a private route and a 
     assert.throws(() => ingressConfig({ ...input, ...changed }))
   }
 })
+
+import { configureTaskBridge, taskMachine } from '../../../cloudflare/api/ingress/task-machine.mjs'
+
+test('a DO reconnect keeps its own bridge capability and a different DO gets another', async () => {
+  const start = async (state) => {
+    let configured
+    let ready
+    const host = { envVars: {}, async setOutboundByHost(...params) { configured = params } }
+    configureTaskBridge(host, { storage: { kv: { get: k => state.get(k), put: (k,v) => state.set(k,v) } }, blockConcurrencyWhile(fn) { ready = fn() } })
+    await ready
+    const token = host.envVars.MIKKA_TASK_MACHINE_BRIDGE_TOKEN
+    assert.deepEqual(configured, ['task-machine.internal', 'taskMachine', { token }])
+    assert.ok(token.length > 60)
+    return token
+  }
+  const storage = new Map()
+  const token = await start(storage)
+  assert.equal(await start(storage), token)
+  assert.notEqual(await start(new Map()), token)
+})
+
+test('task bridge fixes the authority and methods and forwards only a grant and chosen arguments', async () => {
+  const seen = []
+  const machine = {
+    async status(...args) { seen.push(args); return { running: true } },
+    async writeFile(...args) { seen.push(args); return { checkpoint: true } },
+    async readFile(grant, path) { return path === '/missing' ? null : Uint8Array.of(0, 42, 255) },
+    async park() { throw new Error('Task machine scope mismatch') },
+  }
+  const token = 'fixture', grant = { ownerId: 'one' }, env = { TASK_MACHINE: machine }, context = { params: { token } }
+  const call = (path, data, options = {}) => taskMachine(new Request('http://task-machine.internal' + path, {
+    method: 'POST', headers: { authorization: 'Bearer '+token, 'content-type': 'application/json', 'x-untrusted': 'unused' }, body: JSON.stringify(data), ...options
+  }), env, context)
+  assert.deepEqual(await (await call('/v1/status', { grant })).json(), { running: true })
+  assert.deepEqual(await (await call('/v1/write-file', { grant, path: '/bin', base64: 'ACr/' })).json(), { checkpoint: true })
+  assert.deepEqual(seen, [[grant], [grant, '/bin', Uint8Array.of(0, 42, 255)]])
+  assert.deepEqual(new Uint8Array(await (await call('/v1/read-file', { grant, path: '/bin' })).arrayBuffer()), Uint8Array.of(0, 42, 255))
+  assert.equal((await call('/v1/read-file', { grant, path:'/missing' })).status, 204)
+  assert.equal((await call('/v1/park', { grant })).status, 404)
+  assert.equal((await call('/v1/status', { grant }, { headers: {} })).status, 403)
+  assert.equal((await call('/v1/status?next=elsewhere', { grant })).status, 404)
+  assert.equal((await call('/v1/unchecked', { grant })).status, 404)
+  assert.equal((await call('/v1/write-file', { grant, path: '/f', base64: '!' })).status, 400)
+  assert.equal((await call('/v1/open', { grant, junk: 'x'.repeat(17*1024) })).status, 413)
+  assert.equal((await taskMachine(new Request('https://outside.example/v1/status'), env, context)).status, 404)
+  const bound = ingressConfig({release:id,origin:'https://test.example',image:'registry.cloudflare.com/'+'0'.repeat(32)+'/mikka-api@sha256:'+'2'.repeat(64),taskMachine:'dedicated-machines'})
+  assert.deepEqual(bound.services, [{ binding:'TASK_MACHINE', service:'dedicated-machines' }])
+})
