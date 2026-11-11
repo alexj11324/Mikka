@@ -13,7 +13,7 @@ import { afterJob, cronJob } from '@/lib/background'
 import { describeSample, withDatabaseOperation } from '@/lib/db/egress-sample'
 import { manageDatabasePool } from '@/lib/db/pool-lifecycle'
 import { currentRoute, routeScope } from './labels'
-import { traceSampleRate, traceSettings } from './config'
+import { traceEnvironment, traceSampleRate, traceSettings } from './config'
 import { EXPORT_PAUSE_MS, SafeExporter, createPgInstrumentation, createTracerProvider } from './node'
 import { normalizeStatement, sanitizeAttributes, scrubString, statementId } from './sanitize'
 import { approximateBytes, clientKindFor, pgResponseHook } from './spans'
@@ -280,6 +280,13 @@ describe('server tracing', () => {
 })
 
 describe('sampling and settings', () => {
+  test('an explicit deployment stage labels traces without enabling Vercel platform behavior', () => {
+    assert.equal(traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'production' }), 'production')
+    assert.equal(traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'preview', VERCEL_ENV: 'production' }), 'preview')
+    assert.equal(traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'development', VERCEL_ENV: 'production' }), 'dev')
+    assert.throws(() => traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'prod' }), /MIKKA_DEPLOYMENT_STAGE_INVALID/)
+    assert.equal(traceSampleRate({ MIKKA_DEPLOYMENT_STAGE: 'production', CI: 'true' }), 0, 'CI remains untraced')
+  })
   test('tests, CI and builds never trace; 10% by default; 1 allowed in dev', () => {
     assert.equal(traceSampleRate({ NODE_ENV: 'test', MIKKA_TRACE_SAMPLE_RATE: '1' }), 0)
     assert.equal(traceSampleRate({ CI: 'true', MIKKA_TRACE_SAMPLE_RATE: '1' }), 0)
