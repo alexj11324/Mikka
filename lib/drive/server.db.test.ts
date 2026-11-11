@@ -13,7 +13,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const browser = mock.module('@/lib/auth', { namedExports: { MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => null } } } })
   t.after(() => browser.restore())
   const fixture = new Pool({ connectionString: dbUrl })
-  await fixture.query(await readFile(new URL('../../drizzle/20261112030502_drive_blob_workspace_admission.sql', import.meta.url), 'utf8'))
+  await fixture.query(await readFile(new URL('../../drizzle/20261112030506_drive_blob_workspace_admission.sql', import.meta.url), 'utf8'))
   const { pool } = await import('../db')
   const { workspacePool } = await import('../workspace-db')
   const tokens = await import('../tokens/store')
