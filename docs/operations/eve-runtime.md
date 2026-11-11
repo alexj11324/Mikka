@@ -43,6 +43,26 @@ Keep that service's model and database configuration consistent with Mikka.
 `pnpm dev` starts `eve dev` before the API workers. Eve owns its authored-file
 watcher; API hot replacements reuse the existing service.
 
+## Session scratch files
+
+The agent uses `PortableScratchSandbox` through the public
+`eve/sandbox/provider` interface. Its build preparation returns portable JSON
+containing the virtual filesystem and prepared skill files. The pinned
+`just-bash@3.6.0` executes scratch commands in that virtual filesystem. This
+uses the public Eve package without an SDK fork.
+
+The upstream built-in `JustBashSandbox` caches prepared files in a local
+directory. Mikka's provider carries those files in its JSON artifact so the
+deployment can start on another machine. Session files, attachments and skill
+files then persist in the existing application Postgres database, in
+`eve_sandbox_sessions`. The session, owner, Bot, Workspace and surface bind
+each snapshot. Session end removes that snapshot.
+
+Each file or command operation restores and commits its snapshot in a bounded
+database transaction. Concurrent replicas serialize operations for the same
+session. Model generation and idle sessions hold no database client. The same
+provider serves Node, Docker and Vercel; it requires no paid Vercel Sandbox.
+
 ## Vercel prebuilt output
 
 The existing GitHub prebuilt deployment builds both services from the same
@@ -57,9 +77,11 @@ namespace. The small generated function adapter removes that prefix before
 passing the request to the upstream fetch handler. Native queue deliveries
 retain their context and generated trigger configuration.
 
-Do not deploy output built with `--skip-sandbox-prewarm`. If an agent enables
-sandbox-dependent capabilities, its configured provider must complete the
-normal upstream build preparation.
+The build runs upstream preparation with the portable scratch provider. The
+existing production `vercel pull --environment=production` step supplies the
+project settings and actual `VERCEL_OIDC_TOKEN` through the existing build
+environment delivery. Preserve that authenticated preparation when building
+the Vercel output.
 
 ## Verification and rollback
 

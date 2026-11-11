@@ -54,6 +54,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
   { marker: 'lib/eve/scheduled-read.ts', file: 'lib/eve/scheduled-read.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/eve/scope.ts', file: 'lib/eve/scope.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/sandbox.ts', file: 'lib/eve/sandbox.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/eve/settlement.ts', file: 'lib/eve/settlement.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/eve/approval-store.ts', file: 'lib/eve/approval-bridge.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
