@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { getEventListeners } from 'node:events'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady } from './dev.mjs'
+import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, staleRouteFiles, staleRoutesRefusal } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
@@ -24,11 +24,31 @@ test('development shutdown waits for the real close and preserves failure as a n
 })
 
 test('development keeps one explicit browser origin and accepts existing port/host switches', () => {
-  assert.deepEqual(developmentOptions([], {}), { host: 'localhost', port: 3000, origin: 'http://localhost:3000' })
-  assert.deepEqual(developmentOptions(['-p', '3100', '--hostname', '0.0.0.0'], {}), { host: '0.0.0.0', port: 3100, origin: 'http://localhost:3100' })
-  assert.deepEqual(developmentOptions(['--port=3102', '--host=::1'], {}), { host: '::1', port: 3102, origin: 'http://[::1]:3102' })
+  assert.deepEqual(developmentOptions([], {}), { host: 'localhost', port: 3000, allowStaleRoutes: false, origin: 'http://localhost:3000' })
+  assert.deepEqual(developmentOptions(['-p', '3100', '--hostname', '0.0.0.0'], {}), { host: '0.0.0.0', port: 3100, allowStaleRoutes: false, origin: 'http://localhost:3100' })
+  assert.deepEqual(developmentOptions(['--port=3102', '--host=::1'], {}), { host: '::1', port: 3102, allowStaleRoutes: false, origin: 'http://[::1]:3102' })
   assert.equal(developmentOptions([], { MIKKA_DEV_PORT: '3103' }).port, 3103)
-  for (const args of [['--port', '0'], ['-p', '65536'], ['-p', '1x'], ['--host', 'https://example.invalid'], ['--port'], ['--webpack']]) assert.throws(() => developmentOptions(args, {}))
+  // The stale-route guard's escape hatch is explicit and composes with the existing switches.
+  assert.equal(developmentOptions(['--allow-stale-routes'], {}).allowStaleRoutes, true)
+  assert.equal(developmentOptions(['--allow-stale-routes', '-p', '3104'], {}).port, 3104)
+  for (const args of [['--port', '0'], ['-p', '65536'], ['-p', '1x'], ['--host', 'https://example.invalid'], ['--port'], ['--webpack'], ['--allow-stale-route']]) assert.throws(() => developmentOptions(args, {}))
+})
+
+test('a dev start refuses a route manifest the checkout does not contain', () => {
+  const expected = new Map([['routes.json', '{"version":1}\n'], ['routes.ts', 'export const routes = []\n']])
+  // Identical bytes: the generator rewrites unconditionally, but git compares
+  // content, so a same-bytes rewrite leaves the tree clean and must not block.
+  assert.deepEqual(staleRouteFiles(expected, new Map(expected)), [])
+  // Real content difference: serving would run a route table nobody committed.
+  const changed = staleRouteFiles(new Map([['routes.json', '{"version":1,"routes":[]}\n'], ['routes.ts', expected.get('routes.ts')]]), new Map(expected))
+  assert.deepEqual(changed, [{ path: 'apps/api/generated/routes.json', missing: false }])
+  // A generated file the checkout never had is a missing commit, not a change.
+  const added = staleRouteFiles(expected, new Map([['routes.json', expected.get('routes.json')]]))
+  assert.deepEqual(added, [{ path: 'apps/api/generated/routes.ts', missing: true }])
+  const refusal = staleRoutesRefusal([...changed, ...added])
+  assert.equal(refusal.code, 'API_DEV_ROUTES_STALE')
+  for (const text of ['apps/api/generated/routes.json', 'apps/api/generated/routes.ts', 'Changed:', 'Not in this checkout:',
+    'node apps/api/scripts/generate-routes.mjs', 'git add apps/api/generated && git commit', '--allow-stale-routes']) assert.ok(refusal.message.includes(text), text)
 })
 
 test('only machine paths proxy, retaining the browser Host and exact encoded path', t => {
