@@ -91,3 +91,19 @@ test('(mock fetch) a sent message posts its body and mentions to the basePath ro
     await assert.rejects(group.postGroupMessage(ID, 'x', [], (async () => { if (response instanceof Error) throw response; return response }) as typeof fetch), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === code)
   }
 })
+
+test('leave uses the same-origin member writer for the caller and distinguishes refusal from a missing membership', async () => {
+  const request = (status: number, body: unknown) => (async (url, init) => {
+    assert.equal(url, `/mikka/api/conversations/${ID}/members`)
+    assert.equal(init?.method, 'DELETE')
+    assert.equal(init?.credentials, 'same-origin')
+    assert.deepEqual(JSON.parse(String(init?.body)), { memberType: 'user', memberId: 'self' })
+    return Response.json(body, { status })
+  }) satisfies typeof fetch
+  await group.leaveGroup(ID, 'self', request(200, { ok: true }))
+  await group.leaveGroup(ID, 'self', request(404, { error: 'notFound' }))
+  for (const status of [401, 403, 422, 500]) {
+    await assert.rejects(group.leaveGroup(ID, 'self', request(status, {})), (err: unknown) => err instanceof group.GroupMessagesRequestError && err.status === status)
+  }
+  await assert.rejects(group.leaveGroup(ID, 'self', request(200, {})), group.GroupMessagesRequestError)
+})

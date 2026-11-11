@@ -146,8 +146,22 @@ export function fetchScopedGroups(ownerId: string, workspaceId: string, fetcher:
 }
 
 /** A group's members as GET /api/conversations/{id}/members returns them; bots carry their colour and shape. */
-export type GroupMember = { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; color?: string | null; shape?: string | null; coordinator?: boolean }
+export type GroupMember = { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; role?: 'owner' | 'member'; color?: string | null; shape?: string | null; coordinator?: boolean }
 
 export function fetchGroupMembers(id: string, fetcher: typeof fetch = fetch): Promise<GroupMember[]> {
   return readGroupApi(`/api/conversations/${encodeURIComponent(id)}/members`, listIn<GroupMember>('members'), fetcher)
+}
+
+/** Leave only the signed-in person's user membership, using the canonical member writer. */
+export async function leaveGroup(id: string, userId: string, fetcher: typeof fetch = fetch): Promise<void> {
+  let response: Response
+  try {
+    response = await fetcher(withBasePath(`/api/conversations/${encodeURIComponent(id)}/members`), {
+      method: 'DELETE', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ memberType: 'user', memberId: userId }),
+    })
+  } catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
+  if (response.status === 404) return // A retry after a committed departure finds no membership.
+  if (response.ok && (await response.json().catch(() => null))?.ok === true) return
+  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : 'unavailable', response.status)
 }
