@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
@@ -23,38 +24,31 @@ const usable = Boolean(url) && disposableDatabase(process.env, url!)
 const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
 const actor: DriveActor = { ownerId: 'drive-owner', authorName: 'Drive Fixture' }
 
-/** Just the tables these tests touch, from the migrations that create them. */
-const DDL = [
-  `CREATE TABLE drive_volumes (
-    id text PRIMARY KEY, "driveScope" text NOT NULL, "scopeId" text NOT NULL, "scopeUserId" text,
-    "ownerId" text NOT NULL, "workspaceId" uuid, name text NOT NULL,
-    "headVersionId" text NOT NULL, "headDigest" text NOT NULL, "entryCount" integer NOT NULL DEFAULT 0,
-    "totalBytes" bigint NOT NULL DEFAULT 0,
-    "createdAt" timestamptz NOT NULL DEFAULT now(), "updatedAt" timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT drive_volumes_scope_shape CHECK (("driveScope" <> 'project-user') = ("scopeUserId" IS NULL)))`,
-  `CREATE UNIQUE INDEX drive_volumes_scope_name_key
-    ON drive_volumes ("driveScope","scopeId",coalesce("scopeUserId",''),name)`,
-  `CREATE TABLE drive_volume_entries (
-    "volumeId" text NOT NULL REFERENCES drive_volumes(id) ON DELETE CASCADE, "ownerId" text NOT NULL,
-    path text NOT NULL, mode integer NOT NULL CHECK (mode IN (420,493)), "sizeBytes" integer NOT NULL,
-    sha256 text NOT NULL, PRIMARY KEY ("volumeId",path))`,
-  `CREATE TABLE drive_blobs (
-    "ownerId" text NOT NULL, sha256 text NOT NULL, "sizeBytes" integer NOT NULL,
-    "storageKey" text, "inlineContent" bytea, PRIMARY KEY ("ownerId",sha256),
-    CONSTRAINT drive_blobs_home CHECK (("storageKey" IS NULL) <> ("inlineContent" IS NULL)))`,
-  `CREATE UNIQUE INDEX drive_blobs_storage_key ON drive_blobs ("storageKey") WHERE "storageKey" IS NOT NULL`,
-  `CREATE TABLE drive_volume_versions (
-    id text PRIMARY KEY, "volumeId" text NOT NULL REFERENCES drive_volumes(id) ON DELETE CASCADE,
-    "ownerId" text NOT NULL, seq integer NOT NULL, kind text NOT NULL, "fileCount" integer NOT NULL,
-    "totalBytes" bigint NOT NULL, digest text NOT NULL, manifest jsonb NOT NULL,
-    "threadId" text, "threadTitle" text, "authorName" text NOT NULL,
-    "restoredFromVersionId" text, "createdAt" timestamptz NOT NULL DEFAULT now())`,
-  `CREATE UNIQUE INDEX drive_volume_versions_seq_key ON drive_volume_versions ("volumeId",seq)`,
-  `CREATE TABLE drive_mutations (
-    "volumeId" text NOT NULL REFERENCES drive_volumes(id) ON DELETE CASCADE, "mutationId" text NOT NULL,
-    "requestDigest" text NOT NULL, "versionId" text NOT NULL, "expectedDigest" text, "resultDigest" text NOT NULL,
-    "createdAt" timestamptz NOT NULL DEFAULT now(), PRIMARY KEY ("volumeId","mutationId"))`,
-]
+/**
+ * The real DDL, taken from the migrations that ship these tables.
+ *
+ * Re-typing the columns here would let a CHECK constraint drift out of the test:
+ * a mode outside {420,493} or a restore without its source would still pass. So
+ * the statements are read from `drizzle/` itself, keeping every constraint, and
+ * only the account-deletion triggers are dropped (they name a function that
+ * lives in another schema and has nothing to do with these behaviours).
+ */
+function migrationDDL(): string[] {
+  const statements: string[] = []
+  for (const file of ['20261111000100_drive_volume.sql', '20261111000200_drive_cas_write.sql']) {
+    const sql = readFileSync(new URL(`../../drizzle/${file}`, import.meta.url), 'utf8')
+    for (const raw of sql.split(/;\s*\n/)) {
+      // Drop comment lines first: a CREATE TABLE is usually preceded by a note
+      // explaining it, and matching on the raw text would skip the statement.
+      const text = raw.split('\n').filter(line => !line.trimStart().startsWith('--')).join('\n').trim()
+      // The account-deletion triggers name a function from another schema and
+      // say nothing about these behaviours.
+      if (!text || /^(DO|DROP TRIGGER|CREATE TRIGGER|CREATE OR REPLACE FUNCTION)/i.test(text)) continue
+      statements.push(text)
+    }
+  }
+  return statements
+}
 
 /** Every row of the volume, for a before/after comparison. */
 async function snapshot(pool: Pool, volumeId: string) {
@@ -74,12 +68,15 @@ test('Drive CAS on PG17: conflicts refuse with zero side effects, replays land o
   t.after(async () => { await admin.query(`DROP SCHEMA "${schema}" CASCADE`).catch(() => {}); await admin.end() })
   const pool = new Pool({ connectionString: url!, max: 6, options: `-c search_path=${schema}` })
   t.after(async () => { await pool.end() })
-  for (const sql of DDL) await pool.query(sql)
+  for (const sql of migrationDDL()) await pool.query(sql)
 
   // Bytes a `put` may reference. The store takes the size from here, never from the client.
   const blobB = 'seven!!', blobC = 'three'
-  await pool.query(`INSERT INTO drive_blobs ("ownerId",sha256,"sizeBytes","storageKey") VALUES ($1,$2,$3,$4),($1,$5,$6,$4)`,
-    [actor.ownerId, sha256(blobB), blobB.length, 'drive/fixture', sha256(blobC), blobC.length])
+  // Each digest gets its own key: the unique index on storageKey is what stops
+  // two different blobs from sharing (and then deleting) one object.
+  await pool.query(`INSERT INTO drive_blobs ("ownerId",sha256,"sizeBytes","storageKey") VALUES ($1,$2,$3,$4),($1,$5,$6,$7)`,
+    [actor.ownerId, sha256(blobB), blobB.length, `drive/fixture/${sha256(blobB)}`,
+      sha256(blobC), blobC.length, `drive/fixture/${sha256(blobC)}`])
 
   const volume = await createDriveVolume(pool as never, actor, { driveScope: 'user', scopeId: 'drive-owner', name: 'notes' }, sha256)
   assert.match(volume.id, /^vol_[0-9A-HJKMNP-TV-Z]{26}$/)
