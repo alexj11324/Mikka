@@ -1,17 +1,13 @@
-import { getEdition } from '../../../lib/edition'
+import { isCloudEdition } from '../../../lib/edition'
 import { serverPageKind } from '../../../lib/server-pages'
 import { applySecurityHeaders, isPagePath, pageResponse } from './http-policy.mjs'
 
 type Environment = Record<string, string | undefined>
 
-export function servesCommunityUI(env: Environment = process.env): boolean {
-  return getEdition(env) === 'cloud' || env.MIKKA_COMMUNITY_UI === '1'
-}
-
 /** The backend owns dispatch and the public viewmodel; Claude's page can use
  * the same /api/server contract without coupling its layout to this router. */
 export async function serverPageResponse(request: Request, spaHtml: string, serverInfo: (request: Request) => Promise<Response>, env: Environment = process.env) {
-  if (servesCommunityUI(env)) return pageResponse(request, () => spaHtml)
+  if (isCloudEdition(env)) return pageResponse(request, () => spaHtml)
   const url = new URL(request.url)
   if (!isPagePath(url.pathname)) return applySecurityHeaders(request, new Response(null, { status: 404 }))
   if (!['GET', 'HEAD'].includes(request.method)) return applySecurityHeaders(request, new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } }))

@@ -41,17 +41,13 @@ docker compose up -d --force-recreate app
 
 On an empty database, `setup.state` is `required`. Configure SMTP/Resend or your own OAuth client, then use `setup.signUpUrl` to create the initial account. Registration uses the existing authentication flow and creates that person's workspace with the `admin` membership. There is no installation-wide administrator role and no special access to other people's workspaces. Existing installations report `ready`; upgrading does not assign a new administrator or alter existing accounts. Email/password being enabled is separate from the `emailDeliveryConfigured` flag, which reports configuration presence rather than a successful delivery test.
 
-The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry, so authentication does not accidentally open the older built-in workspace UI.
+The server retains sign-in, sign-up, verification/reset, device authorization, OAuth consent, invitations and app handoff pages. GitHub linking keeps its existing account-confirmation surface. Ordinary navigation from these pages returns to the server entry.
 
-### Optional older built-in UI
+### Connect an official client
 
-For compatibility, add `MIKKA_COMMUNITY_UI=1` to your private Compose configuration and recreate the app:
+Open the official Web app and choose **Change** on the sign-in screen or under account settings. Select **Self-hosted server**, enter the HTTPS address from `/mikka/api/server`, and continue to sign in on your server. The app lists saved accounts with their server addresses. Choose **Mikka Cloud** to return to the Cloud account. Official Desktop and iOS clients also accept a server address.
 
-```sh
-MIKKA_COMMUNITY_UI=1 docker compose up -d --force-recreate app
-```
-
-Unset the variable or set it to `0`, then recreate the app to restore server mode. Only the exact value `1` enables the older built-in UI; cloud deployments keep the official app regardless of this setting. This is a presentation switch, not an API authorization rule. It does not change your data, credentials, migrations, scheduler or gateway. The public UI source and its compilation stay in the repository; BoardUI/affectUI source and bundles do not enter the public image.
+The public image contains the API, daemon integration, and the pages needed for sign-in, password recovery, invitations, consent, and app handoffs. Upgrading uses the existing database and installation keys. Remove `MIKKA_COMMUNITY_UI` from older Compose configurations.
 
 ## Installation secrets and backups
 

@@ -149,12 +149,6 @@ jobs:
           docker compose restart app
           docker compose up --detach --wait --wait-timeout 120
           node scripts/self-hosted-smoke.mjs
-      - name: Verify the older built-in UI remains opt-in with the same data
-        run: |
-          MIKKA_COMMUNITY_UI=1 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
-          MIKKA_EXPECT_COMMUNITY_UI=1 node scripts/self-hosted-smoke.mjs
-          MIKKA_COMMUNITY_UI=0 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
-          node scripts/self-hosted-smoke.mjs
       - name: Publish the tested revision
         if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
         env:

@@ -54,9 +54,8 @@ jobs:
           --health-retries 10
     env:
       CI: 'true'
-      # Read-manifest discovery starts from the compiled compatibility UI.
-      # Backend-only defaults are exercised by self-hosted-image.yml.
-      MIKKA_COMMUNITY_UI: '1'
+      # Read-cache acceptance discovers actions published by the Web client.
+      MIKKA_EDITION: cloud
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e

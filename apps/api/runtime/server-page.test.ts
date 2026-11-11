@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { serverPageResponse, servesCommunityUI } from './server-page'
+import { serverPageResponse } from './server-page'
 import { serverDocumentKind, serverPageKind } from '../../../lib/server-pages'
 
 const html = '<!doctype html><html lang="zh-CN"><body><div id="root"></div><script src="/mikka/assets/app.js"></script></body></html>'
@@ -10,16 +10,15 @@ const info = async (input: Request) => new Response(input.method === 'HEAD' ? nu
   headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
 })
 
-test('community defaults to server data, explicit 1 restores the compiled UI, cloud keeps its app', async () => {
-  for (const [env, legacy] of [[{}, false], [{ MIKKA_COMMUNITY_UI: '0' }, false], [{ MIKKA_COMMUNITY_UI: 'true' }, false],
-    [{ MIKKA_COMMUNITY_UI: '1' }, true], [{ MIKKA_EDITION: 'cloud' }, true], [{ MIKKA_EDITION: 'cloud', MIKKA_COMMUNITY_UI: '0' }, true]] as const) {
-    assert.equal(servesCommunityUI(env), legacy)
+test('the retired option cannot select an alternate workbench; cloud serves its application', async () => {
+  for (const [env, cloud] of [[{}, false], [{ MIKKA_COMMUNITY_UI: '1' }, false],
+    [{ MIKKA_EDITION: 'cloud' }, true]] as const) {
     for (const path of ['/mikka', '/mikka/en', '/mikka/settings', '/mikka/en/settings/members']) {
       const response = await serverPageResponse(request(path), html, info, env)
       assert.equal(response.status, 200)
       assert.match(response.headers.get('cache-control')!, /no-store/)
       const body = await response.text()
-      if (legacy) { assert.match(body, /<html\b/); assert.doesNotMatch(body, /data-mikka-server-page/) }
+      if (cloud) { assert.match(body, /<html\b/); assert.doesNotMatch(body, /data-mikka-server-page/) }
       else assert.deepEqual(JSON.parse(body), view)
     }
   }
