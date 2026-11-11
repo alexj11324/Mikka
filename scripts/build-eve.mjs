@@ -18,9 +18,7 @@ export async function buildEve({ root = process.cwd(), env = process.env, execut
   execute(process.execPath, [join(root, 'node_modules/eve/bin/eve.js'), 'build'], {
     cwd: join(root, 'apps/eve'), stdio: 'inherit', env: childEnv,
   })
-  // The public eve CLI publishes .output for every Nitro preset, including
-  // Vercel's config.json and functions tree.
-  const output = join(root, 'apps/eve/.output')
+  const output = join(root, 'apps/eve', preset === 'vercel' ? '.vercel/output' : '.output')
   await writeFile(join(output, 'mikka-eve-build.json'), `${JSON.stringify({ version: 1, eve, revision, preset })}\n`)
 }
 
