@@ -216,11 +216,11 @@ test('a slot answers per repository, so two repositories never vote on one answe
 })
 
 test('a pattern learnt from purchases stays in the repository it was seen in', () => {
-  const bought = (id: string, repository: string | null, suggestionId: string) => fact({
+  const bought = (id: string, repository: string | null) => fact({
     id, kind: 'interest', subject: '川菜调料', subjectKey: `调料 ${id}`, repository, confidence: 0.9,
     value: { topic: '川菜', purchases: [{ merchant: 'Weee', items: ['花椒'], amount: 12, currency: 'USD', date: '2026-10-01T12:00:00Z' }] },
   })
-  const plan = consolidationCandidates([bought('a', 'acme/widget', 's1'), bought('b', 'acme/widget', 's2'), bought('c', 'acme/gadget', 's3')], OPTIONS)
+  const plan = consolidationCandidates([bought('a', 'acme/widget'), bought('b', 'acme/widget'), bought('c', 'acme/gadget')], OPTIONS)
   const topics = plan.items.filter(item => item.kind === 'pattern' && item.evidence.topic === '川菜')
   assert.equal(topics.length, 1, 'only the repository with two purchases is a pattern')
   assert.equal(topics[0].kind === 'pattern' ? topics[0].outcomes.interest.repository : null, 'acme/widget', 'the pattern keeps the repository it was learnt in')
