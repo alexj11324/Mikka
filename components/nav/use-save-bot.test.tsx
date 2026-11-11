@@ -31,7 +31,7 @@ before(async () => {
 after(() => browser.happyDOM.close())
 
 test('a Bot edit updates its workspace roster and existing pickers after one write, even without a live push', async () => {
-  const container = document.createElement('div')
+  const container = document.body
   const root = createRoot(container)
   let save!: ReturnType<typeof useSaveBot>
   function Consumers() {
