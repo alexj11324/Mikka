@@ -34,7 +34,7 @@ export async function startEveService({ root = process.cwd(), env = process.env,
   try { await symlink(persistent, storage, 'dir') }
   catch (error) {
     if (error.code !== 'EEXIST') throw error
-    if (await realpath(storage) !== persistent) throw new Error('EVE_SERVICE_STORAGE_MISMATCH')
+    if (await realpath(storage) !== persistent) throw new Error('EVE_SERVICE_STORAGE_MISMATCH', { cause: error })
   }
   // Both the local World's deliveries and OAuth callbacks use eve's public
   // namespaced mount, never the main application's root Workflow consumer.

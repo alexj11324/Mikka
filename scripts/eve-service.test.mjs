@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -41,4 +41,17 @@ test('managed output and an explicitly supplied peer never spawn another process
     const service = await startEveService({ env, spawnProcess: () => { throw new Error('MUST_NOT_SPAWN') } })
     await service.close()
   }
+})
+
+test('startup preserves an existing session directory instead of replacing its data', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'eve-preserve-storage-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  await mkdir(join(root, 'eve/server'), { recursive: true })
+  await mkdir(join(root, 'eve/.eve/.workflow-data'), { recursive: true })
+  await writeFile(join(root, 'eve/.eve/.workflow-data/history'), 'recorded-session')
+  await writeFile(join(root, 'eve/server/index.mjs'), 'export default {}')
+  await writeFile(join(root, 'eve/mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.0.0-rc.9', revision: 'a'.repeat(40) }))
+  await assert.rejects(startEveService({ root, env: {}, allocatePort: async () => 43127,
+    spawnProcess: () => { throw new Error('MUST_NOT_SPAWN') } }), /EVE_SERVICE_STORAGE_MISMATCH/)
+  assert.equal(await readFile(join(root, 'eve/.eve/.workflow-data/history'), 'utf8'), 'recorded-session')
 })
