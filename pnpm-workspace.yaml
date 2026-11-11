@@ -26,6 +26,7 @@ allowBuilds:
   sharp: true
 
 patchedDependencies:
+  '@fantasticfour/world-cloudflare@2.4.3': patches/@fantasticfour__world-cloudflare@2.4.3.patch
   '@novnc/novnc@1.6.0': patches/@novnc__novnc@1.6.0.patch
   '@better-auth/sso@1.7.12': patches/@better-auth__sso@1.7.12.patch
   ffmpeg-static@5.3.0: patches/ffmpeg-static@5.3.0.patch
