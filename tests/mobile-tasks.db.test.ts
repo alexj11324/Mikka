@@ -135,6 +135,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const body = await response.json()
     assert.deepEqual(Object.keys(body).sort(), ['activity', 'live', 'task'])
     assert.equal(body.task.title, 'Short title')
+    assert.equal(body.task.replyRunId, latest)
     assert.equal(body.task.description, 'Description')
     assert.equal(body.task.group, 'pending', 'PR metadata wins over idle')
     assert.deepEqual([body.task.state, body.task.reason, body.task.blockedBy], ['waiting', 'pr_review', null])
@@ -153,6 +154,17 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(body.activity[0].createdAt, body.activity[1].createdAt)
     assert.equal(body.activity.at(-1).by, 'owner')
     assert.doesNotMatch(JSON.stringify(body), /PRIVATE_RAW_ERROR|failureDetails|"error"/)
+  })
+  await t.test('conversation reads keep control runs as evidence and route replies only to the latest authorized conversation', async () => {
+    await pool.query("update agent_runs set kind='review' where id=$1", [latest])
+    try {
+      const detail = await (await request(issueId)).json()
+      assert.ok(detail.activity.some((row: { runId?: string }) => row.runId === latest))
+      assert.equal(detail.task.replyRunId, first)
+      assert.equal((await (await request(noRun)).json()).task.replyRunId, null)
+      const teammate = await (await request(issueId, { ...teamSelection, bearer: peer.token })).json()
+      assert.equal(teammate.task.replyRunId, null)
+    } finally { await pool.query("update agent_runs set kind='implement' where id=$1", [latest]) }
   })
   await t.test('list decorations share one batched read, cover no-thread schedules and preserve blocked', async () => {
     const measurement = await measured(() => newestTaskRuns(owner, [issueId, noRun], teamWorkspace.id))

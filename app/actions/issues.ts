@@ -385,15 +385,19 @@ const { content: _versionBody, ...versionSummaryColumns } = getTableColumns(issu
 export async function pollIssueVersionSummaries(id: string, known?: string, previous?: readonly ListPosition[]) {
   return cacheReadAction(() => withDatabaseOperation('/actions/issues/activity', async () => {
     const { issue, user } = await requireIssueAccessWithoutBody(id)
-    const held = readListPositions(previous, 50)
+    const held = readListPositions(previous, 51)
     const result = await db.transaction(async tx => {
       const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
       await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // The same deleted-task refusal as pollIssue, after taking the shared lock.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
-      const summaries = tx.select({ ...versionSummaryColumns, content: sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issueVersions.content}->'attrs')`.as('content') })
-        .from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, issue.userId))).orderBy(desc(issueVersions.revision), desc(issueVersions.id)).limit(50).as('activity_versions')
+      const columns = { ...versionSummaryColumns, content: sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issueVersions.content}->'attrs')`.as('content') }
+      const scope = and(eq(issueVersions.issueId, id), eq(issueVersions.userId, issue.userId))
+      // Keep the true creator when the latest fifty summaries no longer include revision one.
+      const recent = tx.select(columns).from(issueVersions).where(scope).orderBy(desc(issueVersions.revision), desc(issueVersions.id)).limit(50)
+      const creation = tx.select(columns).from(issueVersions).where(and(scope, eq(issueVersions.revision, 1)))
+      const summaries = recent.union(creation).as('activity_versions')
       const signatures = tx.select({ id: summaries.id, revision: summaries.revision, item: sql`to_jsonb(activity_versions)`.as('item'), actor: sql`jsonb_build_array(
         (select jsonb_build_array(${users.name}, ${users.image}) from ${users} where ${users.id}=${summaries.actorId} and ${summaries.actorType}='user'),
         (select ${agents.harness} from ${agents} where ${agents.id}::text=${summaries.actorId} and ${agents.userId}=${issue.userId} and ${summaries.actorType}='agent')

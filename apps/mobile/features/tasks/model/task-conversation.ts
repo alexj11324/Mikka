@@ -1,6 +1,6 @@
 import { HARNESS } from '@/lib/harness'
 import { mobileMessages } from '@/lib/messages'
-import type { TaskActivity, ThreadItem } from '@/lib/types'
+import type { TaskActivity, TaskDetail, ThreadItem } from '@/lib/types'
 
 export type Attempt = Extract<TaskActivity, { kind: 'attempt' }>
 /** One attempt's part of the task's conversation, and the raw error it ended with (2026-11-05-0330: inside the attempt). */
@@ -22,6 +22,17 @@ export function conversationSegments(activity: readonly TaskActivity[], threads:
     segments.unshift({ attempt, items, error: thread?.error ?? null })
   }
   return segments
+}
+
+/** Older servers sent numbered attempts but no explicit reply target. Keep their readable
+ * conversation working and exclude any independently marked review or verification. */
+export function conversationReplyRun(task: Pick<TaskDetail['task'], 'replyRunId'>, activity: readonly TaskActivity[]): string | null {
+  if (task.replyRunId !== undefined) return task.replyRunId
+  let latest: Attempt | undefined
+  for (const item of activity) {
+    if (item.kind === 'attempt' && item.stage !== 'verify' && item.stage !== 'review' && (!latest || item.n > latest.n)) latest = item
+  }
+  return latest?.runId ?? null
 }
 
 const agent = (harness: string) => HARNESS[harness] ?? harness

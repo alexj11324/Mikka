@@ -17,6 +17,7 @@ import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { runBotId } from '@/lib/run-bot-name'
 import { taskSchedule, taskScheduleLabels, taskScheduleView } from '@/lib/task-block-runs'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
+import { latestConversationRun } from '@/lib/issue-threads'
 import { mobileTaskActivity } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
@@ -44,7 +45,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
   const [identifiers, runs, [decoration], versions, labels, blockers] = await Promise.all([
     taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number, issuedIdentifier: issue.issuedIdentifier }]),
     db.select({ ...taskStateRunColumns, pullRequest: runPublications.pullRequest,
-      createdAt: agentRuns.createdAt,
+      kind: agentRuns.kind, createdAt: agentRuns.createdAt,
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`,
       model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
       bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape },
@@ -86,6 +87,7 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     task: {
       id, identifier: identifiers.get(id) ?? null, title: displayTaskTitle({ ...issue, shortTitle: issue.shortTitleFrom === issue.title ? issue.shortTitle : null }), description: issueContentToMarkdown(issue.content).trim() || null,
       status: issue.status, priority: issue.priority, ...taskStateOf(task, newest, { block, schedule }), bot: newest?.bot ?? null,
+      replyRunId: latestConversationRun(runs),
       agent: newest ? { harness: newest.harness, model: newest.model } : null, place, schedule,
       review: reviews.get(id) ?? null,
     },

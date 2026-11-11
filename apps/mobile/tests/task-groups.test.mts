@@ -3,7 +3,7 @@ import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { attemptState, groupOf, groupOfThread, rowState, taskListRows } from '../features/tasks/model/task-groups.ts'
-import { activityEntries, boundary, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
+import { activityEntries, boundary, conversationReplyRun, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
 
 test('a task\'s current thread decides its group, by R-52\'s judgement', () => {
   assert.equal(groupOfThread('waiting'), 'pending')
@@ -99,6 +99,15 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   const segments = conversationSegments(activity, threads)
   assert.deepEqual(segments.map(segment => [segment.attempt.runId, segment.items.map(entry => entry.id), segment.error]), [['r1', ['a', 'b'], 'E_TOOL_FAILED'], ['r2', ['c'], null]])
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
+})
+
+test('opening another segment keeps the reply target, and a read-only response has no composer', () => {
+  const run = (runId: string, n: number, stage: 'review' | 'implement' | 'verify') => ({ kind: 'attempt' as const, runId, n, stage, group: 'idle' as const, harness: 'codex', createdAt: '', failed: false })
+  const activity = [run('review', 3, 'review'), run('write', 2, 'implement'), run('verify', 1, 'verify')]
+  assert.equal(conversationReplyRun({ replyRunId: 'write' }, activity), 'write')
+  assert.equal(conversationReplyRun({ replyRunId: null }, activity), null)
+  assert.equal(conversationReplyRun({}, activity), 'write')
+  assert.equal(conversationReplyRun({}, activity.filter(row => row.runId !== 'write')), null)
 })
 
 // Alex 2026-11-09: a task is one conversation; no 「尝试」, no numbering and no switch verb (as Warp): where the Agent changed, the next Agent itself.

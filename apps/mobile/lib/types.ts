@@ -222,6 +222,8 @@ export type TaskActivity =
 /** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
+    /** Authorized conversation head, null for read-only evidence. Absent on older servers. */
+    replyRunId?: string | null
     bot: TaskBot | null
     schedule: TaskSchedule | null
     description: string | null

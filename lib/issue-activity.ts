@@ -69,11 +69,14 @@ function labelNames(content: JSONContent) {
 export function deriveIssueActivity(versions: ActivityVersion[], children: ActivityChild[], limit = 12): IssueActivityEvent[] {
   const ordered = [...versions].sort((a, b) => a.revision - b.revision)
   const events: IssueActivityEvent[] = []
-  const created = ordered.find(version => version.revision === 1) ?? ordered[0]
+  const created = ordered.find(version => version.revision === 1)
   if (created) events.push({ id: `created-${created.id}`, at: timestamp(created.createdAt), kind: 'created', actorKey: actorKeyOf(created), actor: created.actor ?? null })
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1]
     const current = ordered[index]
+    // A bounded activity window can include the original creation and then a later page.
+    // A gap cannot attribute every intervening edit to the first actor on that page.
+    if (current.revision !== previous.revision + 1) continue
     const at = timestamp(current.createdAt)
     const actorKey = actorKeyOf(current)
     const actor = current.actor ?? null

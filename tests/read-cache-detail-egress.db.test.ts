@@ -113,9 +113,9 @@ test('detail and activity revalidate current access while returning only changed
     assert.equal(changedHistory.delta, true)
     assert.deepEqual(changedHistory.items.map(row => row.id), [newVersion])
     const combined = mergeList(snapshot.items, changedHistory)
-    assert.equal(combined.length, 50, 'the oldest row leaves the fifty-version window')
+    assert.equal(combined.length, 51, 'the creation stays beside the fifty-version window')
+    assert.ok(combined.some(version => version.revision === 1))
     assert.equal(combined[0].id, newVersion)
-    assert.ok(!combined.some(row => row.revision === 1))
     const fullSummary = successful(await read(() => pollIssueVersionSummaries(id)))
     assert.ok(fullSummary.snapshot && !('unchanged' in fullSummary.snapshot))
     assert.deepEqual(combined, fullSummary.snapshot.items)
@@ -124,6 +124,15 @@ test('detail and activity revalidate current access while returning only changed
     const actorChanged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version, changedHistory.positions)))
     assert.ok(actorChanged.snapshot && !('unchanged' in actorChanged.snapshot))
     assert.equal(actorChanged.snapshot.items[0].actor?.name, 'Renamed activity actor', 'profile-dependent summaries invalidate without a new version')
+
+    await pool.query('insert into issue_versions(id,"issueId","userId",revision,title,content,status,priority) values($1,$2,$3,52,$4,$5,$6,$7)',
+      [randomUUID(), id, owner, 'Another change', JSON.stringify(changedBody), 'done', 'normal'])
+    const paged = successful(await read(() => pollIssueVersionSummaries(id, changedHistory.version, changedHistory.positions)))
+    assert.ok(paged.snapshot && !('unchanged' in paged.snapshot))
+    const window = mergeList(combined, paged.snapshot)
+    assert.equal(window.length, 51)
+    assert.equal(window.at(-1)?.revision, 1)
+    assert.ok(!window.some(row => row.revision === 2))
 
     assert.equal((await actAs(stranger, () => pollIssue(id, bodyChanged.version))).error, 'issueNotFound')
     assert.equal((await actAs(stranger, () => pollIssueVersionSummaries(id, snapshot.version, snapshot.positions))).error, 'issueNotFound')

@@ -35,7 +35,7 @@ export function useActivityEvents(versions: ActivityVersion[], children: Activit
   const format = useFormatter()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
-  const rows = activityTimeline(deriveIssueActivity(versions, children), [])
+  const rows = activityTimeline(deriveIssueActivity(versions, children, Infinity), [])
   const labelOf = (event: IssueActivityEvent) => event.kind === 'created' ? tDetail('createdTask')
     : event.kind === 'status' ? t('changedStatus', { status: statusLabel(event.status ?? '') })
     : event.kind === 'priority' ? t('changedPriority', { priority: priorityLabel(event.priority ?? '') })
