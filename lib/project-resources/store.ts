@@ -5,6 +5,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { db } from '@/lib/db'
 import { inDatabaseTransaction } from '@/lib/db/request-scope'
+import { currentTransactionBoundary } from '@/lib/db/transaction-boundary'
 import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
@@ -15,8 +16,12 @@ import { environmentConfiguration, projectResourcesInput, saveEnvironmentInput, 
 type Reader = Parameters<typeof withTaskWorkspace>[0]
 const actorId = (reader: Reader) => typeof reader === 'string' ? reader : reader.id
 type EnvironmentRow = { id: string; workspaceId: string; name: string; revision: number; configuration: EnvironmentConfiguration; archivedAt: Date | null }
-type ResourceLease = { userId: string; workspaceId: string; tx: WorkspaceTransaction; active: boolean }
+type ResourceLease = { userId: string; workspaceId: string; tx: WorkspaceTransaction; active: boolean; boundary: object | undefined }
 const resourceLease = new AsyncLocalStorage<ResourceLease>()
+const currentResourceLease = () => {
+  const held = resourceLease.getStore()
+  return held?.active && held.boundary === currentTransactionBoundary() ? held : undefined
+}
 
 /** Acquire before the APP transaction. Nested Factory queues borrow the same
  * lease; the shared locks survive savepoints and last through the owner's COMMIT.
@@ -24,20 +29,20 @@ const resourceLease = new AsyncLocalStorage<ResourceLease>()
 export async function withProjectResourceLease<T>(reader: Reader, workspaceId: string, work: (tx: WorkspaceTransaction) => Promise<T>, requireExisting = false): Promise<T> {
   const scope = taskReaderScope(reader)
   if (scope.workspaceId && scope.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-  const held = resourceLease.getStore()
+  const held = currentResourceLease()
   if (held?.active && held.userId === scope.userId && held.workspaceId === workspaceId) return work(held.tx)
   if (requireExisting || inDatabaseTransaction() || held?.active) throw new ActionFailureError('projectEnvironmentUnavailable')
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))`)
     await resourceLock(tx, workspaceId, false)
-    const lease: ResourceLease = { userId: scope.userId, workspaceId, tx, active: true }
+    const lease: ResourceLease = { userId: scope.userId, workspaceId, tx, active: true, boundary: currentTransactionBoundary() }
     try { return await resourceLease.run(lease, () => work(tx)) }
     finally { lease.active = false }
   })
 }
 
 export function requireProjectResourceLease(userId: string, workspaceId: string) {
-  const held = resourceLease.getStore()
+  const held = currentResourceLease()
   if (!held?.active || held.userId !== userId || held.workspaceId !== workspaceId) throw new ActionFailureError('projectEnvironmentUnavailable')
 }
 
@@ -66,7 +71,7 @@ async function resourceWriteLock(tx: WorkspaceTransaction, workspaceId: string) 
   // Configuration edits cannot upgrade an admission's shared lease. Every
   // independent writer takes relation -> resource -> entity locks, matching
   // admission and Project lifecycle operations across the split databases.
-  if (resourceLease.getStore()?.active) throw new ActionFailureError('projectResourceConflict')
+  if (currentResourceLease()) throw new ActionFailureError('projectResourceConflict')
   await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))`)
   await resourceLock(tx, workspaceId, true)
 }
