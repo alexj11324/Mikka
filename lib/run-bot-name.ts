@@ -4,11 +4,15 @@ import { agentRuns, agents } from '@/lib/db/schema'
 /** A bot's name as the app shows it: the person's Coordinator is always "Coordinator", whatever its row is called. */
 const shownName = sql.raw(`case when exists (select 1 from coordinator_bots cb where cb."botId"=b.id) then 'Coordinator' else b.name end`)
 
-/** A standalone execution identity uses its owning Bot, or the Coordinator for local work. */
+/** A standalone execution identity uses its owning Bot. The Agent's own name is
+ * the last resort: no current identity format lets it be inferred. The removed
+ * `<harness> <uuid>` guess matched lib/device-agents.ts's device-Agent names, not
+ * the Bot runtime's `Cloud <harness> <botId>`, so it named a device Agent
+ * "Coordinator". ALE-77: showing the Agent's own name beats a wrong Bot. */
 export const executionBotName = sql<string>`coalesce(
   (select ${shownName} from bot_cloud_runtimes bcr join bots b on b.id=bcr."botId" and b."ownerId"=bcr."ownerId"
     where bcr."agentId"=${agents.id} and bcr."ownerId"=${agents.userId} limit 1),
-  case when ${agents.name} ~ '^(claude_code|codex|mock) [0-9a-f-]{36}$' then 'Coordinator' else ${agents.name} end
+  ${agents.name}
 )`
 
 /** The dispatching Bot wins; hidden execution identities never become conversation names. */

@@ -42,6 +42,12 @@ export async function workspaceUsage(actorId: string, workspaceId: string, month
   // Run time is the part of each run that falls inside the month; a run still going counts up to now.
   const seconds = sql<number>`coalesce(sum(case when ${agentRuns.startedAt} is null then 0 else greatest(0, extract(epoch from (least(coalesce(${agentRuns.finishedAt}, now()), ${end}::timestamptz) - greatest(${agentRuns.startedAt}, ${start}::timestamptz)))) end), 0)::float8`
   // Runs that overlap the month: created before its end and not finished before its start.
+  // This per-Bot column counts only runs a Bot dispatched (agent_runs.botId), so an
+  // MCP client's run — which has no botId by contract (lib/computer/queue-run.ts) —
+  // is absent here by design. Its time is not lost: `executionAccounts` below
+  // aggregates every run by its frozen execution identity, and that is the surface
+  // billing reads (hosted_usage records usageRunId/executionOwnerId, never a botId).
+  // ALE-77 confirmed both facts; do not "fix" this filter to include them.
   const perBot = ids.length ? await db.select({ botId: agentRuns.botId, seconds })
     .from(agentRuns)
     .where(and(inArray(agentRuns.botId, ids), lt(agentRuns.createdAt, end), sql`(${agentRuns.finishedAt} is null or ${agentRuns.finishedAt} >= ${start}::timestamptz)`))
