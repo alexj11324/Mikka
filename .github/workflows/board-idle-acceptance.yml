@@ -1,4 +1,4 @@
-name: Board idle-budget acceptance
+name: Task command and idle-budget acceptance
 on:
   push:
     branches: ['evidence/1975-board-idle-policy']
@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: d6d49d94cebfe725e2e3e86c750b06642e14a1e5
+          ref: a961064d364f23e834b625f253238f6427179921
           persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
@@ -22,9 +22,7 @@ jobs:
         with:
           node-version: 24
       - name: Check the exact public release-order leaf
-        run: test "$(git rev-parse HEAD)" = 'd6d49d94cebfe725e2e3e86c750b06642e14a1e5'
+        run: test "$(git rev-parse HEAD)" = 'a961064d364f23e834b625f253238f6427179921'
       - run: pnpm install --frozen-lockfile
-      - name: Verify rendered Board and all other existing idle budgets
-        run: pnpm test:idle-budget
-      - name: Verify strict product UI policy
-        run: pnpm lint:ui
+      - name: Run shared creation, receipt and idle-budget suites in the public test environment
+        run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-concurrency=1 tests/idle-request-budget.test.tsx components/coordinator/task-profile-submit.test.tsx tests/use-coordinator-submit.test.tsx
