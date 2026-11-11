@@ -2,7 +2,7 @@
 
 import { PersonAvatar } from '@/components/person-avatar'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -10,7 +10,7 @@ import { Box, Check, CircleUserRound, UserRoundPen, Columns3, Flag, List, ListFi
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { useLiveTaskRunList } from '@/hooks/use-live-lists'
-import { localTaskState } from '@/hooks/use-bot-tasks'
+import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { useListExpiry } from '@/hooks/use-list-expiry'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
@@ -169,11 +169,8 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run, issues.find(issue => issue.id === run.issueId)); return state ? [[run.issueId, state] as const] : [] })), [runs, issues])
-  // Each task's own state, from the one derivation (localTaskState, decision #1864 point 6): the card's status line.
-  const taskStates = useMemo(() => {
-    const newest = new Map((runs ?? []).map(run => [run.issueId, run] as const))
-    return new Map(issues.map(issue => [issue.id, localTaskState(issue, newest.get(issue.id))] as const))
-  }, [runs, issues])
+  const presentation = useContext(TaskPresentationsContext)
+  const taskStates = useMemo(() => new Map(Object.entries(presentation)), [presentation])
   // 受阻 is worked out here from the task and its newest thread; the task keeps its own status (lib/task-blocked.ts).
   const blocks = useMemo(() => boardBlocks(issues, runs), [issues, runs])
   const newestRuns = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, run.runId] as const)), [runs])
