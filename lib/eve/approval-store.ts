@@ -13,8 +13,8 @@ export function eveApprovalStore(pool:Pick<Pool,'query'>,ownerId:string,botId:st
   return {
     read,
     async prepare(key,record) {
-      await pool.query(`INSERT INTO eve_tool_approvals(call_key,owner_id,bot_id,call_digest,plan_digest,decision,status)
-        VALUES($1,$2,$3,$4,$5,$6,'prepared') ON CONFLICT(call_key) DO NOTHING`,[key,ownerId,botId,record.callDigest,record.planDigest,record.decision])
+      await pool.query(`INSERT INTO eve_tool_approvals(call_key,owner_id,bot_id,call_digest,plan_digest,decision,status,output)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(call_key) DO NOTHING`,[key,ownerId,botId,record.callDigest,record.planDigest,record.decision,record.status,JSON.stringify(record.output??null)])
       const saved=await read(key)
       if(!saved)throw new Error('operationBindingConflict')
       return saved
