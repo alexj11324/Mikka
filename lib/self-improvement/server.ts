@@ -45,6 +45,14 @@ export const skillAssignments:ReturnType<typeof createSkillAssignments> = create
   (...args)=>skillEvaluations.authorizeEvaluation(...args))
 export const skillEvaluations:ReturnType<typeof createSkillEvaluations> = createSkillEvaluations(pool, {
   authorize,
+  withQueueWorkspace: async (userId, id, training, work) => {
+    const { rows: [hint] } = await pool.query<{ issueId: string }>(training
+      ? 'SELECT "issueId" FROM improvement_benchmark_instances WHERE id=$1 AND "userId"=$2'
+      : `SELECT i."issueId" FROM improvement_skill_evaluations e JOIN improvement_benchmark_instances i ON i.id=e."instanceId" AND i."userId"=e."userId" WHERE e.id=$1 AND e."userId"=$2`, [id, userId])
+    if (!hint) throw new ImprovementError('notFound')
+    const { withFactoryBackgroundWorkspace } = await import('../factory/background-workspace')
+    return withFactoryBackgroundWorkspace(pool, userId, { kind: 'issue', id: hint.issueId }, work)
+  },
   assess:skillEffectEvaluator,
   queue:(tx,userId,input,sourceRunId)=>queueFactoryRun(tx,userId,input,null,undefined,sourceRunId),
   lockQueuePolicy:async(tx,userId,sourceRunId)=>{await prelockCliRunPolicy(tx,sourceRunId,userId)},

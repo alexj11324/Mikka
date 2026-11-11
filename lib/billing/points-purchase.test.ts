@@ -23,11 +23,16 @@ mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { p
     return { rows: existingCustomer ? [{ id: existingCustomer }] : [] }
   },
 } } })
-mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspaceDb: { transaction: async (fn: (tx: unknown) => Promise<void>) => fn({}) } } })
+// The isolated pricing fixture is an unattached Workspace. Real row locks,
+// Organization designation and revocation are exercised by billing-management.db.test.ts.
+mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspaceDb: {
+  transaction: async (fn: (tx: unknown) => Promise<void>) => fn({ select: () => ({ from: () => ({ where: () => ({ limit: async () => [] }) }) }) }),
+} } })
 mock.module(new URL('../workspace-access.ts', import.meta.url).href, { namedExports: {
   WorkspaceError,
   requireWorkspace: async (...args: unknown[]) => {
-    authorizations.push(args.slice(1))
+    authorizations.push(args.slice(1, 4))
+    assert.equal(args[4], undefined)
     if (!admin) throw new WorkspaceError('workspaceAccessDenied')
   },
 } })
@@ -55,6 +60,7 @@ test('each fixed USD amount creates a payment session with server-owned pricing 
     assert.deepEqual(await pointsPurchaseUrl('actor', workspaceId, amount, 'zh-CN', fake, env), { url: checkoutUrl })
     const { body } = requests.at(-1)!
     assert.equal(body.get('mode'), 'payment')
+    assert.equal(body.get('managed_payments[enabled]'), 'true')
     assert.equal(body.get('customer'), 'cus_existing')
     assert.equal(body.get('client_reference_id'), workspaceId)
     assert.equal(body.get('line_items[0][price_data][currency]'), 'usd')

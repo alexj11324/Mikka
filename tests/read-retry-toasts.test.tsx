@@ -98,7 +98,7 @@ stub('components/workspace/workspace-loading.tsx', { WorkspaceLoading: Empty })
 stub('components/workspace/create-workspace-form.tsx', { CreateWorkspaceForm: Empty })
 stub('components/workspace/invitation-card.tsx', { InvitationCard: Empty })
 stub('components/device-authorization.tsx', { DeviceAuthorization: Empty })
-mock.module(at('app/[locale]/not-found.tsx'), { defaultExport: Empty })
+mock.module(at('components/app-shell/not-found.tsx'), { defaultExport: Empty })
 
 const browser = new Window({ url: 'https://fixture.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']

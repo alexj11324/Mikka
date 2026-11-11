@@ -127,6 +127,18 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
   assert.ok(merged.some(text => text.includes('factory_tasks')), 'the merge still looks for Factory tasks waiting on the PR')
   const { rows: [publication] } = await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [runId])
   assert.equal(publication.pullRequest.state, 'merged', 'the delivery shows the merge')
+  await pool.query('UPDATE run_publications SET "remoteKey"=$2 WHERE "runId"=$1', [runId, 'v2/github.com/o/r'])
+  for (const [event, action] of [['pull_request_review', 'dismissed'], ['pull_request_review_comment', 'edited']]) {
+    const reads = await budget(`${event} ${action}`, event, { action, repository: { full_name: 'o/r' },
+      pull_request: { number, html_url: delivered }, review: { body: 'private review must not be persisted' },
+      comment: { body: 'private comment must not be persisted' } }, 1)
+    assert.equal(reads.length, 1)
+    assert.ok(reads[0].startsWith('SELECT DISTINCT p."issueId"'))
+    assert.ok(!reads[0].includes('private'), 'webhook bodies never become state or query text')
+  }
+  await budget('review with a mismatched URL', 'pull_request_review', {
+    action: 'dismissed', repository: { full_name: 'o/r' }, pull_request: { number, html_url: unrelated },
+  }, 0)
   await budget('issue_comment on an issue by someone without Mikka', 'issue_comment',
     { action: 'created', repository: { full_name: 'o/r' }, sender: { id: 2, login: 'other' }, issue: { number, user: { id: 999_999_999 }, title: 'Bug' }, comment: { id: 1, body: 'hi', created_at: '2026-11-05T00:00:00Z' } }, 1)
   // The person's recent matters, each with the evidence a few notices leave (~10 KB).

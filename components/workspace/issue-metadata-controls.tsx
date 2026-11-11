@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldError } from '@/components/ui/field'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -50,7 +51,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   const prStates = (['open', 'draft', 'merged', 'closed'] as const).map(value => ({ value, label: tPrState(value), icon: PULL_REQUEST_ICONS[value] }))
   const titles: Record<Target, string> = { project: tProperty('setProject'), labels: tProperty('editLabels'), pullRequests: tProperty('managePullRequests'), invite: tProperty('invite') }
   const [target, setTarget] = useState<Target | null>(null)
-  const { pending, error, setError, persist, project: moveToProject } = useIssueMetadataSave({ task, disabled, onSaved, onBusyChange })
+  const { pending, error, setError, persist, project: moveToProject, accessChange, confirmAccess, cancelAccessChange } = useIssueMetadataSave({ task, disabled, onSaved, onBusyChange })
   const [name, setName] = useState('')
   const [color, setColor] = useState<IssueLabel['color']>('violet')
   const [labels, setLabels] = useState<IssueLabel[]>([])
@@ -130,7 +131,30 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
         </form>
       </DialogContent>
     </Dialog>
+    <AccessChangeDialog change={accessChange} pending={pending} onConfirm={confirmAccess} onCancel={cancelAccessChange} />
   </>
+}
+
+/**
+ * The confirmAccess handshake's last step (ALE-26): a project move that would
+ * change who can read the task writes nothing until this is accepted, and then
+ * replays the same move.
+ */
+export function AccessChangeDialog({ change, pending, onConfirm, onCancel }: { change: { tasks: number } | null; pending: boolean; onConfirm: () => Promise<boolean>; onCancel: () => void }) {
+  const tProperty = useTranslations('Metadata.property')
+  const tCommon = useTranslations('Common')
+  return <AlertDialog open={Boolean(change)} onOpenChange={open => { if (!open && !pending) onCancel() }}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{tProperty('accessChangeTitle')}</AlertDialogTitle>
+        <AlertDialogDescription>{tProperty('accessChangeBody', { tasks: change?.tasks ?? 0 })}</AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel disabled={pending}>{tCommon('cancel')}</AlertDialogCancel>
+        <AlertDialogAction disabled={pending} onClick={() => { void onConfirm() }}>{pending ? tCommon('saving') : tProperty('accessChangeConfirm')}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 }
 
 /** The metadata saves behind IssueMetadataControls, for it and for a layer that draws the values itself. */
@@ -151,18 +175,32 @@ export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyCh
     } catch { setError(tProperty('saveFailedRetry')); return false }
     finally { saving.current = false; setPending(false); onBusyChange?.(false) }
   }
+  /** A project move the server refused until the person confirms who it removes. */
+  const [accessChange, setAccessChange] = useState<{ projectId: string | null; tasks: number } | null>(null)
   /** Moves the task to an existing project (null: none); false when it did not. */
   async function project(value: string | null, records: { id: string; name: string }[] | undefined) {
     if (saving.current || disabled) return false
     const selected = records?.find(item => item.name === value)
     if (value && !selected) { setError(tProperty('selectExistingProject')); return false }
+    return save(selected?.id ?? null)
+  }
+  async function save(projectId: string | null, confirmAccess = false) {
     saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
     try {
-      const result = await moveIssueToProject({ issueId: task.id, revision: task.revision, projectId: selected?.id ?? null })
+      const result = await moveIssueToProject({ issueId: task.id, revision: task.revision, projectId, ...(confirmAccess ? { confirmAccess } : {}) })
+      // The move changes who can read the task: nothing was written, and the same
+      // move replays once the person confirms.
+      if (result.error && 'confirmable' in result && result.confirmable) {
+        setAccessChange({ projectId, tasks: Number(result.params?.tasks ?? 1) })
+        return false
+      }
       if (!('issue' in result) || !result.issue) { setError(actionError(result.error ?? 'projectMoveFailed')); return false }
       onSaved(result.issue); return true
     } catch { setError(tProperty('projectLinkFailedRetry')); return false }
     finally { saving.current = false; setPending(false); onBusyChange?.(false) }
   }
-  return { pending, error, setError, persist, project }
+  return { pending, error, setError, persist, project, accessChange,
+    /** Replays the refused move with the confirmation the server asked for. */
+    confirmAccess: async () => { const pendingMove = accessChange; setAccessChange(null); if (!pendingMove) return false; return save(pendingMove.projectId, true) },
+    cancelAccessChange: () => setAccessChange(null) }
 }

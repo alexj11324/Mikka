@@ -4,7 +4,7 @@ import { test as base, expect, type BrowserContext, type Locator, type Page } fr
 import { Pool } from 'pg'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 
-// The app is served under next.config.mjs's basePath. page.goto('/x') resolves
+// The app is served under the base path in lib/base-path-config.mjs. page.goto('/x') resolves
 // against the origin, so app paths go through app().
 export const BASE_PATH = '/mikka'
 export function app(path: string) {

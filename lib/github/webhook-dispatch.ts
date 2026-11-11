@@ -1,6 +1,6 @@
 import { afterJob } from '@/lib/background'
 import { githubCandidateIds } from '@/lib/suggestions/notification'
-import { PULL_REQUEST_REFRESH_ACTIONS } from './publication-webhook-actions'
+import { PULL_REQUEST_REFRESH_ACTIONS, reviewRefreshEvent } from './publication-webhook-actions'
 import { noteLogOutcome } from '@/lib/request-log'
 import { reviewCheckEvent } from './review-checks'
 
@@ -34,12 +34,14 @@ export async function dispatchVerifiedGitHubWebhook(event: string | null, rawBod
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return new Response('Invalid webhook JSON.', { status: 400, headers: noStore })
   const hasNotifications = githubCandidateIds(event, payload).length > 0
   const refresh = (event === 'pull_request' && typeof payload.action === 'string' && PULL_REQUEST_REFRESH_ACTIONS.has(payload.action)) || Boolean(reviewCheckEvent(event, payload))
+  const review = reviewRefreshEvent(event, payload.action)
   const pr = payload.pull_request as { html_url?: unknown; merged?: unknown; merge_commit_sha?: unknown; head?: { sha?: unknown } } | undefined
   const merged = event === 'pull_request' && payload.action === 'closed' && pr?.merged === true && typeof pr.html_url === 'string'
     ? { url: pr.html_url, headSha: typeof pr.head?.sha === 'string' ? pr.head.sha : null, mergeCommitSha: typeof pr.merge_commit_sha === 'string' ? pr.merge_commit_sha : null } : null
-  if (!refresh && !merged && !hasNotifications) { noteLogOutcome('ignored'); return new Response(null, { status: 204, headers: noStore }) }
+  if (!refresh && !review && !merged && !hasNotifications) { noteLogOutcome('ignored'); return new Response(null, { status: 204, headers: noStore }) }
   const work = async () => {
     if (refresh) await (await import('./publication-webhook')).refreshPublishedPullRequest(event, payload)
+    if (review) await (await import('./publication-webhook')).invalidatePublishedPullReview(payload)
     if (merged) await (await import('@/lib/factory/server')).factoryMerges.pullRequestMerged(merged)
     if (hasNotifications) {
       const notifications = await (await import('@/lib/suggestions/sources')).githubWebhookNotifications(event, payload)

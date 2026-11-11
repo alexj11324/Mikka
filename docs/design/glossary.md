@@ -34,8 +34,12 @@ not on the dispatching bot's machine (`cloud-computer-backend.md` § 2).
 | **Account** | 账号 | The person: 账户, security, 偏好, 通知, profile memory (个人资料类记忆), 密钥与登录, 设备 and 「模型与订阅」. The same in every workspace. |
 | **Personal workspace** | 个人工作区 | One per person. Only that person's bots, chats, tasks, threads and their memory; personal 计费 and 用量; no team settings. |
 | **Shared workspace** | 共享工作区 | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
+| **Organization** | 组织 | Manages membership, organization connections, policies and billing across attached Workspaces. Each Workspace remains an independent tenant; an Organization role does not confer private content access. |
+| **Resource owner** | 所有者 | Manages a Project, Task, Thread, Bot or Artifact's access and controlled ownership transfer. Ownership does not bypass a private ancestor or a revoked Workspace membership. |
+| **Actor** | 操作者 | The authenticated person or service principal responsible for a message or operation. Kept separately from the Thread Owner, execution identity, credential owner and payer. |
 
 Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md).
+Collaboration and financial authority: [2026-11-10-0017](decisions/2026-11-10-0017-collaboration-governance.md).
 
 ## Rules for designs
 
@@ -195,13 +199,32 @@ _Owner_: the workspace where it was dispatched (Thread aggregate).
 _Avoid_: 会话, session, 任务, run (a run is one turn of a thread).
 
 **Task (任务)**:
-A unit of work to be done, with a status and an assignee who is always a
-person (`MIK-xx`). A thread works on it; it is not a thread.
-_Owner_: the workspace; in a shared workspace, its team (Task aggregate).
+A unit of work with an immutable UUID and issued Mikka identifier, a status,
+and an optional human assignee who is an active member of its Workspace.
+A thread works on it; it is not a thread. Team and Project are optional groups
+inside that Workspace and do not own the task or change its issued identifier.
+_Owner_: the workspace (Task aggregate).
 _Avoid_: issue in the UI, ticket, 工单, thread.
 _Note_: 受阻 (Blocked) is a board column a task falls into while its newest
 thread, a task it is blocked by or the person's flag stops it; it is not one of
 the task's statuses ([2026-11-06-1600](decisions/2026-11-06-1600-blocked-board-column.md)).
+
+**Task identifier (任务编号)**:
+The immutable human reference issued to a Task. Historical Team, personal and
+Linear spellings are scoped aliases, not access grants. New shared tasks use a
+Workspace prefix/counter; existing publication identifiers and branches stay
+frozen. See [stable identity](decisions/2026-11-07-2301-stable-task-identity.md).
+_Owner_: the Task; the issuing counter belongs to its Workspace.
+_Avoid_: deriving identity from the current Team, owner prefix or a Run number.
+
+**Human assignee (人类负责人)** and **Agent Delegate**:
+The assignee is the active person responsible for the work, or nobody. Delegate
+is an independent Bot, Agent or Agent Profile reference for execution. Neither
+is the reviewer/approver, and changing either does not rewrite an existing Run.
+“Assigned to me” uses the human relation; following is explicit subscription.
+See [compatibility contract](task-responsibility-contract.md).
+_Owner_: the Task, within its Workspace.
+_Avoid_: treating the owner of the executing Bot/Agent as the human assignee.
 
 ### Resources
 
@@ -218,10 +241,12 @@ Agents. The UI calls it daemon in both languages, with no 「Mikka」 in front:
 _Avoid_: Mikka 客户端, Mikka client, 客户端 (reads as the desktop app).
 
 **Connection (连接)**:
-The person's authorised link to an outside app (Gmail, GitHub, Linear,
-Telegram…), used only by their own bots unless a workspace policy says
-otherwise.
-_Owner_: the account (Connection aggregate).
+An authorized link to an outside provider. Personal app connections (Gmail,
+GitHub, Linear, Telegram…) and Claude Code/Codex subscriptions belong to the
+account. Organization model connections are API keys, gateways or custom
+endpoints owned by the organization. Sharing content never shares a connection.
+_Owner_: the account or organization (Connection aggregate); a Subscription
+connection is always account-owned and never a public member resource pool.
 _Avoid_: integration, plugin (a 插件 is the store item, the connection is
 what linking it creates), binding.
 
@@ -232,7 +257,9 @@ Sensitive third-party API values follow the scoped capability boundary in
 `lib/secrets/runtime.ts` separates ordinary env and explicit direct delivery
 from protected HTTP capabilities, which the claim route seals for the run.
 Deployed protection requires the decision's runtime canaries and evidence.
-_Owner_: the workspace (Secret aggregate).
+_Owner_: the account for Personal secrets, or the Workspace/Project for Shared
+secrets. Thread scope narrows delivery to authorized work; it does not change
+ownership or authorize delivery of someone else's Personal secret.
 _Avoid_: credential (a model credential is the account's), token, 环境变量 as
 a separate thing (an environment variable is a kind of secret).
 
@@ -242,6 +269,10 @@ allowance is the credits a new workspace starts with once its owner is
 verified. A model subscription's quota (订阅额度) is the subscription owner's,
 never the workspace's.
 _Owner_: the workspace (Billing aggregate); 订阅额度 belongs to the account.
+An Organization can explicitly designate an attached Workspace's existing
+billing account for its platform resources. Existing balances keep their
+owner and ledger history. External API keys, subscriptions and E2B bills remain
+external; an unavailable provider amount is **Unknown**, never zero.
 _Avoid_: bare 额度 (say 免费额度 or 订阅额度), balance, quota for credits.
 ## Known naming debt
 

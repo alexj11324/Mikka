@@ -5,6 +5,12 @@ import { COMMANDS_DAEMON_LATEST_PARAM, COMMANDS_MAX_SKIP, COMMANDS_MAX_SKIP_DEVI
 import { cachedDaemonVersions, daemonVersions, newerDaemonRelease, daemonRequestTooOld } from '@/lib/daemon-release'
 import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, deviceWorkSubscription, longPollIdleCheck, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
+import { WORKSPACE_REQUEST_HEADER } from '@mikka/protocol/coding-workspace'
+import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
+import { pendingWorkspaceReads } from '@/lib/coding-workspace/requests'
+import { pool } from '@/lib/db'
+import { workspacePool } from '@/lib/workspace-db'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,14 +61,18 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
         ? { work: false, deviceCommand: await deviceUpdateNotice(deviceId) }
         : await deviceMayHaveWork(deviceId, skip, knownRelease ? { ...options, skipDeviceCommands: list(COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_MAX_SKIP_DEVICE_COMMANDS) } : options)
       const { commands, queuedRuns: queued } = check.work ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
+      const workspaceRequests = !obsolete && request.headers.get(WORKSPACE_REQUEST_HEADER) === '1'
+        ? await pendingWorkspaceReads(pool, workspacePool, caller, deviceId, list('skipWorkspaceRequests', 8).filter(id => z.uuid().safeParse(id).success),
+          { diff: request.headers.get(WORKSPACE_DIFF_REQUEST_HEADER) === '1' }) : []
       if (request.signal.aborted) break
       // Memory only: a release published mid-poll ends it once this instance's cache has it.
       if (knownRelease) releases = cachedDaemonVersions() ?? releases
       const news = check.deviceCommand !== null || (knownRelease !== null && newerDaemonRelease(releases, knownRelease))
-      if (commands.length > 0 || queued.length > 0 || news || timedOut || Date.now() >= deadline) {
-        noteLogOutcome(commands.length > 0 || queued.length > 0 || news ? 'work' : 'empty')
+      if (commands.length > 0 || queued.length > 0 || workspaceRequests.length > 0 || news || timedOut || Date.now() >= deadline) {
+        noteLogOutcome(commands.length > 0 || queued.length > 0 || workspaceRequests.length > 0 || news ? 'work' : 'empty')
         return NextResponse.json({
           commands,
+          ...(workspaceRequests.length ? { workspaceRequests } : {}),
           ...(queued.length > 0 ? { queuedRuns: queued } : {}),
           ...(check.deviceCommand ? { deviceCommands: [check.deviceCommand] } : {}),
           ...(releases ? { daemonVersions: releases } : {}),

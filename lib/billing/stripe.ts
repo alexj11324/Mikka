@@ -3,14 +3,22 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { isCloudEdition } from '@/lib/edition'
 
-export interface StripeConfig { secretKey: string; teamPriceId: string | null; webhookSecret: string | null }
+export interface StripeConfig {
+  secretKey: string
+  /** Historical per-seat subscriptions only. Never used for new Checkout. */
+  teamPriceId: string | null
+  resourcePriceId?: string | null
+  webhookSecret: string | null
+}
 
 /** Null when billing is not set up on this deployment (billingNotConfigured). */
 export function stripeConfig(env: Readonly<Record<string, string | undefined>> = process.env): StripeConfig | null {
   if (!isCloudEdition(env)) return null
   const secretKey = env.STRIPE_SECRET_KEY?.trim()
   if (!secretKey) return null
-  return { secretKey, teamPriceId: env.STRIPE_TEAM_PRICE_ID?.trim() || null, webhookSecret: env.STRIPE_WEBHOOK_SECRET?.trim() || null }
+  return { secretKey, teamPriceId: env.STRIPE_TEAM_PRICE_ID?.trim() || null,
+    resourcePriceId: env.STRIPE_TEAM_RESOURCE_PRICE_ID?.trim() || null,
+    webhookSecret: env.STRIPE_WEBHOOK_SECRET?.trim() || null }
 }
 
 export class StripeRequestError extends Error {

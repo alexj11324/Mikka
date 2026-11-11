@@ -16,6 +16,20 @@ on:
         required: false
         type: boolean
         default: false
+      domain_model_sha:
+        description: Exact deployed main SHA for Epic 1687 ordinary shared-account acceptance
+        required: false
+        type: string
+      domain_model_mode:
+        description: Inspect scope, provision retained domain objects without prompts, or submit two useful reports
+        required: false
+        type: choice
+        options: [preflight, provision, active]
+        default: preflight
+      domain_model_scope:
+        description: Explicit JSON workspaceId/botId/repositoryKey/models, baseBranch for provision, projectId/environmentId for active
+        required: false
+        type: string
       audit_recover_lease_run:
         description: Recover only the own pre-dispatch CLI interruption in run 42418118236 before the lease audit
         type: choice
@@ -36,8 +50,69 @@ env:
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
 
 jobs:
+  domain-model:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && (inputs.domain_model_sha != '' || inputs.domain_model_scope != '' || (inputs.domain_model_mode != '' && inputs.domain_model_mode != 'preflight'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DOMAIN_MODEL_SHA: ${{ inputs.domain_model_sha }}
+      DOMAIN_MODEL_MODE: ${{ inputs.domain_model_mode }}
+      DOMAIN_MODEL_SCOPE: ${{ inputs.domain_model_scope }}
+      DOMAIN_OTHER_AUDIT_SHA: ${{ inputs.audit_auth_sha }}
+      DOMAIN_OTHER_AUDIT_LEASE: ${{ inputs.audit_lease }}
+      DOMAIN_OTHER_AUDIT_RECOVERY_RUN: ${{ inputs.audit_recover_lease_run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify strict guards and exact live main before credentials
+        run: |
+          node --test scripts/acceptance/work-domain-production.test.mjs
+          node scripts/acceptance/work-domain-production.mjs --check-target
+      - name: Read only the existing smoke account email through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          include-imports: false
+      - name: Read only the existing smoke account password inside the runner
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          include-imports: false
+      - name: Inspect scope or execute the two retained domain reports
+        run: node scripts/acceptance/work-domain-production.mjs
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-work-domain-${{ github.run_id }}
+          path: production-work-domain-report/report.json
+          retention-days: 14
+          if-no-files-found: ignore
+
   lease-audit:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.audit_auth_sha != '' && inputs.audit_lease == true
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight') && inputs.audit_auth_sha != '' && inputs.audit_lease == true
     runs-on: ubuntu-latest
     timeout-minutes: 35
     concurrency:
@@ -92,7 +167,7 @@ jobs:
           retention-days: 14
 
   auth-audit:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.audit_auth_sha != ''
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight') && inputs.audit_auth_sha != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -146,7 +221,7 @@ jobs:
 
   smoke:
     # Only finished production deployments, plus the schedule and manual runs.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
+    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -183,7 +258,7 @@ jobs:
 
   deployment-comparison:
     # No browser/install/wait loop: quarter-hour follow-ups read the same fixed windows.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'workflow_dispatch' || (inputs.domain_model_sha == '' && inputs.domain_model_scope == '' && (inputs.domain_model_mode == '' || inputs.domain_model_mode == 'preflight'))) && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:

@@ -101,7 +101,7 @@ stub('../db/index.ts', { db: database, pool: { query: async (sql: string) => {
 stub('../agent-runs.ts', { visibleRuns: () => {}, readRun: () => {} })
 stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../issue-visibility.ts', { issueVisibility: () => {} })
-stub('../task-identifier-server.ts', { taskIdentifiers: () => {} })
+stub('../task-identifier-server.ts', { taskIdentifiers: () => {}, issueView: () => assert.fail('message ingress must not project Task DTOs') })
 stub('../artifacts/store.ts', { artifactSummaries: () => {} })
 stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async (user: string) => { woke.push(user) } })
 // The person's Coordinator is an ordinary bot row; MCP resolves it where the message enters.

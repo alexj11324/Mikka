@@ -17,6 +17,7 @@ import { execa } from "execa"
 import { RUN_CHECKPOINT_MAX_BYTES, RUN_CHECKPOINT_RECOVERY_MAX_AGE_MS, type RunCheckpoint } from "@mikka/protocol"
 
 import { pinnedGit, snapshotTree } from "./publish"
+import { captureCheckpointReview } from '../coding-workspace/checkpoint'
 
 export class CheckpointRecoveryError extends Error {
   constructor(message: string) { super(message); this.name = 'CheckpointRecoveryError' }
@@ -42,6 +43,8 @@ export async function headCommit(
 export interface TakenCheckpoint {
   /** The worktree's content as a tree; equal trees mean nothing changed. */
   tree: string
+  /** Capture HEAD is distinct from the synthetic worktree tree. */
+  head: string | null
   /** Clean trees and unavailable trees both supersede the previous snapshot. */
   checkpoint: RunCheckpoint
 }
@@ -55,10 +58,15 @@ export async function takeCheckpoint(options: {
   worktree: string
   baseCommit: string
   lastTree?: string
+  lastHead?: string | null
+  repoId?: string
 }): Promise<TakenCheckpoint | null> {
-  const tree = await snapshotTree(options.repoPath, options.worktree)
-  if (tree === options.lastTree) return null
   const git = await pinnedGit(options.repoPath, options.worktree)
+  const before = String((await git(['rev-parse', '--verify', 'HEAD'])).stdout).trim()
+  const tree = await snapshotTree(options.repoPath, options.worktree)
+  const after = String((await git(['rev-parse', '--verify', 'HEAD'])).stdout).trim()
+  const head = before === after ? after : null
+  if (tree === options.lastTree && (!options.repoId || (head !== null && head === options.lastHead))) return null
   const names = String(
     (await git(["diff", "--name-only", options.baseCommit, tree])).stdout
   )
@@ -76,12 +84,15 @@ export async function takeCheckpoint(options: {
   const unavailable = gzipped.length > RUN_CHECKPOINT_MAX_BYTES
   return {
     tree,
+    head,
     checkpoint: {
       baseCommit: options.baseCommit,
       patch: (unavailable ? gzipSync(Buffer.alloc(0)) : gzipped).toString("base64"),
       files: names.length,
       takenAt: new Date().toISOString(),
       ...(unavailable ? { unavailableReason: 'too_large' as const } : {}),
+      ...(options.repoId ? { review: await captureCheckpointReview({ repoPath: options.repoPath, worktree: options.worktree,
+        repoId: options.repoId, baseSha: options.baseCommit, headSha: head, treeSha: tree }) } : {}),
     },
   }
 }

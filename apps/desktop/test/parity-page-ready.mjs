@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { lstat, readFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
@@ -25,22 +25,10 @@ export async function selectParityWorkspace(page, { menuName, workspaceName, bas
 // transport only for reads whose successful empty state has no DOM of its own.
 // No requests, React internals, application state or response routes are added.
 export async function readActionIds(applicationDirectory) {
-  const nitro = await lstat(join(applicationDirectory, '.output/mikka-build.json')).then(() => true, error => {
-    if (error.code === 'ENOENT') return false
-    throw error
-  })
-  if (nitro) {
-    const manifest = JSON.parse(await readFile(join(applicationDirectory, '.output/public/mikka/renderer-manifest.json'), 'utf8'))
-    return new Map([...publishedActions(manifest)].map(name => [name, name]))
-  }
-  const manifest = JSON.parse(await readFile(join(applicationDirectory, '.next/server/server-reference-manifest.json'), 'utf8'))
-  const names = new Map()
-  for (const [id, action] of Object.entries(manifest.node ?? {})) {
-    const module = /^app\/actions\/(.+)\.tsx?$/.exec(action.filename ?? '')?.[1]
-    if (module && action.exportedName) names.set(id, `${module}.${action.exportedName}`)
-  }
-  assert.ok(names.size, 'The tested production build must identify its real actions')
-  return names
+  // Only the Nitro application is a tested production build; a directory
+  // without its manifest has no real actions to identify.
+  const manifest = JSON.parse(await readFile(join(applicationDirectory, '.output/public/mikka/renderer-manifest.json'), 'utf8'))
+  return new Map([...publishedActions(manifest)].map(name => [name, name]))
 }
 
 export function observeReads(page, requirements, actionIds, basePath) {
@@ -115,7 +103,7 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     await expect(resolved).toHaveAttribute('aria-expanded', /^(?:true|false)$/, { timeout: 45_000 })
     if (await resolved.getAttribute('aria-expanded') === 'false') await resolved.click()
     await expect(resolved).toHaveAttribute('aria-expanded', 'true')
-    // A thread row is named by its task: the team number the database gave it, then its title.
+    // A thread row is named by its task: the immutable identifier issued by APP, then its title.
     await root.getByRole('button', { name: `${fixture.issueIdentifier} ${fixture.issueTitle}`, exact: true }).waitFor()
     await root.getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: false }).waitFor()
   }
