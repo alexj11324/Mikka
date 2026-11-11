@@ -28,8 +28,13 @@ export function nativeScope(value) {
   const fixture = new URL(value.fixtureOrigin), upstream = new URL(value.upstreamOrigin)
   check([fixture, upstream].every(url => url.protocol === 'https:' && url.origin === url.href.slice(0, -1)
     && !url.username && !url.password && /^[a-zA-Z0-9.-]+\.(?:e2b\.app|e2b\.dev)$/.test(url.hostname)), 'fixture_scope')
-  check(DIGEST.test(value.bootstrapToken ?? '') && DIGEST.test(value.canarySha256 ?? '')
-    && DIGEST.test(value.responseSha256 ?? ''), 'configuration')
+  const production = value.deliveryMode === 'production_claim'
+  check(DIGEST.test(value.canarySha256 ?? '') && DIGEST.test(value.responseSha256 ?? ''), 'configuration')
+  if (production) check(/^ACCEPTANCE_1712_[A-F0-9]{32}$/.test(value.secretName ?? '')
+    && ['revocation', 'fresh_claim'].includes(value.phase) && DIGEST.test(value.sdkResponseSha256 ?? '')
+    && value.bootstrapToken === undefined
+    && (value.previousCanarySha256 === undefined || DIGEST.test(value.previousCanarySha256)), 'configuration')
+  else check(value.deliveryMode === undefined && DIGEST.test(value.bootstrapToken ?? ''), 'configuration')
   return { ...value, branch: `acceptance/1712/${value.caseId}/${value.harness}`,
     filename: `acceptance-1712-${value.caseId}.txt` }
 }
@@ -122,6 +127,64 @@ async function httpProof(config, runId, fetchImpl) {
       baseline: 'same_fixture_public_unauthenticated_https_route',
       productionClaimTested: false, productionStoreRotationTested: false }
   } finally { abort.abort(); bridge.close() }
+}
+
+/** Use only the bridge inherited from the actual production claim. This path
+ * never starts a replacement bridge, asks the fixture to mint a grant, or
+ * receives the synthetic value/capability in its configuration. */
+export async function productionHttpProof(config, { environment = process.env, fetchImpl = fetch } = {}) {
+  check(config.deliveryMode === 'production_claim' && !Object.hasOwn(environment, config.secretName), 'secret_environment_visible')
+  const endpoints = JSON.parse(environment.MIKKA_SECRET_ENDPOINTS ?? 'null')
+  check(endpoints && typeof endpoints === 'object' && !Array.isArray(endpoints), 'production_claim_missing')
+  const base = endpoints[config.secretName], parsed = new URL(base)
+  check(parsed.protocol === 'http:' && parsed.hostname === '127.0.0.1' && /^[0-9]{1,5}$/.test(parsed.port)
+    && Number(parsed.port) > 0 && Number(parsed.port) <= 65535 && !parsed.username && !parsed.password
+    && !parsed.search && !parsed.hash && parsed.pathname === `/${parsed.pathname.split('/')[1]}/${config.secretName}`
+    && /^[a-f0-9]{48}$/.test(parsed.pathname.split('/')[1]), 'production_claim_invalid')
+  const call = async (url, options = {}) => fetchImpl(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(25_000) })
+  const samples = config.phase === 'revocation' ? 1 : 10
+  const timings = { direct: [], protected: [] }
+  for (let index = 0; index < samples; index++) for (const mode of ['direct', 'protected']) {
+    const start = performance.now()
+    const response = await call(mode === 'direct' ? `${config.upstreamOrigin}/v1/public/${config.caseId}` : `${base}/v1/protected/${config.caseId}`,
+      mode === 'protected' ? { headers: { authorization: `Bearer ${TASK_SECRET_DUMMY_KEY}` } } : {})
+    const bytes = Buffer.from(await response.arrayBuffer())
+    check(response.status === 200 && hash(bytes) === config.responseSha256, 'production_upstream_response')
+    timings[mode].push(round(performance.now() - start))
+  }
+  const result = { scope: 'production_store_actual_claim_inherited_bridge', client: 'ordinary_installed_sdk_and_node_fetch',
+    samples, productionClaimTested: true, productionStoreRotationTested: config.phase === 'fresh_claim',
+    direct: { p50Ms: percentile(timings.direct, 0.5), p95Ms: percentile(timings.direct, 0.95) },
+    protected: { p50Ms: percentile(timings.protected, 0.5), p95Ms: percentile(timings.protected, 0.95) } }
+  if (config.phase === 'revocation') return result
+  const denied = async (path, options = {}) => {
+    const response = await call(`${base}${path}`, options), text = await response.text()
+    check(response.status >= 400 && response.status <= 599
+      && ![...text.matchAll(/mikka1712s_[a-f0-9]{64}/g)].some(match =>
+        [config.canarySha256, config.previousCanarySha256].includes(hash(match[0]))), 'production_request_not_blocked')
+    return response.status
+  }
+  result.statuses = {
+    method: await denied(`/v1/protected/${config.caseId}`, { method: 'POST' }),
+    path: await denied(`/v1/forbidden/${config.caseId}`),
+    echo: await denied(`/v1/echo/${config.caseId}`),
+    redirect: await denied(`/v1/redirect/${config.caseId}`),
+    origin: await denied(`/v1/protected/${config.caseId}`, { headers: { origin: 'https://example.invalid' } }),
+    authOverride: await denied(`/v1/protected/${config.caseId}`, { headers: { authorization: 'Bearer unexpected' } }),
+  }
+  const [{ createOpenAICompatible }, { generateText }] = await Promise.all([import('@ai-sdk/openai-compatible'), import('ai')])
+  const provider = createOpenAICompatible({ name: 'production-protected-synthetic-fixture',
+    baseURL: `${base}/sdk/${config.caseId}/v1`, apiKey: TASK_SECRET_DUMMY_KEY })
+  // The installed SDK owns its normal transport. No custom fetch or headers,
+  // no provider prompt/billing, and no retry: the upstream is our JSON fixture.
+  const sdk = await generateText({ model: provider.chatModel('synthetic-third-party-model'),
+    prompt: 'Exercise production Secret delivery against the synthetic fixture.', maxRetries: 0,
+    abortSignal: AbortSignal.timeout(25_000) })
+  check(hash(sdk.text) === config.sdkResponseSha256 && sdk.finishReason === 'stop'
+    && sdk.usage.inputTokens === 2 && sdk.usage.outputTokens === 3, 'production_sdk_response')
+  result.sdk = { ordinaryTransport: true, customFetch: false, retries: 0, responseSha256: hash(sdk.text),
+    finishReason: sdk.finishReason, inputTokens: sdk.usage.inputTokens, outputTokens: sdk.usage.outputTokens }
+  return result
 }
 
 /** Every destructive cleanup target is established by this invocation and
@@ -220,7 +283,14 @@ export async function runNativeProbe(value, { fetchImpl = fetch, environment = p
   const config = nativeScope(value), runId = environment.MIKKA_RUN_ID
   check(UUID.test(runId ?? ''), 'run_scope')
   const receipt = { version: 1, caseId: config.caseId, harness: config.harness, runId,
-    status: 'running', productionStoreMutated: false }
+    status: 'running', productionStoreMutated: config.deliveryMode === 'production_claim' }
+  const scan = async () => {
+    const current = await scanCanary(config.canarySha256, { environment })
+    if (!config.previousCanarySha256) return current
+    const previous = await scanCanary(config.previousCanarySha256, { environment })
+    return { ...current, matched: current.matched || previous.matched, truncated: current.truncated || previous.truncated,
+      files: current.files + previous.files, bytes: current.bytes + previous.bytes, unavailable: current.unavailable + previous.unavailable }
+  }
   let phase = 'runtime_identity'
   try {
     const marker = '/opt/mikka/worker-source-sha', info = await lstat(marker)
@@ -229,11 +299,22 @@ export async function runNativeProbe(value, { fetchImpl = fetch, environment = p
     check(info.isFile() && info.uid === 0 && (info.mode & 0o222) === 0
       && workerSha === config.workerSha && workerSourceCommit === config.workerSourceCommit, 'runtime_mismatch')
     receipt.runtime = { workerSha, sourceCommit: workerSourceCommit, node: process.version }
-    phase = 'canary_before'; receipt.before = await scanCanary(config.canarySha256)
+    phase = 'canary_before'; receipt.before = await scan()
     check(!receipt.before.matched, 'canary_visible')
+    if (config.deliveryMode === 'production_claim' && config.phase === 'revocation') {
+      phase = 'production_claim'; receipt.http = await productionHttpProof(config, { environment, fetchImpl })
+      // One bounded deadline keeps this real native child alive for the
+      // owner's rotation/stop event. There is no repeated request or polling.
+      // If it survives, this phase fails rather than counting its natural exit
+      // as successful revocation. The runner separately enforces <=90 seconds.
+      phase = 'revocation_deadline'
+      await new Promise(resolve => setTimeout(resolve, 95_000))
+      throw Error('production_revocation_not_observed')
+    }
     phase = 'native_github'; receipt.github = await nativeGitProof(config, { execute })
-    phase = 'protected_http'; receipt.http = await httpProof(config, runId, fetchImpl)
-    phase = 'canary_after'; receipt.after = await scanCanary(config.canarySha256)
+    phase = 'protected_http'; receipt.http = config.deliveryMode === 'production_claim'
+      ? await productionHttpProof(config, { environment, fetchImpl }) : await httpProof(config, runId, fetchImpl)
+    phase = 'canary_after'; receipt.after = await scan()
     check(!receipt.after.matched, 'canary_visible')
     receipt.status = 'passed'
   } catch { receipt.status = 'failed'; receipt.failure = { phase } }

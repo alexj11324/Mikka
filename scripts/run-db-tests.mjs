@@ -77,6 +77,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/factory/questions/queue-local-continuation.ts', file: 'tests/factory-local-question.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/coordinator/coordinator-bot.ts', file: 'tests/coordinator-bot.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-credential-source.ts', file: 'tests/api-key-runs.db.test.ts', script: 'test:bot-threads-db' },
+  { marker: 'lib/secrets/task-access.ts', file: 'tests/task-secret-local-claim.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/model-order.ts', file: 'tests/model-order.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/model-provider-health.ts', file: 'tests/model-provider-health.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-provider-fallback.ts', file: 'tests/run-provider-fallback.db.test.ts', script: 'test:bot-threads-db' },
