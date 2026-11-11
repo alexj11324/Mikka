@@ -4,8 +4,8 @@
 
 ## 版本与环境
 
-- 测试源码：`593bcc6f96b146f20ecda031b438b89ef44d7f1e`；其后仅添加本记录。
-- 隐私依赖：`fd20e54a338455f9812b9125ed600ab34f893832`；main 基线：`43838a6efd6b66472b0c1f221829125bfb31fe34`。
+- 最终复跑源码：`241a17a349421203faeaf6ad1e7ba18cf9b62d26`；其后仅更新本记录。
+- 隐私依赖：`5f9ba05b2c697bdacae0a40d9b77efe85a837ece`；main 基线：`43838a6efd6b66472b0c1f221829125bfb31fe34`。
 - 云端 Linux，Node 24.19.0、PostgreSQL 17.11，本任务的 loopback 服务端口为 55432。
 - 每个场景创建、迁移并清理自己的随机 `*_e2e` 数据库、Git 仓库及工作树。APP 与 Workspace 两个连接目标指向该场景的同一个隔离库；这不是分库部署验收。
 - API 经 TCP 监听随机端口，使用正式 request-scoped 适配器、真实存储 session、PAT、普通 local-device credential、PostgreSQL LISTEN、默认 `HttpServerLink` 和磁盘 `RunJournal`。
@@ -51,7 +51,7 @@ node --experimental-test-module-mocks --import ./scripts/server-test.mjs \
 
 | 日志 | SHA-256 |
 | --- | --- |
-| `personal-daemon-final27.log` | `7979ddb73a4f7ca69a6e915ec51afb8648495b350d022472a89bc84471005363` |
+| `personal-daemon-stack27.log` | `24d48b10a5626800c7844c812cc4f4d73ab955e98f0f9c5dec53a1821022f1d0` |
 | `personal-daemon-team-registration-red.log` | `2fa440578cc0085e48250b49a0b1d3925b9fdb4841b407e77480bb6759b70fe8` |
 
 ## 未验证的执行层
