@@ -21,7 +21,11 @@ export function useMemorySettings() {
     if (!shown) return
     setFailed(false)
     try {
-      await mutate(async current => { await change(); return next(current ?? shown) }, { optimisticData: current => next(current ?? shown), rollbackOnError: true, revalidate: false })
+      await mutate(async current => {
+        // Fact writes return false when the saved fact can no longer be changed.
+        if (await change() === false) throw new Error('Memory change refused')
+        return next(current ?? shown)
+      }, { optimisticData: current => next(current ?? shown), rollbackOnError: true, revalidate: false })
     } catch {
       setFailed(true)
     }
@@ -29,6 +33,7 @@ export function useMemorySettings() {
 
   return {
     data, error, failed,
+    reload: () => { setFailed(false); return mutate() },
     setEnabled: (enabled: boolean) => run(() => setMemory(enabled), current => ({ ...current, enabled })),
     /** Corrects a fact; an empty text changes nothing. */
     correct: async (id: string, subject: string) => {
