@@ -64,9 +64,12 @@ export type AccessMove = { reference: { kind: 'task'; id: string }; parent: { ki
 export async function observeAudienceChanges(executor: ResourceExecutor, workspaceId: string, moves: readonly AccessMove[]): Promise<Map<string, AudienceChange>> {
   if (!moves.length) return new Map()
   const members = await activeWorkspaceMemberIds(workspaceId)
-  const parents = [...new Map(moves.flatMap(move => move.parent ? [`${move.parent.kind}:${move.parent.id}`, move.parent] as const : [])).values()]
-  const chains = await readAccessChains(executor, [...moves.map(move => move.reference), ...parents])
-  return new Map(moves.map(({ reference, parent }) => {
+  // One read for every resource and every distinct parent, so the chain of each
+  // is taken from the same snapshot.
+  const parents = new Map<string, { kind: string; id: string }>()
+  for (const move of moves) if (move.parent) parents.set(`${move.parent.kind}:${move.parent.id}`, move.parent)
+  const chains = await readAccessChains(executor, [...moves.map(move => move.reference), ...parents.values()])
+  return new Map(moves.map(({ reference, parent }): [string, AudienceChange] => {
     const before = chains.get(`${reference.kind}:${reference.id}`) ?? []
     const parentChain = parent ? chains.get(`${parent.kind}:${parent.id}`) ?? [] : null
     return [`${reference.kind}:${reference.id}`, audienceChange(before, rechain(before, parentChain), members)]
