@@ -50,7 +50,8 @@ export class EveService extends WorkerEntrypoint {
     if (url.origin !== 'https://eve.internal' || !url.pathname.startsWith('/eve/v1/') || /%2e|%2f|%5c/i.test(url.pathname)) return missing()
     const headers = new Headers(request.headers)
     for (const name of ['forwarded', 'host', 'cf-container-target-port', 'proxy-authorization', 'x-real-ip', 'x-mikka-world-capability']) headers.delete(name)
-    for (const name of [...headers.keys()]) {
+    const headerNames = [...headers.keys()]
+    for (const name of headerNames) {
       if (name.startsWith('x-forwarded-') || name.startsWith('x-vercel-') || name.startsWith('cf-')) headers.delete(name)
     }
     return forward(request, this.env, headers)
