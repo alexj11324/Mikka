@@ -7,7 +7,7 @@ import { admissionCapabilities, createAdmissionStorage } from './storage-client.
 /** The official Workflow loader calls createWorld() in the shared Node host.
  * Outbound interception binds world.internal to the private WorldService.
  * The release service owns the namespace; no HTTP client supplies it. */
-export function createNodeWorld({ deploymentId, signingKey, verificationKey, fetchBound }) {
+export function createNodeWorld({ deploymentId, signingKey, verificationKey, fetchBound, workload = 'eve' }) {
   const invoke = async (method, ...args) => {
     const reply = await fetchBound('https://world.internal/world/rpc', {
       method: 'POST', headers: { 'content-type': 'application/cbor' }, body: encodeRecord([method, ...args]),
@@ -28,7 +28,7 @@ export function createNodeWorld({ deploymentId, signingKey, verificationKey, fet
     specVersion: 8,
     capabilities: { ...admissionCapabilities, deploymentAffinity: true, hookRetention: { active: true } },
     ...createAdmissionStorage(methods),
-    ...createNodeQueue({ deploymentId, signingKey, verificationKey, fetchBound }),
+    ...createNodeQueue({ deploymentId, signingKey, verificationKey, fetchBound, workload }),
     streams: {
       get: createNodeStreamReader(fetchBound),
       write: (run, name, chunk) => invoke('write', run, name, chunk),

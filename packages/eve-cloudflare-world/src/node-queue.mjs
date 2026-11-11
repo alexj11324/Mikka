@@ -5,7 +5,7 @@ import { validRelease } from './queue-transport.mjs'
 
 /** The Node host's private outbound intercept routes only world.internal to
  * the named WorldQueueService. The v5 executor owns all workflow processing. */
-export function createNodeQueue({ deploymentId, fetchBound, signingKey, verificationKey }) {
+export function createNodeQueue({ deploymentId, fetchBound, signingKey, verificationKey, workload = 'eve' }) {
   if (!validRelease(deploymentId)) throw new TypeError('Invalid Eve deployment id')
   function forRevision(revision, continuation = false) {
     if (!validRelease(revision)) throw new TypeError('Invalid target Eve deployment id')
@@ -70,7 +70,7 @@ export function createNodeQueue({ deploymentId, fetchBound, signingKey, verifica
         if (url.pathname !== WORKFLOW_FLOW_ROUTE || request.method !== 'POST' ||
             request.headers.get('x-mikka-eve-release') !== deploymentId) return new Response(null, { status: 409 })
         const body = await request.text()
-        if (!await authenticateDelivery(verificationKey ?? signingKey, deploymentId, request.headers, body)) return new Response(null, { status: 403 })
+        if (!await authenticateDelivery(verificationKey ?? signingKey, deploymentId, request.headers, body, workload)) return new Response(null, { status: 403 })
         const response = await handle(new Request(url, { method: 'POST', headers: request.headers, body }))
         const receipt = new Response(response.body, response)
         receipt.headers.set('x-mikka-eve-release', deploymentId)
