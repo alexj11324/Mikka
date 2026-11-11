@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { Pool } from 'pg'
+import { sql } from 'drizzle-orm'
 import { apiAliases } from '../../apps/api/compat-aliases.mjs'
 import type { ApiRoute } from '../../apps/api/src/routes'
 import { daemonStatusSchema, runAssignmentSchema } from '@mikka/protocol'
@@ -164,18 +165,27 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       }
       await pool.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'HTTP Files fixture\',\'HTTPFILES\')', [teamId, workspaceId, owner])
       await pool.query('INSERT INTO mikka_team_members("teamId","userId",role) VALUES($1,$2,\'owner\')', [teamId, owner])
-      await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,'HTTP Files fixture','{"type":"doc","content":[]}','done','normal','workspace')`, [issueId, owner, workspaceId])
-      await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
     } else {
       await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,'Personal HTTP Files fixture','personal')`, [workspaceId, owner])
       await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,'admin','active')`, [workspaceId, owner, `${owner}@example.invalid`])
       await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Other HTTP Files fixture')`, [otherWorkspace, owner])
       for (const user of [owner, member]) await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,'member','active')`, [otherWorkspace, user, `${user}@example.invalid`])
-      await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES($1,$2,$3,'bound','Personal HTTP Files fixture','{"type":"doc","content":[]}','done','normal','personal')`, [issueId, owner, workspaceId])
       assert.deepEqual((await pool.query('SELECT kind FROM mikka_workspaces WHERE id=$1', [workspaceId])).rows, [{ kind: 'personal' }])
       assert.deepEqual((await pool.query('SELECT "userId",role,status FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspaceId])).rows, [{ userId: owner, role: 'admin', status: 'active' }])
-      assert.equal((await pool.query('SELECT count(*)::int AS n FROM mikka_team_issues WHERE "issueId"=$1', [issueId])).rows[0].n, 0)
     }
+    const { db } = await import('../../lib/db')
+    const { withTaskWorkspace } = await import('../../lib/task-workspace')
+    const { registerTaskResourceAccess } = await import('../../lib/task-resource-registration')
+    await withTaskWorkspace(owner, workspaceId, async workspace => db.transaction(async tx => {
+      await tx.execute(sql`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope)
+        VALUES(${issueId},${owner},${workspaceId},'bound','HTTP Files fixture','{"type":"doc","content":[]}','done','normal',${kind === 'personal' ? 'personal' : 'workspace'})`)
+      if (kind === 'shared') await tx.execute(sql`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId")
+        VALUES(${issueId},${teamId},${workspaceId},${owner})`)
+      await registerTaskResourceAccess(tx, { id: issueId, workspaceId, ownerId: owner, workspaceKind: workspace.kind })
+    }))
+    assert.deepEqual((await pool.query('SELECT visibility FROM resource_access_policies WHERE kind=\'task\' AND id=$1', [issueId])).rows,
+      [{ visibility: kind === 'personal' ? 'private' : 'shared' }])
+    if (kind === 'personal') assert.equal((await pool.query('SELECT count(*)::int AS n FROM mikka_team_issues WHERE "issueId"=$1', [issueId])).rows[0].n, 0)
     const runId = randomUUID(), repoId = randomUUID(), deviceId = randomUUID(), tokenId = randomUUID(), agentId = randomUUID()
     const dataDir = join(root, 'daemon'), worktree = join(dataDir, 'worktrees', runId)
     const remote = `https://github.com/mikka-http-fixtures/${runId}.git`, repositoryKey = remoteKey(remote)
