@@ -139,6 +139,7 @@ const functions = {
   'issues.pollIssues': actions14.pollIssues,
   'issues.syncIssueList': actions14.syncIssueList,
   'issues.listWorkspaceIssues': actions14.listWorkspaceIssues,
+  'issues.listWorkspaceTaskPage': actions14.listWorkspaceTaskPage,
   'issues.getIssue': actions14.getIssue,
   'issues.pollIssue': actions14.pollIssue,
   'issues.saveIssue': actions14.saveIssue,

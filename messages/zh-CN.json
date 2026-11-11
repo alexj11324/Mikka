@@ -6778,6 +6778,7 @@
     "moreMany": "{first}、{second} 等 {count, number} 个"
   },
   "HostedTasks": {
+    "loadMore": "加载更多任务",
     "open": "打开任务",
     "status": "状态",
     "factoryStage": "Factory 阶段",

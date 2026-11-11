@@ -46,6 +46,9 @@ import { BrowserPane } from '@/components/browser/browser-pane'
 import { browserAddressRequest, browserAddressVersion, subscribeBrowserAddress } from '@/lib/browser/navigation'
 import { ThreadColumn } from './thread-column'
 import { AllThreadsColumn, AllThreadsToggle } from '@/components/nav/all-threads'
+import { useTaskContinuation } from '@/lib/hooks/use-task-continuation'
+import { nextTaskListCursor } from '@/lib/task-list-page'
+import { listWorkspaceTaskPage } from '@/app/actions/issues'
 import { TaskCardDataProvider } from '@/hooks/use-task-cards'
 import { TaskPresentationsContext, useWorkspaceTaskPresentations } from '@/hooks/use-task-collection'
 import { groupPresentedTasks, waitingTasks } from '@/lib/task-collection'
@@ -209,7 +212,14 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const listWorkspaceId = workspaceData?.workspace.id ?? workspaceContext?.workspace.id
   const listsPaused = boardBusy || settingsShown
   const { data: taskList, mutate, error, isLoading: tasksLoading } = useLiveIssueList(user.id, listWorkspaceId, listsPaused)
-  const tasks = useMemo(() => taskList?.items ?? [], [taskList])
+  const firstTasks = useMemo(() => taskList?.items ?? [], [taskList])
+  const paging = useTaskContinuation(firstTasks, taskList, nextTaskListCursor(firstTasks), async after => {
+    if (!listWorkspaceId) throw new Error('workspaceAccessDenied')
+    const page = await listWorkspaceTaskPage({ workspaceId: listWorkspaceId, after })
+    if (page.reset) { await mutate(); throw new Error('issueStale') }
+    return page
+  })
+  const tasks = useMemo(() => [...paging.items], [paging.items])
   const presentation = useWorkspaceTaskPresentations(user.id, listWorkspaceId, workspaceHome, tasks, !listsPaused)
   useEffect(() => {
     if (!(error instanceof ListReadScopeError) || error.kind !== 'workspace') return
@@ -717,6 +727,12 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         </div>
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={openFromList} onCreate={() => create()} />
       </>}
+      {!selected && paging.hasMore && (section === 'tasks' || section === 'all-issues' || section === 'my-issues' || section === 'team-issues' || threadsView) &&
+        <div className="flex shrink-0 justify-center p-2">
+          <Button variant="ghost" size="sm" disabled={paging.loading} onClick={() => void paging.loadMore()}>
+            {paging.failed ? i18nText('Common.retry') : i18nText('HostedTasks.loadMore')}
+          </Button>
+        </div>}
     </AppShellContent>
     {browserShown && !threadShown && !threadsView && !panelsInFrame && <BrowserPane onClose={() => showBrowser(false)} />}
     {threadShown && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}

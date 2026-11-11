@@ -1,5 +1,6 @@
 import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-command'
+import { taskListPageInput } from '@/lib/task-list-page'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
 import { z } from 'zod'
 import { projectInput, projectPatch } from '@/lib/project-input'
@@ -202,6 +203,7 @@ export const desktopActionSchemas = {
   'issues.pollIssues': tuple(version.optional(), listPositions(100).optional()),
   'issues.syncIssueList': tuple(version.optional(), listPositions(100).optional()),
   'issues.listWorkspaceIssues': oneId,
+  'issues.listWorkspaceTaskPage': tuple(taskListPageInput),
   'issues.getIssue': oneId,
   'issues.pollIssue': tuple(uuid, version.optional()),
   'issues.createTaskOnly': tuple(createOnlyCommand),

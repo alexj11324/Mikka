@@ -1,3 +1,4 @@
+import type { TaskListPageInput } from '../../../../../lib/task-list-page'
 import { api, apiConnection, ApiError } from '../../../lib/api'
 import { apiCache } from '../../../lib/api-cache'
 import type { Task, TaskDetail } from '../../../lib/types'
@@ -25,11 +26,11 @@ function reader() {
 
 export async function readPresentedTasks(path: string) {
   const read = reader()
-  const list = await read.get<{ tasks: Task[]; workspaceId?: string }>(path)
+  const list = await read.get<{ tasks: Task[]; workspaceId?: string; next?: TaskListPageInput['after'] | null }>(path)
   // The v1 projection shipped before the list exposed its selected tenant.
   const workspaceId = list.workspaceId ?? (await read.get<{ workspace: { id: string } }>('/api/mobile/home')).workspace.id
   const presentations = await read.project(workspaceId, list.tasks.map(task => task.id))
-  return { workspaceId, tasks: list.tasks.flatMap(task => {
+  return { workspaceId, ...(list.next !== undefined ? { next: list.next } : {}), tasks: list.tasks.flatMap(task => {
     const view = presentations.get(task.id)
     return view ? [{ ...task, ...view, status: view.primaryStatus }] : []
   }) }
