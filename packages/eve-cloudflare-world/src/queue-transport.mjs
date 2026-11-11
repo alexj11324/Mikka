@@ -84,7 +84,7 @@ async function deliver(message, env) {
   const response = await target.fetch(new Request(new URL(WORKFLOW_FLOW_ROUTE, business ? 'https://business-workflow.internal' : 'https://eve.internal'), {
     method: 'POST', redirect: 'manual',
     headers: await deliveryHeaders(material ?? env.EVE_QUEUE_SIGNING_KEY, entry.revision, message.attempts - 1,
-      entry.key ? entry.key.slice('eve-queue/'.length) : await bodyDigest(entry.body)),
+      entry.key ? entry.key.slice('eve-queue/'.length) : await bodyDigest(entry.body), business ? 'business' : 'eve'),
     body: body?.body ?? entry.body, duplex: 'half',
   }))
   try {
