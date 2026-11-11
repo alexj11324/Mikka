@@ -7144,6 +7144,9 @@
     "refreshFailed": "Unable to refresh {label}. Previous content is shown."
   },
   "PersonalFiles": {
+    "overviewSub": "Files you keep and results from your tasks.",
+    "folders": "Folders",
+    "overviewEmpty": "No files yet.",
     "createFolder": "New folder",
     "folderName": "Folder name",
     "create": "Create",

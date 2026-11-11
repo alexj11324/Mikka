@@ -7144,6 +7144,9 @@
     "refreshFailed": "{label}更新失败，仍显示上次内容。"
   },
   "PersonalFiles": {
+    "overviewSub": "个人保存的文件和任务交付的成果。",
+    "folders": "文件夹",
+    "overviewEmpty": "还没有文件。",
     "createFolder": "新建文件夹",
     "folderName": "文件夹名称",
     "create": "创建",
