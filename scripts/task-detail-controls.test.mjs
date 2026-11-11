@@ -8,7 +8,7 @@ const browser = new Window({ url: 'https://mikka.example/mikka' })
 const noop = () => {}
 const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
-let teamId, response, issue, child, frame, teamWrites, favoriteDenied, moves, reads, optionsRead
+let projectWrites, teamId, response, issue, child, frame, teamWrites, favoriteDenied, moves, reads, optionsRead
 const teams = ['existing', 'another'].map(id => ({ id, identifier: id, name: id }))
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ relativeTime: noop }), useNow: () => new Date() } })
 mock.module('sonner', { namedExports: { toast: { error: noop, success: noop } } })
@@ -42,6 +42,7 @@ stub('app/actions/issue-operations.ts', {
     return { issue: { ...issue, revision: issue.revision + 1, metadata: { ...issue.metadata, favoriteUserIds: favorites } } }
   },
 })
+stub('hooks/use-selected-task-presentation.ts', { useSelectedTaskPresentation: () => ({}) })
 stub('hooks/use-live-key.tsx', { useLiveKey: noop })
 stub('hooks/use-bot-tasks.ts', { localTaskState: () => ({ state: 'todo' }) })
 stub('lib/hooks/use-relation-search.ts', { useRelationSearch: noop })
@@ -49,7 +50,7 @@ stub('lib/use-action-error.ts', { useActionError: () => translate })
 stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => [] })
 stub('components/workspace/issue-activity.tsx', { useActivityDrafts: () => ({}) })
 stub('components/workspace/issue-threads.tsx', { useIssueThreads: () => ({ data: [] }) })
-stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({}), IssueMetadataControls: noop, AccessChangeDialog: noop })
+stub('components/workspace/issue-metadata-controls.tsx', { useIssueMetadataSave: () => ({ project: id => { projectWrites.push(id) } }), IssueMetadataControls: noop, AccessChangeDialog: noop })
 stub('components/workspace/issue-assignee-menu.tsx', { AgentSphere: noop })
 stub('components/workspace/issue-detail-properties.tsx', { overdue: () => false })
 stub('components/workspace/issue-pull-request-link.tsx', { PullRequestStatus: noop })
@@ -68,7 +69,7 @@ beforeEach(() => {
   issue = { id: 'task', userId: 'owner', title: 'Task', identifier: 'T-1', status: 'todo', revision: 3, scope: 'personal', createdAt: new Date(),
     metadata: metadataSchema.parse({ delegate: { id: 'bot', name: 'Assigned bot', kind: 'bot', image: null } }) }
   child = { ...issue, id: 'child', title: 'Child', revision: 2, metadata: { ...issue.metadata, parentId: issue.id } }
-  optionsRead = {}
+  optionsRead = {}; projectWrites = []
   teamId = 'existing'; response = null; favoriteDenied = false; teamWrites = []; reads = []; moves = []
 })
 after(() => browser.close())
@@ -150,5 +151,30 @@ test('label and project placeholders report the options read and retry it', asyn
       await act(async () => retry.onSelect())
     }
     assert.deepEqual(reads, ['property-options', 'property-options'])
+  } finally { await dispose() }
+})
+
+test('the Project row and action menu select same-name records by the same ID', async () => {
+  const first = '40000000-0000-4000-8000-000000000001'
+  const second = '40000000-0000-4000-8000-000000000002'
+  issue.projectId = second
+  issue.metadata.project = 'Shared name'
+  optionsRead = { data: { labels: [], members: [], projects: ['Shared name'], projectRecords: [
+    { id: first, name: 'Shared name' }, { id: second, name: 'Shared name' },
+  ] } }
+  const dispose = await mount()
+  try {
+    await act(async () => row('project').onOpen())
+    const rowItems = row('project').menu
+    const actionItems = frame.menu.items.find(item => item.id === 'project').submenu
+    for (const items of [rowItems, actionItems]) {
+      assert.deepEqual(items.filter(item => item.label === 'Shared name').map(item => [item.id, item.description, item.checked]), [
+        [first, first, false], [second, second, true],
+      ])
+      await act(async () => items.find(item => item.id === second).onSelect())
+      await act(async () => items.find(item => item.id === first).onSelect())
+      await act(async () => items.find(item => item.id === 'none').onSelect())
+    }
+    assert.deepEqual(projectWrites, [first, null, first, null])
   } finally { await dispose() }
 })
