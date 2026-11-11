@@ -39,7 +39,7 @@ mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean)
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspaceReady ? workspace() : undefined, error: workspaceError, mutate: async () => { workspaceError = undefined; workspaceReady = true } }) } })
 mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () => ({ data: { sessions: [] } }) } })
 mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
-mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing } })
+mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
   useLiveIssueList: () => emptyList, useLiveThreadList: () => emptyList,
   useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({ data: [] }),
