@@ -35,8 +35,8 @@ export async function wakeLinkedCiSuite(
         AND lower(p."remoteKey")=ANY($1::text[])
         AND p."pullRequest"->>'state' IN ('open','draft')
         AND p."pullRequest"->>'headSha'=$2
-        AND starts_with(p."pullRequest"->>'url',$3)
-        AND (cardinality($4::text[])=0 OR p."pullRequest"->>'url'=ANY($4::text[]))
+        AND starts_with(lower(p."pullRequest"->>'url'),$3)
+        AND (cardinality($4::text[])=0 OR lower(p."pullRequest"->>'url')=ANY($4::text[]))
       ORDER BY p."userId",r."botId",p."pullRequest"->>'url',p."updatedAt" DESC
       LIMIT 50`,
     [[suite.repository, `v2/github.com/${suite.repository}`], suite.headSha, repoPrefix, links],
