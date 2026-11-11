@@ -2783,7 +2783,7 @@
       "checkAgain": "重新检查",
       "confirmTitle": "向「{workspace}」成员分享「{name}」？",
       "currentWorkspace": "当前工作区",
-      "confirmAuthority": "成员可使用此连接已授权的工具。外部服务可能向连接账户收费。",
+      "confirmAuthority": "成员的任务可使用此连接，并在任务机器上读取配置的凭证。外部服务可能向连接账户收费。",
       "confirmShare": "分享连接",
       "add": "添加 MCP 服务器",
       "empty": "暂无 MCP 服务器",
