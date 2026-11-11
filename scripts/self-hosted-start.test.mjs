@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { installationSecrets, selfHostedEnvironment } from './self-hosted-start.mjs'
+import { installationSecrets, migrationLockConnectionString, selfHostedEnvironment } from './self-hosted-start.mjs'
 
 test('installation keys survive restart, remain private, and explicit overrides never enter the file', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-installation-'))
@@ -42,4 +42,19 @@ test('bad self-hosted origins fail before migration or sign-in', () => {
     'https://user:password@self.example.test', 'https://self.example.test?next=x', 'https://*.example.test']) {
     assert.throws(() => selfHostedEnvironment({ ...env, BETTER_AUTH_URL }, '/app'), /SELF_HOSTED_ORIGIN_INVALID/)
   }
+})
+
+test('Neon migrations take an unpooled PostgreSQL session lock; queries remain pooled', () => {
+  const endpoint = (host, user = 'fixture') => ['postgresql://', user, ':', 'synthetic', '@', host, '/mikka?sslmode=require'].join('')
+  const pooled = endpoint('ep-sample-pooler.us-east-2.aws.neon.tech')
+  const direct = endpoint('ep-sample.us-east-2.aws.neon.tech')
+  const env = selfHostedEnvironment({ MIKKA_DATABASE_URL: pooled, MIKKA_DATABASE_URL_UNPOOLED: direct }, '/app')
+  assert.equal(env.MIKKA_DATABASE_URL, pooled)
+  assert.equal(migrationLockConnectionString(env), direct)
+  // Backward compatibility for users who only configured one Neon URI.
+  assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: pooled }), direct)
+  assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: direct }), direct)
+  // An explicitly provided direct endpoint wins over the pooled query URL.
+  assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: pooled, MIKKA_DATABASE_URL_UNPOOLED: endpoint('db.example.invalid', 'custom') }), endpoint('db.example.invalid', 'custom'))
+  assert.equal(migrationLockConnectionString({ MIKKA_DATABASE_URL: ['postgres://', 'mikka', ':', 'fixture', '@postgres:5432/mikka'].join('') }), ['postgres://', 'mikka', ':', 'fixture', '@postgres:5432/mikka'].join(''))
 })

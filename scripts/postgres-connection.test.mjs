@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { directDatabaseURL, directPoolOptions } from './postgres-connection.mjs'
+import { directDatabaseURL, directPoolOptions, sessionDatabaseURL } from './postgres-connection.mjs'
 
 test('direct Neon sessions preserve identity and TLS, changing only the endpoint host', () => {
   const source = 'postgresql://ep-fixture-pooler.c-1.us-east-2.aws.neon.tech:5432/app?sslmode=verify-full&channel_binding=require&options=-c%20search_path%3Dfixture'
@@ -24,4 +24,16 @@ test('host/identity overrides cannot silently send a direct-session operation to
   assert.throws(() => directPoolOptions({ connectionString: source, host: 'elsewhere.example' }), /DATABASE_CONNECTION_HOST_CONFLICT/)
   assert.throws(() => directDatabaseURL('postgres://other.neon.tech/app'), /NEON_ENDPOINT_HOST_INVALID/)
   assert.throws(() => directDatabaseURL('invalid-private-url'), /^Error: DATABASE_CONNECTION_URL_INVALID$/)
+})
+
+test('a self-hosted explicit direct endpoint applies only to its original database', () => {
+  const pooled = 'postgresql://queries.example.test/app'
+  const direct = 'postgresql://session.example.test/app'
+  const workspace = 'postgresql://queries.example.test/other'
+  const env = { MIKKA_DATABASE_URL: pooled, MIKKA_DATABASE_URL_UNPOOLED: direct }
+  assert.equal(sessionDatabaseURL(pooled, env), direct)
+  assert.equal(sessionDatabaseURL(workspace, env), workspace)
+  assert.equal(sessionDatabaseURL(pooled, { ...env, VERCEL_ENV: 'preview' }), pooled)
+  assert.equal(sessionDatabaseURL(pooled, { ...env, VERCEL: '1' }), pooled)
+  assert.equal(sessionDatabaseURL(undefined, env), undefined)
 })
