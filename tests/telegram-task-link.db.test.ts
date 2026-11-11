@@ -12,9 +12,9 @@ test('Telegram /link resolves stable and historical task identity inside the cur
   const workspace = await seedWorkspace(connection, creator, [{ userId: creator, role: 'admin' }, { userId: viewer, role: 'member' }])
   // Membership in another workspace must not widen this channel's binding.
   const foreign = await seedWorkspace(connection, foreignOwner, [{ userId: foreignOwner, role: 'admin' }, { userId: viewer, role: 'member' }])
-  const current = await seedIssue(connection, creator, workspace.id)
-  const anchor = await seedIssue(connection, viewer, workspace.id)
-  const outside = await seedIssue(connection, foreignOwner, foreign.id)
+  const current = await seedIssue(connection, creator, workspace.id, { registered: true })
+  const anchor = await seedIssue(connection, viewer, workspace.id, { registered: true })
+  const outside = await seedIssue(connection, foreignOwner, foreign.id, { registered: true })
   const telegramUserId = randomUUID(), threadId = `telegram-task-link-${randomUUID()}`, botId = randomUUID()
   await connection.query('insert into telegram_links("userId","telegramUserId") values($1,$2)', [viewer, telegramUserId])
   await connection.query('insert into telegram_conversations("threadId","userId","issueId") values($1,$2,$3)', [threadId, viewer, anchor])
@@ -98,7 +98,7 @@ test('Telegram /link resolves stable and historical task identity inside the cur
   })
 
   await t.test('a uniquely resolved alias cannot grant access to a deleted task', async () => {
-    const removed = await seedIssue(connection, creator, workspace.id)
+    const removed = await seedIssue(connection, creator, workspace.id, { registered: true })
     const label = await identifier(removed)
     const content = (await connection.query('select content from issues where id=$1', [removed])).rows[0].content
     content.attrs.mikka.deletedAt = '2026-11-08T00:00:00.000Z'
