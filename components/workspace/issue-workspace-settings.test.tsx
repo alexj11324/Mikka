@@ -18,6 +18,8 @@ const refreshed = async () => {}
 const browser = new Window({ url: 'https://fixture.example/?workspace=workspace-one' })
 let user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
 let workspaceId = 'workspace-one'
+let workspaceReady = true
+let workspaceError: Error | undefined
 const workspace = () => ({ currentUserId: user.id, workspace: { id: workspaceId, name: 'Fixture', kind: 'team' }, members: [], role: 'admin' })
 const emptyList = { data: { items: [] }, mutate: refreshed }
 const bot = { id: '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f', name: 'Ada', coordinator: false }
@@ -33,7 +35,7 @@ mock.module('@/lib/app-build', { namedExports: { APP_BUILD: '' } })
 mock.module('@/lib/auth-client', { namedExports: { endSession: async () => ({}), authClient: { useSession: () => ({ data: null }) } } })
 mock.module('@/lib/settings-data', { namedExports: { fetchSettingsData: refreshed } })
 mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean) => ({ value: open, open, onOpenChangeComplete: nothing }) } })
-mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspace() }) } })
+mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspaceReady ? workspace() : undefined, error: workspaceError, mutate: async () => { workspaceError = undefined; workspaceReady = true } }) } })
 mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () => ({ data: { sessions: [] } }) } })
 mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
 mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing } })
@@ -63,10 +65,10 @@ for (const [file, names] of [
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
   ['../nav/group-avatar.tsx', ['GroupPillAvatar']], ['../browser/browser-pane.tsx', ['BrowserPane']],
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']], ['./group-chat-view.tsx', ['GroupChatView']],
-  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh']],
+  ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
   ['./create-issue-dialog.tsx', ['CreateIssueDialog']],
-] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, empty])) })
+] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
 mock.module('@/components/nav/bot-list', { namedExports: { BotList: empty, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
@@ -103,7 +105,7 @@ function Conversation({ bot: activeBot }: { bot?: { id: string; name: string } }
   const [draft, setDraft] = useViewState(`settings-fixture:${activeBot?.id ?? 'coordinator'}:draft`, '')
   editDraft = setDraft
   useEffect(() => { composerMounts++; return () => { composerUnmounts++ } }, [])
-  return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} /></>
+  return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<p>Cached conversation</p><Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} /></>
 }
 mock.module('./workspace-overview', { namedExports: { WorkspaceOverview: Conversation } })
 mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, children, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; children?: ReactNode; onRail: (destination: 'chats') => void }) => {
@@ -142,6 +144,8 @@ before(async () => {
 beforeEach(() => {
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
   workspaceId = 'workspace-one'
+  workspaceReady = true
+  workspaceError = undefined
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
@@ -164,6 +168,50 @@ async function go(href: string) {
   browser.history.pushState({}, '', href)
   await render()
 }
+
+test('a cached conversation cannot accept a draft before its authenticated workspace scope resolves', async () => {
+  workspaceReady = false
+  await render()
+  assert.equal(Boolean(container.querySelector('textarea')), false, 'a cached transcript must not expose an editable loading-scope draft')
+  assert.ok(container.querySelector('[data-loading-placeholder]'))
+  assert.equal(composerMounts, 0)
+
+  workspaceReady = true
+  await render()
+  assert.ok(container.textContent?.includes('Cached conversation'))
+  await act(async () => editDraft('Lifecycle readiness draft'))
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'Lifecycle readiness draft')
+
+  workspaceId = 'workspace-two'
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, '', 'another workspace must not inherit the startup draft')
+  await act(async () => editDraft('another workspace draft'))
+  user = { ...user, id: 'owner-two' }
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, '', 'another account must not inherit a workspace draft')
+  user = { ...user, id: 'owner-one' }
+  workspaceId = 'workspace-one'
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'Lifecycle readiness draft')
+})
+
+test('a failed workspace read keeps editing unavailable and offers the normal read retry', async () => {
+  workspaceReady = false
+  workspaceError = new Error('unavailable fixture workspace')
+  await render()
+  assert.equal(Boolean(container.querySelector('textarea')), false)
+  assert.equal(Boolean(container.querySelector('[data-loading-placeholder]')), false, 'a failed read must not remain a perpetual loader')
+  assert.ok(container.querySelector('[role="alert"]'))
+  const retry = button('Common.retry')
+  assert.ok(retry)
+  await act(async () => retry.click())
+  await render()
+  assert.ok(container.querySelector('textarea'))
+  await act(async () => editDraft('draft after retry'))
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'draft after retry')
+})
 
 test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft', async () => {
   await render()

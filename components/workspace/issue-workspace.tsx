@@ -71,7 +71,8 @@ import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
 import { GroupChatView, type GroupChatRequest } from './group-chat-view'
-import { WorkspaceContentLoading } from './workspace-loading'
+import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
+import { InlineLoadError } from '@/components/load-error'
 import { PluginsPage as DefaultPluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionsRefresh } from '@/components/suggestions/suggestion-feed'
 import { backToTaskOrigin, dropQueryKeys, goTo, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
@@ -127,9 +128,15 @@ export function IssueWorkspace({ cacheWorkspace, ...props }: Parameters<typeof I
 }
 
 function IssueWorkspaceScope({ withinLiveProvider = false, ...props }: Parameters<typeof IssueWorkspaceContent>[0] & { withinLiveProvider?: boolean }) {
-  const { data: read } = useWorkspace(props.user.email)
+  const errors = useTranslations('Errors')
+  const common = useTranslations('Common')
+  const { data: read, error, mutate } = useWorkspace(props.user.email)
   const data = read?.currentUserId === props.user.id ? read : undefined
-  const content = <ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>
+  // Cached chats can arrive before the workspace read. Do not accept a draft
+  // in a temporary scope that would discard it when its workspace resolves.
+  if (!data && error) return <InlineLoadError message={errors('workspaceReadFailed')} retryLabel={common('retry')} onRetry={() => { void mutate() }} />
+  if (!data) return <WorkspaceLoading />
+  const content = <ViewStateProvider scope={`${props.user.id}:${data.workspace.id}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>
   return withinLiveProvider ? content : <LiveProvider ownerId={props.user.id} workspaceId={data?.workspace.id}>{content}</LiveProvider>
 }
 
