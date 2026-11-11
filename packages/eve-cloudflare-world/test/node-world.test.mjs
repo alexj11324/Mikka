@@ -142,3 +142,19 @@ test('a verify-only business Node accepts a Worker Ed25519 receipt bound to the 
   expect(await authenticateDelivery(publicMaterial, deploymentId, symmetric, body, 'business')).toBe(false)
   await expect(deliveryHeaders(publicMaterial, deploymentId, 2, await bodyDigest(body), 'business')).rejects.toThrow()
 })
+
+
+test('the native spec-8 run_started replay observer stays in Node across real World RPC', async () => {
+  const { run } = await world.events.create(null, { ...spec, eventType: 'run_created', eventData: {
+    workflowName: 'native-replay-observer', deploymentId, input: Uint8Array.of(1),
+  } })
+  const observed = []
+  const result = await world.events.create(run.runId, { ...spec, eventType: 'run_started' }, {
+    replayEventObserver(event) { observed.push(event.eventId) },
+  })
+  expect(result.run.status).toBe('running')
+  // Worlds may omit replay preloads. The runtime then reads the durable log.
+  expect(observed).toEqual((result.events ?? []).map(event => event.eventId))
+  const log = await world.events.list({ runId: run.runId })
+  expect(log.data.map(event => event.eventType)).toEqual(['run_created', 'run_started'])
+})

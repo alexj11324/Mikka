@@ -65,9 +65,16 @@ export function createAdmissionStorage(authority) {
     events: {
       async create(runId, request, options = {}) {
         if (runId === null && request.eventType === 'run_created') runId = 'wrun_' + mintId()
-        const result = await authority.create(runId, request, options)
+        // The official SDK's replay observer is a synchronous Node callback.
+        // Only serializable options cross the Worker/DO transport.
+        const { replayEventObserver, ...params } = options
+        const result = await authority.create(runId, request, params)
         if (result.ok) {
           const { ok, replayed, ...receipt } = result
+          if (receipt.events) {
+            receipt.events = receipt.events.map(event => stripEventDataRefs(event, options.resolveData ?? 'all'))
+            if (replayEventObserver) for (const event of receipt.events) replayEventObserver(event)
+          }
           if (receipt.event) receipt.event = stripEventDataRefs(receipt.event, options.resolveData ?? 'all')
           if (receipt.run) receipt.run = filterRun(receipt.run, options)
           if (receipt.step) receipt.step = filterStep(receipt.step, options)
