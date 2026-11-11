@@ -119,9 +119,10 @@ before(async () => {
   // The official board supplies the layout. Mount the real toolbar, card menus
   // and their subscriptions while the public-only fixture renders their props.
   const board = await import('../components/slots/board')
+  const { Button } = await import('../components/ui/button')
   mock.module('@ui-slot/board', { namedExports: { ...board,
-    BoardScreen: ({ cards, tools, wrapCard }: BoardScreenProps) => <>{tools}<ul>{cards.map(card =>
-      <li key={card.id}>{wrapCard(card.id, <button>{card.title}</button>)}</li>)}</ul></>,
+    BoardScreen: ({ cards, tools, wrapCard, onOpen }: BoardScreenProps) => <>{tools}<ul>{cards.map(card =>
+      <li key={card.id}>{wrapCard(card.id, <Button onClick={() => onOpen(card.id)}>{card.title}</Button>)}</li>)}</ul></>,
   } })
   // happy-dom has no Web Animations; Base UI asks for running animations before it unmounts a popup.
   const elementPrototype = browser.Element.prototype as unknown as { getAnimations?: () => unknown[] }
