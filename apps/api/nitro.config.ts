@@ -4,7 +4,7 @@ import { defineConfig } from 'nitro'
 import type { ModuleOptions as WorkflowOptions } from 'workflow/nitro'
 import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
 import { apiAliases } from './compat-aliases.mjs'
-import { nodeRuntimePackages, routeFunctionRules, workflowNodeExternals } from './build-contract.mjs'
+import { nodeRuntimePackages, productWorkflowDirectories, routeFunctionRules, workflowNodeExternals } from './build-contract.mjs'
 import { publicAssetConfiguration } from './public-assets.mjs'
 import { nodeRequestAuthority, vercelRequestAuthority } from './request-authority-module.mjs'
 import { builtinServices } from './builtin-services-module.mjs'
@@ -34,7 +34,9 @@ export default defineConfig({
   ...((process.env.NITRO_PRESET === 'vercel' || process.env.VERCEL) ? {
     kv: { 'cache:public-wikimedia-images:v1': { driver: 'vercel-runtime-cache', base: 'mikka:public-wikimedia-images:v1' } },
   } : {}),
-  workflow: { dirs: ['.'], runtime: 'nodejs24.x', sourcemap: false, dashboard: false } satisfies WorkflowOptions,
+  // Discover only product sources. Eve compiles its independent World under
+  // apps/eve/.eve and .output before this build; those are never product inputs.
+  workflow: { dirs: productWorkflowDirectories, runtime: 'nodejs24.x', sourcemap: false, dashboard: false } satisfies WorkflowOptions,
   vercel: { functions: { runtime: 'nodejs24.x' }, functionRules: await routeFunctionRules(root) },
   replace: {
     'process.env.MIKKA_UI_OVERLAY_SHA': JSON.stringify(process.env.MIKKA_UI_OVERLAY_SHA ?? ''),

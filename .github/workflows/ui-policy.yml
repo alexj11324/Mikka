@@ -107,9 +107,6 @@ jobs:
       - name: Governance unit while trusted policy predates enrollment
         if: always() && needs.changes.outputs.full == 'true' && !contains(fromJSON(needs.changes.outputs.units), 'ci-core-governance') && !contains(fromJSON(needs.changes.outputs.units), '*')
         run: pnpm test:governance
-      - name: Eve unit while trusted policy predates enrollment
-        if: always() && needs.changes.outputs.full == 'true' && !contains(fromJSON(needs.changes.outputs.units), 'ci-core-eve') && !contains(fromJSON(needs.changes.outputs.units), '*')
-        run: pnpm test:eve
 
   ui-policy-integrations:
     name: Integration unit checks

@@ -72,3 +72,9 @@ Roll back the entire application and agent output together through the
 existing release flow. Preserve the agent's durable storage and Mikka
 database. An eve package upgrade can strand earlier workflows, so retain
 history and follow the pinned upstream session migration rules.
+
+The main application's Workflow scanner is limited to `workflows` and `lib`.
+Eve's generated `.eve` snapshots and `.output` belong to its independent World
+and must never be discovered by the product compiler. Shared model descriptor
+validation stays in the pure `lib/hosted-model-selection.ts` module; provider,
+credential and database resolution remain on the Node side of the step boundary.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { observeEveSession } from './eve-session.mjs'
 /** #1505: real, normal-session repository dispatch. No provider tokens or DB access.
  *
  * SMOKE_OWNER_EMAIL / SMOKE_OWNER_PASSWORD come from the existing prod:/ identity.
@@ -273,14 +274,6 @@ export async function chooseSharedChatModel(client, botId, harness) {
     && (current.available === true || current.availability === 'checking'), 'shared_chat_model_unavailable')
 }
 
-function readDispatchOutput(output) {
-  if (typeof output !== 'string') return null
-  let value
-  try { value = JSON.parse(output) } catch { return null }
-  if (value?.type === 'json') value = value.value
-  return value && UUID.test(value.runId ?? '') ? value : null
-}
-
 /** A bounded NDJSON read, never a polling loop. Only safe identifiers/times leave. */
 async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false, probe }, now) {
   const marker = `STARTUP_OK_${record.sampleId}`
@@ -299,66 +292,45 @@ async function dispatchThroughCoordinator(client, record, { botId, profileId, de
     deviceId ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId],
   { headers: { traceparent: trace.traceparent } })
   record.phase = 'coordinator_stream'
-  const response = await client.request(`/api/coordinator/stream?botId=${botId}&wait=1`, {}, timeoutMs)
-  if (response.status >= 400 && response.status <= 599) {
-    await response.body?.cancel().catch(() => {})
-    fail(`http_${response.status}`)
-  }
-  assert(response.status === 200 && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'coordinator_stream_unavailable')
-  const workflowRunId = response.headers.get('x-mikka-stream-run')
-  assert(/^wrun_[A-Za-z0-9]+$/.test(workflowRunId ?? ''), 'workflow_run_missing')
-  record.workflowRunId = workflowRunId
-  const reader = response.body.getReader(), decoder = new TextDecoder()
-  let buffer = '', selectedCall
-  try {
-    for (;;) {
-      const { value, done } = await reader.read()
-      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true })
-      assert(buffer.length < 1000000, 'coordinator_stream_too_large')
-      const lines = buffer.split('\n'); buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        let event
-        try { event = JSON.parse(line) } catch (error) { fail('coordinator_stream_invalid', error) }
-        if (event.type !== 'tool' || event.name !== 'dispatch_run') continue
-        if (event.state === 'running') {
-          // A durable Coordinator workflow can replay earlier chat turns.
-          // Bind the call to this owned issue or its unique read-only marker.
-          if (!event.quote?.includes(marker) && !event.input?.includes(record.issueId)) continue
-          assert(!selectedCall || selectedCall === event.call, 'multiple_dispatches')
-          selectedCall = event.call
-          record.dispatchCallId = event.call
-          record.dispatchObservedAt ??= iso(now())
-          continue
-        }
-        if (!selectedCall || event.call !== selectedCall) continue
-        record.dispatchReturnedAt = iso(now())
-        if (event.state !== 'done') {
-          const code = typeof event.errorCode === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(event.errorCode) ? event.errorCode : 'unavailable'
-          record.dispatchRefusal = { code }
-          fail('dispatch_refused')
-        }
-        const result = readDispatchOutput(event.output)
-        // The public stream intentionally truncates output at 200 characters.
-        // Resolve the one thread of our newly-created issue after its push;
-        // this is one event-triggered read, not a background polling loop.
-        record.phase = 'thread_lookup'
-        const { threads } = await client.rpc('agents.pollIssueThreads', [record.issueId])
-        assert(Array.isArray(threads) && threads.length === 1 && UUID.test(threads[0].id ?? '')
-          && threads[0].ownedByCurrentUser === true, 'dispatch_run_missing')
-        if (result) {
-          assert(result.thread === 'new' && result.runId === threads[0].id, 'dispatch_not_new')
-          assert(deviceId ? result.placement?.kind === 'device' && result.placement.deviceId === deviceId
-            : result.placement?.kind === 'cloud', 'placement_mismatch')
-        }
-        record.runId = threads[0].id
-        record.runIdHash = sha(record.runId).slice(0, 16)
-        record.placement = deviceId ? { kind: 'device', deviceId } : { kind: 'cloud' }
-        return
+  let selectedCall, completed = false
+  await observeEveSession(client, botId, { timeoutMs,
+    fail: (code, status, error) => {
+      if (status) fail(`http_${status}`, error)
+      fail(code === 'identity' ? 'workflow_run_missing' : code === 'too_large' ? 'coordinator_stream_too_large' : code === 'unavailable' ? 'coordinator_stream_unavailable' : 'coordinator_stream_invalid', error)
+    },
+    onEvent: async (event, sessionId) => {
+      record.eveSessionId = sessionId
+      // Session id is the durable Workflow run id, not the model's run_ label.
+      record.workflowRunId = sessionId
+      if (event.type === 'call.requested' && event.data.capability?.name === 'dispatch_run') {
+        const input = event.data.input
+        if (input?.issueId !== record.issueId || !input.note?.includes(marker)) return false
+        assert(input.profileId === profileId, 'placement_mismatch')
+        assert(!selectedCall || selectedCall === event.data.callId, 'multiple_dispatches')
+        selectedCall = event.data.callId; record.dispatchCallId = selectedCall
+        record.dispatchObservedAt ??= iso(now())
       }
-      if (done) fail('dispatch_not_observed')
-    }
-  } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
+      if (event.type !== 'call.settled' || !selectedCall || event.data.callId !== selectedCall) return false
+      record.dispatchReturnedAt = iso(now())
+      const code = event.data.error?.code ?? event.data.output?.error ?? (event.data.output?.ok === false ? event.data.output.code : undefined)
+      if (event.data.outcome !== 'completed' || code) {
+        record.dispatchRefusal = { code: typeof code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(code) ? code : 'unavailable' }
+        fail('dispatch_refused')
+      }
+      const result = event.data.output
+      assert(result && UUID.test(result.runId ?? ''), 'dispatch_run_missing')
+      record.phase = 'thread_lookup'
+      const { threads } = await client.rpc('agents.pollIssueThreads', [record.issueId])
+      assert(Array.isArray(threads) && threads.length === 1 && UUID.test(threads[0].id ?? '') && threads[0].ownedByCurrentUser === true, 'dispatch_run_missing')
+      assert(result.thread === 'new' && result.runId === threads[0].id, 'dispatch_not_new')
+      assert(deviceId ? result.placement?.kind === 'device' && result.placement.deviceId === deviceId : result.placement?.kind === 'cloud', 'placement_mismatch')
+      record.runId = threads[0].id; record.runIdHash = sha(record.runId).slice(0, 16)
+      record.placement = deviceId ? { kind: 'device', deviceId } : { kind: 'cloud' }
+      completed = true
+      return true
+    },
+  })
+  assert(completed, 'dispatch_not_observed')
 }
 
 function readStartupTiming(value, record, names = STARTUP_PHASES) {
@@ -1179,18 +1151,23 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
  * credentials, request headers or raw application log envelopes are needed. */
 export function alignServerTimings(report, timings) {
   assert(Array.isArray(timings), 'timings_invalid')
-  const clean = timings.filter(item => item?.msg === 'dispatch_timing' && typeof item.workflowRunId === 'string'
+  const clean = timings.filter(item => item?.msg === 'dispatch_timing' && (typeof item.workflowRunId === 'string' || item.workflowRunId === null)
     && Number.isSafeInteger(item.startedAt) && Number.isSafeInteger(item.endedAt) && item.endedAt >= item.startedAt
     && Number.isFinite(item.totalMs) && item.failed === false)
   for (const sample of report.samples) {
     if (!sample.agentStart || !sample.firstProviderChunk) continue
-    let matching = clean.filter(item => item.workflowRunId === sample.workflowRunId)
+    const owned = timings.filter(item => item?.msg === 'cloud_startup_timing' && item.stage === 'cloud.thread.ensure'
+      && item.runIdHash === sample.runIdHash && Number.isSafeInteger(item.startedAt) && Number.isSafeInteger(item.endedAt))
+    const containsOwnedRun = item => owned.some(run => run.startedAt >= item.startedAt && run.endedAt <= item.endedAt)
+    // Native Eve business tools execute on the product API host, outside the
+    // agent Workflow world. A null runtime id requires the owned run's exact
+    // server interval; session names and runner reception clocks cannot replace it.
+    let matching = clean.filter(item => item.workflowRunId === sample.workflowRunId
+      || sample.eveSessionId && item.workflowRunId === null && containsOwnedRun(item))
     // One durable workflow can dispatch several chat turns. Correlate using
     // the owned run's server-side ensure interval, never runner wall clocks.
     if (matching.length > 1) {
-      const owned = timings.filter(item => item?.msg === 'cloud_startup_timing' && item.stage === 'cloud.thread.ensure'
-        && item.runIdHash === sample.runIdHash && Number.isSafeInteger(item.startedAt) && Number.isSafeInteger(item.endedAt))
-      if (owned.length) matching = matching.filter(item => owned.some(run => run.startedAt >= item.startedAt && run.endedAt <= item.endedAt))
+      if (owned.length) matching = matching.filter(containsOwnedRun)
     }
     if (matching.length !== 1) { sample.timing = { status: 'unavailable', reason: matching.length ? 'ambiguous_dispatch' : 'dispatch_log_missing' }; continue }
     const log = matching[0], end = dateValue(sample.agentStart.storedAt), provider = dateValue(sample.firstProviderChunk.storedAt)

@@ -45,7 +45,7 @@ test('Factory store selects marker-backed suites and real downstream imports', a
 })
 test('Eve model changes select native unit tests and schedule authority selects its database gate', async () => {
   const unit = await pick('lib/eve/streaming-model.ts')
-  assert(unit.units.includes('ci-core-eve'))
+  assert(unit.units.includes('ci-core-41'))
   const database = await pick('lib/eve/scheduled-read.ts')
   assert(database.db_suites.includes('test:eve-db'))
   assert(database.affected.includes(dbId('test:eve-db')))
