@@ -34,6 +34,6 @@ export function nextCron(value: string, zone: string, after: Date): Date {
     return next
   } catch (error) {
     if (error instanceof ScheduleError) throw error
-    throw new ScheduleError('invalidCron', 400)
+    throw new ScheduleError('invalidCron', 400, { cause: error })
   }
 }

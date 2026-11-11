@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { SCHEDULE_READ_TOOL_IDS } from '@/lib/coordinator/scheduled-read-tools'
 
 export class ScheduleError extends Error {
-  constructor(public code: string, public status = 409) { super(code); this.name = 'ScheduleError' }
+  constructor(public code: string, public status = 409, options?: ErrorOptions) { super(code, options); this.name = 'ScheduleError' }
 }
 export const timingSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('once'), at: z.iso.datetime({ offset: true }) }).strict(),

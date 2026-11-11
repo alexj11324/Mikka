@@ -273,13 +273,13 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
   await t.test('maxConcurrent skips later running agent reads without misfire or a duplicate report',async()=>{
    now=new Date('2030-03-01T00:00:00Z')
    const read=()=>def({kind:'agent_read',prompt:'Read concurrently',allowedActions:['get_issue']})
-   const first=read();first.timing={kind:'interval',start:new Date(now.getTime()+60_000).toISOString(),minutes:60};first.maxConcurrent=2;const two=await create(first)
+   const first=read();first.timing={kind:'interval',start:new Date(now.getTime()+60_000).toISOString(),minutes:1};first.maxConcurrent=2;const two=await create(first)
    for(let n=0;n<3;n++){now=new Date(now.getTime()+60_000);await store().tick()}
    const twoRows=(await pool.query<{status:string;error:string|null;operation_id:string}>('SELECT status,error,operation_id FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at',[two.id])).rows
    assert.deepEqual(twoRows.map(o=>[o.status,o.error]),[['running',null],['running',null],['skipped','concurrencyLimit']])
    assert.equal((await pool.query('SELECT count(*)::int n FROM coordinator_messages m JOIN schedule_occurrences o ON o.operation_id=m.id WHERE o.schedule_id=$1 AND o.status=$2',[two.id,'skipped'])).rows[0].n,1)
    await store().command(actor,{action:'cancel',scheduleId:two.id,version:1})
-   const next=read();next.timing={kind:'interval',start:new Date(now.getTime()+60_000).toISOString(),minutes:60};next.maxConcurrent=1;const one=await create(next)
+   const next=read();next.timing={kind:'interval',start:new Date(now.getTime()+60_000).toISOString(),minutes:1};next.maxConcurrent=1;const one=await create(next)
    now=new Date(now.getTime()+60_000);await store().tick();now=new Date(now.getTime()+60_000);await store().tick()
    const oneRows=(await pool.query<{status:string;error:string|null}>('SELECT status,error FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at',[one.id])).rows
    assert.deepEqual(oneRows.map(o=>[o.status,o.error]),[['running',null],['skipped','concurrencyLimit']])
