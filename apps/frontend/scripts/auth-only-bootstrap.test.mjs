@@ -35,7 +35,7 @@ const fixtureModules = new Map([
   ['@/components/workspace/invitation-card', 'export const InvitationCard = () => null;'],
   ['@/components/device-authorization', 'export const DeviceAuthorization = () => null;'],
   ['@/components/plugins/github-settings', 'export const GitHubSettings = () => null;'],
-  ['@/app/[locale]/not-found', 'export default () => null;'],
+  ['@/components/app-shell/not-found', 'export default () => null;'],
   ['@/components/auth-form', `import { createElement } from 'react'; import { useSWRConfig } from 'swr'; export const AuthForm = props => { ${stateAccess}.authCache = useSWRConfig().cache; return createElement('div', { 'data-auth': true, 'data-owner': props.signedInAs?.name ?? 'signed-out', 'data-handoff': Boolean(props.desktopFlow), 'data-email-enabled': props.emailEnabled }); };`],
   ['@/components/auth/forgot-password-form', 'export const ForgotPasswordForm = () => null;'],
   ['@/components/auth/reset-password-form', 'export const ResetPasswordForm = () => null;'],

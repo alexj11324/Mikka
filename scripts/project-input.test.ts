@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { projectInput, projectPatch, hasDependencyCycle, DEFAULT_PROJECT_PROPERTIES } from '../lib/project-input'
+import { projectInput, projectPatch, projectPeople, hasDependencyCycle, DEFAULT_PROJECT_PROPERTIES } from '../lib/project-input'
 
 const input = { name: '项目验收', summary: '', description: '', status: 'backlog', priority: 'none', lead: '', team: 'Mikka', startDate: '', targetDate: '', properties: DEFAULT_PROJECT_PROPERTIES }
 const a = '00000000-0000-4000-8000-000000000001'
@@ -11,11 +11,21 @@ const node = (id: string, dependencyIds: string[]) => ({ id, properties: { depen
 test('new projects support no priority and default properties', () => { assert.equal(projectInput.parse(input).priority, 'none'); const { properties: _, ...legacy } = input; assert.deepEqual(projectInput.parse(legacy).properties, DEFAULT_PROJECT_PROPERTIES) })
 test('rejects a blank project name', () => assert.equal(projectInput.safeParse({ ...input, name: '  ' }).success, false))
 test('trims the project title', () => assert.equal(projectInput.parse({ ...input, name: '  项目  ' }).name, '项目'))
-test('rejects invalid statuses, priorities, leads and teams', () => { for (const [key, value] of [['status', 'unknown'], ['priority', 'invalid'], ['lead', 'other-user'], ['team', 'other-team']]) assert.equal(projectInput.safeParse({ ...input, [key]: value }).success, false) })
+test('rejects invalid statuses and priorities', () => { for (const [key, value] of [['status', 'unknown'], ['priority', 'invalid']]) assert.equal(projectInput.safeParse({ ...input, [key]: value }).success, false) })
 test('rejects invalid calendar dates', () => assert.equal(projectInput.safeParse({ ...input, startDate: '2026-02-30' }).success, false))
 test('rejects target date before start date', () => assert.equal(projectInput.safeParse({ ...input, startDate: '2026-10-25', targetDate: '2026-10-20' }).success, false))
 test('allows clearing dates', () => assert.equal(projectInput.safeParse({ ...input, targetDate: '2026-10-25' }).success, true))
-test('rejects unauthorized member values', () => assert.equal(projectInput.safeParse({ ...input, properties: { ...DEFAULT_PROJECT_PROPERTIES, members: ['other-user'] } }).success, false))
+test('accepts stable people IDs; Workspace authority is validated inside the write transaction', () => {
+  const parsed = projectInput.parse({ ...input, lead: 'person-a', properties: { ...DEFAULT_PROJECT_PROPERTIES, members: ['person-a', 'person-b'] } })
+  assert.deepEqual(projectPeople(parsed, 'actor'), { leadUserId: 'person-a', memberIds: ['person-a', 'person-b'] })
+})
+test('legacy me aliases resolve only to this authenticated actor', () => {
+  assert.deepEqual(projectPeople(projectInput.parse({ ...input, lead: 'me', properties: { ...DEFAULT_PROJECT_PROPERTIES, members: ['me', 'actor'] } }), 'actor'), { leadUserId: 'actor', memberIds: ['actor'] })
+})
+test('explicit nullable lead and member IDs override legacy compatibility input', () => {
+  assert.deepEqual(projectPeople(projectInput.parse({ ...input, lead: 'me', leadUserId: null, memberIds: ['person-b'], properties: { ...DEFAULT_PROJECT_PROPERTIES, members: ['me'] } }), 'actor'), { leadUserId: null, memberIds: ['person-b'] })
+})
+test('Team display names carry no validation or tenancy authority', () => assert.equal(projectInput.parse({ ...input, team: 'Other display name' }).team, 'Other display name'))
 test('rejects duplicate labels after trimming', () => assert.equal(projectInput.safeParse({ ...input, properties: { ...DEFAULT_PROJECT_PROPERTIES, labels: ['设计', ' 设计 '] } }).success, false))
 test('rejects unnamed milestones', () => assert.equal(projectInput.safeParse({ ...input, properties: { ...DEFAULT_PROJECT_PROPERTIES, milestones: [{ id: a, name: '', targetDate: '', completed: false }] } }).success, false))
 test('rejects duplicate milestone ids', () => { const milestone = { id: a, name: '交付', targetDate: '', completed: false }; assert.equal(projectInput.safeParse({ ...input, properties: { ...DEFAULT_PROJECT_PROPERTIES, milestones: [milestone, milestone] } }).success, false) })

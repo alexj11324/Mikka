@@ -1,3 +1,4 @@
+import type { ProjectExecutionSnapshot } from '../project-resources/contracts'
 import type { ExecutionIdentity } from '../execution-identity'
 import type { RunTraceContext } from '@mikka/protocol/trace-context'
 import type { AgentProfileSelection } from '../factory/agent-profile'
@@ -22,10 +23,15 @@ export interface WorkerModelDispatch {
 }
 
 export interface WorkerDefinitionSnapshot {
+  /** Correlates a complete host-frozen review request. It grants no authority;
+   * claim resolves the immutable accepted batch for this exact queued Run. */
+  workspaceReview?: { batchId: string; fingerprint: string; sourceRunId: string }
   /** Correlation only; excluded from the frozen execution/authority digest. */
   traceContext?: RunTraceContext
   /** Trusted dispatch identity; absent on historical runs, never inferred retroactively. */
   executionIdentity?: ExecutionIdentity
+  /** Project/Repository/Environment configuration frozen at admission; never backfilled on old runs. */
+  projectExecution?: ProjectExecutionSnapshot
   /** Copied only from the host's authorized parent execution; legacy workers gain nothing. */
   customMcp?: McpAuthority
   schemaVersion: 1

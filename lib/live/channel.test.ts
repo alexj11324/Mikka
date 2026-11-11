@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { LiveChannel, LIVE_FALLBACK_MS, type LiveRuntime, type LiveSocket, type LiveTicket } from './channel'
+import { LiveChannel, LIVE_FALLBACK_MS, type LiveObservation, type LiveRuntime, type LiveSocket, type LiveTicket } from './channel'
 import { DEVICE_GATEWAY_TICKET_SECONDS } from '../device-gateway-ticket'
 import { acceptSWRRead, observeSWRRead, readBoundary, readFresh } from '../swr/read-observer'
 
@@ -356,6 +356,70 @@ test('online idle channels send pings and perform no polling reads', async () =>
   assert.equal(f.ticketCalls(), 1)
   assert.ok(f.sockets[0].sent.every(value => value === 'ping'))
   assert.equal(f.sockets[0].sent.length, 6)
+  f.channel.dispose()
+})
+
+test('a pong reports its round trip without changing when pings are sent', async () => {
+  const f = fixture(); f.subscribe(); await f.open()
+  const observations: LiveObservation[] = []
+  f.runtime.observe = observation => { observations.push(observation) }
+  const sentBefore = f.sockets[0].sent.filter(value => value === 'ping').length
+
+  // Record the clock at the exact moment the ping goes out, and keep the
+  // fixture from answering it so this test places the reply itself.
+  let pingAt = 0
+  const send = f.sockets[0].send.bind(f.sockets[0])
+  f.sockets[0].respond = false
+  f.sockets[0].send = data => { if (String(data) === 'ping') pingAt = f.runtime.monotonicNow!(); send(data) }
+
+  // One heartbeat goes out; the reply arrives 1.5s later, inside the same advance.
+  await f.advance(30_000)
+  assert.ok(pingAt > 0, 'the ping must have gone out')
+  const replyAt = pingAt + 1_500
+  await f.advance(replyAt - f.runtime.monotonicNow!())
+  f.sockets[0].message('pong')
+  await settle()
+
+  const pong = observations.find(observation => observation.rttMs !== undefined)
+  assert.ok(pong, 'the pong must report a round trip')
+  assert.equal(pong!.event, 'received')
+  // The figure is the gap between the ping and its reply, on the monotonic clock.
+  assert.equal(pong!.rttMs, 1_500)
+  // Timing is untouched: exactly one more ping went out over that window.
+  assert.equal(f.sockets[0].sent.filter(value => value === 'ping').length, sentBefore + 1)
+  f.channel.dispose()
+})
+
+test('a runtime without a monotonic clock reports no round trip rather than guessing', async () => {
+  const f = fixture(); f.subscribe(); await f.open()
+  const observations: LiveObservation[] = []
+  f.runtime.observe = observation => { observations.push(observation) }
+  // Same runtime, no monotonic clock: the figure is absent, not measured across Date.now().
+  delete (f.runtime as { monotonicNow?: () => number }).monotonicNow
+  f.sockets[0].respond = false
+  await f.advance(30_000)
+  f.sockets[0].message('pong')
+  await settle()
+  assert.equal(observations.find(observation => observation.rttMs !== undefined), undefined)
+  // The heartbeat itself still works: the pong was accepted.
+  f.channel.dispose()
+})
+
+test('a wall-clock jump cannot produce a negative round trip', async () => {
+  const f = fixture(); f.subscribe(); await f.open()
+  const observations: LiveObservation[] = []
+  f.runtime.observe = observation => { observations.push(observation) }
+  f.sockets[0].respond = false
+  await f.advance(30_000)
+  // Move the wall clock backwards far more than any real round trip; the
+  // monotonic clock the figure uses is unaffected.
+  f.wallClock(-3_600_000)
+  await f.advance(20)
+  f.sockets[0].message('pong')
+  await settle()
+  const pong = observations.find(observation => observation.rttMs !== undefined)
+  assert.ok(pong, 'the pong still reports')
+  assert.ok(pong!.rttMs! >= 0, `rtt ${pong!.rttMs} must not be negative`)
   f.channel.dispose()
 })
 

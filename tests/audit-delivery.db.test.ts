@@ -44,6 +44,7 @@ async function prepareWorkspace(database: Pool) {
   if (!(await database.query("SELECT to_regclass('mikka_workspace_entitlements') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261109035010_team_entitlements.sql', import.meta.url), 'utf8'))
   // Canonical access reads the real Organization link table even for unattached Workspaces.
   if (!(await database.query("SELECT to_regclass('mikka_organization_workspaces') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261109035020_organization_governance.sql', import.meta.url), 'utf8'))
+  if (!(await database.query("SELECT to_regclass('mikka_organization_billing_accounts') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261110150009_billing_entitlements.sql', import.meta.url), 'utf8'))
 }
 
 test('workspace mutations retain and idempotently deliver audit intent across two logical PostgreSQL stores', { skip: !mainURL }, async t => {

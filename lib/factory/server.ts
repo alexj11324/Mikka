@@ -30,7 +30,6 @@ import type { FactoryAuthorize } from "./store";
 import { configuredMonitorProbes } from "./monitor-probe";
 import { monitorWorkspacePartition } from "./monitor-fingerprint";
 import { createFactoryMonitorIssueLinks } from "./monitor-issue-links";
-import { readAuthorizedIssue } from "../github/user-access";
 
 // Resolve the effective human tenant; background work uses persisted task authority.
 const authorize: FactoryAuthorize = (userId, issueId, tx, lockedIssue) => withDatabaseClient(tx, async () => {
@@ -115,7 +114,8 @@ export const factoryMonitor = createFactoryMonitor(
   null,
   backgroundWorkspace,
 );
-export const factoryMonitorIssueLinks = createFactoryMonitorIssueLinks(pool, authorize, readAuthorizedIssue);
+export const factoryMonitorIssueLinks = createFactoryMonitorIssueLinks(pool, authorize,
+  async (...args) => (await import('../github/user-access')).readAuthorizedIssue(...args));
 
 import { queueFactoryRun } from "@/lib/agent-runs";
 import { createFactoryDispatch, defaultFactoryDispatchAdapters } from "./dispatch";
