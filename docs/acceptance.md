@@ -132,6 +132,69 @@ establish either subscription path. Record that implementation gap without
 making it an additional gate. The built-in Decision judge is separate from
 these user-selectable coding models and keeps its configured model.
 
+## Personal Workspace acceptance
+
+Use `scripts/acceptance/personal-workflow.mjs` to select an account's own personal
+Workspace explicitly. The existing shared acceptance drivers keep their team
+default. A personal request never falls back to a team or borrows its subscription.
+Use the existing `SMOKE_OWNER_EMAIL` / `SMOKE_OWNER_PASSWORD` binding for an
+authorized ordinary test account; do not copy the execution host's CLI identity.
+The existing account-pool runner can also supply its own generated credentials
+in process for an attested loopback environment. That path requires the signed
+descriptor, matching compiled deployment SHA and database attestation; it does
+not admit ordinary account credentials on a production origin.
+
+Start with metadata readiness against the isolated local application:
+
+```sh
+node --import tsx scripts/acceptance/personal-workflow.mjs \
+  --origin http://127.0.0.1:3000 --workspace PERSONAL_WORKSPACE_UUID
+```
+
+This selects the exact authorized `personal` choice, verifies the account's active
+admin membership, reads back the ordinary Workspace cookie and session, and
+restores the original selection before signing out. It reads subscription/model
+and local device/Agent metadata. It creates no Bot, profile, task, machine or
+provider lease. `ready_for_attempt` always carries `executionVerified: false`.
+The report contains closed status/error codes rather than account labels,
+credentials, device names or Agent instructions.
+
+An execution attempt requires an existing enabled, online local device, its
+matching Agent, source pins and one explicit harness:
+
+```sh
+node --import tsx scripts/acceptance/personal-workflow.mjs \
+  --origin http://127.0.0.1:3000 --workspace PERSONAL_WORKSPACE_UUID \
+  --operation execute --harness codex --device-id DEVICE_UUID --agent-id CODEX_AGENT_UUID \
+  --expected-build APPLICATION_SHA --revision DRIVER_SHA
+```
+
+Run the independent Claude case with `--harness claude_code` and its originally
+bound Agent/subscription. Each command runs one case: Codex uses `gpt-6-luna` and
+Claude Code uses `claude-haiku-5-5`. A successful case does not cover the other
+subscription. There is no automatic model/provider fallback or retry. Personal
+execution cannot choose an implicit cloud machine. The device must advertise a
+successful native subscription preflight with the exact versions in
+`packages/daemon/harness/pins.json`; metadata readiness still cannot prove that
+the server can acquire a real provider lease or that a model call succeeded.
+The existing execution and native receipt checks establish that evidence.
+
+Add `--probe files --expected-worker-sha WORKER_SHA
+--expected-worker-source WORKER_SOURCE_SHA` to reuse the Files acceptance driver.
+Personal fixtures use the normal personal task action, without a Team. Its
+immutable installed-worker marker and native shell/file receipts remain required;
+a source daemon without that release installation cannot pass them. A single
+successful Files case reports `partial` and the required/verified harness lists.
+Both original subscriptions remain necessary for complete coverage.
+
+Readiness reports `startup_personal_runtime_unavailable` when the normal
+subscription endpoint cannot expose its configured backend,
+`startup_personal_subscription_missing` when the account has no matching source,
+`startup_personal_model_missing_or_ambiguous` for an absent or foreign fixed-model
+candidate, and separate device/native-runtime/Agent errors for a missing,
+disabled, offline or incompatible target. Record blocked cases as blocked;
+fixture metadata and empty harness lists do not prove native model execution.
+
 ## Shared production acceptance workspace
 
 验收工作区：**Acme Inc.**。**验收在这个工作区里做**。
