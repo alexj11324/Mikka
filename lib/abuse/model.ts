@@ -1,7 +1,9 @@
 import 'server-only'
 import { selfHostedDefaultModelConfig } from '@/lib/default-model-config'
+import { workersAiFallback } from '@/lib/workers-ai-config'
 import { defaultModelTarget } from '@/lib/default-model'
 import { selfHostedDefaultModel } from './self-hosted-model'
+import { workersAiConfig, workersAiCost, workersAiModel } from './workers-ai'
 import { randomUUID } from 'node:crypto'
 import { gateway, type LanguageModel } from 'ai'
 import { modelAdmission } from '@/lib/model-admission/runtime'
@@ -39,18 +41,15 @@ export async function createTrustedGatewayModel(modelId: string, apiKey?: string
   trustedGatewayModels.add(model)
   return model
 }
-/**
- * The default model (COORDINATOR_MODEL) goes to ZeroCat first and to its AI
- * Gateway route only as a fallback; every other hosted model id keeps Gateway.
- */
+/** Only the configured coordinator model qualifies for the ZeroCat primary. */
 export function isZeroCatModel(modelId: string) { return modelId === COORDINATOR_MODEL }
 
-/** Whether a ZeroCat admission refusal leaves the Gateway fallback to decide. */
+/** Only a route denial allows attempting the independently admitted fallback. */
 const routeDenied = (error: unknown) => error instanceof ModelAdmissionError && error.code === 'modelRouteDenied'
 
 /**
  * Admission for a hosted model before any paid work. The default model passes
- * when either of its routes (ZeroCat, else Gateway) is admitted.
+ * when either its primary or its configured fallback is admitted.
  */
 export async function admitHostedModel(scope: { workspaceId: string; ownerId?: string }, modelId: string,
   options: { signal?: AbortSignal; auditAllowed?: boolean } = {}): Promise<GatewayAdmission | null> {
@@ -64,7 +63,22 @@ export async function admitHostedModel(scope: { workspaceId: string; ownerId?: s
     try { await modelAdmission.zeroCat(scope, modelId, ZEROCAT_MODEL_ENDPOINT, options); return null }
     catch (error) { if (!routeDenied(error)) throw error }
   }
+  if (workersAiFallback()) {
+    await modelAdmission.workersAi(scope, modelId, workersAiConfig(modelId).endpoint, options)
+    return null
+  }
   return modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, options)
+}
+
+type ServedRoute = 'zerocat' | 'gateway' | 'cloudflare-workers-ai'
+type GenerateResult = Awaited<ReturnType<Model['doGenerate']>>
+
+function routeCost(served: ServedRoute, result: Pick<GenerateResult, 'usage' | 'providerMetadata'>) {
+  switch (served) {
+    case 'cloudflare-workers-ai': return workersAiCost(result.usage)
+    case 'zerocat': return zeroCatCost(result.usage)
+    case 'gateway': return gatewayCost(result.providerMetadata)
+  }
 }
 
 type CallArgs = Parameters<Model['doGenerate']>[0]
@@ -99,31 +113,38 @@ export async function hostedModel(
     return { payer, organizationId: hostedBillingScope.getStore()?.billingOrganizationId ?? null }
   })
   const zeroCat = isZeroCatModel(modelId)
-  // The default model's fallback is its own Gateway route; a caller may hand in
-  // only the trusted Gateway transport for it, never an arbitrary provider.
+  // The legacy Gateway route accepts only a server-created transport.
   if (zeroCat && provider && !trustedGatewayModels.has(provider)) throw new ModelAdmissionError('modelRouteDenied')
   let primary: Model | undefined, unavailable: ZeroCatFallbackReason | undefined
   if (zeroCat) {
     try { primary = createZeroCatModel() }
     catch (error) { unavailable = error instanceof PaidResourceError && error.detail === 'zerocat_endpoint_unexpected' ? 'endpoint_unexpected' : 'unconfigured' }
   }
-  const model = provider ?? gateway(modelId)
+  const workersAi = workersAiFallback() ? workersAiConfig(modelId) : null
+  if (workersAi && provider) throw new ModelAdmissionError('modelRouteDenied')
+  const fallbackRoute = workersAi ? 'cloudflare-workers-ai' : 'gateway'
+  const model = workersAi ? workersAiModel(workersAi) : provider ?? gateway(modelId)
   let managed: Model | undefined
   const executionModel = async (admission: GatewayAdmission | null) => {
     if (!admission) return model
     if (provider && !trustedGatewayModels.has(provider)) throw new ModelAdmissionError('modelRouteDenied')
     return provider ?? (managed ??= await createTrustedGatewayModel(modelId))
   }
-  /** True when ZeroCat may serve this call; false sends it to the Gateway fallback. */
+  /** A refused primary route can only fall back through a separately authorized provider. */
   const admitZeroCat = async (signal: AbortSignal | undefined, auditAllowed?: boolean) => {
     if (!primary) return false
     try { await modelAdmission.zeroCat(scope, modelId, ZEROCAT_MODEL_ENDPOINT, { signal, auditAllowed }); return true }
     catch (error) { if (routeDenied(error)) return false; throw error }
   }
-  const admitGateway = (signal: AbortSignal | undefined, auditAllowed?: boolean) =>
-    modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal, auditAllowed })
+  const admitFallback = async (signal: AbortSignal | undefined, auditAllowed?: boolean) => {
+    if (workersAi) {
+      await modelAdmission.workersAi(scope, modelId, workersAi.endpoint, { signal, auditAllowed })
+      return null
+    }
+    return modelAdmission.gateway(scope, modelId, GATEWAY_MODEL_ENDPOINT, { signal, auditAllowed })
+  }
   const reserve = async (id: string, args: CallArgs) => {
-    if (!zeroCat || !await admitZeroCat(args.abortSignal, false)) await executionModel(await admitGateway(args.abortSignal, false))
+    if (!zeroCat || !await admitZeroCat(args.abortSignal, false)) await executionModel(await admitFallback(args.abortSignal, false))
     // An input-size boundary, not a prepaid or estimated-cost balance check.
     const promptBytes = Buffer.byteLength(
       JSON.stringify({ prompt: args.prompt, tools: args.tools }),
@@ -140,7 +161,9 @@ export async function hostedModel(
       ...signals,
     ]),
   })
-  const options = (value: CallArgs, admission: GatewayAdmission | null) => ({
+  const options = (value: CallArgs, admission: GatewayAdmission | null) => workersAi
+    ? { ...value, headers: undefined, providerOptions: undefined, ...bounded(value) }
+    : ({
     ...value,
     providerOptions: {
       ...value.providerOptions,
@@ -160,7 +183,7 @@ export async function hostedModel(
     pauseZeroCat()
     return zeroCatFailureReason(error, firstTokenTimedOut)
   }
-  const route = (served: 'zerocat' | 'gateway', reason?: ZeroCatFallbackReason, error?: unknown, metadata?: unknown, attemptMs?: number) => {
+  const route = (served: ServedRoute, reason?: ZeroCatFallbackReason, error?: unknown, metadata?: unknown, attemptMs?: number) => {
     recordAiRoute({ route: served, fallbackReason: reason, zeroCatMs: attemptMs })
     if (zeroCat) recordModelRoute({ model: modelId, route: served, reason, error, attemptMs, status: zeroCatErrorStatus(error), credential: served === 'gateway' ? gatewayCredential(metadata) : undefined })
   }
@@ -189,10 +212,10 @@ export async function hostedModel(
                 finally { attemptMs = Date.now() - started }
               } else reason = 'route_denied'
             }
-            const served = result ? 'zerocat' : 'gateway'
+            const served = result ? 'zerocat' : fallbackRoute
             recordAiRoute({ route: served, fallbackReason: reason, zeroCatMs: attemptMs })
             if (!result) {
-              const admission = await admitGateway(args.abortSignal)
+              const admission = await admitFallback(args.abortSignal)
               const selected = await executionModel(admission)
               const prepared = options(args, admission)
               if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
@@ -200,7 +223,7 @@ export async function hostedModel(
               result = await selected.doGenerate(prepared)
             }
             route(served, reason, failure, result.providerMetadata, attemptMs)
-            const cost = served === 'zerocat' ? zeroCatCost(result.usage) : gatewayCost(result.providerMetadata)
+            const cost = routeCost(served, result)
             recordAiUsage(result.usage)
             recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
             const tokens = modelTokenUsage(result.usage)
@@ -261,10 +284,10 @@ export async function hostedModel(
                 } finally { clearTimeout(timer); attemptMs = Date.now() - started }
               } else reason = 'route_denied'
             }
-            const served = opened ? 'zerocat' : 'gateway'
+            const served = opened ? 'zerocat' : fallbackRoute
             recordAiRoute({ route: served, fallbackReason: reason, zeroCatMs: attemptMs })
             if (!opened) {
-              const admission = await admitGateway(args.abortSignal)
+              const admission = await admitFallback(args.abortSignal)
               const selected = await executionModel(admission)
               const prepared = options(args, admission)
               if (prepared.abortSignal.aborted) throw new DOMException('Model request cancelled', 'AbortError')
@@ -311,7 +334,7 @@ export async function hostedModel(
                     }
                     if (chunk.type === 'finish') {
                       if (!routed) { route(served, reason, failure, chunk.providerMetadata, attemptMs); routed = true }
-                      const cost = served === 'zerocat' ? zeroCatCost(chunk.usage) : gatewayCost(chunk.providerMetadata)
+                      const cost = routeCost(served, chunk)
                       recordAiUsage(chunk.usage)
                       recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
                       const tokens = modelTokenUsage(chunk.usage)
@@ -349,7 +372,7 @@ export async function hostedModel(
       const value = Reflect.get(target, key, target)
       return typeof value === 'function' ? value.bind(target) : value
     },
-  }), { ...metadata, modelId, userId: scope.ownerId, route: zeroCat && primary ? 'zerocat' : 'gateway' })
+  }), { ...metadata, modelId, userId: scope.ownerId, route: zeroCat && primary ? 'zerocat' : fallbackRoute })
 }
 
 function withoutGatewayOptions(options: CallArgs['providerOptions']) {

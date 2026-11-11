@@ -24,7 +24,7 @@ export interface AiMetadata {
 }
 
 export interface AiRoute {
-  route?: 'gateway' | 'zerocat' | 'subscription' | 'api_key' | 'self_hosted' | 'decision'
+  route?: 'gateway' | 'zerocat' | 'cloudflare-workers-ai' | 'subscription' | 'api_key' | 'self_hosted' | 'decision'
   fallbackReason?: string
   zeroCatMs?: number
   totalCostUsd?: number | null

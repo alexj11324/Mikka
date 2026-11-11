@@ -126,7 +126,7 @@ export function zeroCatFailureDetail(error: unknown): { error?: string; code?: s
  * served it, so PostHog (`mikka.model.route`) and Vercel logs count fallbacks.
  * Only closed-set values: no prompt, key or account data.
  */
-export function recordModelRoute(value: { model: string; route: 'zerocat' | 'gateway'; reason?: ZeroCatFallbackReason; status?: number; credential?: 'system' | 'byok'; error?: unknown; attemptMs?: number }) {
+export function recordModelRoute(value: { model: string; route: 'zerocat' | 'gateway' | 'cloudflare-workers-ai'; reason?: ZeroCatFallbackReason; status?: number; credential?: 'system' | 'byok'; error?: unknown; attemptMs?: number }) {
   const detail = value.error === undefined ? {} : zeroCatFailureDetail(value.error)
   const attributes = {
     'mikka.model.id': value.model,

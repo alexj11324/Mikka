@@ -76,4 +76,18 @@ test('model admission: real workspace policy, membership, revision and audit', {
     assert.ok(calls.some(row => row.action === 'model.denied' && row.metadata.reason === 'modelRouteDenied'))
     assert.ok(calls.every(row => !Object.hasOwn(row.metadata, 'prompt')))
   })
+  await t.test('Workers AI binds the account, owner and logical model independently of the Gateway grant', async () => {
+    const endpoint='https://api.cloudflare.com/client/v4/accounts/'+'a'.repeat(32)+'/ai/v1'
+    const model='deepseek/deepseek-v4.1-flash'
+    const other={ workspaceId:two.id, ownerId:owner }
+    const cfRoute={ provider:'cloudflare-workers-ai',model,endpoint,servingProviders:['cloudflare-workers-ai'],dataRegions:['unknown'],principalIds:[owner] }
+    await store.set(other, none, {schemaVersion:1,routes:[cfRoute]})
+    assert.ok(await store.workersAi(other,model,endpoint))
+    await assert.rejects(store.gateway(other,model),/modelRouteDenied/)
+    await assert.rejects(store.workersAi({ ...other, ownerId:member },model,endpoint))
+    await assert.rejects(store.workersAi(other,model,endpoint.replace('a'.repeat(32),'b'.repeat(32))),/modelRouteDenied/)
+    const {rows}=await pool.query('select metadata from workspace_audit_events where "workspaceId"=$1 and action=$2',[two.id,'model.admitted'])
+    assert.ok(rows.some(row=>row.metadata.provider==='cloudflare-workers-ai' && row.metadata.endpoint==='https://api.cloudflare.com' && row.metadata.model===model))
+  })
+
 })
