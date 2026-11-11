@@ -374,7 +374,9 @@
     "teamsDescription": "Browse public workspace teams and manage members, task ownership, and project associations.",
     "property": {
       "estimate": "Estimate",
+      "setEstimate": "Set estimate",
       "dueDate": "Due date",
+      "setDueDate": "Set due date",
       "addLabels": "Add labels",
       "setProject": "Set project",
       "editLabels": "Edit task labels",

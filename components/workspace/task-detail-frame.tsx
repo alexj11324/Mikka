@@ -163,14 +163,37 @@ export function FramedTask(props: FramedTaskProps) {
       if (value === (team.data ?? '')) return
       setTeamChoice(null); team.setNext(value); void team.save(value)
     } })) },
-    ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: preview, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
-    ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: preview, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
+    // A due date, an estimate and a parent are always offered, not only once one is
+    // set: a row that appears only when it already has a value can show the value
+    // but never be given one, which is what made these read as dead controls.
+    { id: 'dueDate', label: tProperty('dueDate'), disabled: preview, onClick: () => props.requestAction('dueDate'), value: meta.dueDate
+      ? { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, title: meta.dueDate, danger: overdue(meta.dueDate, props.status, now) }
+      : { text: tProperty('setDueDate'), mark: { kind: 'icon', icon: 'calendar' }, muted: true } },
+    { id: 'estimate', label: tProperty('estimate'), disabled: preview, onClick: () => props.requestAction('estimate'), value: meta.estimate !== null
+      ? { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' }, title: String(meta.estimate) }
+      : { text: tProperty('setEstimate'), mark: { kind: 'icon', icon: 'estimate' }, muted: true } },
     ...meta.pullRequests.length ? [{ id: 'pullRequests', label: tProperty('pullRequests'), disabled: preview, chips: meta.pullRequests.map(pr => ({ id: pr.url, text: `#${pr.url.split('/').filter(Boolean).at(-1)}`, href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: view.text ? `#${view.number} ${view.text}` : `#${view.number}`, title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('managePullRequestsAria'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow] : [],
-    ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
+    // The parent is one value, so it is a row of its own: it shows the current
+    // parent, opens the picker when there is none, and clears it when there is.
+    // Relations below keep every other kind as chips.
+    ...preview ? [] : (() => {
+      const parent = connections.groups.find(group => group.kind === 'parent')?.items[0]
+      const row: TaskDetailRow = { id: 'parent', label: tRelations('groupLabel.parent'), disabled: connections.pending, value: parent
+        ? { text: [parent.identifier, parent.title].filter(Boolean).join(' '), mark: { kind: 'icon', icon: 'parent' }, title: parent.title }
+        : { text: tMenu('setParent'), mark: { kind: 'icon', icon: 'parent' }, muted: true, aria: tMenu('setParent') }, menu: [
+        { id: 'set', label: tMenu('setParent'), mark: { kind: 'icon', icon: 'parent' }, onSelect: () => props.requestAction('parent') },
+        ...parent ? [
+          { id: 'open', label: tFrame('open'), mark: { kind: 'icon', icon: 'open' }, divider: true, onSelect: () => onOpen(parent.id) },
+          { id: 'remove', label: tRelations('removeAria', { label: tRelations('groupLabel.parent'), title: parent.title }), mark: { kind: 'icon', icon: 'remove' }, danger: true, onSelect: () => { void connections.remove('parent', parent.id) } },
+        ] as TaskMenuItem[] : [],
+      ] }
+      return [row]
+    })(),
+    ...preview ? [] : connections.groups.filter(group => group.items.length && group.kind !== 'parent').map((group): TaskDetailRow => ({
       id: `relation-${group.kind}`, label: group.label, disabled: connections.pending,
       chips: group.items.map(row => ({
         id: row.id, text: [row.identifier, row.title].filter(Boolean).join(' '), title: row.title,
-        mark: { kind: 'icon', icon: group.kind === 'parent' ? 'parent' : group.kind === 'blockedBy' || group.kind === 'blocks' ? 'flag' : 'link' },
+        mark: { kind: 'icon', icon: group.kind === 'blockedBy' || group.kind === 'blocks' ? 'flag' : 'link' },
         menu: [
           { id: 'open', label: tFrame('open'), mark: { kind: 'icon', icon: 'open' }, onSelect: () => onOpen(row.id) },
           { id: 'remove', label: tRelations('removeAria', { label: group.label, title: row.title }), mark: { kind: 'icon', icon: 'remove' }, danger: true, onSelect: () => { void connections.remove(relationOf(group.kind, row, connections.current, task.id), row.id) } },

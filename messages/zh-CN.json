@@ -374,7 +374,9 @@
     "teamsDescription": "浏览工作区公开团队，管理团队成员、任务归属与项目关联。",
     "property": {
       "estimate": "估算",
+      "setEstimate": "设置工作量估算",
       "dueDate": "截止日期",
+      "setDueDate": "设置截止日期",
       "addLabels": "添加标签",
       "setProject": "设置所属项目",
       "editLabels": "编辑任务标签",
