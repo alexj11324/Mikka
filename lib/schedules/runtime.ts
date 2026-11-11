@@ -9,13 +9,13 @@ import { nextScheduleDue, ScheduleStore, type WorkspaceGuard } from './store'
 import { ScheduleError, type Actor, type Command, type ScheduledRead } from './contract'
 
 const guard: WorkspaceGuard = async(owner,workspace,work)=>{
-  if(!workspace)return work()
+  if(!workspace)return work({role:'member'})
   const tx=await workspacePool.connect()
   try{
     await tx.query('BEGIN')
-    const member=await tx.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,owner])
+    const member=await tx.query<{role:'owner'|'admin'|'member'}>(`SELECT role FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,owner])
     if(!member.rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403)
-    const value=await work();await tx.query('COMMIT');return value
+    const value=await work({role:member.rows[0].role});await tx.query('COMMIT');return value
   }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
 }
 export function schedules(){return new ScheduleStore(pool,guard,async(tx,owner,id)=>{
