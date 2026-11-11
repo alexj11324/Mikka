@@ -158,20 +158,22 @@ dbTest('facts are scoped to a repository, so one project\'s habits stay out of a
     // A chat working in one repository is told that repository's facts and the person's, never the other's.
     const inWidget = await store.profilePromptSection(owner, ['acme/widget'])
     const inGadget = await store.profilePromptSection(owner, ['acme/gadget'])
-    assert.match(inWidget, /Test command: pnpm test/)
-    assert.match(inWidget, /Prefers terse replies/)
-    assert.doesNotMatch(inWidget, /npm test/)
-    assert.match(inGadget, /Test command: npm test/)
-    assert.doesNotMatch(inGadget, /pnpm test/)
+    // Match whole list lines: "pnpm test" contains "npm test", so a bare substring
+    // would make the absence checks meaningless.
+    assert.match(inWidget, /^ {2}- Test command: pnpm test$/m)
+    assert.match(inWidget, /^ {2}- Prefers terse replies$/m)
+    assert.doesNotMatch(inWidget, /^ {2}- Test command: npm test$/m)
+    assert.match(inGadget, /^ {2}- Test command: npm test$/m)
+    assert.doesNotMatch(inGadget, /^ {2}- Test command: pnpm test$/m)
     // A chat that names no repository gets only what is true of the person everywhere.
     const bare = await store.profilePromptSection(owner, [])
     assert.match(bare, /Prefers terse replies/)
-    assert.doesNotMatch(bare, /Test command/)
+    assert.doesNotMatch(bare, /^ {2}- Test command:/m)
 
     // The remote's spelling does not matter: every form of one repository reaches the same facts.
     const spelled = await store.profilePromptSection(owner, ['https://github.com/Acme/Widget.git'])
-    assert.match(spelled, /Test command: pnpm test/)
-    assert.doesNotMatch(spelled, /npm test/)
+    assert.match(spelled, /^ {2}- Test command: pnpm test$/m)
+    assert.doesNotMatch(spelled, /^ {2}- Test command: npm test$/m)
 
     // A repeat merges into its own repository's row instead of colliding or duplicating.
     assert.equal(await store.recordFacts(owner, [fact('acme/widget', 'Test command: pnpm test')]), 1)
