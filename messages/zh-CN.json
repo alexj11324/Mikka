@@ -7036,7 +7036,7 @@
       "noCustom": "还没有自定义服务商",
       "defaultBadge": "默认",
       "readOnly": "暂时不能逐个停用模型",
-      "providerOn": "{on}/{total} 个可用",
+      "providerOn": "{on}/{total} 个已启用",
       "firstModel": "任务先用",
       "keyProvider": "服务商"
     }
