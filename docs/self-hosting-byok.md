@@ -59,7 +59,9 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 | --- | --- |
 | `DECISION_MODEL` | 默认 `openai/gpt-6-luna-decisions`。 |
 | `DECISIONS_URL` | 默认 `https://ai-gateway.vercel.sh/v1/decisions`。自配服务需实现相同的 Decisions 请求、回答和调用回执协议。 |
-| `DECISIONS_API_KEY` | 可选的专用 Bearer Key；自配地址未设置时使用自己的 `AI_GATEWAY_API_KEY`。 |
+| `DECISIONS_API_KEY` | 自配兼容服务的专用 Bearer Key，也可用于默认 Gateway。其他兼容服务可沿用管理员指定的 `AI_GATEWAY_API_KEY`。 |
+| `OPENAI_DECISIONS_API_KEY` | 原生 OpenAI Decisions 的专用凭证，用于 `https://api.openai.com/v1/decisions`。 |
+| `DECISIONS_BILLING_PROFILE` | 原生端点当前支持 `openai-global-standard`。仅在账户实际使用全球标准价格时配置。 |
 
 默认 Gateway 地址仍支持现有 `AI_GATEWAY_API_KEY` 或 Vercel OIDC。自配地址不会收到 Vercel OIDC 令牌。没有可用凭据时 `decide()` 返回 `null`，保留既有降级行为。
 

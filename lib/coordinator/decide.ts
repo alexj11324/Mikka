@@ -1,6 +1,5 @@
-import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
 import 'server-only'
-import { gatewayAuth } from '@/lib/ai-gateway-auth'
+import { decisionProviderReceipt, decisionTransport, gatewayEndpoint } from './decision-provider'
 import { isCloudEdition } from '@/lib/edition'
 import { cloudDecisionTarget } from '@/lib/default-model'
 import { CloudServiceError } from '@/lib/cloud-services/errors'
@@ -21,10 +20,11 @@ export interface DecisionExecution {
   startedAt: string
   completedAt: string
   requestDigest: string
+  providerRequestDigest?: string
   imageDigests: string[]
   vision: 'image-input-submitted' | 'no-image-input'
 }
-/** Existing gateway/budget only. No alternate provider, program judgment or human-approval fallback. */
+/** Submit only to the configured Decisions provider after the existing workspace admission check. */
 export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal, diagnostics?: {retainInvalidReceipt:true}, billingAdapter?: HostedModelBilling) {
   'use step'
   if (signal?.aborted) return null
@@ -32,11 +32,10 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   const scope = hostedBillingScope.getStore()
   if (!scope) return null
   const cloud = await cloudDecisionTarget(scope.ownerId)
-  // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
-  const key = cloud ? null : DECISIONS_URL === 'https://ai-gateway.vercel.sh/v1/decisions'
-    ? process.env.DECISIONS_API_KEY || (await gatewayAuth())?.token
-    : process.env.DECISIONS_API_KEY || process.env.AI_GATEWAY_API_KEY
-  if (!cloud && !key) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
+  const transport = cloud ? null : await decisionTransport(DECISIONS_URL, DECISION_MODEL)
+  if (!cloud && !transport) { console.error('Decision unavailable', { purpose: DECISIONS_URL === gatewayEndpoint ? 'no-gateway-auth' : 'provider-not-configured' }); return null }
+  const native = transport?.native === true
+  const wireModel = transport?.model ?? DECISION_MODEL
   const { assertUnmanagedModelTransport } = await import('@/lib/model-admission/runtime')
   await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
   const usage = cloud ? null : await import('@/lib/abuse/runtime')
@@ -53,10 +52,11 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   }
   let requestStarted = false
   try {
-    return await observeAiRequest({ modelId: DECISION_MODEL, userId: scope.ownerId, route: 'gateway', operation: 'decision' }, async report => {
+    return await observeAiRequest({ modelId: DECISION_MODEL, userId: scope.ownerId, route: native ? 'api_key' : 'gateway', provider: native ? 'openai' : undefined, operation: 'decision' }, async report => {
       const requestInput = decisionRequestInput(input)
       const requestedQuestions = structuredClone(questions)
-      const body = JSON.stringify({ model: DECISION_MODEL, input: requestInput, questions: requestedQuestions })
+      const logicalBody = JSON.stringify({ model: DECISION_MODEL, input: requestInput, questions: requestedQuestions })
+      const body = wireModel === DECISION_MODEL ? logicalBody : JSON.stringify({ model: wireModel, input: requestInput, questions: requestedQuestions })
       // Snapshot the same normalized bytes as body before yielding to I/O. The
       // caller may mutate its image objects while this request is in flight.
       const imageDigests = typeof requestInput === 'string' ? [] : requestInput.flatMap(message => message.content.flatMap(part => part.type === 'input_image'
@@ -69,7 +69,7 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
       const init: RequestInit = {
         method: 'POST',
         redirect: 'error',
-        headers: { ...(key ? { Authorization: 'Bearer ' + key } : {}), 'Content-Type': 'application/json' },
+        headers: { ...(transport ? { Authorization: 'Bearer ' + transport.key } : {}), 'Content-Type': 'application/json' },
         body,
         signal: AbortSignal.any([AbortSignal.timeout(DECISION_TIMEOUT_MS), ...(signal ? [signal] : [])]),
       }
@@ -78,15 +78,15 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
         : await fetch(DECISIONS_URL, init)
       if (!response.ok) { await response.body?.cancel(); throw Error('decisionProviderUnavailable') }
       const payload: unknown = await response.json()
+      const receipt = decisionProviderReceipt(native, wireModel, payload, response.headers)
       {
-        const receipt = payload as {provider_metadata?:unknown; usage?:unknown}
-        const cost = gatewayCost(receipt.provider_metadata)
-        const tokens = decisionTokenUsage(receipt.usage)
+        const cost = receipt.cost
+        const tokens = decisionTokenUsage((payload as {usage?:unknown} | null)?.usage)
         report({ usage: tokens, totalCostUsd: cost === null ? null : cost / 1_000_000 })
         // The receipt already carries the real counts; settle them instead of the
         // zeros this used to record, which made every routing decision look free.
         if (store) await store.settle(callId,cost,decisionTokenCount(tokens.inputTokens),decisionTokenCount(tokens.outputTokens),
-          gatewayGenerationId(receipt.provider_metadata),
+          receipt.generation,
           { read: decisionTokenCountOrNull(tokens.inputTokenDetails.cacheReadTokens), write: decisionTokenCountOrNull(tokens.inputTokenDetails.cacheWriteTokens) })
         if (store && isCloudEdition()) await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
       }
@@ -101,13 +101,14 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
       }
       report({ metadata: judgment, invalid: !answers })
       // These fields come from the response envelope, not an answer or input.
-      const metadata = payload as { model?: unknown; provider_metadata?: { gateway?: { generationId?: unknown } } }
-      const generation = metadata?.provider_metadata?.gateway?.generationId
-      if (signal?.aborted || metadata.model !== DECISION_MODEL || typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) { report({ invalid: true }); return null }
+      const generation = receipt.generation
+      if (signal?.aborted || !receipt.modelMatches || !generation || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)
+        || (native && receipt.cost === null)) { report({ invalid: true }); return null }
       if (!answers && !diagnostics?.retainInvalidReceipt) return null
       const execution: DecisionExecution = {
         executionId, modelId: DECISION_MODEL, providerGenerationId: generation,
-        startedAt, completedAt: new Date().toISOString(), requestDigest: hash(body),
+        startedAt, completedAt: new Date().toISOString(), requestDigest: hash(logicalBody),
+        ...(native ? { providerRequestDigest: hash(body) } : {}),
         imageDigests, vision: imageDigests.length ? 'image-input-submitted' : 'no-image-input',
       }
       // Host-only group diagnostics opt in to retaining a paid invalid response.
@@ -132,7 +133,7 @@ function decisionTokenUsage(value: unknown) {
   return {
     inputTokens: usage.inputTokens ?? usage.input_tokens ?? usage.prompt_tokens,
     outputTokens: usage.outputTokens ?? usage.output_tokens ?? usage.completion_tokens,
-    inputTokenDetails: { cacheReadTokens: details.cached_tokens, cacheWriteTokens: usage.cache_creation_input_tokens },
+    inputTokenDetails: { cacheReadTokens: details.cached_tokens, cacheWriteTokens: details.cache_write_tokens ?? usage.cache_creation_input_tokens },
   }
 }
 
