@@ -12,7 +12,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   merge_group:
   workflow_dispatch:
   schedule:
@@ -44,8 +43,6 @@ env:
 
 jobs:
   changes:
-    # Draft PRs must not allocate runners; ready_for_review triggers full proof.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     uses: ./.github/workflows/ci-selection.yml
 
   cloud-secret-access:
@@ -300,7 +297,7 @@ jobs:
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
     needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, image-checks, desktop-checks, analytics-checks, workspace-governance-checks]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -474,7 +471,7 @@ jobs:
     # The required check name. Same docs-only behavior as UI policy above.
     name: Production build and browser interactions
     needs: [changes, browser-tests-full]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
