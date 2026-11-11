@@ -27,7 +27,7 @@
 | 原始 Task INSERT | 只要有 workspaceId 就 shared | private；缺租户仍 quarantined | 否，默认收紧 | 新迁移 `mikka_resource_acl_register` |
 | personal 正常创建/子任务 | SQL 默认或 child override 可为 shared | private | 否 | `lib/issue-create.ts`、`app/actions/issue-operations.ts` |
 | Team 正常根 Task 创建 | SQL 自动 shared | 权威 kind lease 下新行显式 shared | 保留现有能力 | `lib/task-resource-registration.ts` |
-| 重登记既有 private Team Task | 旧触发器不针对该操作 | helper 拒绝既有行，继续走原共享审批入口 | 否 | revision 与 transaction_timestamp guard |
+| 重登记既有 private Team Task | 旧触发器不针对该操作 | helper 拒绝既有行，沿用原 server 共享函数的权限与确认契约 | 否 | revision 与 transaction_timestamp guard |
 | quarantine 历史绑定 | Task 自动 shared | 默认 private，仅锁内 Team kind 显式恢复 | 否，裸绑定收紧 | 回填脚本与新 SQL |
 | account/service 明确授权 | 原 resource grants | 原行、capabilities、expiry 均保留 | 否 | 双库迁移与回填回归 |
 
