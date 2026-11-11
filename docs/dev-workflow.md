@@ -79,6 +79,15 @@ paths in [acceptance.md](acceptance.md#live-model-acceptance). See the
 [local model setup](local-runtime.md#which-model-local-runs-use) for the
 existing harness's limits.
 
+The required CI database matrix initializes its disposable PostgreSQL 17 service
+with `max_locks_per_transaction=512`. Four package lanes, each with concurrent
+test files, can tear down several full-migration schemas at once. PostgreSQL's
+lock table is shared across databases, so separate suite clones still compete
+for it; the default 64 can fail `DROP SCHEMA ... CASCADE` with SQLSTATE `53200`.
+This startup setting increases CI lock-table capacity without reducing test
+parallelism or bypassing cleanup. It does not change application or production
+database configuration.
+
 Signup limits never block local work. In local test-account mode
 (`localTestAccountsMode`, `scripts/test-accounts/database-target.mjs`) and
 outside Vercel, the signup and verification limits default to CI's (1000 per
