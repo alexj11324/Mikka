@@ -32,7 +32,7 @@ test('overlapping mentions each start one workflow, and retries start no duplica
   // Keep real SDK concurrency/deduplication and the registered handler; skip Slack I/O.
   bot.dispatchToHandlers = async (_adapter, threadId, message) => bot.mentionHandlers[0]({ id: threadId }, message)
   const threadId = 'slack:C123:1'
-  const message = id => ({ id, threadId, text: `mention ${id}`, raw: { team_id: 'T123' }, author: { userId: 'U456', isMe: false, isBot: false } })
+  const message = id => ({ id, threadId, text: `mention ${id}`, raw: { team_id: 'T123', channel: 'C123', ts: '1' }, author: { userId: 'U456', isMe: false, isBot: false } })
   const first = bot.handleIncomingMessage(adapter, threadId, message('1'))
   await started
   try {
@@ -40,5 +40,8 @@ test('overlapping mentions each start one workflow, and retries start no duplica
   } finally { releaseFirst() }
   await first
   for (const id of ['1', '2', '3']) await bot.handleIncomingMessage(adapter, threadId, message(id))
-  assert.deepEqual(calls, ['1', '2', '3'].map(id => ['owner-a', threadId, `mention ${id}`]))
+  // Each workflow gets the Slack entry's own team/channel/thread ids, never
+  // the chat adapter's encoded thread id.
+  const entry = { origin: 'slack', originRef: { kind: 'slack', teamId: 'T123', channelId: 'C123', threadTs: '1' } }
+  assert.deepEqual(calls, ['1', '2', '3'].map(id => ['owner-a', threadId, `mention ${id}`, entry]))
 })

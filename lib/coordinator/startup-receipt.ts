@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { AgentKitError } from '@/lib/agent-kit/store'
 import { COORDINATOR_EVENT_KINDS, COORDINATOR_EVENT_TIERS } from '@/lib/db/schema'
+import { runOriginRefSchema, runOriginSchema } from '@/lib/run-origin'
 import type { InboxTake } from './store'
 
 /** Only run settings and inbox metadata cross the first startup checkpoint.
@@ -12,7 +13,7 @@ const candidateSchema = z.object({
 }).strict()
 const settingsSchema = candidateSchema.extend({ coordinator: z.boolean() })
 const id = z.string().min(1)
-const inboxSchema = z.object({
+const inboxObjectSchema = z.object({
   held: z.literal(true), added: z.number().int().min(0),
   telegramTargets: z.array(z.object({ threadId: id, telegramUserId: id, sourceEventIds: z.array(id) }).strict()),
   handoffMatterIds: z.array(id), handoffOnly: z.boolean(),
@@ -20,7 +21,14 @@ const inboxSchema = z.object({
   pushHidesText: z.boolean(), taskEventId: id.optional(), sourceEventId: id.optional(),
   attentionQuestions: z.array(z.object({ eventId: id, taskId: id, issueId: id, questionId: id, runId: id }).strict()).optional(),
   scheduledRead: z.object({ occurrenceId: id, leaseToken: id, allowedActions: z.array(id), prompt: z.string() }).strict().optional(),
+  // Evidence-only run provenance for this take (lib/run-origin.ts).
+  origin: runOriginSchema.optional(),
+  originRef: runOriginRefSchema.optional(),
 }).strict()
+const inboxSchema = inboxObjectSchema.superRefine((value, context) => {
+  if (value.originRef != null && value.originRef.kind !== value.origin)
+    context.addIssue({ code: 'custom', path: ['originRef', 'kind'], message: 'originRef.kind must equal origin' })
+})
 
 // Version 1 is first introduced with this storage format. The JSON columns
 // remain objects; neither this encoding nor a receipt grants current authority.
@@ -31,14 +39,15 @@ const storedSettingsSchema = z.object({
 }).strict()
 // Inbox bits 0/1 hold handoffOnly/pushHidesText. The remaining bits declare
 // field presence, so deleting nonempty metadata cannot silently default to [].
-const inboxPresenceBits = { t: 4, m: 8, p: 16, k: 32, s: 64, q: 128, d: 256 } as const
+const inboxPresenceBits = { t: 4, m: 8, p: 16, k: 32, s: 64, q: 128, d: 256, o: 512, r: 1024 } as const
 const storedInboxSchema = z.object({
-  a: inboxSchema.shape.added, f: z.number().int().min(0).max(511),
-  t: inboxSchema.shape.telegramTargets.min(1).optional(),
-  m: inboxSchema.shape.handoffMatterIds.min(1).optional(),
-  p: inboxSchema.shape.pushEvents.min(1).optional(),
-  k: inboxSchema.shape.taskEventId, s: inboxSchema.shape.sourceEventId,
-  q: inboxSchema.shape.attentionQuestions, d: inboxSchema.shape.scheduledRead,
+  a: inboxObjectSchema.shape.added, f: z.number().int().min(0).max(2047),
+  t: inboxObjectSchema.shape.telegramTargets.min(1).optional(),
+  m: inboxObjectSchema.shape.handoffMatterIds.min(1).optional(),
+  p: inboxObjectSchema.shape.pushEvents.min(1).optional(),
+  k: inboxObjectSchema.shape.taskEventId, s: inboxObjectSchema.shape.sourceEventId,
+  q: inboxObjectSchema.shape.attentionQuestions, d: inboxObjectSchema.shape.scheduledRead,
+  o: inboxObjectSchema.shape.origin, r: inboxObjectSchema.shape.originRef,
 }).strict().superRefine((value, context) => {
   for (const key of Object.keys(inboxPresenceBits) as (keyof typeof inboxPresenceBits)[]) {
     const present = Object.hasOwn(value, key)
@@ -89,7 +98,7 @@ export function encodeStoredStartupReceipt(value: CoordinatorStartupReceipt): St
   const { settings, inbox } = readStartupReceipt(1, value.settings, value.inbox) as {
     settings: CoordinatorStartupSettings; inbox: z.infer<typeof inboxSchema>
   }
-  for (const key of ['taskEventId', 'sourceEventId', 'attentionQuestions', 'scheduledRead'] as const) {
+  for (const key of ['taskEventId', 'sourceEventId', 'attentionQuestions', 'scheduledRead', 'origin', 'originRef'] as const) {
     // JSON cannot preserve an explicitly present undefined. Product takes
     // omit absent optional fields; reject this ambiguous storage input.
     if (Object.hasOwn(inbox, key) && inbox[key] === undefined) throw startupReceiptConflict(new Error('coordinatorStartupUndefinedField'))
@@ -105,6 +114,8 @@ export function encodeStoredStartupReceipt(value: CoordinatorStartupReceipt): St
   if (inbox.sourceEventId !== undefined) { packed.s = inbox.sourceEventId; packed.f |= inboxPresenceBits.s }
   if (inbox.attentionQuestions !== undefined) { packed.q = inbox.attentionQuestions; packed.f |= inboxPresenceBits.q }
   if (inbox.scheduledRead !== undefined) { packed.d = inbox.scheduledRead; packed.f |= inboxPresenceBits.d }
+  if (inbox.origin !== undefined) { packed.o = inbox.origin; packed.f |= inboxPresenceBits.o }
+  if (inbox.originRef !== undefined) { packed.r = inbox.originRef; packed.f |= inboxPresenceBits.r }
   return { settings: { f: flags, r: settings.runtime.harness }, inbox: packed }
 }
 
@@ -127,5 +138,7 @@ export function decodeStoredStartupReceipt(version: unknown, settings: unknown, 
     ...(packed.s !== undefined ? { sourceEventId: packed.s } : {}),
     ...(packed.q !== undefined ? { attentionQuestions: packed.q } : {}),
     ...(packed.d !== undefined ? { scheduledRead: packed.d } : {}),
+    ...(packed.o !== undefined ? { origin: packed.o } : {}),
+    ...(packed.r !== undefined ? { originRef: packed.r } : {}),
   })
 }

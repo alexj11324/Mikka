@@ -198,7 +198,7 @@ test('real workflow entry uses the returned execution snapshot for model, prompt
   assert.deepEqual(calls.find(c=>c.name==='frozenBegin')?.args,[owner,bot,'synthetic-workflow',0,{harness:'ai_sdk'},true])
   assert.deepEqual(calls.find(c=>c.name==='hosted')?.args[0],execution!.snapshot.runtime)
   assert.equal(calls.find(c=>c.name==='prompt')?.args[2],execution!.snapshot)
-  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[]}])
+  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[],origin:'web'}])
   assert.equal(calls.filter(c=>c.name==='hosted').length,1)
   const hosted=calls.find(c=>c.name==='hosted')!.args[2] as {writable:WritableStream;preventClose:boolean}
   const modelWriter=hosted.writable.getWriter()
@@ -361,7 +361,7 @@ test('real workflow carries the host catalogue into named options and prompt wit
   const snapshot=execution!.snapshot, before=JSON.stringify(snapshot)
   await coordinatorTurn(owner,bot)
   assert.deepEqual(calls.find(c=>c.name==='mailboxCatalogue')?.args,[owner,bot,execution!.id])
-  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:true,mailboxTools:['mailbox_inbox']}])
+  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:true,mailboxTools:['mailbox_inbox'],origin:'web'}])
   assert.deepEqual(calls.find(c=>c.name==='prompt')?.args,[owner,bot,snapshot,['mailbox_inbox']])
   assert.equal(JSON.stringify(snapshot),before)
 })
@@ -370,7 +370,7 @@ test('real workflow forwards a host task event without changing the frozen execu
   reset('ai_sdk');taskEventId='10000000-0000-4000-8000-000000000004'
   const before=JSON.stringify(execution!.snapshot)
   await coordinatorTurn(owner,bot)
-  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[],taskEventId}])
+  assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{lazyGitHubContext:true,switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[],taskEventId,origin:'web'}])
   assert.equal(JSON.stringify(execution!.snapshot),before)
 })
 
