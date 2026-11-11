@@ -255,6 +255,7 @@ before(async () => {
     chatReadTrace.push('live'); return { ownerId: owner, workspaceId: chatHome, deadline: { at: chatExpiry.toISOString(), afterMs: chatExpiry.getTime() - observedAt } }
   } } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
+  mock.module('@/lib/eve/retry',{namedExports:{retryEveTurn:async()=>retryQueued?{queued:true}:{queued:false,reason:retryWorking?'working':'nothingToRetry'}}})
   mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
   mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
   ;({ POST } = await import('../app/api/coordinator/messages/route'))
@@ -352,7 +353,7 @@ test('reply retry reports unavailable, already working and no failed turn withou
   assert.equal(callbacks.length, 0)
   retryQueued = true
   assert.deepEqual(await retryCoordinatorTurn(), { queued: true })
-  assert.equal(callbacks.length, 1)
+  assert.equal(callbacks.length, 0, 'native retry delegates send directly without the old outbox wake')
   retryQueued = false; callbacks.length = 0
 })
 

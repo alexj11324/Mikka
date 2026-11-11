@@ -21,6 +21,7 @@ const ingress = new WeakMap<Request, { scope:EveScope; eventId:string }>()
 export async function acceptEveMessage(scope:EveScope,message:MessageContent,context:unknown,request:Request) {
   await assertEveScope(scope)
   const product = eveProductContext.parse(context ?? {})
+  const retry=product.retryOf?await (await import('./retry-source')).loadEveRetrySource(scope,product.retryOf):null
   if (product.expectedWorkspaceId && product.expectedWorkspaceId !== scope.workspaceId || product.botId && product.botId !== scope.botId) throw new Error('workspaceAccessDenied')
   const rawText = typeof message === 'string' ? message : message.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
   const images = typeof message === 'string' ? [] : message.flatMap(part => part.type === 'file' && typeof part.data === 'string' && part.data.startsWith('data:image/') ? [{dataUrl:part.data}] : [])
@@ -44,12 +45,14 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
     if (row.archivedAt || !row.definition.enabled) throw new Error('runInvalid')
   }
   let humanSessionId:string|undefined
-  if (!request.headers.has('authorization') && request.headers.has('cookie')) {
+  if (request.headers.has('authorization') || request.headers.has('cookie')) {
     const {auth} = await import('../api-auth')
-    const session = await auth.api.getSession({headers:request.headers,query:{disableCookieCache:true}})
-    if (session?.user.id === scope.ownerId) humanSessionId = session.session.id
+    const headers=new Headers(request.headers)
+    if(headers.has('authorization'))headers.delete('cookie')
+    const session = await auth.api.getSession({headers,query:{disableCookieCache:true}})
+    if (session?.user.id === scope.ownerId && !session.tokenWorkspaceId) humanSessionId = session.session.id
   }
-  const options={botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,...(product.retryOf?{retryOf:product.retryOf}:{}),...(humanSessionId ? {humanSessionId} : {})}
+  const options={botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,...(product.retryOf?{retryOf:product.retryOf}:{}),...(retry?{taskRequestSourceEventId:retry.taskRequestSourceEventId}:{}),...(humanSessionId ? {humanSessionId} : {})}
   const record=(executor:Parameters<typeof recordPersonalSubmission>[0])=>recordPersonalSubmission(executor,scope.ownerId,text,options)
   let recorded
   if(product.retryOf) {
@@ -63,6 +66,7 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
   const {eventId}=recorded
   ingress.set(request,{scope,eventId})
   const contextual = text === input.text ? [] : [withQuote(withBrowserNotes('',product.notes) ?? '',product.quote)]
+  if(retry)contextual.push('The person explicitly retried this failed request. Continue from the conversation and its completed tool receipts. Do not repeat actions that already succeeded. Keep the original task identity and selected destination, profile and title.')
   return {eventId,context:contextual}
 }
 
