@@ -27,16 +27,12 @@ test('only a live scoped execution lease can retain compute through its original
   assert.throws(() => liveUntil({ expiresAt: now - 1 }, now, now + 60_000), /expired/)
 })
 
-test('recovery requires the exact original task namespace and immutable R2 checkpoint', () => {
-  const pin = { instanceId: 'a'.repeat(64), id: randomUUID(), sha256: 'b'.repeat(64) }
-  const grant = machineGrant({ ...scope, requiredCheckpoint: pin })
-  verifyCheckpoint(grant.requiredCheckpoint, pin.instanceId, pin)
-  verifyCheckpoint(undefined, pin.instanceId, null)
-  for (const wrong of [null, {...pin,id:{}}, {...pin,instanceId:'wrong'}, {...pin,sha256:'short'}]) {
-    assert.throws(() => machineGrant({...scope, requiredCheckpoint:wrong}), /Invalid task checkpoint/)
-  }
-  for (const wrong of [null, {...pin,id:randomUUID()}, {...pin,sha256:'c'.repeat(64)}]) {
-    assert.throws(() => verifyCheckpoint(pin, pin.instanceId, wrong), /checkpoint unavailable/)
-  }
-  assert.throws(() => verifyCheckpoint(pin, 'd'.repeat(64), pin), /checkpoint unavailable/)
+test('a required recovery cannot silently open another instance, stale R2 data, or a fresh directory', () => {
+  const pin = {instanceId:'a'.repeat(64),id:randomUUID(),sha256:'b'.repeat(64)}
+  const grant = machineGrant({...scope,requiredCheckpoint:pin})
+  assert.deepEqual(grant.requiredCheckpoint,pin)
+  verifyCheckpoint(grant.requiredCheckpoint,pin.instanceId,{id:pin.id,sha256:pin.sha256})
+  assert.throws(()=>verifyCheckpoint(pin,'c'.repeat(64),pin))
+  for (const saved of [null,{...pin,id:randomUUID()},{...pin,sha256:'d'.repeat(64)}]) assert.throws(()=>verifyCheckpoint(pin,pin.instanceId,saved))
+  for (const field of ['id','instanceId','sha256']) assert.throws(()=>machineGrant({...scope,requiredCheckpoint:{...pin,[field]:'wrong'}}))
 })

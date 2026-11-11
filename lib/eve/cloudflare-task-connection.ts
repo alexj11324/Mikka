@@ -2,11 +2,10 @@ import type { SandboxConnection } from 'eve/sandbox/provider'
 
 type SandboxProcess = Awaited<ReturnType<SandboxConnection['spawn']>>
 
-export type TaskCheckpoint = Readonly<{ instanceId:string; id:string; sha256:string }>
-
 export type TaskMachineGrant = Readonly<{
   ownerId:string; workspaceId:string; taskId:string; repositoryKey:string
-  runId:string; operationId:string; expiresAt:number; requiredCheckpoint?:TaskCheckpoint
+  runId:string; operationId:string; expiresAt:number
+  requiredCheckpoint?: { instanceId:string; id:string; sha256:string }
 }>
 
 type SpawnOptions = Parameters<SandboxConnection['spawn']>[0]
