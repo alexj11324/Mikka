@@ -56,3 +56,10 @@ test('a missing or outside overlay fails the bundle; @hosted without one fails',
   assert.throws(() => resolveRequest({ originModulePath: join(app, 'x.tsx') }, '@hosted/x', 'ios'), /MOBILE_OVERLAY_IMPORT_WITHOUT_OVERLAY/)
   assert.throws(() => resolveRequest({ originModulePath: join(app, 'x.tsx') }, '@ui-slot/nope', 'ios'), /MOBILE_SLOT_UNKNOWN/)
 })
+
+test('an installed official mobile layer may never substitute the public avatar', () => {
+  const dir = mkdtempSync(join(repository, '.hosted-ui-test-'))
+  try {
+    assert.throws(() => mobileOverlay(app, { MIKKA_MOBILE_OVERLAY_DIR: dir }), /MOBILE_SLOT_REQUIRED: bot-avatar/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})

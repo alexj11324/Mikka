@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
@@ -102,4 +102,19 @@ test('Vite uses the same existing Lightning CSS color space and neutral mixing a
   // Cartesian mixing keeps the primary blue on the neutral sidebar ground.
   assert.match(declarations.get(':root/--sidebar-primary-soft'), /color-mix\(in oklab,\s*var\(--sidebar-primary\)\s*15%,\s*var\(--sidebar\)\)/)
   assert.match(declarations.get('.dark/--sidebar-primary-soft'), /color-mix\(in oklab,\s*var\(--sidebar-primary\)\s*40%,\s*var\(--sidebar\)\)/)
+})
+
+test('official namespace consumers cannot silently render an alternate task detail after an export disappears', async t => {
+  const { UI_SLOTS, PUBLIC_CONTRACT_SLOTS } = await import('../../../lib/ui-overlay.mjs')
+  const dir = await mkdtemp(join(repository, '.hosted-test-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  await mkdir(join(dir, 'slots'))
+  for (const name of UI_SLOTS) if (!PUBLIC_CONTRACT_SLOTS.has(name)) await writeFile(join(dir, 'slots', name + '.tsx'), 'export {}')
+  const before = process.env.MIKKA_UI_OVERLAY_DIR
+  process.env.MIKKA_UI_OVERLAY_DIR = dir
+  t.after(() => { if (before === undefined) delete process.env.MIKKA_UI_OVERLAY_DIR; else process.env.MIKKA_UI_OVERLAY_DIR = before })
+  const consumer = 'import * as slot from "@ui-slot/task-detail"; export const detail = slot.TaskDetailFrame ?? "alternate"'
+  for (const target of ['web', 'desktop']) await assert.rejects(compile(consumer, target), /MISSING_EXPORT|not exported/)
+  await writeFile(join(dir, 'slots/task-detail.tsx'), 'export const TaskDetailFrame = "official"')
+  for (const target of ['web', 'desktop']) assert.match((await compile(consumer, target)).code, /official/)
 })

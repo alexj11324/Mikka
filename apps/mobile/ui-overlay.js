@@ -1,13 +1,13 @@
 // The hosted UI layer for the iOS app (docs/ui-overlay.md, 「iOS app」).
 // Without MIKKA_MOBILE_OVERLAY_DIR every `@ui-slot/<name>` import is its
 // default in slots/; with it, a slot resolves to the layer's slots/<name>.tsx
-// when the layer has one, and `@hosted/*` to the layer's own files. The layer's
+// (required), and `@hosted/*` to the layer's own files. The layer's
 // other imports resolve as if from this app, so it shares this app's react,
 // react-native and react-native-svg. metro.config.js reads this.
-const { existsSync, realpathSync } = require('node:fs')
+const { existsSync, realpathSync, statSync } = require('node:fs')
 const { isAbsolute, join, relative, resolve } = require('node:path')
 
-/** Every slot the app offers. A layer may fill any subset. */
+/** Every native slot required of an official mobile layer. */
 const MOBILE_SLOTS = ['bot-avatar']
 /** The names every slot must export, in a layer as in the default. */
 const MOBILE_SLOT_EXPORTS = { 'bot-avatar': ['BotAvatar'] }
@@ -34,7 +34,8 @@ function mobileOverlay(app, env = process.env) {
   if (!inside(realpathSync(repository), realpathSync(dir))) throw new Error(`MOBILE_OVERLAY_DIR_OUTSIDE_REPOSITORY: ${configured}`)
   for (const name of MOBILE_SLOTS) {
     const file = join(dir, 'slots', `${name}.tsx`)
-    if (existsSync(file)) slots[name] = file
+    if (!existsSync(file) || !statSync(file).isFile() || !inside(realpathSync(dir), realpathSync(file))) throw new Error(`MOBILE_SLOT_REQUIRED: ${name}`)
+    slots[name] = file
   }
   return { dir, slots }
 }

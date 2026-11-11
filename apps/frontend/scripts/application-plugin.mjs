@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
-import { overlayAliases, resolveOverlaySpecifier } from '../../../lib/ui-overlay.mjs'
+import { overlayAliases, resolveOverlaySpecifier, UI_SLOT_EXPORTS, SLOT_PREFIX } from '../../../lib/ui-overlay.mjs'
 import { actionReferences, actionSignatures, nativeOfflineView, bundledIconCatalogue, bundledSyntaxCatalogue } from '../../desktop/scripts/renderer-transforms.mjs'
 
 export const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -13,6 +13,7 @@ const renderer = resolve(repository, 'apps/desktop/src/renderer')
 const actionDirectory = resolve(repository, 'app/actions')
 const slash = value => value.split(sep).join('/')
 const builtins = new Set(builtinModules.flatMap(name => [name, `node:${name}`]))
+const officialSlot = '\0mikka:official-slot:'
 const virtualAction = '\0mikka:action:'
 const commonAliases = new Map([
   ['next/navigation', 'next-navigation.ts'], ['next/link', 'next-link.tsx'], ['next/dynamic', 'dynamic.tsx'],
@@ -99,6 +100,11 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
         if (target === 'desktop') throw new Error('FRONTEND_DESKTOP_REMOTE_SCRIPT_FORBIDDEN')
         return resolve(frontend, 'src/web/next-script.tsx')
       }
+      if (uiSlots.dir && source.startsWith(SLOT_PREFIX)) {
+        const name = source.slice(SLOT_PREFIX.length)
+        if (!Object.hasOwn(UI_SLOT_EXPORTS, name)) throw new Error(`UI_SLOT_UNKNOWN: ${source}`)
+        return officialSlot + name
+      }
       const candidate = resolveOverlaySpecifier(source, uiSlots) ?? (source.startsWith('@/') ? resolve(repository, source.slice(2)) : source)
       // Keep require-call/import semantics when resolving conditional package
       // exports; a CommonJS helper must not become an ESM namespace object.
@@ -111,6 +117,13 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
       return resolved
     },
     async load(id) {
+      if (id.startsWith(officialSlot)) {
+        const name = id.slice(officialSlot.length)
+        const provider = JSON.stringify(uiSlots.absolute[SLOT_PREFIX + name])
+        // Explicit re-exports force the linker to validate exports even when a
+        // consumer uses a namespace import with an optional-property check.
+        return `export * from ${provider}; export { ${UI_SLOT_EXPORTS[name].join(', ')} } from ${provider};`
+      }
       if (id === '\0mikka:frontend-runtime') {
         return frontendRuntimeSource(target, { development, frontend, renderer })
       }

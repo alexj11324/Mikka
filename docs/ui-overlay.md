@@ -17,7 +17,7 @@ and don't add a slot only to make a fix possible. The build without
 | | Build without `mikka-hosted-ui` (compile only) | Official build |
 | --- | --- | --- |
 | `MIKKA_UI_OVERLAY_DIR` | unset | path of the `mikka-hosted-ui` checkout, inside this repository (CI uses `.hosted-ui/`, which is gitignored) |
-| `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` when the layer has it, else the default |
+| `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` for every required provider. Only `auth-sso`, `settings-governance` and `settings-organization` can use their public no-content contracts |
 | `@hosted/*` | does not resolve | `$MIKKA_UI_OVERLAY_DIR/*` |
 
 `lib/ui-overlay.mjs` decides this once. The shared Vite plugin
@@ -90,18 +90,7 @@ behaviour stay in this repository and reach the slot as props. A layer slot
 exports the same named component as the default, takes the same props and is
 a client component (`'use client'`).
 
-**Required and optional exports.** Production builds this repository's main
-with the layer's main, and the two merge at different times. A slot's
-required exports are listed in `UI_SLOT_EXPORTS` (`lib/ui-overlay.mjs`); every
-layer must export them, and callers may import only those by name. Anything
-else a slot exports is optional and is read through a namespace import with a
-fallback (`import * as slot from '@ui-slot/<name>'`, then
-`slot.X ?? fallback`): a layer that predates it still builds, because a
-missing named import fails the production build while a missing namespace
-member is just `undefined`. `lib/ui-overlay.test.mjs` fails when a caller
-imports any other name by name. To make a name required, merge the layer that
-exports it first, then add it to `UI_SLOT_EXPORTS`. On its side, the layer's CI
-builds each change together with this repository's main before it merges.
+**Required exports.** Web and Desktop link the runtime names in `UI_SLOT_EXPORTS` against each selected provider. Dropping a required export fails the official build even when the consumer uses a namespace import. Publish a provider that exports a new business component before requiring its name in the public contract. CI can test the positive and negative linking cases with synthetic slots. Forks need no private source for those tests.
 
 The settings slots are filled together: a layer's frame draws the whole settings page, and its sidebar and content slots hand it their section list and title rather than drawing their own.
 
@@ -120,7 +109,7 @@ the web slots but the idea.
 | | Build without `mikka-hosted-ui` | Official OTA |
 | --- | --- | --- |
 | `MIKKA_MOBILE_OVERLAY_DIR` | unset | `.hosted-ui/mobile`, relative to the repository root and inside it |
-| `@ui-slot/<name>` | `apps/mobile/slots/<name>.tsx` | `$MIKKA_MOBILE_OVERLAY_DIR/slots/<name>.tsx` when the layer has it, else the default |
+| `@ui-slot/<name>` | `apps/mobile/slots/<name>.tsx` | `$MIKKA_MOBILE_OVERLAY_DIR/slots/<name>.tsx` (required in a configured layer) |
 | `@hosted/*` | does not resolve | `$MIKKA_MOBILE_OVERLAY_DIR/*` |
 
 `apps/mobile/ui-overlay.js` decides this and `apps/mobile/metro.config.js`
@@ -139,14 +128,7 @@ build. A set but missing directory fails the bundle.
 Required exports are `MOBILE_SLOT_EXPORTS` in `apps/mobile/ui-overlay.js`;
 the same rule as the web applies (merge the layer's export first).
 
-`mobile-update.yml` reads the existing `HOSTED_UI_READ_KEY` through the main
-OIDC identity on a push to main or a manual run, checks the layer out to
-`.hosted-ui` and sets `MIKKA_MOBILE_OVERLAY_DIR` when it has a `mobile/`
-folder; without the key or the folder the default slots ship. A push to the
-layer's `mobile/` ships by running Mobile OTA update on main by hand. The EAS
-native build (`mobile-native.yml`) builds on Expo's servers from the
-repository alone, so a fresh binary embeds the default slots until it loads
-the production update.
+`mobile-update.yml` obtains the production Expo and UI-checkout credentials through the trusted main workflow. A production OTA requires the private mobile folder and its native slots. The native TestFlight workflow selects a reviewed overlay revision for its hosted production build. The public native source and contract tests can run without private credentials.
 
 ## Rules for the layer
 
