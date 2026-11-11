@@ -205,3 +205,25 @@ test('the official route keeps business handling in its own runtime and does not
     assert.equal(JSON.stringify(logs).includes('PRIVATE_'), false)
   } finally { send.mock.restore(); error.mock.restore() }
 })
+
+test('the internal Cloudflare receipt rejects tampering, other domains, oversized rows and stale queue authentication', async () => {
+  const { POST: receipt } = await import('../../internal/github/workflow-result/route')
+  const value = { version: 1, deliveryId: 'fixture', installationId: 11, repositoryId: 22, repository: 'o/r',
+    workflowId: 33, workflowRunId: 44, attempt: 1, headSha: 'a'.repeat(40), branch: 'mikka/ci-7', conclusion: 'failure' }
+  const body = JSON.stringify(value), stamp = Math.floor(Date.now() / 1000), route = 'https://app.aspectlylabs.com/mikka/api/internal/github/workflow-result'
+  async function receive(bytes: string, macBody: string, time: number, internal = true) {
+    const signature = createHmac('sha256', secret).update(internal ? 'mikka-ci-workflow-v1\n' + time + '\n' + macBody : macBody).digest('hex')
+    return (await receipt(new Request(route, { method: 'POST', body: bytes, headers: {
+      'x-mikka-ci-signature': signature, 'x-mikka-ci-time': String(time), 'content-type': 'application/json' } }))).status
+  }
+  process.env.MIKKA_EDITION = 'cloud'
+  assert.equal(await receive(body, body, stamp - 301), 401)
+  assert.equal(await receive(body, body, stamp + 301), 401)
+  assert.equal(await receive(body + ' ', body, stamp), 401)
+  assert.equal(await receive(body, body, stamp, false), 401)
+  assert.equal(await receive('a'.repeat(2049), body, stamp), 413)
+  const unknown = JSON.stringify({ ...value, url: 'https://example.invalid' })
+  assert.equal(await receive(unknown, unknown, stamp), 400)
+  process.env.MIKKA_EDITION = 'community'
+  assert.equal(await receive(body, body, stamp), 404)
+})

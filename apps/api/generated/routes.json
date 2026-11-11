@@ -1267,6 +1267,15 @@
       "sourceHash": "a2d812cd50ff6fdb8683f4fe06e70ee76f4dc7361e916b2aa9120e3d177bcfef"
     },
     {
+      "path": "/mikka/api/internal/github/workflow-result",
+      "template": "/api/internal/github/workflow-result",
+      "source": "app/api/internal/github/workflow-result/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "60bfd1609395e4f4c60ea71d005c47577726cd659ded97630e9d27f043e49fe5"
+    },
+    {
       "path": "/mikka/api/issues/search",
       "template": "/api/issues/search",
       "source": "app/api/issues/search/route.ts",
