@@ -3420,6 +3420,7 @@
     "unknownClient": "一个未命名的应用"
   },
   "Coordinator": {
+    "waitingQuestions": "{count, plural, other {# 个任务在等你回答}}",
     "stop": "停止",
     "stopped": "已停止",
     "label": "Coordinator",

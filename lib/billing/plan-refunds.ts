@@ -131,22 +131,44 @@ export async function applyPlanRefundEvent(tx: Transaction, event: { id: string;
   }
 }
 
-/** Runs after commit so a refund racing its invoice cannot be lost under READ COMMITTED. No polling worker. */
-export async function drainPlanRefundReceipts() {
+/**
+ * Runs after commit so a refund racing its invoice cannot be lost under READ
+ * COMMITTED. No polling worker. Every pending receipt is attempted; when the
+ * caller names its own event, only that event's failure fails its webhook.
+ */
+export async function drainPlanRefundReceipts(callerEventId?: string) {
   const { db } = await import('@/lib/db')
   const pending = await db.execute<{ id: string; paymentIntentId: string; sourceEventId: string }>(sql`select r.id,r."paymentIntentId",r."sourceEventId"
     from billing_refund_receipts r where r."reconciledAt" is null and exists(select 1 from workspace_credit_grants g
       where g.bucket='plan' and g.reason='subscription' and g."paymentAllocations" ? r."paymentIntentId") order by r."createdAt",r.id limit 100`)
-  for (const receipt of pending.rows) await db.transaction(async tx => {
-    const grants = await tx.select().from(workspaceCreditGrants).where(and(eq(workspaceCreditGrants.bucket, 'plan'),
-      eq(workspaceCreditGrants.reason, 'subscription'), sql`${workspaceCreditGrants.paymentAllocations} ? ${receipt.paymentIntentId}`))
-    if (new Set(grants.map(grant => grant.workspaceId)).size > 1) throw new Error('billing_payment_scope_ambiguous')
-    for (const grant of grants) {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`billing:${grant.workspaceId}`},0))`)
-      await reconcilePlanRefunds(tx, receipt.sourceEventId, grant)
+  let failure: unknown
+  for (const receipt of pending.rows) {
+    try {
+      await db.transaction(async tx => {
+        const grants = await tx.select().from(workspaceCreditGrants).where(and(eq(workspaceCreditGrants.bucket, 'plan'),
+          eq(workspaceCreditGrants.reason, 'subscription'), sql`${workspaceCreditGrants.paymentAllocations} ? ${receipt.paymentIntentId}`))
+        if (new Set(grants.map(grant => grant.workspaceId)).size > 1) throw new Error('billing_payment_scope_ambiguous')
+        for (const grant of grants) {
+          await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`billing:${grant.workspaceId}`},0))`)
+          await reconcilePlanRefunds(tx, receipt.sourceEventId, grant)
+        }
+        await tx.execute(sql`update billing_refund_receipts set "reconciledAt"=now() where id=${receipt.id}`)
+      })
+    } catch (error) {
+      if (callerEventId === undefined || receipt.sourceEventId === callerEventId) { failure ??= error; continue }
+      console.error('[billing] refund receipt pending', { event: 'refund_receipt_pending',
+        causeName: error instanceof Error ? error.name : 'UnknownError' })
     }
-    await tx.execute(sql`update billing_refund_receipts set "reconciledAt"=now() where id=${receipt.id}`)
-  })
-  // Bounded work per delivery; Stripe retries a backlog rather than an idle service polling it.
-  if (pending.rows.length === 100) throw new Error('billing_refund_delivery_backlog')
+  }
+  if (failure) throw failure
+  // A bounded scan may omit the caller's receipt. Only its own backlog (or a
+  // caller-less sweep) asks Stripe to retry; foreign pending rows never do.
+  if (pending.rows.length === 100) {
+    if (callerEventId === undefined) throw new Error('billing_refund_delivery_backlog')
+    const { rows: [callerPending] } = await db.execute<{ pending: boolean }>(sql`select exists(
+      select 1 from billing_refund_receipts r where r."sourceEventId"=${callerEventId} and r."reconciledAt" is null
+        and exists(select 1 from workspace_credit_grants g where g.bucket='plan' and g.reason='subscription'
+          and g."paymentAllocations" ? r."paymentIntentId")) as pending`)
+    if (callerPending?.pending) throw new Error('billing_refund_delivery_backlog')
+  }
 }

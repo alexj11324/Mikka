@@ -3420,6 +3420,7 @@
     "unknownClient": "An unnamed app"
   },
   "Coordinator": {
+    "waitingQuestions": "{count, plural, one {# task is waiting for your answer} other {# tasks are waiting for your answer}}",
     "stop": "Stop",
     "stopped": "Stopped",
     "label": "Coordinator",
