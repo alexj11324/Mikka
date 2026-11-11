@@ -9,6 +9,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { MODEL_CREDENTIAL_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, REPO_ORIGIN_HEADER, MIN_DAEMON_VERSION } from '@mikka/protocol/device'
+import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import type { ProviderFailure } from '@mikka/protocol/provider-failure'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { emptyRunReport } from '@mikka/protocol/run'
@@ -21,9 +22,11 @@ import { isolateCoordinatorWakes } from './support/coordinator-wake'
 import { threadPromptView } from '../lib/thread-prompt'
 
 test('provider failure continues the same task through its authorized preferred models', { skip: !dbUrl }, async t => {
-  const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
+  const names = ['WORKSPACE_SECRETS_KEY', 'BETTER_AUTH_SECRET', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED'] as const
   const saved = new Map(names.map(name => [name, process.env[name]]))
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+  // Policy snapshots sign with this secret; CI provides one, local runs get a test-only value.
+  process.env.BETTER_AUTH_SECRET ??= randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
@@ -175,10 +178,11 @@ test('provider failure continues the same task through its authorized preferred 
   const end = (p: Person, runId: string, failure: ProviderFailure) => persistRunCompletion(p.id, runId, {
     stopReason: 'provider_failure', report: { ...emptyRunReport('The model provider could not serve the request.'), providerFailure: failure },
   })
-  const claim = async (p: Person, runId: string) => {
+  const claim = async (p: Person, runId: string, options: { snapshot?: boolean } = {}) => {
     const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
       method: 'POST', headers: { 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${p.token}`,
-        [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [PROJECT_ENVIRONMENT_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
+        [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [PROJECT_ENVIRONMENT_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1',
+        ...(options.snapshot ? { [POLICY_SNAPSHOT_HEADER]: POLICY_SNAPSHOT_VERSION } : {}) },
     }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
     const body = await response.text()
     assert.equal(response.status, 200, body)
@@ -665,23 +669,26 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(await recoverProviderFailure(pool, p.id, runId), null)
   })
 
-  await t.test('switching harnesses preserves the original worker permission ceiling through claim', async () => {
+  await t.test('switching harnesses preserves the original workspace permission ceiling through claim', async () => {
     const { p } = await twoModels('provider-policy-ceiling')
-    await pool.query('UPDATE agents SET cli_run_policy=$2 WHERE id=$1', [p.agents.claude_code,
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy) VALUES ($1,'allow',$2)
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [p.workspaceId,
       { approvalMode: 'read_only', permissions: { git_push: 'deny' }, networkAllow: ['api.example.invalid'] }])
     const runId = await running(p)
-    assert.equal((await row(runId)).agentDefinition.readOnly, undefined, 'the constraint originates in worker policy, not a readOnly run argument')
+    assert.equal((await row(runId)).agentDefinition.readOnly, undefined, 'the constraint originates in workspace policy, not a readOnly run argument')
     await end(p, runId, balance)
     const [continuation] = await children(runId)
     assert.ok(continuation)
     assert.equal(continuation.agentDefinition.harness, 'codex')
     assert.equal(continuation.agentDefinition.policyCeiling.readOnly, true)
-    // Even a later relaxation of the new worker cannot remove the inherited cap.
+    // Even a later relaxation of the workspace cannot remove the inherited cap.
     // Open network is network=allow without a domain ceiling; bare '*' is not
     // a valid stored networkAllow domain and would reject the policy itself.
-    await pool.query('UPDATE agents SET cli_run_policy=$2 WHERE id=$1', [p.agents.codex,
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,cli_run_policy) VALUES ($1,'allow',$2)
+      ON CONFLICT ("workspaceId") DO UPDATE SET cli_run_policy=excluded.cli_run_policy`, [p.workspaceId,
       { approvalMode: 'ask', permissions: { git_push: 'allow', network: 'allow' } }])
-    const assignment = await claim(p, continuation.id)
+    // A non-empty workspace layer requires a signed-policy consumer at claim.
+    const assignment = await claim(p, continuation.id, { snapshot: true })
     assert.equal(assignment.policy.readOnly, true)
     assert.equal(assignment.policy.permissions.git_push, 'deny')
     assert.equal(assignment.policy.permissions.computer_use, 'deny')

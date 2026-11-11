@@ -780,8 +780,7 @@ test('run result publication commits one owner-scoped result through retries and
     })
 
     await t.test('Plugins › GitHub settings gate nothing: a stored deny or ask still opens the pull request with no card', async () => {
-      const { readGitHubPermissions, setGitHubPermissions } = await import('../lib/github/plugin-permissions')
-      // The runs here name no bot; they are the personal workspace's Coordinator's, whose settings these are.
+      // The runs here name no bot; they are the personal workspace's Coordinator's.
       const home = async (userId: string) => (await (await import('../lib/coordinator/coordinator-bot')).coordinatorBot(userId, null)).workspaceId
       const ready = async () => {
         const f = await fixture({ approved: true })
@@ -791,11 +790,12 @@ test('run result publication commits one owner-scoped result through retries and
       }
       const cards = async (f: Fixture) => (await pool.query(`select id from pending_actions where "userId"=$1`, [f.userId])).rows
 
-      // The stored values stay readable and writable (history), and gate nothing.
+      // A legacy per-Bot deny and a workspace deny are both ignored.
       const denied = await ready()
-      await setGitHubPermissions(pool, denied.userId, await home(denied.userId), { version: '0:0', pullRequest: 'deny' })
-      assert.equal((await readGitHubPermissions(pool, denied.userId, await home(denied.userId))).pullRequest, 'deny')
+      await pool.query(`update agent_kit_heads set external_write_permissions=jsonb_set(coalesce(external_write_permissions,'{}'::jsonb),'{github_pull_request}','"deny"') where owner_id=$1`, [denied.userId])
       await pool.query(`update agent_kit_heads set cli_run_policy=jsonb_set(coalesce(cli_run_policy,'{}'::jsonb),'{permissions}','{"git_push":"deny"}') where owner_id=$1`, [denied.userId])
+      await pool.query(`insert into workspace_computer_policies ("workspaceId",permission,external_write_permissions,external_write_policy_version) values ($1,'allow','{"github":"deny"}',1)
+        on conflict ("workspaceId") do update set external_write_permissions=excluded.external_write_permissions`, [await home(denied.userId)])
       let opened = 0
       assert.deepEqual(await publishRunResult(denied.runId, async () => { opened++; return prFor(denied) }), { done: true })
       assert.equal(opened, 1)
@@ -803,7 +803,6 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await cards(denied), [])
 
       const legacy = await ready()
-      await setGitHubPermissions(pool, legacy.userId, await home(legacy.userId), { version: '0:0', pullRequest: 'allow' })
       await pool.query(`update agent_kit_heads set external_write_permissions=jsonb_set(coalesce(external_write_permissions,'{}'::jsonb),'{github_pull_request}','"ask"') where owner_id=$1`, [legacy.userId])
       assert.deepEqual(await publishRunResult(legacy.runId, async () => prFor(legacy)), { done: true })
       assert.equal((await receipt(legacy)).status, 'published')

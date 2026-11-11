@@ -9,6 +9,7 @@ import { tokenWorkspace } from '../lib/tokens/principal'
 
 class WorkspaceError extends Error { constructor(readonly code: string) { super(code) } }
 const calls: Array<[string, ...unknown[]]> = []
+const workspaceContextCalls: Array<string | undefined> = []
 const auditContext = { ip: null, geoCity: null, geoCountry: null, geoRegion: null }
 const cookieJar = new Map<string, string>()
 let failure: Error | null = null
@@ -36,7 +37,8 @@ before(async () => {
     cookies: async () => ({ set: (name: string, value: string) => cookieJar.set(name, value), delete: (name: string) => cookieJar.delete(name), get: (name: string) => cookieJar.has(name) ? { value: cookieJar.get(name) } : undefined }),
     headers: async () => new Headers(),
   } })
-  mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, requireWorkspace: async () => { throw new Error('unexpected') }, loadWorkspaceContext: async () => ({ workspace: { id: actor.workspaceId } }) } })
+  mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, requireWorkspace: async () => { throw new Error('unexpected') }, loadWorkspaceContext: async (workspaceId?: string) => { workspaceContextCalls.push(workspaceId); return { workspace: { id: workspaceId ?? actor.workspaceId } } } } })
+  mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { listOwnerBots: async (ownerId: string, workspaceId: string) => { calls.push(['listOwnerBots', ownerId, workspaceId]); return [{ id: 'bot-in-shown-workspace', name: 'Bot', color: 'encre', shape: 'cercle', coordinator: true }] } } })
   mock.module('@/lib/workspace-admin/current', { namedExports: { currentWorkspaceActor: async (workspaceId?: string) => { calls.push(['currentWorkspaceActor', workspaceId]); return workspaceId ? { ...actor, workspaceId } : actor } } })
   mock.module('@/lib/audit/record', { namedExports: { auditRequestContext: () => ({ ip: null, geoCity: null, geoCountry: null, geoRegion: null }) } })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name, [tokenWorkspace]: tokenWorkspaceId }) } })
@@ -94,7 +96,7 @@ before(async () => {
   teamActions = await import('../app/actions/teams')
 })
 
-function reset() { calls.length = 0; cookieJar.clear(); failure = null; teamExists = true; tokenWorkspaceId = undefined }
+function reset() { calls.length = 0; workspaceContextCalls.length = 0; cookieJar.clear(); failure = null; teamExists = true; tokenWorkspaceId = undefined }
 const relevant = () => calls.filter(([name]) => name !== 'currentWorkspaceActor')
 
 test('updateWorkspace delegates the real slug change and audit context to one backend transaction', async () => {
@@ -210,6 +212,14 @@ test('createBot refuses a repository the workspace has not installed', async () 
   await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', repository: 'other/secret' }), /botDefaultRepositoryUnavailable/)
   assert.equal(inserted.length, 1)
   assert.deepEqual(calls.filter(call => call[0] === 'repositoryAvailable').map(call => call[2]), ['acme/app', 'other/secret'])
+})
+
+test('the Bot list for a shown workspace is read from that workspace, not the session active one', async () => {
+  reset()
+  const shown = '33333333-3333-4333-8333-333333333333'
+  assert.deepEqual(await botActions.listBotsForWorkspace(shown), [{ id: 'bot-in-shown-workspace', name: 'Bot', color: 'encre', shape: 'cercle', coordinator: true }])
+  assert.deepEqual(workspaceContextCalls, [shown])
+  assert.deepEqual(relevant(), [['listOwnerBots', actor.userId, shown]])
 })
 
 test('bot defaults and workspace bot list actions', async () => {

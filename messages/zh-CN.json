@@ -1825,7 +1825,7 @@
         "title": "连接"
       },
       "bot-permissions": {
-        "title": "Bot 权限"
+        "title": "应用与运行权限"
       },
       "models": {
         "title": "模型与订阅",
@@ -2304,8 +2304,16 @@
     },
     "botPermissions": {
       "loading": "正在读取权限…",
-      "rule": "由 Decision API 判断，只有删除、覆盖这类破坏性操作才会先问你。",
-      "bot": "Bot",
+      "rule": "每个应用对整个工作区只有一个档位，工作区里的所有 Bot 都用它；工具列表来自应用的真实目录。",
+      "workspaceScope": "这些设置作用于本工作区的所有 Bot。",
+      "allTools": "所有工具",
+      "allToolsCount": "所有工具 · {count} 项",
+      "tools": "查看工具",
+      "toolsCount": "{count} 个工具 · {readOnly} 个只读",
+      "toolsLoading": "正在读取工具…",
+      "toolsFailed": "工具列表读取失败",
+      "readOnly": "只读",
+      "write": "可写",
       "mode": "审批方式",
       "modes": {
         "ask": "按规则处理",
@@ -2314,11 +2322,11 @@
       "empty": "还没有连接应用",
       "level": {
         "workspaceDefault": "默认（按工作区设置）",
-        "default": "默认（Decision API 判断）",
+        "runDefault": "默认（按运行策略）",
+        "default": "默认（由 Decision API 判断）",
         "allow": "直接做",
         "ask": "先问你",
-        "deny": "不允许",
-        "eachBot": "按各 Bot 的设置"
+        "deny": "不允许"
       },
       "run": {
         "install_dependency": "安装依赖",
@@ -2332,7 +2340,8 @@
         "saveFailed": "保存失败",
         "writePolicyChanged": "设置刚被改过，已重新读取",
         "agentPolicyUnavailable": "这项设置现在保存不了",
-        "workspaceAccessDenied": "只有管理员能改工作区设置"
+        "workspaceAccessDenied": "只有管理员能改工作区设置",
+        "noBotInWorkspace": "这个工作区还没有 Bot。新建一个 Bot 后才能读取和保存工作区的应用权限。"
       }
     },
     "workspaceLoading": "正在读取工作区…",
@@ -6385,8 +6394,8 @@
   "HostedPermissions": {
     "apps": "应用",
     "redLines": "红线",
-    "redLinesText": "设为「不允许」的写操作：无论 Decision API 怎么判断都不会做",
-    "redLinesEmpty": "还没有设为「不允许」的写操作",
+    "redLinesText": "设为「不允许」的应用：直接的应用调用和 GitHub 调用不会使用；工作区的禁止是最终结果。",
+    "redLinesEmpty": "还没有设为「不允许」的应用",
     "allowText": "不问你直接做，记录在动态里",
     "askText": "在收件箱等你确认",
     "neverText": "不做，并告诉你做不了",
@@ -6396,25 +6405,21 @@
     "changes": "写操作",
     "care": "需要小心",
     "nothingToDecide": "先连接一个应用",
-    "noActions": "这个应用没有单独设置的写操作，每次调用由 Decision API 判断",
+    "noActions": "这个应用只有一个档位；默认时由 Decision API 判断",
     "noApp": "没有打开的应用",
-    "noAppText": "选一个应用，看 Bot 在里面的写操作怎么处理。",
+    "noAppText": "选一个应用，查看它的工具和访问档位。",
     "empty": "还没有连接应用",
-    "emptyText": "连接应用后，Bot 在里面的写操作会显示在这里。",
+    "emptyText": "连接应用后，它的工具会显示在这里。",
     "means": "直接做 {allow} 项 · 先问你 {ask} 项 · 不允许 {never} 项，其余由 Decision API 判断",
     "summaryAllow": "直接做 {count}",
     "summaryAsk": "先问你 {count}",
     "summaryNever": "不允许 {count}",
     "all": "全部{kind}",
-    "modeAskText": "写操作按上面的设置和 Decision API 处理，Agent 按运行权限",
+    "modeAskText": "写操作按上面的设置，再看 Decision API；Agent 按运行权限",
     "modeReadOnlyText": "只读取和汇报，不做任何改动",
-    "unsetText": "没有单独设置：应用写操作由 Decision API 判断，Agent 动作按工作区设置",
+    "unsetText": "没有单独设置：应用写操作由 Decision API 判断；Agent 动作按运行策略",
     "runTitle": "Agent 运行权限",
-    "runNote": "云端的 Claude Code、Codex 运行时不逐条确认；这些动作按这里的设置执行",
-    "workspaceTitle": "工作区写操作",
-    "workspaceNote": "对工作区里的每个 Bot 生效；比 Bot 的设置更严时以这里为准",
-    "now": "现在：{value}",
-    "workspace": "工作区：{value}"
+    "runNote": "云端的 Claude Code、Codex 运行时不逐条确认；这些动作按这里的设置执行"
   },
   "HostedBoard": {
     "due": "截止 {date}",

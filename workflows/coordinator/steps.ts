@@ -469,6 +469,13 @@ export async function personalMcp(userId: string, botId: string, executionId: st
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
+/** GitHub's workspace app policy for github_call, read in a step: a workflow body never does DB I/O. */
+export async function githubCallAllowedStep(userId: string, botId: string | null) {
+  'use step'
+  const { githubCallDecision } = await import('@/lib/operations/github-call-policy')
+  return githubCallDecision(userId, botId)
+}
+
 /** GitHub's hosted MCP server as the caller, with the caller's own token only (decision 2026-11-02-1730). */
 export async function githubMcp(userId: string, input: import('@/lib/github/mcp').GitHubMcpCommand, scope?: NativeToolScope) {
   'use step'
@@ -495,6 +502,11 @@ appTools.maxRetries = 0
 export async function accountWrite(userId: string, action: ApprovalActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  // Two app surfaces, both checked before anything is sent: 团队权限 › 允许使用的应用
+  // blocks the app outright for a named Bot, and the workspace's own app setting
+  // (deny / ask / allow, 设置 › 应用与运行权限) decides inside writeAccountAction
+  // through lib/operations/account-write-setting.ts. Reading only the first let the
+  // Coordinator send mail while the same app's call_app_tool was denied (ALE-8).
   if (await appBlockedForBot(botId, action)) return { error: 'integrationBlockedByWorkspace' }
   return writeAccountAction(userId, action, input, accountId, botId ?? null)
 }

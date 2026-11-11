@@ -199,11 +199,18 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
   await t.test('cross-harness provider policy survives live settings, broker grants and signed HTTP renewal', async () => {
     const sourceAgent = randomUUID(), nextAgent = randomUUID()
     await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex','Provider source fixture',$3),($4,$2,'claude_code','Provider target fixture',$3)`, [sourceAgent, owner, device, nextAgent])
-    const source = await fixture(null), child = await fixture(null), unrelated = await fixture(null)
+    // These runs share one workspace, and the read_only setting below applies to the workspace, not to one worker
+    // (ADR 2026-11-10-1730 retired the worker layer). They therefore get workspaces of their own: on the shared
+    // personal workspace the setting would force install_dependency to deny for `personal.run` too, which the later
+    // 'Coordinator tasks inherit their own workspace ceiling' case reads. `unrelated` is in a third workspace because
+    // the `readOnly` / `computer_use` assertions below are about what the setting does NOT reach.
+    const isolationWorkspace = await seedFixtureWorkspace(pool, owner, 'team')
+    const unrelatedWorkspace = await seedFixtureWorkspace(pool, owner, 'team')
+    const source = await fixture(isolationWorkspace), child = await fixture(isolationWorkspace), unrelated = await fixture(unrelatedWorkspace)
     await pool.query('UPDATE agent_runs SET "agentId"=$2 WHERE id=$1', [source.run, sourceAgent])
     await pool.query('UPDATE agent_runs SET "agentId"=$2,"issueId"=$3 WHERE id=$1', [child.run, nextAgent, source.issue])
     await pool.query('UPDATE agent_runs SET "agentId"=$2 WHERE id=$1', [unrelated.run, nextAgent])
-    await setCliPolicy(pool, owner, source.run, 'worker', (await read(source.run)).revision,
+    await setCliPolicy(pool, owner, source.run, 'workspace', (await read(source.run)).revision,
       { approvalMode: 'read_only', permissions: { git_push: 'deny' }, networkAllow: ['*.example.invalid'] })
     const capture = async (runId: string, userId = owner) => {
       const tx = await pool.connect()
@@ -239,7 +246,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     assert.equal(renewed.payload.policy.permissions.computer_use, 'deny')
     assert.deepEqual(renewed.payload.policy.networkCeiling, ['*.example.invalid'])
     assert.deepEqual(await (await checkHTTP(current.revision, child.run)).json(), { live: true, paused: false })
-    const relaxed = await setCliPolicy(pool, owner, child.run, 'worker', current.revision,
+    const relaxed = await setCliPolicy(pool, owner, child.run, 'workspace', current.revision,
       { permissions: { install_dependency: 'allow', git_push: 'allow', network: 'allow' } })
     assert.equal(relaxed.policy.readOnly, true)
     assert.equal(relaxed.policy.permissions.git_push, 'deny')
@@ -247,10 +254,10 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     assert.notEqual(relaxed.revision, current.revision)
     assert.deepEqual(await (await checkHTTP(current.revision, child.run)).json(), { live: false, paused: false })
     assert.equal((await renew()).status, 409, 'settings changes revoke the old signed policy revision')
-    const narrowed = await setCliPolicy(pool, owner, child.run, 'worker', relaxed.revision, { permissions: { network: 'deny' } })
+    const narrowed = await setCliPolicy(pool, owner, child.run, 'workspace', relaxed.revision, { permissions: { network: 'deny' } })
     assert.equal(narrowed.policy.permissions.network, 'deny')
     assert.deepEqual(await (await checkHTTP(narrowed.revision, child.run)).json(), { live: true, paused: false })
-    await setCliPolicy(pool, owner, source.run, 'worker', (await read(source.run)).revision, {})
+    await setCliPolicy(pool, owner, source.run, 'workspace', (await read(source.run)).revision, {})
     assert.equal((await read(child.run)).policy.readOnly, true, 'later source changes cannot remove the captured ceiling')
     const computerOnly: RunPolicy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: 'deny' } }
     await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [unrelated.run, JSON.stringify(freezeWorkerDefinition({ harness: 'claude_code', instructions: '', prompt: '', parent: null, executionId: null, model: 'fixture-model', policyCeiling: computerOnly }))])
@@ -291,21 +298,80 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     assert.notEqual(reverted.revision, initial.revision)
     assert.equal(await store.check(actor, a.run, reverted.revision), true)
   })
-  await t.test('a lower agent layer cannot loosen the task workspace limit', async () => {
+  await t.test('the workspace policy is the only limit', async () => {
     const current = await read(a.run)
-    const next = await setCliPolicy(pool, owner, a.run, 'agent', current.revision, { permissions: { install_dependency: 'allow' } })
+    // The head's policy column is retired; writing it cannot change the decision.
+    await pool.query(`UPDATE agent_kit_heads SET cli_run_policy=$2 WHERE owner_id=$1 AND bot_key=(SELECT "botId"::text FROM agent_runs WHERE id=$3)`, [owner, { permissions: { install_dependency: 'allow' } }, a.run])
+    const next = await read(a.run)
     assert.equal(next.policy.permissions.install_dependency, 'deny')
+    assert.equal(next.revision, current.revision)
     assert.equal((await read(personal.run)).policy.permissions.install_dependency, 'allow')
+  })
+  await t.test('a workspace read_only setting forces the destructive permissions to deny', async () => {
+    // policy-store.ts:186-191 turns any workspace layer's approvalMode: 'read_only' into readOnly with
+    // install_dependency, write_outside_repo and git_push forced to deny. This asserts that derivation on its own
+    // workspace, so it stays covered independently of any other case's fixture state.
+    const readonlyWorkspace = await seedFixtureWorkspace(pool, owner, 'team')
+    const subject = await fixture(readonlyWorkspace)
+    const before = await read(subject.run)
+    // The protocol default this overrides, so the assertion below proves the forcing rather than a stored value.
+    assert.equal(before.policy.permissions.install_dependency, 'allow')
+    assert.equal(before.policy.readOnly, undefined)
+    const applied = await setCliPolicy(pool, owner, subject.run, 'workspace', before.revision, { approvalMode: 'read_only' })
+    assert.equal(applied.policy.readOnly, true)
+    assert.equal(applied.policy.permissions.install_dependency, 'deny')
+    assert.equal(applied.policy.permissions.write_outside_repo, 'deny')
+    assert.equal(applied.policy.permissions.git_push, 'deny')
+    // read_only is a ceiling: a later explicit workspace allow cannot widen it back. Each field gets its own widest
+    // legal value — write_outside_repo offers ask|deny only (CONFIGURABLE_PERMISSIONS, ADR 0009 Stage 1: writing
+    // outside the worktree cannot be allowed wholesale), so `ask` is the widest it can ask for.
+    const relaxed = await setCliPolicy(pool, owner, subject.run, 'workspace', applied.revision,
+      { permissions: { install_dependency: 'allow', write_outside_repo: 'ask', git_push: 'allow' } })
+    assert.equal(relaxed.policy.readOnly, true)
+    assert.equal(relaxed.policy.permissions.install_dependency, 'deny')
+    assert.equal(relaxed.policy.permissions.write_outside_repo, 'deny')
+    // Removing read_only lifts the forced values for another workspace, never retroactively for this one.
+    const cleared = await setCliPolicy(pool, owner, subject.run, 'workspace', relaxed.revision, { approvalMode: 'ask' })
+    assert.equal(cleared.policy.readOnly, undefined)
+    assert.equal(cleared.policy.permissions.install_dependency, 'allow')
+  })
+  await t.test('a permissions-only workspace save keeps the stored approvalMode; only an explicit value replaces it', async () => {
+    // The workspace layer is replaced whole, so a save that names only `permissions`
+    // would drop `approvalMode: 'read_only'` and silently lift the ADR 0046 ceiling
+    // ("whatever the workspace chose"). approvalMode is therefore sticky: unnamed
+    // keeps the stored value, and `ask` is the one explicit way to clear it.
+    const stickyWorkspace = await seedFixtureWorkspace(pool, owner, 'team')
+    const subject = await fixture(stickyWorkspace)
+    const start = await read(subject.run)
+    const readonly = await setCliPolicy(pool, owner, subject.run, 'workspace', start.revision, { approvalMode: 'read_only' })
+    assert.equal(readonly.policy.readOnly, true)
+    // A permissions-only save: no approvalMode in the body, so the stored one survives.
+    const permissionsOnly = await setCliPolicy(pool, owner, subject.run, 'workspace', readonly.revision,
+      { permissions: { install_dependency: 'allow' } })
+    assert.equal(permissionsOnly.layers.workspace.approvalMode, 'read_only', 'an unnamed approvalMode is kept')
+    assert.equal(permissionsOnly.policy.readOnly, true, 'so the ceiling still applies')
+    assert.equal(permissionsOnly.policy.permissions.install_dependency, 'deny', 'and still forces the denials')
+    assert.notEqual(permissionsOnly.revision, readonly.revision, 'permissions still replaced, so the revision moves')
+    // The only way out is naming the mode.
+    const cleared = await setCliPolicy(pool, owner, subject.run, 'workspace', permissionsOnly.revision, { approvalMode: 'ask' })
+    assert.equal(cleared.layers.workspace.approvalMode, 'ask')
+    assert.equal(cleared.policy.readOnly, undefined)
+    assert.equal(cleared.policy.permissions.install_dependency, 'allow')
   })
   await t.test('team and shared-project ceilings are derived, intersected and live-versioned', async () => {
     const initial = await read(a.run)
     assert.deepEqual(initial.hierarchy, { workspaceId: workspaceA, teamId: a.team, projectId: project })
     const team = await setCliPolicy(pool,owner,a.run,'team',initial.revision,{permissions:{network:'deny'}})
     const scoped = await setCliPolicy(pool,owner,a.run,'project',team.revision,{permissions:{git_push:'deny'}})
-    const lower = await setCliPolicy(pool,owner,a.run,'worker',scoped.revision,{permissions:{network:'allow',git_push:'allow'}})
+    const lower = await setCliPolicy(pool,owner,a.run,'workspace',scoped.revision,{permissions:{network:'allow',git_push:'allow'}})
     assert.equal(lower.policy.permissions.network,'deny')
     assert.equal(lower.policy.permissions.git_push,'deny')
-    assert.equal(lower.policy.permissions.install_dependency,'deny')
+    // The workspace layer is replaced whole, not merged per key: this save names
+    // network and git_push, so the fixture's own install_dependency deny is gone
+    // and the protocol default applies again. That replace *is* the settings
+    // page's delete-key semantic; what must still bind is the ceiling above,
+    // which the team/project assertions on the lines before this one prove.
+    assert.equal(lower.policy.permissions.install_dependency,'allow')
     assert.equal((await read(b.run)).layers.team?.permissions?.network,undefined)
     assert.equal((await read(personal.run)).hierarchy,undefined)
     assert.deepEqual(await (await checkHTTP(initial.revision)).json(),{live:false,paused:false})
@@ -313,6 +379,11 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     const changed = await setCliPolicy(pool,owner,a.run,'project',lower.revision,{permissions:{git_push:'deny',install_dependency:'deny'}})
     const rolledBack = await setCliPolicy(pool,owner,a.run,'project',changed.revision,lower.layers.project)
     assert.notEqual(rolledBack.revision,lower.revision)
+    // This case now writes the workspace layer itself (the retired worker layer
+    // used to absorb it), and that layer is shared with every later case in this
+    // file. Put back what it replaced, as the neighbouring cases already do, so
+    // the fixture value they read is the one this file set up.
+    await setCliPolicy(pool,owner,a.run,'workspace',rolledBack.revision,initial.layers.workspace)
   })
   await t.test('an ungrouped workspace Task inherits its canonical Project policy without a Team', async () => {
     const subject = await fixture(workspaceA, null, false), projectId = randomUUID()
@@ -379,20 +450,27 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
       assert.equal(inherited.policy.permissions.install_dependency,'deny','the actual task workspace ceiling remains binding')
       assert.equal((await read(b.run)).policy.permissions.git_push,'deny','the other workspace retains its own forced ceiling')
       assert.deepEqual(inherited.policy.networkAllow,['project-default.invalid']);assert.equal(inherited.policy.readOnly,undefined)
-      const explicit=await publish(subject.run,'agent',{permissions:{network:'ask',git_push:'deny'},networkAllow:['explicit.invalid'],approvalMode:'ask'})
+      const explicit=await publish(subject.run,'workspace',{permissions:{network:'ask',git_push:'deny'},networkAllow:['explicit.invalid'],approvalMode:'ask'})
       assert.equal(explicit.policy.permissions.network,'ask');assert.equal(explicit.policy.permissions.git_push,'deny');assert.deepEqual(explicit.policy.networkAllow,['explicit.invalid'])
       await publish(subject.run,'team',{permissions:{network:'deny'},defaults:teamDefaults})
-      const constrained=await publish(subject.run,'agent',{permissions:{network:'allow',git_push:'allow'},networkAllow:['explicit.invalid']})
-      assert.equal(constrained.policy.permissions.network,'deny');assert.equal(constrained.policy.permissions.install_dependency,'deny')
-      assert.equal((await settings(subject.run,'agent',{defaults:{permissions:{network:'allow'}}})).status,409)
-      assert.equal((await settings(subject.run,'worker',{defaults:{permissions:{network:'allow'}}})).status,409)
+      const constrained=await publish(subject.run,'workspace',{permissions:{network:'allow',git_push:'allow'},networkAllow:['explicit.invalid']})
+      // The team ceiling still wins on network. install_dependency is 'allow' because
+      // this write names no value for it and the workspace layer is replaced whole
+      // (see 'team and shared-project ceilings' above): the retired per-Bot layer
+      // used to absorb these writes, so the fixture's own deny was never touched
+      // here. The workspace ceiling is still covered — `inherited` above reads a
+      // workspace that does name it, and the read_only case asserts the forced deny.
+      assert.equal(constrained.policy.permissions.network,'deny');assert.equal(constrained.policy.permissions.install_dependency,'allow')
+      // The per-Bot targets are retired: the route rejects them as invalid.
+      assert.equal((await settings(subject.run,'agent',{defaults:{permissions:{network:'allow'}}})).status,400)
+      assert.equal((await settings(subject.run,'worker',{defaults:{permissions:{network:'allow'}}})).status,400)
       assert.equal((await settings(subject.run,'project',{defaults:{permissions:{computer_use:'allow'}}})).status,409)
       const beforeDenied=await read(subject.run)
       await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
       try {assert.equal((await settings(subject.run,'project',{defaults:projectDefaults})).status,409)}
       finally {await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])}
       assert.equal((await read(subject.run)).revision,beforeDenied.revision)
-      await publish(subject.run,'agent',original.layers.agent)
+      await publish(subject.run,'workspace',original.layers.workspace)
       await publish(subject.run,'team',{defaults:teamDefaults})
       const before=await read(subject.run),store=new AgentToolApprovalStore(pool),actor={userId:owner,deviceId:device}
       const snapshot=issuePolicySnapshot(policyDistributionContext(origin,owner,device,subject.run,before),before.policy)
@@ -409,7 +487,6 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
       assert.ok(audits.some(row=>row.metadata.scope==='workspace'))
       assert.ok(audits.every(row=>Object.keys(row.metadata).sort().join(',')==='revision,scope'))
     } finally {
-      await setCliPolicy(pool,owner,subject.run,'agent',(await read(subject.run)).revision,original.layers.agent)
       await setCliPolicy(pool,owner,subject.run,'workspace',(await read(subject.run)).revision,original.layers.workspace)
       await setCliPolicy(pool,owner,b.run,'workspace',(await read(b.run)).revision,botOriginal.layers.workspace)
     }
@@ -423,7 +500,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     const controlPolicy = await read(control.run)
     await setCliPolicy(pool,owner,control.run,'project',controlPolicy.revision,{permissions:{git_push:'deny'}})
     const old = await read(candidate.run)
-    // The default before the stricter layer: push is the GitHub App grant (allow), never ask.
+    // The default: push is the GitHub App grant (allow), never ask.
     assert.equal(old.policy.permissions.git_push,'allow')
     await seedProjectTasks(pool, scopedProject, [control.issue, candidate.issue])
     await pool.query('UPDATE workspace_projects SET revision=revision+1 WHERE id=$1', [scopedProject])
@@ -438,7 +515,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     const controlPolicy = await read(control.run)
     await setCliPolicy(pool,owner,control.run,'team',controlPolicy.revision,{permissions:{git_push:'deny'}})
     const old = await read(candidate.run)
-    // The default before the stricter layer: push is the GitHub App grant (allow), never ask.
+    // The default: push is the GitHub App grant (allow), never ask.
     assert.equal(old.policy.permissions.git_push,'allow')
     await pool.query(`UPDATE mikka_team_issues SET "teamId"=$2 WHERE "issueId"=$1`,[candidate.issue,control.team])
     await assert.rejects(read(candidate.run),/agentPolicyChanged/)

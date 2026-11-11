@@ -25,16 +25,22 @@ export interface BotView {
 
 
 /** The person and the workspace they are in: a bot belongs to both. */
-async function getOwner() {
+async function getOwner(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
-  const context = await loadWorkspaceContext(undefined, session.user)
+  const context = await loadWorkspaceContext(workspaceId, session.user)
   return { ownerId: session.user.id, workspaceId: context.workspace.id }
 }
 
 /** The bot list: the person's bots here, their Coordinator first (lib/coordinator/coordinator-bot.ts listOwnerBots). */
 export async function listBots(): Promise<BotView[]> {
   return (await pollBots()).items
+}
+
+/** The Bot list for the workspace a settings page shows (`?workspace=`), not the session's active one. */
+export async function listBotsForWorkspace(workspaceId: string): Promise<BotView[]> {
+  const { ownerId, workspaceId: shown } = await getOwner(workspaceId)
+  return listOwnerBots(ownerId, shown)
 }
 
 /** The list cache is bound to this actual authorized Owner/workspace read. */

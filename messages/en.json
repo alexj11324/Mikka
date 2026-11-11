@@ -1825,7 +1825,7 @@
         "title": "Connections"
       },
       "bot-permissions": {
-        "title": "Bot permissions"
+        "title": "App & run permissions"
       },
       "models": {
         "title": "Models and subscriptions",
@@ -2304,8 +2304,16 @@
     },
     "botPermissions": {
       "loading": "Reading permissions…",
-      "rule": "The Decision API judges each call; only destructive ones, like deleting or overwriting, ask you first.",
-      "bot": "Bot",
+      "rule": "Each app has one access level for the whole workspace; every Bot uses it. Tools come from the provider's real catalogue.",
+      "workspaceScope": "These settings apply to every Bot in this workspace.",
+      "allTools": "All tools",
+      "allToolsCount": "All tools · {count}",
+      "tools": "View tools",
+      "toolsCount": "{count} tools · {readOnly} read-only",
+      "toolsLoading": "Reading tools…",
+      "toolsFailed": "Couldn't read the tool list",
+      "readOnly": "read-only",
+      "write": "can write",
       "mode": "Approval",
       "modes": {
         "ask": "By the rules",
@@ -2314,11 +2322,11 @@
       "empty": "No apps connected",
       "level": {
         "workspaceDefault": "Default (workspace setting)",
+        "runDefault": "Default (run policy)",
         "default": "Default (Decision API)",
         "allow": "On its own",
         "ask": "Asks you first",
-        "deny": "Not allowed",
-        "eachBot": "Each Bot's setting"
+        "deny": "Not allowed"
       },
       "run": {
         "install_dependency": "Install dependencies",
@@ -2332,7 +2340,8 @@
         "saveFailed": "Couldn't save",
         "writePolicyChanged": "The settings just changed; read again",
         "agentPolicyUnavailable": "This setting can't be saved right now",
-        "workspaceAccessDenied": "Only admins can change workspace settings"
+        "workspaceAccessDenied": "Only admins can change workspace settings",
+        "noBotInWorkspace": "This workspace has no Bot yet. Create one to read and save its app permissions."
       }
     },
     "workspaceLoading": "Loading the workspace…",
@@ -6385,8 +6394,8 @@
   "HostedPermissions": {
     "apps": "Apps",
     "redLines": "Red lines",
-    "redLinesText": "Writes set to Not allowed: never done, whatever the Decision API judges",
-    "redLinesEmpty": "No writes are set to Not allowed",
+    "redLinesText": "Apps set to Not allowed: direct app and GitHub calls won't use them. The workspace block is absolute.",
+    "redLinesEmpty": "No app is set to Not allowed",
     "allowText": "Does it without asking – recorded in the activity",
     "askText": "Waits for your OK in the Inbox",
     "neverText": "Won't do it, and tells you it can't",
@@ -6396,25 +6405,21 @@
     "changes": "Writes",
     "care": "Needs care",
     "nothingToDecide": "Connect an app first",
-    "noActions": "No write of this app has its own setting; the Decision API judges each call",
+    "noActions": "This app has one access level; Default follows the Decision API",
     "noApp": "Nothing open",
-    "noAppText": "Pick an app to see how the Bot's writes in it are handled.",
+    "noAppText": "Pick an app to see its tools and access level.",
     "empty": "No apps connected",
-    "emptyText": "Connect an app and the Bot's writes in it show up here.",
-    "means": "{allow} on its own · asks before {ask} · {never} not allowed; the Decision API judges the rest",
+    "emptyText": "Connect an app and its tools show up here.",
+    "means": "{allow} on its own · asks before {ask} · {never} not allowed; Default follows the Decision API",
     "summaryAllow": "{count} on its own",
     "summaryAsk": "asks before {count}",
     "summaryNever": "{count} not allowed",
     "all": "All {kind}",
-    "modeAskText": "Writes follow the settings above and the Decision API; agents follow their run permissions",
+    "modeAskText": "Writes follow the settings above, then the Decision API; agents follow their run permissions",
     "modeReadOnlyText": "Reads and reports, changes nothing",
-    "unsetText": "Nothing set: an app write goes to the Decision API, an agent action follows the workspace",
+    "unsetText": "Nothing set: an app write goes to the Decision API; an agent action follows the run policy",
     "runTitle": "Agent run permissions",
-    "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here",
-    "workspaceTitle": "Workspace writes",
-    "workspaceNote": "For every Bot in the workspace; where it is stricter than a Bot's setting, this one applies",
-    "now": "Now: {value}",
-    "workspace": "Workspace: {value}"
+    "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here"
   },
   "HostedBoard": {
     "due": "Due {date}",
