@@ -14,7 +14,7 @@ export class BusinessApi extends Container {
     // replica the same stable secrets and separate Eve origin on every boot.
     this.envVars = { BETTER_AUTH_URL: env.PUBLIC_ORIGIN, MIKKA_API_INGRESS: 'cloudflare' }
     for (const key of ['BETTER_AUTH_SECRET', 'DATABASE_URL', 'MIKKA_DATABASE_URL',
-      'MIKKA_EVE_ORIGIN', 'WORKFLOW_TARGET_WORLD', 'MIN_CLIENT_VERSION',
+      'MIKKA_EVE_ORIGIN', 'WORKFLOW_TARGET_WORLD', 'MIN_CLIENT_VERSION', 'MIKKA_CLOUDFLARE_TASK_WORKSPACES',
       'R2_ACCOUNT_ID', 'R2_ARTIFACTS_BUCKET', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY']) {
       if (env[key]) this.envVars[key] = env[key]
     }

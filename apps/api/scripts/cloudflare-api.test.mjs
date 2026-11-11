@@ -88,6 +88,7 @@ test('task bridge fixes the authority and methods and forwards only a grant and 
     async status(...args) { seen.push(args); return { running: true } },
     async writeFile(...args) { seen.push(args); return { checkpoint: true } },
     async readFile(grant, path) { return path === '/missing' ? null : Uint8Array.of(0, 42, 255) },
+    async removePath(...args) { seen.push(args) },
     async park() { throw new Error('Task machine scope mismatch') },
   }
   const token = 'fixture', grant = { ownerId: 'one' }, env = { TASK_MACHINE: machine }, context = { params: { token } }
@@ -97,6 +98,11 @@ test('task bridge fixes the authority and methods and forwards only a grant and 
   assert.deepEqual(await (await call('/v1/status', { grant })).json(), { running: true })
   assert.deepEqual(await (await call('/v1/write-file', { grant, path: '/bin', base64: 'ACr/' })).json(), { checkpoint: true })
   assert.deepEqual(seen, [[grant], [grant, '/bin', Uint8Array.of(0, 42, 255)]])
+  assert.equal((await call('/v1/remove-path', { grant, path:'/f' })).status, 200)
+  assert.deepEqual(seen.at(-1), [grant, '/f', { force:false, recursive:false }])
+  assert.equal((await call('/v1/remove-path', { grant, path:'/f', recursive:true })).status, 200)
+  assert.deepEqual(seen.at(-1), [grant, '/f', { force:false, recursive:true }])
+  assert.equal((await call('/v1/remove-path', { grant, path:'/f', force:null })).status, 400)
   assert.deepEqual(new Uint8Array(await (await call('/v1/read-file', { grant, path: '/bin' })).arrayBuffer()), Uint8Array.of(0, 42, 255))
   assert.equal((await call('/v1/read-file', { grant, path:'/missing' })).status, 204)
   assert.equal((await call('/v1/park', { grant })).status, 404)

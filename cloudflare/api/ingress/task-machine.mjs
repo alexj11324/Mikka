@@ -95,8 +95,9 @@ export async function taskMachine(request, env, { params }) {
       }
       case '/v1/write-file': return Response.json(await machine.writeFile(body.grant, body.path, bytes))
       case '/v1/remove-path': {
-        if (typeof body.force !== 'boolean' || typeof body.recursive !== 'boolean') return refused('invalid_options', 400)
-        return Response.json((await machine.removePath(body.grant, body.path, { force: body.force, recursive: body.recursive })) ?? null)
+        const { force = false, recursive = false } = body
+        if (typeof force !== 'boolean' || typeof recursive !== 'boolean') return refused('invalid_options', 400)
+        return Response.json((await machine.removePath(body.grant, body.path, { force, recursive })) ?? null)
       }
     }
   } catch (error) { return machineFailure(error) }
