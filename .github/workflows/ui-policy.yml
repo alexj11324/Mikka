@@ -349,6 +349,9 @@ jobs:
           POSTGRES_USER: e2e
           POSTGRES_PASSWORD: e2e-local-only
           POSTGRES_DB: mikka_e2e
+          # Parallel full-schema DROP CASCADE needs more than PG17's default
+          # cluster-wide lock table. This applies only to the disposable service.
+          POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512
         ports:
           - 5432:5432
         options: >-

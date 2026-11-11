@@ -547,6 +547,19 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   }
 })
 
+test('the disposable CI service budgets cluster-wide DDL locks for parallel full-schema cleanup', () => {
+  const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
+  const job = workflow.split('\n  browser-tests-full:')[1]
+  assert.ok(job, 'the required database matrix must exist')
+  const service = job.split('\n    services:')[1]?.split('\n    env:')[0]
+  assert.ok(service, 'capacity belongs to the disposable service, not application configuration')
+  assert.match(service, /image: postgres:17/)
+  assert.match(service, /POSTGRES_INITDB_ARGS: --set=max_locks_per_transaction=512/)
+  assert.equal(concurrency(undefined), 4, 'retain the existing parallel DB suites')
+  assert.match(job, /REQUIRE_DB: '1'/)
+  assert.match(job, /run: pnpm test:db\n/)
+})
+
 test('self-improvement DB suite stays mandatory when its feature exists', () => {
   const required = [{ marker: 'lib/self-improvement/store.ts', file: 'lib/self-improvement/postgres.test.ts', script: 'test:self-improvement-db' }]
   const tree = { [required[0].marker]: '', [required[0].file]: "import { Pool } from 'pg'" }
