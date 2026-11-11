@@ -1,4 +1,5 @@
-// Settings › 个人访问令牌. Mirrors drizzle/20261030204834_personal_access_tokens.sql (MIKKA_DATABASE_URL).
+// Settings › 个人访问令牌. Mirrors drizzle/20261030204834_personal_access_tokens.sql
+// and drizzle/20261111080200_api_tokens.sql (MIKKA_DATABASE_URL).
 import { sql } from 'drizzle-orm'
 import { index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 import { users } from './schema'
@@ -13,10 +14,14 @@ export const personalAccessTokens = pgTable('personal_access_tokens', {
   tokenHash: text('tokenHash').notNull(),
   /** Last 4 characters, for telling tokens apart. */
   hint: text('hint').notNull(),
+  /** Public `/api/v1` scopes, or the single internal `legacy:full` scope for a pre-M4 token. */
+  scopes: text('scopes').array().notNull().default(sql`ARRAY['tasks:read','tasks:write','runs:read','runs:write']::text[]`),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
   lastUsedAt: timestamp('lastUsedAt', { withTimezone: true }),
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
+  /** The last in-place rotation; the previous secret stopped working then. */
+  rotatedAt: timestamp('rotatedAt', { withTimezone: true }),
 }, table => [
   uniqueIndex('personal_access_tokens_hash_key').on(table.tokenHash),
   index('personal_access_tokens_owner_idx').on(table.userId, table.workspaceId, table.createdAt.desc()).where(sql`${table.revokedAt} is null`),

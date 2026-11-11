@@ -1809,6 +1809,96 @@
       "sourceHash": "e8d815c9b938f970ece9b1b51a9775c17e2cfa547feffb8f5acd58ab36c8a717"
     },
     {
+      "path": "/mikka/api/runs/[runId]/workspace/git/checkpoints",
+      "template": "/api/runs/[runId]/workspace/git/checkpoints",
+      "source": "app/api/runs/[runId]/workspace/git/checkpoints/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "01396738190b4730fa0ae375207db64d58ba8cad8a28f52a295cd8c03d15a52c"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/checkpoints/restore",
+      "template": "/api/runs/[runId]/workspace/git/checkpoints/restore",
+      "source": "app/api/runs/[runId]/workspace/git/checkpoints/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "d254d57c0e82f164003da3e11ae63c8dfc0f1459efbdf74e5ddebe809ceb278f"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/checkpoints/restore/preview",
+      "template": "/api/runs/[runId]/workspace/git/checkpoints/restore/preview",
+      "source": "app/api/runs/[runId]/workspace/git/checkpoints/restore/preview/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "3c6734bc991f3ecb9a5f0751d34603fbf00095c1486a3001eed81b8cb1dac5a0"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/commits/[commitSha]/diff",
+      "template": "/api/runs/[runId]/workspace/git/commits/[commitSha]/diff",
+      "source": "app/api/runs/[runId]/workspace/git/commits/[commitSha]/diff/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "4e11a875f9b68b0dc0efca45b48f788464a1120498a6c3019fd6875f47a1448a"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/history",
+      "template": "/api/runs/[runId]/workspace/git/history",
+      "source": "app/api/runs/[runId]/workspace/git/history/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "b9bd61eab8a125e0e446b6f029b5eaae82ee78a902ced8c316979335e80c033a"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/revert",
+      "template": "/api/runs/[runId]/workspace/git/revert",
+      "source": "app/api/runs/[runId]/workspace/git/revert/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "aadd3e463964c349e4a299f12a2f258684d714cfffbe515181f4d836b6e145a8"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/revert/preview",
+      "template": "/api/runs/[runId]/workspace/git/revert/preview",
+      "source": "app/api/runs/[runId]/workspace/git/revert/preview/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "6299c49ff4997dd82967bbf09b35e86fb545f32e8cdc0f2678f216f8dec0f631"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/status",
+      "template": "/api/runs/[runId]/workspace/git/status",
+      "source": "app/api/runs/[runId]/workspace/git/status/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "9e590b832d3caddb34d3f8270b9e30b9e568baff696ce3a48b3fb25eaaa63922"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/git/undo",
+      "template": "/api/runs/[runId]/workspace/git/undo",
+      "source": "app/api/runs/[runId]/workspace/git/undo/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "62f1f253a80e0ce1e8321cc3160dd1f3b6fd4d8c46a8c3412959b8f53d171260"
+    },
+    {
       "path": "/mikka/api/runs/[runId]/workspace/identity",
       "template": "/api/runs/[runId]/workspace/identity",
       "source": "app/api/runs/[runId]/workspace/identity/route.ts",
@@ -2373,7 +2463,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "6046bbbdea7eac16df7cbd338a91bfda0838bf0fac8d16d4de72737596ecd32d"
+      "sourceHash": "734b0665e530fa61dfc3f9b76e282b12e8170d411a2290741b6f4be700858743"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/commands/ack",

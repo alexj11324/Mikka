@@ -9,6 +9,7 @@ import type { FactoryQueue } from '../dispatch';
 import { factoryRunBotMatches } from '../run-scope';
 import type { FactoryTask } from '../store';
 import { unclaimedPlanQuestionContinuation } from './execution-continuation';
+import { resolveRunOrigin } from '../../run-origin';
 import { assertRunProjectResources } from '../../project-resources/run-lease';
 
 /** A question resumes its server-bound executor, not the Bot's local queue.
@@ -86,8 +87,12 @@ export async function queueCloudQuestionContinuation(
   const runId = randomUUID();
   const copied = copyRunPrompt(origin, `${origin.prompt}\n\n${input.note ?? ''}`);
   const { prompt } = copied;
-  await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",source,status,kind,"baseBranch",prompt,"agentDefinition",attempt,"promptTaskStart","promptTaskLength")
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9,$10,$11,$12,$13,$14,$15)`, [runId,userId,origin.issueId,origin.agentId,origin.deviceId,origin.deviceRepoId,origin.botId,origin.source,origin.kind,origin.baseBranch,prompt,JSON.stringify(retryWorkerDefinition(origin.agentDefinition,prompt)),origin.attempt,copied.promptTaskStart,copied.promptTaskLength]);
+  // The answered question resumes the same entry. A legacy origin row keeps
+  // the host recovery origin instead of inventing one.
+  const entry = resolveRunOrigin({ sourceRun: origin, defaultOrigin: origin.source === 'mcp' ? 'api' : 'automation' });
+  await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",source,status,kind,"baseBranch",prompt,"agentDefinition",attempt,"promptTaskStart","promptTaskLength",origin,"originRef")
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9,$10,$11,$12,$13,$14,$15,$16,$17)`, [runId,userId,origin.issueId,origin.agentId,origin.deviceId,origin.deviceRepoId,origin.botId,origin.source,origin.kind,origin.baseBranch,prompt,JSON.stringify(retryWorkerDefinition(origin.agentDefinition,prompt)),origin.attempt,copied.promptTaskStart,copied.promptTaskLength,
+    entry.origin, entry.originRef ? JSON.stringify(entry.originRef) : null]);
   await tx.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId,binding.botId,binding.workspaceId,userId]);
   // Same transfer shape as adoptTaskMachine: history retains its scope; only
   // the task's own new run takes custody of the existing sandbox.

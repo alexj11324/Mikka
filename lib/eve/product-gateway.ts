@@ -93,8 +93,10 @@ const defaultServices: EveProductGatewayServices = {
         WHERE t.session_id=$1 AND t.turn_id=$2`, [input.sessionId, input.turnId, scope.ownerId, scope.botId])).rows[0]
       if (source && !source.id) throw new Error('notFound')
       const sourceEventId = source?.source_event_id
-      const taskEventId = source ? await (await import('./retry-source')).eveTaskRequestSource(scope,source.source_event_id,source.payload) : undefined
+      const requestSource = source ? await (await import('./retry-source')).eveOriginalRequestSource(scope,source.source_event_id,source.payload) : undefined
+      const taskEventId = requestSource ? await (await import('./retry-source')).eveTaskRequestSource(scope,requestSource.id,requestSource.payload) : undefined
       const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope, sourceEventId) : null
+      const entryOrigin = (await import('./run-origin')).eveRunOrigin(scope.surface,requestSource?.payload,Boolean(scheduledRead))
       if (input.operation === 'instructions') {
         if (scheduledRead) return { instructions: `This is a scheduled read-only task. Use only its allowed read tools, perform no writes and request no approval.\n${scheduledRead.prompt}` }
         if (scope.surface === 'slack') {
@@ -104,7 +106,7 @@ const defaultServices: EveProductGatewayServices = {
         const { prepareEveInstructions } = await import('../../workflows/coordinator/steps')
         return { instructions: await prepareEveInstructions(scope.ownerId, scope.botId, execution?.snapshot) }
       }
-      const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId)
+      const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId,entryOrigin)
       if (input.operation === 'catalogue') {
         return { tools: await Promise.all(Object.entries(tools).map(async ([name, definition]) => ({ name, description: definition.description ?? name, inputSchema: await asSchema(definition.inputSchema).jsonSchema }))) }
       }
@@ -146,12 +148,12 @@ async function gatewayExecution(scope: Scope, input: Input): Promise<AgentExecut
   return agentKitStore.readExecution(await agentScope(scope.ownerId, scope.botId), input.executionId)
 }
 
-async function productTools(scope: Scope, execution: AgentExecution | null, sourceEventId: string | undefined, scheduledRead: import('../schedules/contract').ScheduledRead | null, taskEventId?: string): Promise<ToolSet> {
+async function productTools(scope: Scope, execution: AgentExecution | null, sourceEventId: string | undefined, scheduledRead: import('../schedules/contract').ScheduledRead | null, taskEventId: string | undefined,entryOrigin:import('../run-origin').ResolvedRunOrigin): Promise<ToolSet> {
   const steps = await import('../../workflows/coordinator/steps')
   const { coordinatorTools, readCoordinatorSwitches } = await import('../../workflows/coordinator/tools')
   const mailboxEnabled = !scheduledRead && await steps.mailboxToolsEnabled()
   const tools = coordinatorTools(scope.ownerId, scope.botId, scheduledRead ? { scheduledRead: { botId: scope.botId, occurrence: scheduledRead } } : undefined, {
-    execution, sourceEventId, ...(taskEventId ? { taskEventId } : {}),
+    execution, sourceEventId, ...(taskEventId ? { taskEventId } : {}),...entryOrigin,
     switches: readCoordinatorSwitches(), coordinator: await steps.isCoordinatorChat(scope.ownerId, scope.botId),
     computerEnabled: !scheduledRead && await steps.computerToolsEnabled(), writeEnabled: !scheduledRead && await steps.personalWriteToolsEnabled(),
     mailboxEnabled, mailboxTools: mailboxEnabled ? await steps.mailboxCatalogue(scope.ownerId, scope.botId, execution?.id) : [],

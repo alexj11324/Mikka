@@ -342,7 +342,7 @@ dbTest('startup retry after a committed take keeps E1 and leaves E2 pending', { 
     assert.ok(receipts[0].settings && typeof receipts[0].settings === 'object' && !Array.isArray(receipts[0].settings))
     assert.ok(receipts[0].inbox && typeof receipts[0].inbox === 'object' && !Array.isArray(receipts[0].inbox))
     assert.deepEqual(Object.keys(receipts[0].settings).sort(), ['f', 'r'])
-    assert.deepEqual(Object.keys(receipts[0].inbox).sort(), ['a', 'f', 'k', 'p', 's'])
+    assert.deepEqual(Object.keys(receipts[0].inbox).sort(), ['a', 'f', 'k', 'o', 'p', 's'])
     assert.deepEqual(await decodeReceiptRow(receipts[0]), { holder: f.holder, round: 0, version: 1, settings: first.settings, inbox: first.inbox })
   })
 })
@@ -766,7 +766,9 @@ dbTest('malformed stored receipts never fall back to consuming a later input', {
     { label: 'missing settings flag', corrupt: row => { delete row.settings!.f } },
     { label: 'unknown receipt field', corrupt: row => { row.inbox!.newAuthority = true } },
     { label: 'unknown settings bit', corrupt: row => { row.settings!.f = Number(row.settings!.f) | 256 } },
-    { label: 'unknown inbox bit', corrupt: row => { row.inbox!.f = Number(row.inbox!.f) | 512 } },
+    // Bits 512/1024 now declare origin/originRef; 2048 stays outside the
+    // closed presence bitmap.
+    { label: 'unknown inbox bit', corrupt: row => { row.inbox!.f = Number(row.inbox!.f) | 2048 } },
     { label: 'missing added', corrupt: row => { delete row.inbox!.a } },
     { label: 'null added', corrupt: row => { row.inbox!.a = null } },
     { label: 'null declared optional questions', corrupt: row => { row.inbox!.f = Number(row.inbox!.f) | 128; row.inbox!.q = null } },

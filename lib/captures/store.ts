@@ -298,6 +298,9 @@ export async function failRecording(id: string, error: string) {
  */
 export async function runEvidence(userId: string, runId: string) {
   const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status, issueId: agentRuns.issueId, botId: agentRuns.botId,
+    // Evidence-only entry provenance (lib/run-origin.ts): owner-only acceptance
+    // reads may see it; lists, chat, events, logs and analytics never do.
+    origin: agentRuns.origin, originRef: agentRuns.originRef,
     harness: sql<string | null>`${agentRuns.agentDefinition}->>'harness'`,
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
