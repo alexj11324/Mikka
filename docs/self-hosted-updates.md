@@ -8,8 +8,8 @@ driver and packaged Desktop. Main publishes a SHA image and the moving
 
 ## Stable channel (no silent main/latest upgrades)
 
-To promote a version, change `config/self-hosted-stable-version` to a new
-`vMAJOR.MINOR.PATCH` in a reviewed PR. An explicit stable tag on an accepted
+To promote a version, create or update `config/self-hosted-stable-version`
+with a new `vMAJOR.MINOR.PATCH` in a reviewed PR. An explicit stable tag on an accepted
 main commit can also initiate promotion. Ordinary merges publish the SHA image
 and `latest`. Desktop releases use a separate tag series.
 
@@ -20,6 +20,14 @@ release tag against the same commit. The GitHub release records the digest,
 commit, migration fingerprint and tested desktop protocol range. The host
 pulls that digest and independently checks the revision and migrations. A
 repeat release with a different manifest or digest fails closed.
+
+When shipping new migrations, first merge the source and let the self-hosted
+image workflow publish its tested main SHA. Verify that digest is available
+from GHCR. Then open the version promotion PR on the same migration inventory.
+The release drill needs two real, previously published installations. The
+first has the new schema and can return to its previous image after a failed
+probe. The second has the older schema and must recover forward after a
+migration. This sequence also applies to the first stable version.
 
 ## Host-side CLI
 
@@ -254,7 +262,9 @@ test path). The image job executes the affected tests in community mode. For
 a test using a custom runner, also set `suite` to a `test:...` package script
 which executes that file. Stable releases rerun every declared test. The CI
 source comparison checks the declaration, environment names, new hard-coded
-hosted origins and test path. The Docker gate executes the installation
+hosted origins and test path. Declared PostgreSQL tests run with a separate
+loopback PG17 cluster and a fresh database whose name ends in `_e2e`.
+The Docker gate executes the installation
 acceptance separately. An irreversible migration always requires the
 operator's manual review and verified recovery point.
 
