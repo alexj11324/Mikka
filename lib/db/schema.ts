@@ -188,6 +188,48 @@ export const issueVersions = pgTable('issue_versions', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/**
+ * A task's comment, lifted out of the collaborative document (drizzle/20261112040000_issue_collaboration.sql).
+ * The document still holds the body and the discussions anchored inside it; this table is the queryable side,
+ * with a parent pointer so a reply is a row rather than a convention about message order.
+ */
+export const issueComments = pgTable('issue_comments', {
+  id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  authorId: text('authorId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  authorType: text('authorType').$type<'user' | 'agent' | 'system'>().notNull().default('user'),
+  body: text('body').notNull(),
+  parentId: uuid('parentId').references((): AnyPgColumn => issueComments.id, { onDelete: 'cascade' }),
+  /** Attachments as { id, name, contentType, size } objects. */
+  files: jsonb('files').$type<IssueCommentFile[]>().notNull().default([]),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+  /** Soft delete: replies keep their parent, and a reader draws the gap. */
+  deletedAt: timestamp('deletedAt', { withTimezone: true }),
+}, table => [index('issue_comments_issue_created_idx').on(table.issueId, table.createdAt), index('issue_comments_parent_idx').on(table.parentId)])
+
+/** One row per reader of a task: when they last looked at it, for the unread marker and mention count. */
+export const issueSeen = pgTable('issue_seen', {
+  issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  seenAt: timestamp('seenAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.issueId, table.userId] })])
+
+/**
+ * An external reference attached to a task (Capy's :code/links: { ref } / { target }).
+ * Deliberately not the task-to-task graph, which stays in metadata (relatedIds, blockedByIds, duplicateOfId, parentId).
+ */
+export const issueLinks = pgTable('issue_links', {
+  id: uuid('id').primaryKey(), issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  /** The reference as given: a pull URL, a provider identifier, an external URL. */
+  ref: text('ref').notNull(),
+  /** The normalized form used to unlink and deduplicate; `ref` keeps what was typed. */
+  target: text('target').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('issue_links_issue_target_key').on(table.issueId, table.target), index('issue_links_issue_idx').on(table.issueId, table.createdAt)])
+
+/** One attachment a comment carries; the bytes live in the artifact store and `id` names them. */
+export type IssueCommentFile = { id: string; name: string; contentType: string; size: number }
+
 /** OAuth grants and sync state live beside issues so webhook inbox/outbox writes are atomic. */
 export const linearOAuthStates = pgTable('linear_oauth_states', {
   stateHash: text('stateHash').primaryKey(), userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),

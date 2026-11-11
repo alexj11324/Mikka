@@ -12,7 +12,7 @@ import { IssueDescriptionHistory } from './issue-description-history'
 import { IssueRelations } from './issue-relations'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
-import { getDeletedIssue, listIssueConnections, setIssueDeleted } from '@/app/actions/issue-operations'
+import { getDeletedIssue, listIssueConnections, markIssueSeen, setIssueDeleted } from '@/app/actions/issue-operations'
 import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
@@ -98,6 +98,16 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
     return () => { active = false }
   }, [cache, id, mutate, props.user.id])
   const unavailable = error instanceof CacheReadError || error instanceof ListReadScopeError || !!readAccessFailure(error)
+  // Looking at a task is the mark its unread badge and mention count are measured
+  // from (Capy's markSeen). Once the read has succeeded, so a refusal or a cached
+  // stand-in never marks a task the person did not actually see. `preview` means
+  // the body is still a local snapshot and access has not been rechecked yet.
+  const seenMarked = useRef<string | null>(null)
+  useEffect(() => {
+    if (!data || unavailable || loadedId !== id || seenMarked.current === id) return
+    seenMarked.current = id
+    void markIssueSeen(id).catch(() => { seenMarked.current = null })
+  }, [data, unavailable, loadedId, id])
   // A refusal retires this mount's authorization; a later transport failure
   // cannot make its old cached document writable again.
   useEffect(() => {

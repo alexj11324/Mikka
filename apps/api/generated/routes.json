@@ -1267,6 +1267,24 @@
       "sourceHash": "a2d812cd50ff6fdb8683f4fe06e70ee76f4dc7361e916b2aa9120e3d177bcfef"
     },
     {
+      "path": "/mikka/api/issues/assigned-count",
+      "template": "/api/issues/assigned-count",
+      "source": "app/api/issues/assigned-count/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "aa561fe26633ac9c4e63e2a846171c9843bd675800e50fc92e22e141cf484c6b"
+    },
+    {
+      "path": "/mikka/api/issues/mention-count",
+      "template": "/api/issues/mention-count",
+      "source": "app/api/issues/mention-count/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "bd554133b8862d9f7cb12d41c05c324a59353c92b94ee804b7ac375592441ab1"
+    },
+    {
       "path": "/mikka/api/issues/search",
       "template": "/api/issues/search",
       "source": "app/api/issues/search/route.ts",
@@ -1274,6 +1292,45 @@
         "GET"
       ],
       "sourceHash": "fabfa106b3654b3b19e2f1aecc74d0c4f43190ca7b471005746127ac8f4910df"
+    },
+    {
+      "path": "/mikka/api/issues/[code]/comments",
+      "template": "/api/issues/[code]/comments",
+      "source": "app/api/issues/[code]/comments/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "f4b8ed3d6b40c51af3a3b80da402ca1eabe98b1871f11d3508ec95b3111fb474"
+    },
+    {
+      "path": "/mikka/api/issues/[code]/links",
+      "template": "/api/issues/[code]/links",
+      "source": "app/api/issues/[code]/links/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "2b3dba91f0159be993148c49b76e49e7a5c5145aecce7b37163a87ba4629a240"
+    },
+    {
+      "path": "/mikka/api/issues/[code]/seen",
+      "template": "/api/issues/[code]/seen",
+      "source": "app/api/issues/[code]/seen/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "3ac44066a4a2b937e1d5beee48f8f306e24255bcb641f019feb6635c4425469e"
+    },
+    {
+      "path": "/mikka/api/issues/[code]/subscription",
+      "template": "/api/issues/[code]/subscription",
+      "source": "app/api/issues/[code]/subscription/route.ts",
+      "methods": [
+        "PUT"
+      ],
+      "sourceHash": "34449359d56a941e2e59d7dc940b0669ec1a2d2d0475ee86226d0501fa93c592"
     },
     {
       "path": "/mikka/api/live/ticket",

@@ -307,3 +307,29 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
     }
   })
 }
+
+/**
+ * Notes that this person has now looked at the task, and answers the counters a
+ * list or sidebar shows. A task page calls it once when it opens (Capy's
+ * `POST :code/seen`), which is what makes "new since you last looked" mean
+ * something: without a visit there is no baseline, and every comment would look
+ * new forever.
+ */
+export async function markIssueSeen(id: string) {
+  return runAction(async () => {
+    const parsed = z.uuid().safeParse(id)
+    if (!parsed.success) return { error: 'issueOperationInvalid' }
+    const { markIssueSeen: mark } = await import('@/lib/issue-collaboration')
+    const result = await mark(parsed.data)
+    return { seenAt: result.seenAt, counts: { assigned: result.assigned, mentions: result.mentions } }
+  })
+}
+
+/** The counters a sidebar or list shows for the signed-in person. */
+export async function readIssueCounters() {
+  return runAction(async () => {
+    const user = await requireUser()
+    const { readIssueCounts } = await import('@/lib/issue-collaboration')
+    return readIssueCounts(user.id)
+  })
+}
