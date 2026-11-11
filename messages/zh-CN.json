@@ -5126,7 +5126,10 @@
     "notSent": "未发送",
     "answering": "正在回复",
     "noTaker": "没有 Bot 接这条，@ 它的名字",
-    "stopped": "已停止"
+    "stopped": "已停止",
+    "leave": "退出群聊",
+    "leaveConfirm": "确定退出这个群聊？重新加入需要再次邀请。",
+    "leaveError": "退出群聊失败。"
   },
   "DeviceSetup": {
     "title": "设置 {device}",

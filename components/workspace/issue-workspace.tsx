@@ -533,6 +533,13 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const activeChat: ChatTarget | null = section === 'coordinator' ? activeBot ? { kind: 'bot', botId: activeBot.id } : { kind: 'coordinator' } : section === 'agent' ? { kind: 'agent', sessionId: activeAgentId } : section === 'group' && groupRequest ? { kind: 'group', ...groupRequest } : null
   // The same rows as the bot list, for a frame that draws its own navigation (RailProps.chats).
   const { entries: chatNav, reloadGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id, threads, issues: tasks })
+  const onGroupLeft = async (id: string) => {
+    // Clear member-only transcript pages before moving; browser Back must not flash revoked history.
+    await clearCache(key => typeof key === 'string' && key.includes(id) && (key.includes('group-messages') || key.includes('group-members')), undefined, { revalidate: false })
+    setPanelSheet(false)
+    void reloadGroups().catch(() => {})
+    openChat({ kind: 'coordinator' })
+  }
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }
   const isProjects = section === 'projects' || section === 'team-projects'
@@ -699,11 +706,11 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     {/* Opening, closing and handing the column to a thread are instant (R-37). */}
     {isConversation && !panelsInFrame && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: coordinatorUpdatedAt }} />}
-    {groupPanel && panelOpen && !rightTaken && <GroupPanel key={`group-panel:${groupPanel.id}`} group={groupPanel} onClose={() => showPanel(false)} />}
+    {groupPanel && panelOpen && !rightTaken && <GroupPanel key={`group-panel:${groupPanel.id}`} group={groupPanel} userId={user.id} onLeft={onGroupLeft} onClose={() => showPanel(false)} />}
     {groupPanel && !rightTaken && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
       <SheetContent side="right" instant showCloseButton={false} className="gap-0 p-0 data-[side=right]:w-full sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
-        <GroupPanel sheet group={groupPanel} onClose={() => setPanelSheet(false)} />
+        <GroupPanel sheet group={groupPanel} userId={user.id} onLeft={onGroupLeft} onClose={() => setPanelSheet(false)} />
       </SheetContent>
     </Sheet>}
     {isConversation && !panelsInFrame && !rightTaken && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>

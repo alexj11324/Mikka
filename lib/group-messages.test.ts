@@ -91,3 +91,32 @@ test('(mock fetch) a sent message posts its body and mentions to the basePath ro
     await assert.rejects(group.postGroupMessage(ID, 'x', [], (async () => { if (response instanceof Error) throw response; return response }) as typeof fetch), (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === code)
   }
 })
+
+test('member departure is available only to the non-owner and writes their own ID', async () => {
+  const current = { id: 'self', name: 'Self', memberType: 'user', role: 'member' } as const
+  const owner = { id: 'owner', name: 'Owner', memberType: 'user', role: 'owner' } as const
+  assert.equal(group.mayLeaveGroup([current, owner], 'self'), true)
+  assert.equal(group.mayLeaveGroup([current, owner], 'owner'), false)
+  assert.equal(group.mayLeaveGroup([current, owner], 'outsider'), false)
+  assert.equal(group.mayLeaveGroup(undefined, 'self'), false)
+  const calls: Array<[string, RequestInit | undefined]> = []
+  await group.leaveGroupConversation(ID, 'self', (async (url: string, init?: RequestInit) => {
+    calls.push([url, init])
+    return Response.json({ ok: true })
+  }) as typeof fetch)
+  assert.equal(calls[0][0], `/mikka/api/conversations/${ID}/members`)
+  assert.equal(calls[0][1]?.method, 'DELETE')
+  assert.equal(calls[0][1]?.credentials, 'same-origin')
+  assert.deepEqual(JSON.parse(String(calls[0][1]?.body)), { memberType: 'user', memberId: 'self' })
+  for (const [response, code] of [
+    [Response.json({}, { status: 401 }), 'unauthorized'],
+    [Response.json({}, { status: 404 }), 'not_found'],
+    [Response.json({}, { status: 403 }), 'unavailable'],
+    [new TypeError('offline'), 'unavailable'],
+  ] as const) {
+    await assert.rejects(
+      group.leaveGroupConversation(ID, 'self', (async () => { if (response instanceof Error) throw response; return response }) as typeof fetch),
+      (error: unknown) => error instanceof group.GroupMessagesRequestError && error.code === code,
+    )
+  }
+})

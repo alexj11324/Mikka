@@ -5126,7 +5126,10 @@
     "notSent": "Not sent",
     "answering": "Replying",
     "noTaker": "No bot took this. @ one by name",
-    "stopped": "Stopped"
+    "stopped": "Stopped",
+    "leave": "Leave group",
+    "leaveConfirm": "Leave this group? You will need a new invitation to rejoin.",
+    "leaveError": "Couldn't leave the group."
   },
   "DeviceSetup": {
     "title": "Set up {device}",

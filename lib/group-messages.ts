@@ -146,8 +146,25 @@ export function fetchScopedGroups(ownerId: string, workspaceId: string, fetcher:
 }
 
 /** A group's members as GET /api/conversations/{id}/members returns them; bots carry their colour and shape. */
-export type GroupMember = { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; color?: string | null; shape?: string | null; coordinator?: boolean }
+export type GroupMember = { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; role?: 'owner' | 'member'; color?: string | null; shape?: string | null; coordinator?: boolean }
 
 export function fetchGroupMembers(id: string, fetcher: typeof fetch = fetch): Promise<GroupMember[]> {
   return readGroupApi(`/api/conversations/${encodeURIComponent(id)}/members`, listIn<GroupMember>('members'), fetcher)
+}
+
+/** A member may leave their own group; owner transfer is deliberately a separate operation. */
+export function mayLeaveGroup(members: readonly GroupMember[] | undefined, userId: string): boolean {
+  return members?.some(item => item.memberType === 'user' && item.id === userId && item.role === 'member') ?? false
+}
+
+/** Voluntary departure uses the authenticated membership command, not an owner-only delete. */
+export async function leaveGroupConversation(id: string, userId: string, fetcher: typeof fetch = fetch): Promise<void> {
+  let response: Response
+  try {
+    response = await fetcher(withBasePath(`/api/conversations/${encodeURIComponent(id)}/members`), {
+      method: 'DELETE', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ memberType: 'user', memberId: userId }),
+    })
+  } catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
+  if (!response.ok) throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable', response.status)
 }
