@@ -39,6 +39,16 @@ test('Project v2: split database migration, canonical relationships and live ten
   const workspace = new Pool({ connectionString: tenantUrl.toString(), max: 5 })
   const previousEnv = { app: process.env.MIKKA_DATABASE_URL, workspace: process.env.DATABASE_URL }
   process.env.MIKKA_DATABASE_URL = appUrl.toString(); process.env.DATABASE_URL = tenantUrl.toString()
+  // lib/db/request-scope.ts builds its default pool at module load, before this
+  // file can point MIKKA_DATABASE_URL at the databases it just created. A run
+  // that arrives with MIKKA_DATABASE_URL already set (CI sets it to the shared
+  // E2E database) therefore leaves `db` on that other database while the raw
+  // Pools below use the fresh pair, and the two disagree on the same rows.
+  // Hand the created pools to the module the way
+  // tests/factory-workspace-admission.db.test.ts does, and restore afterwards.
+  const globals = globalThis as unknown as { mikkaPool?: Pool; workspacePool?: Pool }
+  const previousPools = { app: globals.mikkaPool, workspace: globals.workspacePool }
+  globals.mikkaPool = application; globals.workspacePool = workspace
   let applicationModule: Pool | undefined, workspaceModule: Pool | undefined
   let selectedWorkspace: string | undefined
   const framework = await import('next/headers')
@@ -342,8 +352,15 @@ test('Project v2: split database migration, canonical relationships and live ten
     })
   } finally {
     headersMock.restore(); localeMock.restore()
-    await Promise.all([applicationModule?.end(), workspaceModule?.end(), application.end(), workspace.end()])
-    await dropTestDatabase(admin, appName); await dropTestDatabase(admin, tenantName); await admin.end()
+    // lib/db and lib/workspace-db export Proxies over the very Pools injected
+    // above: `pool.end()` binds to the injected Pool, so passing both the module
+    // Proxy and the Bare Pool would end one Pool twice. Restore the globals, then
+    // hand dropTestDatabase only the Pools this file created; it ends them and
+    // waits for their sockets before the FORCE drop.
+    globals.mikkaPool = previousPools.app; globals.workspacePool = previousPools.workspace
+    await dropTestDatabase(admin, appName, application)
+    await dropTestDatabase(admin, tenantName, workspace)
+    await admin.end()
     if (previousEnv.app === undefined) delete process.env.MIKKA_DATABASE_URL; else process.env.MIKKA_DATABASE_URL = previousEnv.app
     if (previousEnv.workspace === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = previousEnv.workspace
   }
