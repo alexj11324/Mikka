@@ -81,6 +81,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const [intent, setIntent] = useState(initialIntent)
   const only = Boolean(onCreated && workspaceId && !project && intent === 'create_only')
   const dispatching = open && !only
+  const intentField = useRef<HTMLDivElement>(null)
   const pending = useRef(false)
   const createRequests = useRef(new Map<string, string>())
   const [draft, setDraft] = useState('')
@@ -195,14 +196,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
 
   const profileChoices = useTaskProfileChoices({ workspaceId, value: profileId ?? null, data: profiles.data })
   const keyDialogNode = keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />
-  const chooseIntent = onCreated && workspaceId && !project ? <Field>
+  const chooseIntent = onCreated && workspaceId && !project ? <Field ref={intentField}>
     <FieldLabel htmlFor="new-task-intent">{t('intent')}</FieldLabel>
     <Select value={intent} onValueChange={value => { if (value === 'create_only' || value === 'create_and_dispatch') setIntent(value) }}
       disabled={sending || attachments.locked || attachments.files.length > 0} items={[
         { value: 'create_only', label: t('createOnly') }, { value: 'create_and_dispatch', label: t('createAndDispatch') },
       ]}>
       <SelectTrigger id="new-task-intent" size="sm"><SelectValue /></SelectTrigger>
-      <SelectContent><SelectGroup><SelectItem value="create_only">{t('createOnly')}</SelectItem>
+      <SelectContent portalContainer={intentField}><SelectGroup><SelectItem value="create_only">{t('createOnly')}</SelectItem>
         <SelectItem value="create_and_dispatch">{t('createAndDispatch')}</SelectItem></SelectGroup></SelectContent>
     </Select>
   </Field> : null
