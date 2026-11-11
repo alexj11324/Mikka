@@ -204,8 +204,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const providerExplained = data?.thread.modelFallbackPending || modelFallback.some(item => item.runId === liveRunId)
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
-  const replyBlocked = data?.thread.replyAvailable === false
-  const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && data.thread.retryAvailable && !runIsActive(view?.status ?? '')
+  const replyBlocked = transcriptOnly || data?.thread.replyAvailable === false
+  const canRetry = !transcriptOnly && !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && data.thread.retryAvailable && !runIsActive(view?.status ?? '')
   const failureText = runErrorText(failure)
   const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
     <div className="flex min-w-0 flex-1 flex-col">
@@ -238,6 +238,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     } finally { setSending(false) }
   }
   async function send(retry?: string, retryOriginalSession?: true) {
+    if (transcriptOnly) return
     if (changeRequest && retry === undefined) return sendChangeRequest(changeRequest)
     const text = retry ?? draft.trim()
     const questionWake = retryOriginalSession ? data?.thread.questionWake : null
@@ -260,6 +261,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     finally { setSending(false) }
   }
   async function stop() {
+    if (transcriptOnly) return
     if (!active || (!stopFailed && (stopRequested || stopAttemptRef.current !== null))) return
     const attempt = Date.now()
     stopAttemptRef.current = attempt
@@ -397,8 +399,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (data.thread.quota?.switched.length || modelFallback.length || (!active && (view?.status ?? data.thread.status) === 'succeeded') || data.thread.feedbackEligible) bot('tail', [{ kind: 'text', text: '', node: tail }])
     if (active && !items.length) bot('waiting', [], { streaming: true })
   }
-  const entriesKey = entries.map(entry => `${entry.id}:${entry.role === 'bot' ? entry.parts.length : entry.text.length}`).join('|')
-  useEffect(() => { if (collect && Screen) collect(runId, entries) }, [collect, Screen, runId, entriesKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Re-publish the admitted read itself. Identical message lengths or tool
+  // counts do not prove the content, grant or attempt result is unchanged.
+  useEffect(() => { if (collect && Screen) collect(runId, entries) }, [collect, Screen, runId, data, active, canRetry, sending, view?.status, retryLabel]) // eslint-disable-line react-hooks/exhaustive-deps
   if (collect && Screen) return null
   if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
   const screen = Screen && !bare && detail ? <Screen botId={null} name={title} mark={author?.mark ?? null} entries={data ? [...beforeEntries ?? [], ...entries, ...afterEntries ?? []] : null}

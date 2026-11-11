@@ -50,9 +50,10 @@ export function botPageLive(_data: BotPage | null, botId: string | null | undefi
  * 任务: the open workspace's tasks, and the person's own (personal) ones on their home channel (useLiveIssueList);
  * a thread blocking or resuming moves its task in or out of 受阻, so it follows the person's runs too (task_run_list).
  */
-export function tasksLive(home: string | null | undefined, open: string | null | undefined): Spec {
+export function tasksLive(home: string | null | undefined, open: string | null | undefined, issueIds: readonly string[] = []): Spec {
   const scopes = [...new Set([open || null, home || null])]
-  return { minIntervalMs: LIST_MERGE_MS, refs: [...scopes.map(scope => listRef('issue_list', scope)), listRef('task_run_list', home)] }
+  return { minIntervalMs: LIST_MERGE_MS, refs: [...scopes.map(scope => listRef('issue_list', scope)), listRef('task_run_list', home),
+    ...issueIds.map(id => ({ kind: 'factory_issue' as const, id, scope: open }))] }
 }
 
 /** Only an open, authorized Task listens to its discussion and attempt keys. */

@@ -7072,6 +7072,7 @@
   },
   "CodeReview": {
     "summary": {
+      "fileCount": "{count, plural, one {# file} other {# files}}",
       "pr": "PR #{number}",
       "files": "{count, plural, one {# file} other {# files}} +{additions} −{deletions}",
       "failed": "⚠ {count, plural, one {# check} other {# checks}} failed",

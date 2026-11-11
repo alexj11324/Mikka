@@ -7072,6 +7072,7 @@
   },
   "CodeReview": {
     "summary": {
+      "fileCount": "{count} 个文件",
       "pr": "PR #{number}",
       "files": "{count} 个文件 +{additions} −{deletions}",
       "failed": "⚠ {count} 项检查失败",

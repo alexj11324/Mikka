@@ -200,7 +200,7 @@ export interface Task { id: string; identifier: string | null; title: string; st
 export type TaskState = 'waiting' | 'failed' | 'blocked' | 'running' | 'queued'
 /** The API's `state`: the four attempt states, or the board status of an open or closed task. */
 export type ServerTaskState = TaskState | 'todo' | 'done' | 'canceled' | 'duplicate'
-export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'blocked_by' | 'flagged'
+export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'offline' | 'blocked_by' | 'flagged'
 
 /** 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md). */
 export type TaskGroup = 'pending' | 'running' | 'todo' | 'done'

@@ -2,7 +2,7 @@
 
 import { PersonAvatar } from '@/components/person-avatar'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -10,14 +10,15 @@ import { Box, Check, CircleUserRound, UserRoundPen, Columns3, Flag, List, ListFi
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { useLiveTaskRunList } from '@/hooks/use-live-lists'
-import { localTaskState } from '@/hooks/use-bot-tasks'
+import type { TaskBlock } from '@/lib/task-blocked'
+import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { useListExpiry } from '@/hooks/use-list-expiry'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
-import { AGENT_STATES, BLOCKED_COLUMN, BOARD_COLUMNS, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, agentStateOf, boardBlocks, type AgentState, type BoardColumn, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
+import { AGENT_STATES, BLOCKED_COLUMN, BOARD_COLUMNS, CARD_PROPERTIES, DEFAULT_CARD_PROPERTIES, DEFAULT_HIDDEN_COLUMNS, cardStateKind, type AgentState, type BoardColumn, type CardProperty } from '@/components/blocks/kanban-board-1/components/data'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -31,7 +32,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { statusIconTints } from '@/lib/status-appearance'
-import { personFilters } from '@/lib/board-filters'
+import { boardProjectFilters, personFilters } from '@/lib/board-filters'
 import { IssueBoard } from './issue-board'
 import { BoardScreen, BoardScreenView } from './board-screen'
 import type { BoardMenuItem } from '@/components/slots/board-contract'
@@ -127,7 +128,17 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
   const [settings, update] = useBoardSettings()
   const { view, display } = settings
   const scope: Scope = personalWorkspace ? 'all' : settings.scope
-  const [filters, setFilters] = useViewState<Filters>('board:filters', DEFAULT_FILTERS)
+  const [savedFilters, setFilters] = useViewState<Filters>('board:filters', DEFAULT_FILTERS)
+  const projects = useMemo(() => new Map(issues.flatMap(issue => issue.projectId && issue.metadata.project
+    ? [[issue.projectId, issue.metadata.project] as const] : [])), [issues])
+  const filters = useMemo(() => {
+    const project = boardProjectFilters(savedFilters.project, projects)
+    return project?.some((id, index) => id !== savedFilters.project?.[index]) || project?.length !== savedFilters.project?.length
+      ? { ...savedFilters, project } : savedFilters
+  }, [savedFilters, projects])
+  useEffect(() => {
+    if (filters !== savedFilters) setFilters(filters)
+  }, [filters, savedFilters, setFilters])
   useListExpiry(display.completed === 'all' ? [] : issues.filter(issue => issue.status === 'done')
     .map(issue => new Date(issue.updatedAt).getTime() + COMPLETED_DAYS[display.completed] * 86_400_000))
   const listScroll = useViewScroll<HTMLDivElement>(`${stateKey}:list`, view === 'list')
@@ -167,15 +178,24 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
   const runs = runList?.items
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
-  // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.
-  const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run, issues.find(issue => issue.id === run.issueId)); return state ? [[run.issueId, state] as const] : [] })), [runs, issues])
-  // Each task's own state, from the one derivation (localTaskState, decision #1864 point 6): the card's status line.
-  const taskStates = useMemo(() => {
-    const newest = new Map((runs ?? []).map(run => [run.issueId, run] as const))
-    return new Map(issues.map(issue => [issue.id, localTaskState(issue, newest.get(issue.id))] as const))
-  }, [runs, issues])
-  // 受阻 is worked out here from the task and its newest thread; the task keeps its own status (lib/task-blocked.ts).
-  const blocks = useMemo(() => boardBlocks(issues, runs), [issues, runs])
+  const presentation = useContext(TaskPresentationsContext)
+  const taskStates = useMemo(() => new Map(Object.entries(presentation)), [presentation])
+  const agentStates = useMemo(() => {
+    const result = new Map<string, AgentState>()
+    for (const [id, task] of taskStates) {
+      const state = cardStateKind(task.state)
+      if (state && state !== 'done') result.set(id, state)
+    }
+    return result
+  }, [taskStates])
+  const blocks = useMemo(() => {
+    const result = new Map<string, TaskBlock>()
+    for (const [id, task] of taskStates) {
+      const reason = task.blockedReason
+      if (reason) result.set(id, { reason: reason === 'factory' ? 'run' : reason, blockerIdentifier: task.blockedBy })
+    }
+    return result
+  }, [taskStates])
   const newestRuns = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, run.runId] as const)), [runs])
   const subtasks = useMemo(() => {
     const result = new Map<string, { done: number; total: number }>()
@@ -195,7 +215,7 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
       case 'assignee': return [...(personFilters(issue, userId, { agents: myAgents, heldByMyBot: !!owners.get(issue.id)?.bot }).assignee ? [ME] : []), issue.metadata.assignee?.id ?? NONE]
       case 'creator': return personFilters(issue, userId, { agents: myAgents, heldByMyBot: false }).creator ? [ME] : []
       case 'labels': return issue.metadata.labels.map(label => label.name)
-      case 'project': return [issue.metadata.project ?? NONE]
+      case 'project': return [issue.projectId ?? NONE]
       case 'agentState': return [agentStates.get(issue.id) ?? NONE]
     }
   }
@@ -213,14 +233,13 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
   // Every value a filter can take, from the tasks on the board.
   const assignees = [...new Map(issues.flatMap(issue => issue.metadata.assignee ? [[issue.metadata.assignee.id, issue.metadata.assignee] as const] : [])).values()]
   const labels = [...new Map(issues.flatMap(issue => issue.metadata.labels.map(label => [label.name, label] as const))).values()]
-  const projects = [...new Set(issues.flatMap(issue => issue.metadata.project ? [issue.metadata.project] : []))]
   const options: Record<FilterField, { value: string; label: string; mark?: React.ReactNode }[]> = {
     status: BOARD_COLUMNS.map(column => { const status = ISSUE_STATUSES.find(item => item.value === column.value); return { value: column.value, label: statusLabel(column.value), mark: <column.icon className={cn(status ? statusIconTints[status.tone] : 'text-destructive-foreground')} /> } }),
     priority: ISSUE_PRIORITIES.map(priority => ({ value: priority.value, label: priorityLabel(priority.value), mark: <priority.icon {...priority.iconProps} /> })),
     assignee: [{ value: ME, label: t('me') }, ...assignees.filter(assignee => assignee.id !== userId).map(assignee => ({ value: assignee.id, label: assignee.name, mark: assignee.kind === 'agent' ? <AgentSphere name={assignee.name} compact /> : <PersonAvatar name={assignee.name} image={assignee.image} size="row" /> })), { value: NONE, label: t('unassigned'), mark: <CircleUserRound /> }],
     creator: [{ value: ME, label: t('me') }],
     labels: labels.map(label => ({ value: label.name, label: label.name, mark: <LabelDot color={label.color} /> })),
-    project: [...projects.map(project => ({ value: project, label: project, mark: <Box /> })), { value: NONE, label: t('noProject') }],
+    project: [...[...projects].map(([id, name]) => ({ value: id, label: name, mark: <Box /> })), { value: NONE, label: t('noProject') }],
     agentState: [...AGENT_STATES.map(state => ({ value: state, label: t(`card.agent.${state}` as `card.agent.${AgentState}`) })), { value: NONE, label: t('noRun') }],
   }
   function toggleFilter(field: FilterField, value: string) {
