@@ -26,8 +26,9 @@ async function handleGET(request: Request) {
       // Keep the selected workspace already resolved by the existing list read; no extra context query.
       const params = new URL(request.url).searchParams
       const continuation = params.has('after') || params.has('updatedAt')
-      const page = continuation ? taskListPageInput.safeParse({ workspaceId: params.get('workspaceId'),
-        after: { id: params.get('after'), updatedAt: params.get('updatedAt') } }) : null
+      const dispatchedBy = params.get('dispatchedBy')
+      const page = continuation || dispatchedBy !== null ? taskListPageInput.safeParse({ workspaceId: params.get('workspaceId'),
+        ...(dispatchedBy !== null ? { dispatchedBy } : {}), after: continuation ? { id: params.get('after'), updatedAt: params.get('updatedAt') } : null }) : null
       if (page && !page.success) return json({ error: 'validationGeneric' }, 400)
       const nextPage = page?.success ? await listWorkspaceTaskPage(page.data) : null
       if (nextPage?.reset) return json({ error: 'issueStale' }, 409)
@@ -50,7 +51,7 @@ async function handleGET(request: Request) {
             const block = blocks.get(issue.id)
             return {
               // The short title the small model wrote, while the task keeps the title it was written from (lib/short-title.ts).
-              id: issue.id, identifier: issue.identifier, title: displayTaskTitle(issue), status: issue.status, priority: issue.priority,
+              ...(dispatchedBy ? { dispatchedBy } : {}), id: issue.id, identifier: issue.identifier, title: displayTaskTitle(issue), status: issue.status, priority: issue.priority,
               owner: issue.ownerName, updatedAt: issue.updatedAt,
               createdAt: issue.createdAt, ...taskStateOf(issue, runByIssue.get(issue.id), { block, schedule: byIssue.get(issue.id)?.schedule }),
               bot: byIssue.get(issue.id)?.bot ?? null, schedule: byIssue.get(issue.id)?.schedule ?? null,

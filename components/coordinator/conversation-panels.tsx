@@ -1,6 +1,6 @@
 'use client'
 
-import * as taskConversationSlot from '@ui-slot/task-conversation'
+import { TaskConversation } from '@ui-slot/task-conversation'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import useSWR from 'swr'
@@ -82,9 +82,8 @@ function ThreadTab({ runId, issueId: known, name, onOpenTask, onTitle, onTask }:
   useEffect(() => { onTask(runId, issueId) }, [runId, issueId, onTask])
   if (!known && looked === undefined) return error ? <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div> : <TabLoading />
   if (!known && looked === null) return <div className="p-4"><InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div>
-  const TaskConversation = taskConversationSlot.TaskConversation ?? null
   const toTask = issueId ? () => onOpenTask(issueId) : undefined
-  return TaskConversation && issueId && toTask
+  return issueId && toTask
     ? <TaskConversation key={issueId} issueId={issueId} runId={runId} name={name} onBack={toTask} onOpenThread={openThread} onOpenTask={toTask} />
     : <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onOpenThread={openThread} onOpenTask={toTask} />
 }

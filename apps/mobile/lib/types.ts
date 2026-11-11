@@ -179,7 +179,10 @@ export interface Suggestions { groups: { source: Source; items: Suggestion[] }[]
 
 /** Why a task is 受阻 (lib/task-blocked.ts on the web): its newest thread, a task it waits on (`blocker`, its number), or the person's flag. */
 export type TaskBlockReason = 'question' | 'quota' | 'run' | 'failed' | 'dependency' | 'flagged'
-export interface Task { id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
+export interface Task {
+  /** Server-verified dispatch history on a scoped list; the latest Bot may differ. */
+  dispatchedBy?: string
+  id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
   /** Absent from a server older than 受阻. */
   blocked?: { reason: TaskBlockReason; blocker: string | null } | null
   /** Its list group from its current thread (R-52, 2026-11-07); absent from an older server (features/tasks/model/task-groups.ts). */

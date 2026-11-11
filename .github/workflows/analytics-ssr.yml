@@ -44,9 +44,8 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       CI: 'true'
-      # This existing UI regression targets the frozen compatibility app.
-      # The self-hosted image separately verifies backend mode by default.
-      MIKKA_COMMUNITY_UI: '1'
+      # The root, sign-in redirects and analytics are exercised on the Web client.
+      MIKKA_EDITION: cloud
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e

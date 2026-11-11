@@ -20,18 +20,29 @@ mock.module(new URL('../ui/select.tsx', import.meta.url).href, { namedExports: {
   },
   SelectContent: Wrap, SelectGroup: Wrap, SelectLabel: Wrap, SelectSeparator: () => null, SelectTrigger: Wrap, SelectValue: () => null,
 } })
-mock.module(new URL('../ui/dialog.tsx', import.meta.url).href, { namedExports: {
-  Dialog: Wrap, DialogContent: Wrap, DialogTitle: Wrap, DialogDescription: Wrap,
+// Check the controller's inputs and callbacks without requiring the private renderer.
+mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExports: {
+  NewTask: (props: import('../slots/new-task-contract').NewTaskProps) => <>
+    <input id="new-task-name" value={props.title} maxLength={props.titleMax} onChange={event => props.onTitle(event.target.value)} />
+    {props.notices}
+    {props.intent !== 'create_only' && props.profile.choices.map(choice => <Button key={choice.value} data-option={choice.value}
+      disabled={choice.disabled || props.profile.disabled} onClick={() => props.profile.onChange(choice.value)}>{choice.label}</Button>)}
+    <Button aria-keyshortcuts="Control+Enter Meta+Enter" disabled={!props.canSubmit || props.sending} onClick={props.onSubmit}>Shell.newTaskDialog.create</Button>
+  </>,
 } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 
 let data: AgentProfilesView | undefined, readError: Error | undefined
 const submitted: { text: string; context?: CoordinatorMessageContext }[] = []
 const manualCommands: import('../../lib/task-create-command').CreateOnlyCommand[] = []
-let failManual = false
+let failManual = false, requireConsent = false
+mock.module(new URL('../workspace/issue-metadata-controls.tsx', import.meta.url).href, { namedExports: {
+  AccessChangeDialog: ({ onConfirm }: { onConfirm: () => Promise<boolean> }) => <button data-confirm onClick={() => void onConfirm()}>Confirm</button>,
+} })
 mock.module(new URL('../../app/actions/issues.ts', import.meta.url).href, { namedExports: { createTaskOnly: async (command: import('../../lib/task-create-command').CreateOnlyCommand) => {
   manualCommands.push(command)
   if (failManual) throw new Error('response lost')
+  if (requireConsent && !command.confirmAccess) return { error: 'accessChangeConfirmationRequired', params: { tasks: 1 }, confirmable: true }
   return { version: 1, taskId: 'one-task', identifier: 'TEST-1', dispatch: null }
 } } })
 let refreshes = 0
@@ -51,7 +62,6 @@ mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { name
   }, failureMessage: () => null }),
 } })
 mock.module(new URL('../../hooks/use-computer.ts', import.meta.url).href, { namedExports: { useComputer: () => ({ data: undefined }) } })
-mock.module(new URL('../../hooks/use-focus-return.ts', import.meta.url).href, { namedExports: { useOpenerFocus: () => undefined } })
 mock.module(new URL('../../lib/settings-read.ts', import.meta.url).href, { namedExports: { settingsRead: async () => undefined } })
 mock.module(new URL('../../lib/use-presence.ts', import.meta.url).href, { namedExports: { usePresence: () => ({ value: false, open: false, onOpenChangeComplete: () => {} }) } })
 mock.module(new URL('../settings/e2b-key-dialog.tsx', import.meta.url).href, { namedExports: {
@@ -83,7 +93,7 @@ before(async () => {
   ;({ NewTaskDialog } = await import('./new-task-dialog'))
 })
 beforeEach(() => {
-  manualCommands.length = 0; failManual = false
+  manualCommands.length = 0; failManual = false; requireConsent = false
   submitted.length = 0; refreshes = 0; readError = undefined
   data = { profiles: [{
     id: customId, name: 'Fixture role', description: '', roles: ['review'], icon: 'lens', color: 'pink', enabled: true, harness: 'claude_code',
@@ -189,10 +199,6 @@ const typeTitle = async (value: string) => act(async () => {
   Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')!.set!.call(input, value)
   input.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
 })
-const press = async (init: { metaKey?: boolean }) => act(async () => {
-  titleInput().dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init }) as unknown as Event)
-})
-
 test('a written title is sent as taskTitle beside the description', async () => {
   await render(dialog())
   assert.equal(titleInput().maxLength, 60)
@@ -222,15 +228,12 @@ test('a title alone enables submit and becomes the request text', async () => {
   assert.equal(submitted[0].context?.taskTitle, 'Only a title')
 })
 
-test('Enter in the title moves focus to the description; Ctrl or Cmd+Enter submits', async () => {
-  await render(dialog())
-  await typeTitle('Named task')
-  await press({})
+test('a backlog entry waits for its authenticated workspace without changing to dispatch', async () => {
+  await render(<NewTaskDialog open onOpenChange={() => {}} onCreated={() => {}} initialIntent="create_only" initialText="Keep in backlog." />)
+  assert.equal(create().disabled, true)
+  await act(async () => create().click())
   assert.equal(submitted.length, 0)
-  assert.equal(browser.document.activeElement?.id, 'new-issue-title')
-  await press({ metaKey: true })
-  assert.equal(submitted.length, 1)
-  assert.equal(submitted[0].context?.taskTitle, 'Named task')
+  assert.equal(manualCommands.length, 0)
 })
 
 test('manual creation survives uncertain results, bypasses dispatch settings, and opens the returned Task', async () => {
@@ -264,4 +267,35 @@ test('the same form explicitly switches to dispatch and sends only its selected 
   assert.equal(submitted.length, 1)
   assert.deepEqual(submitted[0].context?.taskCommand, { version: 1, intent: 'create_and_dispatch', description: 'Run now.' })
   assert.equal(submitted[0].context?.expectedWorkspaceId, workspaceId)
+})
+
+
+test('Team creation retains its chosen identity when switching from backlog to dispatch', async () => {
+  const teamId = '12250000-0000-4000-8000-000000000003'
+  const team = <NewTaskDialog open workspaceId={workspaceId} teamId={teamId} initialIntent="create_only" initialText="Prepare release."
+    onCreated={() => {}} onOpenChange={() => {}} />
+  await render(team)
+  await act(async () => create().click())
+  assert.equal(manualCommands[0].teamId, teamId)
+  await act(async () => root.render(null))
+  await render(team)
+  await act(async () => option('create_and_dispatch').click())
+  await act(async () => create().click())
+  assert.equal(submitted[0].context?.taskCommand?.teamId, teamId)
+  assert.equal(submitted[0].context?.expectedWorkspaceId, workspaceId)
+})
+
+
+test('Project creation binds the UUID and retries only after a real access refusal is confirmed', async () => {
+  const projectId = '12250000-0000-4000-8000-000000000004'
+  requireConsent = true
+  await render(<NewTaskDialog open workspaceId={workspaceId} project="Same name" projectId={projectId} initialIntent="create_only" initialText="Prepare release."
+    onCreated={() => {}} onOpenChange={() => {}} />)
+  await act(async () => create().click())
+  assert.equal(manualCommands[0].projectId, projectId)
+  assert.equal(manualCommands[0].confirmAccess, undefined)
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-confirm]')!.click())
+  assert.equal(manualCommands[1].requestId, manualCommands[0].requestId)
+  assert.equal(manualCommands[1].confirmAccess, true)
+  assert.equal(submitted.length, 0)
 })

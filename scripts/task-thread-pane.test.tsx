@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { TaskConversationProps } from '../components/slots/task-conversation-contract'
 
@@ -9,11 +10,12 @@ mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.met
   IssueThreadPanel: (props: { issueId: string | null; runId: string; initialTab?: string }) => { panels.push(props); return <section data-panel={props.runId} /> },
 } })
 
-const { TaskThreadPane } = await import('../components/workspace/task-thread-pane')
 const { agentStretches } = await import('../lib/issue-threads')
 
 const conversations: TaskConversationProps[] = []
 const Conversation = (props: TaskConversationProps) => { conversations.push(props); return <section data-conversation={props.runId} /> }
+mock.module(new URL('../components/slots/task-conversation.tsx', import.meta.url).href, { namedExports: { TaskConversation: Conversation } })
+const { TaskThreadPane } = await import('../components/workspace/task-thread-pane')
 const noop = () => {}
 
 // One Agent stretch: Claude Code's run failed, its next run fixed it; then Codex took over.
@@ -27,7 +29,7 @@ test('an 活动 row opens the task\'s one conversation at its stretch\'s start, 
   const [stretch] = agentStretches(threads)
   assert.deepEqual(stretch.ids, ['failed', 'fixed'], 'the failed run and the run that fixed it are one stretch, one row')
   conversations.length = 0; panels.length = 0
-  const html = renderToStaticMarkup(<TaskThreadPane issueId="task" runId={stretch.first.id} tab="chat" onOpenThread={noop} onBack={noop} conversation={Conversation} />)
+  const html = renderToStaticMarkup(<TaskThreadPane issueId="task" runId={stretch.first.id} tab="chat" onOpenThread={noop} onBack={noop} />)
   assert.equal(panels.length, 0, 'not a single run\'s thread')
   assert.equal(conversations.length, 1)
   assert.equal(conversations[0].issueId, 'task', 'the task\'s joined conversation: every run of the task, oldest first')
@@ -35,18 +37,23 @@ test('an 活动 row opens the task\'s one conversation at its stretch\'s start, 
   assert.match(html, /data-conversation="failed"/)
 })
 
-test('验收 stays the run\'s own panel, and so does every thread in the build without a layer', () => {
+test('验收 stays the chosen run’s own panel', () => {
   conversations.length = 0; panels.length = 0
-  renderToStaticMarkup(<TaskThreadPane issueId="task" runId="fixed" tab="acceptance" onOpenThread={noop} onBack={noop} conversation={Conversation} />)
-  renderToStaticMarkup(<TaskThreadPane issueId="task" runId="failed" tab="chat" onOpenThread={noop} onBack={noop} conversation={null} />)
+  renderToStaticMarkup(<TaskThreadPane issueId="task" runId="fixed" tab="acceptance" onOpenThread={noop} onBack={noop} />)
   assert.equal(conversations.length, 0)
-  assert.deepEqual(panels.map(panel => [panel.runId, panel.initialTab]), [['fixed', 'acceptance'], ['failed', 'chat']])
+  assert.deepEqual(panels.map(panel => [panel.runId, panel.initialTab]), [['fixed', 'acceptance']])
 })
 
-test('the default slot has no conversation, so the public build keeps the run panel', async () => {
-  const slot = await import('../components/slots/task-conversation')
-  assert.equal(slot.TaskConversation, null)
-  panels.length = 0
-  renderToStaticMarkup(<TaskThreadPane issueId="task" runId="failed" tab="chat" onOpenThread={noop} onBack={noop} />)
-  assert.deepEqual(panels.map(panel => panel.runId), ['failed'])
+test('Task entries import the required frame and joined conversation directly', () => {
+  const files = [
+    ['workspace/task-detail', 'TaskDetailFrame', 'task-detail'],
+    ['workspace/task-thread-pane', 'TaskConversation', 'task-conversation'],
+    ['workspace/thread-column', 'TaskConversation', 'task-conversation'],
+    ['coordinator/conversation-panels', 'TaskConversation', 'task-conversation'],
+  ]
+  for (const [file, component, slot] of files) {
+    const source = readFileSync(new URL(`../components/${file}.tsx`, import.meta.url), 'utf8')
+    assert.match(source, new RegExp(`import \{ ${component} \} from '@ui-slot/${slot}'`), file)
+    assert.doesNotMatch(source, /(?:if\s*\(\s*(?:Frame|TaskDetailFrame|TaskConversation)\s*\)|(?:TaskDetailFrame|TaskConversation)\s*(?:&&|\?\?))/, file)
+  }
 })
