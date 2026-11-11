@@ -160,14 +160,13 @@ test('signed completed suite is durably enqueued before webhook ACK, without per
   assert.equal(wakeSuite.mock.callCount(), 0)
   assert.equal((await POST(request('check_suite', hint))).status, 202)
   assert.equal(wakeSuite.mock.callCount(), 1, 'persist before response, not in afterJob')
-  assert.equal(callbacks.length, 1, 'cloud forwarding remains the official route responsibility')
+  assert.equal(callbacks.length, 0, 'suite-only webhook does not schedule empty afterJob')
   assert.deepEqual(wakeSuite.mock.calls[0].arguments[0], {
     installationId: 7, repositoryId: 8, repository: 'acme/app', suiteId: 9,
     headSha: 'a'.repeat(40), conclusion: 'failure', numbers: [10],
   })
   assert.equal(refresh.mock.callCount(), 0)
   assert.equal(readNotifications.mock.callCount(), 0)
-  await callbacks.shift()!()
   assert.equal(wakeSuite.mock.callCount(), 1)
 })
 
