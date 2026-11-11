@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { SWRConfig, type Middleware } from 'swr'
 import { NextIntlClientProvider } from 'next-intl'
 import en from '../../messages/en.json'
 import type { BotOverviewProps } from '../slots/bot-overview-contract'
@@ -15,7 +16,13 @@ const team = { role: 'member', workspace: { id: 'workspace-one', name: 'Shared',
 let workspace: typeof team | undefined = team
 let readError: Error | undefined
 const writes: unknown[] = []
-mock.module('./e2b-key-dialog', { namedExports: { E2BKeyDialog: none, useOwnE2BKey: none, useE2BKeyStatus: () => ({}) } })
+const cacheKeys: unknown[] = []
+const computerScopes: unknown[] = []
+const recordKeys: Middleware = next => (key, fetcher, config) => {
+  if (key) cacheKeys.push(key)
+  return next(key, fetcher, config)
+}
+mock.module('./e2b-key-dialog', { namedExports: { E2BKeyDialog: none, useOwnE2BKey: none, useE2BKeyStatus: (scope: string | null) => { if (scope) computerScopes.push(scope); return {} } } })
 const slot = (name: string, exports: Record<string, unknown>) =>
   mock.module(new URL('../slots/' + name + '.tsx', import.meta.url).href, { namedExports: exports })
 
@@ -59,12 +66,14 @@ for (const [path, exports] of Object.entries({
   '@/lib/settings-prefetch': ['prefetchSettingsSection'],
 })) mock.module(path, { namedExports: Object.fromEntries(exports.map(name => [name, none])) })
 let ContextPanel: typeof import('../nav/context-panel')['ContextPanel']
+let BotOverviewBody: typeof import('../nav/bot-overview')['BotOverviewBody']
 let SettingsView: typeof import('./settings-view')['SettingsView']
 before(async () => {
   ;({ ContextPanel } = await import('../nav/context-panel'))
+  ;({ BotOverviewBody } = await import('../nav/bot-overview'))
   ;({ SettingsView } = await import('./settings-view'))
 })
-const render = (node: ReactNode) => renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={en} timeZone="UTC">{node}</NextIntlClientProvider>)
+const render = (node: ReactNode) => renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={en} timeZone="UTC"><SWRConfig value={{ use: [recordKeys] }}>{node}</SWRConfig></NextIntlClientProvider>)
 
 test('frame tab, standalone column and sheet expose the same Bot identity and edit command', async () => {
   const bot = { id: 'bot-one', name: 'Studio', kind: 'bot' as const }
@@ -81,6 +90,19 @@ test('frame tab, standalone column and sheet expose the same Bot identity and ed
   assert.deepEqual(writes, Array.from({ length: 3 }, () => ({ id: bot.id, patch: { name: 'New name' } })))
   render(<ContextPanel {...props} conversation={{ ...bot, kind: 'coordinator' }} />)
   assert.equal(overview?.edit, null)
+})
+
+test('only the visible Bot tab activates library, role or computer reads', () => {
+  const bot = { id: 'bot-one', name: 'Studio', kind: 'bot' as const }
+  const props = { conversation: bot, tabs: [], onTab: none, query: null, onQuery: none, workspaceId: team.workspace.id, threads: [], issues: [], tasks: null, computer: { botId: bot.id, name: bot.name } }
+  for (const tab of ['threads', 'prs', 'details', 'computer'] as const) {
+    cacheKeys.length = 0
+    computerScopes.length = 0
+    render(<BotOverviewBody {...props} tab={tab} />)
+    const reads = cacheKeys.filter(Array.isArray).map(key => key[0])
+    assert.deepEqual(reads.sort(), tab === 'details' ? ['bot-library', 'bot-public-role'] : [])
+    assert.deepEqual(computerScopes, tab === 'computer' ? [team.workspace.id] : [])
+  }
 })
 
 test('Settings routes team and member state only through the resolved official provider', () => {

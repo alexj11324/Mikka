@@ -23,10 +23,10 @@ async function requestPublicRole(botId: string, publicRole?: string): Promise<Pu
 /**
  * Bot Overview reads and saves the owner's public role through the owner endpoint.
  */
-export function useBotPublicRole(botId: string, workspaceId?: string) {
+export function useBotPublicRole(botId: string, workspaceId: string | undefined, visible: boolean) {
   const t = useTranslations('Shell.panel.publicRole')
   const actionError = useActionError()
-  const { data, error: loadError, mutate } = useSWR(['bot-public-role', workspaceId ?? null, botId], () => requestPublicRole(botId))
+  const { data, error: loadError, mutate } = useSWR(visible ? ['bot-public-role', workspaceId ?? null, botId] : null, () => requestPublicRole(botId))
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
