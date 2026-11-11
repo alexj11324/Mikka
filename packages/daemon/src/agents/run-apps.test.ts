@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { runApps, runAppsHost, nativeMcpProcess } from './run-apps'
+import { runApps, runAppsHost, nativeMcpProcess, hasRunAppServers, registeredRunAppServer, codexMcpServer } from './run-apps'
 import { claudeAppServers } from '../adapters/claude'
 import { codexAppArgs } from '../adapters/codex'
 import { cursorAppServers } from '../adapters/cursor'
@@ -95,4 +95,20 @@ it('keeps native connection credentials in memory and strips them from restart j
     expect(restored.assignment.mcp?.servers).toBeUndefined()
     expect(restored.taskSecretsWithheld).toBe(true)
   } finally { rmSync(directory,{recursive:true,force:true}) }
+})
+
+it('native MCP-only tasks require a configured process and recognize only their assigned server names', () => {
+  const apps = runApps({...mcp,apps:[],servers:[{name:'mcp_local',transport:'stdio',command:'node',args:[],env:{}}]})
+  expect(hasRunAppServers(apps)).toBe(true)
+  expect(registeredRunAppServer(apps,'mcp_local')).toBe(true)
+  expect(registeredRunAppServer(apps,'mcp_other')).toBe(false)
+  expect(hasRunAppServers(undefined)).toBe(false)
+})
+
+it('Codex connects legacy SSE through a pinned native bridge with headers kept out of argv', () => {
+  const server = {name:'mcp_old',transport:'sse' as const,url:'https://mcp.acme.dev/sse',headers:{Authorization:'Bearer synthetic-secret'}}
+  const bridge = codexMcpServer(server)
+  expect(bridge).toEqual({name:'mcp_old',transport:'stdio',command:'npx',args:['--yes','mcp-remote@0.16.5','https://mcp.acme.dev/sse','--transport','sse-only','--header','Authorization:${MIKKA_NATIVE_MCP_HEADER_0}'],env:{MIKKA_NATIVE_MCP_HEADER_0:'Bearer synthetic-secret'}})
+  if (bridge.transport === 'stdio') expect(JSON.stringify(bridge.args)).not.toContain('synthetic-secret')
+  expect(codexAppArgs({token,apps:[],servers:[server]})).toContain('mcp_servers.mcp_old.command="npx"')
 })

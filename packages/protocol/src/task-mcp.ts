@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+export const TASK_MCP_HEADER = 'x-mikka-task-mcp'
+export const TASK_MCP_VERSION = '1'
+
 const atom = z.string().min(1).max(4096).refine(value => !/[\r\n\0]/.test(value))
 export const mcpEnvironmentSchema = z.record(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/), z.string().max(16_384).refine(value => !value.includes('\0')))
 export const mcpHeadersSchema = z.record(z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/).refine(name => !/^(?:host|cookie|set-cookie|connection|content-length|transfer-encoding|proxy-.*|x-forwarded-.*)$/i.test(name)), atom)

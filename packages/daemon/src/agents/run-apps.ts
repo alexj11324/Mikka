@@ -49,6 +49,21 @@ export function runApps(mcp: RunAssignment['mcp']): RunApps | undefined {
 /** The Mikka server host the app entries reach. */
 export const runAppsHost = (apps?: RunApps) => apps?.apps[0] ? new URL(apps.apps[0].url).host : undefined
 
+export const hasRunAppServers = (apps?: RunApps) => Boolean(apps?.apps.length || apps?.servers?.length)
+export const registeredRunAppServer = (apps: RunApps | undefined, name: string) => Boolean(apps?.apps.some(app=>app.name === name) || apps?.servers?.some(server=>server.name === name))
+
+/** Codex speaks Streamable HTTP. Use the pinned upstream bridge for historical SSE connections. */
+export function codexMcpServer(server: TaskMcpServer): TaskMcpServer {
+  if (server.transport !== 'sse') return server
+  const env: Record<string,string> = {}
+  const headers = Object.entries(server.headers).flatMap(([name,value],index)=>{
+    const key = `MIKKA_NATIVE_MCP_HEADER_${index}`
+    env[key] = value
+    return ['--header', `${name}:\${${key}}`]
+  })
+  return { name:server.name,transport:'stdio',command:'npx',args:['--yes','mcp-remote@0.16.5',server.url,'--transport','sse-only',...headers],env }
+}
+
 /** The CLI APIs lack a portable per-STDIO cwd field. This launcher only changes cwd and execs argv. */
 export function nativeMcpProcess(server: Extract<TaskMcpServer, { transport: 'stdio' }>) {
   return server.cwd ? { command: process.execPath, args: [resolve(import.meta.dirname, 'mcp-stdio-launcher.mjs'), server.cwd, server.command, ...server.args], env: server.env }
