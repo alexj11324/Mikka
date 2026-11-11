@@ -62,7 +62,7 @@ jobs:
             MIKKA_BUILD_WORKER_SHA=${{ steps.image-inputs.outputs.worker-sha }}
           # A fork PR cannot borrow the owner's cache through its own ref.
           # Missing/expired cache never replaces an actual build.
-          cache-from: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '' || 'type=gha,scope=mikka-selfhost-public' }}
+          cache-from: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'type=gha,scope=mikka-selfhost-public' || '' }}
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=mikka-selfhost-public,mode=max' || '' }}
       - name: Verify packaged subscription binaries without network or credentials
         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
