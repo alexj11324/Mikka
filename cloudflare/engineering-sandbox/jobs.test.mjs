@@ -4,18 +4,21 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { githubRun, validJob, WORKFLOW, REPOSITORY, sourceSuites } from './jobs.mjs'
+import { githubRun, validJob, sourceSuites } from './jobs.mjs'
 
 test('only the upstream main engineering workflow can use compute or read a receipt', () => {
-  const allowed = { repository: REPOSITORY, repository_id: '1427517699', workflow_ref: WORKFLOW,
-    sub: 'repo:' + REPOSITORY + ':ref:refs/heads/main', ref: 'refs/heads/main', event_name: 'workflow_dispatch',
+  const repository = 'selfhost/engineering', repositoryId = '12345'
+  const workflow = repository + '/.github/workflows/engineering-sandbox.yml@refs/heads/main'
+  const allowed = { repository, repository_id: repositoryId, workflow_ref: workflow,
+    sub: 'repo:' + repository + ':ref:refs/heads/main', ref: 'refs/heads/main', event_name: 'workflow_dispatch',
     run_id: '1234', run_attempt: '2' }
-  assert.equal(githubRun(allowed), '1234/2')
-  for (const altered of [{ repository_id: '1' }, { event_name: 'pull_request_target' }, { event_name: 'pull_request' },
+  assert.equal(githubRun(allowed), null)
+  assert.equal(githubRun(allowed, repository, repositoryId), '1234/2')
+  for (const altered of [{ repository_id: '1' }, { event_name: 'push' }, { event_name: 'pull_request_target' }, { event_name: 'pull_request' },
     { repository: 'fork/Mikka' }, { sub: 'repo:fork/Mikka:ref:refs/heads/main' },
-    { ref: 'refs/pull/1/merge' }, { workflow_ref: WORKFLOW.replace('engineering-sandbox', 'another') },
+    { ref: 'refs/pull/1/merge' }, { workflow_ref: workflow.replace('engineering-sandbox', 'another') },
     { run_id: '1234/2' }, { run_attempt: '1/anything' }]) {
-    assert.equal(githubRun({ ...allowed, ...altered }), null)
+    assert.equal(githubRun({ ...allowed, ...altered }, repository, repositoryId), null)
   }
 })
 test('workload and source are closed inputs', () => {

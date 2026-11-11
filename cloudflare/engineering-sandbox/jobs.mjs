@@ -1,6 +1,6 @@
 export const AUDIENCE = 'mikka-engineering-sandbox'
 export const REPOSITORY = 'alexj11324/Mikka'
-export const WORKFLOW = REPOSITORY + '/.github/workflows/engineering-sandbox.yml@refs/heads/main'
+const workflow = '/.github/workflows/engineering-sandbox.yml@refs/heads/main'
 export const DEADLINE_MS = 10 * 60_000
 export const RECEIPT_MS = 7 * 24 * 60 * 60_000
 
@@ -29,11 +29,12 @@ export const jobs = {
   'postgres-policy': ['drizzle/20261029011701_cli_run_policy.sql'],
 }
 
-export function githubRun(claims) {
-  if (claims.repository !== REPOSITORY || claims.repository_id !== '1427517699' ||
-      claims.workflow_ref !== WORKFLOW || claims.ref !== 'refs/heads/main' ||
-      claims.sub !== 'repo:' + REPOSITORY + ':ref:refs/heads/main' ||
-      !['workflow_dispatch', 'push'].includes(claims.event_name) ||
+export function githubRun(claims, repository, repositoryId) {
+  if (!repository || !/^[1-9][0-9]*$/.test(repositoryId ?? '') ||
+      claims.repository !== repository || claims.repository_id !== repositoryId ||
+      claims.workflow_ref !== repository + workflow || claims.ref !== 'refs/heads/main' ||
+      claims.sub !== 'repo:' + repository + ':ref:refs/heads/main' ||
+      claims.event_name !== 'workflow_dispatch' ||
       !/^[1-9][0-9]{0,19}$/.test(claims.run_id) || !/^[1-9][0-9]{0,5}$/.test(claims.run_attempt)) return null
   return claims.run_id + '/' + claims.run_attempt
 }

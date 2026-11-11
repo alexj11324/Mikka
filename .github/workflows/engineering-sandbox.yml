@@ -54,82 +54,19 @@ jobs:
             --mount "type=bind,src=$PWD/drizzle,dst=/workspace/drizzle,readonly" --workdir /workspace \
             mikka-engineering-pg17 node --test /opt/mikka-engineering/pg17.test.mjs
 
-  deploy:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [test, postgres_image]
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    concurrency:
-      group: engineering-sandbox-release
-      cancel-in-progress: false
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: npm ci --ignore-scripts --prefix cloudflare/engineering-sandbox
-      - name: Require exact main source CI
-        run: node scripts/release/ci-gate.mjs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-      - name: Read the existing Cloudflare deployment token
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: CLOUDFLARE_API_TOKEN
-          include-imports: false
-      - name: Read the existing Cloudflare account ID
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: CLOUDFLARE_ACCOUNT_ID
-          include-imports: false
-      - name: Deploy the engineering Worker and its Container
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          test "$(gh api repos/alexj11324/Mikka/commits/main --jq '.sha')" = "$GITHUB_SHA"
-          pnpm exec wrangler deploy --config cloudflare/engineering-sandbox/wrangler.jsonc --message "$GITHUB_SHA"
-
   run:
-    needs: [test, postgres_image, deploy]
-    if: >-
-      always() && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&
-      needs.test.result == 'success' && needs.postgres_image.result == 'success' &&
-      ((github.event_name == 'push' && needs.deploy.result == 'success') || github.event_name == 'workflow_dispatch')
+    needs: [test, postgres_image]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 13
     permissions:
       contents: read
       id-token: write
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        workload: ${{ fromJSON(github.event_name == 'push' && '["factory-handoff","startup-timing","postgres-policy"]' || format('["{0}"]', inputs.workload)) }}
     env:
-      ISSUE: ${{ inputs.issue || 1948 }}
-      SOURCE_SHA: ${{ inputs.sha || github.sha }}
-      WORKLOAD: ${{ matrix.workload }}
+      ENGINEERING_SANDBOX_URL: ${{ vars.ENGINEERING_SANDBOX_URL }}
+      ISSUE: ${{ inputs.issue }}
+      SOURCE_SHA: ${{ inputs.sha }}
+      WORKLOAD: ${{ inputs.workload }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -146,7 +83,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: engineering-${{ matrix.workload }}-${{ github.run_attempt }}
+          name: engineering-${{ inputs.workload }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/engineering-receipt.json
           retention-days: 7
           if-no-files-found: error

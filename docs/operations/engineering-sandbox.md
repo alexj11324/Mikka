@@ -15,6 +15,13 @@ gh workflow run engineering-sandbox.yml --repo alexj11324/Mikka --ref main \
 | `startup-timing` | The startup timing report regression tests for aligning and filtering dispatch, runtime and native CLI timing evidence. |
 | `postgres-policy` | Node 24 and pnpm 10.34.3 start a fresh unprivileged PostgreSQL 17 cluster, apply the selected revision’s real CLI-policy migration and verify its triggers and transaction rollback. |
 
+For self-hosting, set the Worker variables CALLER_REPOSITORY and
+CALLER_REPOSITORY_ID to the dispatch workflow's full GitHub repository name and
+numeric ID. Set that repository's ENGINEERING_SANDBOX_URL Actions variable to
+the HTTPS origin of the deployed Worker. The workflow rejects pull requests
+and runs only explicitly dispatched main jobs. Company publishing belongs to
+the [private operations entry](https://github.com/alexj11324/mikka-cloud/blob/main/AGENTS.md).
+
 Actions authenticates with its short-lived GitHub OIDC token. The Worker
 requires the upstream repository ID, trusted workflow path, main ref and event.
 The Worker obtains the declared public source files at the exact commit.
