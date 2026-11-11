@@ -254,11 +254,30 @@ test('MCP waits use committed PG notifications; independent web observers still 
         child.stdout.on('data', chunk => { stdout += String(chunk) })
         child.stderr.on('data', chunk => { stderr += String(chunk) })
         const exited = once(child, 'exit')
-        const reply = await bounded(waiter.promise, 15_000)
+        // A writer that dies never commits, so the reply cannot arrive and the
+        // reply deadline alone would report "no committed push" for every cause.
+        // Surface its own exit at once instead. A successful exit may still be
+        // a moment ahead of the notification the parent has not read yet.
+        const died = new Promise<never>((_resolve, reject) => {
+          child.once('exit', (code, signal) => {
+            if (code === 0 && signal === null) return
+            reject(new Error(`the separate writer exited before the reply arrived (code ${code}, signal ${signal}): ${stderr.trim() || stdout.trim()}`))
+          })
+        })
+        died.catch(() => {})
+        // The writer runs its module graph before it can write: measured 2.5s
+        // here and 5.9s under 6x CPU saturation, on the same fixture.
+        const reply = await bounded(Promise.race([waiter.promise, died]), 15_000)
         const [code, signal] = await bounded(exited, 15_000)
         assert.equal(code, 0, stderr)
         assert.equal(signal, null)
-        assert.deepEqual(JSON.parse(stdout.trim()), { written: true, notifications: 2 })
+        // Diagnostics such as db_transport_sample share this stdout; only the
+        // writer's own record is the fixture's result.
+        const written = stdout.split('\n').flatMap(line => {
+          try { const value: unknown = JSON.parse(line); return value && typeof value === 'object' && 'written' in value ? [value] : [] }
+          catch { return [] }
+        })
+        assert.deepEqual(written, [{ written: true, notifications: 2 }])
         await eventually(() => socket.received.some(value => JSON.stringify(value) === JSON.stringify({ kind: 'coordinator_session', id: identity.botId })), 'the independent web observer did not receive the committed live key')
         assert.deepEqual(reply.messages.map(value => value.text), ['Reply from a separate writer process'])
       } finally { waiter.controller.abort() }
