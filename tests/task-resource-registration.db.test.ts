@@ -92,11 +92,12 @@ test('Task defaults fail closed in APP; real Team creation registers from the lo
       assert.deepEqual((await app.query('SELECT * FROM resource_access_grants ORDER BY "subjectKind"')).rows, grants)
     })
     const { db, pool } = await import('../lib/db')
-    const { workspacePool } = await import('../lib/workspace-db')
+    const { workspacePool, workspaceTransactionKey } = await import('../lib/workspace-db')
     moduleApp = pool; moduleWs = workspacePool
     const { withTaskWorkspace } = await import('../lib/task-workspace')
     const { createIssueForUserInTransaction } = await import('../lib/issue-create')
     const { registerTaskResourceAccess } = await import('../lib/task-resource-registration')
+    const { withoutDatabaseClient } = await import('../lib/db/request-scope')
     const create = (workspaceId: string) => withTaskWorkspace(owner, workspaceId, () => db.transaction(tx => createIssueForUserInTransaction(tx, owner, {
       title: 'Real creation', content: { type: 'doc', content: [{ type: 'paragraph' }] }, status: 'todo', priority: 'normal',
     }, { actorType: 'user', actorId: owner }, { workspaceId })))
@@ -147,6 +148,22 @@ test('Task defaults fail closed in APP; real Team creation registers from the lo
       await withTaskWorkspace(owner, team, async () => { delayed = AsyncLocalStorage.bind(() => db.transaction(tx => registerTaskResourceAccess(tx, { id, ownerId: owner, workspaceId: team, workspaceKind: 'team' }))) })
       await assert.rejects(delayed!(), { code: 'workspaceAccessDenied' })
       assert.equal(await visibility(id), 'private')
+    })
+    await t.test('an independent APP boundary cannot borrow the parent kind proof; its own WS lease can register', async () => {
+      const write = () => db.transaction(tx => createIssueForUserInTransaction(tx, owner, {
+        title: 'Independent creation', content: { type: 'doc', content: [{ type: 'paragraph' }] }, status: 'todo', priority: 'normal',
+      }, { actorType: 'user', actorId: owner }, { workspaceId: team }))
+      await withTaskWorkspace(owner, team, async () => {
+        const parent = workspaceTransactionKey()
+        assert.ok(parent)
+        await assert.rejects(withoutDatabaseClient(write), { code: 'workspaceAccessDenied' })
+        const created = await withoutDatabaseClient(() => withTaskWorkspace(owner, team, () => {
+          assert.notEqual(workspaceTransactionKey(), parent, 'independent work owns its Workspace transaction')
+          return write()
+        }))
+        assert.ok(created)
+        assert.equal(await visibility(created.id), 'shared')
+      })
     })
     await t.test('a later Team lease cannot republish an existing private root as new creation', async () => {
       const id = await insert(team)

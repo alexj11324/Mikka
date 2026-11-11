@@ -132,7 +132,10 @@ export async function changeResourceAccess(reader: IssueReader, reference: Resou
   if (new Set(value.grants.map(grant => grant.subjectId)).size !== value.grants.length
     || value.grants.some(grant => !grant.capabilities.includes('canReadContent') || grant.capabilities.some(action => !SHARING_GRANT_ACTIONS.includes(action))))
     throw new ActionFailureError('validationGeneric')
-  return withTaskWorkspace(reader, reference.workspaceId, async (_workspace, membership) => {
+  return withTaskWorkspace(reader, reference.workspaceId, async (workspace, membership) => {
+    // Private retains explicit grants. Personal Workspaces never admit the
+    // blanket membership audience, including a confirmed expansion request.
+    if (workspace.kind === 'personal' && value.visibility !== 'private') throw new ActionFailureError('validationGeneric')
     const subjects = value.grants.map(grant => grant.subjectId)
     const active = subjects.length ? await membership.select({ id: workspaceMembers.userId }).from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, reference.workspaceId), eq(workspaceMembers.status, 'active'), inArray(workspaceMembers.userId, subjects))) : []
