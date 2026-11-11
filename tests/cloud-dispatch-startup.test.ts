@@ -44,7 +44,8 @@ async function query(sql: string, values: unknown[] = []) {
   if (sql.includes('FROM suggestion_executions')) return { rows: [], rowCount: Number(suggestionAllowed) }
   if (sql.startsWith('SELECT "agentDefinition"')) return { rows: [{ agentDefinition: { model, subscription: { bindingId } } }], rowCount: 1 }
   if (sql.includes('FROM coordinator_events')) {
-    if (sql.startsWith('SELECT payload')) {
+    if (sql.startsWith('SELECT e.payload,c."taskId" AS "commandIssueId"')) {
+      assert.deepEqual(values, [sourceEventId, owner, botId, workspaceId])
       const ownSource = requestSource?.userId === values[1] && requestSource?.botId === values[2] && requestSource?.kind === 'user_message'
       return { rows: ownSource ? [{ payload: requestSource!.payload }] : [], rowCount: Number(ownSource) }
     }

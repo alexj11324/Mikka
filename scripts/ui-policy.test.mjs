@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync } from 'node:fs'
+import { copyFileSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, unlinkSync } from 'node:fs'
 import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { tmpdir } from 'node:os'
@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { auditSource, auditCss, isComponentLibrarySource, exemptAsShipped, splitUtilities, utilityBase } from './ui-policy.mjs'
+import { entityContracts } from './entity-ui-policy.mjs'
 
 const policy = JSON.parse(readFileSync(new URL('../ui-policy.json', import.meta.url), 'utf8'))
 const prefix = `import { cn } from '@/lib/utils'; import { Button } from '@/components/ui/button';`
@@ -257,8 +258,19 @@ test('lint permits imported components but fails handwritten business UI without
     writeFileSync(path.join(cwd, 'ui-policy.json'), JSON.stringify(policy))
     writeFileSync(path.join(cwd, 'components.json'), JSON.stringify({ style: policy.style, iconLibrary: policy.iconLibrary.replace('-react', '') }))
     writeFileSync(path.join(cwd, filename), original)
+    // Lint reads the repository-wide entity contracts even for this one-screen fixture.
+    const contractFiles = new Set(entityContracts.flatMap(contract => [
+      ...(contract.routes ?? []), ...(contract.detail ? [contract.detail] : []), ...(contract.adapters ?? []), ...contract.sources,
+    ].map(([file]) => file)))
+    // Exclude only those fixture dependencies from the sample's source counts.
+    const ignoredPaths = Array.from(contractFiles, file => '/' + file.replace(/[?*[\\]/g, '\\$&'))
+    writeFileSync(path.join(cwd, '.git/info/exclude'), ignoredPaths.join('\n') + '\n')
+    for (const file of contractFiles) {
+      mkdirSync(path.join(cwd, path.dirname(file)), { recursive: true })
+      copyFileSync(new URL('../' + file, import.meta.url), path.join(cwd, file))
+    }
     const composed = await execute()
-    assert.equal(composed.status, 0)
+    assert.equal(composed.status, 0, JSON.stringify(composed.report.diagnostics))
     assert.equal(composed.report.errors, 0)
     assert.equal(composed.report.libraryFiles, policy.componentRoots.length)
     assert.equal(composed.report.files, 1)
@@ -282,6 +294,11 @@ test('lint permits imported components but fails handwritten business UI without
     const rawBlock = await execute()
     assert.equal(rawBlock.status, 1)
     assert.ok(rawBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/use-button-component'))
+
+    unlinkSync(path.join(cwd, 'app/actions/issues.ts'))
+    const missingCommands = await execute()
+    assert.equal(missingCommands.status, 1)
+    assert.ok(missingCommands.report.diagnostics.some(d => d.file === 'app/actions/issues.ts' && d.rule === 'entity/contract-export'))
   } finally {
     console.error(`Retained UI policy fixture directory: ${cwd}`)
   }

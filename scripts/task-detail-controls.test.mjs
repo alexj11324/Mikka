@@ -43,7 +43,7 @@ stub('app/actions/issue-operations.ts', {
   },
 })
 stub('hooks/use-live-key.tsx', { useLiveKey: noop })
-stub('hooks/use-bot-tasks.ts', { localTaskState: () => ({ state: 'todo' }) })
+stub('hooks/use-selected-task-presentation.ts', { useSelectedTaskPresentation: () => ({ data: { state: 'todo' } }) })
 stub('lib/hooks/use-relation-search.ts', { useRelationSearch: noop })
 stub('lib/use-action-error.ts', { useActionError: () => translate })
 stub('components/workspace/issue-activity-feed.tsx', { useActivityEvents: () => [] })

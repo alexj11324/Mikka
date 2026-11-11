@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
-import { frontendRuntimeSource } from '../apps/frontend/scripts/frontend-runtime.mjs'
+import { applicationPlugin } from '../apps/frontend/scripts/application-plugin.mjs'
 import { analyticsPath, sanitizeAnalyticsEvent } from '../lib/analytics-policy.ts'
 import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, proactiveFeatures, upcomingFeatures } from '../lib/feature-flags.ts'
 import { analyticsEnvironment, analyticsKey, analyticsPaths, inspectAnalyticsBuild, localAnalyticsRequest, requiredRuntimeResources, syntheticPostHogRequest, verifyRuntimeResources } from '../scripts/check-analytics-ssr.mjs'
@@ -97,18 +97,17 @@ test('the 电脑 tab has its own kill switch, apart from the cloud computer roll
   assert.match(hook, /export function useComputerTab\(\)[\s\S]*?killSwitches\.computerTab[\s\S]*?!== true/)
 })
 
-test('the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker', () => {
+test('the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker', async () => {
   const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
   assert.match(source('apps/frontend/src/index.tsx'), /import 'mikka:frontend-runtime'[\s\S]*await import\('\.\.\/\.\.\/desktop\/src\/renderer\/index'\)/)
-  const plugin = source('apps/frontend/scripts/application-plugin.mjs')
-  assert.match(plugin, /import \{ frontendRuntimeSource \} from '\.\/frontend-runtime\.mjs'/)
-  assert.match(plugin, /if \(id === '\\0mikka:frontend-runtime'\) \{\s*return frontendRuntimeSource\(target, \{ development, frontend, renderer \}\)/)
-  const frontend = fileURLToPath(new URL('../apps/frontend', import.meta.url))
-  const renderer = fileURLToPath(new URL('../apps/desktop/src/renderer', import.meta.url))
+  const plugin = await applicationPlugin('web')
+  const runtimeId = await plugin.resolveId('mikka:frontend-runtime')
+  const entry = fileURLToPath(new URL('../apps/frontend/src/web/runtime.ts', import.meta.url))
   for (const development of [false, true]) {
-    const code = frontendRuntimeSource('web', { development, frontend, renderer })
-    const prefix = development ? 'globalThis[Symbol.for("openui.devtools.autoMount")] = true;\n' : ''
-    assert.equal(code, `${prefix}import ${JSON.stringify(join(frontend, 'src/web/runtime.ts'))};\n`)
+    plugin.configResolved({ command: development ? 'serve' : 'build' })
+    const code = await plugin.load(runtimeId)
+    assert.ok(code.split('\n').includes(`import ${JSON.stringify(entry)};`))
+    assert.equal(code.includes('globalThis[Symbol.for("openui.devtools.autoMount")] = true;'), development)
   }
   assert.match(source('apps/frontend/src/web/runtime.ts'), /import '@\/instrumentation-client'/)
   assert.match(source('instrumentation-client.ts'), /posthog\.init\(posthogConfig\.token/)
