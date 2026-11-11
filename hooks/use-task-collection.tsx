@@ -37,7 +37,10 @@ export function usePresentedTaskGroups(threads: readonly Thread[], issues: reado
   return useMemo(() => groupPresentedTasks(issues, threads, presentations, scope), [issues, threads, presentations, scope])
 }
 
-export function useTaskEvidenceFolders(issues: readonly CollectionIssue[], storedArtifactIds: readonly string[] | undefined) {
+type EvidenceFolder = { factoryTaskId: string; extraCount: number }
+const EMPTY_FOLDERS: Record<string, EvidenceFolder> = {}
+
+export function useTaskEvidenceFolders(issues: readonly Pick<CollectionIssue, 'id' | 'workspaceId'>[], storedArtifactIds: readonly string[] | undefined) {
   const scope = useLiveScope()
   const workspaceId = scope?.workspaceId
   const ids = useMemo(() => issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id).sort(), [issues, workspaceId])
@@ -45,7 +48,7 @@ export function useTaskEvidenceFolders(issues: readonly CollectionIssue[], store
   const key = workspaceId && ids.length && stored ? ['task-evidence-folders', scope?.ownerId, workspaceId, ids, stored] : null
   const result = useSWR(key, async () => {
     const projected = await readPresentationPages(workspaceId!, ids, input => getTaskPresentations({ ...input, folderStoredIds: stored }))
-    const folders: Record<string, { factoryTaskId: string; extraCount: number }> = {}
+    const folders: Record<string, EvidenceFolder> = {}
     for (const [id, task] of projected) {
       if (task.factoryTaskId && task.factoryExtraCount !== undefined) folders[id] = { factoryTaskId: task.factoryTaskId, extraCount: task.factoryExtraCount }
     }
@@ -53,5 +56,5 @@ export function useTaskEvidenceFolders(issues: readonly CollectionIssue[], store
   }, { revalidateOnFocus: false, shouldRetryOnError: false })
   const keys = key ? [unstable_serialize(key)] : []
   useLiveKeys(key ? ids.map(id => ({ kind: 'factory_issue', id, workspaceId })) : [], keys, workspaceId ?? null, { minIntervalMs: 2000 })
-  return result
+  return { ...result, data: workspaceId && stored && !ids.length ? EMPTY_FOLDERS : result.data }
 }

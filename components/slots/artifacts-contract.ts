@@ -3,5 +3,5 @@
 // the tasks name the folders a layer may group them into.
 export type ArtifactsPageProps = {
   /** The workspace's tasks, to name the task each artifact was made for. */
-  issues: { id: string; title: string; identifier: string | null }[]
+  issues: { id: string; workspaceId: string | null; title: string; identifier: string | null }[]
 }
