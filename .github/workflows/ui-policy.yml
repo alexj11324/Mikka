@@ -247,6 +247,8 @@ jobs:
     needs: changes
     if: github.event_name != 'push' && needs.changes.outputs.image == 'true'
     uses: ./.github/workflows/self-hosted-image.yml
+    with:
+      selected: true
     permissions:
       contents: read
       packages: write
@@ -255,11 +257,15 @@ jobs:
     needs: changes
     if: github.event_name != 'push' && needs.changes.outputs.desktop == 'true'
     uses: ./.github/workflows/desktop.yml
+    with:
+      selected: true
 
   analytics-checks:
     needs: changes
     if: github.event_name != 'push' && needs.changes.outputs.analytics == 'true'
     uses: ./.github/workflows/analytics-ssr.yml
+    with:
+      selected: true
 
   ui-policy:
     # The required check name. It reports success when only documentation
