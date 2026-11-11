@@ -194,11 +194,6 @@
     "kind": "core",
     "env": {}
   },
-  "core-41": {
-    "command": "pnpm test:coordinator-native-relay",
-    "kind": "core",
-    "env": {}
-  },
   "core-42": {
     "command": "pnpm test:coordinator-native-scope",
     "kind": "core",
