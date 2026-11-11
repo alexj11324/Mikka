@@ -14,6 +14,14 @@ export const RENDERER_CSP = [
 const ID = '[A-Za-z0-9_-]{1,128}'
 const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/flow$/i
 const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
+const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
+const SERVICE_IDENTITY_DIRECTORY = `/api/workspaces/${UUID}/service-identities`
+const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
+  [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}$`), 'POST'],
+  [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}/${UUID}$`), 'PATCH'],
+  [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}/${UUID}/projects$`), 'PUT'],
+  [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}/${UUID}/credential$`), 'POST'],
+]
 /** Route families are enumerated; there is deliberately no generic /api/* forwarding. */
 const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/agents\/eve\/v1\/session$/, ['POST']],
@@ -65,6 +73,9 @@ export function allowedApiPath(path: string, method: string): boolean {
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'
   if (BILLING_MANAGEMENT.test(path)) return method === 'GET' || method === 'POST'
+  if (path.startsWith('/api/workspaces/') && path.includes('/service-identities')) {
+    return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
+  }
   if (path === '/api/organizations') return method === 'GET'
   // Viewer grants are capabilities and must be obtained through owner-bound IPC.
   if (/^\/api\/bots\/[^/]+\/(?:computer\/(?:viewer|takeover)|subagents\/[^/]+\/viewer)$/.test(path)) return false

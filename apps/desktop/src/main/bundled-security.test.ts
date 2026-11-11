@@ -88,6 +88,22 @@ test('Factory flow accepts only a strict UUID and its two declared methods', () 
   assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
 })
 
+test('service identity management forwards only its declared human-session methods and UUID paths', () => {
+  const workspace = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
+  const identity = 'ebb7878e-6918-4b68-9300-d956761b5011'
+  const directory = `/api/workspaces/${workspace}/service-identities`
+  const item = `${directory}/${identity}`
+  const methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+  const routes = [[directory, 'POST'], [item, 'PATCH'], [item + '/projects', 'PUT'], [item + '/credential', 'POST']]
+  for (const [path, mutation] of routes) {
+    for (const method of methods) assert.equal(allowedApiPath(path, method), method === 'GET' || method === mutation, `${method} ${path}`)
+  }
+  for (const path of [directory.replace(workspace, 'unknown'), directory + '/bad-id', item + '/unknown',
+    item + '/credential/rotate', item + '/projects/', '/api/service-identity/projects']) {
+    for (const method of methods) assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
+  }
+})
+
 test('billing metadata and commands have exact scoped routes and methods', () => {
   assert.equal(allowedApiPath('/api/organizations', 'GET'), true)
   for (const method of ['HEAD', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS']) assert.equal(allowedApiPath('/api/organizations', method), false)
