@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
+import { EventEmitter } from 'node:events'
+import pg from 'pg'
+import * as databaseScope from '../lib/db/request-scope'
 import { ComputerError } from '../lib/computer/store'
 import { ActionFailureError } from '../lib/action-error'
 import * as profileDefinitions from '../lib/factory/agent-profile-definition'
@@ -60,6 +63,13 @@ async function query(sql: string, values: unknown[] = []) {
   throw new Error(`Unexpected query in startup fixture: ${sql}`)
 }
 const pool = { query, connect: async () => ({ query, release() {} }) }
+const applicationPool = { options: {}, end: async () => undefined }
+stub('../lib/db/request-scope.ts', { ...databaseScope, currentDatabasePool: () => applicationPool })
+class TaskLockPool extends EventEmitter {
+  connect() { return pool.connect() }
+  end() { return Promise.resolve() }
+}
+mock.module('pg', { defaultExport: { ...pg, Pool: TaskLockPool }, namedExports: { ...pg, Pool: TaskLockPool } })
 stub('../lib/auth.ts', { auth: { api: {} } })
 stub('../lib/cloud-computer-flag.ts', { cloudComputerRunsEnabled: () => true, cloudComputerTasksEnabled: () => true, byosEnabled: () => true, byosEnrollmentEnabled: () => true })
 stub('../lib/db/index.ts', { db: { execute: async () => { calls.push('link-continuation'); return { rows: [], rowCount: 1 } } }, pool, withDatabaseClient: unused, withDatabaseTransaction: unused })
