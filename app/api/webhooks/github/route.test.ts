@@ -163,7 +163,7 @@ test('signed completed suite is durably enqueued before webhook ACK, without per
   assert.equal(callbacks.length, 0, 'suite-only webhook does not schedule empty afterJob')
   assert.deepEqual(wakeSuite.mock.calls[0].arguments[0], {
     installationId: 7, repositoryId: 8, repository: 'acme/app', suiteId: 9,
-    headSha: 'a'.repeat(40), conclusion: 'failure', numbers: [10],
+    headSha: 'a'.repeat(40), conclusion: 'failure', numbers: [10], heads: {},
   })
   assert.equal(refresh.mock.callCount(), 0)
   assert.equal(readNotifications.mock.callCount(), 0)
