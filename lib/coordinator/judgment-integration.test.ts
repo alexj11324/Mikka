@@ -185,3 +185,12 @@ test('native receipts use the response header and the provider usage at its stan
   assert.equal(receipt(10, 0, 0, 'another-model').cost, null)
   assert.equal(decisionProviderReceipt(true, 'gpt-6-luna', { model: 'gpt-6-luna', id: 'req_body_only' }, new Headers()).generation, undefined)
 })
+
+test('Decisions traces separate a connected Cloud receipt and custom transport from the Vercel endpoint', async () => {
+  const { decisionTraceTarget, gatewayEndpoint, nativeEndpoint } = await import('./decision-provider')
+  assert.deepEqual(decisionTraceTarget(gatewayEndpoint, true), { route: 'decision', provider: 'mikka-cloud' })
+  assert.deepEqual(decisionTraceTarget(nativeEndpoint, true), { route: 'decision', provider: 'mikka-cloud' })
+  assert.deepEqual(decisionTraceTarget(gatewayEndpoint, false), { route: 'gateway' })
+  assert.deepEqual(decisionTraceTarget(nativeEndpoint, false), { route: 'api_key', provider: 'openai' })
+  assert.deepEqual(decisionTraceTarget('https://compatible.example/v1/decisions', false), { route: 'api_key' })
+})
