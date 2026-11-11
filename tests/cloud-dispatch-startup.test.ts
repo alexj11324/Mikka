@@ -3,6 +3,14 @@ import { before, beforeEach, mock, test } from 'node:test'
 import { ComputerError } from '../lib/computer/store'
 import { ActionFailureError } from '../lib/action-error'
 import * as profileDefinitions from '../lib/factory/agent-profile-definition'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
+import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
+import { createTracerProvider, SafeExporter } from '../lib/tracing/node'
+import { createLogProvider } from '../lib/tracing/logs'
 
 const owner = 'synthetic-owner', botId = '10000000-0000-4000-8000-000000000001'
 const issueId = '10000000-0000-4000-8000-000000000002', runId = '10000000-0000-4000-8000-000000000003'
@@ -30,14 +38,14 @@ let preferLocal = false
 const hostSourceQueries: string[] = []
 type RequestSource = { userId: string; botId: string; issueId: string | null; kind: string; deliveredAt: Date | null; payload: Record<string, unknown> }
 let requestSource: RequestSource | null = null
-let modelResolutions = 0, bindingSelections = 0, credentialReads = 0
+let modelResolutions = 0, bindingSelections = 0, credentialReads = 0, factoryReadCalls = 0
 const queued = new Map<string, Record<string, unknown>>()
 const subscription = { id: bindingId, consumerId: agentId, ownerId: owner, workspaceId, connectionId: 'connection', connectionRevision: 3, route: 'codex_cli', modelId: model }
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 const unused = () => { throw new Error('Unexpected side effect in startup fixture') }
 const target = () => ({ workspaceId, agentId: replaceAgent && awake ? 'different-agent' : agentId, repoId, deviceId })
 async function query(sql: string, values: unknown[] = []) {
-  if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [], rowCount: 0 }
+  if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql === 'BEGIN ISOLATION LEVEL REPEATABLE READ' || sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [], rowCount: 0 }
   if (sql.includes('FROM workspace_computer_policies')) return { rows: permission === undefined ? [] : [{ permission }], rowCount: 1 }
   if (sql.includes('FROM suggestion_executions')) return { rows: [], rowCount: Number(suggestionAllowed) }
   if (sql.startsWith('SELECT "agentDefinition"')) return { rows: [{ agentDefinition: { model, subscription: { bindingId } } }], rowCount: 1 }
@@ -55,7 +63,7 @@ async function query(sql: string, values: unknown[] = []) {
   }
   if (sql.includes('EXISTS (SELECT 1 FROM computer_run_bindings')) return { rows: [{ cloud: true }], rowCount: 1 }
   if (sql.includes('FROM agent_runs')) return { rows: previous ? [{ ...previous, remoteUrl: null, harness: 'codex', cloudWorkspaceId: workspaceId, cloudBotId: botId }] : [], rowCount: Number(Boolean(previous)) }
-  if (sql.includes('FROM factory_tasks')) return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) }
+  if (sql.includes('FROM factory_tasks')) { factoryReadCalls++; return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) } }
   if (sql.includes('FROM bots') || sql.includes('FROM bot_cloud_runtimes')) return { rows: present && values[0] === botId && values[1] === owner ? [target()] : [], rowCount: Number(present) }
   throw new Error(`Unexpected query in startup fixture: ${sql}`)
 }
@@ -167,7 +175,7 @@ beforeEach(() => {
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
   previous = null; pendingSpec = false; requestSource = null; preferLocal = false
-  selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
+  selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = factoryReadCalls = 0; queued.clear()
 })
 
 const cloudTaskSource = (): RequestSource => ({ userId: owner, botId, issueId, kind: 'user_message', deliveredAt: new Date(),
@@ -331,6 +339,49 @@ for (const refusal of ['owner', 'runtime', 'workspace', 'issue', 'policy', 'sugg
   assert.deepEqual(calls, [], 'authorization precedes provider I/O')
   assert.equal(queued.size, 0)
 })
+
+
+test('both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR', async () => {
+  const require = createRequire(import.meta.url), workflowRequire = createRequire(require.resolve('workflow'))
+  const official = await import(pathToFileURL(join(dirname(workflowRequire.resolve('@workflow/core')), 'telemetry.js')).href)
+  const sdk = await import('../workflows/coordinator/steps'), factory = await import('../workflows/coordinator/factory-steps')
+  const memory = new InMemorySpanExporter(), logMemory = new InMemoryLogRecordExporter()
+  const logs = createLogProvider({ endpoint: 'https://unused.test/i/v1/traces', token: 'unused', environment: 'dev', exporter: logMemory })
+  const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 1, environment: 'dev', logger: logs.getLogger('test'), serverless: false })
+  provider.register()
+  try {
+    const observations: { children: number; statuses: number[]; codes: unknown[]; errorLogs: number }[] = []
+    for (const read of [
+      () => sdk.readFactoryTask(owner, issueId, undefined, botId),
+      () => factory.getFactoryTask(owner, { taskId: issueId }),
+    ]) {
+      memory.reset(); logMemory.reset()
+      const result = await official.trace('step.execute readFactoryTask fixture', (step: { setAttribute(key: string, value: string): void }) => {
+        step.setAttribute('workflow.run.id', 'wrun_factory_refusal_fixture')
+        return read()
+      })
+      assert.deepEqual(result, { error: 'factoryNotFound' })
+      await provider.forceFlush(); await logs.forceFlush()
+      const spans = memory.getFinishedSpans(), children = spans.filter(span => span.name === 'coordinator.tool')
+      const parent = spans.find(span => span.name === 'step.execute')!
+      assert.equal(parent.status.code, SpanStatusCode.OK, 'the SDK legitimately persists the returned result; child ERROR must survive that')
+      assert.ok(children.every(span => span.parentSpanContext?.spanId === parent.spanContext().spanId && span.spanContext().traceId === parent.spanContext().traceId))
+      const failures = logMemory.getFinishedLogRecords().filter(record => record.body === 'mikka.stage.failed' && record.attributes['mikka.stage'] === 'coordinator.tool')
+      assert.ok(failures.every(record => children.some(span => span.spanContext().spanId === record.spanContext?.spanId && span.spanContext().traceId === record.spanContext?.traceId)))
+      assert.doesNotMatch(JSON.stringify(spans.map(span => ({ attributes: span.attributes, status: span.status, events: span.events }))), new RegExp(owner + '|' + issueId + '|' + botId))
+      observations.push({ children: children.length, statuses: children.map(span => span.status.code), codes: children.map(span => span.attributes['mikka.error.code']), errorLogs: failures.length })
+    }
+    assert.equal(factoryReadCalls, 2, 'each real store read executes its one existing mocked SELECT; no extra read is added')
+    assert.deepEqual(calls, [])
+    assert.equal(modelResolutions, 0); assert.equal(credentialReads, 0); assert.equal(queued.size, 0)
+    assert.ok(observations.every(item => item.children === 1), 'each actual asToolResult must own the failing operation span')
+    assert.ok(observations.every(item => item.statuses[0] === SpanStatusCode.ERROR && item.codes[0] === 'factoryNotFound' && item.errorLogs === 1))
+  } finally {
+    await provider.shutdown(); await logs.shutdown()
+    trace.disable(); context.disable(); propagation.disable()
+  }
+})
+
 
 test('preparation permits authorized quota fallback and leaves the original selection for queue-time validation', async () => {
   awake = false; switchedCredential = true

@@ -4,7 +4,8 @@ import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode }
 import { useSWRConfig } from 'swr'
 import { browserRuntime } from '@/lib/live/browser-runtime'
 import { type LiveRefresh, type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
-import { LiveChannels } from '@/lib/live/channels'
+import type { LiveChannelRegistry } from '@/lib/live/channels'
+import { LiveChannelOwner, type PreparedLiveChannels } from '@/lib/live/preparation'
 import { coversLiveRevisions } from '@/lib/live/revisions'
 import { TabShare, tabShareChannelName } from '@/lib/live/tab-share'
 import type { LiveKind } from '@/lib/live/events'
@@ -12,7 +13,7 @@ import { registerLiveKeyConnection } from '@/lib/swr/live-focus'
 import { PersistentReadCache, readCacheShareNamespace } from '@/lib/swr/persistent-cache'
 import { readBoundary, readFresh } from '@/lib/swr/read-observer'
 
-const LiveContext = createContext<{ channels: LiveChannels; ownerId: string; workspaceId?: string; namespace: string | null; share?: (scope: string | null) => TabShare | null } | null>(null)
+const LiveContext = createContext<{ channels: LiveChannelRegistry; ownerId: string; workspaceId?: string; namespace: string | null; share?: (scope: string | null) => TabShare | null } | null>(null)
 
 /** Live reads opt in to taking another tab's result (lib/live/tab-share.ts). */
 export type LiveKeyOptions = LiveSubscriptionOptions & { shareAcrossTabs?: boolean }
@@ -37,13 +38,14 @@ function tabShares(namespace: string) {
 
 export { watchPageVisibility } from '@/lib/live/browser-runtime'
 
-export function LiveProvider({ ownerId, workspaceId, children }: { ownerId: string; workspaceId?: string; children: ReactNode }) {
+export function LiveProvider({ ownerId, workspaceId, preparation, children }: { ownerId: string; workspaceId?: string; preparation?: PreparedLiveChannels; children: ReactNode }) {
   const { cache } = useSWRConfig()
-  const channels = useMemo(() => new LiveChannels(browserRuntime), [ownerId])
+  const channels = useMemo(() => new LiveChannelOwner(browserRuntime, cache, preparation), [ownerId, cache, preparation])
   const namespace = readCacheShareNamespace(cache, ownerId)
   const shares = useMemo(() => namespace ? tabShares(namespace) : null, [namespace])
   const value = useMemo(() => ({ channels, ownerId, workspaceId, namespace, share: shares?.share }), [channels, ownerId, workspaceId, namespace, shares])
-  useEffect(() => () => channels.dispose(), [channels])
+  useEffect(() => channels.mount(), [channels])
+  useEffect(() => { channels.confirmWorkspace(workspaceId) }, [channels, workspaceId])
   useEffect(() => () => shares?.close(), [shares])
   return <LiveContext value={value}>{children}</LiveContext>
 }

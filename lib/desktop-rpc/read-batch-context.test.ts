@@ -3,6 +3,10 @@ import assert from 'node:assert/strict'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ownerLiveReadScope, ownerLiveScope } from '../live/owner-scope'
 import { readBatchOwnerRevisions, readBatchRevisions, withReadBatchContext } from './read-batch-context'
+import * as readContext from './read-batch-context'
+import { readPendingWorkspaceChoices } from './workspace-choices'
+import { COMMIT_EXECUTOR } from '../db/commit-effects'
+import { routeScope } from '../tracing/labels'
 
 const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const workspace = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
@@ -293,4 +297,303 @@ test('throw and cancellation release the plan as well as its earlier observation
     assert.deepEqual(await after(), { [threadKey]: 12 })
     assert.deepEqual(calls.map(values => values[0]), [['issue_list', 'thread_list'], ['thread_list'], ['thread_list']])
   }
+})
+
+// The old source executes its real per-reader queue for RED comparison, so a
+// failed count is behavioral rather than a missing new export.
+const workspaceRevisions: typeof readContext.readBatchWorkspaceRevisions =
+  readContext.readBatchWorkspaceRevisions ?? ((database, refs) => readBatchRevisions(database, refs))
+const workspacePlan = ['task-runs.syncThreadList', 'task-runs.pollTaskRuns', 'issues.syncIssueList'] as const
+const selectedTeam = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+
+function workspaceRevisionFixture(initial = 7) {
+  let revision = initial
+  const calls: string[][][] = []
+  const database = { query: async (_sql: string, values: string[][]) => {
+    calls.push(values)
+    return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: String(revision) })) }
+  } } as unknown as Parameters<typeof readBatchRevisions>[0]
+  return { database, calls, setRevision: (next: number) => { revision = next } }
+}
+
+test('authorized workspace readers share their earlier Team revisions despite different readiness', async () => {
+  const f = workspaceRevisionFixture(), scope = { ownerId: owner, workspaceId: selectedTeam }
+  await withReadBatchContext(async () => {
+    for (const kind of ['thread_list', 'task_run_list', 'issue_list'] as const) {
+      assert.deepEqual(await workspaceRevisions(f.database, [{ kind, id: selectedTeam }], scope), { [`${kind}:${selectedTeam}`]: 7 })
+      f.setRevision(12)
+    }
+  }, workspacePlan)
+  assert.deepEqual(f.calls, [[['issue_list', 'task_run_list', 'thread_list'], [selectedTeam, selectedTeam, selectedTeam]]])
+  assert.deepEqual(await withReadBatchContext(() => workspaceRevisions(f.database, [{ kind: 'thread_list', id: selectedTeam }], scope), workspacePlan),
+    { [`thread_list:${selectedTeam}`]: 12 })
+  assert.equal(f.calls.length, 2, 'a later request observes current counters')
+})
+
+test('authorized Team plans do not resolve a Personal home or borrow a different workspace', async () => {
+  const f = workspaceRevisionFixture(), peerTeam = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+  await withReadBatchContext(async () => {
+    const teamScope = { ownerId: owner, workspaceId: selectedTeam }
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'thread_list', id: selectedTeam }], teamScope), { [`thread_list:${selectedTeam}`]: 7 })
+    f.setRevision(12)
+    const home = { ownerId: owner, workspaceId: workspace }
+    assert.deepEqual(await readBatchOwnerRevisions(f.database, [{ kind: 'issue_list', id: workspace }], home), { [`issue_list:${workspace}`]: 12 })
+    const peer = { ownerId: 'other-owner', workspaceId: peerTeam }
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'thread_list', id: peerTeam }], peer), { [`thread_list:${peerTeam}`]: 12 })
+  }, workspacePlan)
+  assert.equal(f.calls.length, 3)
+  assert.deepEqual(f.calls.map(call => [...new Set(call[1])]), [[selectedTeam], [workspace], [peerTeam]])
+})
+
+test('entities, unresolved scopes and mismatched workspace refs never start a Team plan', async () => {
+  const f = workspaceRevisionFixture(), scope = { ownerId: owner, workspaceId: selectedTeam }
+  await withReadBatchContext(async () => {
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'bot_chat', id: selectedTeam }], scope), { [`bot_chat:${selectedTeam}`]: 7 })
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'thread_list', id: workspace }], scope), { [threadKey]: 7 })
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'issue_list', id: workspace }], null), { [`issue_list:${workspace}`]: 7 })
+    assert.deepEqual(await workspaceRevisions(f.database, [{ kind: 'thread_list', id: 'invalid' }], scope), {})
+  }, workspacePlan)
+  assert.deepEqual(f.calls.map(call => call[0]), [['bot_chat'], ['thread_list'], ['issue_list']])
+})
+
+test('workspace revision observations use the actual executor behind one request proxy', async () => {
+  const first = workspaceRevisionFixture(7), second = workspaceRevisionFixture(12)
+  const executors = new AsyncLocalStorage<Parameters<typeof readBatchRevisions>[0]>()
+  const proxy = {
+    get [COMMIT_EXECUTOR]() { return executors.getStore() },
+    query(...args: unknown[]) { return Reflect.apply(executors.getStore()!.query, executors.getStore(), args) },
+  } as unknown as Parameters<typeof readBatchRevisions>[0]
+  const scope = { ownerId: owner, workspaceId: selectedTeam }, refs = [{ kind: 'thread_list' as const, id: selectedTeam }]
+  await withReadBatchContext(async () => {
+    assert.deepEqual(await executors.run(first.database, () => workspaceRevisions(proxy, refs, scope)), { [`thread_list:${selectedTeam}`]: 7 })
+    assert.deepEqual(await executors.run(second.database, () => workspaceRevisions(proxy, refs, scope)), { [`thread_list:${selectedTeam}`]: 12 })
+    assert.deepEqual(await executors.run(first.database, () => workspaceRevisions(proxy, refs, scope)), { [`thread_list:${selectedTeam}`]: 7 })
+  }, workspacePlan)
+  assert.equal(first.calls.length, 1); assert.equal(second.calls.length, 1)
+})
+
+test('workspace plans never supply foreground revisions to after, cron or workflow reads', async () => {
+  const f = workspaceRevisionFixture(), scope = { ownerId: owner, workspaceId: selectedTeam }
+  const read = () => workspaceRevisions(f.database, [{ kind: 'thread_list', id: selectedTeam }], scope)
+  await withReadBatchContext(async () => {
+    assert.deepEqual(await read(), { [`thread_list:${selectedTeam}`]: 7 })
+    let revision = 8
+    for (const route of ['after:revision-fixture', 'cron:revision-fixture', 'workflow:revision-fixture/read']) {
+      f.setRevision(revision)
+      assert.deepEqual(await routeScope.run(route, read), { [`thread_list:${selectedTeam}`]: revision })
+      revision++
+    }
+    assert.deepEqual(await read(), { [`thread_list:${selectedTeam}`]: 7 })
+  }, workspacePlan)
+  assert.equal(f.calls.length, 4)
+  assert.ok(f.calls.slice(1).every(call => call[0].length === 1), 'deferred work does not inherit the plan either')
+})
+
+test('workspace plan failure and completed lifetimes never fabricate or retain revision proof', async () => {
+  const failure = new Error('synthetic_workspace_revision_failure'), f = workspaceRevisionFixture()
+  let unavailable = true, after!: () => Promise<unknown>, reads = 0
+  const database = { query: async (...args: unknown[]) => {
+    reads++
+    if (unavailable) throw failure
+    return Reflect.apply(f.database.query, f.database, args)
+  } } as unknown as Parameters<typeof readBatchRevisions>[0]
+  const scope = { ownerId: owner, workspaceId: selectedTeam }, refs = [{ kind: 'thread_list' as const, id: selectedTeam }]
+  await assert.rejects(withReadBatchContext(async () => {
+    after = AsyncLocalStorage.bind(() => workspaceRevisions(database, refs, scope))
+    await workspaceRevisions(database, refs, scope)
+  }, workspacePlan), error => error === failure)
+  unavailable = false
+  assert.deepEqual(await after(), { [`thread_list:${selectedTeam}`]: 7 })
+  f.setRevision(12)
+  assert.deepEqual(await after(), { [`thread_list:${selectedTeam}`]: 12 })
+  assert.equal(reads, 3)
+  assert.ok(f.calls.every(call => call[0].length === 1), 'the expired plan does not survive through a bound callback')
+})
+
+test('authorized Team list prefetch reduces three separately ready fixed-revision reads to one SQL', async () => {
+  const f = workspaceRevisionFixture(7), scope = { ownerId: owner, workspaceId: selectedTeam }
+  const kinds = ['thread_list', 'task_run_list', 'issue_list'] as const
+  const observed: Record<string, number>[] = []
+  await withReadBatchContext(async () => {
+    for (const kind of kinds) {
+      await Promise.resolve()
+      observed.push(await workspaceRevisions(f.database, [{ kind, id: selectedTeam }], scope))
+    }
+  }, workspacePlan)
+  assert.deepEqual(observed, kinds.map(kind => ({ [`${kind}:${selectedTeam}`]: 7 })),
+    'all three readers finish with the same counters and only their original requested key')
+  assert.equal(f.calls.length, 1, 'the old per-reader queue issues three SQL reads after separate readiness')
+  assert.deepEqual(f.calls[0], [['issue_list', 'task_run_list', 'thread_list'], [selectedTeam, selectedTeam, selectedTeam]])
+})
+
+type ChoiceReadInput = Parameters<typeof readPendingWorkspaceChoices>[0]
+const choiceFamily = {}, choiceRequest = {}, choiceDatabase = {}
+const choiceInput = (patch: Partial<ChoiceReadInput> = {}): ChoiceReadInput => ({
+  family: choiceFamily, database: choiceDatabase, request: choiceRequest, transaction: false,
+  identity: { userId: owner, nativeSessionId: 'choice-native-session', requestedId: workspace }, ...patch,
+})
+const choiceRow = () => ({ id: workspace, name: 'Fixture', kind: 'team', role: 'member', organizationId: null })
+
+test('pending workspace choices share one fresh SELECT and independent scalar rows before dispatch', async () => {
+  let reads = 0
+  const selected = choiceRow()
+  const read = async () => { reads++; return [selected] }
+  const result = await withReadBatchContext(() => Promise.all([
+    readPendingWorkspaceChoices(choiceInput(), read),
+    readPendingWorkspaceChoices(choiceInput(), read),
+  ]))
+  assert.equal(reads, 1)
+  assert.deepEqual(result, [[choiceRow()], [choiceRow()]])
+  assert.notEqual(result[0], result[1])
+  assert.notEqual(result[0][0], result[1][0])
+  result[0][0].name = 'Changed by one consumer'
+  assert.equal(result[1][0].name, 'Fixture')
+  assert.equal(selected.name, 'Fixture', 'a consumer cannot mutate the shared SQL observation')
+})
+
+test('a workspace SELECT is removed before callback construction and Drizzle thenable assimilation', async () => {
+  for (const point of ['construction', 'then'] as const) {
+    let reads = 0, following: Promise<ReturnType<typeof choiceRow>[]> | undefined
+    const fresh = () => { reads++; return Promise.resolve([]) }
+    const first = () => {
+      reads++
+      if (point === 'construction') following = readPendingWorkspaceChoices(choiceInput(), fresh)
+      return {
+        // oxlint-disable-next-line unicorn/no-thenable -- Match Drizzle query builders to test dispatch cleanup before assimilation.
+        then(resolve: (rows: ReturnType<typeof choiceRow>[]) => void) {
+          if (point === 'then') following = readPendingWorkspaceChoices(choiceInput(), fresh)
+          resolve([choiceRow()])
+        },
+      } as PromiseLike<ReturnType<typeof choiceRow>[]>
+    }
+    await withReadBatchContext(async () => {
+      assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), first), [choiceRow()])
+      assert.ok(following)
+      assert.deepEqual(await following, [], 'a call after the dispatch fence cannot join the older SELECT')
+    })
+    assert.equal(reads, 2, point)
+  }
+})
+
+test('a later workspace read cannot join an in-flight or completed pre-revocation SELECT', async () => {
+  let reads = 0, member = true, release!: () => void, dispatched!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  const started = new Promise<void>(resolve => { dispatched = resolve })
+  const read = async () => {
+    const rows = member ? [choiceRow()] : []
+    if (++reads === 1) { dispatched(); await held }
+    return rows
+  }
+  await withReadBatchContext(async () => {
+    const earlier = readPendingWorkspaceChoices(choiceInput(), read)
+    await started
+    member = false
+    assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), read), [])
+    assert.equal(reads, 2, 'the old SQL remains unresolved while the revocation is observed')
+    release()
+    assert.deepEqual(await earlier, [choiceRow()])
+    assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), read), [])
+    assert.equal(reads, 3, 'completion is not a reusable authority cache')
+    member = true
+    assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), read), [choiceRow()])
+    assert.equal(reads, 4, 'the same batch also sees restoration')
+  })
+})
+
+test('workspace queue failures reject only their joined readers and never poison a later read', async () => {
+  for (const synchronous of [true, false]) {
+    let reads = 0
+    const error = new Error('workspace SELECT unavailable')
+    const failed = () => { reads++; if (synchronous) throw error; return Promise.reject(error) }
+    await withReadBatchContext(async () => {
+      const results = await Promise.allSettled([
+        readPendingWorkspaceChoices(choiceInput(), failed),
+        readPendingWorkspaceChoices(choiceInput(), failed),
+      ])
+      assert.ok(results.every(result => result.status === 'rejected' && result.reason === error))
+      assert.equal(reads, 1)
+      assert.deepEqual(await readPendingWorkspaceChoices(choiceInput(), async () => { reads++; return [choiceRow()] }), [choiceRow()])
+      assert.equal(reads, 2)
+    })
+  }
+})
+
+test('workspace choices are partitioned by request, SQL family, executor, session, reader, pin and principal', async () => {
+  const base = choiceInput()
+  const identities: ChoiceReadInput['identity'][] = [
+    { ...base.identity, userId: 'other-owner' },
+    { ...base.identity, nativeSessionId: 'another-session' },
+    { ...base.identity, requestedId: 'another-workspace' },
+    { ...base.identity, tokenWorkspaceId: 'pinned-workspace' },
+    { ...base.identity, principal: { kind: 'session', sessionId: 'explicit-session' } },
+    { ...base.identity, principal: { kind: 'pat', tokenId: 'pat-a', workspaceId: workspace } },
+    { ...base.identity, principal: { kind: 'pat', tokenId: 'pat-b', workspaceId: workspace } },
+    { ...base.identity, principal: { kind: 'delegation', credentialId: 'delegation', credentialKind: 'oauth' } },
+    { ...base.identity, principal: { kind: 'delegation', credentialId: 'delegation', credentialKind: 'run' } },
+    { ...base.identity, principal: { kind: 'delegation', credentialId: 'delegation', credentialKind: 'run', workspaceId: workspace } },
+    { ...base.identity, principal: { kind: 'admission', runId: 'run-a', workspaceId: workspace } },
+    { ...base.identity, principal: { kind: 'admission', runId: 'run-b', workspaceId: workspace } },
+    { ...base.identity, acting: { userId: owner } },
+    { ...base.identity, acting: { userId: 'other-acting-user' } },
+    { ...base.identity, acting: { userId: owner, tokenWorkspaceId: workspace } },
+    { ...base.identity, acting: { userId: owner, enterprisePrincipal: { kind: 'session', sessionId: 'acting-session' } } },
+  ]
+  const inputs = [base, choiceInput({ request: {} }), choiceInput({ family: {} }), choiceInput({ database: {} }),
+    ...identities.map(identity => choiceInput({ identity }))]
+  let reads = 0
+  await withReadBatchContext(() => Promise.all(inputs.flatMap(input => [
+    readPendingWorkspaceChoices(input, async () => { reads++; return [choiceRow()] }),
+    readPendingWorkspaceChoices(input, async () => { reads++; return [choiceRow()] }),
+  ])))
+  assert.equal(reads, inputs.length, 'only each exact pair shares its own new SELECT')
+  const execution = new AsyncLocalStorage<object>()
+  const proxy = new Proxy({}, { get: (_target, property) => property === COMMIT_EXECUTOR ? execution.getStore() : undefined })
+  await withReadBatchContext(() => Promise.all([{}, {}].map(executor => execution.run(executor, () =>
+    readPendingWorkspaceChoices(choiceInput({ database: proxy }), async () => { reads++; return [] })))))
+  assert.equal(reads, inputs.length + 2, 'one dynamic pool proxy cannot merge different actual executors')
+})
+
+test('transactions, absent Native identity, unknown principal and detached work bypass the workspace queue', async () => {
+  const base = choiceInput()
+  const unsupported = { kind: 'future-principal' } as unknown as NonNullable<ChoiceReadInput['identity']['principal']>
+  const extended = { kind: 'session', sessionId: 'session', futureAssurance: 'unknown' } as NonNullable<ChoiceReadInput['identity']['principal']>
+  const inputs = [
+    choiceInput({ transaction: true }), choiceInput({ request: undefined }),
+    choiceInput({ identity: { ...base.identity, nativeSessionId: undefined } }),
+    choiceInput({ identity: { ...base.identity, principal: unsupported } }),
+    choiceInput({ identity: { ...base.identity, principal: extended } }),
+    choiceInput({ identity: { ...base.identity, acting: { userId: owner, enterprisePrincipal: unsupported } } }),
+  ]
+  let reads = 0
+  const read = async () => { reads++; return [choiceRow()] }
+  for (const input of inputs) await withReadBatchContext(() => Promise.all([
+    readPendingWorkspaceChoices(input, read), readPendingWorkspaceChoices(input, read),
+  ]))
+  assert.equal(reads, inputs.length * 2)
+  let later!: () => Promise<ReturnType<typeof choiceRow>[][]>
+  const after = () => Promise.all([readPendingWorkspaceChoices(base, read), readPendingWorkspaceChoices(base, read)])
+  await assert.rejects(withReadBatchContext(async () => {
+    later = AsyncLocalStorage.bind(after)
+    throw new Error('batch stopped before its later callback')
+  }), /batch stopped/)
+  await later()
+  assert.equal(reads, inputs.length * 2 + 2, 'a bound callback cannot reactivate the closed queue')
+  for (const route of ['after:fixture', 'cron:fixture', 'workflow:fixture']) {
+    await withReadBatchContext(() => routeScope.run(route, after))
+  }
+  assert.equal(reads, inputs.length * 2 + 8)
+})
+
+test('parallel and successive Native batches never share a workspace observation', async () => {
+  let reads = 0
+  const read = async () => { reads++; return [choiceRow()] }
+  const run = () => withReadBatchContext(() => Promise.all([
+    readPendingWorkspaceChoices(choiceInput(), read), readPendingWorkspaceChoices(choiceInput(), read),
+  ]))
+  await Promise.all([run(), run()])
+  assert.equal(reads, 2)
+  await run()
+  assert.equal(reads, 3)
+  await Promise.all([readPendingWorkspaceChoices(choiceInput(), read), readPendingWorkspaceChoices(choiceInput(), read)])
+  assert.equal(reads, 5, 'ordinary reads outside Native batching always execute their own SELECT')
 })

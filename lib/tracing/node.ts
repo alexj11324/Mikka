@@ -83,7 +83,9 @@ export function createTracerProvider({ exporter, sampleRate, environment, versio
     sampler: new RunSampler(sampleRate),
     // Logs see the retained span, including the effective rate after a tail
     // promotion, so APM and native Logs describe the same sampling decision.
-    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(logger ? new StageLogProcessor(logger, batcher) : batcher), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush(), flushTelemetry()]) }, serverless)],
+    // The SDK batch flush drains queued spans, but not an export its timer
+    // already started. Keep that transport in waitUntil as well.
+    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(logger ? new StageLogProcessor(logger, batcher) : batcher), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush().finally(() => exporter.forceFlush?.()), flushTelemetry()]) }, serverless)],
   })
 }
 

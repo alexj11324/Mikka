@@ -191,6 +191,30 @@ test('registration grant is user-bound, expires, and has one concurrent winner',
   assert.equal(await consumeDeviceEnrollment('invalid'), null)
 }))
 
+test('registration grant consumption uses one PostgreSQL statement', t => run(async () => {
+  const grant = await mintDeviceEnrollment('single-statement-owner')
+  const result = await measured(() => consumeDeviceEnrollment(grant))
+  assert.ok(result.value, 'a valid grant still issues its credential')
+  t.diagnostic(JSON.stringify({ scenario: 'enrollment-consumption', statements: result.statements }))
+  assert.equal(result.statements, 1)
+}))
+
+test('a failed credential insertion does not consume the enrollment grant', () => run(async () => {
+  const { pool } = await import('./db')
+  const grant = await mintDeviceEnrollment('rollback-owner')
+  await pool.query(`ALTER TABLE device_tokens ADD CONSTRAINT enrollment_insert_failure CHECK ("userId" <> 'rollback-owner')`)
+  try {
+    await assert.rejects(consumeDeviceEnrollment(grant), /enrollment_insert_failure/)
+  } finally {
+    await pool.query('ALTER TABLE device_tokens DROP CONSTRAINT enrollment_insert_failure')
+  }
+  const credential = await consumeDeviceEnrollment(grant)
+  assert.ok(credential, 'failed insertion rolls the grant consumption back')
+  assert.equal(await consumeDeviceEnrollment(grant), null, 'the successful retry still consumes the grant once')
+  const { rows } = await pool.query('SELECT "userId" FROM device_tokens WHERE "tokenHash"=$1', [hashDeviceToken(credential)])
+  assert.deepEqual(rows, [{ userId: 'rollback-owner' }])
+}))
+
 test('daemon acceptance follows real local enrollment and owner routes without a cloud token binding', () => run(async () => {
   const { pool } = await import('./db')
   const { GET: readTokens } = await import('../app/api/device-tokens/route')
@@ -306,6 +330,35 @@ test('management queue is owner-scoped, serial and acknowledges only its device'
   await pendingDeviceCommands(a, [third!])
   const replay = await pool.query(`SELECT "completedAt" FROM device_management_commands WHERE id=$1`, [third])
   assert.equal(receipt.rows[0].completedAt.getTime(), replay.rows[0].completedAt.getTime())
+}))
+
+test('pending commands without receipts are one read and preserve current device removal state', t => run(async () => {
+  const { pool } = await import('./db')
+  const active = randomUUID(), removed = randomUUID(), empty = randomUUID(), foreign = randomUUID()
+  const restart = randomUUID(), later = randomUUID(), hidden = randomUUID(), uninstall = randomUUID(), other = randomUUID()
+  await pool.query(`INSERT INTO devices(id,"ownerId",enabled,"removedAt")
+    VALUES($1,'pending-owner',false,NULL),($2,'pending-owner',false,now()),($3,'pending-owner',true,NULL),($4,'other-owner',true,NULL)`, [active, removed, empty, foreign])
+  await pool.query(`INSERT INTO device_management_commands(id,"deviceId",kind,"createdAt") VALUES
+    ($1,$6,'restart',now()-interval '3 seconds'),($2,$6,'update',now()),
+    ($3,$7,'restart',now()-interval '3 seconds'),($4,$7,'uninstall',now()),($5,$8,'redetect',now()-interval '5 seconds')`,
+  [restart, later, hidden, uninstall, other, active, removed, foreign])
+  const snapshot = async () => (await pool.query('SELECT id,"completedAt",error FROM device_management_commands WHERE "deviceId"=ANY($1::uuid[]) ORDER BY id', [[active, removed, empty, foreign]])).rows
+  const before = await snapshot()
+  const cases = [
+    { scenario: 'disabled-device', device: active, expected: [{ id: restart, kind: 'restart' }] },
+    { scenario: 'removed-device', device: removed, expected: [{ id: uninstall, kind: 'uninstall' }] },
+    { scenario: 'empty-device', device: empty, expected: [] },
+    { scenario: 'missing-device', device: randomUUID(), expected: [] },
+  ]
+  for (const { scenario, device, expected } of cases) {
+    const result = await measured(() => pendingDeviceCommands(device, []))
+    assert.deepEqual(result.value, expected)
+    t.diagnostic(JSON.stringify({ scenario, statements: result.statements }))
+    assert.equal(result.statements, 1)
+  }
+  assert.deepEqual(await snapshot(), before, 'a read does not acknowledge or fail any command')
+  await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [active])
+  assert.deepEqual(await pendingDeviceCommands(active, []), [], 'the next call observes a committed removal and does not reuse an earlier device state')
 }))
 
 test('a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential', () => run(async () => {

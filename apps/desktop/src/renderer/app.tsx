@@ -29,6 +29,10 @@ import { setClientConfiguration } from './client-configuration'
 import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, bootstrapScope, PlatformExtras, requireUpdate } from 'mikka:platform'
 import { loadWorkspace, preloadWorkspace } from './workspace-loader'
 import { InstalledWorkspace } from './installed-workspace'
+import { WorkspaceLiveController, isInstalledWorkspacePath } from './workspace-live'
+import { browserRuntime } from '@/lib/live/browser-runtime'
+import { publicAppOrigin } from '@/lib/platform/public-origin'
+import type { PreparedLiveChannels } from '@/lib/live/preparation'
 import { serverDocumentKind, serverPageKind } from '@/lib/server-pages'
 
 const Workspace = lazy(loadWorkspace)
@@ -38,7 +42,7 @@ const GitHubHandoff = lazy(() => import('@/components/plugins/github-settings').
 
 type ApplicationBootstrap =
   | { scope: 'authentication'; value: AuthenticationBootstrap }
-  | { scope: 'workspace'; workspace: string | null; value: DesktopBootstrap }
+  | { scope: 'workspace'; workspace: string | null; value: DesktopBootstrap; livePreparation?: PreparedLiveChannels }
 
 /** Runtime-specific composition only. The application surfaces below are the
  * exact same components, data hooks and lazy chunks as the web application. */
@@ -58,8 +62,10 @@ function SessionApplication() {
   const location = useLocation()
   const requestedScope = bootstrapScope(location)
   const requestedWorkspace = requestedScope === 'workspace' ? location.searchParams.get('workspace') : null
-  const requested = useRef({ scope: requestedScope, workspace: requestedWorkspace })
-  requested.current = { scope: requestedScope, workspace: requestedWorkspace }
+  const workspaceRoute = platform === 'desktop' && isInstalledWorkspacePath(withoutLocale(location.pathname))
+  const [live] = useState(() => new WorkspaceLiveController(browserRuntime))
+  const requested = useRef({ scope: requestedScope, workspace: requestedWorkspace, workspaceRoute })
+  requested.current = { scope: requestedScope, workspace: requestedWorkspace, workspaceRoute }
   const lastRequested = useRef(requested.current)
   const generation = useRef(0)
   const inFlight = useRef<{ scope: BootstrapScope; workspace: string | null; promise: Promise<void> } | null>(null)
@@ -69,7 +75,7 @@ function SessionApplication() {
     if (inFlight.current?.scope === request.scope && inFlight.current.workspace === request.workspace && !changedOwner) return inFlight.current.promise
     const changedScope = changedOwner || request.scope !== lastRequested.current.scope || request.workspace !== lastRequested.current.workspace
     lastRequested.current = request
-    if (changedScope) { resetReadBatchScope(); setBootstrap(null) }
+    if (changedScope) { live.retire(); resetReadBatchScope(); setBootstrap(null) }
     if (changedOwner) { setClientConfiguration(null); setSession(null) }
     const current = ++generation.current
     setPending(true)
@@ -83,10 +89,21 @@ function SessionApplication() {
         ? { scope: 'authentication', value: await readAuthentication(isCurrent) }
         : { scope: 'workspace', workspace: request.workspace, value: await readBootstrap(request.workspace, isCurrent) }
       if (current !== generation.current) return
-      if (!value.value.user) await clearPersistentReadCaches()
+      if (!value.value.user) { live.retire(); await clearPersistentReadCaches() }
       if (current !== generation.current) return
       setClientConfiguration(value.scope === 'workspace' ? value.value : null)
       setSession(value.value.user && value.value.session ? { user: value.value.user, session: value.value.session } : null)
+      if (platform === 'desktop' && value.scope === 'workspace') {
+        // Navigation notifications are queued; the URL may already have changed
+        // before React refreshes requested.current. Prepare only for this URL.
+        const active = new URL(window.location.href)
+        value.livePreparation = live.reconcile(value.value, {
+          enabled: current === generation.current && isInstalledWorkspacePath(withoutLocale(active.pathname))
+            && bootstrapScope(active) === request.scope && active.searchParams.get('workspace') === request.workspace
+            && getTransportState() !== 'update-required',
+          selector: request.workspace, server: publicAppOrigin(),
+        })
+      } else live.retire()
       setBootstrap(value)
       setFailed(false)
       setTransportState('ready')
@@ -97,7 +114,7 @@ function SessionApplication() {
     })
     inFlight.current = { ...request, promise }
     return promise
-  }, [])
+  }, [live])
   useEffect(() => {
     void reload()
     // Load only installed code in parallel with bootstrap. The shared provider
@@ -111,13 +128,17 @@ function SessionApplication() {
     window.addEventListener('online', changed)
     window.addEventListener('offline', offline)
     return () => {
+      live.retire()
       generation.current++
       stop()
       window.removeEventListener(REFRESH_EVENT, changed)
       window.removeEventListener('online', changed)
       window.removeEventListener('offline', offline)
     }
-  }, [reload])
+  }, [reload, live])
+  useEffect(() => {
+    if (!workspaceRoute || state === 'update-required' || state === 'unauthenticated') live.retire()
+  }, [workspaceRoute, state, live])
   useEffect(() => {
     // Leaving a PKCE identity page needs full workspace authorization even
     // when both routes have the same selector. Ordinary application navigation
@@ -128,17 +149,18 @@ function SessionApplication() {
     // A confirmed expiry discards every owner-scoped cache together. Network
     // failures retain the visible conversation and its unsent local draft.
     if (state === 'unauthenticated' && bootstrap?.value.user) {
+      live.retire()
       resetReadBatchScope()
       generation.current++
       inFlight.current = null
       setClientConfiguration(null)
       setSession(null)
       setBootstrap(current => !current ? null : current.scope === 'workspace'
-        ? { ...current, value: { ...current.value, user: null, session: null, cacheWorkspace: null, onboarding: undefined } }
+        ? { ...current, livePreparation: undefined, value: { ...current.value, user: null, session: null, cacheWorkspace: null, liveHomeWorkspaceId: null, onboarding: undefined } }
         : { ...current, value: { ...current.value, user: null, session: null } })
       void clearPersistentReadCaches()
     }
-  }, [state, bootstrap?.value.user])
+  }, [state, bootstrap?.value.user, live])
   if (state === 'update-required') return <UpdateRequired />
   if (!bootstrap || bootstrap.scope !== requestedScope || (bootstrap.scope === 'workspace' && bootstrap.workspace !== requestedWorkspace))
     return failed ? <Offline pending={pending} retry={() => void reload()} /> : <WorkspaceLoading />
@@ -188,8 +210,8 @@ function Routes({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   // return must still finish after the surrounding community app is disabled.
   if (serverDocument && serverPageKind(location) === 'github') return <Suspense fallback={<WorkspaceLoading />}><GitHubHandoff /></Suspense>
   if (serverDocument) return <WorkspaceLoading />
-  if (path !== '/' && path !== '/dashboard' && !['/settings', '/settings/teams', '/settings/members'].includes(path)) return <NotFound />
-  if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap.value} />
+  if (!isInstalledWorkspacePath(path)) return <NotFound />
+  if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap.value} livePreparation={bootstrap.livePreparation?.isAuthorityRetired ? undefined : bootstrap.livePreparation} />
   return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap.value} /></Suspense>
 }
 

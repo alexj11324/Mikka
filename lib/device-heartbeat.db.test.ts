@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 import { seedFixtureWorkspace } from '../tests/helpers/task-workspace'
+import { measured } from '../tests/helpers/read-metrics'
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
 // Local pure runs skip them; REQUIRE_DB=1 makes a missing database fail.
@@ -110,6 +111,78 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
     const [{ leaseExpiresAt }] = (await pool.query(`select "leaseExpiresAt" from agent_runs where id=$1`, [run])).rows
     assert.ok(leaseExpiresAt.getTime() > Date.now() + 60_000, 'the stored lease moved forward')
     assert.equal(new Date(leased.leases[run]).getTime(), leaseExpiresAt.getTime())
+  })
+})
+
+for (const kind of ['runs', 'repos'] as const) dbTest(`${kind} poll reads current authority, ownership and results in one snapshot`, { timeout: 20_000 }, async t => {
+  const [{ createRequestDatabaseScope, pool }, runs, repos] = await Promise.all([
+    import('./db'), import('../app/v1/devices/[deviceId]/runs/route'), import('../app/v1/devices/[deviceId]/repos/route'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `poll-${kind}-${randomUUID()}`, foreign = `poll-other-${randomUUID()}`
+  const owners = [owner, foreign]
+  t.after(async () => {
+    await scope.run(async () => {
+      await pool.query('DELETE FROM device_repos WHERE "userId"=ANY($1::text[])', [owners])
+      await pool.query('DELETE FROM agent_runs WHERE "userId"=ANY($1::text[])', [owners])
+      await pool.query('DELETE FROM agents WHERE "userId"=ANY($1::text[])', [owners])
+      await pool.query('DELETE FROM device_tokens WHERE "userId"=ANY($1::text[])', [owners])
+      await pool.query('DELETE FROM devices WHERE "ownerId"=ANY($1::text[])', [owners])
+      await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [owners])
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    for (const user of owners) await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$1||'@example.invalid',false,now(),now())`, [user])
+    const fixture = async () => {
+      const device = randomUUID(), tokenId = randomUUID(), credential = `orv_${randomBytes(32).toString('base64url')}`
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,'Poll fixture','local')`, [device, owner])
+      await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","lastUsedAt") VALUES($1,$2,$3,now())', [tokenId, owner, createHash('sha256').update(credential).digest('hex')])
+      const request = () => new Request(`http://127.0.0.1/mikka/v1/devices/${device}/${kind}`, { headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': '999.0.0' } })
+      return { device, tokenId, request }
+    }
+    const get = kind === 'runs' ? runs.GET : repos.GET
+    const current = await fixture()
+    const read = () => get(current.request(), { params: Promise.resolve({ deviceId: current.device }) })
+    const result = await measured(async () => {
+      const response = await read()
+      assert.equal(response.status, 200)
+      return response.json()
+    })
+    assert.deepEqual(result.value, kind === 'runs' ? { runIds: [] } : { repos: [] })
+    t.diagnostic(JSON.stringify({ scenario: `${kind}-empty-poll`, statements: result.statements }))
+    if (kind === 'runs') {
+      const agent = randomUUID(), queued = randomUUID()
+      const workspaceId = await seedFixtureWorkspace(pool, owner)
+      await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,'Poll agent','codex')`, [agent, owner])
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId","workspaceId",status) VALUES($1,$2,$3,$4,$5,'queued')`, [queued, owner, agent, current.device, workspaceId])
+      assert.deepEqual(await (await read()).json(), { runIds: [queued] })
+      await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [current.device])
+      assert.deepEqual(await (await read()).json(), { runIds: [] }, 'disabled devices receive no queued work')
+    } else {
+      const repo = randomUUID(), repoPath = 'v2/github.com/fixture/poll-repo'
+      await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath") VALUES($1,$2,$3,$4)', [repo, owner, current.device, repoPath])
+      assert.deepEqual(await (await read()).json(), { repos: [{ repoId: repo, name: 'poll-repo', path: repoPath, remoteUrl: null }] })
+    }
+    for (const change of ['revoked', 'expired', 'removed', 'foreign-owner'] as const) {
+      const f = await fixture()
+      const entered = Promise.withResolvers<void>(), gate = Promise.withResolvers<{ deviceId: string }>()
+      // The wrapped handler reads params after real initial authentication and
+      // waits for this promise before any business read.
+      const pending = get(f.request(), { get params() { entered.resolve(); return gate.promise } })
+      try {
+        await Promise.race([entered.promise, pending.then(() => { throw new Error('Poll completed before the params barrier') })])
+        if (change === 'revoked') await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [f.tokenId])
+        else if (change === 'expired') await pool.query(`UPDATE device_tokens SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [f.tokenId])
+        else if (change === 'removed') await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [f.device])
+        else await pool.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1', [f.device, foreign])
+      } finally { gate.resolve({ deviceId: f.device }) }
+      const response = await pending
+      assert.equal(response.status, change === 'revoked' || change === 'expired' ? 401 : 404, `${change} between authentication and the snapshot is refused`)
+      const body = await response.json()
+      assert.equal('runIds' in body || 'repos' in body, false, 'no business data accompanies a refused read')
+    }
+    assert.equal(result.statements, 2, 'one fresh authentication and one authority/owner/result snapshot')
   })
 })
 

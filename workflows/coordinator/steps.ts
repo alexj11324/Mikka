@@ -67,6 +67,7 @@ import { recordDecision, settleTurn } from '@/lib/attention/store'
 import type { CreateIssueInput, UpdateIssueInput } from '@/lib/coordinator/issue-input'
 import { systemActor } from '@/lib/activity-actor'
 import { timedPhase, withDispatchTiming } from '@/lib/dispatch-timing'
+import { withRunSpan } from '@/lib/tracing/context'
 
 // Every function here is a durable step: it runs with full Node access, its
 // result is recorded, and a failure is retried. Tools return `{ error }` for
@@ -87,7 +88,7 @@ export async function computerToolsEnabled() {
 
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
   try {
-    return await fn()
+    return await withRunSpan('coordinator.tool', {}, fn)
   } catch (error) {
     if (error instanceof ActionFailureError) {
       // A refused run says why, so the Coordinator acts on the cause instead of guessing one.

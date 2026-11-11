@@ -208,15 +208,22 @@ test('when no fence connection can be had the request is refused with 503, never
   for (const answer of await Promise.all(holding)) assert.equal(answer.status, 200)
 })
 
-test('ten concurrent device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement', { skip: !url }, async t => {
-  const { overrideDeploymentSwitch, runs } = await modules()
+test('ten concurrent multi-statement device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement', { skip: !url }, async t => {
+  const { overrideDeploymentSwitch, withDeviceRoute, pool } = await modules()
+  // Pure polling routes carry authority in one read snapshot. Keep exercising
+  // the unit fence with an actual protected burst of two separate statements.
+  const protectedBurst = withDeviceRoute(async () => {
+    await pool.query('SELECT 1')
+    await pool.query('SELECT 2')
+    return Response.json({ ok: true })
+  })
   const fs = await Promise.all(Array.from({ length: 10 }, () => fixture()))
-  const answers = await Promise.all(fs.map(f => runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })))
+  const answers = await Promise.all(fs.map(f => protectedBurst(request(f))))
   for (const answer of answers) assert.equal(answer.status, 200)
 
   // Count actual backend transaction completions on the request's checked-out
   // clients. Database-wide statistics lag each backend and include our reader's
-  // own transactions, so a sleep + pg_stat_clear_snapshot cannot isolate this poll.
+  // own transactions, so a sleep + pg_stat_clear_snapshot cannot isolate this burst.
   let completed = 0, roundTrips = 0, explicit = 0
   type Message = { status?: string; text?: string }
   type MessageConnection = { on: (event: string, listener: (message: Message) => void) => unknown; removeListener: (event: string, listener: (message: Message) => void) => unknown }
@@ -240,9 +247,9 @@ test('ten concurrent device requests complete with three fence connections; fewe
       overrideDeploymentSwitch('deviceUnitFence', unit)
       const f = fs[0]
       // Warm connections and install the observer before the measured request.
-      assert.equal((await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })).status, 200)
+      assert.equal((await protectedBurst(request(f))).status, 200)
       const before = { completed, roundTrips, explicit }
-      assert.equal((await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })).status, 200)
+      assert.equal((await protectedBurst(request(f))).status, 200)
       // The route awaits its fence COMMIT in finally. ReadyForQuery(I) includes
       // both explicit COMMIT/ROLLBACK and implicit autocommit transactions.
       return { completed: completed - before.completed, roundTrips: roundTrips - before.roundTrips, explicit: explicit - before.explicit }

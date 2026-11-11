@@ -2532,7 +2532,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9"
+      "sourceHash": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs",
@@ -2541,7 +2541,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54"
+      "sourceHash": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/attachments/[id]",

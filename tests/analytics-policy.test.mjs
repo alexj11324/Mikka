@@ -65,6 +65,29 @@ test('masked replay keeps only its transport payload and cannot mutate a person'
   assert.match(source, /recordBody: false/)
 })
 
+test('SDK browser classification keeps only bot or browser on normal events and masked Replay', () => {
+  const payload = [{ type: 2, data: { node: { textContent: '***' } } }]
+  for (const event of ['$pageview', '$snapshot']) {
+    for (const browserType of ['bot', 'browser']) {
+      const properties = { $browser_type: browserType, $session_id: 'session', $raw_user_agent: 'PRIVATE_UA_CANARY',
+        userAgent: 'PRIVATE_UA_CANARY', private: 'PRIVATE_CLASSIFICATION_CANARY',
+        ...(event === '$snapshot' ? { $snapshot_data: payload, $snapshot_bytes: 10 } : {}) }
+      const sanitized = sanitizeAnalyticsEvent({ event, properties })
+      assert.deepEqual(sanitized.properties, { $browser_type: browserType, $session_id: 'session',
+        ...(event === '$snapshot' ? { $snapshot_data: payload, $snapshot_bytes: 10 } : {}) })
+      if (event === '$snapshot') assert.equal(sanitized.properties.$snapshot_data, payload)
+      assert.equal(JSON.stringify(sanitized).includes('PRIVATE_'), false)
+    }
+    for (const value of [undefined, null, true, 1, 'BOT', 'human', 'bot ', 'private@example.invalid', 'x'.repeat(4096), { type: 'bot' }]) {
+      const sanitized = sanitizeAnalyticsEvent({ event, properties: { $browser_type: value } })
+      assert.equal(Object.hasOwn(sanitized.properties, '$browser_type'), false)
+      assert.deepEqual(sanitized.properties, {})
+    }
+  }
+  assert.equal(sanitizeAnalyticsEvent({ event: 'unknown', properties: { $browser_type: 'bot' } }), null)
+  assert.equal(sanitizeAnalyticsEvent({ event: 'unknown', get properties() { throw new Error('PRIVATE_CLASSIFICATION_CANARY') } }), null)
+})
+
 test('all upcoming features fail closed, even if the remote switch is accidentally enabled', () => {
   for (const [feature, definition] of Object.entries(upcomingFeatures)) {
     assert.equal(definition.implemented, false)

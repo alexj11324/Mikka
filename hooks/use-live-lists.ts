@@ -13,6 +13,7 @@ import { chatKeys, taskRunKeys, threadKeys } from '@/lib/swr/keys'
 import { botListKey, groupListKey, issueListKey, ListReadScopeError, listReadDeadline, listReadPresence, liveListReadOptions, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE, type ListLiveRead } from '@/lib/live/list-read'
 import { fetchScopedGroups, GroupMessagesRequestError } from '@/lib/group-messages'
 import { heldRevision } from '@/lib/live/revisions'
+import { snapshotReadFetcher } from '@/lib/swr/read-observer'
 import { useLiveKey } from './use-live-key'
 
 type Issues = Awaited<ReturnType<typeof listIssues>>
@@ -90,11 +91,11 @@ export function useLiveThreadList(ownerId: string, paused = false) {
 /** `enabled: false` reads nothing and registers no key (the desktop badge on the web). */
 export function useLiveTaskRunList(ownerId: string, enabled = true) {
   const key = enabled ? taskRunKeys.list(ownerId) : null
-  const result = useSWR(key, () => observeListRead(async () => {
+  const result = useSWR(key, snapshotReadFetcher(() => observeListRead(async () => {
     const next = await pollTaskRuns()
     if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
     return next
-  }), liveListReadOptions)
+  })), liveListReadOptions)
   const home = result.error instanceof ListReadScopeError ? null : ownerListWorkspace(result.data, ownerId)
   useLiveKey('task_run_list', key ? home ?? UNRESOLVED_LIST_SCOPE : null, key ? [unstable_serialize(key)] : [], home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId),
     revisions: key ? { [unstable_serialize(key)]: heldRevision(result.data, 'task_run_list', home) } : undefined, shareAcrossTabs: true })
@@ -103,11 +104,11 @@ export function useLiveTaskRunList(ownerId: string, enabled = true) {
 
 export function useLiveBotChatList(ownerId: string) {
   const key = chatKeys.list(ownerId)
-  const result = useSWR(key, () => observeListRead(async () => {
+  const result = useSWR(key, snapshotReadFetcher(() => observeListRead(async () => {
     const next = await pollBotChatSummaries()
     if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
     return next
-  }), liveListReadOptions)
+  })), liveListReadOptions)
   const home = result.error instanceof ListReadScopeError ? null : ownerListWorkspace(result.data, ownerId)
   // The pinned Coordinator row reads this list too. Its open chat listens to its own
   // bot_chat key; a list push never re-reads that whole chat.
@@ -127,12 +128,12 @@ export function useLiveGroupList(ownerId: string, workspaceId: string | null, en
 
 export function useLiveBotRoster(ownerId: string, workspaceId: string | undefined, paused = false) {
   const key = workspaceId ? botListKey(ownerId, workspaceId) : null
-  const result = useSWR(key, () => observeListRead(async () => {
+  const result = useSWR(key, snapshotReadFetcher(() => observeListRead(async () => {
     const next = await pollBots()
     if (next.live.ownerId !== ownerId) throw new ListReadScopeError('owner')
     if (next.live.workspaceId !== workspaceId) throw new ListReadScopeError('workspace')
     return next
-  }), { ...liveListReadOptions, isPaused: () => paused })
+  })), { ...liveListReadOptions, isPaused: () => paused })
   const wasPaused = useRef(paused)
   useEffect(() => {
     if (wasPaused.current && !paused) void result.mutate()

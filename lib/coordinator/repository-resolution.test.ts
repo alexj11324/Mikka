@@ -2,6 +2,15 @@ import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import { findRepository, resolveRepository, withResolvedRepository, type RepositoryLister } from './repository-resolution'
 import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
+import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
+import { createTracerProvider, SafeExporter } from '../tracing/node'
+import { createLogProvider } from '../tracing/logs'
+import { withDispatchTiming, type DispatchTiming } from '../dispatch-timing'
 
 const ISSUE = '550e8400-e29b-41d4-a716-446655440000'
 const repos = (...names: string[]) => ({ repositories: names.map(fullName => ({ fullName, private: true })) })
@@ -183,4 +192,77 @@ test('workspace discovery orders ambiguous names but neither authorizes nor sile
   assert.deepEqual(await findRepository('alex', undefined, unavailable, refusedContext), { error: 'githubReconnectRequired' })
   assert.equal(unavailable.mock.callCount(), 1, 'discovery adds no retry')
   assert.equal(refusedContext.mock.callCount(), 0)
+})
+
+
+test('closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step', async () => {
+  const require = createRequire(import.meta.url), workflowRequire = createRequire(require.resolve('workflow'))
+  const official = await import(pathToFileURL(join(dirname(workflowRequire.resolve('@workflow/core')), 'telemetry.js')).href)
+  const memory = new InMemorySpanExporter(), logMemory = new InMemoryLogRecordExporter()
+  const logs = createLogProvider({ endpoint: 'https://unused.test/i/v1/traces', token: 'unused', environment: 'dev', exporter: logMemory })
+  const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 1, environment: 'dev', logger: logs.getLogger('test'), serverless: false })
+  provider.register()
+  try {
+    const observations: { code: string; ownStatuses: number[]; ownCodes: unknown[]; parentStatus: number; failed: boolean; errorLogs: number }[] = []
+    for (const code of ['githubNotConnected', 'githubNotConfigured', 'githubReconnectRequired', 'githubUnavailable', 'githubRepositoryForbidden', 'repositoryNotFound', 'repositoryAmbiguous']) {
+      memory.reset(); logMemory.reset()
+      const list = mock.fn<RepositoryLister>(async () => {
+        if (code === 'repositoryNotFound') return repos()
+        if (code === 'repositoryAmbiguous') return repos('one/repository', 'two/repository')
+        throw Object.assign(new Error('PRIVATE_REFUSAL_MESSAGE'), { name: 'GitHubAccessError', code })
+      })
+      const dispatch = mock.fn(async () => ({ runId: 'never' })), lines: DispatchTiming[] = []
+      const result = await official.trace('step.execute repository fixture', (step: { setAttribute(key: string, value: string): void }) => {
+        step.setAttribute('workflow.run.id', 'wrun_repository_refusal_fixture')
+        return withDispatchTiming(() => withResolvedRepository('PRIVATE_OWNER', ISSUE, 'repository', dispatch, list, noContext),
+          Date.now, line => lines.push(line), async () => ({ workflowRunId: 'wrun_repository_refusal_fixture', stepId: 'step_fixture', attempt: 1 }))
+      })
+      assert.equal(result.error, code)
+      assert.equal(result.issueId, ISSUE)
+      if (code.startsWith('github')) assert.deepEqual(result, { error: code, repository: 'repository', issueId: ISSUE })
+      assert.equal(dispatch.mock.callCount(), 0)
+      assert.equal(list.mock.callCount(), code === 'githubUnavailable' ? 2 : 1, 'fresh authorization and existing retry semantics are unchanged')
+      await provider.forceFlush(); await logs.forceFlush()
+      const spans = memory.getFinishedSpans(), own = spans.filter(span => span.name.startsWith('dispatch'))
+      const parent = spans.find(span => span.name === 'step.execute')!
+      assert.equal(own.length, 2)
+      assert.ok(own.every(span => span.spanContext().traceId === parent.spanContext().traceId))
+      const root = own.find(span => span.name === 'dispatch_run')!, phase = own.find(span => span.name === 'dispatch.resolveRepository')!
+      assert.equal(phase.parentSpanContext?.spanId, root.spanContext().spanId)
+      assert.equal(root.parentSpanContext?.spanId, parent.spanContext().spanId)
+      assert.doesNotMatch(JSON.stringify({ spans: spans.map(span => ({ attributes: span.attributes, status: span.status, events: span.events })), logs: logMemory.getFinishedLogRecords().map(record => ({ body: record.body, attributes: record.attributes })) }), /PRIVATE_OWNER|PRIVATE_REFUSAL_MESSAGE/)
+      observations.push({ code, ownStatuses: own.map(span => span.status.code), ownCodes: own.map(span => span.attributes['mikka.error.code']), parentStatus: parent.status.code, failed: lines[0].failed,
+        errorLogs: logMemory.getFinishedLogRecords().filter(record => record.body === 'mikka.stage.failed' && record.attributes['mikka.error.code'] === code).length })
+    }
+    assert.ok(observations.every(item => item.parentStatus === SpanStatusCode.OK), 'official Workflow preserves the returned-result step semantics')
+    assert.ok(observations.every(item => item.ownStatuses.every(status => status === SpanStatusCode.ERROR)), 'the own phase and dispatch remain ERROR after the SDK marks its parent OK')
+    assert.ok(observations.every(item => item.ownCodes.every(code => code === item.code)))
+    assert.ok(observations.every(item => item.failed && item.errorLogs === 2))
+
+    // A later successful request returns the same object and cannot inherit a refusal.
+    memory.reset(); logMemory.reset()
+    const success = { runId: 'same-success-object', get content(): never { throw new Error('UNREAD_CONTENT') } }, lines: DispatchTiming[] = []
+    const result = await official.trace('step.execute successful repository fixture', () =>
+      withDispatchTiming(() => withResolvedRepository('alex', ISSUE, 'Mikka_test', async () => success, lister(), noContext),
+        Date.now, line => lines.push(line), async () => ({ workflowRunId: 'wrun_repository_success_fixture', stepId: 'step_fixture', attempt: 1 })))
+    assert.equal(result, success)
+    await provider.forceFlush(); await logs.forceFlush()
+    assert.equal(lines[0].failed, false)
+    assert.ok(memory.getFinishedSpans().every(span => span.status.code !== SpanStatusCode.ERROR && span.attributes['mikka.error.code'] === undefined))
+
+    // A malformed host error preserves the old return contract but is not a
+    // member of the closed repository telemetry code set.
+    memory.reset(); logMemory.reset()
+    const unknownLines: DispatchTiming[] = []
+    const unknown = await withDispatchTiming(() => withResolvedRepository('alex', ISSUE, 'repository', async () => success,
+      async () => { throw accessError('PRIVATE_UNKNOWN_CODE') }, noContext), Date.now, line => unknownLines.push(line),
+      async () => ({ workflowRunId: 'wrun_repository_unknown_fixture', stepId: 'step_fixture', attempt: 1 }))
+    assert.deepEqual(unknown, { error: 'PRIVATE_UNKNOWN_CODE', repository: 'repository', issueId: ISSUE })
+    await provider.forceFlush(); await logs.forceFlush()
+    assert.equal(unknownLines[0].failed, false)
+    assert.doesNotMatch(JSON.stringify(memory.getFinishedSpans().map(span => span.attributes)), /PRIVATE_UNKNOWN_CODE/)
+  } finally {
+    await provider.shutdown(); await logs.shutdown()
+    trace.disable(); context.disable(); propagation.disable()
+  }
 })

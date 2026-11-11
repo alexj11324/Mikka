@@ -14,7 +14,7 @@
  * PostHog/APM ingestion and real browser replay require independent verification.
  */
 import { createHash, randomBytes } from 'node:crypto'
-import { appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, open, rename, unlink, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { decode, encode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
@@ -44,8 +44,9 @@ const errorCodes = new Set([
   'task_timeout', 'interrupted', 'submission_refused', 'foreign_activity', 'task_scope', 'fixture_ambiguous',
   'run_scope', 'run_model', 'run_identity', 'run_profile', 'run_failed', 'budget_exceeded', 'task_blocked',
   'artifact_missing', 'artifact_content', 'cleanup_incomplete', 'acceptance_failed',
-  'owner_busy', 'preparation_conflict', 'preparation_restore_failed', 'task_inventory_changed',
-  'task_checks_missing', 'task_acceptance',
+  'owner_busy', 'owner_inventory_incomplete', 'owner_inventory_changed', 'owner_inventory_timeout',
+  'preparation_conflict', 'preparation_restore_failed', 'task_inventory_changed',
+  'task_checks_missing', 'task_acceptance', 'recovery_metadata_invalid', 'recovery_checkpoint_failed',
 ])
 const serverCodes = new Set(['authRequired', 'modelUnavailable', 'modelChanged', 'factoryStale', 'factoryStopped', 'runChainEnded',
   'agentProfileNotFound', 'agentProfileRequestConflict', 'agentProfileVersionConflict', 'subscriptionConflict',
@@ -64,6 +65,37 @@ const sourceKey = value => JSON.stringify([value?.harness, value?.model, value?.
 const profilePath = (workspaceId, id = '') => '/api/factory/agent-profiles' + (id ? '/' + id : '') + '?workspaceId=' + workspaceId
 const profileDefinition = value => Object.fromEntries(['name', 'description', 'roles', 'enabled', 'harness', 'model', 'effort', 'instructions', 'skills']
   .filter(key => value[key] !== undefined).map(key => [key, structuredClone(value[key])]))
+
+
+/** Recovery metadata only: never persist menu labels, quotas or private Profile definitions. */
+function recoveryModel(value) {
+  const { id, kind, modelId, provider, chosen } = value ?? {}
+  const model = typeof modelId === 'string' && (modelId === '' || /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(modelId))
+  const apiKey = typeof id === 'string' && /^apikey:[0-9a-f-]{36}:/i.test(id)
+    && uuid(id.slice(7, 43)) && id.slice(44) === modelId
+  check(['hosted', 'subscription', 'apiKey', 'shared'].includes(kind) && typeof chosen === 'boolean'
+    && model && typeof provider === 'string' && /^[a-z][a-z0-9_-]{0,47}$/.test(provider)
+    && (kind === 'apiKey' || kind === 'shared' ? apiKey && modelId !== '' : uuid(id)), 'recovery_metadata_invalid')
+  return { id, kind, modelId, provider, chosen }
+}
+
+/** Fixed runner-local file; replace the complete 0600 snapshot, never append private state. */
+export async function writeRecoveryJournal(journal) {
+  const directory = 'production-run-observability-report', temporary = directory + '/.recovery.json.tmp'
+  await mkdir(directory, { recursive: true, mode: 0o700 })
+  let created = false
+  try {
+    const file = await open(temporary, 'wx', 0o600)
+    created = true
+    try { await file.writeFile(JSON.stringify(journal, null, 2) + '\n'); await file.sync() }
+    finally { await file.close() }
+    await rename(temporary, directory + '/recovery.json')
+    const parent = await open(directory, 'r')
+    try { await parent.sync() } finally { await parent.close() }
+  } finally {
+    if (created) await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error })
+  }
+}
 
 async function selectOwnPersonalWorkspace(read, rpc, ownerId) {
   const current = await read('/api/workspace')
@@ -285,8 +317,8 @@ export async function openLive(read, workspaceId, { now = Date.now, socketFactor
 }
 
 export async function runObservabilityAcceptance({ env = process.env, execute = false, prepare = false, browserSubmit = false,
-  onBrowserReady = emitBrowserReady, fetchImpl = fetch, now = Date.now, openLiveImpl = openLive, signal } = {}) {
-  check((!prepare && !browserSubmit || execute) && typeof onBrowserReady === 'function', 'configuration_required')
+  onBrowserReady = emitBrowserReady, onRecoveryCheckpoint = async () => {}, fetchImpl = fetch, now = Date.now, openLiveImpl = openLive, signal } = {}) {
+  check((!prepare && !browserSubmit || execute) && typeof onBrowserReady === 'function' && typeof onRecoveryCheckpoint === 'function', 'configuration_required')
   const revision = env.MIKKA_EXPECTED_DEPLOYMENT_SHA
   const timeoutMs = Number(env.MIKKA_OBSERVABILITY_TIMEOUT_MS ?? 480_000)
   const modelCase = env.MIKKA_OBSERVABILITY_MODEL_CASE ?? 'all'
@@ -304,18 +336,40 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   let ownerId, workspaceId, botId, closeSession = false
   // Full definitions never leave this closure or appear in the public report.
   const preparation = { profiles: [], fallback: null }
-  async function request(path, { body, method = body === undefined ? 'GET' : 'POST', headers: extra, cleanup = false } = {}) {
+  const recovery = report.recovery = { version: 1, revision, scope: null, sequence: 0, checkpointFailures: 0,
+    preparation: { profiles: [], fallback: null }, cases: [] }
+  async function checkpoint(cleanup = false) {
+    // A failed journal blocks new work, but cannot prevent already-required recovery.
+    if (!cleanup && recovery.checkpointFailures) throw new AcceptanceError('recovery_checkpoint_failed')
+    recovery.sequence++
+    try { await onRecoveryCheckpoint(structuredClone(recovery)) }
+    catch (cause) {
+      recovery.checkpointFailures++
+      if (!cleanup) throw new AcceptanceError('recovery_checkpoint_failed', { cause })
+    }
+  }
+  async function request(path, { body, method = body === undefined ? 'GET' : 'POST', headers: extra, cleanup = false, deadline } = {}) {
     check(path.startsWith('/api/') || path.startsWith('/mikka/api/artifacts/'), 'origin_rejected')
     const url = new URL(path.startsWith('/mikka/') ? path : '/mikka' + path, ORIGIN)
     check(url.origin === ORIGIN && !url.username && !url.password && !url.hash, 'origin_rejected')
     if (!cleanup && signal?.aborted) throw new AcceptanceError('interrupted')
     const headers = new Headers({ origin: ORIGIN, 'cache-control': 'no-store', accept: 'application/json', ...extra })
+    if (url.pathname.startsWith('/mikka/api/factory/')) {
+      // Selection is routing, never authority: the ordinary endpoint still
+      // checks the fresh session, membership, Origin and exact business target.
+      check(uuid(workspaceId) && (!headers.has('x-mikka-workspace-id') || headers.get('x-mikka-workspace-id') === workspaceId)
+        && url.searchParams.getAll('workspaceId').every(value => value === workspaceId)
+        && (body?.workspaceId === undefined || body.workspaceId === workspaceId), 'workspace_missing')
+      headers.set('x-mikka-workspace-id', workspaceId)
+    }
+    const remaining = deadline === undefined ? 30_000 : Math.min(30_000, deadline - now())
+    check(Number.isSafeInteger(remaining) && remaining > 0, 'owner_inventory_timeout')
     const cookie = cookies.header(url); if (cookie) headers.set('cookie', cookie)
     if (body !== undefined) headers.set('content-type', 'application/json')
     let response
     try {
       response = await fetchImpl(url, { method, headers, redirect: 'error',
-        signal: !cleanup && signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
+        signal: !cleanup && signal ? AbortSignal.any([signal, AbortSignal.timeout(remaining)]) : AbortSignal.timeout(remaining),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
     } catch (cause) { throw new AcceptanceError(!cleanup && signal?.aborted ? 'interrupted' : 'request_failed', { cause }) }
     cookies.receive(url, response.headers)
@@ -323,8 +377,8 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   }
   async function read(path, options = {}) {
     const response = await request(path, options)
-    if (options.missing && response.status === 404) return null
     const value = await response.json().catch(() => null)
+    if (options.missing && response.status === 404 && value?.error === 'agentProfileNotFound') return null
     if (!response.ok || value?.error) {
       const error = new AcceptanceError('http_refused')
       error.httpStatus = response.status; error.serverCode = typeof value?.error === 'string' ? value.error : value?.error?.code
@@ -384,12 +438,72 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     return { ownerId, menu, order, connections, keys, profiles }
   }
   async function ownerIdle(cleanup = false) {
-    // Both existing readers are owner-wide, including other workspaces. They
-    // expose at most 200 rows/30 days each; we claim only this visible scope.
-    const [threads, tasks] = await Promise.all([rpc('task-runs.pollThreads', [], { cleanup }), rpc('task-runs.pollTaskRuns', [], { cleanup })])
-    check(Array.isArray(threads?.items) && Array.isArray(tasks?.items), 'response_invalid')
-    check([...threads.items, ...tasks.items].every(value => nativeTerminal.has(value.status)), 'owner_busy')
-    report.preparation.visibleRunRowsChecked = threads.items.length + tasks.items.length
+    // P0 makes both readers workspace-scoped. Inventory is the ordinary,
+    // unpaginated active-membership endpoint; never infer owner-wide idle from
+    // the selected workspace alone. This finite scan is not an atomic fence.
+    const started = now(), deadline = started + 30_000
+    const withinTime = () => check(now() >= started && now() < deadline, 'owner_inventory_timeout')
+    const complete = value => value && !Object.hasOwn(value, 'error')
+      && (value.nextCursor === undefined || value.nextCursor === null)
+      && (value.truncated === undefined || value.truncated === false)
+      && (value.hasMore === undefined || value.hasMore === false)
+    const inventory = async () => {
+      withinTime()
+      const value = await read('/api/workspace', { cleanup, deadline, headers: { 'x-mikka-workspace-id': workspaceId } })
+      withinTime()
+      check(complete(value) && value.currentUserId === ownerId && value.workspace?.id === workspaceId
+        && value.workspace.kind === 'personal' && Array.isArray(value.choices) && value.choices.length > 0
+        && value.choices.length <= 32, 'owner_inventory_incomplete')
+      const choices = value.choices
+      check(choices.every(choice => uuid(choice?.id) && ['personal', 'team'].includes(choice.kind))
+        && new Set(choices.map(choice => choice.id.toLowerCase())).size === choices.length
+        && choices.filter(choice => choice.kind === 'personal').length === 1
+        && choices.some(choice => choice.kind === 'personal' && choice.id === workspaceId), 'owner_inventory_incomplete')
+      return choices.map(({ id, kind }) => ({ id, kind })).sort((a, b) => a.id.localeCompare(b.id))
+    }
+    const before = await inventory()
+    let checked = 0
+    const expiries = []
+    for (const workspace of before) {
+      withinTime()
+      const options = { cleanup, deadline, headers: { 'x-mikka-workspace-id': workspace.id } }
+      const [threads, tasks] = await Promise.all([
+        rpc('task-runs.pollThreads', [], options), rpc('task-runs.pollTaskRuns', [], options),
+      ])
+      withinTime()
+      for (const [kind, result] of [['threads', threads], ['tasks', tasks]]) {
+        check(complete(result) && Array.isArray(result.items) && result.items.length < 200
+          && (result.delta === undefined || result.delta === false) && (result.unchanged === undefined || result.unchanged === false)
+          && result.live?.ownerId === ownerId && result.live.workspaceId === workspace.id, 'owner_inventory_incomplete')
+        const ids = result.items.map(value => kind === 'threads' ? value?.id : value?.runId)
+        check(ids.every(uuid) && new Set(ids).size === ids.length
+          && result.items.every(value => nativeStatuses.has(value?.status)), 'owner_inventory_incomplete')
+        if (kind === 'threads') {
+          check(typeof result.version === 'string' && /^[0-9a-f]{32}$/.test(result.version) && Array.isArray(result.positions)
+            && result.positions.length === ids.length && new Set(result.positions.map(value => value?.id)).size === ids.length
+            && result.positions.every(value => ids.includes(value?.id) && typeof value.version === 'string'
+              && /^[0-9a-f]{32}$/.test(value.version)), 'owner_inventory_incomplete')
+        }
+        if (result.items.length) {
+          const expiry = result.live.deadline
+          check(typeof expiry?.at === 'string' && Number.isFinite(Date.parse(expiry.at))
+            && Number.isFinite(expiry.afterMs) && expiry.afterMs > 0, 'owner_inventory_incomplete')
+          expiries.push(Math.min(Date.parse(expiry.at), started + expiry.afterMs))
+        }
+        check(result.items.every(value => nativeTerminal.has(value.status)), 'owner_busy')
+        checked += result.items.length
+      }
+    }
+    const after = await inventory()
+    check(isDeepStrictEqual(before, after), 'owner_inventory_changed')
+    withinTime()
+    // The existing readers cover only the last 30 days. If a visible row
+    // expires during this scan, do not turn its disappearance into idle proof.
+    check(expiries.every(expiry => expiry > now()), 'owner_inventory_incomplete')
+    report.preparation.visibleRunRowsChecked = checked
+    report.preparation.visibleRunWorkspacesChecked = before.length
+    report.preparation.visibleRunWindowDays = 30
+    report.preparation.workspaceScanAtomic = false
   }
   async function prepareSettings() {
     await quiet(); await ownerIdle()
@@ -408,10 +522,13 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     if (state.keys.apiKeyAfterQuota) {
       await ownerIdle()
       check((await read('/api/settings/api-keys?workspace=' + workspaceId)).apiKeyAfterQuota === true, 'preparation_conflict')
-      preparation.fallback = { before: true, acknowledged: false }
+      const journal = recovery.preparation.fallback = { before: true, intended: false, write: 'intent', restored: false }
+      await checkpoint()
+      preparation.fallback = { before: true, acknowledged: false, journal }
       const changed = await rpc('model-api-keys.updateApiKeyAfterQuota', [false, workspaceId])
       check(changed.apiKeyAfterQuota === false, 'preparation_conflict')
       preparation.fallback.acknowledged = true; report.preparation.fallbackChanged = true
+      journal.write = 'acknowledged'; await checkpoint()
     }
     for (const profile of state.profiles.profiles.filter(value => value.enabled && !value.archivedAt)) {
       check(uuid(profile.id) && Number.isSafeInteger(profile.version) && profile.version > 0, 'profile_scope')
@@ -420,16 +537,26 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       check(current?.version === profile.version && typeof profile.digest === 'string' && /^[0-9a-f]{64}$/.test(profile.digest)
         && current.digest === profile.digest && !current.archivedAt
         && isDeepStrictEqual(profileDefinition(current), profileDefinition(profile)), 'preparation_conflict')
-      const entry = { id: profile.id, before: profileDefinition(profile), version: profile.version, written: null, rejected: false }
+      const journal = { id: profile.id, before: { version: profile.version, digest: profile.digest, enabled: profile.enabled },
+        intendedEnabled: false, write: 'intent', written: null, restored: false }
+      check(typeof journal.before.enabled === 'boolean', 'recovery_metadata_invalid')
+      recovery.preparation.profiles.push(journal)
+      await checkpoint()
+      const entry = { id: profile.id, before: profileDefinition(profile), version: profile.version, written: null, rejected: false, journal }
       preparation.profiles.push(entry)
       let changed
       try { changed = (await read(profilePath(workspaceId, entry.id), { method: 'PATCH',
         body: { workspaceId, version: entry.version, profile: { ...entry.before, enabled: false } } })).profile }
-      catch (error) { entry.rejected = [400, 401, 403, 404, 409, 422].includes(error.httpStatus); throw error }
+      catch (error) {
+        entry.rejected = [400, 401, 403, 404, 409, 422].includes(error.httpStatus)
+        if (entry.rejected) journal.write = 'rejected'
+        await checkpoint(true); throw error
+      }
       check(changed?.id === entry.id && changed.version === entry.version + 1 && !changed.archivedAt && /^[0-9a-f]{64}$/.test(changed.digest)
         && isDeepStrictEqual(profileDefinition(changed), { ...entry.before, enabled: false }), 'preparation_conflict')
       entry.written = { version: changed.version, digest: changed.digest }
       report.preparation.profilesDisabled++
+      journal.written = { ...entry.written }; journal.write = 'acknowledged'; await checkpoint()
     }
   }
   async function restoreSettings() {
@@ -452,12 +579,15 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
           // profile. Preserve an unacknowledged/concurrent edit for review.
           check(entry.written && current.version === entry.written.version && current.digest === entry.written.digest
             && isDeepStrictEqual(profileDefinition(current), { ...entry.before, enabled: false }), 'preparation_conflict')
+          await checkpoint(true)
           const restored = (await read(profilePath(workspaceId, entry.id), { method: 'PATCH', cleanup: true,
             body: { workspaceId, version: current.version, profile: entry.before } })).profile
           check(restored?.version === current.version + 1 && isDeepStrictEqual(profileDefinition(restored), entry.before), 'preparation_conflict')
         }
         summary.profilesRestored++
+        entry.journal.restored = true
       } catch (error) { failed(error) }
+      await checkpoint(true)
     }
     if (preparation.fallback) {
       try {
@@ -467,18 +597,21 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
           // This existing boolean setting has no version/CAS API. Compare its
           // last acknowledged value immediately before restoring, never guess.
           check(preparation.fallback.acknowledged && current === false, 'preparation_conflict')
+          await checkpoint(true)
           const restored = await rpc('model-api-keys.updateApiKeyAfterQuota', [preparation.fallback.before, workspaceId], { cleanup: true })
           check(restored.apiKeyAfterQuota === preparation.fallback.before, 'preparation_conflict')
         }
         summary.fallbackRestored = true
+        preparation.fallback.journal.restored = true
       } catch (error) { failed(error) }
+      await checkpoint(true)
     }
   }
   async function runCase(item) {
     const result = { case: item.id, model: item.model, status: 'running', cleanup: { state: 'not_created' } }
     const fixture = fixtureTask(revision, item)
     const started = now()
-    let baseline, previousModel, selectedModel, temporarySelection, restoreImplicit = false, profileCreated = false, modelTouched = false, submitted = false, browserWaiting = false, live, task, foreignActivity = false
+    let baseline, previousModel, selectedModel, temporarySelection, journal, restoreImplicit = false, profileCreated = false, modelTouched = false, submitted = false, browserWaiting = false, live, task, foreignActivity = false
     const issueIds = new Set(), runIds = new Set(), proofs = new Map(), workflowIds = new Set()
     const { title, content, input } = fixture
     const expectedMessages = new Map(browserSubmit ? ['en', 'zh-CN'].map(locale => [browserSubmissionText(input, locale), locale]) : [[input, 'api']])
@@ -624,12 +757,15 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
           const current = (await profileRead(fixture.profileId, { cleanup: true, missing: true }))?.profile
           if (current) {
             check(current.id === fixture.profileId && current.version === 1 && current.name === fixture.marker, 'profile_changed')
+            await checkpoint(true)
             const archived = await read(profilePath(workspaceId, fixture.profileId), { method: 'DELETE',
               body: { workspaceId, version: current.version }, cleanup: true })
             check(Boolean(archived.profile?.archivedAt), 'cleanup_incomplete')
           }
           cleanup.profileArchived = true
+          journal.profile.archived = true
         } catch (error) { cleanup.state = 'incomplete'; cleanup.profileError = publicFailure(error) }
+        await checkpoint(true)
       }
       if (cleanup.ownRunsStopped && modelTouched) {
         try {
@@ -638,6 +774,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
             // from equal model values or clear a later human choice.
             check(temporarySelection, 'cleanup_incomplete')
             try {
+              await checkpoint(true)
               const restored = await read('/api/mobile/model', { method: 'PUT',
                 body: { bot: botId, mode: 'restore-implicit', ...temporarySelection }, cleanup: true })
               check(restored.restored === true && restored.preferenceState === 'absent', 'model_changed')
@@ -651,12 +788,15 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
             const current = (await menuRead({ cleanup: true })).current
             if (!sameModel(current, previousModel)) {
               check(sameModel(current, selectedModel), 'model_changed')
+              await checkpoint(true)
               const restored = await read('/api/mobile/model', { method: 'PUT', body: { bot: botId, id: previousModel.id }, cleanup: true })
               check(sameModel(restored.current, previousModel), 'model_changed')
             }
           }
           cleanup.modelRestored = true
+          journal.model.restored = true
         } catch (error) { cleanup.state = 'incomplete'; cleanup.modelError = publicFailure(error) }
+        await checkpoint(true)
       }
       live?.close()
       if (!cleanup.ownRunsStopped || !cleanup.ownMachinesEnded || !cleanup.profileArchived || !cleanup.modelRestored) cleanup.state = 'incomplete'
@@ -672,7 +812,13 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       live = await openLiveImpl(read, workspaceId, { now })
       result.preflight = { ownSubscription: true, cloudReady: true, workspaceIdle: true, modelRestorable: true, paidFallbackOff: true, soleFixedProfileAvailable: true, liveReady: true }
       if (!execute) { result.status = 'ready'; return result }
+      journal = { case: item.id, profileId: fixture.profileId, profile: { write: 'intent', archived: false },
+        model: { before: restoreImplicit ? { preferenceState: 'absent' } : { preferenceState: 'present', choice: recoveryModel(previousModel) },
+          target: recoveryModel({ ...planned.option, kind: 'subscription', chosen: true }),
+          write: 'not_started', temporarySelection: null, restored: false } }
+      recovery.cases.push(journal)
       await quiet()
+      await checkpoint()
       const profile = { name: fixture.marker, description: 'Issue #1512 bounded acceptance', enabled: true, harness: item.harness,
         model: { mode: 'fixed', harness: item.harness, model: item.model, source: planned.source.source }, effort: 'low', roles: [], skills: [], instructions: '' }
       // Deterministic request ID prevents a runner retry from spending again.
@@ -680,23 +826,29 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
       const created = await read(profilePath(workspaceId), { body: { workspaceId, requestId: fixture.profileId, profile } })
       check(created.profile?.id === fixture.profileId && created.profile.version === 1 && created.profile.name === fixture.marker, 'profile_scope')
       result.profileId = fixture.profileId
+      journal.profile.write = 'acknowledged'; await checkpoint()
       selectedModel = { ...planned.option, kind: 'subscription', chosen: true }
+      journal.model.write = 'intent'; await checkpoint()
       modelTouched = true
       let selected
       try {
         selected = await read('/api/mobile/model', { method: 'PUT', body: { bot: botId, id: planned.option.id,
           ...(restoreImplicit ? { mode: 'temporary-if-absent' } : {}) } })
       } catch (error) {
-        if (restoreImplicit && error?.httpStatus === 409 && error?.serverCode === 'modelChanged') modelTouched = false
+        if (restoreImplicit && error?.httpStatus === 409 && error?.serverCode === 'modelChanged') {
+          modelTouched = false; journal.model.write = 'rejected'
+        }
         throw error
       }
       if (restoreImplicit) {
         const receipt = selected.temporarySelection
         check(uuid(receipt?.bindingId) && typeof receipt.revision === 'string' && /^[0-9]{1,10}$/.test(receipt.revision), 'response_invalid')
         temporarySelection = { bindingId: receipt.bindingId, revision: receipt.revision }
+        journal.model.temporarySelection = { ...temporarySelection }; await checkpoint()
       }
       check(selected.current?.id === planned.option.id && selected.current.kind === 'subscription' && selected.current.available === true && !selected.current.fallback, 'model_selection')
       selectedModel = selected.current
+      journal.model.write = 'acknowledged'; await checkpoint()
       await pin()
       const available = await profileRead()
       check(available.profiles.filter(value => value.enabled && !value.archivedAt).every(value => value.id === fixture.profileId)
@@ -785,6 +937,7 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     return result
   }
   try {
+    await checkpoint()
     await pin()
     const email = env.ACME_DEMO_EMAIL, password = env.ACME_DEMO_PASSWORD
     check(typeof email === 'string' && /^[^@\s]+@[^@\s]+$/.test(email) && typeof password === 'string' && password.length > 0, 'account_required')
@@ -798,10 +951,12 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     const chat = await read('/api/coordinator/messages')
     check(uuid(chat.botId), 'response_invalid'); botId = chat.botId
     report.botId = botId
+    check(typeof ownerId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(ownerId), 'recovery_metadata_invalid')
+    recovery.scope = { ownerId, workspaceId, botId }; await checkpoint()
     if (prepare) await prepareSettings()
     for (const item of cases) {
       const result = await runCase(item); report.cases.push(result)
-      if (result.cleanup?.state === 'incomplete' || signal?.aborted) break
+      if (result.cleanup?.state === 'incomplete' || recovery.checkpointFailures || signal?.aborted) break
     }
     await pin()
     report.status = report.cases.length === cases.length && report.cases.every(value => value.status === (execute ? 'runtime_verified' : 'ready'))
@@ -814,6 +969,10 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     cookies.clear()
     if (closeSession && !report.sessionClosed) { report.status = 'blocked'; report.code = 'cleanup_incomplete' }
     report.finishedAt = new Date(now()).toISOString()
+    await checkpoint(true)
+    if (recovery.checkpointFailures && ['ready', 'runtime_verified'].includes(report.status)) {
+      report.status = 'blocked'; report.code = 'recovery_checkpoint_failed'
+    }
   }
   return report
 }
@@ -827,7 +986,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const args = process.argv.slice(2)
     check(args.every(arg => ['--execute', '--prepare', '--browser-submit'].includes(arg)) && new Set(args).size === args.length, 'configuration_required')
     report = await runObservabilityAcceptance({ execute: args.includes('--execute'), prepare: args.includes('--prepare'),
-      browserSubmit: args.includes('--browser-submit'), signal: controller.signal })
+      browserSubmit: args.includes('--browser-submit'), onRecoveryCheckpoint: writeRecoveryJournal, signal: controller.signal })
   } catch (error) { report = { version: 1, issue: 1512, ...publicFailure(error) } }
   finally { process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt) }
   const directory = 'production-run-observability-report'

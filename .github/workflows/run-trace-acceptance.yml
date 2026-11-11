@@ -145,6 +145,7 @@ jobs:
           name: run-trace-acceptance-${{ github.run_id }}
           path: |
             production-run-observability-report/report.json
+            production-run-observability-report/recovery.json
             production-run-observability-report/browser-actor.receipt.json
           retention-days: 7
           if-no-files-found: warn

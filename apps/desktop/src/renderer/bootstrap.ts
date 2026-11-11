@@ -12,6 +12,7 @@ export type DesktopBootstrap = AuthConfiguration & {
   session: DesktopSession['session'] | null
   onboarding?: { computer: OnboardingComputer }
   cacheWorkspace: WireBootstrap['cacheWorkspace']
+  liveHomeWorkspaceId: WireBootstrap['liveHomeWorkspaceId']
 }
 export type BootstrapScope = 'authentication' | 'workspace'
 export type AuthenticationBootstrap = Pick<DesktopBootstrap, 'user' | 'session' | 'googleEnabled' | 'githubEnabled' | 'emailEnabled'>
@@ -48,11 +49,14 @@ async function fetchBootstrap(workspaceId?: string | null, isCurrent?: () => boo
   const requested = workspaceId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId) ? workspaceId : undefined
   try {
     const value = await callAction<WireBootstrap>('desktop.bootstrap', requested ? [requested] : [], isCurrent)
-    return { user: value.user, session: value.session, cacheWorkspace: workspaceId && !requested ? null : value.cacheWorkspace, googleEnabled: value.googleEnabled, githubEnabled: value.githubEnabled, emailEnabled: value.emailEnabled, features: value.features, daemonPackageName: value.daemonPackageName, ...(value.onboarding ? { onboarding: { computer: value.computer } } : {}) }
+    const liveHomeWorkspaceId = typeof value.liveHomeWorkspaceId === 'string'
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.liveHomeWorkspaceId)
+      && value.liveHomeWorkspaceId !== '00000000-0000-0000-0000-000000000000' ? value.liveHomeWorkspaceId : null
+    return { user: value.user, session: value.session, cacheWorkspace: workspaceId && !requested ? null : value.cacheWorkspace, liveHomeWorkspaceId: workspaceId && !requested ? null : liveHomeWorkspaceId, googleEnabled: value.googleEnabled, githubEnabled: value.githubEnabled, emailEnabled: value.emailEnabled, features: value.features, daemonPackageName: value.daemonPackageName, ...(value.onboarding ? { onboarding: { computer: value.computer } } : {}) }
   }
   catch (error) {
     if (!(error instanceof DesktopTransportError) || error.code !== 'desktop_session_expired') throw error
     const configuration = await readPublicConfiguration()
-    return { ...configuration, user: null, session: null, cacheWorkspace: null }
+    return { ...configuration, user: null, session: null, cacheWorkspace: null, liveHomeWorkspaceId: null }
   }
 }

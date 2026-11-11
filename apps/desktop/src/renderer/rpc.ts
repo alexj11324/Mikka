@@ -1,4 +1,4 @@
-import { captureReadDispatch } from '@/lib/swr/read-observer'
+import { capturePendingReadDispatch, captureReadDispatch } from '@/lib/swr/read-observer'
 import { withBasePath } from '@/lib/base-path'
 import { decode, encodeArgs, DESKTOP_RPC_VERSION } from '@/lib/desktop-rpc/wire'
 import { isBatchReadAction } from '@/lib/desktop-rpc/read-batch-contract'
@@ -15,12 +15,14 @@ const workspaceSelector = () => new URLSearchParams(window.location.search).get(
  * main, so even a compromised page cannot read or export its session credential. */
 export function callAction<T = unknown>(action: string, args: unknown[], isCurrent?: () => boolean): Promise<T> {
   if (!isBatchReadAction(action)) return callRemoteAction(action, args, { ...nativeTransport, isCurrent })
+  const onDispatch = isSnapshotReadAction(action) ? capturePendingReadDispatch() : undefined
   return enqueueRead(action, args, {
     locale: localeOf(window.location.pathname), workspace: workspaceSelector(), currentWorkspace: workspaceSelector, isCurrent,
+    ...(onDispatch ? { onDispatch } : {}),
   }, (action, args, context) => callRemoteAction(action, args, { ...nativeTransport, ...context }))
 }
 
-export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale }): Promise<T> {
+export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale; onDispatch?: () => void }): Promise<T> {
   // Web supplies its existing SDK owner generation; bootstrap also fences
   // retired page phases. Native identity authorization remains in main.
   const assertCurrent = (cause?: unknown, response?: Response) => {
@@ -32,6 +34,9 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
   // Only this snapshot read (or its batch envelope) supplies a dispatch proof.
   // Other list actions may merge cached data or issue additional reads.
   const prove = transport.endpoint === '/api/desktop/rpc' && (isSnapshotReadAction(action) || action === 'desktop.readBatch') ? captureReadDispatch() : undefined
+  // A pending snapshot may cover the live gap before its response arrives.
+  // Completion still requires that response's existing dispatch proof.
+  if (prove) transport.onDispatch?.()
   try {
     response = await fetch(withBasePath(transport.endpoint), {
       method: 'POST',

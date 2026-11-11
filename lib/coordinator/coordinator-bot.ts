@@ -32,10 +32,45 @@ export async function personalWorkspaceId(ownerId: string): Promise<string> {
   const found = (await pool.query<{ id: string }>(`SELECT w.id FROM mikka_workspaces w
       JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=$1 AND m.status='active'
     WHERE w."userId"=$1 AND w.kind='personal' LIMIT 1`, [ownerId])).rows[0]?.id
-  if (found) return found
+  return found ?? createPersonalWorkspace(ownerId)
+}
+
+async function createPersonalWorkspace(ownerId: string): Promise<string> {
+  const { pool } = await import('@/lib/db')
   const [person] = (await pool.query<{ id: string; email: string; name: string }>('SELECT id,email,name FROM "user" WHERE id=$1', [ownerId])).rows
   if (!person) throw Object.assign(new Error('workspaceAccessDenied'), { code: 'workspaceAccessDenied' })
   return (await import('@/lib/personal-workspace')).ensurePersonalWorkspace(person, 'zh-CN')
+}
+
+/**
+ * Reuse the explicit-workspace backfill's Personal lookup to observe whether it
+ * has work. Only a complete, authorized empty observation skips the existing
+ * migration. Late legacy writes remain eligible at the original next pass.
+ */
+async function personalCoordinatorForBackfill(ownerId: string): Promise<CoordinatorBot | null> {
+  const { pool } = await import('@/lib/db')
+  const found = (await pool.query<{ id: string; botId: string | null; legacyWork: boolean }>(`SELECT w.id, c."botId",
+      (EXISTS (SELECT 1 FROM coordinator_messages WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM agent_runs WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=w.id AND "botKey"='coordinator')
+        OR EXISTS (SELECT 1 FROM chat_preferences WHERE "userId"=$1 AND "chatKey"='coordinator')
+        OR EXISTS (SELECT 1 FROM user_schedules WHERE owner_id=$1 AND bot_id IS NULL)
+        OR EXISTS (SELECT 1 FROM suggestions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM pending_actions WHERE "userId"=$1 AND "botId" IS NULL)
+        OR EXISTS (SELECT 1 FROM agent_kit_heads old_head WHERE old_head.owner_id=$1 AND old_head.bot_key='coordinator'
+          AND NOT EXISTS (SELECT 1 FROM agent_kit_heads current_head
+            WHERE current_head.owner_id=$1 AND current_head.bot_key=c."botId"::text))) AS "legacyWork"
+    FROM mikka_workspaces w
+      JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=$1 AND m.status='active'
+      LEFT JOIN coordinator_bots c ON c."ownerId"=$1 AND c."workspaceId"=w.id
+    WHERE w."userId"=$1 AND w.kind='personal' LIMIT 1`, [ownerId])).rows[0]
+  if (found?.id && found.botId && found.legacyWork === false) return null
+  // A missing authorized Personal row follows the original creation/check path,
+  // without issuing the Personal lookup a second time.
+  return ensureFor(ownerId, found?.id ?? await createPersonalWorkspace(ownerId))
 }
 
 async function ensureFor(ownerId: string, workspaceId: string): Promise<CoordinatorBot> {
@@ -64,8 +99,8 @@ export async function coordinatorBot(ownerId: string, workspaceId: string | null
     // locks now (lock_timeout) is retried on the next read; the chat stays usable meanwhile.
     try {
       const { pool } = await import('@/lib/db')
-      const personal = workspaceId ? await ensureFor(ownerId, await personalWorkspaceId(ownerId)) : bot
-      await backfillCoordinatorChat(pool, ownerId, personal)
+      const personal = workspaceId ? await personalCoordinatorForBackfill(ownerId) : bot
+      if (personal) await backfillCoordinatorChat(pool, ownerId, personal)
       backfilled.set(ownerId, Date.now())
     } catch (error) { console.error('Coordinator chat move deferred', { code: (error as { code?: string }).code }) }
   }
