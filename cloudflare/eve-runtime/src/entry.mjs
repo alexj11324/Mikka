@@ -1,6 +1,6 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import { getContainer } from '@cloudflare/containers'
-import { timingSafeEqual } from 'node:crypto'
+import { equalCapability, productRequest } from '../runtime/product.mjs'
 import { hostConfiguration } from '../runtime/config.mjs'
 export { EveRuntime } from './index.mjs'
 export { ContainerProxy } from '@cloudflare/containers'
@@ -16,9 +16,7 @@ export class EveWorldOutbound extends WorkerEntrypoint {
   fetch(request) {
     const url = new URL(request.url)
     if (url.origin !== 'https://world.internal' || !methods.get(url.pathname)?.includes(request.method)) return missing()
-    const actual = Buffer.from(request.headers.get('x-mikka-world-capability') ?? '')
-    const expected = Buffer.from(this.ctx.props.capability)
-    if (!expected.length || actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    if (!equalCapability(request.headers.get('x-mikka-world-capability'), this.ctx.props.capability)) {
       return new Response(null, { status: 403 })
     }
     const headers = new Headers()
@@ -26,6 +24,12 @@ export class EveWorldOutbound extends WorkerEntrypoint {
       if (request.headers.has(name)) headers.set(name, request.headers.get(name))
     }
     return this.env.WORLD_SERVICE.fetch(new Request(request, { headers, redirect: 'manual' }))
+  }
+}
+
+export class EveProductOutbound extends WorkerEntrypoint {
+  fetch(request) {
+    return productRequest(request, this.env.BUSINESS_API, this.env.EVE_PUBLIC_ORIGIN, this.ctx.props.capability)
   }
 }
 
@@ -49,9 +53,8 @@ export class EveService extends WorkerEntrypoint {
     const url = new URL(request.url)
     if (url.origin !== 'https://eve.internal' || !url.pathname.startsWith('/eve/v1/') || /%2e|%2f|%5c/i.test(url.pathname)) return missing()
     const headers = new Headers(request.headers)
-    for (const name of ['forwarded', 'host', 'cf-container-target-port', 'proxy-authorization', 'x-real-ip', 'x-mikka-world-capability']) headers.delete(name)
-    const headerNames = [...headers.keys()]
-    for (const name of headerNames) {
+    for (const name of ['forwarded', 'host', 'cf-container-target-port', 'proxy-authorization', 'x-real-ip', 'x-mikka-world-capability', 'x-mikka-product-capability']) headers.delete(name)
+    for (const name of request.headers.keys()) {
       if (name.startsWith('x-forwarded-') || name.startsWith('x-vercel-') || name.startsWith('cf-')) headers.delete(name)
     }
     return forward(request, this.env, headers)

@@ -1,10 +1,18 @@
 import { gatewayCost, gatewayGenerationId } from '../abuse/policy'
 import { gatewayAuth } from '../ai-gateway-auth'
 import { STANDARD_DECISION_MODEL } from './decision'
+import type { ObservedModelOptions } from '../tracing/ai'
 
 export const gatewayEndpoint = 'https://ai-gateway.vercel.sh/v1/decisions'
 export const nativeEndpoint = 'https://api.openai.com/v1/decisions'
 const nativeModel = STANDARD_DECISION_MODEL.slice('openai/'.length, -'-decisions'.length)
+
+/** Attribute the network hop selected by the caller. Relays retain a gateway-compatible receipt. */
+export function decisionTraceTarget(endpoint: string, connected: boolean): Pick<ObservedModelOptions, 'route' | 'provider'> {
+  if (connected) return { route: 'decision', provider: 'mikka-cloud' }
+  if (endpoint === nativeEndpoint) return { route: 'api_key', provider: 'openai' }
+  return { route: endpoint === gatewayEndpoint ? 'gateway' : 'api_key' }
+}
 
 /** The application authorizes the logical model; only the provider's wire spelling differs. */
 export async function decisionTransport(endpoint: string, model: string, env: Record<string, string | undefined> = process.env) {

@@ -47,7 +47,7 @@ function fixture(map = new Map(), bindings = env) {
     async put(key, value) { map.set(key, structuredClone(value)) },
     async transaction(work) { return work(storage) },
   }
-  return { host: new EveRuntime({ storage, container: { async interceptOutboundHttps() {} }, exports: { EveWorldOutbound: x => x } }, bindings), map }
+  return { host: new EveRuntime({ storage, container: { async interceptOutboundHttps() {} }, exports: { EveWorldOutbound: x => x, EveProductOutbound: x => x } }, bindings), map }
 }
 beforeEach(() => { calls = 0; forwarded = undefined; selected = new Response('native'); mock.restoreAll() })
 
