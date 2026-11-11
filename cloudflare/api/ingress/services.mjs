@@ -32,7 +32,7 @@ export function eveServiceRequest(request, binding) {
   if (!binding) return no(503)
   const headers = new Headers(request.headers)
   for (const name of (headers.get('connection') ?? '').split(',')) if (name.trim()) headers.delete(name.trim())
-  for (const name of [...headers.keys()]) {
+  for (const name of request.headers.keys()) {
     if (['connection', 'forwarded', 'host', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te',
       'trailer', 'transfer-encoding', 'upgrade', 'cf-connecting-ip', 'cf-container-target-port', 'x-real-ip'].includes(name)
         || name.startsWith('x-forwarded-') || name.startsWith('x-vercel-')
