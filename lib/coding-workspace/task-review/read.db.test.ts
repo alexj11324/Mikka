@@ -22,6 +22,7 @@ import type { ExternalDiffProvider } from '../diff/service'
 import type { ObservedPullState } from '../diff/github-state'
 import type { ReviewMutationReceipt } from '../diff/review'
 import type { TaskReviewHttpInput, TaskReviewHttpResult } from './http'
+import type { ReviewResources } from '../../code-review/contract'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) assert.ok(disposableDatabase(process.env, url), E2E_DB_RULE)
@@ -73,6 +74,7 @@ test('Task review reads preserve exact source, tenancy and accepted comments on 
     const { currentTaskReview, selectedTaskReview } = await import('./context')
     const { taskCommentAnchor } = await import('./anchor')
     const { readTaskReview, readTaskReviewFile, readTaskReviewSummary, summarySnapshot, taskReviewSummary } = await import('./read')
+    const { readTaskReviewResources } = await import('./resources')
     const { markTaskReviewFiles } = await import('./reviewed')
     const { retainTaskPullState } = await import('./pull-state')
     const { hasCommitEffect } = await import('../../db/commit-effects')
@@ -300,6 +302,76 @@ test('Task review reads preserve exact source, tenancy and accepted comments on 
         assert.ok(!checks.includes(current.scope.identity.runId))
         assert.equal(current.ownerId, owner.id); assert.equal(current.scope.identity.repoId, f.repoId)
       }
+    })
+
+    await t.test('resource locators follow the Task owner source and real continuation root without changing resource access', async () => {
+      const f = await fixture(); await checkpoint(f)
+      await extraRun(f, member, 10)
+      await factoryCheck(f, 'review', 20)
+      for (const who of [f.who, f.viewer]) {
+        const value = await render<ReviewResources>(await readTaskReviewResources(input(f, {}, who)), who)
+        assert.deepEqual(value, { taskId: f.taskId, workspace: { runId: f.runId, repoId: f.repoId, workspaceId: f.where.id },
+          run: { id: f.runId, threadId: f.runId, status: 'running' }, previewUrl: null,
+          interactiveTerminalAvailable: false, live: { workspaceId: f.where.id } })
+      }
+      await assert.rejects(() => readTaskReviewResources(input(f, { runId: randomUUID() })))
+      await assert.rejects(() => readTaskReviewResources(input(f, {}, actor(outsider, f.where.id))), code('workspace_not_found'))
+      const continued = await extraRun(f, owner, 30)
+      await pool.query(`UPDATE agent_runs SET "continuesRunId"=$2,"workspaceId"=$3,"deviceId"=$4,"deviceRepoId"=$5,
+        "agentDefinition"=$6 WHERE id=$1`, [continued, f.runId, f.where.id, f.deviceId, f.repoId,
+        { executionIdentity: { workspaceId: f.where.id }, repositoryAdmission: { workspaceId: f.where.id, remoteKey: remoteKey(remote) } }])
+      const current = await render<ReviewResources>(await readTaskReviewResources(input(f, {})), f.who)
+      assert.equal(current.run?.id, continued); assert.equal(current.run?.threadId, f.runId)
+      assert.equal(current.workspace?.runId, continued)
+    })
+
+    await t.test('resource read preserves null, latest-run races and current membership rejection', async () => {
+      const f = await fixture(); await checkpoint(f)
+      const pending = await readTaskReviewResources(input(f, {}))
+      await extraRun(f, owner, 10)
+      await assert.rejects(() => render<ReviewResources>(pending, f.who), code('workspace_snapshot_outdated'))
+      const viewer = await fixture(); await checkpoint(viewer)
+      const retained = await readTaskReviewResources(input(viewer, {}, viewer.viewer))
+      await pool.query('UPDATE mikka_workspace_members SET status=\'removed\' WHERE "workspaceId"=$1 AND "userId"=$2', [viewer.where.id, member.id])
+      await assert.rejects(() => render<ReviewResources>(retained, viewer.viewer), code('workspace_not_found'))
+      const empty = await fixture()
+      await pool.query('DELETE FROM agent_runs WHERE id=$1', [empty.runId])
+      assert.equal((await readTaskReviewResources(input(empty, {}))).context, null)
+    })
+
+    await t.test('preview uses only this run current Factory candidate and newest verified successful receipt', async () => {
+      const f = await fixture(); await checkpoint(f); await stop(f)
+      const reviewRun = await factoryCheck(f, 'review', 10)
+      const { rows: [attempt] } = await pool.query<{ id: string; taskId: string }>('SELECT id,"taskId" FROM factory_attempts WHERE "runId"=$1', [reviewRun])
+      const candidateId = randomUUID()
+      await pool.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId",kind)
+        VALUES($1,$2,$3,'mikka-fixtures/task-review','preview','Resource preview fixture',$4,'repository')`, [candidateId, attempt!.taskId, f.baseSha, f.runId])
+      await pool.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [attempt!.taskId, candidateId])
+      async function publication(url: string, minute: number) {
+        const id = randomUUID(), approvalId = randomUUID(), target = 'resource-preview-' + minute
+        await pool.query(`INSERT INTO factory_approvals(id,"taskId","candidateId","attemptId","userId","principalId","humanSessionId","eventId",request,candidate,
+          action,target,"evidenceDigest",evidence,"approvedRevision","publishAttemptId","publishRevision","expiresAt")
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,'{}','{}','deploy_preview',$9,'fixture','[]',1,$4,1,now()+interval '1 hour')`,
+        [approvalId, attempt!.taskId, candidateId, attempt!.id, owner.id, 'session:' + owner.sessionId, owner.sessionId, randomUUID(), target])
+        await pool.query(`INSERT INTO factory_publications(id,"approvalId","taskId","candidateId",action,target,"eventId",request,status,receipt,"finishedAt")
+          VALUES($1,$2,$3,$4,'deploy_preview',$5,$6,'{}','succeeded',$7,clock_timestamp()+$8*interval '1 minute')`,
+        [id, approvalId, attempt!.taskId, candidateId, target, randomUUID(), { verifiedTarget: { reference: url } }, minute])
+        return id
+      }
+      const read = async () => render<ReviewResources>(await readTaskReviewResources(input(f, {})), f.who)
+      await publication('https://verified-preview.example.test/', 1)
+      assert.equal((await read()).previewUrl, 'https://verified-preview.example.test/')
+      const newer = await publication('http://unverified-preview.example.test/', 2)
+      assert.equal((await read()).previewUrl, null, 'never fall back to the older https receipt')
+      for (const url of ['https://user:secret@preview.example.test/', 'https://preview.example.test/?token=private']) {
+        await pool.query('UPDATE factory_publications SET receipt=$2 WHERE id=$1', [newer, { verifiedTarget: { reference: url } }])
+        assert.equal((await read()).previewUrl, null)
+      }
+      await pool.query('UPDATE factory_publications SET receipt=$2 WHERE id=$1', [newer, { verifiedTarget: { reference: 'https://verified-preview.example.test/' } }])
+      await pool.query('UPDATE factory_candidates SET repository=\'foreign/repository\' WHERE id=$1', [candidateId])
+      assert.equal((await read()).previewUrl, null, 'the candidate must match the retained repository identity')
+      await pool.query('UPDATE factory_candidates SET repository=\'mikka-fixtures/task-review\',"runId"=$2 WHERE id=$1', [candidateId, reviewRun])
+      assert.equal((await read()).previewUrl, null, 'another Factory run cannot provide the current Task run preview')
     })
 
     await t.test('frozen source remains readable after device/repo deletion, but fresh Team and membership gates still apply', async () => {
@@ -638,6 +710,7 @@ test('Task review reads preserve exact source, tenancy and accepted comments on 
       await associatePull(f, 103)
       const snapshot = await retainPull(f, native, 103)
       await assert.rejects(() => readTaskReviewSummary(input(f, {})), code('workspace_review_github_unavailable'))
+      await assert.rejects(() => readTaskReviewResources(input(f, {})), code('workspace_review_github_unavailable'))
       let verifies = 0
       const denied = external(async (scope, selected) => {
         verifies++;
@@ -646,7 +719,9 @@ test('Task review reads preserve exact source, tenancy and accepted comments on 
       })
       for (const who of [f.who, f.viewer]) await assert.rejects(() => readTaskReviewSummary({ ...input(f, {}, who),
         deps: { ...deps, external: denied } }), code('workspace_review_github_forbidden'))
-      assert.equal(verifies, 2)
+      for (const who of [f.who, f.viewer]) await assert.rejects(() => readTaskReviewResources({ ...input(f, {}, who),
+        deps: { ...deps, external: denied } }), code('workspace_review_github_forbidden'))
+      assert.equal(verifies, 4)
     })
 
     await t.test('summary rendering rejects a different working source selected after the initial read', async () => {

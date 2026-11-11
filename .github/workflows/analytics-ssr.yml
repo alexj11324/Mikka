@@ -69,6 +69,7 @@ jobs:
         run: |
           export PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mikka-analytics-browsers"
           printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
           pnpm exec playwright install --with-deps chromium
       - name: Permit the installed Chromium sandbox in this disposable runner
         run: |

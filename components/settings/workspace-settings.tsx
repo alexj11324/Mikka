@@ -124,7 +124,7 @@ export function ReplayOnboarding() {
 function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = true, onOpenChangeComplete }: { workspaceId: string; name: string; onClose: () => void; onDone: (owner: string) => void } & PresenceProps) {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
-  const { people, readError, pending, error, transfer } = useTransferWorkspace(workspaceId)
+  const { people, readError, reload, pending, error, transfer } = useTransferWorkspace(workspaceId)
   const [to, setTo] = useState<string | null>(null)
   const items = (people ?? []).map(person => ({ value: person.userId, label: person.name ? `${person.name} · ${person.email}` : person.email }))
 
@@ -147,7 +147,7 @@ function TransferWorkspaceDialog({ workspaceId, name, onClose, onDone, open = tr
               </Select>
             </Label>
             : <p className="text-muted-foreground">{t('transferNoMembers')}</p>
-          : readError ? <FieldError>{readError}</FieldError> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
+          : readError ? <SettingsSaveError message={readError} retryLabel={commonT('retry')} onRetry={() => { void reload() }} /> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
         {error && <FieldError>{error}</FieldError>}
       </div>
       <DialogFooter>
@@ -163,7 +163,7 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpen
   const t = useTranslations('Settings.workspaceForm')
   const computerBilling = useGatedFeature('computerBilling')
   const commonT = useTranslations('Common')
-  const { counts, readError, pending, error, remove } = useDeleteWorkspace(workspaceId)
+  const { counts, readError, reload, pending, error, remove } = useDeleteWorkspace(workspaceId)
   const [typed, setTyped] = useState('')
 
   async function confirm() {
@@ -181,7 +181,7 @@ function DeleteWorkspaceDialog({ workspaceId, name, onClose, open = true, onOpen
             <li>{t('deleteTasks', { tasks: counts.tasks, teams: counts.teams })}</li>
             {computerBilling && counts.purchasedPoints > 0 && <li>{t('deletePoints', { points: counts.purchasedPoints })}</li>}
           </ul>
-          : readError ? <FieldError>{readError}</FieldError> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
+          : readError ? <SettingsSaveError message={readError} retryLabel={commonT('retry')} onRetry={() => { void reload() }} /> : <p role="status" className="text-muted-foreground">{t('loading')}</p>}
         <p className="text-muted-foreground">{t('deleteKept')}</p>
         <Label className="flex flex-col items-start gap-1.5 font-normal text-muted-foreground">{t('deleteConfirmLabel', { name })}
           {/* No placeholder: the name to type is in the label once; a placeholder of it reads as already filled in. */}
