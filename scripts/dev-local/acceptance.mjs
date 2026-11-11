@@ -34,7 +34,7 @@ const completedItems = []
 const cleanupHooks = [], daemonDirectories = [join(directory, 'daemon')]
 let cloudRelease, cloudApiKey, pool, accounts, environment, runtime, localStackChild, secondDaemonPromise, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
 async function fingerprint() {
-  const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml', 'next.config.mjs'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
+  const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
   const hash = createHash('sha256')
   for (const path of paths) { hash.update(`${path}\0`); hash.update(await readFile(join(root, path)).catch(() => Buffer.from('[deleted]'))) }
   return hash.digest('hex')

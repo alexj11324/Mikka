@@ -2,6 +2,7 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { ownerListChanged } from '@/lib/live/lists'
 import { botChatChanged } from '@/lib/live/chats'
+import { applyCliFold, applyExternalFold, foldCliRunPolicy, foldExternalWritePermissions } from '@/lib/operations/workspace-policy-fold'
 
 /**
  * The person's Coordinator is an ordinary bot (glossary), one per person per
@@ -294,22 +295,36 @@ async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, works
 }
 
 /**
- * The Coordinator's agent definition and its two run policies (computer use,
- * external writes) were kept on the account's 'coordinator' head. Versions are
- * immutable history, so the active definition is copied as the row's first
- * version and the policies with it (Plugins › GitHub's two writes among
- * them, lib/github/plugin-permissions.ts); the old head stays as history.
+ * The Coordinator's agent definition is kept on the account's 'coordinator'
+ * head; versions are immutable history, so the active definition is copied as
+ * the new row's first version. The two policy columns are not copied: a Bot has
+ * no permission layer. The legacy head's deny/ask choices are folded into the
+ * workspace policy first, so no restriction is lost.
  */
 async function copyAgentHead(client: PoolClient, ownerId: string, botId: string, workspaceId: string) {
-  const old = (await client.query(`SELECT h.cli_run_policy, h.cli_run_policy_version, h.external_write_permissions, h.external_write_policy_version,
+  const old = (await client.query(`SELECT h.cli_run_policy, h.external_write_permissions,
       v.definition, v.digest, v.source
     FROM agent_kit_heads h LEFT JOIN agent_kit_versions v ON v.owner_id=h.owner_id AND v.bot_key=h.bot_key AND v.id=h.active_version
     WHERE h.owner_id=$1 AND h.bot_key='coordinator'`, [ownerId])).rows[0]
   if (!old) return
-  const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy,cli_run_policy_version,external_write_permissions,external_write_policy_version)
-      VALUES ($1,$2,$8,$3,$4,$5,$6,$7) ON CONFLICT (owner_id,bot_key) DO NOTHING`,
-  [ownerId, botId, workspaceId, old.cli_run_policy, old.cli_run_policy_version, old.external_write_permissions, old.external_write_policy_version, botId])
-  if (!created.rowCount || !old.definition) return
+  const created = await client.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id)
+      VALUES ($1,$2,$3,$4) ON CONFLICT (owner_id,bot_key) DO NOTHING`, [ownerId, botId, botId, workspaceId])
+  // Fold only when this head is first created. A later backfill must not
+  // re-apply the legacy ceiling over an admin's newer workspace choice.
+  if (!created.rowCount) return
+  // The same locks the workspace policy writers take, before the row read.
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-external-write:${workspaceId}`])
+  await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-cli-policy:${workspaceId}`])
+  const policy = (await client.query<{ external_write_permissions: unknown; cli_run_policy: unknown }>(
+    'SELECT external_write_permissions,cli_run_policy FROM workspace_computer_policies WHERE "workspaceId"=$1 FOR UPDATE', [workspaceId])).rows[0]
+  const external = applyExternalFold(policy?.external_write_permissions, foldExternalWritePermissions([old.external_write_permissions, policy?.external_write_permissions]))
+  const cli = applyCliFold(policy?.cli_run_policy, foldCliRunPolicy([old.cli_run_policy, policy?.cli_run_policy]))
+  await client.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,external_write_permissions,external_write_policy_version,cli_run_policy)
+      VALUES ($1,'allow',$2,case when $2::jsonb='{}'::jsonb then 0 else 1 end,$3)
+      ON CONFLICT ("workspaceId") DO UPDATE SET external_write_permissions=excluded.external_write_permissions,cli_run_policy=excluded.cli_run_policy
+      WHERE workspace_computer_policies.external_write_permissions IS DISTINCT FROM excluded.external_write_permissions
+         OR workspace_computer_policies.cli_run_policy IS DISTINCT FROM excluded.cli_run_policy`, [workspaceId, external, cli])
+  if (!old.definition) return
   const versionId = crypto.randomUUID()
   await client.query(`INSERT INTO agent_kit_versions (id,owner_id,bot_key,version,definition,digest,source,request_key,base_version)
       VALUES ($1,$2,$3,1,$4,$5,$6,'coordinator-bot-backfill',NULL)`, [versionId, ownerId, botId, old.definition, old.digest, old.source])

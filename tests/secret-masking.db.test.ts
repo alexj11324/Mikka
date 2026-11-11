@@ -259,12 +259,11 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
       const input = await maskWorkerMailboxInput(runId, { to: '', key: randomUUID(), text: `use ${SECRET} for the deploy` }) as { to: string; key: string; text: string }
       // Same ids in the throwaway DB, so the run is live there too.
       await mailboxPool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [admin, `${admin}@example.invalid`])
-      await mailboxPool.query(`insert into mikka_workspaces (id,"userId",name,slug,kind) values ($1,$2,'Masking fixture',$3,'team')`, [ws.id, admin, `mask-${ws.id}`])
-      await mailboxPool.query(`insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,'admin','active')`, [ws.id, admin, `${admin}@example.invalid`])
+      await (await import('./helpers/task-workspace')).seedFixtureWorkspace(mailboxPool, admin, 'team', ws.id)
       await mailboxPool.query(`insert into devices (id,name,"ownerId",kind,enabled) values ($1,'cloud',$2,'cloud',true)`, [device, admin])
       await mailboxPool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values ($1,$2,$3,$4,$5,now()+interval '1 hour')`, [claimTokenId, admin, hashDeviceToken(token), device, ws.id])
       await mailboxPool.query(`insert into agents (id,"userId",harness,name) values ($1,$2,'codex','a')`, [agent, admin])
-      await mailboxPool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId","deviceTokenId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,'running',now()+interval '10 minutes')`, [runId, agent, admin, device, ws.id, claimTokenId])
+      await mailboxPool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId","workspaceId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,'running',now()+interval '10 minutes')`, [runId, agent, admin, device, claimTokenId, ws.id])
       const mailbox = new SessionMailbox(mailboxPool, ws.id)
       const sender = await mailbox.run(admin, runId)
       const coordinator = await mailbox.conversation(admin, 'coordinator')

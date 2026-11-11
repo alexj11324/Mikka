@@ -73,7 +73,8 @@ export async function applicationPlugin(target, { deploymentId = '' } = {}) {
   const offline = fileLoader(nativeOfflineView())
   const catalogues = [fileLoader(bundledIconCatalogue()), fileLoader(bundledSyntaxCatalogue())]
   const webRpc = resolve(frontend, 'src/web/rpc.ts')
-  // UI slots and the hosted layer's `@hosted/` imports, as next.config.mjs resolves them (docs/ui-overlay.md).
+  // UI slots and the hosted layer's `@hosted/` imports, resolved exactly as the
+  // desktop renderer's build resolves them (docs/ui-overlay.md).
   const uiSlots = overlayAliases(repository)
   let development = false
   let inventory

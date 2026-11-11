@@ -15,7 +15,7 @@ function fixture(behaviour: { echo?: boolean; failCall?: boolean } = {}) {
     const transport = options.transport as { url: string; headers: Record<string, string> }
     seen.url = transport.url; seen.headers = transport.headers
     return {
-      listTools: async ({ params }: { params?: { cursor?: string } }) => ({ tools: [{ name: 'issue_read', title: 'Read an issue', description: `token ${OWN}`, inputSchema: {} }], nextCursor: params?.cursor ? undefined : 'next' }),
+      listTools: async ({ params }: { params?: { cursor?: string } }) => ({ tools: [{ name: 'issue_read', title: 'Read an issue', description: `token ${OWN}`, inputSchema: {}, annotations: { readOnlyHint: true } }], nextCursor: params?.cursor ? undefined : 'next' }),
       callTool: async (call: { name: string; arguments: unknown }) => {
         seen.calls.push(call)
         if (behaviour.failCall) throw new Error(`lost ${OWN}`)
@@ -52,8 +52,8 @@ test('a call reaches the hosted GitHub MCP with only the caller\'s own token, an
 test('listing returns tools and a cursor, masked', async () => {
   const { dependencies } = fixture()
   const runtime = createGitHubMcpRuntime(tokens([]), dependencies)
-  const first = await runtime('owner', {}) as { tools: { name: string; displayName: string }[]; nextCursor: string | null }
-  assert.equal(first.tools[0].name, 'issue_read'); assert.equal(first.tools[0].displayName, 'Read an issue'); assert.equal(typeof first.nextCursor, 'string')
+  const first = await runtime('owner', {}) as { tools: { name: string; displayName: string; readOnly?: boolean }[]; nextCursor: string | null }
+  assert.equal(first.tools[0].name, 'issue_read'); assert.equal(first.tools[0].displayName, 'Read an issue'); assert.equal(first.tools[0].readOnly, true); assert.equal(typeof first.nextCursor, 'string')
   assert.ok(!JSON.stringify(first).includes(OWN))
   assert.equal((await runtime('owner', { cursor: first.nextCursor! }) as { nextCursor: string | null }).nextCursor, null)
 })

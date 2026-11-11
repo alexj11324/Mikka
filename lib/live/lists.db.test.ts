@@ -9,6 +9,7 @@ import { Pool } from 'pg'
 import { sql } from 'drizzle-orm'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { captureDatabaseQuery, observePoolCommits } from '../db/commit-effects'
 import { groupListTargets, issueListTargets, issueListScopesBeforeChange, issueListScopeChanged, ownerListTargets, ownerSettingsTargets, runListChanged, runListTargets, workspaceListTargets } from './lists'
@@ -100,13 +101,15 @@ test('real PG: lists retain their reader scope and publish only the originating 
     await database.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,'owner','Fixture','codex'),($2,'foreign','Fixture','codex')`, [ownerAgent, foreignAgent])
     await foreign.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,'foreign','Other source','codex')`, [foreignAgent])
     for (const target of [database, foreign]) await target.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES($1,'owner',$2,'bound','Fixture','{"type":"doc","content":[]}','todo','normal','workspace')`, [issueId, team])
-    await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,'owner')`, [issueId, randomUUID(), team])
+    const issueGrouping = await seedTeam(database, team, 'owner')
+    await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,'owner')`, [issueId, issueGrouping.id, team])
     await database.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES
       ($1,'owner',$4,'bound','Personal','{"type":"doc","content":[]}','todo','normal','personal'),
       ($2,'owner',$5,'bound','Unlinked','{"type":"doc","content":[]}','todo','normal','workspace'),
       ($3,'owner',$5,'bound','Sync policy','{"type":"doc","content":[]}','todo','normal','workspace')`, [personalIssueId, unlinkedIssueId, policyIssueId, home, team])
     await database.query(`UPDATE issues SET "linearSyncPolicy"='explicit',"linearSyncBlocked"=false WHERE id=$1`, [policyIssueId])
-    await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,'owner')`, [policyIssueId, randomUUID(), team])
+    const policyGrouping = await seedTeam(database, team, 'owner')
+    await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,'owner')`, [policyIssueId, policyGrouping.id, team])
     await database.query(`INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId",status,prompt) VALUES($1,'owner',$6,$2,$3,'running','Fixture'),($4,'foreign',$6,$2,$5,'running','Fixture')`, [runId, issueId, ownerAgent, foreignRunId, foreignAgent, team])
     // Same UUID, different owner in an actual second database: losing the
     // originating request would publish to a different valid channel.

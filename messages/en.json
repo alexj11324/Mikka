@@ -400,6 +400,9 @@
       "selectExistingProject": "Choose an existing project. Create new projects on the projects page first.",
       "projectLinkFailed": "Could not link the project.",
       "projectLinkFailedRetry": "Could not link the project. Please try again.",
+      "accessChangeTitle": "Change who can see this task?",
+      "accessChangeBody": "This moves {tasks} task(s) and changes who can read them.",
+      "accessChangeConfirm": "Move anyway",
       "saveFailed": "The save failed. Please try again.",
       "saveFailedRetry": "The save failed. Please try again shortly.",
       "estimatePoints": "{count} point estimate"
@@ -1036,6 +1039,8 @@
       "changedTitle": "Renamed the task to {title}",
       "assigned": "Assigned to {name}",
       "unassigned": "Cleared the assignee",
+      "delegated": "Delegated to {name}",
+      "undelegated": "Cleared the delegate",
       "addedSubtask": "Added subtask {title}",
       "addedLabel": "Added label {name}",
       "removedLabel": "Removed label {name}",
@@ -1107,6 +1112,15 @@
     "allStatuses": "All statuses"
   },
   "Errors": {
+    "projectRepositoryDenied": "This repository or target branch is not permitted by the workspace or project.",
+    "projectEnvironmentUnavailable": "The selected environment or one of its required resources is unavailable for this run.",
+    "projectResourceConflict": "These resource settings changed. Refresh and try again.",
+    "teamArchived": "This team is archived. Restore it before assigning new work.",
+    "teamPersonalWorkspace": "Teams are available only in shared workspaces.",
+    "teamDeleteReferenced": "This team contains tasks, projects, or execution history. Archive it or remove its grouping to retain that work.",
+    "teamLifecycleConflict": "The team changed. Refresh and review its current impact.",
+    "projectArchived": "This project is archived. Restore it before starting new work.",
+    "projectDeleteNotEmpty": "This project still has tasks, relationships or history. Archive it to preserve that work.",
     "botNotFound": "This bot does not exist in this workspace.",
     "executionPlaceInvalid": "Choose an available device or cloud.",
     "executionHarnessUnavailable": "This Agent is unavailable on the selected device.",
@@ -1166,6 +1180,7 @@
     "issueOutdated": "This task was updated. Please refresh and try again.",
     "issueTargetUnavailable": "The related task is no longer available.",
     "issueAccessChanged": "Task access has changed.",
+    "accessChangeConfirmationRequired": "Changing this would change who can read the task. Confirm to continue.",
     "issueParentCycle": "Parent and subtask relations cannot form a cycle.",
     "issueDuplicateCycle": "Duplicate relations cannot form a cycle.",
     "issueBlockCycle": "Blocking relations cannot form a cycle.",
@@ -1490,6 +1505,18 @@
     "removeFailedTitle": "Could not remove",
     "removing": "Removing…",
     "confirmRemove": "Remove member",
+    "memberRoleOwner": "Can invite",
+    "mute": "Mute",
+    "unmute": "Follow",
+    "memberRoleMember": "Collaborator",
+    "subscribedOn": "Following",
+    "subscribedOff": "Muted",
+    "roleChanged": "{name} can now invite members.",
+    "roleChangeFailed": "The role could not be changed.",
+    "subscriptionChanged": "Notifications for this task were {state}.",
+    "subscriptionChangeFailed": "Notifications could not be changed.",
+    "mutedState": "muted",
+    "followedState": "restored",
     "title": "Members",
     "breadcrumbSettings": "Settings",
     "navLabel": "Workspace settings navigation",
@@ -1672,6 +1699,8 @@
       "readingActivity": "Loading activity…"
     },
     "activity": {
+      "archived": "archived the project",
+      "restored": "restored the project",
       "created": "created the project",
       "updatedOverview": "updated the project properties and overview",
       "updatedFields": "updated {fields}",
@@ -1796,7 +1825,7 @@
         "title": "Connections"
       },
       "bot-permissions": {
-        "title": "Bot permissions"
+        "title": "App & run permissions"
       },
       "models": {
         "title": "Models and subscriptions",
@@ -1995,6 +2024,7 @@
       "empty": "No memories yet",
       "correct": "Correct",
       "delete": "Delete",
+      "scopedTo": "Only in {repository}",
       "kinds": {
         "interest": "Interests",
         "routine": "Routines",
@@ -2388,8 +2418,16 @@
     },
     "botPermissions": {
       "loading": "Reading permissions…",
-      "rule": "The Decision API judges each call; only destructive ones, like deleting or overwriting, ask you first.",
-      "bot": "Bot",
+      "rule": "Each app has one access level for the whole workspace; every Bot uses it. Tools come from the provider's real catalogue.",
+      "workspaceScope": "These settings apply to every Bot in this workspace.",
+      "allTools": "All tools",
+      "allToolsCount": "All tools · {count}",
+      "tools": "View tools",
+      "toolsCount": "{count} tools · {readOnly} read-only",
+      "toolsLoading": "Reading tools…",
+      "toolsFailed": "Couldn't read the tool list",
+      "readOnly": "read-only",
+      "write": "can write",
       "mode": "Approval",
       "modes": {
         "ask": "By the rules",
@@ -2398,11 +2436,11 @@
       "empty": "No apps connected",
       "level": {
         "workspaceDefault": "Default (workspace setting)",
+        "runDefault": "Default (run policy)",
         "default": "Default (Decision API)",
         "allow": "On its own",
         "ask": "Asks you first",
-        "deny": "Not allowed",
-        "eachBot": "Each Bot's setting"
+        "deny": "Not allowed"
       },
       "run": {
         "install_dependency": "Install dependencies",
@@ -2416,7 +2454,8 @@
         "saveFailed": "Couldn't save",
         "writePolicyChanged": "The settings just changed; read again",
         "agentPolicyUnavailable": "This setting can't be saved right now",
-        "workspaceAccessDenied": "Only admins can change workspace settings"
+        "workspaceAccessDenied": "Only admins can change workspace settings",
+        "noBotInWorkspace": "This workspace has no Bot yet. Create one to read and save its app permissions."
       }
     },
     "workspaceLoading": "Loading the workspace…",
@@ -3125,17 +3164,28 @@
         "keyRefused": "API key refused",
         "balance": "API balance exhausted",
         "providerUnavailable": "Model service unavailable",
-        "unavailable": "Model source or run location is currently unavailable"
+        "unavailable": "Model source or run location is currently unavailable",
+        "skillMissing": "A selected skill is no longer installed",
+        "skillDisabled": "A selected skill is disabled",
+        "skillForbidden": "A shared skill is no longer authorized"
       },
       "skillNames": {
         "implementation-evidence": "Implementation evidence",
         "independent-review": "Independent review",
-        "systematic-debugging": "Systematic debugging"
+        "systematic-debugging": "Systematic debugging",
+        "test-driven-development": "Test-driven development",
+        "verification-before-completion": "Verification before completion",
+        "performance-investigation": "Performance investigation",
+        "security-review": "Security review"
       },
       "skillDescriptions": {
         "implementation-evidence": "Record changes, verification results and unverified acceptance criteria.",
         "independent-review": "Review the frozen candidate and record reproducible findings.",
-        "systematic-debugging": "Reproduce the failure, identify its cause and verify the fix."
+        "systematic-debugging": "Reproduce the failure, identify its cause and verify the fix.",
+        "test-driven-development": "Write a failing check, then make the smallest change pass.",
+        "verification-before-completion": "Separate observed results from unverified claims before reporting.",
+        "performance-investigation": "Measure the problem, change the dominant cost, then measure again.",
+        "security-review": "Check trust boundaries, authorization, injection and secret handling."
       },
       "numberedSource": "{source} {number}",
       "mark": {
@@ -3157,7 +3207,48 @@
           "teal": "Teal",
           "pink": "Pink"
         }
-      }
+      },
+      "blankProfile": "Blank profile",
+      "templates": {
+        "investigator": {
+          "name": "Investigator",
+          "description": "Reproduce the problem and report evidence and root cause."
+        },
+        "planner": {
+          "name": "Planner",
+          "description": "Turn a complex request into a plan and acceptance criteria."
+        },
+        "implementer": {
+          "name": "Implementer",
+          "description": "Implement, test and verify the change in the task repository."
+        },
+        "reviewer": {
+          "name": "Reviewer",
+          "description": "Review the frozen candidate independently."
+        }
+      },
+      "skillSources": {
+        "official": "Official",
+        "personal": "Personal",
+        "workspace": "Workspace",
+        "repository": "Repository"
+      },
+      "skillStates": {
+        "disabled": "Disabled",
+        "missing": "No longer installed",
+        "forbidden": "No longer shared",
+        "invalid": "Unusable source"
+      },
+      "repositorySkills": "Repository skills",
+      "repositorySkillName": "Skill name",
+      "repositorySkillPlaceholder": "test-driven-development",
+      "addRepositorySkill": "Add",
+      "repositorySkillHint": "Loaded from this checkout when the run starts.",
+      "shareSkill": "Share",
+      "unshareSkill": "Unshare",
+      "skillLoaded": "Loaded",
+      "skillNotLoaded": "Not loaded",
+      "skillsNone": "No skills"
     },
     "cloud": {
       "title": "Mikka Cloud",
@@ -3273,6 +3364,9 @@
     "linkCopied": "Invite link copied.",
     "copyManually": "Copy is unavailable; select the link and copy it manually.",
     "refreshFailed": "Invites were created, but the list did not refresh. Close this dialog and reload the page; do not create them again.",
+    "skippedTitle": "{count} address(es) were not invited",
+    "skippedAlreadyMember": "Already a member",
+    "skippedDuplicate": "Listed twice",
     "imported": "{count, plural, =1 {Imported 1 valid email} other {Imported # valid emails}}; {total} to invite.",
     "importedDuplicates": "{count, plural, =1 {Imported 1 valid email} other {Imported # valid emails}}, removed {duplicates} duplicate(s); {total} to invite.",
     "errors": {
@@ -3521,6 +3615,7 @@
     "unknownClient": "An unnamed app"
   },
   "Coordinator": {
+    "waitingQuestions": "{count, plural, one {# task is waiting for your answer} other {# tasks are waiting for your answer}}",
     "stop": "Stop",
     "stopped": "Stopped",
     "label": "Coordinator",
@@ -3644,6 +3739,14 @@
     "sendUncertain": "Delivery not confirmed",
     "sendOffline": "No connection. Not sent",
     "lengthCount": "{count} / {max}",
+    "context": "Context",
+    "contextUsage": "Context, about {used} of {compactAt} estimated tokens before older turns fold",
+    "contextHeld": "Estimated tokens the next turn carries",
+    "contextCompactAt": "Older turns fold at",
+    "contextKeepRecent": "Recent turns kept after a fold",
+    "contextNearFold": "The next turn folds older turns first",
+    "contextEstimated": "Estimated from stored text, not a provider token count",
+    "contextNoWindow": "Mikka stores no model context window, so no share of one is shown",
     "modelPicker": {
       "label": "Model: {name}",
       "labelUnavailable": "Model: {name}, unavailable",
@@ -4193,6 +4296,9 @@
     "close": "Close thread",
     "openTask": "Open task",
     "conversation": "Thread conversation",
+    "outlineIndex": "Jump to a message, {count} in this thread",
+    "outlineYou": "You",
+    "outlineUnknownAuthor": "Unknown",
     "loading": "Opening thread",
     "loadFailed": "Thread failed to load",
     "retry": "Retry",
@@ -4232,6 +4338,22 @@
       "paidBy": "{owner}'s {plan}",
       "movedTo": "Moved to {machine} to continue"
     },
+    "context": "Context",
+    "contextUsage": "Context, {used} of {budget} for the brief",
+    "contextBrief": "Brief",
+    "contextHeld": "Held",
+    "contextEstimated": "Estimated, not billed tokens",
+    "contextUnmeasured": "Not counted: {segments}",
+    "contextListSeparator": ", ",
+    "contextSegments": {
+      "system": "System",
+      "tools": "Tools",
+      "rules": "Instructions",
+      "skills": "Skills",
+      "mcp": "MCP",
+      "environment": "Environment",
+      "conversation": "Conversation"
+    },
     "back": "Back",
     "executionIdentity": {
       "you": "You",
@@ -4265,6 +4387,11 @@
       "copyDiagnostics": "Copy diagnostics",
       "diagnosticsCopied": "Diagnostics copied",
       "diagnosticsCopyFailed": "Couldn't copy diagnostics",
+      "skills": "Skills",
+      "skillsInlined": "In the prompt",
+      "skillsDeferred": "Description only",
+      "skillsDeferredList": "{count, plural, =1 {1 skill} other {# skills}} listed by description; the agent opens the skill file to read the text",
+      "skillsBudget": "{used} of {budget} characters of skill text in the prompt",
       "title": "Execution identity and billing",
       "loading": "Loading execution record",
       "unavailable": "Execution record unavailable",
@@ -4593,6 +4720,12 @@
         },
         "reason": {
           "needsReply": "Needs your reply",
+          "needs_input": "Needs your reply",
+          "approval": "Needs your confirmation",
+          "pr_review": "Needs review",
+          "offline": "Offline",
+          "blocked_by": "Waiting on a task",
+          "flagged": "Flagged",
           "running": "Running",
           "confirm": "Needs your confirmation",
           "review": "Needs review",
@@ -4857,10 +4990,10 @@
     "category": {
       "all": "All",
       "documents": "Documents",
-      "pages": "Web pages"
-    ,
+      "pages": "Web pages",
       "pullRequests": "Pull requests",
-      "media": "Screenshots and recordings"},
+      "media": "Screenshots and recordings"
+    },
     "columns": {
       "name": "Name",
       "source": "Source",
@@ -5414,7 +5547,11 @@
       "activePlan": "Active resource plan",
       "inactiveCreditShare": "Your earlier personal credit share is inactive while the Organization account pays. Turn it off to revoke that consent.",
       "capacity": "Concurrent platform runs",
-      "plans": { "free": "Free", "pro": "Pro", "enterprise": "Enterprise" },
+      "plans": {
+        "free": "Free",
+        "pro": "Pro",
+        "enterprise": "Enterprise"
+      },
       "removeLimitHelp": "Remove this scope’s spending cap. Existing usage and audit history remain.",
       "differentPayer": "Platform execution uses a different Organization payment account. This page shows this Workspace’s retained balance and history. Open the Organization scope to manage platform purchases."
     },
@@ -5630,23 +5767,57 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
-    "workspace_not_found": { "default": "This code workspace is unavailable to your account." },
-    "workspace_snapshot_unavailable": { "default": "This version has no available review snapshot." },
-    "workspace_snapshot_outdated": { "default": "The source version changed. Refresh the diff before submitting feedback." },
-    "workspace_review_conflict": { "default": "The review changed. Refresh it before applying this update." },
-    "workspace_review_anchor_invalid": { "default": "This line selection does not belong to the selected diff version." },
-    "workspace_review_unavailable": { "default": "Review feedback is unavailable for this task or account." },
-    "workspace_review_delivery_uncertain": { "default": "The feedback delivery is not yet confirmed. Check its existing receipt before trying another submission." },
-    "workspace_review_github_unavailable": { "default": "GitHub review is temporarily unavailable. Your local comments remain saved." },
-    "workspace_review_github_forbidden": { "default": "Your GitHub connection cannot review this pull request. Your comments are saved locally." },
-    "workspace_machine_unavailable": { "default": "The run machine is unavailable. Resume it or view its saved history." },
-    "workspace_checkout_unavailable": { "default": "The run's repository checkout is unavailable." },
-    "workspace_path_unavailable": { "default": "This file is unavailable or protected." },
-    "workspace_version_conflict": { "default": "The source changed. Reload it and select the context again." },
-    "workspace_limit_exceeded": { "default": "The workspace request exceeds its limit. Select fewer files or a smaller range." },
-    "workspace_request_expired": { "default": "The file reference expired. Select the source again." },
-    "workspace_unsupported": { "default": "This operation is unsupported for the selected file or platform." },
-    "workspace_invalid_request": { "default": "The workspace request is invalid." },
+    "workspace_not_found": {
+      "default": "This code workspace is unavailable to your account."
+    },
+    "workspace_snapshot_unavailable": {
+      "default": "This version has no available review snapshot."
+    },
+    "workspace_snapshot_outdated": {
+      "default": "The source version changed. Refresh the diff before submitting feedback."
+    },
+    "workspace_review_conflict": {
+      "default": "The review changed. Refresh it before applying this update."
+    },
+    "workspace_review_anchor_invalid": {
+      "default": "This line selection does not belong to the selected diff version."
+    },
+    "workspace_review_unavailable": {
+      "default": "Review feedback is unavailable for this task or account."
+    },
+    "workspace_review_delivery_uncertain": {
+      "default": "The feedback delivery is not yet confirmed. Check its existing receipt before trying another submission."
+    },
+    "workspace_review_github_unavailable": {
+      "default": "GitHub review is temporarily unavailable. Your local comments remain saved."
+    },
+    "workspace_review_github_forbidden": {
+      "default": "Your GitHub connection cannot review this pull request. Your comments are saved locally."
+    },
+    "workspace_machine_unavailable": {
+      "default": "The run machine is unavailable. Resume it or view its saved history."
+    },
+    "workspace_checkout_unavailable": {
+      "default": "The run's repository checkout is unavailable."
+    },
+    "workspace_path_unavailable": {
+      "default": "This file is unavailable or protected."
+    },
+    "workspace_version_conflict": {
+      "default": "The source changed. Reload it and select the context again."
+    },
+    "workspace_limit_exceeded": {
+      "default": "The workspace request exceeds its limit. Select fewer files or a smaller range."
+    },
+    "workspace_request_expired": {
+      "default": "The file reference expired. Select the source again."
+    },
+    "workspace_unsupported": {
+      "default": "This operation is unsupported for the selected file or platform."
+    },
+    "workspace_invalid_request": {
+      "default": "The workspace request is invalid."
+    },
     "task_secret_unavailable": {
       "default": "A task Secret is unavailable. Check its delivery policy and retry the task.",
       "invalid_capability": "The task Secret capability is invalid. Retry the task to obtain a new grant.",
@@ -5659,18 +5830,42 @@
       "limit_exceeded": "The Secret request exceeds the supported size or grant limit.",
       "configuration": "Configure this Secret’s protected HTTP policy, or explicitly allow direct exposure for this Secret."
     },
-    "run_subscription_expired": { "default": "The model subscription needs to be reconnected." },
-    "run_api_key_invalid": { "default": "The provider rejected the API key. Check the key in model settings." },
-    "run_quota_exceeded": { "default": "The provider's usage limit or credit balance has been reached. Check your usage." },
-    "run_rate_limited": { "default": "The provider is limiting requests. Try again shortly." },
-    "run_invalid_request": { "default": "The provider could not accept this request. Check the error details." },
-    "run_access_denied": { "default": "The provider denied access to this request. Check the account's permissions." },
-    "run_model_unavailable": { "default": "This model is unavailable or has been retired. Choose another model." },
-    "run_context_length_exceeded": { "default": "The request exceeds the model's context limit. Shorten the input or choose another model." },
-    "run_timeout": { "default": "The provider did not respond in time. Try again." },
-    "run_network_error": { "default": "The provider connection failed. Check the connection and try again." },
-    "run_provider_error": { "default": "The model provider could not complete this request. Try again." },
-    "run_failed": { "default": "The task could not be completed. Check the error details or try again." },
+    "run_subscription_expired": {
+      "default": "The model subscription needs to be reconnected."
+    },
+    "run_api_key_invalid": {
+      "default": "The provider rejected the API key. Check the key in model settings."
+    },
+    "run_quota_exceeded": {
+      "default": "The provider's usage limit or credit balance has been reached. Check your usage."
+    },
+    "run_rate_limited": {
+      "default": "The provider is limiting requests. Try again shortly."
+    },
+    "run_invalid_request": {
+      "default": "The provider could not accept this request. Check the error details."
+    },
+    "run_access_denied": {
+      "default": "The provider denied access to this request. Check the account's permissions."
+    },
+    "run_model_unavailable": {
+      "default": "This model is unavailable or has been retired. Choose another model."
+    },
+    "run_context_length_exceeded": {
+      "default": "The request exceeds the model's context limit. Shorten the input or choose another model."
+    },
+    "run_timeout": {
+      "default": "The provider did not respond in time. Try again."
+    },
+    "run_network_error": {
+      "default": "The provider connection failed. Check the connection and try again."
+    },
+    "run_provider_error": {
+      "default": "The model provider could not complete this request. Try again."
+    },
+    "run_failed": {
+      "default": "The task could not be completed. Check the error details or try again."
+    },
     "governance_denied": {
       "plan_changed": "The plan changed. Review its current entitlements before applying this update.",
       "default": "The governance action could not be completed. Try again.",
@@ -5685,33 +5880,87 @@
       "template_limit": "This plan has reached its approval template limit.",
       "not_found": "This organization, workspace, or template is unavailable."
     },
-    "web_auth_invalid_request": { "default": "The sign-in request is invalid. Connect again." },
-    "web_auth_forbidden": { "default": "The server refused this sign-in origin." },
-    "web_auth_state_unavailable": { "default": "This sign-in request was already used. Connect again." },
-    "web_auth_exchange_rejected": { "default": "The sign-in handoff was refused or expired. Connect again." },
-    "web_auth_session_expired": { "default": "The sign-in session expired. Sign in to the server again." },
-    "web_connection_account_conflict": { "default": "This account ID belongs to another server. Use a separate account." },
-    "web_connection_app_invalid": { "default": "The official app address is invalid." },
-    "web_connection_auth_unavailable": { "default": "The server cannot verify this session right now. Try again." },
-    "web_connection_cloud_selected": { "default": "Switch back to the cloud account." },
-    "web_connection_disabled": { "default": "The administrator disabled official web access." },
-    "web_connection_download_failed": { "default": "The server file could not be read. Try again." },
-    "web_connection_handoff_expired": { "default": "The sign-in handoff expired. Connect again." },
-    "web_connection_handoff_rejected": { "default": "The server refused the sign-in handoff. Connect again." },
-    "web_connection_https_required": { "default": "An HTTPS address is required to connect." },
-    "web_connection_method_refused": { "default": "The server does not allow this request method." },
-    "web_connection_origin_refused": { "default": "The request address does not belong to the selected server." },
-    "web_connection_popup_blocked": { "default": "Allow the sign-in popup and try again." },
-    "web_connection_preflight_refused": { "default": "The server refused the cross-origin request. Check the app version." },
-    "web_connection_probe_required": { "default": "Check the server address again before signing in." },
-    "web_connection_revoke_unconfirmed": { "default": "Browser credentials were cleared, but server revocation could not be confirmed. Check sessions on that server." },
-    "web_connection_route_refused": { "default": "This endpoint is unavailable through the current connection." },
-    "web_connection_server_limit": { "default": "Twenty servers are already saved. Disconnect one first." },
-    "web_connection_session_changed": { "default": "The server or account changed. Try again." },
-    "web_connection_session_expired": { "default": "The server session expired. Sign in again." },
-    "web_connection_session_invalid": { "default": "The server returned invalid account information. Connect again." },
-    "web_connection_session_unavailable": { "default": "The server session could not be read. Try again." },
-    "web_connection_sign_in_required": { "default": "Sign in to this server first." },
+    "web_auth_invalid_request": {
+      "default": "The sign-in request is invalid. Connect again."
+    },
+    "web_auth_forbidden": {
+      "default": "The server refused this sign-in origin."
+    },
+    "web_auth_state_unavailable": {
+      "default": "This sign-in request was already used. Connect again."
+    },
+    "web_auth_exchange_rejected": {
+      "default": "The sign-in handoff was refused or expired. Connect again."
+    },
+    "web_auth_session_expired": {
+      "default": "The sign-in session expired. Sign in to the server again."
+    },
+    "web_connection_account_conflict": {
+      "default": "This account ID belongs to another server. Use a separate account."
+    },
+    "web_connection_app_invalid": {
+      "default": "The official app address is invalid."
+    },
+    "web_connection_auth_unavailable": {
+      "default": "The server cannot verify this session right now. Try again."
+    },
+    "web_connection_cloud_selected": {
+      "default": "Switch back to the cloud account."
+    },
+    "web_connection_disabled": {
+      "default": "The administrator disabled official web access."
+    },
+    "web_connection_download_failed": {
+      "default": "The server file could not be read. Try again."
+    },
+    "web_connection_handoff_expired": {
+      "default": "The sign-in handoff expired. Connect again."
+    },
+    "web_connection_handoff_rejected": {
+      "default": "The server refused the sign-in handoff. Connect again."
+    },
+    "web_connection_https_required": {
+      "default": "An HTTPS address is required to connect."
+    },
+    "web_connection_method_refused": {
+      "default": "The server does not allow this request method."
+    },
+    "web_connection_origin_refused": {
+      "default": "The request address does not belong to the selected server."
+    },
+    "web_connection_popup_blocked": {
+      "default": "Allow the sign-in popup and try again."
+    },
+    "web_connection_preflight_refused": {
+      "default": "The server refused the cross-origin request. Check the app version."
+    },
+    "web_connection_probe_required": {
+      "default": "Check the server address again before signing in."
+    },
+    "web_connection_revoke_unconfirmed": {
+      "default": "Browser credentials were cleared, but server revocation could not be confirmed. Check sessions on that server."
+    },
+    "web_connection_route_refused": {
+      "default": "This endpoint is unavailable through the current connection."
+    },
+    "web_connection_server_limit": {
+      "default": "Twenty servers are already saved. Disconnect one first."
+    },
+    "web_connection_session_changed": {
+      "default": "The server or account changed. Try again."
+    },
+    "web_connection_session_expired": {
+      "default": "The server session expired. Sign in again."
+    },
+    "web_connection_session_invalid": {
+      "default": "The server returned invalid account information. Connect again."
+    },
+    "web_connection_session_unavailable": {
+      "default": "The server session could not be read. Try again."
+    },
+    "web_connection_sign_in_required": {
+      "default": "Sign in to this server first."
+    },
     "installer_failed": {
       "default": "Mikka could not install. Open the local installation log for details.",
       "node_required": "Install Node.js 22 or newer, then retry.",
@@ -6262,8 +6511,8 @@
   "HostedPermissions": {
     "apps": "Apps",
     "redLines": "Red lines",
-    "redLinesText": "Writes set to Not allowed: never done, whatever the Decision API judges",
-    "redLinesEmpty": "No writes are set to Not allowed",
+    "redLinesText": "Apps set to Not allowed: direct app and GitHub calls won't use them. The workspace block is absolute.",
+    "redLinesEmpty": "No app is set to Not allowed",
     "allowText": "Does it without asking – recorded in the activity",
     "askText": "Waits for your OK in the Inbox",
     "neverText": "Won't do it, and tells you it can't",
@@ -6273,25 +6522,21 @@
     "changes": "Writes",
     "care": "Needs care",
     "nothingToDecide": "Connect an app first",
-    "noActions": "No write of this app has its own setting; the Decision API judges each call",
+    "noActions": "This app has one access level; Default follows the Decision API",
     "noApp": "Nothing open",
-    "noAppText": "Pick an app to see how the Bot's writes in it are handled.",
+    "noAppText": "Pick an app to see its tools and access level.",
     "empty": "No apps connected",
-    "emptyText": "Connect an app and the Bot's writes in it show up here.",
-    "means": "{allow} on its own · asks before {ask} · {never} not allowed; the Decision API judges the rest",
+    "emptyText": "Connect an app and its tools show up here.",
+    "means": "{allow} on its own · asks before {ask} · {never} not allowed; Default follows the Decision API",
     "summaryAllow": "{count} on its own",
     "summaryAsk": "asks before {count}",
     "summaryNever": "{count} not allowed",
     "all": "All {kind}",
-    "modeAskText": "Writes follow the settings above and the Decision API; agents follow their run permissions",
+    "modeAskText": "Writes follow the settings above, then the Decision API; agents follow their run permissions",
     "modeReadOnlyText": "Reads and reports, changes nothing",
-    "unsetText": "Nothing set: an app write goes to the Decision API, an agent action follows the workspace",
+    "unsetText": "Nothing set: an app write goes to the Decision API; an agent action follows the run policy",
     "runTitle": "Agent run permissions",
-    "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here",
-    "workspaceTitle": "Workspace writes",
-    "workspaceNote": "For every Bot in the workspace; where it is stricter than a Bot's setting, this one applies",
-    "now": "Now: {value}",
-    "workspace": "Workspace: {value}"
+    "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here"
   },
   "HostedBoard": {
     "due": "Due {date}",

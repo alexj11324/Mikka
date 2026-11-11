@@ -291,23 +291,16 @@ export function forgetNotes(memory: string, text: string): { memory: string; rem
   return { memory: kept.join('\n'), removed: lines.length - kept.length }
 }
 
-/** The system prompt with the person's memory after it. */
-export function instructionsWithMemory(instructions: string, memory: string): string {
-  if (!memory) return instructions
-  return `${instructions}\n\n## What the person asked you to remember\n${memory}`
-}
-
-/** The cached context after the rules: the GitHub lines, then the allowed models list; empty parts are left out. */
-export function cachedContextLines(...parts: string[]): string {
-  return parts.filter(Boolean).join('\n')
-}
-
-/** Keep a rules breakpoint before the repository/model context: a repository push or a newly used repository
- * can change that context between turns, while the rules and tool definitions remain reusable. */
-export function promptWithCachedContext(rules: string, github: string, memory: string, tail: string): { instructions: string; stable: number; stableRules: number } {
-  const prefix = github ? `${rules}\n${github}` : rules
-  return { stableRules: rules.length, stable: prefix.length, instructions: instructionsWithMemory(prefix, memory) + tail }
-}
+/**
+ * The system prompt with the person's memory after it. `profile` is what Mikka
+ * has learnt about them (lib/profile/prompt.ts profileSection): a named section
+ * of its own, after their own notes, so the two never read as one thing. The
+ * person's own words come first because they outrank Mikka's deductions.
+ *
+ * Composed in lib/coordinator/prompt-parts.ts so it can be read and tested
+ * without the conversation model; re-exported here, where callers already look.
+ */
+export { cachedContextLines, instructionsWithMemory, promptWithCachedContext } from './prompt-parts'
 
 /**
  * The system prompt with the person's own instructions (Settings, 个人指令)

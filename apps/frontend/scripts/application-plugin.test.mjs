@@ -29,7 +29,7 @@ async function compile(source, target = 'web') {
 }
 
 test('the actual Vite graph preserves action arity and the web/native transport separation', async () => {
-  const source = 'export { listProjects } from "@/app/actions/projects"; export { getArtifact } from "@/app/actions/artifacts"; export { startCardVerification, startPointsPurchase } from "@/lib/billing/verification-client";'
+  const source = 'export { listProjects, listWorkspaceProjects } from "@/app/actions/projects"; export { getArtifact } from "@/app/actions/artifacts"; export { startCardVerification, startPointsPurchase } from "@/lib/billing/verification-client";'
   const windowBefore = globalThis.window
   const fetchBefore = globalThis.fetch
   const workspace = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
@@ -45,11 +45,13 @@ test('the actual Vite graph preserves action arity and the web/native transport 
       globalThis.fetch = async (url, options) => { requests.push({ url, options }); return Response.json({ version: 1, ok: true, result: null }) }
       const actions = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}#vite-contract-${++sequence}`)
       await actions.listProjects('ignored SWR key')
+      await actions.listWorkspaceProjects(workspace, 'ignored SWR key')
       await actions.getArtifact('artifact-id', 'ignored extra argument')
       await actions.startCardVerification(workspace)
       await actions.startPointsPurchase(workspace, 25)
       assert.deepEqual(requests.map(request => JSON.parse(request.options.body)), [
         { version: 1, action: 'projects.listProjects', args: [] },
+        { version: 1, action: 'projects.listWorkspaceProjects', args: [workspace] },
         { version: 1, action: 'artifacts.getArtifact', args: ['artifact-id'] },
         { version: 1, action: 'billing.startCardVerification', args: [workspace] },
         { version: 1, action: 'billing.startPointsPurchase', args: [workspace, 25] },

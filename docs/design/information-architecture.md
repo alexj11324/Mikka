@@ -1,17 +1,19 @@
 # Information architecture
 
 What each object is, who owns it, where it is managed and found, and the
-navigation tree. The object/lifecycle tables and audit findings in §§1–4,
-§6's inconsistency table and §8 record the 2026-11-02 audit of `fa4ac2b`,
-when #890, #892 and #895 were in flight. Their counts, line numbers, gaps
-and proposed fixes describe that revision. The accepted navigation in §5
-and the linked feature contracts incorporate later decisions.
+navigation tree. Sections 1–2 record the work-domain contract updated for
+#1687 on 2026-11-07. The audit findings in §§3–4, §6’s inconsistency table
+and §8 retain the 2026-11-02 snapshot of `fa4ac2b`, when #890, #892 and
+#895 were in flight. Their counts, line numbers, gaps and proposed fixes
+describe that revision. The accepted navigation in §5 and linked feature
+contracts incorporate later decisions.
 
 Sources, higher wins (`README.md`): Alex's decisions, `glossary.md`,
 `rules.md`, then code. Tenancy rules T1–T6 are in
 [decision 2026-11-02-0231](decisions/2026-11-02-0231-workspace-is-the-tenant.md),
-which records the tenant rules. Later accepted decisions take priority
-over the audit snapshot.
+and the confirmed implementation contract for work objects is
+[Project v2 and domain consistency](decisions/2026-11-07-2300-work-domain-model.md).
+Later accepted decisions take priority over the audit snapshot.
 
 Method texts, cited by short name:
 
@@ -64,20 +66,20 @@ referenced by id (DDD).
 | Account | The person | Account · itself | `user`; `user_preferences.userId` (`lib/db/schema.ts:1090`) | Sign-up | 设置 › 账户, 安全, 偏好设置 | Rail avatar → account menu (R-75) |
 | Workspace | The tenant (T1) | Workspace · owner account | `mikka_workspaces.userId`, `kind` personal/team (`lib/db/workspace-schema.ts:4-14`) | Personal: on first use (`lib/personal-workspace.ts:16-26`); team: 创建工作区 (`app/actions/workspace.ts:49`) | 设置 › 常规 | Account menu, the only switcher (R-75, R-79) |
 | Member | An account's place in a workspace | Workspace · workspace | `mikka_workspace_members (workspaceId, userId, role, status)` (`workspace-schema.ts:16-24`) | Invitation, team only (`app/actions/workspace.ts:91`, refuses personal at `:100`) | 设置 › 成员 | 设置 › 成员 |
-| Team (团队) | A group inside a shared workspace | Team · workspace | `mikka_teams.workspaceId` (`lib/db/team-schema.ts:3-9`) | 设置 › 团队 › 创建团队 (`app/actions/teams.ts:47`) | 设置 › 团队 | 看板 (R-82); 设置 › 你的团队 |
+| Team (团队) | Optional grouping inside a shared Workspace | Team · Workspace | `mikka_teams.workspaceId`, archive state, lifecycle events | Authorized Shared Workspace member | Team settings, archive/restore/remove grouping | Current shared Workspace; absent in personal Workspace |
 | Bot | Chats, dispatches threads | Bot · workspace, held by owner | `bots (ownerId, workspaceId, archivedAt)` (`schema.ts:95-115`) | 新建 Bot (`app/actions/bots.ts:45` → `lib/bot-create.ts:14`) | 概览 header (name, look; R-51); defaults in 设置 › Bot 与 Agents | Bot list (R-01); ⌘K |
 | Coordinator | The person's ordinary bot in a workspace (R-06) | Bot · workspace, one per person | `coordinator_bots (ownerId, workspaceId) → bots` (`schema.ts:117-122`; `lib/coordinator/coordinator-bot.ts:5-16`) | On first use | As any bot | Bot list, pinned |
 | Group chat | Chat with several bots and people | Conversation · workspace | `conversations.workspaceId`, `createdBy`; `conversation_members` (`schema.ts:822-836`) | Bot list 「+」 › 新建群聊 | Group panel | Bot list; ⌘K |
 | Agent | Coding worker that runs a thread | Agent · account | `agents.userId`, `deviceId` (`schema.ts:321-328`); choice per person per workspace in `execution_rules (ownerId, workspaceId)` (`schema.ts:126-131`) | Detected on a device | 设置 › Bot 与 Agents | Its mark on 全部线程 rows (R-78) |
 | Agent Profile | Reusable logical coding role, model policy, private instructions and controlled Skills | Execution · person in workspace | `factory_agent_profiles` and immutable profile versions | Settings › Models and subscriptions | Factory Agent Profiles section, beside Preferred models | New task selector; frozen Profile in the thread execution identity dialog; [spec](factory-agent-profiles.md) |
-| Thread (run chain) | Work a bot dispatched; a root run and the runs that resume, retry or continue it (`lib/run-chain.ts`) | Thread · workspace where it was dispatched (run by an Agent; the bot only dispatches it) | `agent_runs.userId`, `botId`, `issueId` (`schema.ts:338-398`); no `workspaceId`, reached through `bots.workspaceId` | Dispatched from chat | Its column: 对话, 验收 | 概览 › 线程; 全部线程; chat card; task's 线程 (R-82) |
-| Task (issue) | Work to be done (`MIK-xx`) | Task · workspace (team: its team) | `issues.userId`, `scope` (`schema.ts:30-45`); team tasks in `mikka_team_issues (teamId, workspaceId)` (`team-schema.ts:15-18`) | By a bot in chat, or 新建任务 (R-22) | Task page | 看板; ⌘K; chat chips (R-15) |
-| Project | A group of tasks | Project · account, linked to teams | `workspace_projects.userId` (`lib/db/project-schema.ts:4-6`); `mikka_team_projects.workspaceId` (`team-schema.ts:29-32`) | 看板 › 项目 | Project page | 看板 (R-82); ⌘K |
+| Thread (run chain) | A root Run and its continuations/retries | Thread · verified Workspace | `agent_runs.workspaceId`, immutable admitted execution identity; `userId` is the execution actor | Dispatch | Thread conversation and acceptance | Overview, All threads, Task detail |
+| Task (issue) | Work with an immutable UUID and issued identifier | Task · verified Workspace | `issues.workspaceId`, `ownershipState`; optional `mikka_team_issues` grouping and `workspace_project_tasks` Project | Trusted current Workspace or persisted source | Task detail | All tasks, Team filter, Ungrouped, search |
+| Project | A Workspace collaboration object with 0..N Tasks and Teams | Project · Workspace | `workspace_projects.workspaceId`, `workspace_project_tasks`, `workspace_project_members`; `userId` records creator only | Current authorized Workspace | Project detail, real member IDs, resources | Current Workspace Projects and search |
 | Artifact | What a thread produces to look at or accept | Artifact · account, linked to run | `artifacts.userId`, `runId`, `issueId` (`schema.ts:893-904`) | By a thread | Artifact window (R-56) | Artifact rail page; thread header 「Artifact · N」 |
 | Device | The person's computer or server | Device · account | `devices.ownerId` (`schema.ts:248-262`) | Daemon registration (`app/v1/devices/register/route.ts:41`) | 设置 › 设备 | 设置 › 设备 |
 | Bot computer (电脑) | A bot's own desktop on its owner's bot machine; one machine per person per workspace | Bot · workspace (machine: person · workspace) | `bot_desktops (botId PK)`, `bot_cloud_runtimes (botId, workspaceId, ownerId)`; `cloud_machines` PK (`workspaceId`, `ownerId`) (`drizzle/20261029080001_owner_cloud_machines.sql`) | With the bot (R-04) | — | 概览 › 电脑 |
 | Connection | Link to an outside app | Connection · account | `composio_accounts.userId` (`schema.ts:727-741`), `github_connections.userId` (`:399`), `linear_connections.userId` (`:169`), `telegram_links` | 插件 › an app | 插件, and 设置 › 连接 (same `PluginsView`) | 插件 rail page |
-| App policy | What members' connections may do here | Workspace · workspace | `workspace_app_policies.workspaceId` (`lib/db/app-policy-schema.ts:4`) | — | 设置 › 团队权限 | 设置 › 团队权限 |
+| App policy | The workspace's allow/ask/deny per app; 团队权限 › 允许使用的应用 still narrows which apps a Bot may use | Workspace · workspace | `workspace_computer_policies.external_write_permissions` (legacy `workspace_app_policies.workspaceId` is still enforced) | — | 设置 › 应用与运行权限; 设置 › 团队权限 | 设置 › 应用与运行权限; 设置 › 团队权限 |
 | Run environment | Setup/install scripts and reusable actions a task machine runs; frozen per run at claim | Environment · workspace, optionally one project | `project_environments` + `project_environment_revisions` (workspace DB), frozen `run_environment_bindings` and `run_action_executions` (application DB) | 设置 › 运行环境 | 设置 › 运行环境 | 设置 › 运行环境 |
 | Secret / env var | Value injected into the workspace's runs | Secret · workspace | `workspace_secrets (workspaceId, scopeType, scopeRef, createdBy)` (`lib/db/secrets-schema.ts:8-23`); injected by `loadWorkspaceRuntimeSecrets` (`lib/secrets/runtime.ts:20`) | 设置 › 密钥与环境 (`lib/secrets/store.ts:124`) | 设置 › 密钥与环境 | 设置 › 密钥与环境 |
 | Model credential | Subscription login or API key | Credentials · account | `byos_connections.ownerId` (+ legacy `workspaceId`), `model_api_keys.ownerId`, `user_e2b_keys.userId`; shares `workspace_subscription_shares`, `model_api_key_shares` (drizzle `20261027164503`, `20261101021000`, `20261101020201`) | 设置 › 模型与订阅 | 设置 › 模型与订阅 (shares: team only) | 设置 › 模型与订阅; bot model chip (R-11) |
@@ -85,31 +87,44 @@ referenced by id (DDD).
 | Notifications | Pushes and alerts about runs and chats | Account · account | `user_preferences` switches (`components/settings/notifications-settings.tsx:9`), `mobile_push_tokens.userId` (`schema.ts:1071`) | — | 设置 › 通知 | Web: none; desktop: system notification and Dock badge for 等你 (`platforms.md`); phone: push |
 | Memory | Facts about the person | Account · account | `user_facts.userId` (`schema.ts:664`) | Extracted from chats | 设置 › 记忆与建议 | 设置 › 记忆与建议 |
 
-Not determined from code: where bot memory and team memory are stored
-(decision 2310 keeps them in their workspace; no table for them was found), and
-how a personal task (`issues.scope = 'personal'`) is tied to one workspace,
-since `issues` has no `workspaceId`.
+Repository and Environment configuration are Workspace resources. A Project can
+bind 0..N repository keys and 0..N reusable environments, including defaults.
+A binding restricts existing GitHub/device authorization; it does not grant it.
+An Environment holds controlled setup, runtime/harness constraints, variables
+and existing secret IDs. A Run freezes the admitted checkout and configuration.
+See [the API contract](work-domain-api.md) for exact fields and error codes.
 
-## 2. Ownership and lifecycle (workspace area)
+Human assignee and Agent Delegate are independent. The assignee is a current
+human Workspace member or empty; a Delegate is an Agent/Bot/Profile selection.
+Neither field is reviewer/merge authority. Project lead/member IDs are current
+Workspace identities; names and `me` are not stored relationship keys.
 
-Each cell cites the code path read at `fa4ac2b`; "not implemented" means no
-path was found at that revision.
+Unknown historical ownership remains quarantined. A NULL verified Workspace
+is not a personal Workspace, and no creator, Team name or project name is an
+alternate ACL. The task ownership migration is owned by #1608/#1636.
 
-| Object | Created by | Belongs to | Changed by | Transfer | Delete | Owner leaves a shared workspace | Owner deletes the account (personal workspace) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Personal workspace | System, first use (`lib/personal-workspace.ts:16-26`) | Its account | Owner (admin of it) | Never (#895: `general.ts` `mayTransfer`) | Never (#895: `workspacePersonalDelete`) | n/a, one member | Workspace DB rows go (`lib/account/delete.ts:110-119`); main-DB rows keyed only by workspace (`workspace_secrets`, `workspace_billing`, `workspace_settings`, `hosted_allowances`) are not swept: the sweep matches owner columns only (`delete.ts:32`, `:180`), and `workspace_secrets` has `createdBy` |
-| Shared workspace | Any account (`app/actions/workspace.ts:49`) | Owner account (`mikka_workspaces.userId`) | Admins (`lib/workspace-admin/general.ts:44`) | Owner, or an admin when the owner is no longer an active admin (`general.ts:78-85`, `:114-134`); only `workspaces.userId` changes | Admin, typed name (`general.ts:215-250`); leaves `workspace_secrets`, `workspace_e2b_keys`, `workspace_app_policies`, `workspace_personal_policies`, `workspace_subscription_shares`, `model_api_key_shares`, `workspace_credit_shares`, `workspace_payment_designations`, `hosted_allowances`, `execution_rules`, `bot_model_choices`, `personal_access_tokens` (`deleteAppData`, `general.ts:170-213`) | Last active admin cannot be removed (`members.ts:117-121`) | Refused while they are its only active admin (`delete.ts:96-100`); otherwise membership goes (`delete.ts:121-122`) |
-| Member | Invitation accepted (`workspace.ts:164`) | Workspace | Admins: role, suspend (`workspace.ts:122-147`) | n/a | Admin removes (`members.ts:133-155`); not themselves (`:135`); self-leave not implemented, though `workspaceCannotRemoveSelf` copy names 「离开工作区」 (`messages/zh-CN.json:1160`) | Removed or suspended | Membership rows deleted (`delete.ts:121-123`) |
-| Team | Any member (`app/actions/teams.ts:47-60`, no admin or kind check) | Workspace | Team admins (`teams.ts:56`) | Not implemented | Typed name (`lib/workspace-admin/teams.ts:57-80`) | Their team memberships go (`members.ts:146`) | Team memberships go (`delete.ts:121`); a team they created stays |
-| Bot | Owner (`lib/bot-create.ts:14`) | Workspace, held by owner | Owner (`lib/bot-update.ts:19`); defaults by admins (`lib/workspace-admin/bots.ts:59`) | On removal or suspension to a named member, or admin takeover (`members.ts:45-66`, `:94-107`); Coordinator never (`:40-43`); threads keep `agent_runs.userId` of the old owner | Not implemented for one bot; only with its workspace (`general.ts:192`) or account | Paused, `archivedAt` (`members.ts:72-86`); restored on reactivation (`:89-91`) | Deleted with every `ownerId` row (`delete.ts:17-21`), in shared workspaces too, unlike leaving |
-| Agent | Device report | Account (`agents.userId`) | Owner | n/a | With its device or account | Unaffected; the person's per-workspace choice stays in `execution_rules` | Deleted (owner column) |
-| Device | Daemon (`app/v1/devices/register/route.ts:41`) | Account | Owner | Not implemented | Owner (`app/actions/agents.ts:146`) | Unaffected; it runs only its owner's bots (2240) | Deleted (owner column) |
-| Connection | Owner (`lib/composio-account-store.ts:35`) | Account | Owner | n/a | Owner | Unaffected; admin app policy governs only sharing (2240) | Deleted (owner column) |
-| Secret / env var | Admin: any scope; member: repository scope (`lib/secrets/permissions.ts:14-25`) | Workspace | Admins; members may replace repository entries (`permissions.ts:17`) | n/a | Admins only (`permissions.ts:19`, `store.ts:179`) | Stays, it is the workspace's | Personal workspace: not deleted (see first row) |
-| Model credential | Owner | Account | Owner | n/a | Owner | Shares in that workspace deleted, runs on them stopped (`members.ts:76-85`) | Deleted (owner column) |
-| Credits, billing | Stripe webhook (`lib/billing/service.ts:145`) | Workspace | Admins (计费) | n/a | With the workspace, refused while a subscription is live (`general.ts:172`) | Their card designation released with a grace period (`members.ts:74`), credit share deleted (`:78`) | Personal workspace's billing rows remain (see first row) |
+## 2. Ownership and lifecycle
 
-## 3. Model vs implementation on 2026-11-02
+| Object | Current authority | Lifecycle contract | Source |
+| --- | --- | --- | --- |
+| Personal Workspace | Its active owner | No Teams; account deletion removes its private data through the existing deletion job | `lib/personal-workspace.ts`, `lib/account/delete.ts` |
+| Shared Workspace | Current active members, admin for administrative writes | Task and Project ownership does not depend on creator membership or Team links; deleting the Workspace removes its own resources | `lib/workspace-admin/general.ts`, Task ownership ADR |
+| Member | Current Workspace membership | Removal/suspension revokes access; Project lead/member projections clear, historical author IDs remain | `lib/workspace-admin/members.ts`, Project v2 membership trigger |
+| Team | Same Workspace, Team-management permissions for lifecycle | Archive is reversible; remove grouping retains Tasks/Projects/history; hard delete refuses referenced Teams | [Team lifecycle ADR](decisions/2026-11-07-2340-team-lifecycle-retention.md) |
+| Task | Verified `issues.workspaceId` | Optional Team/Project; neither regrouping nor account identity is authority to move it across tenants | `lib/task-workspace.ts`, `lib/issue-visibility.ts` |
+| Project | Immutable verified Workspace | Same-tenant lead/member/Team/Task IDs; creator deletion preserves shared Project and decision history; unresolved Project evidence remains restricted | `lib/project-access.ts`, `lib/account/delete.ts` |
+| Run / publication | Frozen admitted identity plus current authorization at execution boundaries | Later configuration never rewrites history or reuses a publication under a new number; revoked policy blocks claim/new admission | `lib/project-resources/run-lease.ts`, `lib/run-publications.ts` |
+
+Account deletion and Workspace deletion are separate operations. A creator
+leaving or deleting their account cannot make surviving shared work personal.
+Counters and aliases belong to the Task/Workspace lifecycle, not a display
+name or the continued existence of the original creator's account.
+
+## 3. Historical audit (2026-11-02)
+
+The rows below preserve the original audit evidence; they are not current
+ownership or lifecycle rules. Sections 1–2 and linked ADRs supersede their
+work-domain descriptions. Reverify unrelated findings before acting on them.
 
 Severity: P0 blocks a key task or loses data; P1 frequent or a security,
 credential or data-retention risk; P2 friction or drift. Occurrence × impact
@@ -164,7 +179,8 @@ terms) and tenancy rule.
 | 成员 (`members`) | Team-only | Member | T2 | Team-only | Between people |
 | 团队 (`teams`) | Team-only | Team | T2 | Team-only (server gap M5) | Between people |
 | Bot 与 Agents (`bots`) | Workspace; 已暂停的 Bot team-only | Bot, Agent | T1, T2 | Team-only; fixed by #890 | A person's bots need defaults; bots of people who left are a team's |
-| 团队权限 (`permissions`) | Team-only | Workspace (policies) | T2 | Team-only | Governs sharing with other members (2240) |
+| 应用与运行权限 (`bot-permissions`) | Workspace | Workspace (policies) | T1 | Workspace | The workspace's app access and run policy; every Bot inherits it |
+| 团队权限 (`permissions`) | Team-only | Workspace (policies) | T2 | Team-only | Governs sharing with other members (2240); still holds 允许使用的应用 (`workspace_app_policies`) |
 | 运行环境 (`environments`) | Workspace; admins write | Run environment | T5 | Composition only; the section is new | Setup/install scripts and user-started actions on a task machine |
 | 密钥与环境 (`secrets`) | Workspace | Secret | T5 | Team-only, admin-only; fixed by #895 (members gap M6) | Injected into the workspace's own runs |
 | 审计日志 (`audit`) | Team-only | Workspace (audit) | T2 | Team-only | Member audit is between people |
@@ -298,6 +314,12 @@ to `/task/:id?attempt=:runId`, then the task conversation
 | Personal workspace | 个人工作区 | Personal workspace |
 | Shared workspace | 共享工作区 | Shared workspace |
 | Team (inside a workspace) | 团队 | Team |
+| No Team grouping | 未分组 | Ungrouped |
+| All task groups | 所有任务 | All tasks |
+| Human assignee | 负责人 | Assignee |
+| Agent Delegate | 执行委派 | Delegate |
+| Project | 项目 | Project |
+| Reusable execution environment | 执行环境 | Environment |
 | Member | 成员 | Member |
 | Bot list / task list | Bot / 任务 | Bots / Tasks |
 | Chat | 对话 | Chat |

@@ -87,15 +87,24 @@ test('optional warmup aborts a stalled request instead of hanging startup work',
 })
 
 test('page requests never wait for unrelated AI routes or readiness marker files', async () => {
-  const proxy = await readFile(new URL('../proxy.ts', import.meta.url), 'utf8')
-  assert.doesNotMatch(proxy, /waitForPreviewReady|PREVIEW_READY_FILE|await ready/)
-  assert.match(proxy, /return localize\(request\)/)
+  // The document is served by the SPA page policy and, in development, by the
+  // Vite fallback; neither waits for a preview-readiness marker.
+  const policy = await readFile(new URL('../apps/api/runtime/http-policy.mjs', import.meta.url), 'utf8')
+  assert.doesNotMatch(policy, /waitForPreviewReady|PREVIEW_READY_FILE|await ready/)
+  assert.match(policy, /export async function pageResponse/)
+  const dev = await readFile(new URL('../apps/api/scripts/dev-http.mjs', import.meta.url), 'utf8')
+  assert.doesNotMatch(dev, /waitForPreviewReady|PREVIEW_READY_FILE|await ready/)
+  assert.match(dev, /apps\/frontend\/index\.html/)
 })
 
-test('preview bootstrap script is inside head to avoid hydration failure', async () => {
-  const layout = await readFile(new URL('../app/[locale]/layout.tsx', import.meta.url), 'utf8')
-  assert.match(layout, /<head>[\s\S]*?<Script id="disable-openui-devtools" strategy="beforeInteractive">[\s\S]*?<\/head>\s*<body/)
-  assert.doesNotMatch(layout, /<html[^>]*>\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?\{process\.env/)
+test('preview bootstrap script runs before any application import, and no inline env lands in the document', async () => {
+  // The devtools guard is emitted by the Vite runtime entry ahead of the app
+  // graph, so it never renders into HTML; the document carries no server env.
+  const runtime = await readFile(new URL('../apps/frontend/scripts/frontend-runtime.mjs', import.meta.url), 'utf8')
+  assert.match(runtime, /development \? 'globalThis\[Symbol\.for\("openui\.devtools\.autoMount"\)\] = true;\\n' : ''/)
+  const html = await readFile(new URL('../apps/frontend/index.html', import.meta.url), 'utf8')
+  assert.doesNotMatch(html, /process\.env/)
+  assert.doesNotMatch(html, /openui\.devtools/)
 })
 
 test('startup preserves readiness output and starts default warmup without awaiting it', async () => {
