@@ -9,6 +9,6 @@ export function createWorld() {
   if (typeof publicKey !== 'string' || !/^[A-Za-z0-9+/]{43}=$/.test(publicKey)) {
     throw new Error('Business workflow delivery verification key unavailable')
   }
-  return createNodeWorld({ deploymentId: process.env.MIKKA_DEPLOYMENT_ID,
+  return createNodeWorld({ workload: 'business', deploymentId: process.env.MIKKA_DEPLOYMENT_ID,
     verificationKey: 'ed25519-public:' + publicKey, fetchBound: createBoundFetch(process.env.MIKKA_BUSINESS_WORLD_TOKEN) })
 }
