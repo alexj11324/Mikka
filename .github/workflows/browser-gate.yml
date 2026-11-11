@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# Keep the historical required status name; cancel obsolete PR heads only.
+concurrency:
+  group: browser-gate-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   browser-e2e:
     name: Browser tests (before merge)
