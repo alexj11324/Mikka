@@ -46,6 +46,7 @@ test('only an already-bound open PR on exactly that head and repository receives
   const event = completedCiSuite('check_suite', payload)!
   assert(linkedCiSuiteRun(event, row))
   assert(linkedCiSuiteRun(event, { ...row, state: 'draft' }))
+  assert(linkedCiSuiteRun(event, { ...row, pullUrl: 'https://github.com/Acme/App/pull/7' }))
   for (const invalid of [
     { state: 'merged' }, { state: 'closed' }, { state: null },
     { headSha: 'b'.repeat(40) }, { headSha: null },
