@@ -104,6 +104,7 @@ class Netfilter:
             if 'tcp sport' not in script:
                 rows = self.value['nftables']
                 self.value['nftables'] = rows[:3] + rows[-3:]
+                self.value['nftables'][-3]['rule']['expr'][-1] = {'drop': None}
             output = None
         elif tail == ['-j', '-n', 'list', 'table', 'inet', 'mikka_review_v1']:
             assert self.value is not None
@@ -143,6 +144,7 @@ class IngressPolicy(unittest.TestCase):
         self.assertEqual(receipt['providerPorts'], [])
         self.assertEqual(receipt['rulesVerified'], {'ipv4': True, 'ipv6': True})
         self.assertNotIn('tcp sport', self.filter.scripts[0])
+        self.assertIn('meta mark != 1296781398 drop', self.filter.scripts[0])
         self.assertEqual(guard.prepare(cloudflare=True), receipt)
         with self.assertRaisesRegex(guard.IngressError, 'provider'):
             guard.prepare()

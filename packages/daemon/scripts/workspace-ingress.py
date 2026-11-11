@@ -243,7 +243,10 @@ def policy(ports):
         f'add chain inet {TABLE} {CHAIN}',
         f'add chain inet {TABLE} output {{ type filter hook output priority -1; policy accept; }}',
         *provider_rules,
-        f'add rule inet {TABLE} {CHAIN} meta l4proto tcp ct direction reply meta mark != {SOCKET_MARK} reject with tcp reset',
+        # Cloudflare guests support the drop verdict. The inet tcp-reset
+        # module is absent there; both verdicts block the same unmarked reply.
+        f'add rule inet {TABLE} {CHAIN} meta l4proto tcp ct direction reply meta mark != {SOCKET_MARK} '
+        + ('reject with tcp reset' if ports else 'drop'),
         f'add rule inet {TABLE} output oifname != "lo" meta l4proto tcp jump {CHAIN}',
     )) + '\n'
 
@@ -326,7 +329,7 @@ def check_rules(executable, ports):
     ]
     reply = [tcp, {'match': {'op': '==', 'left': {'ct': {'key': 'direction'}}, 'right': 1}},
              {'match': {'op': '!=', 'left': {'meta': {'key': 'mark'}}, 'right': SOCKET_MARK}},
-             {'reject': {'type': 'tcp reset'}}]
+             {'reject': {'type': 'tcp reset'}} if ports else {'drop': None}]
     jump = [{'match': {'op': '!=', 'left': {'meta': {'key': 'oifname'}}, 'right': 'lo'}},
             tcp, {'jump': {'target': CHAIN}}]
     canonical = lambda value: json.dumps(value, sort_keys=True, separators=(',', ':'))

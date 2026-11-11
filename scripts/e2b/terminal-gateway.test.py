@@ -72,7 +72,8 @@ class PtyTests(unittest.IsolatedAsyncioTestCase):
         self.temporary = tempfile.TemporaryDirectory(prefix='mikka-terminal-')
         self.root = Path(self.temporary.name)
         os.chmod(self.root, 0o755)
-        self.account = pwd.getpwnam('nobody')
+        self.cloudflare = os.environ.get('MIKKA_TEST_CLOUDFLARE_TASK') == '1'
+        self.account = pwd.getpwnam('node' if self.cloudflare else 'nobody')
         self.control = self.root / 'control'
         installer.install(self.control, self.account)
         self.worktree = self.root / 'worktree'
@@ -82,7 +83,7 @@ class PtyTests(unittest.IsolatedAsyncioTestCase):
         for path in [self.worktree, *self.worktree.rglob('*')]:
             os.chown(path, self.account.pw_uid, self.account.pw_gid)
         self.key = b'real-pty-private-fixture-key-32!!'
-        self.gateway = gateway.Gateway(self.key, self.control, self.account)
+        self.gateway = gateway.Gateway(self.key, self.control, self.account, cloudflare=self.cloudflare)
         self.grant = scope(self.gateway.boot) | {'worktreePath': str(self.worktree)}
         self.idle_receipt()
         self.server = await asyncio.start_server(self.gateway.serve, '127.0.0.1', 0, limit=16_384)
@@ -141,6 +142,10 @@ class PtyTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_real_pwd_git_test_resize_ctrl_c_exit_and_reconnect(self):
         reader, writer = await self.ready()
+        if self.cloudflare:
+            command = "id -u; id -g; awk '/^NoNewPrivs:/{print $2}' /proc/self/status; printf '__USER_MODE__\\n'\n"
+            self.assertEqual((await self.call('input', {'data': command}))[0], 204)
+            self.assertIn('1000\r\n1000\r\n1\r\n__USER_MODE__', await self.until(reader, '__USER_MODE__\r\n'))
         self.assertEqual((await self.call('input', {'data': "pwd; git -c color.status=false status --short; bash fixture.sh; printf '__DONE__\\n'\n"}))[0], 204)
         output = await self.until(reader, '__DONE__\r\n')
         self.assertIn(str(self.worktree), output)
@@ -287,6 +292,7 @@ class PtyTests(unittest.IsolatedAsyncioTestCase):
 
 
 if __name__ == '__main__':
-    if (os.environ.get('CI') or os.environ.get('REQUIRE_REAL_PTY') == '1' or os.environ.get('MIKKA_REQUIRE_REAL_PTY') == '1') and (os.geteuid() != 0 or not Path('/proc').exists()):
+    if (os.environ.get('CI') or os.environ.get('REQUIRE_REAL_PTY') == '1' or os.environ.get('MIKKA_REQUIRE_REAL_PTY') == '1'
+            or os.environ.get('MIKKA_TEST_CLOUDFLARE_TASK') == '1') and (os.geteuid() != 0 or not Path('/proc').exists()):
         raise SystemExit('real_terminal_pty_requires_isolated_linux_root')
     unittest.main(verbosity=2)
