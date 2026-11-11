@@ -2,6 +2,7 @@
 """Exercise the installed MTA adapter, host receiver and upstream release API."""
 import json
 import os
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from pathlib import Path
 import re
@@ -24,18 +25,7 @@ def check(condition, error):
         raise RuntimeError(error)
 
 
-def main():
-    tag, digest, revision = sys.argv[1:]
-    check(re.fullmatch(r'v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', tag), 'invalid stable tag')
-    check(re.fullmatch(r'sha256:[a-f0-9]{64}', digest) and re.fullmatch(r'[a-f0-9]{40}', revision), 'invalid release identity')
-    with urlopen(Request(UPSTREAM + tag, headers={'User-Agent': 'mikka-stable-acceptance',
-                 'Accept': 'application/vnd.github+json'}), timeout=20) as response:
-        release = json.load(response)
-    check(release['tag_name'] == tag and not release['draft'] and not release['prerelease'], 'upstream release mismatch')
-    check(release['html_url'] in release['body'], 'the publisher must include a stable link in the email-visible release body')
-    message = EmailMessage()
-    message['Subject'] = release['name']
-    message.set_content(release['body'])
+def accept_delivery(policy, raw, tag, digest, revision):
     with tempfile.TemporaryDirectory(prefix='mikka-stable-delivery-') as installation:
         # The MTA supplies raw MIME to the adapter's stdin. Only the transport
         # envelope is constructed here; the release content and API are public.
@@ -50,21 +40,31 @@ def main():
             port = sock.getsockname()[1]
         env = {'PATH': os.environ['PATH'], 'HOME': str(host),
                'MIKKA_UPDATE_WEBHOOK_SECRET': key, 'MIKKA_UPDATE_WEBHOOK_PORT': str(port),
-               'MIKKA_UPDATE_POLICY': 'notify', 'MIKKA_UPDATE_STATE_DIR': str(state)}
+               'MIKKA_UPDATE_POLICY': policy, 'MIKKA_UPDATE_STATE_DIR': str(state)}
         with subprocess.Popen(['node', str(ROOT / 'scripts/self-hosted-update-webhook.mjs')],
                               env=env, cwd=host, stdout=subprocess.PIPE) as receiver:
             try:
                 check(select.select([receiver.stdout], [], [], 15)[0], 'receiver did not start')
                 check(receiver.stdout.readline().strip() == b'SELF_HOSTED_UPDATE_WEBHOOK_READY', 'receiver failed')
-                deliver = [sys.executable, str(ROOT / 'scripts/self-hosted-release-mail.py'),
-                           '--secret-file', str(keyfile), '--port', str(port)]
-                subprocess.run(deliver, input=message.as_bytes(), cwd=host, env=env, check=True, timeout=30)
+
+                def deliver():
+                    subprocess.run([sys.executable, str(ROOT / 'scripts/self-hosted-release-mail.py'),
+                                    '--secret-file', str(keyfile), '--port', str(port)],
+                                   input=raw, cwd=host, env=env, check=True, timeout=30)
+
+                deliver()
+                if policy == 'manual':
+                    check(not any(state.iterdir()), 'manual delivery recorded or started an upgrade')
+                    deliver()
+                    check(not any(state.iterdir()), 'duplicate manual delivery recorded or started an upgrade')
+                    return {'acceptedDeliveries': 2, 'stateDirectoryEmpty': True}
+
                 record = state / 'pending-release.json'
                 first = record.read_bytes()
                 pending = json.loads(first)
                 check(pending['tag'] == tag and pending['revision'] == revision and pending['status'] == 'notified',
                       'receiver did not resolve the exact stable release through the upstream API')
-                subprocess.run(deliver, input=message.as_bytes(), cwd=host, env=env, check=True, timeout=30)
+                deliver()
                 check(record.read_bytes() == first, 'duplicate event replaced the original receipt')
                 invalid = Request(f'http://127.0.0.1:{port}/self-hosted-release-hint', data=b'{}',
                                   headers={'X-Hub-Signature-256': 'sha256=' + '0' * 64})
@@ -79,15 +79,42 @@ def main():
                 verified = json.loads(result.stdout)
                 check(verified['image'] == 'ghcr.io/alexj11324/mikka@' + digest and verified['revision'] == revision,
                       'operator CLI returned a different release identity')
+                return {'receivedAt': pending['receivedAt'], 'image': verified['image'],
+                        'duplicatePreserved': True, 'invalidSignatureHttpStatus': 401}
             finally:
                 receiver.send_signal(signal.SIGTERM)
                 receiver.wait(timeout=10)
-    evidence = {'policy': 'notify', 'release': release['html_url'], 'releaseId': release['id'],
-                'tag': tag, 'revision': revision, 'image': verified['image'],
-                'source': 'Live public GitHub Releases REST API', 'receivedAt': pending['receivedAt'],
+
+
+def main():
+    tag, digest, revision = sys.argv[1:]
+    check(re.fullmatch(r'v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)', tag), 'invalid stable tag')
+    check(re.fullmatch(r'sha256:[a-f0-9]{64}', digest) and re.fullmatch(r'[a-f0-9]{40}', revision), 'invalid release identity')
+    with urlopen(Request(UPSTREAM + tag, headers={'User-Agent': 'mikka-stable-acceptance',
+                 'Accept': 'application/vnd.github+json'}), timeout=20) as response:
+        release = json.load(response)
+    check(release['tag_name'] == tag and not release['draft'] and not release['prerelease'], 'upstream release mismatch')
+    check(release['html_url'] in release['body'], 'the publisher must include a stable link in the email-visible release body')
+    message = EmailMessage()
+    message['Subject'] = release['name']
+    message.set_content(release['body'])
+    raw = message.as_bytes()
+    # This job owns one disposable Docker runner. Query its historical start
+    # events after the manual receiver has exited, including short-lived containers.
+    started = datetime.now(timezone.utc).isoformat()
+    manual = accept_delivery('manual', raw, tag, digest, revision)
+    finished = datetime.now(timezone.utc).isoformat()
+    starts = subprocess.run(['docker', 'events', '--since', started, '--until', finished,
+                             '--filter', 'type=container', '--filter', 'event=start'],
+                            capture_output=True, check=True, timeout=15)
+    check(not starts.stdout.strip(), 'manual delivery started a Docker container')
+    manual['containerStarts'] = 0
+    notified = accept_delivery('notify', raw, tag, digest, revision)
+    evidence = {'policy': 'notify', 'manual': manual, 'release': release['html_url'], 'releaseId': release['id'],
+                'tag': tag, 'revision': revision, **notified,
+                'source': 'Live public GitHub Releases REST API',
                 'adapter': 'Production MTA stdin pipe and host receiver on loopback',
-                'transport': 'MIME constructed from the published body; Internet SMTP delivery was not observed',
-                'duplicatePreserved': True, 'invalidSignatureHttpStatus': 401}
+                'transport': 'MIME constructed from the published body; Internet SMTP delivery was not observed'}
     output = ROOT / '.artifacts/self-hosted/delivery.json'
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(evidence, indent=2) + '\n')
