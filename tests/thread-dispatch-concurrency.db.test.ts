@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
 import { test } from 'node:test'
 import { dbUrl, seedIssue, seedPersonalWorkspace, seedUser } from './support/workspace-admin-db'
 
@@ -50,6 +51,13 @@ test('task dispatch locks preserve concurrency, serialization and database owner
     const target = new URL(dbUrl!)
     target.pathname = `/${name}`
     await pool.query(`CREATE DATABASE "${name}"`)
+    const { Client } = await import('pg')
+    const ended: Promise<unknown>[] = []
+    const end = Client.prototype.end
+    const observeEnd = t.mock.method(Client.prototype, 'end', function(this: InstanceType<typeof Client>, ...args: unknown[]) {
+      if (this.database === name) ended.push(once(this, 'end'))
+      return Reflect.apply(end, this, args)
+    })
     const request = createRequestDatabaseScope(target.toString())
     const key = JSON.stringify(['task-thread', userId, issues[2]])
     try {
@@ -61,10 +69,14 @@ test('task dispatch locks preserve concurrency, serialization and database owner
         assert.deepEqual(rows, [{ datname: name }], 'the lock must use the effective request database, never the default')
       }))
       await request.close()
+      // Pool.end drops logical owners before their asynchronous socket ends.
+      await Promise.all(ended)
       const { rows: [result] } = await pool.query('SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname=$1', [name])
       assert.equal(result.n, 0, 'scope shutdown ends its business and derived task-lock connections')
     } finally {
       await request.close()
+      await Promise.all(ended)
+      observeEnd.mock.restore()
       await pool.query(`DROP DATABASE "${name}"`)
     }
   })
