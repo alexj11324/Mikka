@@ -104,7 +104,7 @@ const defaultServices: EveProductGatewayServices = {
           return { instructions: COORDINATOR_INSTRUCTIONS + '\nUse only this Slack conversation. Do not access private web conversation history, memories or profile. Reply in this thread, or call no_reply when no useful response is needed.' }
         }
         const { prepareEveInstructions } = await import('../../workflows/coordinator/steps')
-        return { instructions: await prepareEveInstructions(scope.ownerId, scope.botId, execution?.snapshot) }
+        return { instructions: await prepareEveInstructions(scope.ownerId, scope.botId, execution?.snapshot, { sessionId: input.sessionId, turnId: input.turnId }) }
       }
       const tools = await productTools(scope, execution, sourceEventId, scheduledRead, taskEventId,entryOrigin)
       if (input.operation === 'catalogue') {

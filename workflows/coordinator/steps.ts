@@ -108,12 +108,12 @@ export async function recordAttention(userId: string, input: { matterId: string;
 }
 
 /** Product context only: eve supplies history and owns pruning and compaction. */
-export async function prepareEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot) {
+export async function prepareEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }) {
   const withoutSkills = snapshot ? { ...snapshot, personalPlugins: snapshot.personalPlugins ? { ...snapshot.personalPlugins, skills: [] } : undefined } : undefined
-  return prepareInstructions(userId, botId, withoutSkills)
+  return prepareInstructions(userId, botId, withoutSkills, nativeTurn)
 }
 
-async function prepareInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot) {
+async function prepareInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }) {
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
@@ -130,10 +130,12 @@ async function prepareInstructions(userId: string, botId: string, snapshot?: Def
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubPromptContext } = await import('@/lib/coordinator/github-context')
   const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const [execution, rules, github] = await Promise.all([
+  const { memoryForBotPrompt } = await import('@/lib/profile/memory')
+  const [execution, rules, github, approvedFacts] = await Promise.all([
     executionContextParts(userId, botId),
     withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined),
     githubPromptContext(userId, githubScope, undefined, undefined, botId),
+    conversation.memoryEnabled ? memoryForBotPrompt(userId, botId, conversation.memoryEnabled, nativeTurn) : Promise.resolve(''),
   ])
   // What Mikka has learnt about the person (R-73). It reaches only the chat's own
   // repositories' facts, so one project's habits never surface in another's
@@ -150,7 +152,7 @@ async function prepareInstructions(userId: string, botId: string, snapshot?: Def
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
   // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
   // The person's memory and what Mikka knows about them ride together just after it, then live model availability.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), [memory, approvedFacts].filter(Boolean).join('\n'), factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''), profile)
   return prompt.instructions
 }
 

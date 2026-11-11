@@ -38,7 +38,7 @@ test('committed native outcomes deliver Telegram and existing phone Decisions on
    CREATE TABLE telegram_links("userId" text PRIMARY KEY,"telegramUserId" text);
    CREATE TABLE telegram_conversations("threadId" text PRIMARY KEY,"userId" text);
    CREATE TABLE issues(id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"ownershipState" text,content jsonb)`)
-  await app.query(await readFile(new URL('../../drizzle/20261112000500_eve_outcome_deliveries.sql',import.meta.url),'utf8'))
+  await app.query(await readFile(new URL('../../drizzle/20261112030500_eve_outcome_deliveries.sql',import.meta.url),'utf8'))
   async function fixture(options:{text?:string;outcome?:TurnOutcome;error?:string;quiet?:boolean;commit?:boolean;telegram?:boolean;kind?:string;payload?:Record<string,unknown>}={}) {
    decisions=0;choice='finished';decisionInputs.length=0;pushes.length=0;telegram.length=0
    const owner='owner-'+randomUUID(),bot=randomUUID(),workspace=randomUUID(),source=randomUUID(),session='wrun_'+randomUUID(),turn='turn_0',tg='tg-'+randomUUID(),thread='telegram:'+tg

@@ -31,7 +31,8 @@ const enter = async (reader: Reader, args: unknown[]) => {
 const forbidden = () => { throw new Error('No database, provider or tool effects in prompt concurrency fixture') }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 
-stub('./store.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: personal }), saveSummary: forbidden })
+stub('./store.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: personal, memoryEnabled: true }), saveSummary: forbidden })
+stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('./bot-instructions.ts', { botInstructions: forbidden })
 stub('./personal-instructions.ts', { withPersonalInstructionText: async (...args: unknown[]) => {
   await enter('personal', args)

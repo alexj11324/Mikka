@@ -8,7 +8,7 @@ const valid=disposableDatabase() && process.env.E2E_DATABASE_URL===process.env.M
 if(process.env.REQUIRE_DB==='1'&&!valid)throw new Error('Eve ownership tests require matching isolated loopback _e2e databases')
 test('eve sessions keep Bot, Workspace, owner and surface authorization after import and replay',{skip:!valid},async t=>{
   const {pool}=await import('../db')
-  await pool.query(await readFile(new URL('../../drizzle/20261112000100_eve_sessions.sql',import.meta.url),'utf8'))
+  await pool.query(await readFile(new URL('../../drizzle/20261112030100_eve_sessions.sql',import.meta.url),'utf8'))
   const {assertEveScope,assertSessionScope,registerSession}=await import('./scope')
   const {priorHistory}=await import('./history')
   const {projectTurnState}=await import('./projection')
