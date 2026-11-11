@@ -294,7 +294,7 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(composed.status, 0, JSON.stringify(composed.report.diagnostics))
     assert.equal(composed.report.errors, 0)
     assert.equal(composed.report.libraryFiles, policy.componentRoots.length)
-    assert.equal(composed.report.files, 1 + [...contractSources.keys()].filter(file => !file.startsWith('apps/')).length)
+    assert.equal(composed.report.files, 1)
     const commandFile = 'app/actions/issues.ts'
     writeFileSync(path.join(cwd, commandFile), contractSources.get(commandFile).replace('export function saveIssue', 'function saveIssue'))
     const missingCommand = await execute()
@@ -322,10 +322,13 @@ test('lint permits imported components but fails handwritten business UI without
     assert.equal(rawBlock.status, 1)
     assert.ok(rawBlock.report.diagnostics.some(d => d.file === 'components/blocks/example.tsx' && d.rule === 'interaction/use-button-component'))
 
-    unlinkSync(path.join(cwd, 'app/actions/issues.ts'))
-    const missingCommands = await execute()
-    assert.equal(missingCommands.status, 1)
-    assert.ok(missingCommands.report.diagnostics.some(d => d.file === 'app/actions/issues.ts' && d.rule === 'entity/contract-export'))
+    for (const file of contractFiles) unlinkSync(path.join(cwd, file))
+    const missingContracts = await execute()
+    assert.equal(missingContracts.status, 1)
+    const missingFiles = missingContracts.report.diagnostics
+      .filter(d => d.rule === 'entity/contract-export' || d.rule === 'entity/native-detail-route')
+      .map(d => d.file)
+    assert.deepEqual(new Set(missingFiles), contractFiles)
   } finally {
     console.error(`Retained UI policy fixture directory: ${cwd}`)
   }
