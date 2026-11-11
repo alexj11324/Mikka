@@ -122,6 +122,7 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
   const remoteTasks = useMemo(() => search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'), [search.state.tasks.items])
   // The workspace already reads its loaded issues. Only hits outside that collection need another batch.
   const extraTasks = useMemo(() => {
+    if (!workspaceId) return []
     const loaded = new Set(issues.map(issue => issue.id))
     return remoteTasks.filter(hit => !loaded.has(hit.id)).map(hit => ({ id: hit.id, workspaceId }))
   }, [issues, remoteTasks, workspaceId])
