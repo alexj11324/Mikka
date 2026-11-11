@@ -1066,7 +1066,7 @@
       "editLabel": "Edit comment",
       "saveEdit": "Save",
       "cancelEdit": "Cancel",
-      "downloadFile": "Download {name}"
+      "fileOnComment": "File on this comment: {name}"
     },
     "detail": {
       "readFailed": "Could not load this task. Please try again.",

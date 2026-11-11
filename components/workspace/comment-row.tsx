@@ -12,15 +12,30 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { attachmentsOf, isTombstone, mayEditMessage, type CommentNode } from '@/lib/comment-thread'
 
-/** A file on a comment: its name and size; a click opens the issue's own download. */
-function AttachmentRow({ issueId, file }: { issueId: string; file: CommentAttachment }) {
+/** Bytes as a person reads them: 980 B, 12.4 KB, 3.1 MB. */
+function fileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/**
+ * A file a comment carries. The download route is the issue's own file read;
+ * until that store exists (MIKKA-43 owns comment bytes) the row still draws the
+ * file with its name and size rather than a link that would 404.
+ */
+function AttachmentRow({ issueId, file, downloadable }: { issueId: string; file: CommentAttachment; downloadable: boolean }) {
   const t = useTranslations('Workspace.activity')
-  return <a href={`/api/issues/${issueId}/files/${file.id}`} className="flex w-fit max-w-full items-center gap-1.5 rounded-md border border-rule px-2 py-1 text-xs text-muted-foreground hover:bg-muted" download={file.name}>
+  const body = <>
     <Paperclip className="size-3 shrink-0" aria-hidden="true" />
     <span className="min-w-0 truncate">{file.name}</span>
-    <span className="shrink-0" aria-hidden="true">{file.size}</span>
-    <span className="sr-only">{t('downloadFile', { name: file.name })}</span>
-  </a>
+    <span className="shrink-0" aria-hidden="true">{fileSize(file.size)}</span>
+    <span className="sr-only">{t('fileOnComment', { name: file.name })}</span>
+  </>
+  const drawing = 'flex w-fit max-w-full items-center gap-1.5 rounded-md border border-rule px-2 py-1 text-xs text-muted-foreground'
+  if (!downloadable) return <span className={drawing}>{body}</span>
+  return <a href={`/api/issues/${issueId}/files/${file.id}`} className={cn(drawing, 'hover:bg-muted')} download={file.name}>{body}</a>
 }
 
 /** Who wrote it, when, and (for an edit) that the words changed since. */
@@ -85,6 +100,8 @@ export type CommentRowProps = {
   onCancelEdit: () => void
   onDelete: (messageId: string) => void
   onResolve?: () => void
+  /** Whether the issue's file route can serve a comment's files yet. */
+  filesDownloadable?: boolean
 }
 
 /**
@@ -92,13 +109,13 @@ export type CommentRowProps = {
  * answers an answer reads as one thread; the indent stops widening after two
  * levels so a long exchange stays readable in a narrow column.
  */
-export function CommentRow({ issueId, node, isThreadStart, threadResolved, viewerId, viewerName, editing, draft, replyingTo, replyDraft, replyPlaceholder, onStartReply, onReplyDraft, onSendReply, onStartEdit, onEditDraft, onSaveEdit, onCancelEdit, onDelete, onResolve }: CommentRowProps) {
+export function CommentRow({ issueId, node, isThreadStart, threadResolved, viewerId, viewerName, editing, draft, replyingTo, replyDraft, replyPlaceholder, onStartReply, onReplyDraft, onSendReply, onStartEdit, onEditDraft, onSaveEdit, onCancelEdit, onDelete, onResolve, filesDownloadable = false }: CommentRowProps) {
   const t = useTranslations('Workspace.activity')
   const { message, depth } = node
   const canEdit = mayEditMessage(message, viewerId)
   const files = attachmentsOf(message)
   const replyOpen = replyingTo === message.id
-  const nested = { issueId, isThreadStart: false, threadResolved, viewerId, viewerName, editing, draft, replyingTo, replyDraft, replyPlaceholder, onStartReply, onReplyDraft, onSendReply, onStartEdit, onEditDraft, onSaveEdit, onCancelEdit, onDelete }
+  const nested = { issueId, isThreadStart: false, threadResolved, viewerId, viewerName, editing, draft, replyingTo, replyDraft, replyPlaceholder, onStartReply, onReplyDraft, onSendReply, onStartEdit, onEditDraft, onSaveEdit, onCancelEdit, onDelete, filesDownloadable }
   // Depth reads as indentation and a tinted surface, never a drawn line: a
   // reply nests inside a bordered box so a long exchange stays legible.
   return <>
@@ -110,7 +127,7 @@ export function CommentRow({ issueId, node, isThreadStart, threadResolved, viewe
           ? <EditField value={draft} onChange={onEditDraft} label={message.id} onSave={() => { if (draft.trim()) onSaveEdit(message.id, draft.trim()) }} onCancel={onCancelEdit} />
           : <>
             <p className="whitespace-pre-wrap break-words text-md">{message.body}</p>
-            {files.length > 0 && <div className="flex flex-wrap gap-1.5">{files.map(file => <AttachmentRow key={file.id} issueId={issueId} file={file} />)}</div>}
+            {files.length > 0 && <div className="flex flex-wrap gap-1.5">{files.map(file => <AttachmentRow key={file.id} issueId={issueId} file={file} downloadable={filesDownloadable} />)}</div>}
             <div className="flex items-center gap-1">
               <Button type="button" variant="ghost" size="xs" className="text-muted-foreground" aria-expanded={replyOpen} onClick={() => onStartReply(message.id)}>{t('reply')}</Button>
               {canEdit && <>

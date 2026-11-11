@@ -322,3 +322,34 @@ test('IssueActivity: writing a reply under one message sends that message as the
     assert.equal(container.querySelector<HTMLTextAreaElement>('#reply-discussion-r')?.value, '', 'the thread footer box is untouched')
   } finally { await done() }
 })
+
+test('IssueActivity: a comment draws the files it carries with their names and sizes', async () => {
+  const { IssueActivity } = await import('../components/workspace/issue-activity')
+  const withFiles: ThreadRecord[] = [{
+    id: 'discussion-f', author: 'Owner', createdAt: '2026-11-07T08:00:00Z', resolved: false,
+    messages: [{ id: 'f-1', author: 'Owner', authorUserId: 'owner', body: 'See attached', at: '2026-11-07T08:00:00Z',
+      attachments: [{ id: 'file-1', name: 'build.log', mediaType: 'text/plain', size: 2048 }, { id: 'file-2', name: 'trace.zip', mediaType: 'application/zip', size: 3 * 1024 * 1024 }] }],
+  }]
+  const { container, done } = await render(<ViewStateProvider scope="owner:workspace-a"><IssueActivity issueId="issue-f" author="Owner" viewerId="owner" threads={withFiles} anchors={[]} onComment={() => {}} onReply={() => {}} onResolve={() => {}} onSelect={() => {}} /></ViewStateProvider>, '#issue-comment')
+  try {
+    const text = container.textContent ?? ''
+    assert.ok(text.includes('build.log'), 'the first file is named')
+    assert.ok(text.includes('2.0 KB'), 'the first file shows its size')
+    assert.ok(text.includes('trace.zip'), 'the second file is named')
+    assert.ok(text.includes('3.0 MB'), 'the second file shows its size')
+    // No download route serves issue files yet, so the row must not link somewhere that 404s.
+    assert.equal(container.querySelector('a[href^="/api/issues/issue-f/files/"]'), null, 'no dead download link while the store is missing')
+  } finally { await done() }
+})
+
+test('IssueActivity: a comment with no files draws no attachment row', async () => {
+  const { IssueActivity } = await import('../components/workspace/issue-activity')
+  const plain: ThreadRecord[] = [{
+    id: 'discussion-p', author: 'Owner', createdAt: '2026-11-07T08:00:00Z', resolved: false,
+    messages: [{ id: 'p-1', author: 'Owner', authorUserId: 'owner', body: 'Just words', at: '2026-11-07T08:00:00Z' }],
+  }]
+  const { container, done } = await render(<ViewStateProvider scope="owner:workspace-a"><IssueActivity issueId="issue-p" author="Owner" viewerId="owner" threads={plain} anchors={[]} onComment={() => {}} onReply={() => {}} onResolve={() => {}} onSelect={() => {}} /></ViewStateProvider>, '#issue-comment')
+  try {
+    assert.equal(container.querySelectorAll('a[download]').length, 0, 'a comment without files links nothing')
+  } finally { await done() }
+})

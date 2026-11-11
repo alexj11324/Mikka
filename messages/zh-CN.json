@@ -1066,7 +1066,7 @@
       "editLabel": "编辑评论",
       "saveEdit": "保存",
       "cancelEdit": "取消",
-      "downloadFile": "下载 {name}"
+      "fileOnComment": "评论附件：{name}"
     },
     "detail": {
       "readFailed": "任务读取失败，请重试。",
