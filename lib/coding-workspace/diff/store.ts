@@ -174,6 +174,18 @@ export async function readStoredDiffFile(database: WorkspaceQuery, scope: Review
   return { file, patch }
 }
 
+/** Revert selects a file from an immutable snapshot; it needs the metadata,
+ * not a locally retained patch (the device proofs re-derive the diff). */
+export async function readSnapshotFileMetadata(database: WorkspaceQuery, scope: ReviewScope, snapshot: DiffSnapshot, path: string) {
+  if (!isDeepStrictEqual(snapshot.identity, scope.identity) || snapshot.taskId !== scope.taskId) throw unavailable()
+  const { rows: [row] } = await database.query<{ metadata: unknown }>(`SELECT f.metadata FROM coding_workspace_snapshot_files f
+    JOIN coding_workspace_snapshots s ON s.id=f."snapshotId" WHERE s.id=$1 AND s."boardId"=$2 AND s."runId"=$3 AND s."repoId"=$4
+      AND s."workspaceId"=$5 AND f.path=$6`, [snapshot.id, scope.boardId, scope.identity.runId, scope.identity.repoId,
+    scope.identity.workspaceId, path])
+  if (!row) throw unavailable()
+  return diffFileMetadata.parse(row.metadata)
+}
+
 export async function retainDiffFilePatch(client: PoolClient, scope: ReviewScope, snapshot: DiffSnapshot, input: DiffFilePatch, mask: Masker,
   verifiedPolicy = mask.sourcePolicy) {
   if (verifiedPolicy !== maskPolicy(mask)) throw new CodingWorkspaceError('workspace_path_unavailable')

@@ -130,7 +130,7 @@ test.beforeAll(async () => {
     await workspacePool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Synthetic search\',\'team\')', [id, user])
     await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",email,name,role,status) values ($1,$2,$3,$2,\'admin\',\'active\')', [id, user, `${user}@example.invalid`])
   }
-  await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,\'Synthetic search\',$4,$5)', [randomUUID(), owner, workspace, scopedToken.tokenHash, scopedToken.hint])
+  await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,\'Synthetic search\',$4,$5,ARRAY[\'legacy:full\']::text[])', [randomUUID(), owner, workspace, scopedToken.tokenHash, scopedToken.hint])
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1999-01-01T00:00:00Z\')', [archivedId, owner, `${prefix}-archive-locator`])
   await pool.query('insert into agent_turns (id,"sessionId","userId",prompt,completion,status,"attemptId") values ($1,$2,$3,\'synthetic archived question\',$4,\'complete\',$5)', [randomUUID(), archivedId, owner, archivedCompletion, randomUUID()])
   await pool.query('insert into agent_sessions (id,"userId",title,"updatedAt") values ($1,$2,$3,\'1998-01-01T00:00:00Z\')', [emptyArchiveId, owner, `${prefix}-empty-archive`])

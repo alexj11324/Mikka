@@ -294,18 +294,24 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
     assert.deepEqual(Buffer.from(await (await ownerRequest(path)).arrayBuffer()),bytes)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_capture_posters WHERE "captureId"=$1',[movie])).rows[0].n,1)
   })
-  await t.test('real browser token creation grants same-workspace HTTP media and rejects another workspace PAT',async()=>{
+  await t.test('a pre-M4 token reaches same-workspace HTTP media; a newly created v1 token and another workspace PAT do not',async()=>{
+    // The settings action now mints a public /api/v1 token, so it must be
+    // rejected by this pre-M4 route; the legacy fixture below is the one that
+    // still reaches the old factory HTTP surface.
+    const created=await ownerRequest('/api/rpc',{method:'POST',headers:{'content-type':'application/json','x-mikka-rpc':'1',[WORKSPACE_SELECTION_HEADER]:workspace.id},
+      body:JSON.stringify({version:DESKTOP_RPC_VERSION,action:'tokens.createAccessToken',args:encode([{name:'Activity HTTP v1 token'},workspace.id])})})
+    assert.equal(created.status,200)
+    const envelope=await created.json();assert.equal(envelope.ok,true)
+    const fresh=decode(envelope.result) as {id?:string;token?:string;error?:string}
+    assert.equal(fresh.error,undefined);assert.ok(typeof fresh.token==='string' && fresh.token.startsWith('mkp_'))
+    await recordAuthenticationSecrets([fresh.token],{environment})
+    await denied(await anonymous(activityPath,fresh.token),401,activityPath)
     const token=async(workspaceId:string)=>{
-      const response=await ownerRequest('/api/rpc',{method:'POST',headers:{'content-type':'application/json','x-mikka-rpc':'1',[WORKSPACE_SELECTION_HEADER]:workspaceId},
-        body:JSON.stringify({version:DESKTOP_RPC_VERSION,action:'tokens.createAccessToken',args:encode([{name:'Activity HTTP acceptance'},workspaceId])})})
-      assert.equal(response.status,200)
-      const envelope=await response.json();assert.equal(envelope.ok,true)
-      const result=decode(envelope.result) as {id?:string;token?:string;error?:string}
-      assert.equal(result.error,undefined);assert.ok(typeof result.token==='string' && result.token.startsWith('mkp_'))
-      assert.ok(typeof result.id==='string')
-      if(workspaceId===workspace.id)taskPatId=result.id
-      await recordAuthenticationSecrets([result.token],{environment})
-      return result.token
+      const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+      const legacy=await createLegacyPersonalAccessToken(owner,workspaceId,{name:'Activity HTTP acceptance'})
+      if(workspaceId===workspace.id)taskPatId=legacy.id
+      await recordAuthenticationSecrets([legacy.token],{environment})
+      return legacy.token
     }
     const allowed=await token(workspace.id),outside=await token(outsideWorkspace.id)
     taskPat=allowed

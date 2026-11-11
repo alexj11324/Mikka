@@ -141,7 +141,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
         ['insert into hosted_verifications ("workspaceId") values ($1)', [workspaceId]],
         ['insert into hosted_card_claims (fingerprint,"workspaceId") values ($1,$2)', [randomUUID(), workspaceId]],
         [`insert into execution_rules (id,"ownerId","workspaceId",place,harness,model,position) values ($1,$2,$3,'local','codex','gpt',0)`, [randomUUID(), member, workspaceId]],
-        [`insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,'cli',$4,'abcd')`, [randomUUID(), member, workspaceId, randomUUID().replaceAll('-', '').repeat(2)]],
+        [`insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,'cli',$4,'abcd',ARRAY['legacy:full']::text[])`, [randomUUID(), member, workspaceId, randomUUID().replaceAll('-', '').repeat(2)]],
         [`insert into bot_model_choices ("ownerId","workspaceId","botKey") values ($1,$2,'k')`, [member, workspaceId]],
         // A run outside any bot that names the workspace's mailbox, without ON DELETE CASCADE.
         [`insert into session_mailboxes (id,"userId","workspaceId",kind,"sessionKey") values ($1,$2,$3,'run',$4)`, [mailbox, member, workspaceId, randomUUID()]],

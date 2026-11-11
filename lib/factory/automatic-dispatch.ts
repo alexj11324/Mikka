@@ -234,7 +234,7 @@ export function automaticFactoryDispatch(pool: Pool) {
           ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
       }
-      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, ...(continueImplementation ? { threadRunId: source.id } : {}), pinnedDeviceId: (checkStart?.run ?? source).agentDefinition?.pinnedDeviceId, readOnly: check || (continueImplementation && source.agentDefinition?.readOnly) }),
+      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, origin: source.origin ?? 'factory', originRef: source.originRef ?? null, ...(continueImplementation ? { threadRunId: source.id } : {}), pinnedDeviceId: (checkStart?.run ?? source).agentDefinition?.pinnedDeviceId, readOnly: check || (continueImplementation && source.agentDefinition?.readOnly) }),
         checkStart ? { ...defaultFactoryDispatchAdapters, configure: { ...defaultFactoryDispatchAdapters.configure,
           review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
           verify: (client, current, id) => configureFactoryCheck(client, current, id, checkStart.selection.policyCeiling),
@@ -271,6 +271,9 @@ export function automaticFactoryDispatch(pool: Pool) {
       botId: runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
       withoutBot: task.botId === null, ...(continueImplementation ? { threadRunId: source.id } : {}), readOnly: check || (continueImplementation && source.agentDefinition?.readOnly), idempotencyKey: `factory:${context.attemptId}`,
       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
+      // The stage continues the source run's entry; a legacy source names the
+      // Factory stage that dispatches it rather than guessing 'web'.
+      origin: source.origin ?? 'factory', originRef: source.originRef ?? null,
     }, client, context), { ...defaultFactoryDispatchAdapters, configure: {
       ...defaultFactoryDispatchAdapters.configure,
       review: (client, current, id) => configureFactoryCheck(client, current, id, checkStart?.selection.policyCeiling),

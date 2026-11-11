@@ -301,11 +301,14 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
     assert.deepEqual(args,[repoId,owner]);assert.equal(queueRepository.repoPath.startsWith('v2/github.com/'),false)
     return fixtureRows([])
    }
-   if(sql===compactSql(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength","workspaceId")
-      VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12,$13)`)){
-    assert.equal(insertedRunId,undefined);assert.equal(args.length,13);assert.match(String(args[0]),/^[0-9a-f-]{36}$/)
+   if(sql===compactSql(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength","workspaceId",origin,"originRef")
+      VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12,$13,$14,$15)`)){
+    assert.equal(insertedRunId,undefined);assert.equal(args.length,15);assert.match(String(args[0]),/^[0-9a-f-]{36}$/)
     assert.deepEqual(args.slice(1,7),[owner,issueId,agentId,deviceId,repoId,queueRepository.baseBranch])
     assert.equal(args[8],botId);assert.equal(args[12],workspace)
+    // M0 provenance rides on the same insert; these fixtures name no entry, so the
+    // helper default applies and no ref is written.
+    assert.equal(args[13],'web');assert.equal(args[14],null)
     insertedRunId=String(args[0]);return fixtureRows([])
    }
    if(sql==='INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)'){
