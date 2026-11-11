@@ -25,7 +25,10 @@ test('runtime events read as lines in the person\'s language, with the thread as
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
     const agentId = randomUUID()
     await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
-    await pool.query('INSERT INTO agent_runs (id, "userId", "agentId", status, prompt) VALUES ($1, $2, $3, $4, $5)', [runId, user.id, agentId, 'waiting_input', '改用 msw 还是只改这两个测试'])
+    // The recorded task range is the only thing allowed to name a thread (lib/run-bot-name.ts); without it the
+    // citation falls back to the agent name and the waiting sentence could not name the task it links.
+    await pool.query('INSERT INTO agent_runs (id, "userId", "agentId", status, prompt, "promptTaskStart", "promptTaskLength") VALUES ($1, $2, $3, $4, $5, 0, char_length($5))',
+      [runId, user.id, agentId, 'waiting_input', '改用 msw 还是只改这两个测试'])
     // What the server stores for each event (eventPrompt + sourcedEventMessage): the model's text and its kind.
     const events = [
       { kind: 'run_question', text: `[Event] The agent in run ${runId} asks the person: msw or just these two tests?\nCheck the current run state and existing task facts first. Never invent their permission. send_to_run does not itself prove the run resumed.` },
@@ -40,8 +43,13 @@ test('runtime events read as lines in the person\'s language, with the thread as
   } finally { await pool.end() }
   await page.reload()
   const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
-  await expect(chat.locator('[data-event-line="runQuestion"]')).toContainText('改用 msw 还是只改这两个测试')
-  await expect(chat.locator('[data-event-line="runQuestion"]')).toContainText('在等你回答')
+  // A question is a live state above the composer, not a stored event row (decision 2026-11-10); the thread stays an
+  // inline link inside one sentence. The sentence lives in the composer column, outside the transcript region the
+  // `chat` locator names, so it is read from the surface that holds both.
+  const waiting = page.locator('[data-slot="waiting-questions"]')
+  await expect(waiting).toContainText('在等你回答')
+  await expect(waiting).toContainText('改用 msw 还是只改这两个测试')
+  await expect(chat.locator('[data-event-line="runQuestion"]')).toHaveCount(0)
   await expect(chat.locator('[data-event-line="issueStatus"]')).toHaveText('「登录页在 Safari 17 上白屏」 改为评审中')
   await expect(chat.locator('[data-event-line="runRetried"]')).toContainText('换了一台机器继续')
   for (const leak of ['[Event]', 'asks the person', 'send_to_run', runId, issueId]) await expect(chat.getByText(leak, { exact: false })).toHaveCount(0)

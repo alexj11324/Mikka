@@ -1,3 +1,4 @@
+import { resourceBoundDispatchConstructor } from './helpers/factory-resource-boundary'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
@@ -288,12 +289,13 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
   })
 
   await t.test('the real Factory queue freezes routing, owner evidence reads it, and terminal outcomes are scoped and idempotent', async () => {
-    const [{ createFactoryStore }, { createFactoryDispatch, factoryBinding, defaultFactoryDispatchAdapters }, { queueFactoryRun }, { issueForUser },
+    const [{ createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding, defaultFactoryDispatchAdapters }, { queueFactoryRun }, { issueForUser },
       { factoryCheckGates }, { factoryCheckIndependent }, { lockCliAgentPolicy }, { workerDefinitionDigest }, { recordModelRoutingOutcome }, { factoryEventId }, { runEvidence }, { threadExecutionEvidence }] = await Promise.all([
       import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'), import('../lib/issue-access'),
       import('../lib/factory/checks'), import('../lib/factory/check-independence'), import('../lib/agent-tool-approval/policy-store'),
       import('../lib/agent-kit/worker-digest'), import('../lib/model-routing-outcome'), import('../lib/factory/event-id'), import('../lib/captures/store'), import('../lib/thread-execution-identity-view'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
     const issueId = await seedIssue(pool, scope.ownerId, scope.workspaceId), sourceEventId = randomUUID()
     await pool.query('UPDATE issues SET title=$2 WHERE id=$1', [issueId, 'PRIVATE_ROUTING_TASK_CONTENT'])
     await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,$4,'user_message',$5,$6)`,
@@ -365,12 +367,13 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
   })
 
   await t.test('an inherited profile effort survives default or unavailable Decisions, freezes and reaches the real claim assignment', async () => {
-    const [{ createFactoryStore }, { createFactoryDispatch, factoryBinding, defaultFactoryDispatchAdapters }, { queueFactoryRun }, { issueForUser },
+    const [{ createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding, defaultFactoryDispatchAdapters }, { queueFactoryRun }, { issueForUser },
       { factoryCheckGates }, { factoryCheckIndependent }, { lockCliAgentPolicy }, { hashDeviceToken }, claimRoute] = await Promise.all([
       import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'), import('../lib/issue-access'),
       import('../lib/factory/checks'), import('../lib/factory/check-independence'), import('../lib/agent-tool-approval/policy-store'),
       import('../lib/device-link'), import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
     const profile = await new profiles.AgentProfileStore(pool).create(scope, {
       name: 'Inherited explicit effort', harness: 'claude_code', effort: 'high', model: { mode: 'inherit' },
     })

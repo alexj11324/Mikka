@@ -3,6 +3,7 @@
 - Date: 2026-11-01
 - Source: Alex, relayed by the coordinator session: 「按照他们的去做，我们的和他们不一样的话，以他们的为准」 (they = Warp Factories)
 - Rule: R-62
+- Superseded for access, collaboration and sharing by [2026-11-10-0017](2026-11-10-0017-collaboration-governance.md), authorized in #1849. This historical comparison does not authorize public links, retrospective sharing or private account delegation.
 - Replaces: [2026-11-01-2245-thread-privacy-and-local-isolation](2026-11-01-2245-thread-privacy-and-local-isolation.md) rule 1 (only the starter sees a thread), and the base branch in its rule 2 (see rule 3 below; the rest of rule 2 stands).
 
 1. **A thread a bot or the Coordinator dispatches in a workspace is a Warp

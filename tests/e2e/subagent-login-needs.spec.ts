@@ -1,5 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 
+// BLOCKED: this suite drove the Next page app/[locale]/preview/subagent-login,
+// a test harness gated by MIKKA_CREDENTIAL_HARNESS. The app renders no Next
+// pages, so the harness page is gone and components/coordinator/subagent-login-needs.tsx
+// currently has no browser entry point. Keep the cases and unskip them together
+// with a harness route that mounts the component (Components/, not a lookalike).
+const HARNESS_MISSING = true
+test.skip(HARNESS_MISSING, 'subagent-login harness page was removed with the Next page layer')
+
 const BOT = '00000000-0000-4000-8000-0000000000b0'
 const WORKSPACE = '00000000-0000-4000-8000-0000000000c0'
 const SUB = '00000000-0000-4000-8000-0000000000a1'

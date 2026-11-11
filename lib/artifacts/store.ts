@@ -12,8 +12,7 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { ARTIFACT_CONTENT_TYPES, ARTIFACT_EXTENSIONS, ARTIFACT_MAX_BYTES, cleanTitle, utf8Bytes } from '@/lib/artifacts/limits'
 import { stripDiffMarkers } from '@/lib/artifacts/diff'
 import type { ArtifactDetail, ArtifactListItem, ArtifactMedia, ArtifactSummary } from '@/lib/artifacts/types'
-import { numberedIssueTeamScope } from '@/lib/issue-team-access'
-import { pageTaskPrefixInput, taskIdentifiers } from '@/lib/task-identifier-server'
+import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
 import { artifactChanged } from '@/lib/live/artifacts'
 import { taskActivityChanged } from '@/lib/factory/activity-live'
@@ -185,16 +184,13 @@ async function withIssueKeys(reader: ArtifactReader, rows: (Omit<ArtifactListIte
   const { userId } = taskReaderScope(reader)
   const issueIds = [...new Set(rows.flatMap(row => row.issueId ? [row.issueId] : []))]
   const current = issueIds.length ? access ?? await artifactReadAccess(reader) : null
-  // Team links supply names only; tenant authority is the fresh read above.
-  const { taskTeams } = await numberedIssueTeamScope(userId, issueIds)
-  const prefixOwner = sql<string | null>`case when issues.scope = 'personal'
-    or not (issues.id = any(${`{${[...taskTeams.keys()].join(',')}}`}::uuid[]))
-    then issues."userId" end`
+  // Reuse this operation's fresh reader gate and the authorized rows' issued
+  // identifiers; Team grouping and names cannot change a task's identity.
   const tasks = current ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, number: issueNumber,
-    prefixInput: pageTaskPrefixInput(prefixOwner, sql`issues.id`) })
+    issuedIdentifier: issues.issuedIdentifier })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(inArray(issues.id, issueIds), current.taskPredicate)) : []
-  const identifiers = await taskIdentifiers(tasks, db, taskTeams)
+  const identifiers = await taskIdentifiers(tasks, db)
   const numbers = new Map(tasks.map(task => [task.id, task.number]))
   return rows.map(({ updatedAt, ...row }) => {
     const number = row.issueId ? numbers.get(row.issueId) ?? null : null

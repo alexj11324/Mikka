@@ -2,6 +2,11 @@ import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { hostedBillingScope } from './context'
 import { COORDINATOR_MODEL } from '../coordinator/model'
+// This provider unit fixture has no organization account. Real account selection
+// and revocation are exercised against PostgreSQL in tests/billing.db.test.ts.
+mock.module(new URL('../billing/organization-account.ts', import.meta.url).href, { namedExports: {
+  resolvePlatformBillingAccount: async (workspaceId: string) => ({ organizationId: null, accountWorkspaceId: workspaceId }),
+} })
 let verified = true,
   allow = true
 const reservations: string[] = [],

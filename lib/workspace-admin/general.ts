@@ -256,7 +256,7 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     const before = await workspaceListScopesBeforeChange(tx, workspaceId)
     const teamRows = await tx.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId)).for('update')
     const teamIds = teamRows.map(row => row.id)
-    const projectRows = await tx.select({ id: teamProjects.projectId }).from(teamProjects).where(eq(teamProjects.workspaceId, workspaceId))
+    const projectRows = await tx.select({ id: projects.id }).from(projects).where(eq(projects.workspaceId, workspaceId))
     const projectIds = [...new Set(projectRows.map(row => row.id))]
     // The machines' sandboxes are killed before their rows go, so no refused deletion may follow: the billing check runs first too.
     const [billing] = await db.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)

@@ -18,7 +18,7 @@ export const GITHUB_MCP_MIN_VALIDITY_MS = 5 * 60_000
 const PAGE_BYTES = 32 * 1024
 const CURSOR_PREFIX = 'mikka-github-tools:'
 type Page = { remote: string | null; offset: number }
-type ListedTool = Record<string, unknown> & { name: string; description?: string; displayName?: string }
+type ListedTool = Record<string, unknown> & { name: string; description?: string; displayName?: string; annotations?: unknown }
 export type GitHubMcpCommand = Extract<McpCommand, { name: string }> | { cursor?: string; tool?: string }
 class GitHubCursorError extends Error {}
 
@@ -61,10 +61,13 @@ function cataloguePage(userId: string, result: Record<string, unknown>, page: Pa
     // A schema is either complete or refused; truncated properties are unsafe to call.
     return Buffer.byteLength(JSON.stringify(response)) <= PAGE_BYTES ? response : { error: 'githubToolSchemaTooLarge' }
   }
-  const selected: { name: string; description?: string; displayName: string }[] = []
+  const selected: { name: string; description?: string; displayName: string; readOnly?: boolean }[] = []
   for (let index = page.offset; index < tools.length; index++) {
     const tool = tools[index]
-    const summary = { name: tool.name, displayName: tool.displayName ?? catalogueToolDisplayName(tool), ...(tool.description === undefined ? {} : { description: tool.description.slice(0, 240) }) }
+    const annotations = tool.annotations
+    const readOnly = annotations !== null && typeof annotations === 'object' && !Array.isArray(annotations) &&
+      (annotations as Record<string, unknown>).readOnlyHint === true
+    const summary = { name: tool.name, displayName: tool.displayName ?? catalogueToolDisplayName(tool), ...(readOnly ? { readOnly: true } : {}), ...(tool.description === undefined ? {} : { description: tool.description.slice(0, 240) }) }
     if (Buffer.byteLength(JSON.stringify({ tools: [...selected, summary], nextCursor: next(index + 1) })) > PAGE_BYTES) break
     selected.push(summary)
   }

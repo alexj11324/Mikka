@@ -15,7 +15,13 @@ import { clearFacts, correctFact, countFacts, deleteFact, listFacts } from '@/li
 export async function getMemory() {
   const user = await requireUser()
   const [preferences, facts, total] = await Promise.all([readPreferences(user.id), listFacts(user.id), countFacts(user.id)])
-  return { enabled: preferences.memoryEnabled, total, facts: facts.map(fact => ({ id: fact.id, kind: fact.kind, subject: fact.subject, userEdited: fact.userEdited })) }
+  return {
+    enabled: preferences.memoryEnabled, total,
+    // `repository` is where the fact is true of; null is a fact about the person
+    // themselves. 记忆 shows both so a fact scoped to one project is not
+    // mistaken for one that holds everywhere (ALE-68).
+    facts: facts.map(fact => ({ id: fact.id, kind: fact.kind, subject: fact.subject, repository: fact.repository, userEdited: fact.userEdited })),
+  }
 }
 
 export async function setMemory(enabled: boolean) {

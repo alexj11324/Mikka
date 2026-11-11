@@ -6,6 +6,7 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { issueMemberTargets, issueRelationTargets } from './issue-detail'
@@ -75,7 +76,10 @@ test('issue members and relations keys reach only the task audience, after the a
       const id = randomUUID()
       await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId") VALUES ($1,'owner','Fixture',$2,'todo','normal',$3,$4)`,
         [id, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] }), workspace ? 'workspace' : 'personal', workspace ?? home])
-      if (workspace) await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, randomUUID(), workspace])
+      if (workspace) {
+        const grouping = await seedTeam(database, workspace, 'owner')
+        await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, grouping.id, workspace])
+      }
       return id
     }
     const parent = await issue(team), unrelated = await issue(team)

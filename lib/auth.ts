@@ -13,6 +13,7 @@ import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { afterJob } from '@/lib/background'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
 import { githubSignInClient } from '@/lib/github/app-config'
+import { refreshGitHubOAuthToken } from '@/lib/github/oauth-token'
 import { beforeSignup, localSignUpRateRules } from '@/lib/abuse/signup'
 import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
@@ -73,11 +74,13 @@ export const auth = betterAuth({
   },
   socialProviders: {
     ...(appleOptions ? { apple: appleOptions } : {}),
-    github: async () => ({
-      ...await githubSignInClient(),
+    github: async () => {
+      const client = await githubSignInClient()
+      return { ...client,
+        refreshAccessToken: (refreshToken: string) => refreshGitHubOAuthToken(client, refreshToken),
       getUserInfo: githubVerifiedProfile(),
       requireEmailVerification: true,
-    }),
+    } },
     ...(googleEnabled ? { google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,

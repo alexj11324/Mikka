@@ -192,8 +192,11 @@ source wins in a conflict is in [`README.md`](README.md).
   personal workspace stay in Mikka. Personal and team workspaces are kept
   apart: a task or chat never moves between them
   ([decision 2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md), which replaces turning a
-  workspace task back into a personal one, issue #184). Teammates see agent runs on workspace issues only, never left-column
-  chats or private memory.
+  workspace task back into a personal one, issue #184). Content visibility uses
+  the resource ACL and restrictive Project/Thread parents, in addition to active
+  Workspace membership. Shared collaboration does not expose private Bot chats
+  or memory; historical private data remains private
+  ([#1849 decision](decisions/2026-11-10-0017-collaboration-governance.md)).
 
 ## Issue detail
 
@@ -224,13 +227,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   ending in the shared composer (R-10). The task properties
   show its dispatching bot, Agent/model and execution location. A reader who
   cannot access the work sees no private transcript. Workspace visibility
-  follows [2026-11-01-2300](decisions/2026-11-01-2300-thread-visibility-follows-warp.md)
-  and the enforced access checks. Teammates with view access watch the
-  conversation; sending requires the corresponding owner authorization.
+  follows [#1849](decisions/2026-11-10-0017-collaboration-governance.md)
+  and the enforced resource ACL. Authorized teammates can watch the
+  conversation and contribute according to their capabilities; triggering
+  execution or owner-funded resources requires separate authorization and budget.
   The bot dispatches the work and the Agent runs it (R-78). A person's private
-  Bot chat stays private until shared with the team, selected people or by
-  link. Shared readers can request owner-approved edit access or fork a copy
-  to continue, under the same visibility decision.
+  Bot chat stays private until its owner explicitly shares it. A shared link is
+  not permission to use the owner's private credential, device, Secret or memory.
+  Administrators without a content grant see only the separate management and
+  usage projection, never a private transcript or title.
 - **R-63** Activity: events (created, handed to, dispatched a thread,
   status changes) are plain one-line rows; one person's events in the same
   minute join into one row (「创建了任务，交给 Mikka Backend，自己负责」). A comment is a card with a 1px
@@ -441,8 +446,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   words: its row names the reason. Raw input and output sit last, under
   「原始数据」, folded. 全部展开 / 全部收起, always shown beside every
   group, opens or closes every group in the chat. Under a reply, 复制 and 「N 个来源」 (web pages
-  only; tasks and threads are already chips) share one line that shows while the
-  reply is hovered, focused or tapped; the latest reply keeps it on a touch screen.
+  only; tasks and threads are already chips) share one line that is always there; the
+  icons stay muted until hovered or focused ([decision](decisions/2026-11-10-2002-chat-reply-actions-and-waiting.md)).
 
 ## Settings
 
@@ -465,9 +470,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
   value read-only. A person's own subscriptions and API keys are not such a
-  feature: they always run that person's own bots, with no switch; an admin
-  can switch off only 「分享给团队成员」 (decision
-  [2026-11-01-2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). A stored off is an admin's choice, never a leftover
+  feature. A person's subscriptions remain Account-owned and are not a public
+  resource pool. Organization connection and model policies govern admitted work
+  without revealing personal credentials; authorized owner use stays available
+  under [#1849](decisions/2026-11-10-0017-collaboration-governance.md).
+  A stored off is an admin's choice, never a leftover
   default: a migration that turns a default on also rewrites rows that hold
   the old default. A feature stays off only for real per-use cost, an
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety
@@ -475,10 +482,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   they change only with Alex's decision. Source: Alex, 2026-10-31.
 - **R-77** An app write has the permission its connection grants, and only
   a destructive call asks. If the Gmail, Calendar, Notion or Slack
-  connection allows the write, the agent writes without a card. Explicit
-  person or admin allow/ask/deny win first. Otherwise the Decisions API
-  answers one predicate, `destructive`: does this exact call delete,
-  overwrite or remove existing data? The tool's MCP annotations
+  connection allows the write, the agent writes without a card. The workspace's
+  allow/ask/deny wins first; there is no per-Bot or per-person layer. Otherwise
+  the Decisions API answers one predicate, `destructive`: does this exact call
+  delete, overwrite or remove existing data? The tool's MCP annotations
   (`destructiveHint`, `readOnlyHint`) are input; a `readOnlyHint` tool is not
   asked about. Creating, sending, appending and adding never ask. An
   unavailable or refused judgment shows a card, never a silent write.

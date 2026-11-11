@@ -20,7 +20,10 @@ import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklist
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/react'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
+import { issueView, taskAssignees, taskIdentifiers } from '@/lib/task-identifier-server'
+import { projectViewsForTasks } from '@/lib/project-access'
+import { projectDb, projects, projectTasks } from '@/lib/db/projects'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { issueShortTitle } from '@/lib/short-title-sql'
 import { createTeamIssueForUser } from '@/lib/team-issue-create'
@@ -34,9 +37,9 @@ import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { actingContext, activityActor } from '@/lib/activity-actor'
 import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
-import { queryVersion } from '@/lib/db/query-version'
+import { queryVersion, queryVersions } from '@/lib/db/query-version'
 import { workspaceDb } from '@/lib/workspace-db'
-import { teamIssues, teams as localTeams } from '@/lib/db/team-schema'
+import { teamIssues } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
@@ -46,7 +49,7 @@ import { cacheReadAction } from '@/lib/cache-read-action'
 import { requireTaskWorkspace, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 
 type IssueRow = typeof issues.$inferSelect
-export type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
+export type IssueView = Awaited<ReturnType<typeof issueView<IssueRow>>>
 
 async function getUserId() {
   const user = await currentUser()
@@ -114,27 +117,36 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // Fingerprint before reading links that will be reused below. A relation
   // moved during this read must invalidate the next poll, never be acknowledged
   // with a newer fingerprint while returning its older team.
-  const linksVersion = await queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId, number: teamIssues.number, key: localTeams.identifier }).from(teamIssues)
-    .leftJoin(localTeams, eq(localTeams.id, teamIssues.teamId))
-    .where(and(eq(teamIssues.workspaceId, context.workspace.id), or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined))), workspaceDb)
+  const linksQuery = workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId }).from(teamIssues)
+    .where(and(eq(teamIssues.workspaceId, context.workspace.id), or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined)))
+  // A departed/suspended human must disappear from responsibility even when
+  // the Task's historical metadata did not change. These hashes are taken
+  // before projection, so a concurrent revoke remains visible on the next read.
+  const membersQuery = workspaceDb.select({ userId: workspaceMembers.userId, status: workspaceMembers.status }).from(workspaceMembers)
+    .where(eq(workspaceMembers.workspaceId, context.workspace.id))
+  const projectsQuery = projectDb.select({ issueId: projectTasks.issueId, projectId: projects.id, name: projects.name }).from(projectTasks)
+    .innerJoin(projects, and(eq(projects.id, projectTasks.projectId), eq(projects.workspaceId, projectTasks.workspaceId)))
+    .where(eq(projectTasks.workspaceId, context.workspace.id))
+  // These three authorities live in the canonical Workspace database. Read
+  // their hashes together before reading any projection, without an APP join.
+  const { linksVersion, membersVersion, projectsVersion } = await queryVersions({ linksVersion: linksQuery, membersVersion: membersQuery, projectsVersion: projectsQuery }, workspaceDb)
   // This operation already authorized the selected tenant in loadWorkspaceContext.
   // Keep that fresh membership result instead of loading it a second time.
   const visibility = {
     predicate: issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [context.workspace.id] }),
     links: await issueTeamScope(userId, [], { teams, withTaskNumbers: true }),
   }
-  const candidates = db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
-  // Include identifier dependencies: a prefix, profile or Linear rename can change a list without editing a task.
-  // Qualified by alias: drizzle renders columns bare here, and a bare "userId" inside
-  // issue_prefixes would compare that table with itself.
+  // The predicate binds every candidate to this one authorized Workspace.
+  // Restore that known ID in the DTO instead of transferring it per row.
+  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
+  // Issued identifiers are part of the Task row and do not follow Team,
+  // personal-prefix or provider renames. Current human profile changes still
+  // invalidate responsibility without rewriting historical Task metadata.
   const signature = db.select({ id: candidates.id, scope: candidates.scope, updatedAt: candidates.updatedAt, item: sql`to_jsonb(task_list)`.as('item'), identifiers: sql`jsonb_build_array(
-    (select owner.email from "user" owner where owner.id = task_list."userId"),
-    (select prefix.prefix from issue_prefixes prefix where prefix."userId" = task_list."userId"),
-    (select jsonb_agg(sync."linearTeamKey" order by sync."linearTeamKey") from linear_team_syncs sync where sync."ownerId" = task_list."userId"),
-    (select jsonb_agg(link."linearIdentifier" order by link."linearIdentifier") from linear_issue_links link where link."issueId" = task_list.id)
+    (select jsonb_build_array(person.name,person.image) from "user" person where person.id = coalesce(task_list.content->'attrs'->'mikka',task_list.content->'attrs'->'orvilo')->'assignee'->>'id')
   )`.as('identifiers') }).from(candidates)
   const tasksVersion = await queryVersion(signature)
-  const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion])).digest('hex').slice(0, 32)
+  const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion, membersVersion, projectsVersion])).digest('hex').slice(0, 32)
   if (known === version) return { ...unchangedList(version), live }
   // Read the version first: a concurrent change is picked up on the next poll, never acknowledged unseen.
   const signed = signature.as('task_signatures')
@@ -155,7 +167,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // link moves. Rebuild the small authorized id manifest and read only rows
   // whose visible projection differs from the caller's held snapshot.
   const positions = manifest
-    .map(row => ({ id: row.id, version: createHash('sha256').update(JSON.stringify([userId, context.workspace.id, row.signature, links.find(link => link.issueId === row.id)?.teamId ?? null, row.scope === 'workspace' ? taskTeams.get(row.id) ?? null : null])).digest('hex').slice(0, 32) }))
+    .map(row => ({ id: row.id, version: createHash('sha256').update(JSON.stringify([userId, context.workspace.id, row.signature, membersVersion, projectsVersion, links.find(link => link.issueId === row.id)?.teamId ?? null])).digest('hex').slice(0, 32) }))
   // Every request rebuilds visibility and the complete manifest before it may
   // join. A removed task/link therefore cannot inherit an older flight even
   // when this person's workspace role and team membership are unchanged.
@@ -165,12 +177,25 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
     version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
     const changedIds = changedListIds(positions, previous)
     const rows = changedIds.length ? await db.select().from(candidates).where(inArray(candidates.id, changedIds)).orderBy(desc(candidates.updatedAt), desc(candidates.id)) : []
-    const liveRows = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
-    const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), db, taskTeams)
+    const liveRows = rows.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => ({ ...row, workspaceId: context.workspace.id }))
+    // Reuse this request's authorized APP rows; only an unissued historical
+    // Task needs the legacy reconciliation path and its additional queries.
+    const identifiers = new Map(liveRows.filter(row => row.issuedIdentifier).map(row => [row.id, row.issuedIdentifier]))
+    const unissued = liveRows.filter(row => !row.issuedIdentifier)
+    for (const [id, identifier] of await taskIdentifiers(unissued.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), db, taskTeams)) identifiers.set(id, identifier)
+    const assignees = await taskAssignees(liveRows.map(row => ({ id: row.id, workspaceId: row.workspaceId, assignee: readIssueMetadata(row.content).assignee })))
+    const taskProjects = await projectViewsForTasks(liveRows)
     // The leader's revision was read before these rows. Never stamp a joined
     // response with the joining request's possibly newer live revision.
     // The body stays in Postgres; only metadata and checklist counts are read.
-    return { version, live, positions, ...(previous ? { delta: true as const } : {}), items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) })) }
+    return { version, live, positions, ...(previous ? { delta: true as const } : {}), items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({
+      ...issue, issuedIdentifier: identifiers.get(issue.id) ?? null, identifier: identifiers.get(issue.id) ?? null,
+      projectId: taskProjects.get(issue.id)?.projectId ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null,
+      // Keep the legacy DTO union during the client rollout. taskAssignees
+      // above is the runtime authority and emits only active members or null.
+      metadata: { ...readIssueMetadata(content), assignee: assignees.get(issue.id) ?? null, project: taskProjects.get(issue.id)?.project ?? null } as ReturnType<typeof readIssueMetadata>,
+      checklist: checklistView(checklistTotal, checklistChecked),
+    })) }
   })
 }
 
@@ -185,15 +210,16 @@ const { content: _issueBody, ...issueSummaryColumns } = getTableColumns(issues)
  * Postgres so a warm read returns no document unless the visible view changed. */
 export async function pollIssue(id: string, known?: string): Promise<ActionResult<{ viewerId: string; version: string; issue: IssueView; unchanged?: never } | { viewerId: string; version: string; unchanged: true; issue?: never }>> {
   return cacheReadAction(() => withDatabaseOperation('/actions/issues/detail', async () => {
-    const { issue, user, teamId } = await requireIssueAccessWithoutBody(id)
+    const { issue, user } = await requireIssueAccessWithoutBody(id)
+    if (!issue.issuedIdentifier) await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope }])
     return db.transaction(async tx => {
       const [locked] = await tx.select({ ...issueSummaryColumns, content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-      await requireCurrentIssueWorkspace(user, issue.workspaceId)
+      await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // Same unavailable task as the entry ACL, when deletion committed before
       // this lock. A cursor never turns a deleted task into an unchanged result.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
-      const summary = await issueView(locked, tx, teamId === null ? new Map() : undefined)
+      const summary = await issueView(locked, tx)
       const version = createHash('sha256').update(JSON.stringify([user.id, summary])).digest('hex').slice(0, 32)
       if (known === version) return { viewerId: user.id, version, unchanged: true as const }
       const [body] = await tx.select({ content: issues.content }).from(issues).where(eq(issues.id, id))
@@ -204,13 +230,14 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
 }
 
 async function readIssue(id: string) {
-  const { issue, user, teamId } = await requireIssueAccessWithoutBody(id)
+  const { issue, user } = await requireIssueAccessWithoutBody(id)
+  if (!issue.issuedIdentifier) await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope }])
   return db.transaction(async tx => {
     const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-    await requireCurrentIssueWorkspace(user, issue.workspaceId)
+    await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
-    return issueView(locked, tx, teamId === null ? new Map() : undefined)
+    return issueView(locked, tx)
   })
 }
 
@@ -261,7 +288,7 @@ export async function saveIssue(input: { id?: string; revision?: number; workspa
         await issueRelationsChanged(tx, [id])
         return { issue: await issueView(issue, tx) }
       })
-      const result = existing ? await withIssueWorkspace(user, context.workspace.id, save) : await withTaskWorkspace(user, context.workspace.id, save)
+      const result = existing ? await withIssueWorkspace(user, context.workspace.id, { issueId: existing.id, action: 'canSteer' }, save) : await withTaskWorkspace(user, context.workspace.id, save)
       if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       if (statusEvent && 'issue' in result) scheduleIssueEffect({ kind: 'wake', userId: ownerId })
       return result
@@ -345,7 +372,7 @@ export async function listIssueVersions(id: string) {
   const versions = await db.transaction(async tx => {
     const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-    await requireCurrentIssueWorkspace(user, issue.workspaceId)
+    await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     return tx.select().from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, userId))).orderBy(desc(issueVersions.revision)).limit(50)
   })
   return enrichActivityActors(versions, userId)
@@ -362,7 +389,7 @@ export async function pollIssueVersionSummaries(id: string, known?: string, prev
     const result = await db.transaction(async tx => {
       const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
-      await requireCurrentIssueWorkspace(user, issue.workspaceId)
+      await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // The same deleted-task refusal as pollIssue, after taking the shared lock.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
       const summaries = tx.select({ ...versionSummaryColumns, content: sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issueVersions.content}->'attrs')`.as('content') })

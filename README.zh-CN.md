@@ -7,23 +7,26 @@
 
 # Mikka
 
-**让 AI Agent 在你的电脑与云端协同工作。**
+### 为大事而生的 AI lead。
 
-Mikka 为 Claude Code、Codex 和受支持的 Cursor 运行环境组织工作：Bot 负责协调任务，Agent 负责执行。
+从本地到云端，所有 Agent 协作如一。
 
 [访问 Mikka](https://app.aspectlylabs.com/mikka) · [文档](https://aspectlylabs.com/mikka/docs) · [快速入门](https://aspectlylabs.com/mikka/docs/quickstart)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
 
 [English](README.md) · **简体中文**
 
 </div>
 
+Mikka 为 Claude Code、Codex 和受支持的 Cursor 运行环境组织工作：Bot 负责协调任务，Agent 负责执行。
+
 向 Bot 描述一个任务，Mikka 就能将编码工作派发给运行在 Mac、Linux 设备、SSH 服务器或符合条件的云端沙盒中的 Agent，并把进度、提问和结果汇总到同一个地方。你可以通过网页、macOS 或 iOS App 使用 Mikka。
 
 ## 开始使用
 
-**Mikka Cloud（早期体验）。** [打开应用](https://app.aspectlylabs.com/mikka)。如需获取使用资格，可发送邮件至 [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com)，再按照[快速入门指南](https://aspectlylabs.com/mikka/docs/quickstart)操作。
+**Mikka Cloud。** [打开应用](https://app.aspectlylabs.com/mikka)，直接注册账号即可开始使用 Mikka。具体步骤参见[快速入门指南](https://aspectlylabs.com/mikka/docs/quickstart)。
 
 **自托管服务器。** 你可以使用 Docker 和 PostgreSQL 在自己的 Linux 主机上运行 Mikka。按照[自托管指南](docs/self-hosting.md)配置所需信息，下载匹配版本的 Compose 文件，然后启动服务器：
 
@@ -106,10 +109,26 @@ Aspectly Labs 同时提供商业许可，联系邮箱为 [legal@aspectlylabs.com
 
 <p>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
-    <img src="docs/assets/openai-mark-light.svg" alt="OpenAI 标识" width="28" height="28">
-  </picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI 标志" width="32" height="32">
+    </picture>
   <strong>OpenAI · Codex for Open Source</strong>
 </p>
 
-Mikka 的维护者通过 [Codex for Open Source](https://openai.com/form/codex-for-oss/) 计划获得了六个月的 ChatGPT Pro 使用资格。Mikka 是独立开源项目，与 OpenAI 不存在隶属或官方背书关系。OpenAI 名称及标识均为 OpenAI 的商标。
+Mikka 的开发得到了 [Codex for Open Source](https://openai.com/form/codex-for-oss/) 计划的支持。
+
+衷心感谢 OpenAI 和 Codex 团队为 Mikka 的维护者提供六个月的 ChatGPT Pro 使用资格。这份支持让我们有更多空间探索有挑战性的想法、改进工程质量和用户体验，并回馈开源社区。
+
+Mikka 是独立开源项目，与 OpenAI 不存在隶属关系，也未获得 OpenAI 官方背书。OpenAI 名称及标志均为 OpenAI 的商标。
+
+## 许可证
+
+Mikka 的版权归 Aspectly Labs 所有（© 2026），采用 [AGPL-3.0-only](LICENSE) 协议开源。第三方组件遵循各自的许可证，详见 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md)。
+
+如需不受 AGPL 义务约束的商业许可，请联系 Aspectly Labs：[legal@aspectlylabs.com](mailto:legal@aspectlylabs.com)。
+
+如果你将修改后的 Mikka 作为网络服务提供给他人使用，AGPL 要求你向这些用户提供所部署版本的源代码。
+
+## 参与贡献
+
+欢迎参与贡献，请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。贡献者保留其作品的版权，并按 [AGPL-3.0-only](LICENSE) 授权；提交贡献即同意 Aspectly Labs 可以按其他条款（包括商业许可）提供这些贡献。无需另行签署任何文件，完整条款见 [`CONTRIBUTING.md`](CONTRIBUTING.md#license)。

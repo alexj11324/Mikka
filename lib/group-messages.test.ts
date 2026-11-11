@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test, { before } from 'node:test'
 import { basePath } from './base-path-config.mjs'
 
-// Runs with next.config's real basePath. fetch is mocked in the request tests:
+// Runs with the app's real basePath. fetch is mocked in the request tests:
 // they cover the client's reading of the group API contract, not the route.
 process.env.MIKKA_BASE_PATH = basePath
 let group: typeof import('./group-messages')

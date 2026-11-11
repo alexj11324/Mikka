@@ -10,11 +10,11 @@ import { resolveEntitlements, type DeploymentMode, type PlanGrant } from '@/lib/
 export const organizationPlanInput = z.object({
   organizationId: z.uuid(), expectedPlan: z.enum(['free', 'pro', 'enterprise']),
   plan: z.enum(['free', 'enterprise']), source: z.enum(['cloud', 'license']),
-  seatLimit: z.number().int().min(1).max(100_000).nullable(),
+  seatLimit: z.number().int().min(1).max(100_000).nullable().default(null),
   expiresAt: z.iso.datetime({ offset: true }).nullable(),
   reason: z.enum(['evaluation', 'licensed', 'downgrade', 'correction']),
   operator: z.string().trim().min(1).max(120).refine(value => !looksLikeSecretValue(value)),
-}).strict().refine(value => value.plan === 'enterprise' ? value.seatLimit !== null : value.seatLimit === null && value.expiresAt === null)
+}).strict().refine(value => value.plan === 'enterprise' || value.seatLimit === null && value.expiresAt === null)
 
 /** Existing Workspace-database operator authority is required. No payment or membership mutation. */
 export async function provisionOrganizationPlan(database: Pick<Pool, 'connect'>, input: unknown, options: { apply?: boolean; mode?: DeploymentMode } = {}) {

@@ -24,7 +24,7 @@ import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, CircleHelp } from 'lucide-react'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
@@ -36,6 +36,7 @@ import { navigate, openTask, openThread } from '@/components/workspace/workspace
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
+import { CoordinatorContextUsage } from './coordinator-context-usage'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { useLiveKey, useLiveKeys, useLiveScope, watchPageVisibility } from '@/hooks/use-live-key'
@@ -86,6 +87,7 @@ import { CloudFailureAction, FailureReason } from './failure-reason'
 import { RunErrorDetails } from '@/components/workspace/run-error-text'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { ChatEventLine } from './chat-event-line'
+import { waitingQuestionRuns } from '@/lib/coordinator/waiting-questions'
 import { RetryReplyButton } from './retry-reply-button'
 import { COMPOSER_NOTICE } from './composer-notice'
 
@@ -297,6 +299,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const firstThreadCard = useMemo(() => firstThreadCards(items), [items])
   // A thread's event line said again later (「… 在等你回答」 twice) shows only the latest one (R-66).
   const staleEvents = useMemo(() => staleEventPositions(items), [items])
+
+  // A run's question is a live state, not a message: the thread card already names the run and its state badge says
+  // 等待你 (decision 2026-11-10), so the chat shows one sentence above the composer instead of a stored event line.
+  const waitingQuestions = useMemo(() => waitingQuestionRuns(items, data?.sources, staleEvents), [items, data, staleEvents])
   /** The thread cards under `item`: those whose first reply it is; a live reply only threads no stored reply has carded. */
   const cardsOf = (item: Chat['items'][number], live: boolean) => item.threads.filter(id => (live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position) && sources?.[id]?.kind === 'run')
   // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
@@ -373,8 +379,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     {/* The stored codes, and the turn failure behind a wake code, only under 详情 (decision 2026-11-05-0330). */}
     {liveRaw && <RunErrorDetails code={liveRaw} />}
   </>
-  // The newest reply keeps its actions in view, as Claude's does; older ones show them on hover.
-  const lastReplyAt = stream.replies.length ? -1 : items.findLast(item => item.from === 'coordinator' && item.text)?.position
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
   // A failed welcome is the Bot saying nothing yet: never an unread message.
@@ -506,7 +510,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     const liveFailurePart: ThreadEntryPart = plainFailure
       ? { kind: 'error', text: wakeError ? t(`wakeErrors.${wakeError}`) : t('failedTitle'), actions: <>{retry}{liveRaw && <RunErrorDetails code={liveRaw} />}</> }
       : { kind: 'error', text: t('failedTitle'), actions: failureNotice }
-    const rows = [...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined as CoordinatorLiveReply | undefined, key: String(item.pending ? `pending-${item.position}` : item.streamId ?? item.position) })),
+    const rows = [...items.filter(item => !staleEvents.has(item.position) && item.line?.kind !== 'runQuestion').map(item => ({ item, live: undefined as CoordinatorLiveReply | undefined, key: String(item.pending ? `pending-${item.position}` : item.streamId ?? item.position) })),
       ...stream.replies.map(reply => ({ item: streamedItem(reply, stopping), live: stopping && reply.committedThrough === undefined ? { ...reply, committedThrough: -1 } : reply, key: reply.id }))]
     const entries: ThreadEntry[] = []
     for (const { item, live, key } of rows) {
@@ -541,7 +545,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       if (artifacts.length) parts.push({ kind: 'artifacts', items: artifacts, onOpen: openArtifact })
       if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
       entries.push({ id: key, role: 'bot', at, parts, streaming, ...(item.stopped ? { stopped: true } : {}),
-        actions: item.text && !streaming ? <MessageActions className={cn('items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>
+        actions: item.text && !streaming ? <MessageActions className={cn('items-start', REPLY_ACTIONS)}>
           <CopyAction text={replyCopyText(item.text)} />
           <AgentCitationsContext value={citations}><CitationSources text={item.text} /></AgentCitationsContext>
           {item.id && <MessageReactions reactions={reactions[item.id]} align="start" />}
@@ -564,6 +568,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
       {unanswered && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48">{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
+      {/* One live sentence, not a stored event line; the thread is an inline link inside it (decision 2026-11-10). */}
+      {waitingQuestions.length > 0 && <p data-slot="waiting-questions" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
+        <span role="status" aria-live="polite" aria-atomic="false" className="inline-flex min-w-0 items-center gap-1.5"><CircleHelp aria-hidden="true" className="size-3.5 shrink-0 text-warning" />{t('waitingQuestions', { count: waitingQuestions.length })}</span>
+        {waitingQuestions[0].runId && <Button variant="link" size="xs" className="h-auto min-w-0 max-w-full px-0 font-normal" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></Button>}
+      </p>}
       <PendingActions />
     </>
     return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
@@ -628,7 +637,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               </div>)}
             {/* Stored and streamed replies are one list: a stored reply takes the key of the stream it was shown from, so
                 storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
-            {[...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
+            {[...items.filter(item => !staleEvents.has(item.position) && item.line?.kind !== 'runQuestion').map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
               // After 停止 the reply in flight no longer draws as streaming (no cursor, no running activity) while it is stored.
               ...stream.replies.map(reply => ({ item: streamedItem(reply, stopping), live: stopping && reply.committedThrough === undefined ? { ...reply, committedThrough: -1 } : reply, key: reply.id }))].map(({ item, live, key }) => <Fragment key={key}>
               {!live && dividerAt === item.position && <UnreadDivider />}
@@ -657,8 +666,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} onOpenTask={openTask} /> : null
                     })}</>}
-                    // Copy and the pages it cites, on one line under the reply, only while it is hovered or tapped (R-83).
-                    actions={item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1 items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>
+                    // Copy and the pages it cites, on one line under the reply, always there and quiet (R-83 revised 2026-11-10).
+                    actions={item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1 items-start', REPLY_ACTIONS)}>
                       <CopyAction text={item.from === 'coordinator' ? replyCopyText(item.text) : splitReplyQuote(item.text).text} />
                       {item.from === 'coordinator' && <AgentCitationsContext value={citations}><CitationSources text={item.text} /></AgentCitationsContext>}
                     </MessageActions>}
@@ -709,10 +718,20 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
       {unanswered && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48">{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
+      {/* One live sentence, not a stored event line; the thread is an inline link inside it (decision 2026-11-10). */}
+      {waitingQuestions.length > 0 && <p data-slot="waiting-questions" className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground">
+        <span role="status" aria-live="polite" aria-atomic="false" className="inline-flex min-w-0 items-center gap-1.5"><CircleHelp aria-hidden="true" className="size-3.5 shrink-0 text-warning" />{t('waitingQuestions', { count: waitingQuestions.length })}</span>
+        {waitingQuestions[0].runId && <Button variant="link" size="xs" className="h-auto min-w-0 max-w-full px-0 font-normal" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></Button>}
+      </p>}
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
-        model={<BotModelPicker botId={botId ?? null} running={working || sending} />}
+        model={<div className="flex min-w-0 items-center gap-1">
+          <BotModelPicker botId={botId ?? null} running={working || sending} />
+          {/* How near the next fold is (lib/coordinator/context-usage.ts). Beside the model chip,
+              because both describe the next turn rather than anything already in the list. */}
+          {data?.context && <CoordinatorContextUsage usage={data.context} />}
+        </div>}
         quote={embedded?.quote || replyQuote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
           {embedded?.quote && <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} />}
           {replyQuote && <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} />}

@@ -12,6 +12,7 @@ export type RunPolicyStopScope =
   | { kind: 'team' | 'project'; scopeId: string; ownerId?: string }
   | { kind: 'task'; issueId: string }
   | { kind: 'tasks'; issueIds: string[] }
+  | { kind: 'runs'; runIds: string[] }
 export type StoppedPolicyRun = { id: string; deviceId: string; stopped: boolean }
 
 /** Direct runners hold their authority on the machine. A policy mutation
@@ -30,6 +31,7 @@ export function runPolicyStopSQL(scope: RunPolicyStopScope): SQL {
       ${scope.ownerId ? sql`AND r."userId"=${scope.ownerId}` : sql``}`; break
     case 'task': where = sql`r."issueId"=${scope.issueId}::uuid`; break
     case 'tasks': where = sql`r."issueId"=ANY(${sql.param(scope.issueIds)}::uuid[])`; break
+    case 'runs': where = sql`r.id=ANY(${sql.param(scope.runIds)}::uuid[])`; break
   }
   return sql`WITH affected AS MATERIALIZED (
     SELECT r.id,r."deviceId",r."machineAuthority" FROM agent_runs r

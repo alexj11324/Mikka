@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core'
 import { workspaces } from './workspace-schema'
 import type { GovernancePlan } from './team-entitlements-schema'
 import type { AuditExportRecord } from '@/lib/audit/integrity'
@@ -42,6 +42,20 @@ export const organizationEntitlements = pgTable('mikka_organization_entitlements
   source: text('source').$type<'cloud' | 'license'>().notNull().default('cloud'),
   seatLimit: integer('seatLimit'),
   expiresAt: timestamp('expiresAt', { withTimezone: true }),
+  billingPlan: text('billingPlan').$type<GovernancePlan>().notNull().default('free'),
+  billingExpiresAt: timestamp('billingExpiresAt', { withTimezone: true }),
+  billingRevision: bigint('billingRevision', { mode: 'number' }).notNull().default(0),
+  billingSubscriptionId: text('billingSubscriptionId'),
+  billingWorkspaceId: uuid('billingWorkspaceId'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/** An organization designates an existing account; no balances change owners. */
+export const organizationBillingAccounts = pgTable('mikka_organization_billing_accounts', {
+  organizationId: uuid('organizationId').primaryKey().references(() => organizations.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull().unique().references(() => workspaces.id),
+  createdBy: text('createdBy').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -90,7 +104,7 @@ export const organizationResourcePolicies = pgTable('mikka_organization_resource
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export type SharedResourceKind = 'subscription' | 'api_key' | 'mcp'
+export type SharedResourceKind = 'subscription' | 'api_key' | 'mcp' | 'skill'
 export const organizationResourceApprovals = pgTable('mikka_organization_resource_approvals', {
   id: uuid('id').primaryKey(),
   organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
