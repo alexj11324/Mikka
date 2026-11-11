@@ -128,7 +128,10 @@ export async function switchWorkspace(...args: Parameters<typeof switchWorkspace
  * ones got a link and which were skipped, instead of failing all of them for one
  * address that is already a member: the person can correct exactly those.
  */
-async function createWorkspaceInvitationBody(input: { workspaceId: string; emails: string[]; role: string }) {
+/** The links this action returns as `data`, and the per-address answer beside them. */
+type InvitationBatch = { links: { email: string; path: string }[]; outcomes: InvitationOutcome[] }
+
+async function createWorkspaceInvitationBody(input: { workspaceId: string; emails: string[]; role: string }): Promise<{ ok: true; data: InvitationBatch } | { ok: false; error: string }> {
   return result(async () => {
     const user = await requireUser()
     const role = roleSchema.parse(input.role)
@@ -156,10 +159,18 @@ async function createWorkspaceInvitationBody(input: { workspaceId: string; email
       if (results.some(result => result.created)) await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
       return results
     })
-    // `data` is the link list this action always returned, so every existing
-    // caller keeps working; `outcomes` adds the answer for each address.
-    return { data: outcomes.flatMap(outcome => outcome.created ? [{ email: outcome.email, path: outcome.path }] : []), outcomes }
+    return {
+      links: outcomes.flatMap(outcome => outcome.created ? [{ email: outcome.email, path: outcome.path }] : []),
+      outcomes,
+    }
   })
+}
+
+/** Puts the per-address answers beside the links, in the shape callers already read. */
+async function invitationBatch(...args: Parameters<typeof createWorkspaceInvitationBody>) {
+  const body = await createWorkspaceInvitationBody(...args)
+  if (!body.ok) return body
+  return { ok: true as const, data: body.data.links, outcomes: body.data.outcomes }
 }
 
 /**
@@ -229,7 +240,11 @@ async function acceptWorkspaceInvitationBody(token: string) {
 }
 
 // Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
-export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) { return withFreshSession(() => createWorkspaceInvitationBody(...args)) }
+/// `data` keeps the array of links this action has always returned, so every
+/// existing caller and RPC consumer keeps working; `outcomes` sits beside it
+/// with one entry per address (ALE-28). The fresh-session wrapper stays the
+/// one-line shape `tests/session-cookie-cache.db.test.ts` pins for this action.
+export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) { return withFreshSession(() => invitationBatch(...args)) }
 export async function updateWorkspaceMember(...args: Parameters<typeof updateWorkspaceMemberBody>) { return withFreshSession(() => updateWorkspaceMemberBody(...args)) }
 export async function revokeWorkspaceInvitation(...args: Parameters<typeof revokeWorkspaceInvitationBody>) { return withFreshSession(() => revokeWorkspaceInvitationBody(...args)) }
 export async function acceptWorkspaceInvitation(...args: Parameters<typeof acceptWorkspaceInvitationBody>) { return withFreshSession(() => acceptWorkspaceInvitationBody(...args)) }
