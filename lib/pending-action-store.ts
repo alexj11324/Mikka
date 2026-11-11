@@ -28,7 +28,7 @@ const MAX_PENDING = 20
  * The row is written before dispatch and kept as the record; like other writes
  * the policy allows, it has no `decidedAt` and never shows as a card.
  */
-export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId), review?: NativeWriteReview) {
+export async function writeAccountAction(userId: string, action: string, input: unknown, selectedAccountId?: string, botId: string | null = null, judge: WriteJudge = serverWriteJudge(userId, botId), review?: NativeWriteReview, signal?:AbortSignal) {
   if (!isApprovalAction(action)) return { error: 'integrationActionNotAllowed' }
   const parsed = parseActionInput(action, input)
   if (!parsed) return { error: 'invalidIntegrationInput' }
@@ -48,7 +48,7 @@ export async function writeAccountAction(userId: string, action: string, input: 
     await db.insert(pendingActions).values({ id, userId, botId, action, input: parsed, connectedAccountId: accountId, status: 'running' })
     recorded = true
     return null
-  })
+  }, signal)
   if ('error' in result && result.error === 'integrationApprovalRequired') return proposeAction(userId, action, parsed, selectedAccountId, botId)
   // The gate runs before every dispatch, so an unrecorded result never sent anything.
   if (!recorded) return 'error' in result ? result : { error: 'integrationActionFailed' }

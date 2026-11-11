@@ -209,6 +209,7 @@ export async function executeComposioAction(
   chosenDefault: (toolkit: string) => Promise<string | null> = async () => null,
   boundAccountId?: string,
   gate?: ComposioDispatchGate,
+  signal?: AbortSignal,
 ): Promise<ComposioActionResult> {
   if (!Object.hasOwn(COMPOSIO_ACTIONS, actionName)) return { error: 'integrationActionNotAllowed' }
   const action = COMPOSIO_ACTIONS[actionName as ComposioActionName]
@@ -228,13 +229,14 @@ export async function executeComposioAction(
     const stopped = gate ? await gate(accountId, schema) : null
     if (stopped) return stopped
 
+    signal?.throwIfAborted()
     dispatched = true
     const result = await client.tools.execute(action.slug, {
       userId,
       connectedAccountId: accountId,
       version: schema.version,
       arguments: actionArguments(actionName as ComposioActionName, parsed),
-    })
+    }, { signal })
     return result.successful
       ? { data: result.data, accountId, ...(result.logId ? { logId: result.logId } : {}) }
       : { error: isApprovalAction(actionName) ? 'operationUncertain' : result.error ?? 'integrationActionFailed', accountId, ...(result.logId ? { logId: result.logId } : {}) }
