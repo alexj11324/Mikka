@@ -5,11 +5,18 @@ import type { AgentExecution } from '../agent-kit/store'
 
 const id = z.string().min(1).max(256)
 const common = { sessionId: id, turnId: id, executionId: z.uuid().nullable().optional() }
+const toolCall = { ...common, name: z.string().min(1).max(128), input: z.unknown(), callId: id }
+const approvalResponder = z.object({
+  authenticator: z.literal('mikka'), principalType: z.literal('user'), principalId: id,
+  attributes: z.object({ botId: z.uuid(), workspaceId: z.uuid(), surface: z.enum(['web', 'slack']) }).strict(),
+}).strict()
 const requestSchema = z.discriminatedUnion('operation', [
   z.object({ ...common, operation: z.literal('prepare') }).strict(),
   z.object({ ...common, operation: z.literal('instructions') }).strict(),
   z.object({ ...common, operation: z.literal('catalogue') }).strict(),
-  z.object({ ...common, operation: z.literal('execute'), name: z.string().min(1).max(128), input: z.unknown(), callId: id }).strict(),
+  z.object({ ...toolCall, operation: z.literal('approval') }).strict(),
+  z.object({ ...toolCall, operation: z.literal('execute'), approvalResponder: approvalResponder.optional() }).strict(),
+  z.object({ ...common, operation: z.literal('finish'), outcome: z.enum(['completed', 'failed', 'cancelled']), messages: z.array(z.unknown()).optional() }).strict(),
 ])
 type Input = z.infer<typeof requestSchema>
 type Scope = { ownerId: string; botId: string; workspaceId: string; surface: 'web' | 'slack' }
@@ -18,7 +25,7 @@ type Scope = { ownerId: string; botId: string; workspaceId: string; surface: 'we
 export interface EveProductGatewayServices {
   authorize(request: Request): Promise<Scope | null>
   assertSession(scope: Scope, sessionId: string): Promise<void>
-  run(scope: Scope, input: Input, signal: AbortSignal): Promise<unknown>
+  run(scope: Scope, input: Input, signal: AbortSignal, authorization: string | null): Promise<unknown>
 }
 
 async function boundedBody(request: Request) {
@@ -47,7 +54,7 @@ export async function handleEveProductRequest(request: Request, services: EvePro
     const parsed = requestSchema.safeParse(await boundedBody(request))
     if (!parsed.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
     await services.assertSession(scope, parsed.data.sessionId)
-    const result = await services.run(scope, parsed.data, request.signal)
+    const result = await services.run(scope, parsed.data, request.signal, request.headers.get('authorization'))
     return Response.json(result, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     // Raw tool/provider/SQL errors can contain credentials or user content.
@@ -66,7 +73,7 @@ const defaultServices: EveProductGatewayServices = {
     const { assertSessionScope } = await import('./scope')
     await assertSessionScope(scope, sessionId)
   },
-  async run(scope, input, signal) {
+  async run(scope, input, signal, authorization) {
     const { actAs } = await import('../acting-user')
     const { tokenWorkspace } = await import('../tokens/principal')
     return actAs({ id: scope.ownerId, [tokenWorkspace]: scope.workspaceId }, async () => {
@@ -74,6 +81,10 @@ const defaultServices: EveProductGatewayServices = {
       if (input.operation === 'prepare') {
         const execution = await kit.beginAgentExecution(scope.ownerId, scope.botId, `${input.sessionId}:${input.turnId}`, 0, { harness: 'ai_sdk' })
         return { execution, runtime: execution?.snapshot.runtime ?? await kit.botRuntime(scope.ownerId, scope.botId) }
+      }
+      if (input.operation === 'finish') {
+        const { finishEveTurn } = await import('./settlement')
+        return finishEveTurn(scope, input)
       }
       const execution = await gatewayExecution(scope, input)
       const { pool } = await import('../db')
@@ -104,7 +115,16 @@ const defaultServices: EveProductGatewayServices = {
       const checked = await validator(input.input)
       if (!checked.success) throw new Error('validationGeneric')
       signal.throwIfAborted()
-      const output = await tool.execute(checked.value, { toolCallId: input.callId, messages: [], context: {}, abortSignal: signal })
+      const { withEveProductAuthority } = await import('../enterprise/execution-authority')
+      const output = await withEveProductAuthority(authorization, input, async () => {
+        const call = { ...scope, sessionId: input.sessionId, turnId: input.turnId, executionId: input.executionId, sourceEventId, name: input.name, input: checked.value, callId: input.callId }
+        const { reviewEveProductApproval, executeEveApprovedWrite } = await import('./product-approval')
+        if (input.operation === 'approval') return reviewEveProductApproval(call)
+        const approved = await executeEveApprovedWrite(call, input.approvalResponder)
+        if (approved) return approved.output
+        return tool.execute!(checked.value, { toolCallId: input.callId, messages: [], context: {}, abortSignal: signal })
+      })
+      if (input.operation === 'approval') return output
       const { maskDeep, credentialMasker } = await import('../secrets/mask')
       const safe = maskDeep(output, credentialMasker)
       await (await import('../credentials/chat-guard')).assertCredentialSafeChat(scope.ownerId, safe)

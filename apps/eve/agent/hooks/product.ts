@@ -21,7 +21,9 @@ export default defineHook({events:{
     const messages = projectEveTurn(ctx.view,ctx.session.id,event.data.turnId,event.data.outcome)
     const {pool} = await import('../../../../lib/db')
     const sourceEventId = (await pool.query<{source_event_id:string}>('SELECT source_event_id FROM eve_turn_sources WHERE session_id=$1 AND turn_id=$2',[ctx.session.id,event.data.turnId])).rows[0]?.source_event_id
-    const scheduled = sourceEventId ? await (await import('../../../../lib/eve/scheduled-read')).loadScheduledRead(scope,sourceEventId) : null
+    // Delegated sessions share the read authority but only the original turn
+    // owns the schedule occurrence and publishes the combined result.
+    const scheduled = !ctx.session.parent && sourceEventId ? await (await import('../../../../lib/eve/scheduled-read')).loadScheduledRead(scope,sourceEventId) : null
     if (scheduled) {
       const {completeScheduledRead,failScheduledRead} = await import('../../../../lib/eve/scheduled-read')
       const text = messages.flatMap(message => message.role === 'assistant' ? message.content.flatMap(part => part.type === 'text' && 'text' in part ? [part.text] : []) : []).join('\n')
