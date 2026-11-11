@@ -67,6 +67,11 @@ test('an explicit automatic-destination dispatch is bound before execution and c
     const request = () => new Request('http://localhost/agent', { headers: { 'x-mikka-submission-id': requestId } })
     const read = () => withActivitySession(user, () => getDispatchedTaskReceipt(args), workspaceId)
     assert.equal(await read(), null)
+    const removedProject = { ...context, taskCommand: { ...context.taskCommand, projectId: randomUUID() } }
+    const refused = new Request('http://localhost/agent', { headers: { 'x-mikka-submission-id': randomUUID(), cookie: 'fixture=1' } })
+    await assert.rejects(withActivitySession(user, () => acceptEveMessage(scope, text, removedProject, refused), workspaceId), /projectMoveFailed/)
+    assert.equal((await pool.query('select 1 from coordinator_events where "userId"=$1 and kind=$2', [user, 'user_message'])).rowCount, 0, 'a refused create must not leave a pending dispatch')
+    assert.equal((await pool.query('select 1 from issues where "userId"=$1', [user])).rowCount, 0)
     const first = request(), second = request()
     const [{ eventId }, replay] = await Promise.all([acceptEveMessage(scope, text, context, first), acceptEveMessage(scope, text, context, second)])
     assert.equal(eventId, replay.eventId)
