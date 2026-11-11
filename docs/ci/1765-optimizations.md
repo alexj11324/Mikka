@@ -62,6 +62,33 @@ module trees normally, or the package store when workspace hooks disable reuse.
 Existing store entries remain a fallback on misses, avoiding duplicate uploads
 of both large trees.
 
+## Self-hosted image BuildKit cache (#2064)
+
+`self-hosted-image.yml` uses a pinned Docker Buildx runner and
+`docker/build-push-action` to build and **load** the exact source image used
+by the unchanged Compose, daemon, migration, desktop and release checks.
+
+The `mikka-selfhost-public` GitHub Actions cache scope is read on main,
+same-repository pull requests and tags. Only a `push` to `main` exports
+the `mode=max` BuildKit cache. Fork pull requests do not import or export the
+owner's build cache. The final application image is still built from the
+current Git commit and computed worker SHA; neither a cache hit nor a stored
+artifact counts as acceptance. All Docker build inputs continue through the
+normal source Dockerfile. Build secrets are not added to cache inputs.
+
+The subscription-worker stage is source-scoped, so unrelated application
+changes may reuse its layers. The main build stage copies all sources before
+installing dependencies, which limits cache reuse across ordinary code edits;
+the next optimization should be justified by actual cache-hit and runner cost
+data, not a claimed throughput improvement.
+
+Buildx uses the runner's normal GitHub Actions cache credentials. A cache miss
+builds normally. If the remote cache service errors, the Docker action can
+fail as an infrastructure failure, rather than reporting a falsely green
+build. Use the CI run's Buildx logs and the existing timing collector to
+compare warm and cold builds and cache transfer time. Publication remains
+subject to the same exact-source tests and does not reuse a CI image artifact.
+
 ## Measure the result
 
 The [local dependency receipt](1765-dependencies.json) compares the same Desktop

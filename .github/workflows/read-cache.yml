@@ -2,6 +2,7 @@ name: Read cache API acceptance
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - 'apps/api/**'
       - 'apps/frontend/**'
@@ -35,6 +36,8 @@ concurrency:
 
 jobs:
   read-cache:
+    # Draft-only work is exercised locally; ready_for_review runs CI.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     name: Read cache API and CLI
     runs-on: ubuntu-22.04
     timeout-minutes: 20
