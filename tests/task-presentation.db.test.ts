@@ -131,6 +131,39 @@ test('Task presentation batches keep current tenant authority and one Factory pr
     const expected = (patch: Record<string, unknown> = {}) => ({ version: 1, primaryStatus: 'doing', factoryStage: null, runStatus: null, needsAction: null, blockedReason: null, completion: null,
       state: 'todo', reason: null, blockedBy: null, group: 'todo', ...patch })
 
+    await t.test('old and new authorized read bodies for identical Task collections', async () => {
+      const list = (await import('../app/api/factory/tasks/route')).GET
+      const flow = (await import('../app/api/factory/tasks/[taskId]/flow/route')).GET
+      const activity = (await import('../app/api/factory/tasks/[taskId]/activity/route')).GET
+      for (const withFactory of [false, true]) {
+        const ids = await Promise.all(Array.from({ length: 16 }, () => makeTask()))
+        if (withFactory) for (const id of ids) await makeFactory(id)
+        const request = (path: string) => new Request('http://localhost/mikka' + path, { headers: { cookie:'fixture=1' } })
+        let bytes = 0, calls = 0
+        async function count(res: Response) {
+          assert.equal(res.status, 200, await res.clone().text())
+          const text = await res.text()
+          bytes += Buffer.byteLength(text)
+          calls++
+          return JSON.parse(text)
+        }
+        for (const issueId of ids) {
+          const result = await count(await as(owner, shared, () => list(request('/api/factory/tasks?issueId=' + issueId))))
+          if (!withFactory) { assert.equal(result.tasks.length, 0); continue }
+          assert.equal(result.tasks.length, 1)
+          const taskId = result.tasks[0].id, params = Promise.resolve({taskId})
+          await count(await as(owner, shared, () => flow(request('/api/factory/tasks/' + taskId + '/flow'), {params})))
+          await count(await as(owner, shared, () => activity(request('/api/factory/tasks/' + taskId + '/activity'), {params})))
+        }
+        const current = await as(owner, shared, () => getTaskPresentations({ workspaceId: shared, issueIds: ids, includeFactoryIdentity: true }))
+        assert.equal(Object.keys(current.items).length, ids.length)
+        const batchBytes = Buffer.byteLength(JSON.stringify({ok:true,result:current}))
+        t.diagnostic(JSON.stringify({fixture:withFactory?'factory':'threadless', size:ids.length, oldRequests:calls, oldResponseBodyBytes:bytes, currentRequests:1, currentResponseBodyBytes:batchBytes}))
+        assert.equal(calls, withFactory ? 48 : 16)
+        if (withFactory) assert.ok(bytes > batchBytes)
+      }
+    })
+
     await t.test('the action returns current-tenant business status without another actor private Run or Factory', async () => {
       const issue = await makeTask(shared, {}, 'doing', peer)
       await makeRun(issue, { userId: peer, status: 'waiting_input' })
