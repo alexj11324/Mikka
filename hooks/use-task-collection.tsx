@@ -15,7 +15,7 @@ export const TaskPresentationsContext = createContext<Readonly<Record<string, Ta
 /** The shell owns one batch per visible issue list. The Bot and Inbox views
  * consume that same result; neither owns a per-row request or a second cache. */
 export function useWorkspaceTaskPresentations(ownerId: string, workspaceId: string | undefined,
-  home: string | null, issues: readonly CollectionIssue[], enabled: boolean) {
+  home: string | null, issues: readonly Pick<CollectionIssue, 'id' | 'workspaceId'>[], enabled: boolean) {
   const ids = useMemo(() => issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id).sort(), [issues, workspaceId])
   const key = enabled && workspaceId && ids.length ? ['task-presentations', ownerId, workspaceId, ids] : null
   const { data, error, isLoading, mutate } = useSWR(key, async () => Object.fromEntries(await readPresentationPages(workspaceId!, ids,
