@@ -21,7 +21,7 @@ on:
       workload:
         required: true
         type: choice
-        options: [factory-handoff, startup-timing]
+        options: [factory-handoff, startup-timing, postgres-policy]
 
 permissions:
   contents: read
@@ -39,9 +39,24 @@ jobs:
           node-version: 24
       - run: node --test cloudflare/engineering-sandbox/jobs.test.mjs
 
+  postgres_image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Build and verify the pinned engineering image using a real isolated PG17 cluster
+        run: |
+          docker build -t mikka-engineering-pg17 cloudflare/engineering-sandbox/postgres
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt=no-new-privileges \
+            --tmpfs /tmp:rw,nosuid,nodev,mode=1777 --shm-size=128m \
+            --mount "type=bind,src=$PWD/drizzle,dst=/workspace/drizzle,readonly" --workdir /workspace \
+            mikka-engineering-pg17 node --test /opt/mikka-engineering/pg17.test.mjs
+
   deploy:
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: test
+    needs: [test, postgres_image]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:
@@ -96,10 +111,10 @@ jobs:
           pnpm exec wrangler deploy --config cloudflare/engineering-sandbox/wrangler.jsonc --message "$GITHUB_SHA"
 
   run:
-    needs: [test, deploy]
+    needs: [test, postgres_image, deploy]
     if: >-
       always() && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&
-      needs.test.result == 'success' &&
+      needs.test.result == 'success' && needs.postgres_image.result == 'success' &&
       ((github.event_name == 'push' && needs.deploy.result == 'success') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 13
@@ -108,8 +123,9 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
-        workload: ${{ fromJSON(github.event_name == 'push' && '["factory-handoff","startup-timing"]' || format('["{0}"]', inputs.workload)) }}
+        workload: ${{ fromJSON(github.event_name == 'push' && '["factory-handoff","startup-timing","postgres-policy"]' || format('["{0}"]', inputs.workload)) }}
     env:
       ISSUE: ${{ inputs.issue || 1948 }}
       SOURCE_SHA: ${{ inputs.sha || github.sha }}

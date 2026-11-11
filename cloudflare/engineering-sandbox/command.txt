@@ -3,14 +3,15 @@ const { dirname } = await import('node:path')
 const { spawn } = await import('node:child_process')
 let input = ''
 for await (const chunk of process.stdin) input += chunk
-const { files } = JSON.parse(input)
+const { files, workload } = JSON.parse(input)
 const { tmpdir } = await import('node:os')
 const root = await mkdtemp(tmpdir() + '/mikka-test-')
 for (const file of files) {
   await mkdir(root + '/' + dirname(file.path), { recursive: true })
   await writeFile(root + '/' + file.path, file.text)
 }
-const child = spawn(process.execPath, ['--test', '--test-reporter=tap', files[0].path], {
+const suite = workload === 'postgres-policy' ? '/opt/mikka-engineering/pg17.test.mjs' : files[0].path
+const child = spawn(process.execPath, ['--test', '--test-reporter=tap', suite], {
   cwd: root, env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp' }, stdio: ['ignore', 'pipe', 'pipe'],
 })
 let log = Buffer.alloc(0)

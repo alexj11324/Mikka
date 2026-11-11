@@ -38,6 +38,8 @@ export class EngineeringRun extends DurableObject {
   }
   capacity() { return this.env.CAPACITY.getByName('engineering') }
   async begin(job) {
+    const postgres = job.workload === 'postgres-policy'
+    const instance = postgres ? 'standard-1' : 'lite'
     const claim = await this.ctx.blockConcurrencyWhile(async () => {
       const previous = await this.ctx.storage.get('run')
       if (previous) {
@@ -49,7 +51,7 @@ export class EngineeringRun extends DurableObject {
       const now = Date.now()
       // A crash during admission must leave a wake that can release this slot.
       await this.ctx.storage.setAlarm(now + DEADLINE_MS)
-      await this.ctx.storage.put('run', { job, provider: 'cloudflare', repository: REPOSITORY, instance: 'lite',
+      await this.ctx.storage.put('run', { job, provider: 'cloudflare', repository: REPOSITORY, instance,
         state: 'active', requestedAt: now, deadline: now + DEADLINE_MS })
       if (await this.capacity().acquire(job.owner)) return null
       await this.ctx.storage.delete('run')
@@ -67,11 +69,11 @@ export class EngineeringRun extends DurableObject {
       const container = this.ctx.container
       if (!container) throw new Error('engineering container binding unavailable')
       container.start({
-        image: 'cloudflare/debian-trixie', instance: 'lite', enableInternet: false,
+        image: postgres ? container.images.postgres : 'cloudflare/debian-trixie', instance, enableInternet: false,
         entrypoint: ['node', '-e', 'setTimeout(() => {}, ' + remaining + ')'],
       })
       await container.setInactivityTimeout(30_000)
-      const body = new Response(JSON.stringify({ files })).body
+      const body = new Response(JSON.stringify({ files, workload: job.workload })).body
       const proc = await container.exec(['node', '--input-type=module', '-e', command], { stdin: body })
       const output = await proc.output()
       if (output.exitCode !== 0) throw new Error('container test driver exited ' + output.exitCode)

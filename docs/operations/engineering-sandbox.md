@@ -13,6 +13,7 @@ gh workflow run engineering-sandbox.yml --repo alexj11324/Mikka --ref main \
 | --- | --- |
 | `factory-handoff` | The factory handoff regression tests for owned device failover and recovery. |
 | `startup-timing` | The startup timing report regression tests for aligning and filtering dispatch, runtime and native CLI timing evidence. |
+| `postgres-policy` | Node 24 and pnpm 10.34.3 start a fresh unprivileged PostgreSQL 17 cluster, apply the selected revision’s real CLI-policy migration and verify its triggers and transaction rollback. |
 
 Actions authenticates with its short-lived GitHub OIDC token. The Worker
 requires the upstream repository ID, trusted workflow path, main ref and event.
@@ -35,6 +36,8 @@ corresponding artifact for seven days. Source remains in Git throughout. This
 execution path does not host an editable checkout or create filesystem
 snapshots. Cancel the originating Actions run to stop the corresponding job.
 
-PG17, browser, privileged Docker and live subscription checks still use their
+The other database suites, browser, privileged Docker and live subscription checks still use their
 existing acceptance jobs until each workload has a tested Cloudflare profile.
 Those CI and release gates remain required. The account budget includes other services; run and issue identifiers keep engineering usage attributable. [Provider billing and quota evidence](https://github.com/alexj11324/Mikka/issues/1934)
+
+The database profile uses a Cloudflare-managed registry image built from digest-pinned official Node 24 and PostgreSQL 17 images and the checksum-pinned project pnpm version. Its PostgreSQL server listens only on a private Unix socket and exits before the Container stops. It receives no remote database URL.

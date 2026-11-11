@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { githubRun, validJob, WORKFLOW, REPOSITORY, jobs } from './jobs.mjs'
+import { githubRun, validJob, WORKFLOW, REPOSITORY, sourceSuites } from './jobs.mjs'
 
 test('only the upstream main engineering workflow can use compute or read a receipt', () => {
   const allowed = { repository: REPOSITORY, repository_id: '1427517699', workflow_ref: WORKFLOW,
@@ -25,7 +25,7 @@ test('workload and source are closed inputs', () => {
     assert.equal(validJob({ ...valid, ...invalid }), false)
   }
 })
-for (const [profile, paths] of Object.entries(jobs)) {
+for (const [profile, paths] of Object.entries(sourceSuites)) {
   test('the declared files run without the repository checkout: ' + profile, async () => {
     const isolated = await mkdtemp(join(tmpdir(), 'engineering-job-'))
     try {

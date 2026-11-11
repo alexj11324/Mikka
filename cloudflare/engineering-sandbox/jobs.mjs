@@ -4,7 +4,7 @@ export const WORKFLOW = REPOSITORY + '/.github/workflows/engineering-sandbox.yml
 export const DEADLINE_MS = 10 * 60_000
 export const RECEIPT_MS = 7 * 24 * 60 * 60_000
 
-export const jobs = {
+export const sourceSuites = {
   'factory-handoff': [
     'scripts/dev-local/factory-handoff-acceptance.test.mjs',
     'scripts/dev-local/factory-handoff-acceptance.mjs',
@@ -22,6 +22,11 @@ export const jobs = {
     'lib/smoke-account.ts',
     'lib/desktop-rpc/wire.ts',
   ],
+}
+
+export const jobs = {
+  ...sourceSuites,
+  'postgres-policy': ['drizzle/20261029011701_cli_run_policy.sql'],
 }
 
 export function githubRun(claims) {
