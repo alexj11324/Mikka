@@ -24,7 +24,7 @@ export async function wakeLinkedCiSuite(
   const repoPrefix = `https://github.com/${suite.repository}/pull/`
   const links = suite.numbers.map(number => repoPrefix + number)
   const { rows } = await dependencies.query(
-    `SELECT DISTINCT ON (p."userId", p."pullRequest"->>'url')
+    `SELECT DISTINCT ON (p."userId", r."botId", p."pullRequest"->>'url')
       p."runId" AS "runId",r."userId" AS "userId",r."botId" AS "botId",
       r."issueId" AS "issueId",p."pullRequest"->>'url' AS "pullUrl",
       p."pullRequest"->>'headSha' AS "headSha",p."pullRequest"->>'state' AS state
@@ -37,7 +37,7 @@ export async function wakeLinkedCiSuite(
         AND p."pullRequest"->>'headSha'=$2
         AND starts_with(p."pullRequest"->>'url',$3)
         AND (cardinality($4::text[])=0 OR p."pullRequest"->>'url'=ANY($4::text[]))
-      ORDER BY p."userId",p."pullRequest"->>'url',p."updatedAt" DESC
+      ORDER BY p."userId",r."botId",p."pullRequest"->>'url',p."updatedAt" DESC
       LIMIT 50`,
     [[suite.repository, `v2/github.com/${suite.repository}`], suite.headSha, repoPrefix, links],
   )
