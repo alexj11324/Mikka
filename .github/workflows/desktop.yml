@@ -39,11 +39,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: ./.github/actions/pnpm-install
-        with:
-          profile: desktop
-          skip-electron: 'true'
-          ffmpeg-github-token: ${{ github.token }}
+      # A literal install step keeps this job auditable under the credential
+      # boundary in tests/mvp/pinned-pnpm.test.mjs, which requires exactly one
+      # `pnpm install --frozen-lockfile` carrying the read-only token. setup-node's
+      # `cache: pnpm` is deliberately absent: it uploads a cache per pull request.
+      - name: Install dependencies without the Electron runtime
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm install --frozen-lockfile
       - run: pnpm --filter @mikka/desktop typecheck
       - run: pnpm --filter @mikka/desktop lint
       - run: pnpm --filter @mikka/desktop test
@@ -84,11 +88,11 @@ jobs:
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: ./.github/actions/pnpm-install
-        with:
-          profile: desktop
-          skip-electron: 'true'
-          ffmpeg-github-token: ${{ github.token }}
+      - name: Install dependencies
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm install --frozen-lockfile
       - name: Install Chromium system dependencies
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
@@ -203,11 +207,11 @@ jobs:
           name: desktop-icon
           path: ${{ runner.temp }}/icon
           retention-days: 7
-      - uses: ./.github/actions/pnpm-install
-        with:
-          profile: desktop
-          skip-electron: 'true'
-          ffmpeg-github-token: ${{ github.token }}
+      - name: Install dependencies
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: pnpm install --frozen-lockfile
       - run: test "$(uname -m)" = arm64
       - name: Keep setup-node 24 in the native installer login shell
         run: node apps/desktop/test/native-node.mjs

@@ -54,9 +54,17 @@ test('macOS acceptance starts independently and retains icon, package, crypto an
   const desktop = workflow('desktop'), native = desktop.jobs['native-arm64']
   assert.deepEqual(native.needs, ['changes'])
   assert(!desktop.jobs.icon, 'icon preflight shares the native runner')
+  // Assert the purpose — one reusable dependency installation whose credential
+  // handling main's pinned-pnpm boundary can audit — not the mechanism. A
+  // desktop job may reach that through the shared composite action or through a
+  // literal install step, so long as exactly one step installs and no job hands
+  // dependency caching to setup-node (which uploads per-PR caches).
   for (const name of ['checks', 'smoke', 'native-arm64']) {
-    assert(desktop.jobs[name].steps.some(step => step.uses === './.github/actions/pnpm-install'))
-    assert(!desktop.jobs[name].steps.some(step => step.with?.cache === 'pnpm'), 'PRs must not upload setup-node caches')
+    const job = desktop.jobs[name]
+    const shared = job.steps.filter(step => step.uses === './.github/actions/pnpm-install')
+    const literal = job.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')
+    assert.equal(shared.length + literal.length, 1, `${name}: exactly one dependency installation`)
+    assert(!job.steps.some(step => step.with?.cache === 'pnpm'), `${name}: PRs must not upload setup-node caches`)
   }
   const commands = native.steps.map(step => step.run || '').join('\n')
   for (const required of ['actool', 'pnpm build:app', 'package-dev.mjs --acceptance', 'native-crypto.mjs', 'bundled-smoke parity lifecycle', 'native-evidence.mjs']) assert(commands.includes(required), required)
@@ -82,10 +90,18 @@ test('installed cache writes are main-only and a miss installs; hits do not inst
   for (const hit of ['true', 'false', undefined]) assert.equal(evaluate(install.if, { steps: { modules: { outputs: { 'cache-hit': hit } } } }), hit !== 'true')
   const restore = action.runs.steps.find(step => step.id === 'modules')
   assert(!restore.with['restore-keys'], 'installed modules never use partial key matches')
+  // The desktop jobs render their own literal install step, so the expression
+  // lives there rather than on the composite's install step: main's credential
+  // boundary requires that step's env to carry FFMPEG_GITHUB_TOKEN alone.
+  const desktop = workflow('desktop')
+  const desktopInstalls = ['checks', 'smoke', 'native-arm64'].map(name => desktop.jobs[name].steps.find(step => step.run === 'pnpm install --frozen-lockfile'))
+  assert(desktopInstalls.every(Boolean), 'every desktop job installs dependencies')
   const fingerprint = action.runs.steps.find(step => step.id === 'modules-key')
   for (const [optIn, inherited, expected] of [['true', '', '1'], ['false', '1', '1'], ['false', undefined, '']]) {
     const context = { inputs: { 'skip-electron': optIn }, env: { ELECTRON_SKIP_BINARY_DOWNLOAD: inherited } }
-    assert.equal(evaluate(install.env.ELECTRON_SKIP_BINARY_DOWNLOAD, context), expected)
     assert.equal(evaluate(fingerprint.env.ELECTRON_SKIP_BINARY_DOWNLOAD, context), expected)
   }
+  // The desktop jobs install without the Electron runtime so the checksum-verifying
+  // installer owns it; the value is a literal there, not an expression.
+  for (const step of desktopInstalls) assert.equal(step.env.ELECTRON_SKIP_BINARY_DOWNLOAD, '1')
 })
