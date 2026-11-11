@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
-import { act } from 'react'
+import { act, type ComponentProps } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import type { SettingsSidebarProps } from './settings-sidebar-contract'
@@ -16,7 +16,7 @@ const translate = Object.assign((path: string) => {
 mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
 mock.module(new URL('../settings/settings-link.tsx', import.meta.url).href, { namedExports: {
-  SettingsLink: (props: Record<string, unknown>) => <a {...props} />,
+  SettingsLink: (props: ComponentProps<'a'>) => <a {...props} href={props.href} />,
 } })
 mock.module(new URL('../../app/actions/teams.ts', import.meta.url).href, { namedExports: { listTeams: async () => [] } })
 // The team read has already settled before the Workspace identity arrives.
