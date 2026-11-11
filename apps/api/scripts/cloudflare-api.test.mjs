@@ -140,7 +140,7 @@ test('the private API receives its sign-in and product bindings without inheriti
   const origin = 'https://app.example'
   const allowed = {
     GOOGLE_CLIENT_ID: 'google', GOOGLE_CLIENT_SECRET: 'google-credential',
-    GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential',
+    GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential', GITHUB_WEBHOOK_SECRET: 'existing-hook',
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASK_WORKSPACES: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
     OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
@@ -189,7 +189,8 @@ test('the private Eve API preserves session, signed body, stream cancellation an
     'x-mikka-workspace-id': 'workspace', 'x-mikka-locale': 'en', 'x-mikka-bot-id': 'bot' }
   const options = { method: 'POST', body: ' signed bytes ', signal: controller.signal, headers: {
     ...product, authorization: 'Bearer sample', cookie: 'session=fixture', origin: 'https://app.example',
-    'x-slack-signature': 'fixture', 'x-forwarded-host': 'other.example', 'x-mikka-world-capability': 'other',
+    'x-slack-signature': 'fixture', 'x-forwarded-host': 'other.example', 'x-forwarded-for': '192.0.2.11',
+    'x-vercel-id': 'fixture-a', 'x-vercel-region': 'fixture-b', 'x-mikka-world-capability': 'other',
     connection: 'x-hop', 'x-hop': 'drop',
   } }
   let sent
@@ -203,7 +204,7 @@ test('the private Eve API preserves session, signed body, stream cancellation an
   assert.equal(sent.headers.get('x-slack-signature'), 'fixture')
   assert.equal(sent.headers.get('cookie'), 'session=fixture')
   for (const [name, value] of Object.entries(product)) assert.equal(sent.headers.get(name), value)
-  for (const name of ['connection','x-hop','x-forwarded-host','x-mikka-world-capability']) assert.equal(sent.headers.has(name), false)
+  for (const name of ['connection', 'x-hop', 'x-forwarded-for', 'x-forwarded-host', 'x-vercel-id', 'x-vercel-region', 'x-mikka-world-capability']) assert.equal(sent.headers.has(name), false)
   assert.equal(await sent.text(), ' signed bytes ')
   const write = stream.writable.getWriter().write(new Uint8Array([42]))
   assert.deepEqual((await res.body.getReader().read()).value, new Uint8Array([42]))
