@@ -559,6 +559,13 @@
     "test": "tests/task-create-only.db.test.ts",
     "suite": "test:coordinator-issue-create-db"
   },
+  "lib/task-dispatches.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read actual Task dispatches from PostgreSQL once per batch, restricted to the current workspace and the signed-in reader's own Bots.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
   "lib/task-factory-events.ts": {
     "mode": "built-in",
     "environment": [],
