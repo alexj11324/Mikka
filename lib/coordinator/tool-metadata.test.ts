@@ -5,7 +5,7 @@ import { chatItems, type ChatTool } from './context'
 import { toolSummary } from './tool-activity'
 import { coordinatorTextStream } from './stream-response'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
-import { coordinatorStreamReply, readCoordinatorStream, type CoordinatorLiveReply } from '../coordinator-stream-client'
+import { coordinatorStreamReply, readCoordinatorStream, type CoordinatorLiveReply } from '@/tests/support/legacy-coordinator-stream'
 import { fingerprint } from '../credentials/fingerprint'
 import { CodedError } from '@mikka/protocol/coded-error'
 
