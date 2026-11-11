@@ -102,7 +102,7 @@ test('the active Vite web entry initializes PostHog and the shared application m
   assert.match(source('apps/frontend/src/index.tsx'), /import 'mikka:frontend-runtime'[\s\S]*await import\('\.\.\/\.\.\/desktop\/src\/renderer\/index'\)/)
   const plugin = source('apps/frontend/scripts/application-plugin.mjs')
   assert.match(plugin, /import \{ frontendRuntimeSource \} from '\.\/frontend-runtime\.mjs'/)
-  assert.match(plugin, /if \(id === '\\0mikka:frontend-runtime'\) \{\s*return frontendRuntimeSource\(target, \{ development, frontend, renderer \}\)/)
+  assert.match(plugin, /if \(id === '\\0mikka:frontend-runtime'\) \{\s*const runtime = frontendRuntimeSource\(target, \{ development, frontend, renderer \}\)\s*return uiSlots\.dir && !development \? `import \$\{JSON\.stringify\(officialContract\)\};\\n\$\{runtime\}` : runtime/)
   const frontend = fileURLToPath(new URL('../apps/frontend', import.meta.url))
   const renderer = fileURLToPath(new URL('../apps/desktop/src/renderer', import.meta.url))
   for (const development of [false, true]) {

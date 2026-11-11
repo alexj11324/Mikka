@@ -23,8 +23,8 @@ const recordKeys: Middleware = next => (key, fetcher, config) => {
   return next(key, fetcher, config)
 }
 mock.module('./e2b-key-dialog', { namedExports: { E2BKeyDialog: none, useOwnE2BKey: none, useE2BKeyStatus: (scope: string | null) => { if (scope) computerScopes.push(scope); return {} } } })
-const slot = (name: string, exports: Record<string, unknown>) =>
-  mock.module(new URL('../slots/' + name + '.tsx', import.meta.url).href, { namedExports: exports })
+const slot = (name: string, providedExports: Record<string, unknown>) =>
+  mock.module(new URL('../slots/' + name + '.tsx', import.meta.url).href, { namedExports: providedExports })
 
 slot('bot-overview', { BotOverview: (props: BotOverviewProps) => { overview = props; return <strong>{props.conversation.name}</strong> } })
 slot('panel-header', { PanelHeader: () => <header>Overview header</header>, PANEL_INITIAL_WIDTH: null })

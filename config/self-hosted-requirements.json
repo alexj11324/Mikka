@@ -235,6 +235,12 @@
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/coordinator/ci-suite-transport.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Only a committed, source-bound CI result for an existing finished Run may take the model-free Coordinator transport path. It grants neither GitHub permissions nor merge authority.",
+    "test": "lib/coordinator/ci-suite-transport.test.mjs"
+  },
   "lib/coordinator/decision-provider.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -368,6 +374,20 @@
     "behavior": "Counts visible Factory evidence inside the existing PostgreSQL snapshot, scoped to the owner, workspace and visible Factory IDs.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "lib/github/ci-suite-event.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate a bounded completed GitHub suite hint and match only the installation publication for its repository, open PR and associated source head. A hint is not a required-check rollup or approval.",
+    "test": "lib/github/ci-suite-event.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/ci-suite-wake.ts": {
+    "mode": "optional-cloud",
+    "environment": [],
+    "behavior": "A configured signed GitHub webhook persists a deduplicated hint only for the installation existing finished Run and publication. It uses the local Coordinator outbox and never acknowledges a failed persistence write or creates a polling or merge authority path.",
+    "test": "app/api/webhooks/github/route.test.ts",
+    "suite": "test:suggestions"
   },
   "lib/github/comment-mention.ts": {
     "mode": "built-in",

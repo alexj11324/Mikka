@@ -30,6 +30,7 @@ const selectedProfiles: (string | undefined)[] = []
 const selectedLocations: (string | undefined)[] = []
 let preferLocal = false
 const hostSourceQueries: string[] = []
+const profileSourceQueries: string[] = []
 type RequestSource = { userId: string; botId: string; issueId: string | null; kind: string; deliveredAt: Date | null; payload: Record<string, unknown> }
 let requestSource: RequestSource | null = null
 let modelResolutions = 0, bindingSelections = 0, credentialReads = 0
@@ -44,9 +45,12 @@ async function query(sql: string, values: unknown[] = []) {
   if (sql.includes('FROM suggestion_executions')) return { rows: [], rowCount: Number(suggestionAllowed) }
   if (sql.startsWith('SELECT "agentDefinition"')) return { rows: [{ agentDefinition: { model, subscription: { bindingId } } }], rowCount: 1 }
   if (sql.includes('FROM coordinator_events')) {
-    if (sql.startsWith('SELECT payload')) {
+    // Profile selection now joins the creation receipt in the same source read.
+    // Its qualified payload projection is separate from destination admission.
+    if (sql.startsWith('SELECT payload') || sql.startsWith('SELECT e.payload,c."taskId" AS "commandIssueId" FROM coordinator_events e')) {
+      profileSourceQueries.push(sql)
       const ownSource = requestSource?.userId === values[1] && requestSource?.botId === values[2] && requestSource?.kind === 'user_message'
-      return { rows: ownSource ? [{ payload: requestSource!.payload }] : [], rowCount: Number(ownSource) }
+      return { rows: ownSource ? [{ payload: requestSource!.payload, commandIssueId: null }] : [], rowCount: Number(ownSource) }
     }
     hostSourceQueries.push(sql)
     const projected = requestSource && sql.includes('"hasTaskDestination"')
@@ -176,7 +180,7 @@ beforeEach(() => {
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
   previous = null; pendingSpec = false; requestSource = null; preferLocal = false
-  selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
+  selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = profileSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
 })
 
 const cloudTaskSource = (): RequestSource => ({ userId: owner, botId, issueId, kind: 'user_message', deliveredAt: new Date(),
@@ -195,6 +199,7 @@ for (const target of ['cloud', undefined] as const) test(`a bound task-form sour
   assert.equal(input?.factoryBotId, botId)
   assert.equal((input?.modelDispatch as { location?: string })?.location, 'cloud')
   assert.equal(input?.allowLocalRecovery, undefined, 'a fixed cloud destination never grants local fallback')
+  assert.equal(profileSourceQueries.length, 1, 'Profile and receipt selection retain one authenticated source read')
   assert.equal(hostSourceQueries.length, 1, 'source admission retains one database read')
   assert.match(hostSourceQueries[0], /payload\s*\?\s*'taskDestination'/)
   assert.match(hostSourceQueries[0], /payload->'taskDestination'/)
