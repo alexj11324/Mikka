@@ -36,6 +36,7 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 ## Connect and run Mikka
 
 - [Self-hosting](self-hosting.md) deploys the public server and connects clients.
+- [Self-hosted stable releases and updates](self-hosted-updates.md) covers Docker host upgrades, backups, migration gates and signed release notifications.
 - [Self-hosted model credentials](self-hosting-byok.md),
   [realtime](self-hosting-realtime.md) and
   [GitHub cloud connection](self-hosting-github-cloud.md) cover their setup.
