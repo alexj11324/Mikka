@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { useViewScroll } from '@/lib/hooks/view-state'
 import { useTranslations } from 'next-intl'
 import { InlineLoadError } from '@/components/load-error'
@@ -9,9 +9,7 @@ import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { PanelHeader } from '@ui-slot/panel-header'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { usePanelInitialWidth, useWidenToggle } from '@/hooks/use-panel-width'
-import { leaveGroupConversation, mayLeaveGroup, type GroupMember } from '@/lib/group-messages'
-import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
+import type { GroupMember } from '@/lib/group-messages'
 import { cn } from '@/lib/utils'
 import { BotAvatar } from './bot-avatar'
 import { GroupAvatar, memberAvatar, useGroupMembers } from './group-avatar'
@@ -35,21 +33,8 @@ function MemberRow({ member }: { member: GroupMember }) {
  * bot's own chat shows its. Recent threads and files join once a group's
  * threads and files are stored with it.
  */
-export function GroupPanel({ group, userId, onLeft, onClose, sheet = false }: { group: { id: string; title: string }; userId: string; onLeft: (groupId: string) => Promise<void>; onClose: () => void; sheet?: boolean }) {
+export function GroupPanel({ group, onClose, sheet = false }: { group: { id: string; title: string }; onClose: () => void; sheet?: boolean }) {
   const t = useTranslations('Shell.panel')
-  const tGroup = useTranslations('GroupChat')
-  const [leaving, setLeaving] = useState(false)
-  const leave = async () => {
-    if (leaving || !window.confirm(tGroup('leaveConfirm'))) return
-    setLeaving(true)
-    try {
-      await leaveGroupConversation(group.id, userId)
-      await onLeft(group.id)
-    } catch {
-      toast.error(tGroup('leaveError'))
-      setLeaving(false)
-    }
-  }
   const { data: members, error, mutate } = useGroupMembers(group.id)
   const scroll = useViewScroll<HTMLElement>(`group-panel:${group.id}`, !!members)
   const label = members ? t('members', { count: members.length }) : t('membersLoading')
@@ -76,9 +61,6 @@ export function GroupPanel({ group, userId, onLeft, onClose, sheet = false }: { 
           : !members ? <div aria-busy="true" className="flex flex-col gap-2 px-2 py-1.5">{[0, 1, 2].map(index => <Skeleton key={index} className="h-5 w-40" />)}</div>
           : <ul className="flex flex-col">{members.map(member => <MemberRow key={`${member.memberType}:${member.id}`} member={member} />)}</ul>}
       </section>
-      {mayLeaveGroup(members, userId) && <div className="shrink-0 px-4 pb-4">
-        <Button variant="outline" size="sm" disabled={leaving} onClick={() => { void leave() }}>{tGroup('leave')}</Button>
-      </div>}
     </div>
   </aside>
 }

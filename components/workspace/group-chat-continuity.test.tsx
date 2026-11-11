@@ -20,7 +20,7 @@ const sent: { group: string; body: string }[] = []
 let post: (id: string, body: string) => Promise<GroupMessage>
 const notices = new Map<string, { message: string; action?: { label: string; onClick: (event: Event) => void } }>()
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ AgentCopy: {} }), useFormatter: () => ({}) } })
-mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module('swr/infinite', { defaultExport: () => ({ data: pages, error: readError, size: 1, setSize: async () => {}, mutate, isValidating: false }), namedExports: { unstable_serialize: (getKey: (index: number, previous: null) => unknown) => '$inf$' + JSON.stringify(getKey(0, null)) } })
 mock.module('@/lib/group-messages', { namedExports: { ...groupMessages, postGroupMessage: async (id: string, body: string) => { sent.push({ group: id, body }); return post(id, body) } } })
 mock.module('sonner', { namedExports: { toast: {

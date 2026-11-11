@@ -128,3 +128,18 @@ test('revocation clears group list, transcript and infinite-page caches without 
   assert.equal(group.revokedGroupCacheKey(['group-members', 'another-group'], ID), false)
   assert.equal(group.revokedGroupCacheKey(['workspace', ID], ID), false)
 })
+
+test('leave uses the same-origin member writer for the caller and distinguishes refusal from a missing membership', async () => {
+  const request = (status: number, body: unknown) => (async (url, init) => {
+    assert.equal(url, `/mikka/api/conversations/${ID}/members`)
+    assert.equal(init?.method, 'DELETE')
+    assert.equal(init?.credentials, 'same-origin')
+    assert.deepEqual(JSON.parse(String(init?.body)), { memberType: 'user', memberId: 'self' })
+    return Response.json(body, { status })
+  }) satisfies typeof fetch
+  await group.leaveGroupConversation(ID, 'self', request(200, { ok: true }))
+  for (const status of [401, 403, 404, 422, 500]) {
+    await assert.rejects(group.leaveGroupConversation(ID, 'self', request(status, {})), (err: unknown) => err instanceof group.GroupMessagesRequestError && err.status === status)
+  }
+  await assert.rejects(group.leaveGroupConversation(ID, 'self', request(200, {})), group.GroupMessagesRequestError)
+})

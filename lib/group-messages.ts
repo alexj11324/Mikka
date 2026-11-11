@@ -166,11 +166,14 @@ export async function leaveGroupConversation(id: string, userId: string, fetcher
       body: JSON.stringify({ memberType: 'user', memberId: userId }),
     })
   } catch (cause) { throw new GroupMessagesRequestError('unavailable', undefined, { cause }) }
-  if (!response.ok) throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable', response.status)
+  if (response.ok && (await response.json().catch(() => null))?.ok === true) return
+  throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable', response.status)
 }
 
 /** SWR can pass either an array key or an encoded infinite-page key. Revoke both, not just the visible list. */
 export function revokedGroupCacheKey(key: unknown, id: string): boolean {
   if (Array.isArray(key)) return (key[0] === 'group-members' || key[0] === 'group-messages') && key[1] === id
-  return typeof key === 'string' && key.includes(id) && (key.includes('group-members') || key.includes('group-messages'))
+  if (typeof key !== 'string') return false
+  const encoded = key.startsWith('$inf$') ? key.slice(5) : key
+  return encoded.startsWith(`@"group-messages",${JSON.stringify(id)},`) || encoded.startsWith(`@"group-members",${JSON.stringify(id)},`)
 }

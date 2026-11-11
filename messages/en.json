@@ -5110,6 +5110,11 @@
     "mine": "{emoji}: {others, plural, =0 {just you} one {you and # other} other {you and # others}}"
   },
   "GroupChat": {
+    "leave": "Leave group",
+    "leaveConfirm": "Leave {name}?",
+    "reinvite": "The group owner will need to invite you to return.",
+    "leaveDenied": "You can’t leave this group with your current membership.",
+    "leaveError": "Couldn’t leave the group. Try again.",
     "untitled": "Untitled group chat",
     "composer": "Message {name}",
     "messages": "Group chat messages",
@@ -5126,10 +5131,7 @@
     "notSent": "Not sent",
     "answering": "Replying",
     "noTaker": "No bot took this. @ one by name",
-    "stopped": "Stopped",
-    "leave": "Leave group",
-    "leaveConfirm": "Leave this group? You will need a new invitation to rejoin.",
-    "leaveError": "Couldn't leave the group."
+    "stopped": "Stopped"
   },
   "DeviceSetup": {
     "title": "Set up {device}",
