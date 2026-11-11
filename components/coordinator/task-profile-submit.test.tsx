@@ -5,7 +5,7 @@ import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import type { AgentProfilesView } from '../settings/factory-profiles-data'
 import type { CoordinatorMessageContext } from './use-coordinator-submit'
-import type { SubmitOutcome } from '../../lib/coordinator-client-submission'
+import type { SubmitOutcome } from '../../lib/eve/client'
 
 // Source component contracts in Node, not a browser acceptance test. The
 // existing Select primitive is reduced to its value/disabled/onChange contract.
