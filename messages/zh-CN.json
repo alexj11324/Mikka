@@ -7179,6 +7179,7 @@
     "overviewEmpty": "还没有文件。",
     "createFolder": "新建文件夹",
     "folderName": "文件夹名称",
+    "folderNameTaken": "已有同名文件夹，请换一个名称。",
     "create": "创建",
     "personalFolder": "我的文件 · {name}",
     "back": "Artifact",

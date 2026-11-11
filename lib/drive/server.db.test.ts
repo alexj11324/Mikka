@@ -70,6 +70,9 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const created = await call('', { method: 'POST', body: { name: `Drive ${randomUUID()}` } })
   assert.equal(created.status, 201)
   const volume = (await created.json()).volume
+  const duplicate = await call('', { method: 'POST', body: { name: volume.name } })
+  assert.equal(duplicate.status, 409)
+  assert.deepEqual(await duplicate.json(), { error: 'drive_volume_exists' })
   assert.equal(created.headers.get('cache-control'), 'private, no-store')
   assert.equal((await call('', { token: null })).status, 401)
   assert.equal((await call('', { method: 'POST', body: { name: 'Cross origin' }, origin: 'https://other.invalid' })).status, 403)

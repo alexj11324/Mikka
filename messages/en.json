@@ -7179,6 +7179,7 @@
     "overviewEmpty": "No files yet.",
     "createFolder": "New folder",
     "folderName": "Folder name",
+    "folderNameTaken": "A folder with this name already exists. Choose another name.",
     "create": "Create",
     "personalFolder": "My files · {name}",
     "back": "Artifact",
