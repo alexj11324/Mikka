@@ -51,7 +51,8 @@ export class EngineeringRun extends DurableObject {
       const now = Date.now()
       // A crash during admission must leave a wake that can release this slot.
       await this.ctx.storage.setAlarm(now + DEADLINE_MS)
-      await this.ctx.storage.put('run', { job, provider: 'cloudflare', repository: REPOSITORY, instance,
+      await this.ctx.storage.put('run', { job, provider: 'cloudflare', providerInstanceId: this.ctx.id.toString(),
+        repository: REPOSITORY, instance,
         state: 'active', requestedAt: now, deadline: now + DEADLINE_MS })
       if (await this.capacity().acquire(job.owner)) return null
       await this.ctx.storage.delete('run')

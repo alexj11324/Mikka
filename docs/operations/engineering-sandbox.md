@@ -41,3 +41,18 @@ existing acceptance jobs until each workload has a tested Cloudflare profile.
 Those CI and release gates remain required. The account budget includes other services; run and issue identifiers keep engineering usage attributable. [Provider billing and quota evidence](https://github.com/alexj11324/Mikka/issues/1934)
 
 The database profile uses a Cloudflare-managed registry image built from digest-pinned official Node 24 and PostgreSQL 17 images and the checksum-pinned project pnpm version. Its PostgreSQL server listens only on a private Unix socket and exits before the Container stops. It receives no remote database URL.
+
+## Match a run to provider usage
+
+Use the receipt’s `providerInstanceId` and the interval from `requestedAt` to
+`stoppedAt` in Cloudflare account Analytics. These are Unix epoch milliseconds.
+The Durable Object-managed Container instance ID matches its Durable Object ID.
+Bound the query to the hour surrounding the run to include delayed samples.
+
+Group `containersUsageAdaptiveGroups` by `instanceId` and sum `cpuTimeSec`,
+`allocatedMemory` and `allocatedDisk` for the billing estimate. The latter two
+are byte-seconds. Under the same instance filter, `containersMetricsAdaptiveGroups`
+reports the observed workload peak as `max.memory` and sampled CPU time as
+`sum.cpuTimeSec`. A short run can finish between workload samples. The
+account’s Analytics Read permission stays with the operator. The job receives
+no analytics token. [Cloudflare query examples](https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-container-metrics/)
