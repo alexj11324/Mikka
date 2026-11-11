@@ -25,3 +25,14 @@ test('completed native calls retain results and dispatched thread cards after hi
   assert.equal(history[0].activity?.tools[0].state,'done')
   assert.match(history[0].activity?.tools[0].output ?? '',new RegExp(runId))
 })
+
+test('native failed outcomes preserve a closed provider code without publishing raw errors',()=>{
+  const view=foldEvents(emptySessionView(),[
+    {type:'turn.started',data:{turnId:'turn_failed',cause:{deliveryId:'delivery_failed'},follows:null},meta:{position:{line:0,index:0},at:'2026-11-11T00:00:00Z',endOfLine:true}},
+    {type:'turn.settled',data:{turnId:'turn_failed',outcome:'failed',error:{code:'rate_limit_exceeded',message:'Private provider diagnostic'}},meta:{position:{line:1,index:0},at:'2026-11-11T00:00:01Z',endOfLine:true}},
+  ])
+  const messages=projectEveTurn(view,'wrun_fixture','turn_failed','failed')
+  assert.ok('mikkaFailure' in messages[0])
+  assert.equal(messages[0].mikkaFailure,'rate_limit_exceeded')
+  assert.equal(JSON.stringify(messages).includes('Private provider diagnostic'),false)
+})
