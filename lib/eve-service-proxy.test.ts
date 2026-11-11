@@ -49,3 +49,20 @@ test('the Slack compatibility route keeps the exact signed body and does not fol
   } })
   assert.equal(response.status, 307)
 })
+
+test('cookie session mutations require the configured application origin before any upstream call', async () => {
+  let calls = 0
+  const options = { env: { BETTER_AUTH_URL: 'https://app.test' }, fetch: async () => { calls++; return new Response('{}') } }
+  for (const origin of [undefined, 'https://evil.test', 'https://app.test.evil.test']) {
+    const headers = new Headers({ cookie: 'session=fixture', 'content-type': 'text/plain', 'x-forwarded-host': 'evil.test' })
+    if (origin) headers.set('origin', origin)
+    const response = await proxyEveRequest(new Request('https://app.test/mikka/api/agents/eve/v1/session', { method: 'POST', body: '{"message":"paid turn"}', headers }), undefined, options)
+    assert.equal(response.status, 403)
+  }
+  assert.equal(calls, 0)
+  const request = new Request('https://app.test/mikka/api/agents/eve/v1/session/wrun_a/cancel', {
+    method: 'POST', body: '{}', headers: { cookie: 'session=fixture', origin: 'https://app.test' },
+  })
+  assert.equal((await proxyEveRequest(request, undefined, options)).status, 200)
+  assert.equal(calls, 1)
+})
