@@ -60,7 +60,7 @@ export type LinkedCiSuiteRun = {
 export function linkedCiSuiteRun(suite: CompletedCiSuite, row: LinkedCiSuiteRun): boolean {
   const prefix = `https://github.com/${suite.repository}/pull/`
   if (!row.botId || !row.runId || !row.userId || !['open', 'draft'].includes(row.state ?? '')
-    || row.headSha?.toLowerCase() !== suite.headSha || !row.pullUrl.startsWith(prefix)) return false
+    || row.headSha?.toLowerCase() !== suite.headSha || !row.pullUrl.toLowerCase().startsWith(prefix)) return false
   const number = row.pullUrl.slice(prefix.length)
   if (!/^[1-9]\d*$/.test(number) || !Number.isSafeInteger(Number(number))) return false
   return suite.numbers.length === 0 || suite.numbers.includes(Number(number))
