@@ -9,6 +9,7 @@ import { refreshPublishedPullRequest } from './publication-webhook'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { readFactoryFlow } from '../factory/public-flow'
 import type { FactoryTask } from '../factory/store'
+import type { CoordinatorEventInput } from '../coordinator-events'
 import { afterDatabaseCommit, captureDatabaseQuery, observePoolCommits } from '../db/commit-effects'
 
 const base = process.env.E2E_DATABASE_URL
@@ -29,7 +30,7 @@ const event = (lines: { additions?: number; deletions?: number }, state: 'open' 
 })
 const content = (pullRequests: unknown[]) => JSON.stringify({ type: 'doc', attrs: { mikka: { pullRequests } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Body stays' }] }] })
 
-test('a PR webhook records its line counts on the delivery and on the tasks it belongs to, as a versioned system change', { skip: !base, timeout: 120_000 }, async () => {
+test('a PR webhook records its line counts on the delivery and on the tasks it belongs to, as a versioned system change', { skip: !base, timeout: 120_000 }, async t => {
   const admin = guarded(base!)
   const name = `prw_${randomUUID().replaceAll('-', '')}_e2e`
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 })
@@ -226,6 +227,26 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
     const secondId = await recordWorkflowResult(pool, target, { ...result, attempt: 2, conclusion: 'success' })
     assert.ok(secondId && secondId !== idA)
     assert.equal(await recordWorkflowResult(pool, target, result), null, 'old attempt cannot overwrite the later conclusion')
+    await t.test('a completed GitHub check suite selects the ended publication with the matching PR head', async () => {
+      const { wakeLinkedCiSuite } = await import('./ci-suite-wake')
+      const sent: CoordinatorEventInput[] = []
+      const dependencies = {
+        query: (statement: string, params: unknown[]) => pool.query(statement, params),
+        send: async (event: CoordinatorEventInput) => { sent.push(event) },
+      }
+      const suite = { installationId: 11, repositoryId: 22, repository: 'o/r', suiteId: 97,
+        headSha: '9'.repeat(40), conclusion: 'failure', numbers: [7], heads: { '7': newHead } }
+      await pool.query(`UPDATE run_publications SET "pullRequest"="pullRequest" || '{"state":"open"}'::jsonb WHERE "runId"=$1`, [ciRun])
+      assert.equal(await wakeLinkedCiSuite(suite, dependencies), 0, 'unfinished runs stay asleep')
+      await pool.query('UPDATE agent_runs SET "finishedAt"=now() WHERE id=$1', [ciRun])
+      assert.equal(await wakeLinkedCiSuite({ ...suite, heads: { '7': headSha } }, dependencies), 0, 'stale PR head')
+      assert.equal(await wakeLinkedCiSuite({ ...suite, repository: 'another/repository' }, dependencies), 0, 'foreign repository')
+      assert.equal(await wakeLinkedCiSuite(suite, dependencies), 1)
+      assert.deepEqual(sent.map(event => [
+        event.userId, event.botId, event.issueId, event.runId, event.kind, event.dedupeKey, event.payload.source,
+      ]), [['owner', ciBot, delivered, ciRun, 'run_report',
+        `github_ci_suite:${ciRun}:o/r:${suite.headSha}:97:failure`, 'github_ci_suite']])
+    })
     const { rows: [counts] } = await pool.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "runId"=$1 AND "botId"=$2`, [ciRun, ciBot])
     assert.equal(counts.n, 2)
     await pool.query('DELETE FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2', ['owner','v2/github.com/o/r'])

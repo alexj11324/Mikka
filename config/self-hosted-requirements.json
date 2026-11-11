@@ -235,6 +235,12 @@
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/coordinator/ci-suite-transport.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Only a committed CI suite notification bound to the finished run can bypass paid semantic triage. The transport grants no GitHub authority.",
+    "test": "lib/coordinator/ci-suite-transport.test.mjs"
+  },
   "lib/coordinator/decision-provider.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -368,6 +374,20 @@
     "behavior": "Counts visible Factory evidence inside the existing PostgreSQL snapshot, scoped to the owner, workspace and visible Factory IDs.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "lib/github/ci-suite-event.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "A configured GitHub App projects verified completed check suites into bounded notifications and validates the associated pull-request head.",
+    "test": "lib/github/ci-suite-event.test.ts",
+    "suite": "test:github"
+  },
+  "lib/github/ci-suite-wake.ts": {
+    "mode": "operator-configured",
+    "environment": [],
+    "behavior": "For a configured GitHub App, use the installation PostgreSQL publication and run records to enqueue a Coordinator wake only for an ended run on the same repository and pull-request head.",
+    "test": "lib/github/publication-webhook.db.test.ts",
+    "suite": "test:run-publication-db"
   },
   "lib/github/comment-mention.ts": {
     "mode": "built-in",
