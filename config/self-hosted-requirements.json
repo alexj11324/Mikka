@@ -235,6 +235,13 @@
     "behavior": "A sponsored machine requires the workspace allowlist and a private bridge token. Unconfigured workspaces cannot acquire the machine grant.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/cloud-computer/thread-machines.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Question recovery locks the current PostgreSQL task, owner, run and operation before reusing a retained machine. Self-hosted recovery uses its existing database and configured execution provider.",
+    "test": "lib/factory/checks.db.test.ts",
+    "suite": "test:factory-checks-db"
+  },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
     "environment": [],
