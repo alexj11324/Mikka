@@ -10,8 +10,8 @@
   },
   "scripts": {
     "test:coding-workspace-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-concurrency=1 lib/coding-workspace/files.db.test.ts lib/coding-workspace/http-daemon.db.test.ts lib/coding-workspace/http-daemon-personal.db.test.ts lib/coding-workspace/diff/store.db.test.ts lib/coding-workspace/diff/github-delivery.db.test.ts lib/coding-workspace/diff/agent-delivery.db.test.ts lib/coding-workspace/task-review/read.db.test.ts lib/coding-workspace/task-review/send.db.test.ts lib/coding-workspace/task-review/merge.db.test.ts lib/coding-workspace/task-review/summaries.db.test.ts lib/coding-workspace/git/operations.db.test.ts",
-    "test:drive": "node --import ./scripts/drive-test-hooks.mjs --test lib/drive/contract.test.ts lib/drive/ulid.test.ts lib/drive/http.test.ts lib/drive/store.test.ts",
-    "test:drive-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-concurrency=1 lib/drive/store.db.test.ts",
+    "test:drive": "node --import ./scripts/drive-test-hooks.mjs --test lib/drive/contract.test.ts lib/drive/ulid.test.ts lib/drive/http.test.ts lib/drive/store.test.ts lib/drive/client.test.ts",
+    "test:drive-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-concurrency=1 lib/drive/store.db.test.ts lib/drive/server.db.test.ts",
     "test:web-auth-db": "node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/web-auth-handoff.db.test.ts tests/web-workspace-selection.db.test.ts tests/project-workspace-selection.db.test.ts",
     "test:mailbox-verification": "node --import tsx --test scripts/personal-mailbox-acceptance/r4-verification.test.mts",
     "test:factory-check-independence-db": "node --import tsx --test lib/factory/check-independence.db.test.ts",
