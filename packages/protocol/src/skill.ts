@@ -141,6 +141,68 @@ export const skillInstructionsSchema = z
   .max(MAX_SKILL_INSTRUCTIONS_LENGTH)
 
 /**
+ * Profile Skills: the selected capabilities of a Factory Agent Profile. Only
+ * short metadata enters the agent's brief; the exact pinned body is served by
+ * the `load_skill` Mikka tool when the agent asks for it. The four sources are
+ * closed: reviewed official texts, the owner's personal installations, skills
+ * an owner explicitly shared to the workspace, and skills declared in the
+ * task repository (the daemon pins those from its own checkout).
+ */
+export const PROFILE_SKILL_SOURCES = ['official', 'personal', 'workspace', 'repository'] as const
+export type ProfileSkillSource = (typeof PROFILE_SKILL_SOURCES)[number]
+
+/** Stable namespaced id. A bare legacy id is the official namespace. */
+export const PROFILE_SKILL_ID = /^(?:(?:official|personal|workspace):[a-z0-9][a-z0-9-]{0,127}|repository:[a-z0-9][a-z0-9-]{0,63})$/
+export const profileSkillIdSchema = z.string().max(160).regex(PROFILE_SKILL_ID)
+export const MAX_PROFILE_SKILLS_PER_RUN = 12
+export const MAX_PROFILE_SKILL_INSTRUCTIONS_LENGTH = 20_000
+
+/** The body travels only from the server that froze it to the owner's daemon. */
+export const profileRunSkillSchema = z.object({
+  id: profileSkillIdSchema,
+  name: skillNameSchema,
+  description: z.string().trim().max(MAX_SKILL_DESCRIPTION_LENGTH),
+  source: z.enum(PROFILE_SKILL_SOURCES),
+  digest: z.string().regex(/^[a-f0-9]{64}$/),
+  instructions: z.string().min(1).max(MAX_PROFILE_SKILL_INSTRUCTIONS_LENGTH),
+})
+export type ProfileRunSkill = z.infer<typeof profileRunSkillSchema>
+
+/** Where the daemon writes the run's pinned Profile Skills. It stays inside
+ * the run directory: a skill in the worktree would enter `git status`. */
+export const PROFILE_SKILLS_DIR = 'profile-skills'
+export const PROFILE_SKILL_MANIFEST_FILE = 'manifest.json'
+export const PROFILE_SKILL_LOADS_DIR = 'loaded'
+
+/** What the `load_skill` tool records after it served one pinned body. */
+export const profileSkillLoadReceiptSchema = z.object({
+  id: profileSkillIdSchema,
+  name: skillNameSchema,
+  source: z.enum(PROFILE_SKILL_SOURCES),
+  digest: z.string().regex(/^[a-f0-9]{64}$/),
+  loadedAt: z.iso.datetime(),
+}).strict()
+export type ProfileSkillLoadReceipt = z.infer<typeof profileSkillLoadReceiptSchema>
+
+/** A run-detail reference: never includes the body or a private path. */
+export const profileSkillRefSchema = z.object({
+  id: profileSkillIdSchema,
+  name: skillNameSchema,
+  source: z.enum(PROFILE_SKILL_SOURCES),
+  /** Null for a repository skill whose checkout the server could not pin. */
+  digest: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+}).strict()
+export type ProfileSkillRef = z.infer<typeof profileSkillRefSchema>
+
+/** Daemon-authored evidence: what the frozen Profile selected and what the
+ * agent actually loaded. Assigned is never reported as loaded. */
+export const profileSkillRunReportSchema = z.object({
+  configured: z.array(profileSkillRefSchema).max(MAX_PROFILE_SKILLS_PER_RUN),
+  loaded: z.array(profileSkillLoadReceiptSchema).max(MAX_PROFILE_SKILLS_PER_RUN),
+}).strict()
+export type ProfileSkillRunReport = z.infer<typeof profileSkillRunReportSchema>
+
+/**
  * A skill as it travels with a run (`RunAssignment.skills`). `id` and `name`
  * are what the run record keeps, so a run still says which skills it used
  * after the skill is renamed or deleted.
