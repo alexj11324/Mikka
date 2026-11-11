@@ -105,7 +105,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const usage = 'Usage: node scripts/repair-personal-resource-privacy.mjs [--workspace UUID ...] [--apply --actor ACCOUNT --app-target HOST:PORT/DATABASE --workspace-target HOST:PORT/DATABASE]. Default: dry-run. Deploy the private-default/creation/share fixes before applying. Explicit grants/owners stay unchanged; mismatches are reported. Policy/audit commits send no live invalidation; clients see the new policy on their next normal read/refresh.'
+  const usage = 'Usage: node scripts/repair-personal-resource-privacy.mjs [--workspace UUID ...] [--apply --actor ACCOUNT --app-target HOST:PORT/DATABASE --workspace-target HOST:PORT/DATABASE]. Default: dry-run. Deploy the compatible creation/share writers and retire older writers before applying; the SQL default flip is a later release. Explicit grants/owners stay unchanged; mismatches are reported. Policy/audit commits send no live invalidation; clients see the new policy on their next normal read/refresh.'
   if (process.argv.includes('--help')) console.log(usage)
   else main().then(result => console.log(JSON.stringify(result))).catch(error => {
     console.error('Personal resource privacy repair failed', { name: error.name, code: error.code })

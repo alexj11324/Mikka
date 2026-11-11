@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
-import { Pool } from 'pg'
+import { Pool, type PoolClient } from 'pg'
+import { registeredTask } from './helpers/registered-task'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
 import { orderMigrations } from '../scripts/migration-order.mjs'
@@ -52,13 +53,10 @@ test('personal resources stay private through sharing and audited split-database
       await ws.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,\'admin\',\'active\')', [id, owner])
     }
     await ws.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,\'member\',\'active\')', [team, member])
-    const insertTask = (id: string, tenant: string) => app.query('INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority) VALUES($1,$2,$3,\'bound\',\'personal\',\'Privacy fixture\',\'{"type":"doc","content":[]}\',\'todo\',\'normal\')', [id, owner, tenant])
+    const insertTask = (id: string, tenant: string, client: Pick<PoolClient, 'query'> = app) => client.query('INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority) VALUES($1,$2,$3,\'bound\',\'personal\',\'Privacy fixture\',\'{"type":"doc","content":[]}\',\'todo\',\'normal\')', [id, owner, tenant])
     await insertTask(historical, personal)
     await migrate(files.filter(file => file >= boundary))
-    await insertTask(teamTask, team)
-    // Explicit historical state also permits this suite to run after the SQL
-    // default becomes private; it must never weaken that new default.
-    await app.query('UPDATE resource_access_policies SET visibility=\'shared\' WHERE kind=\'task\' AND id=ANY($1::uuid[])', [[historical, teamTask]])
+    await registeredTask(app, owner, team, teamTask, client => insertTask(teamTask, team, client))
     await app.query('INSERT INTO resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance) VALUES(\'bot\',$1,$2,$3,\'shared\',\'created\')', [sharedBot, personal, owner])
     for (const [kind, subject] of [['account', outsider], ['service', service]]) {
       await app.query('INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities,"expiresAt") VALUES(\'task\',$1,$2,$3,\'{canReadContent}\',\'2030-01-01T00:00:00Z\')', [historical, kind, subject])
