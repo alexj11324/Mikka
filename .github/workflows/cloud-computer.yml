@@ -82,6 +82,8 @@ jobs:
         with:
           path: ${{ runner.temp }}/cua/driver.tar.gz
           key: cua-driver-rs-v0.38.0-${{ runner.os }}-${{ runner.arch }}-31ab9709dd91ce73677e49b9f3e75c6f0d3e4d9625c286c9e58262bfbea698dd
+      - name: Use official Ubuntu apt sources
+        run: sudo "$(command -v node)" scripts/ci/ubuntu-apt-sources.mjs
       - name: Install isolated X11 and pinned MIT driver
         env:
           GITHUB_TOKEN: ${{ github.token }}

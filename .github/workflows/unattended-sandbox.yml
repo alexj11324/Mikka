@@ -46,6 +46,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Visual model, scoped policy and network contracts
         run: pnpm test:unattended
+      - name: Use official Ubuntu apt sources
+        run: sudo "$(command -v node)" scripts/ci/ubuntu-apt-sources.mjs
       - name: Install isolated browser acceptance dependencies
         run: |
           python3 -m pip install aiohttp==3.13.5 playwright==1.60.0 pillow==11.3.0

@@ -104,6 +104,8 @@ jobs:
         env:
           FFMPEG_GITHUB_TOKEN: ${{ github.token }}
         run: pnpm install --frozen-lockfile
+      - name: Use official Ubuntu apt sources
+        run: sudo "$(command -v node)" scripts/ci/ubuntu-apt-sources.mjs
       - name: Install Chromium system dependencies
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium

@@ -92,6 +92,9 @@ jobs:
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.34.3
+      - name: Use official Ubuntu apt sources
+        if: inputs.browser-submit
+        run: sudo "$(command -v node)" scripts/ci/ubuntu-apt-sources.mjs
       - name: Install locked Chromium before loading account credentials
         if: inputs.browser-submit
         env:
