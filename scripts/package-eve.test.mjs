@@ -28,7 +28,7 @@ test('Vercel wrapper runs the upstream fetch handler with native request context
 test('prebuilt packaging keeps queue triggers and rejects mixed app/agent revisions', async t => {
   const root = await mkdtemp(join(tmpdir(), 'eve-packaging-'))
   t.after(() => rm(root, { recursive: true, force: true }))
-  const output = join(root, '.vercel/output'), source = join(root, 'apps/eve/.vercel/output')
+  const output = join(root, '.vercel/output'), source = join(root, 'apps/eve/.output')
   const functionPath = 'functions/.well-known/workflow/v1/flow.func'
   await mkdir(join(source, functionPath), { recursive: true })
   await mkdir(join(output, 'functions/app.func'), { recursive: true })

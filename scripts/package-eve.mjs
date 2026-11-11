@@ -30,7 +30,7 @@ export default { ...application, fetch(request, context) {
 
 export async function packageEve({ root = process.cwd(), preset = process.env.NITRO_PRESET || (process.env.VERCEL ? 'vercel' : 'node-server') } = {}) {
   if (!['node-server', 'vercel'].includes(preset)) throw new Error('EVE_BUILD_PRESET_INVALID')
-  const source = join(root, 'apps/eve', preset === 'vercel' ? '.vercel/output' : '.output')
+  const source = join(root, 'apps/eve/.output')
   const output = join(root, preset === 'vercel' ? '.vercel/output' : '.output')
   const agent = JSON.parse(await readFile(join(source, 'mikka-eve-build.json'), 'utf8'))
   const appPath = join(output, 'mikka-build.json')
