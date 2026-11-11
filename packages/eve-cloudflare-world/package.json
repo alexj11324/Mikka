@@ -12,6 +12,7 @@
     "test": "vitest run --testTimeout=30000"
   },
   "devDependencies": {
+    "@workflow/world-local": "5.2.1",
     "ulid": "3.0.2",
     "vitest": "5.0.5"
   }

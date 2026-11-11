@@ -2,6 +2,7 @@ export { EveQueueClaim, WorldQueueService } from './queue-service.mjs'
 import { consumeWorldQueue } from './queue-transport.mjs'
 export { EveWorldStream } from './streams.mjs'
 import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
+import { listSteps, readStep } from './execution.mjs'
 import { serveStreamRequest } from './streams.mjs'
 import { applyWorldEvent, initializeWorldStorage, listEvents, readEvent, readHookById, readHookByToken, readRun } from './admission.mjs'
 
@@ -14,6 +15,8 @@ export class EveWorldAuthority extends DurableObject {
   }
   create(runId, event) { return applyWorldEvent(this.ctx.storage, runId, event) }
   run(runId) { return readRun(this.ctx.storage, runId) }
+  step(runId, stepId) { return readStep(this.ctx.storage, runId, stepId) }
+  steps(runId, options) { return listSteps(this.ctx.storage, runId, options) }
   hook(hookId) { return readHookById(this.ctx.storage, hookId) }
   hookByToken(token) { return readHookByToken(this.ctx.storage, token) }
   event(runId, slot) { return readEvent(this.ctx.storage, runId, slot) }

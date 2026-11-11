@@ -1,17 +1,16 @@
 import {
   CreateEventSchema, EventSchema, HookSchema, WorkflowRunSchema, eventIdToSlot,
-  DEFAULT_TIMESTAMP_THRESHOLD_FUTURE_MS, isTerminalWorkflowRunStatus, slotToEventId,
+  DEFAULT_TIMESTAMP_THRESHOLD_FUTURE_MS, isStepEventType, isTerminalWorkflowRunStatus, slotToEventId,
   SPEC_VERSION_SUPPORTS_HOOK_FORCE_CLAIM, ulidToDate, workflowRunIdSchema,
 } from '@workflow/world'
 import { START_HOOK_CANDIDATE_MAX_AGE_MS, startHookId } from '@workflow/world/start-hook.js'
-import { decode, encode } from 'cbor-x'
+import { changeStep, changeWait, initializeExecution } from './execution.mjs'
+import { decodeRecord, encodeRecord, fail, first } from './records.mjs'
 
 const MAX_RETENTION_MS = 30 * 86_400_000
-const encodeRecord = value => Uint8Array.from(encode(value)).buffer
-const decodeRecord = bytes => decode(new Uint8Array(bytes))
-const first = cursor => cursor.toArray()[0]
 
 export function initializeWorldStorage(storage) {
+  initializeExecution(storage)
   storage.sql.exec(`CREATE TABLE IF NOT EXISTS world_runs (
     run_id TEXT PRIMARY KEY, status TEXT NOT NULL, record BLOB NOT NULL
   );
@@ -28,9 +27,6 @@ export function initializeWorldStorage(storage) {
   CREATE INDEX IF NOT EXISTS world_start_decision_age ON world_start_admissions(recorded_at)`)
 }
 
-function fail(status, code, details = {}) {
-  return { ok: false, status, code, ...details }
-}
 
 export function readRun(storage, runId) {
   const row = first(storage.sql.exec('SELECT record FROM world_runs WHERE run_id=?', runId))
@@ -185,9 +181,12 @@ export function applyWorldEvent(storage, runId, request, now = Date.now()) {
     if (event.eventType === 'run_created' || event.eventType === 'run_started') return startRun(storage, runId, event, now)
     const run = readRun(storage, runId)
     if (!run) return fail(404, 'RUN_NOT_FOUND')
+    if (isStepEventType(event.eventType)) return changeStep(storage, run, event, now, appendEvent)
+    if (event.eventType === 'wait_created' || event.eventType === 'wait_completed') return changeWait(storage, run, event, now, appendEvent)
     if (isTerminalWorkflowRunStatus(run.status)) return fail(410, 'RUN_EXPIRED')
     if (['hook_created', 'hook_disposed', 'hook_received'].includes(event.eventType)) return changeHook(storage, run, event, now)
     if (!Object.hasOwn(terminal, event.eventType)) return fail(501, 'UNSUPPORTED_EVENT')
+    storage.sql.exec('DELETE FROM world_waits WHERE run_id=?', runId)
     const completedAt = new Date(now)
     const updated = saveRun(storage, { ...run, ...event.eventData, status: terminal[event.eventType], updatedAt: completedAt, completedAt })
     storage.sql.exec('DELETE FROM world_hooks WHERE run_id=? AND (retain_until IS NULL OR retain_until<=?)', runId, now)
