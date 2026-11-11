@@ -10,10 +10,10 @@ mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) 
 mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: {
   getSession: async () => ({ data: { user: { id: owner } }, error: null }),
 } } })
+const browser = new Window()
 let createRoot: typeof import('react-dom/client')['createRoot']
 let useCoordinatorSubmit: typeof import('../components/coordinator/use-coordinator-submit')['useCoordinatorSubmit']
 before(async () => {
-  const browser = new Window()
   for (const [key, value] of Object.entries({ window: browser, document: browser.document, navigator: browser.navigator, IS_REACT_ACT_ENVIRONMENT: true })) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ useCoordinatorSubmit } = await import('../components/coordinator/use-coordinator-submit'))
@@ -27,7 +27,7 @@ test('uncertain native sends retain their logical identity across other sends an
     if (conflict) throw new ClientError(409, '{"code":"submissionConflict"}')
     if (fail) throw new TypeError('network unavailable')
   } } as unknown as Pick<UseEveAgentReturn, 'send'>
-  const container = document.createElement('div'), root = createRoot(container)
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
   let composer!: ReturnType<typeof useCoordinatorSubmit>
   function Probe() { composer = useCoordinatorSubmit(agent); return null }
   try {
