@@ -87,6 +87,30 @@ async function noSession(path, init = {}) {
 }
 const post = messageId => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messageId }) })
 
+acceptance('native Coordinator prewarm preserves the sealed account footprint and stable session', async () => {
+  const scope = await acquire('native-prewarm')
+  try {
+    for (const account of [scope.owner, scope.peer]) {
+      const fingerprint = () => pool.transaction(client => pool.fingerprint(client, account.userId), { readOnly: true })
+      const baseline = await fingerprint()
+      let sessionId
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await account.request('/api/agents/eve/v1/session', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+        })
+        assert.equal(response.status, 200)
+        const session = await response.json()
+        assert.equal(typeof session.sessionId, 'string')
+        assert.ok(session.sessionId.length > 0)
+        if (sessionId) assert.equal(session.sessionId, sessionId)
+        sessionId = session.sessionId
+        assert.equal(await fingerprint(), baseline, 'Opening native chat must preserve the sealed clean-account footprint')
+      }
+    }
+    assert.equal((await release(scope)).state, 'released')
+  } finally { if (active.has(scope)) await release(scope, 'dirty') }
+})
+
 acceptance('personal plugin APIs keep MCP and skill settings private across real authenticated sessions', async () => {
   const scope = await acquire('personal-plugins')
   const json = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
