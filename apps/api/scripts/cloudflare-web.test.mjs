@@ -1,11 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import gateway from '../../../cloudflare/web/gateway.mjs'
 import release from '../../../cloudflare/web/release.mjs'
-import { gatewayConfig, releaseConfig } from '../../../cloudflare/web/prepare.mjs'
+import { gatewayConfig, prepareRelease, releaseConfig } from '../../../cloudflare/web/prepare.mjs'
 
 const request = (path, init) => new Request(new URL(path, 'https://app.example'), init)
 const services = () => ({
@@ -21,7 +21,7 @@ test('official pages preserve localization, credential referrer policy, raw-inde
   assert.match(localized.headers.get('set-cookie'), /NEXT_LOCALE=en/)
   assert.equal(localized.headers.get('cache-control'), 'no-store')
   assert.equal((await release.fetch(request('/mikka/device'), env)).headers.get('referrer-policy'), 'no-referrer')
-  for (const path of ['/mikka/index.html', '/mikka/%69ndex.html', '/mikka/.vite/manifest.json', '/outside/logo.svg']) {
+  for (const path of ['/mikka/index.html', '/mikka/%69ndex.html', '/mikka/.vite/manifest.json', '/mikka/renderer-manifest.json', '/mikka/_headers', '/outside/logo.svg']) {
     assert.equal((await release.fetch(request(path), env)).status, 404)
   }
   const setup = await release.fetch(request('/mikka?installation_id=123&state=mikka-gh.' + 'a'.repeat(36) + '.' + 'b'.repeat(43)), env)
@@ -89,6 +89,16 @@ test('release config requires the official compiled shell, matching pins and pri
   assert.equal(config.assets.run_worker_first, true)
   assert.equal(config.assets.html_handling, 'none')
   await assert.rejects(releaseConfig({ ...input, id: 'abcdef0-2-1' }), /PIN_MISMATCH/)
+  const parent = await mkdtemp(join(tmpdir(), 'cf-web-publish-'))
+  t.after(() => rm(parent, { recursive: true, force: true }))
+  await mkdir(join(assets, '.vite'))
+  await writeFile(join(assets, '.vite', 'manifest.json'), '{}')
+  await writeFile(join(assets, '_redirects'), '/old /new')
+  const ready = await prepareRelease(input, parent)
+  assert.deepEqual(await readdir(ready.assets.directory), ['index.html'])
+  assert.equal(await readFile(join(ready.assets.directory, 'index.html'), 'utf8'), await readFile(join(assets, 'index.html'), 'utf8'))
+  assert.ok((await readFile(join(assets, 'renderer-manifest.json'), 'utf8')).includes('.hosted-ui'))
+  await assert.rejects(prepareRelease(input, assets), /OUTPUT_INSIDE_BUILD/)
   await writeFile(join(assets, 'chunk.js.map'), '{}')
   await assert.rejects(releaseConfig(input), /sourceInOutput/)
   assert.throws(() => gatewayConfig({ current: 'new', retained: ['old'] }), /RETENTION_INVALID/)

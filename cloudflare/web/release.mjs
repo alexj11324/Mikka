@@ -11,6 +11,10 @@ export default {
     try { decoded = decodeURIComponent(url.pathname) } catch { return env.API.fetch(request) }
     if (/^\/mikka\/cloud(?:\/|$)/.test(decoded)) return env.CLOUD.fetch(request)
 
+    if (['/mikka/renderer-manifest.json', '/mikka/_headers', '/mikka/_redirects'].includes(decoded)) {
+      return applySecurityHeaders(request, new Response(null, { status: 404 }))
+    }
+
     const options = {
       production: true, edition: 'cloud', legacyHost: env.MIKKA_LEGACY_APP_HOST ?? '',
       origin: env.BETTER_AUTH_URL ?? url.origin,
