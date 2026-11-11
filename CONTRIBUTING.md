@@ -123,6 +123,15 @@ Classification and skip reasons appear in CI Summary; no PR-provided selector
 can authorize its own skipped work. Details and inspection commands:
 [Dependency-aware CI](docs/ci/incremental.md).
 
+### Regression ownership and CI cost
+
+Before adding a regression, identify the observable behavior, the failure it
+must catch, its strongest production owner and why existing tests miss it.
+Prefer one owner instead of redundant mocked replay, while retaining distinct
+security, storage, API, protocol, migration and release contracts. Review
+preserved evidence before deleting any test. See
+[test ownership and CI cost](docs/ci/test-ownership.md).
+
 ### Before asking Alex: look at how leading products do it
 
 A choice goes to Alex only when leading products (Linear, Slack, GitHub, Figma,
