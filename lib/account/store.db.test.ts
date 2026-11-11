@@ -1,6 +1,8 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
+import { createServer } from 'node:http'
 import test from 'node:test'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
@@ -24,6 +26,69 @@ async function load() {
 async function addUser(pool: { query: (text: string, values?: unknown[]) => Promise<unknown> }, id: string) {
   await pool.query(`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, $1, $2, true, now(), now())`, [id, `${id}@example.com`])
 }
+
+dbTest('avatar object replacement and metadata rollback keep exactly the committed bytes', async t => {
+  const { createRequestDatabaseScope, pool, avatar } = await load()
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const objects = new Map<string, Buffer>()
+  let refuseDelete = false
+  const server = createServer(async (request, response) => {
+    const key = decodeURIComponent(request.url!.slice('/avatar-test/'.length))
+    assert.match(request.headers.authorization ?? '', /AWS4-HMAC-SHA256/)
+    if (request.method === 'PUT') {
+      const chunks = []
+      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      objects.set(key, Buffer.concat(chunks))
+    } else if (request.method === 'DELETE') {
+      if (refuseDelete) { response.writeHead(403).end(); return }
+      objects.delete(key)
+    } else { response.writeHead(objects.has(key) ? 200 : 404).end(objects.get(key)); return }
+    response.end()
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const env = { S3_ENDPOINT: `http://127.0.0.1:${(server.address() as { port: number }).port}`, S3_BUCKET: 'avatar-test', S3_ACCESS_KEY_ID: 'local-avatar', S3_SECRET_ACCESS_KEY: 'local-avatar-test' }
+  const original = Object.fromEntries(Object.keys(env).map(name => [name, process.env[name]]))
+  Object.assign(process.env, env)
+  const owner = `avatar-recovery-${randomUUID()}`
+  t.after(async () => {
+    server.closeAllConnections(); server.close()
+    for (const [name, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+    await scope.run(async () => {
+      await pool.query('delete from account_storage_retirements where "userId"=$1', [owner])
+      await pool.query('delete from "user" where id=$1', [owner])
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await addUser(pool, owner)
+    const first = await avatar.saveAvatar(owner, 'image/png', PNG(1))
+    const [originalKey] = objects.keys()
+    await avatar.saveAvatar(owner, 'image/png', PNG(2))
+    assert.equal(await avatar.saveAvatar(owner, 'image/png', PNG(1)), first)
+    assert.equal(objects.has(originalKey), false, 'reusing an image does not revive a retired key')
+    const hash = first.split('/').at(-1)!
+    const current = (await pool.query('select "storageKey" from user_avatars where "userId"=$1', [owner])).rows[0].storageKey
+    assert.deepEqual((await avatar.readAvatar(owner, hash))?.bytes, PNG(1))
+    const oversize = new Uint8Array(204801)
+    const failedCheck = (error: unknown) => {
+      const cause = (error as { cause?: { code?: string } }).cause
+      return cause?.code === '23514' || (error as { code?: string }).code === '23514'
+    }
+    await assert.rejects(avatar.saveAvatar(owner, 'image/png', oversize), failedCheck)
+    assert.deepEqual([...objects.keys()], [current], 'the failed PG CHECK after PUT removed only its new object')
+    refuseDelete = true
+    await assert.rejects(avatar.saveAvatar(owner, 'image/png', oversize), failedCheck)
+    const pending = await pool.query('select "storageKey" from account_storage_retirements where "userId"=$1', [owner])
+    assert.equal(pending.rowCount, 1, 'failed provider cleanup remains discoverable by account deletion')
+    assert.notEqual(pending.rows[0].storageKey, current)
+    assert.equal(objects.has(pending.rows[0].storageKey), true)
+    assert.deepEqual((await avatar.readAvatar(owner, hash))?.bytes, PNG(1))
+  })
+})
 
 dbTest('devices, shared links, export links and avatars belong to one person', async t => {
   const { createRequestDatabaseScope, pool, sessions, sharedLinks, exportStore, avatar } = await load()
