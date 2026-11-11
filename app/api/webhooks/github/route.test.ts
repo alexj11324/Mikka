@@ -172,7 +172,8 @@ test('signed completed suite is durably enqueued before webhook ACK, without per
 })
 
 test('suite persistence failure fails the webhook and can be retried by GitHub', async () => {
-  wakeSuite.mock.mockImplementationOnce(async () => { throw Error('queue unavailable') })
+  let attempts = 0
+  wakeSuite.mock.mockImplementation(async () => { if (++attempts === 1) throw Error('queue unavailable'); return 1 })
   const hint = {
     installation: { id: 7 }, repository: { id: 8, full_name: 'acme/app' },
     action: 'completed',
