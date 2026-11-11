@@ -95,7 +95,7 @@ test('an explicit automatic-destination dispatch is bound before execution and c
     const route = { sourceEventId: eventId, title: 'Another generated title', body: 'Generated details', rationale: 'Explicit human command', needsSpec: false,
       missingInformation: [], missingPermissions: [] }
     const factory = await Promise.all([1, 2].map(() => asOwner(() => tools.intakeFactoryRequest(user, route, undefined, botId))))
-    for (const result of factory) assert.ok(result && !('error' in result), JSON.stringify(result))
+    for (const result of factory) assert.ok(result !== null && typeof result === 'object' && !('error' in result), JSON.stringify(result))
     assert.equal((await pool.query('select count(*)::int n from issues where "userId"=$1', [user])).rows[0].n, 1)
     assert.deepEqual((await pool.query('select "issueId" from factory_tasks where "userId"=$1', [user])).rows, [{ issueId: receipt.taskId }])
     const { requestedTaskSelection } = await import('../lib/factory/profile-request')
