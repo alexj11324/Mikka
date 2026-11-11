@@ -156,7 +156,9 @@ async function createWorkspaceInvitationBody(input: { workspaceId: string; email
       if (results.some(result => result.created)) await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
       return results
     })
-    return outcomes
+    // `data` is the link list this action always returned, so every existing
+    // caller keeps working; `outcomes` adds the answer for each address.
+    return { data: outcomes.flatMap(outcome => outcome.created ? [{ email: outcome.email, path: outcome.path }] : []), outcomes }
   })
 }
 
@@ -227,18 +229,7 @@ async function acceptWorkspaceInvitationBody(token: string) {
 }
 
 // Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
-/**
- * `data` is the links this action always returned, so its callers keep working;
- * `outcomes` adds one entry per address, which is what a partially skipped batch
- * needs to report (ALE-28).
- */
-export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) {
-  return withFreshSession(async () => {
-    const body = await createWorkspaceInvitationBody(...args)
-    if (!body.ok) return body
-    return { ok: true as const, data: body.data.flatMap(outcome => outcome.created ? [{ email: outcome.email, path: outcome.path }] : []), outcomes: body.data }
-  })
-}
+export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) { return withFreshSession(() => createWorkspaceInvitationBody(...args)) }
 export async function updateWorkspaceMember(...args: Parameters<typeof updateWorkspaceMemberBody>) { return withFreshSession(() => updateWorkspaceMemberBody(...args)) }
 export async function revokeWorkspaceInvitation(...args: Parameters<typeof revokeWorkspaceInvitationBody>) { return withFreshSession(() => revokeWorkspaceInvitationBody(...args)) }
 export async function acceptWorkspaceInvitation(...args: Parameters<typeof acceptWorkspaceInvitationBody>) { return withFreshSession(() => acceptWorkspaceInvitationBody(...args)) }
