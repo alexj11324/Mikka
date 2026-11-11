@@ -95,7 +95,7 @@ test('bot chat keys reach only the owner in the bot workspace, after the actual 
     })
 
     await t.test('the actual turn writers publish once after COMMIT and nothing on rollback', async () => {
-      const store = await import('../coordinator/store')
+      const store = await import('@/tests/support/legacy-coordinator-store')
       await database.query(`INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil") VALUES('owner',$1,'fixture-holder',now()+interval '5 minutes')`, [bot])
       await database.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) VALUES($1,'owner',$2,1,'{"role":"user","content":"Hello"}')`, [randomUUID(), bot])
       sent.length = 0

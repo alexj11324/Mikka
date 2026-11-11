@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { AgentKitError } from '@/lib/agent-kit/store'
 import { COORDINATOR_EVENT_KINDS, COORDINATOR_EVENT_TIERS } from '@/lib/db/schema'
-import type { InboxTake } from './store'
+import type { InboxTake } from './legacy-coordinator-store'
 
 /** Only run settings and inbox metadata cross the first startup checkpoint.
  * Credentials, model objects and authorization decisions never enter this receipt. */

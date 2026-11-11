@@ -74,7 +74,7 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
    const {createRequestDatabaseScope}=await import('../db/request-scope')
    const request=createRequestDatabaseScope(target!)
    try{
-    const coordinator=await import('../coordinator/store')
+    const coordinator=await import('@/tests/support/legacy-coordinator-store')
     const chat=await request.run(()=>coordinator.chatView(owner,200,botId))
     assert.equal(chat.items.find(item=>item.id===occurrence.operation_id)?.text,'Legacy useful reminder')
     const previews=await request.run(()=>coordinator.botChats(owner))
@@ -137,7 +137,7 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
   })
   await t.test('actual Coordinator inbox isolates the scheduled read and preserves user source identity',async()=>{
    const app=await import('../db/request-scope')
-   const coordinator=await import('../coordinator/store')
+   const coordinator=await import('@/tests/support/legacy-coordinator-store')
    const request=app.createRequestDatabaseScope(target!)
    try{
     await pool.query('UPDATE coordinator_events SET "deliveredAt"=now() WHERE "userId"=$1',[owner])

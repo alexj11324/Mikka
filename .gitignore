@@ -82,3 +82,9 @@ next-env.d.ts
 /apps/eve/.eve/
 /apps/eve/.output/
 /apps/eve/.vercel/
+
+# Temporary standalone typecheck inputs and compiler artifacts.
+/.cache/typecheck/
+
+# Native Eve session data for the default self-hosted service.
+/.cache/eve-workflow/

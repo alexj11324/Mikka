@@ -5,7 +5,7 @@ import { makeSnapshot } from '../agent-kit/definition'
 import { DEFAULT_AGENT_DEFINITION } from '../agent-kit/builtin'
 import { executionInstructions } from '../agent-kit/execution-instructions'
 import { withCoordinatorPresentation } from './native-prompt'
-import { cachedContextLines, instructionsWithPersonal, promptMessages, promptWithCachedContext, type StoredMessage } from './context'
+import { cachedContextLines, instructionsWithPersonal, promptWithCachedContext, type StoredMessage } from './context'
 import { SCHEDULE_INSTRUCTIONS } from '../schedules/contract'
 
 const owner = 'synthetic-prompt-owner', bot = '10000000-0000-4000-8000-000000000001'
@@ -31,7 +31,7 @@ const enter = async (reader: Reader, args: unknown[]) => {
 const forbidden = () => { throw new Error('No database, provider or tool effects in prompt concurrency fixture') }
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 
-stub('./store.ts', { loadConversationForPrompt: async () => ({ ...conversation, personalInstructions: personal }), saveSummary: forbidden })
+stub('./store.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: personal }), saveSummary: forbidden })
 stub('./bot-instructions.ts', { botInstructions: forbidden })
 stub('./personal-instructions.ts', { withPersonalInstructionText: async (...args: unknown[]) => {
   await enter('personal', args)
@@ -43,7 +43,6 @@ stub('./github-context.ts', { githubPromptContext: async (...args: unknown[]) =>
   usedRepositoriesForBot: async (...args: unknown[]) => { await enter('repositories', args); return ['synthetic/repository'] } })
 stub('../profile/store.ts', { profilePromptSection: async (...args: unknown[]) => { await enter('profile', args); return '' } })
 stub('./execution-context.ts', { executionContextParts: async (...args: unknown[]) => { await enter('execution', args); return facts } })
-stub('./summary-model.ts', { summarizeConversation: forbidden })
 stub('../personal-mailbox-config.ts', { personalMailboxEnabled: () => false })
 stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: forbidden })
 stub('../issue-visibility.ts', { issueVisibility: forbidden })
@@ -61,11 +60,10 @@ stub('../telegram/client.ts', { postTelegramText: forbidden })
 stub('../attention/store.ts', { recordDecision: forbidden, settleTurn: forbidden })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })
 
-let preparePrompt: typeof import('../../workflows/coordinator/steps')['preparePrompt']
-let prepareTurn: typeof import('../../workflows/coordinator/steps')['prepareTurn']
+let prepareEveInstructions: typeof import('../../workflows/coordinator/steps')['prepareEveInstructions']
 before(async () => {
   overrideDeploymentSwitch('factoryRouting', false)
-  ;({ preparePrompt, prepareTurn } = await import('../../workflows/coordinator/steps'))
+  ;({ prepareEveInstructions } = await import('../../workflows/coordinator/steps'))
 })
 after(() => overrideDeploymentSwitch('factoryRouting', undefined))
 beforeEach(() => {
@@ -76,15 +74,12 @@ beforeEach(() => {
 
 function expectedPrompt() {
   const rules = instructionsWithPersonal(withCoordinatorPresentation(executionInstructions(snapshot)), personal)
-  return {
-    ...promptWithCachedContext(rules, cachedContextLines(github, facts.models), conversation.memory, '\n' + SCHEDULE_INSTRUCTIONS + '\n' + facts.live),
-    messages: promptMessages(conversation.summary, conversation.messages, { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([owner, bot]) }),
-  }
+  return promptWithCachedContext(rules, cachedContextLines(github, facts.models), conversation.memory, '\n' + SCHEDULE_INSTRUCTIONS + '\n' + facts.live).instructions
 }
 
 test('all independent prompt reads start before any completes, keeping bytes, scope and one call each', async () => {
   gates = { execution: deferred(), personal: deferred(), github: deferred() }
-  const pending = preparePrompt(owner, bot, snapshot)
+  const pending = prepareEveInstructions(owner, bot, snapshot)
   await firstStarted.promise
   try {
     // The old serial code starts only execution here. No sleeps or timing threshold.
@@ -92,13 +87,8 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
     // so only the parallel set is asserted here against the gates.
     assert.deepEqual(calls.map(call => call.reader).filter(reader => reader !== 'repositories' && reader !== 'profile'), ['execution', 'personal', 'github'])
     assert.deepEqual(calls.find(call => call.reader === 'execution')?.args, [owner, bot])
-    assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, undefined, undefined, undefined, bot])
-    // The 5th argument is ALE-75's grant: whether this round's frozen tools can
-    // fetch a skill body, which decides whether the skills section carries
-    // metadata only or the bodies. This fixture's DEFAULT_AGENT_DEFINITION
-    // includes read_personal_skill, so the section is metadata only here. The
-    // assertion stays exact so a later change to this contract is not silent.
-    assert.deepEqual(calls.find(call => call.reader === 'personal')?.args, [owner, withCoordinatorPresentation(executionInstructions(snapshot)), personal, { servers: [], skills: [] }, { canReadPersonalSkill: true }])
+    assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, { hosted: true, readOnly: false, effectiveTools: snapshot.effectiveTools }, undefined, undefined, bot])
+    assert.deepEqual(calls.find(call => call.reader === 'personal')?.args, [owner, withCoordinatorPresentation(executionInstructions(snapshot)), personal, { servers: [], skills: [] }])
   } finally {
     // Complete in reverse order; assembly order and the cache boundary must not change.
     gates.github!.resolve(); gates.personal!.resolve(); gates.execution!.resolve()
@@ -111,13 +101,13 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
 })
 
 test('a later turn reads current context again without caching or changing the frozen host', async () => {
-  const first = await preparePrompt(owner, bot, snapshot)
+  const first = await prepareEveInstructions(owner, bot, snapshot)
   assert.deepEqual(first, expectedPrompt())
   personal = 'Updated synthetic instruction'; github = 'Updated authorized repositories'
   facts = { models: 'Updated allowed models', live: 'Updated availability' }
-  const second = await preparePrompt(owner, bot, snapshot)
+  const second = await prepareEveInstructions(owner, bot, snapshot)
   assert.deepEqual(second, expectedPrompt())
-  assert.notEqual(second.instructions, first.instructions)
+  assert.notEqual(second, first)
   for (const reader of ['execution', 'personal', 'github'] as const) assert.equal(calls.filter(call => call.reader === reader).length, 2)
   // What Mikka learnt about the person is re-read every turn too, never carried over.
   assert.equal(calls.filter(call => call.reader === 'profile').length, 2)
@@ -126,32 +116,14 @@ test('a later turn reads current context again without caching or changing the f
 
 test('an instruction read refusal is propagated unchanged without retry or a partial prompt', async () => {
   denied = new Error('Synthetic instruction read refusal')
-  await assert.rejects(preparePrompt(owner, bot, snapshot), error => error === denied)
+  await assert.rejects(prepareEveInstructions(owner, bot, snapshot), error => error === denied)
   assert.equal(calls.filter(call => call.reader === 'personal').length, 1)
 })
 
-test('prepareTurn returns only fixed numeric context timings beside the unchanged model prompt', async () => {
-  const prepared = await prepareTurn(owner, bot, 'synthetic-holder', { snapshot, mailboxEnabled: false, runtime: null })
-  assert.deepEqual(prepared.prompt, expectedPrompt())
-  assert.deepEqual(Object.keys(prepared.contextMs).sort(), ['execution', 'github', 'personal', 'profile'])
-  assert.ok(Object.values(prepared.contextMs).every(value => Number.isFinite(value) && value >= 0))
-  assert.deepEqual(prepared.mailboxTools, [])
-  assert.deepEqual(calls.map(call => call.reader), ['execution', 'personal', 'github', 'repositories', 'profile'],
-    'the three parallel reads, then the repositories this chat works in, then the person\'s facts')
-  assert.doesNotMatch(JSON.stringify(prepared.contextMs), /Synthetic|owner|request|instruction|repositories/)
-  assert.ok(!('contextMs' in prepared.prompt) && !('phaseMs' in prepared.prompt), 'diagnostics never become model options or cached text')
-})
-
-test('hosted preparation forwards only its frozen discovery grant and scheduled-read restriction', async () => {
-  for (const input of [
-    { snapshot, runtime: {} },
-    { snapshot: { ...snapshot, effectiveTools: [] }, runtime: {} },
-    { snapshot, runtime: null },
-  ]) {
-    calls.length = 0
-    await prepareTurn(owner, bot, 'synthetic-holder', { ...input, mailboxEnabled: false })
-    assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [
-      owner, { hosted: true, readOnly: input.runtime === null, effectiveTools: input.snapshot.effectiveTools }, undefined, undefined, bot,
-    ])
-  }
+test('Eve instructions keep frozen discovery grants and leave history to eve', async () => {
+  const selected = { ...snapshot, effectiveTools: [] }
+  const instructions = await prepareEveInstructions(owner, bot, selected)
+  assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, { hosted: true, readOnly: false, effectiveTools: [] }, undefined, undefined, bot])
+  assert.equal(typeof instructions, 'string')
+  assert.doesNotMatch(instructions, /Synthetic request/)
 })
