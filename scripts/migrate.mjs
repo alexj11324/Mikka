@@ -11,7 +11,7 @@
 // `-- migrate: no-transaction` for one standalone statement.
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
-import { directDatabaseURL } from './postgres-connection.mjs'
+import { sessionDatabaseURL } from './postgres-connection.mjs'
 import { alreadyApplied, orderMigrations } from './migration-order.mjs'
 import { applyMigration, planMigration } from './migration-steps.mjs'
 import { migrationTargets } from './migration-targets.mjs'
@@ -59,7 +59,7 @@ try {
   // Validate both targets' complete scope history before applying pending DDL.
   // Commits remain per file/connection, not distributed across targets.
   for (const [target, pending] of byTarget) {
-    const pool = new Pool({ connectionString: directDatabaseURL(targets[target]), max: 1, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 20_000 })
+    const pool = new Pool({ connectionString: sessionDatabaseURL(targets[target], env), max: 1, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 20_000 })
     pool.on?.('error', () => console.warn('migration_idle_connection_lost'))
     const state = { target, pending, pool }
     states.push(state)

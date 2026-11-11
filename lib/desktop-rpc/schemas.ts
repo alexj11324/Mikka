@@ -1,4 +1,4 @@
-import { saveEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { saveEnvironmentInput, projectDefaultEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
 import { z } from 'zod'
 import { projectInput, projectPatch } from '@/lib/project-input'
@@ -104,6 +104,7 @@ export const desktopActionSchemas = {
   'teams.restoreTeam': oneId,
   'teams.removeTeamGrouping': tuple(uuid, text(120)),
   'project-resources.listProjectResources': tuple(uuid, uuid.optional()),
+  'project-resources.setProjectDefaultEnvironment': tuple(projectDefaultEnvironmentInput),
   'project-resources.saveEnvironment': tuple(saveEnvironmentInput),
   'project-resources.saveProjectResources': tuple(projectResourcesInput),
   'project-resources.saveWorkspaceRepositoryPolicy': tuple(workspaceRepositoryPolicyInput),

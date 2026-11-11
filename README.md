@@ -28,13 +28,17 @@ Describe a task to a bot. Mikka dispatches coding work to agents on your Mac, Li
 
 **Mikka Cloud.** [Open the app](https://app.aspectlylabs.com/mikka), create an account and start using Mikka. Follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart) to get set up.
 
-**Self-hosted server.** Mikka can run on your own Linux host with Docker and PostgreSQL. Follow the [self-hosting guide](docs/self-hosting.md) to configure credentials, download the matching Compose file and start the server:
+**Self-hosted server.** Mikka runs on your own Linux host with Docker and PostgreSQL. Use the bundled PostgreSQL server, or choose managed PostgreSQL (**[Neon recommended](docs/self-hosting.md#managed-postgresql-neon-recommended)**; other compatible providers also work). Follow the [self-hosting guide](docs/self-hosting.md) and download the matching Compose file.
+
+With bundled PostgreSQL:
 
 ```sh
 docker compose up -d --wait
 ```
 
-The Compose deployment starts the Mikka server and PostgreSQL; it does **not** install a separate copy of the official UI. Connect an official client to your server. See [Client and source availability](#client-and-source-availability) before choosing self-hosting.
+With Neon, configure the pooled and direct connection URLs in your private `.env`, then run `docker compose -f docker-compose.neon.yml up -d --wait`. This variant starts no PostgreSQL container.
+
+The server deployment does **not** install a separate copy of the official UI. Connect an official client to your server. See [Client and source availability](#client-and-source-availability) before choosing self-hosting.
 
 **Already use Claude Code?** Connect Mikka as an MCP server:
 

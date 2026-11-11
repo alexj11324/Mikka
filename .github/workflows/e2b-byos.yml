@@ -3,6 +3,7 @@ name: E2B subscription custody
 # CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - 'lib/subscription*'
       - 'lib/infisical-workload*'
@@ -17,6 +18,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+
+concurrency:
+  group: e2b-byos-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
@@ -25,6 +31,8 @@ env:
 
 jobs:
   custody:
+    # Draft-only work is exercised locally; ready_for_review runs CI.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
