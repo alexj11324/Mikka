@@ -2485,7 +2485,7 @@
         "GET",
         "PUT"
       ],
-      "sourceHash": "5aee0fcbc517f0a953914b6acc61bdf13bc7f0c1656dc48336c4d43282e40e39"
+      "sourceHash": "dd706909e7fe93a2f59e60a836a9225934937e7d3a0c20f71c51258316d3f1d2"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/skills",

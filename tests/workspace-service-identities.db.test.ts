@@ -98,6 +98,17 @@ test('registered service identity routes enforce a fresh Workspace admin through
   assert.deepEqual(restored.body, { ...rename.body, enabled: true, revision: 4 })
   assert.equal((await request(admin.token, first.id, 'PATCH', item, { action: 'restore', revision: 4, subscription: 'personal' })).status, 400)
 
+  await t.test('the Project picker exposes manageable names only to a current Workspace admin', async () => {
+    const options = projectEndpoint + '?view=choices'
+    const response = await request({ cookie }, first.id, 'GET', options)
+    assert.equal(response.status, 200)
+    const { rows: visible } = await pool.query('SELECT id,name FROM workspace_projects WHERE id=$1', [project])
+    assert.deepEqual(response.body, { projects: visible, nextCursor: null })
+    assert.deepEqual((await request(admin.token, first.id, 'GET', options + '&after=' + project)).body.projects, [])
+    assert.equal((await request(ordinary.token, first.id, 'GET', options)).status, 403)
+    assert.equal((await request(other.token, second.id, 'GET', options)).status, 404)
+  })
+
   await t.test('project assignment uses the canonical ACL and preserves other principals', async () => {
     const serviceAllowed = async (id: string, kind: string) => (await pool.query(
       "SELECT mikka_resource_acl_allowed('service',$1,$2,'project',$3,$4) AS allowed", [identity.id, first.id, id, kind],
