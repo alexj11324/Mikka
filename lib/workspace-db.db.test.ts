@@ -69,7 +69,6 @@ test('workspace transactions reuse one checkout, roll back savepoints, and relea
     await t.test('an immediate after-commit effect starts a fresh transaction instead of a savepoint on the committed client', async () => {
       let effect: Promise<void> | undefined
       let writerTransaction: string | undefined
-      let borrowed: object | null = null
       const before = acquisitions
       await workspaceDb.transaction(async writer => {
         writerTransaction = (await writer.execute<{ id: string }>(sql`SELECT txid_current()::text AS id`)).rows[0].id
