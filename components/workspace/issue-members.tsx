@@ -6,7 +6,7 @@ import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { CheckCircle2, Mail, Search, ShieldCheck, UserPlus, Users } from 'lucide-react'
-import { inviteMember, listMembers, removeMember } from '@/app/actions/collaboration'
+import { inviteMember, listMembers, removeMember, setMemberRole, setMemberSubscribed } from '@/app/actions/collaboration'
 import { useActionError } from '@/lib/use-action-error'
 import { Badge } from '@/components/reui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -22,6 +22,9 @@ import { Spinner } from '@/components/ui/spinner'
 import { SearchInput } from '@/components/ui/search-input'
 
 type Member = Awaited<ReturnType<typeof listMembers>>['owner']
+/** A member row carries its role and subscription; the owner is shown first without one. */
+type MemberRow = Awaited<ReturnType<typeof listMembers>>['members'][number]
+type ListedMember = Member & { role?: MemberRow['role']; subscribed?: boolean }
 
 export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => Promise<void> }) {
   const t = useTranslations('Members')
@@ -76,8 +79,39 @@ export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => 
     finally { busy.current = false; setPending(false) }
   }
 
+  /** Hands the invite role to a member, or takes it back (ALE-29). */
+  async function toggleRole(target: ListedMember) {
+    if (busy.current) return
+    busy.current = true; setPending(true); setRemoveError(''); setMessage('')
+    const next = target.role === 'owner' ? 'member' : 'owner'
+    try {
+      const result = await setMemberRole(id, target.id, next)
+      if (result.error) { setRemoveError(actionError(result.error)); return }
+      setMessage(t('roleChanged', { name: target.name || target.email }))
+      void mutate().catch(() => {})
+    } catch { setRemoveError(t('roleChangeFailed')) }
+    finally { busy.current = false; setPending(false) }
+  }
+
+  /**
+   * Mutes or follows this task without leaving it. `subscribed` is the state the
+   * member is in now; the action takes the state to set.
+   */
+  async function toggleSubscription(target: ListedMember) {
+    if (busy.current) return
+    busy.current = true; setPending(true); setRemoveError(''); setMessage('')
+    const next = !(target.subscribed ?? true)
+    try {
+      const result = await setMemberSubscribed(id, target.id, next)
+      if (result.error) { setRemoveError(actionError(result.error)); return }
+      setMessage(t('subscriptionChanged', { state: t(next ? 'followedState' : 'mutedState') }))
+      void mutate().catch(() => {})
+    } catch { setRemoveError(t('subscriptionChangeFailed')) }
+    finally { busy.current = false; setPending(false) }
+  }
+
   const normalizedQuery = query.trim().toLowerCase()
-  const visible = data ? [data.owner, ...data.members].filter(member => `${member.name} ${member.email}`.toLowerCase().includes(normalizedQuery)) : []
+  const visible = data ? [data.owner, ...data.members].filter((member): member is ListedMember => `${member.name} ${member.email}`.toLowerCase().includes(normalizedQuery)) : []
 
   return <>
     {/* The dialog is the only surface: sections and rows inside it carry no frame of their own. */}
@@ -106,7 +140,15 @@ export function IssueMembers({ id, onChanged }: { id: string; onChanged?: () => 
             <ItemMedia><UserAvatar user={member} /></ItemMedia>
             <ItemContent className="min-w-0"><ItemTitle>{member.name || member.email}{member.id === data.currentUserId && <Badge variant="outline">{t('you')}</Badge>}</ItemTitle><ItemDescription className="break-all">{member.email}</ItemDescription></ItemContent>
             <ItemActions>
-              {member.id === data.owner.id ? <Badge variant="secondary"><ShieldCheck />{t('owner')}</Badge> : <Badge variant="outline">{t('collaborator')}</Badge>}
+              {/* The task owner, or a member whose role lets them invite too (ALE-29). */}
+              {member.id === data.owner.id
+                ? <Badge variant="secondary"><ShieldCheck />{t('owner')}</Badge>
+                : <Badge variant={member.role === 'owner' ? 'secondary' : 'outline'}>{t(member.role === 'owner' ? 'memberRoleOwner' : 'memberRoleMember')}</Badge>}
+              {member.id !== data.owner.id && member.subscribed === false && <Badge variant="outline">{t('subscribedOff')}</Badge>}
+              {/* The owner hands out the invite role; nobody edits their own row's role. */}
+              {data.isOwner && member.id !== data.owner.id && <Button size="sm" variant="ghost" disabled={pending} onClick={() => void toggleRole(member)}>{t(member.role === 'owner' ? 'memberRoleMember' : 'memberRoleOwner')}</Button>}
+              {/* A member follows or mutes the task themselves; the owner may do it for them. */}
+              {(member.id === data.currentUserId || data.isOwner) && member.id !== data.owner.id && <Button size="sm" variant="ghost" disabled={pending} onClick={() => void toggleSubscription(member)}>{t(member.subscribed === false ? 'unmute' : 'mute')}</Button>}
               {data.isOwner && member.id !== data.owner.id && <Button size="sm" variant="ghost" disabled={pending} aria-label={t('removeAria', { name: member.name || member.email })} onClick={() => { setRemoving(member); setRemoveError('') }}>{t('remove')}</Button>}
             </ItemActions>
           </Item>)}
