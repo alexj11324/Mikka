@@ -8,6 +8,7 @@ import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
 import { issuesForUser } from '@/lib/issues-for-user'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import 'server-only'
+import { taskReviewSummaries } from '../coding-workspace/task-review/summaries'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
@@ -329,13 +330,13 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
     ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })),
     ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier })),
   ])
-  // The hint keeps the Review loader off reads whose tasks have no source.
+  // The hint avoids Review database reads for tasks with no source.
   const reviewIds = [...new Set([
     ...issueRows.filter(row => row.codingReview).map(row => row.id),
     ...[...tasks.values()].filter(task => task.codingReview).map(task => task.id),
   ])]
   const reviews = reviewIds.length
-    ? await (await import('../coding-workspace/task-review/summaries')).taskReviewSummaries(reader, reviewIds)
+    ? await taskReviewSummaries(reader, reviewIds)
     : new Map<string, TaskReviewSummary>()
   for (const { content, ownerId: _owner, scope: _scope, issuedIdentifier: _issued, codingReview: _codingReview, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)

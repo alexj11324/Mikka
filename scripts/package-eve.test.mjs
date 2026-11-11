@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -28,9 +28,11 @@ test('Vercel wrapper runs the upstream fetch handler with native request context
 test('prebuilt packaging keeps queue triggers and rejects mixed app/agent revisions', async t => {
   const root = await mkdtemp(join(tmpdir(), 'eve-packaging-'))
   t.after(() => rm(root, { recursive: true, force: true }))
-  const output = join(root, '.vercel/output'), source = join(root, 'apps/eve/.vercel/output')
+  const output = join(root, '.vercel/output'), source = join(root, 'apps/eve/.output')
   const functionPath = 'functions/.well-known/workflow/v1/flow.func'
   await mkdir(join(source, functionPath), { recursive: true })
+  await mkdir(join(source, 'functions/__server.func'), { recursive: true })
+  await mkdir(join(source, 'functions/eve/v1'), { recursive: true })
   await mkdir(join(output, 'functions/app.func'), { recursive: true })
   const revision = 'a'.repeat(40)
   const agent = { version: 1, revision, eve: '1.0.0-rc.9', preset: 'vercel' }
@@ -40,15 +42,27 @@ test('prebuilt packaging keeps queue triggers and rejects mixed app/agent revisi
   await save(join(source, 'config.json'), { version: 3, routes: [], crons: [{ path: '/eve/v1/cron/run', schedule: '* * * * *' }] })
   await save(join(source, functionPath, '.vc-config.json'), contract)
   await writeFile(join(source, functionPath, 'index.mjs'), 'export default { fetch() {} }')
+  await save(join(source, 'functions/__server.func/.vc-config.json'), { handler: 'index.mjs', runtime: 'nodejs24.x' })
+  await writeFile(join(source, 'functions/__server.func/index.mjs'), 'export default { fetch() { return Response.json({ upstream: true }) } }')
+  await symlink('../../__server.func', join(source, 'functions/eve/v1/session.func'), 'dir')
   await save(join(output, 'config.json'), { version: 3, routes: [{ src: '/(.*)', dest: '/app' }] })
   await save(join(output, 'mikka-build.json'), { revision: 'b'.repeat(40), resources: [], functions: [{ path: 'functions/app.func' }] })
   await assert.rejects(packageEve({ root, preset: 'vercel' }), /EVE_APP_BUILD_MISMATCH/)
   await save(join(output, 'mikka-build.json'), { revision, resources: [], functions: [{ path: 'functions/app.func' }] })
+  await mkdir(join(root, 'outside.func'))
+  await symlink(join(root, 'outside.func'), join(source, 'functions/escape.func'), 'dir')
+  await assert.rejects(packageEve({ root, preset: 'vercel' }), /EVE_FUNCTION_ALIAS_INVALID/)
+  await rm(join(source, 'functions/escape.func'))
   await packageEve({ root, preset: 'vercel' })
   const packaged = JSON.parse(await readFile(join(output, 'functions/_mikka_eve/.well-known/workflow/v1/flow.func/.vc-config.json'), 'utf8'))
   assert.deepEqual(packaged.experimentalTriggers, contract.experimentalTriggers)
   assert.equal(packaged.environment.EVE_PUBLIC_ROUTE_PREFIX, '/mikka/api/agents')
   assert.equal(packaged.supportsCancellation, true)
+  const alias = join(output, 'functions/_mikka_eve/eve/v1/session.func')
+  assert.equal((await lstat(alias)).isSymbolicLink(), true)
+  assert.equal(await realpath(alias), join(output, 'functions/_mikka_eve/__server.func'))
+  const service = (await import(pathToFileURL(join(alias, 'mikka-eve-entry.mjs')).href)).default
+  assert.deepEqual(await (await service.fetch(new Request('https://app.test/mikka/api/agents/eve/v1/session'), {})).json(), { upstream: true })
   const config = JSON.parse(await readFile(join(output, 'config.json'), 'utf8'))
   assert.deepEqual(config.routes.slice(0, 2), eveVercelRoutes())
   assert.equal(config.crons[0].path, '/mikka/api/agents/eve/v1/cron/run')

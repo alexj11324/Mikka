@@ -1,6 +1,6 @@
 import type { LanguageModel } from 'ai'
 import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
-import { hostedModelSelectionSchema, type HostedModelSelection } from './subscription-model-snapshot'
+import { hostedModelSelectionSchema, type HostedModelSelection } from './hosted-model-selection'
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 /** Only non-secret frozen references cross Workflow steps. Custody is resolved

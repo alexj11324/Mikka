@@ -1,3 +1,4 @@
+import { nativeCall, eveResponse } from '../../tests/support/eve-acceptance.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -154,19 +155,15 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
     }
     if (path === '/api/issues/search') return Response.json({ items: issues.filter(issue => issue.title.includes(url.searchParams.get('q')))
       .map(issue => ({ id: issue.id, ownerId: issue.userId, title: issue.title })), nextCursor: null, truncated: false })
-    if (path === '/api/coordinator/stream') {
+    if (path === '/api/agents/eve/v1/session') return Response.json({ ok: true, sessionId: 'wrun_domain' })
+    if (/^\/api\/agents\/eve\/v1\/session\/[^/]+\/stream$/.test(path)) {
       elapsed += dispatchAdvanceMs
       const selected = selectedRun
-      const events = [{ type: 'tool', name: 'dispatch_run', state: 'running', call: 'call-' + selected.issueId,
-        input: JSON.stringify({ issueId: selected.issueId, ...(requestKeyPreview ? { requestKey: selected.requestKey } : {}) }),
-        ...(!missingDispatchReference && !requestKeyPreview ? { quote: selected.note } : {}) }, { type: 'tool', name: 'dispatch_run',
-        state: selected.refused ? 'error' : 'done', call: 'call-' + selected.issueId,
-        ...(selected.refused ? { errorCode: 'subscriptionQuotaExhausted' } : { output: JSON.stringify({ runId: selected.id }) }) }]
-      if (foreignDispatchEvent) events.unshift(
-        { type: 'tool', name: 'dispatch_run', state: 'running', call: 'unrelated', input: JSON.stringify({ issueId: selected.issueId }), quote: '[1687:' + id(999) + '] other submission' },
-        { type: 'tool', name: 'dispatch_run', state: 'done', call: 'unrelated', output: JSON.stringify({ runId: runs.find(run => run.issueId === selected.issueId && run.foreign).id }) },
-      )
-      return new Response(events.map(event => JSON.stringify(event)).join('\n') + '\n', { headers: { 'content-type': 'application/x-ndjson' } })
+      const input = { issueId: selected.issueId, profileId: selected.profile.id,
+        ...(!missingDispatchReference ? { requestKey: selected.requestKey, ...(!requestKeyPreview ? { note: selected.note } : {}) } : {}) }
+      const events = nativeCall('call-' + selected.issueId, input, { runId: selected.id }, selected.refused ? 'subscriptionQuotaExhausted' : undefined)
+      if (foreignDispatchEvent) events.unshift(...nativeCall('unrelated', { issueId: selected.issueId, profileId: selected.profile.id, requestKey: id(999), note: '[1687:' + id(999) + '] other submission' }, { runId: runs.find(run => run.issueId === selected.issueId && run.foreign).id }))
+      return eveResponse(events)
     }
     if (path === '/api/factory/tasks') {
       const issueId = url.searchParams.get('issueId')
