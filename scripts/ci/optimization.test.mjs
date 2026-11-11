@@ -101,7 +101,11 @@ test('installed cache writes are main-only and a miss installs; hits do not inst
     const context = { inputs: { 'skip-electron': optIn }, env: { ELECTRON_SKIP_BINARY_DOWNLOAD: inherited } }
     assert.equal(evaluate(fingerprint.env.ELECTRON_SKIP_BINARY_DOWNLOAD, context), expected)
   }
-  // The desktop jobs install without the Electron runtime so the checksum-verifying
-  // installer owns it; the value is a literal there, not an expression.
-  for (const step of desktopInstalls) assert.equal(step.env.ELECTRON_SKIP_BINARY_DOWNLOAD, '1')
+  // Only `checks` installs without the Electron runtime: it only typechecks, lints
+  // and tests, so the checksum-verifying installer never runs there. `smoke` and
+  // `native-arm64` do install it, and main's credential boundary pins their
+  // install env to FFMPEG_GITHUB_TOKEN alone.
+  const [checksInstall, ...installerJobs] = desktopInstalls
+  assert.equal(checksInstall.env.ELECTRON_SKIP_BINARY_DOWNLOAD, '1')
+  for (const step of installerJobs) assert.equal(step.env.ELECTRON_SKIP_BINARY_DOWNLOAD, undefined)
 })

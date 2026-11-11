@@ -102,7 +102,6 @@ jobs:
           node-version: 24
       - name: Install dependencies
         env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
           FFMPEG_GITHUB_TOKEN: ${{ github.token }}
         run: pnpm install --frozen-lockfile
       - name: Install Chromium system dependencies
@@ -227,7 +226,6 @@ jobs:
           node-version: 24
       - name: Install dependencies
         env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
           FFMPEG_GITHUB_TOKEN: ${{ github.token }}
         run: pnpm install --frozen-lockfile
       - run: test "$(uname -m)" = arm64
