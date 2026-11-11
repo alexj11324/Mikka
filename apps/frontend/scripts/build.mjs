@@ -17,8 +17,8 @@ async function assetFiles(directory) {
   return result
 }
 
-export async function buildFrontend({ target = 'web', outdir = resolve(frontend, 'dist', target), clean = true, serverPages = false } = {}) {
-  const config = await frontendConfig({ target, outdir, clean, serverPages })
+export async function buildFrontend({ target = 'web', outdir = resolve(frontend, 'dist', target), clean = true, serverPages = false, publicTestFixture = false } = {}) {
+  const config = await frontendConfig({ target, outdir, clean, serverPages, publicTestFixture })
   outdir = resolve(config.root, config.build.outDir)
   // This directory belongs to the build. Complete its removal before Vite
   // writes anything, then verify the emitted inventory before publishing it.
@@ -45,7 +45,7 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
     fingerprint.update(content)
   }
   const rendererBuild = fingerprint.digest('hex')
-  const result = { ...inventory, rendererBuild, ...(serverPages && { serverPages: true }) }
+  const result = { ...inventory, rendererBuild }
   await writeFile(resolve(outdir, 'renderer-build.js'), `export const rendererBuild = ${JSON.stringify(rendererBuild)};\n`)
   await writeFile(resolve(outdir, 'renderer-manifest.json'), `${JSON.stringify(result, null, 2)}\n`)
   // Next served this source icon as metadata; retain it in the static build.
@@ -63,6 +63,6 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const target = process.argv.includes('--desktop') ? 'desktop' : 'web'
-  const result = await buildFrontend({ target, serverPages: process.argv.includes('--server-pages') })
+  const result = await buildFrontend({ target, serverPages: process.argv.includes('--server-pages'), publicTestFixture: process.argv.includes('--public-test-fixture') })
   process.stdout.write(`${JSON.stringify({ target, rendererBuild: result.rendererBuild, actions: result.usedActions.length, exports: result.exports, serverModules: result.serverModules })}\n`)
 }

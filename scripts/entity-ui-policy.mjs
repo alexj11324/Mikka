@@ -23,7 +23,7 @@ export const entityContracts = [
     sources: [['apps/mobile/features/chat/screens/chat-screen.tsx', 'ChatScreen']] },
   { entity: 'Group conversation', routes: [['apps/mobile/app/groups/[id].tsx', 'GroupChat']],
     sources: [['lib/group-messages.ts', 'groupMessagesUrl', 'postGroupMessage']] },
-  { entity: 'Bot name', detail: ['components/nav/bot-name-editor.tsx', 'BotNameEditor'],
+  { entity: 'Bot name', detail: ['components/nav/bot-overview.tsx', 'BotOverviewBody'],
     sources: [['components/nav/use-save-bot.ts', 'useSaveBot'], ['app/actions/bots.ts', 'updateBot']] },
   { entity: 'Settings device', sources: [['components/devices/use-device-actions.ts', 'useDeviceActions'],
     ['app/actions/agents.ts', 'renameDevice', 'setDeviceEnabled', 'removeDevice', 'sendDeviceCommand']] },

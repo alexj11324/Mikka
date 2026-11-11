@@ -16,6 +16,7 @@ export type CoordinatorMessageContext = {
   quote?: ArtifactQuote | null
   botId?: string | null
   taskCommand?: DispatchTaskIntent
+  confirmTaskAccess?: boolean
   taskDestination?: TaskDestination
   profileId?: string
   /** The composer's captured target; the server checks it against its trusted selection. */
@@ -39,7 +40,9 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
     const { data, error } = await authClient.getSession({ query: { disableCookieCache: true } })
     if (error) return { kind: 'uncertain' }
     if (!data?.user.id) return { kind: 'authRequired' }
-    const body = JSON.stringify([data.user.id, trimmed, context ?? null])
+    // The confirmation replays one refused command. It is not a new message.
+    const { confirmTaskAccess: _confirmation, ...immutable } = context ?? {}
+    const body = JSON.stringify([data.user.id, trimmed, context ? immutable : null])
     // Another message may be sent before this one's uncertain result is retried.
     // Retain each unresolved key; the native server remains the dedupe authority.
     let operation = operations.current.get(body)
@@ -68,7 +71,7 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
       if (operation.delivered) return { kind: 'uncertain' }
       const outcome = coordinatorSendFailure(error)
       if (outcome.kind === 'conflict') operations.current.set(body, { ...operation, conflict: true })
-      else if (outcome.kind !== 'uncertain' && outcome.kind !== 'authRequired') operations.current.delete(body)
+      else if (outcome.kind !== 'uncertain' && outcome.kind !== 'authRequired' && !(outcome.kind === 'rejected' && outcome.error === 'accessChangeConfirmationRequired')) operations.current.delete(body)
       return outcome
     }
   }, [agent?.send])

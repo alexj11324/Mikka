@@ -24,13 +24,15 @@ import { readPresentedTasks } from '../model/task-presentation-read'
 import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
 
 /** The person's tasks (GET /api/mobile/tasks), read again when a task or one of its threads changes (the live channel). */
-export function useTasks(enabled = true) {
+export function useTasks(enabled = true, botId?: string) {
   const home = useHome().data
-  const list = useLiveApi<{ tasks: Task[]; workspaceId: string; next?: TaskListPageInput['after'] | null }>(enabled ? '/api/mobile/tasks' : null,
+  const selected = home?.workspace.id
+  const path = botId ? selected ? '/api/mobile/tasks?' + new URLSearchParams({ workspaceId: selected, dispatchedBy: botId }) : null : '/api/mobile/tasks'
+  const list = useLiveApi<{ tasks: Task[]; workspaceId: string; next?: TaskListPageInput['after'] | null }>(enabled ? path : null,
     list => tasksLive(home?.live?.workspaceId, list?.workspaceId ?? home?.workspace.id, list?.tasks.map(task => task.id)), readPresentedTasks)
   const paging = useTaskContinuation(list.data?.tasks ?? [], list.data, list.data?.next ?? null, async after => {
     const workspaceId = list.data!.workspaceId
-    const params = new URLSearchParams({ workspaceId, after: after.id, updatedAt: after.updatedAt })
+    const params = new URLSearchParams({ workspaceId, after: after.id, updatedAt: after.updatedAt, ...(botId ? { dispatchedBy: botId } : {}) })
     const page = await readPresentedTasks('/api/mobile/tasks?' + params).catch(async error => {
       if (error instanceof ApiError && error.status === 409) await list.reload()
       throw error
@@ -48,10 +50,10 @@ export function useTasks(enabled = true) {
  */
 export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFilter; bot?: string; bottom?: number }) {
   const insets = useSafeAreaInsets()
-  const { data, error, loading, reload, paging } = useTasks()
+  const { data, error, loading, reload, paging } = useTasks(true, bot)
   const refresh = useRefresh(reload)
   const [toggled, setToggled] = useState<ReadonlySet<TaskGroup>>(new Set())
-  const tasks = bot ? paging.items.filter(task => task.bot?.id === bot) : [...paging.items]
+  const tasks = bot ? paging.items.filter(task => task.dispatchedBy === bot || task.bot?.id === bot) : [...paging.items]
   const rows = taskListRows(tasks, toggled, filter)
   const toggle = (id: TaskGroup) => setToggled(current => {
     const next = new Set(current)

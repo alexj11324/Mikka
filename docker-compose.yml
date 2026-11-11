@@ -10,7 +10,6 @@ services:
       - "127.0.0.1:${MIKKA_PORT:-3000}:3000"
     environment:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
-      MIKKA_COMMUNITY_UI: ${MIKKA_COMMUNITY_UI:-0}
       MIKKA_DATABASE_URL: postgres://mikka:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/mikka
       DATABASE_URL: postgres://mikka:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/mikka
       MIKKA_EMAIL_FROM: ${MIKKA_EMAIL_FROM:-}

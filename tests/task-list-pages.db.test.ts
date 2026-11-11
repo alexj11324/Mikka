@@ -38,6 +38,20 @@ test('authorized Task collection traverses every threadless issue, including mic
     await assert.rejects(run(() => listWorkspaceTaskPage({ workspaceId: foreign, after: cursor })), /workspaceAccessDenied/)
     const anchor = (await pool.query('select id from issues where "userId"=$1', [other])).rows[0].id
     assert.deepEqual(await run(() => listWorkspaceTaskPage({ workspaceId, after: { ...cursor, id: anchor } })), { workspaceId, items: [], next: null, reset: true })
+    const { seedAgent, seedBot, seedRun } = await import('./support/workspace-admin-db')
+    const agent = await seedAgent(pool, user)
+    const firstBot = await seedBot(pool, workspaceId, user, 'First dispatcher'), laterBot = await seedBot(pool, workspaceId, user, 'Later dispatcher')
+    const foreignBot = await seedBot(pool, foreign, other, 'Private dispatcher')
+    const shared = last.items[0].id, laterOnly = last.items[1].id
+    for (const [id, botId] of [[shared, firstBot], [shared, laterBot], [laterOnly, laterBot]]) {
+      await seedRun(pool, { userId: user, agentId: agent, workspaceId, botId, issueId: id, status: 'done' })
+    }
+    const byBot = (dispatchedBy: string) => run(() => listWorkspaceTaskPage({ workspaceId, after: null, dispatchedBy }))
+    assert.deepEqual((await byBot(firstBot)).items.map(row => row.id), [shared])
+    assert.deepEqual(new Set((await byBot(laterBot)).items.map(row => row.id)), new Set([shared, laterOnly]))
+    assert.deepEqual((await byBot(foreignBot)).items, [])
+    assert.equal((await run(() => listWorkspaceTaskPage({ workspaceId, after: cursor, dispatchedBy: firstBot }))).reset, true, 'cursor must belong to the filtered set')
+    await pool.query('delete from agent_runs where "userId"=$1', [user])
     await pool.query('update issues set "updatedAt"=now() where id=$1', [cursor.id])
     assert.equal((await run(() => listWorkspaceTaskPage({ workspaceId, after: cursor }))).reset, true)
   } finally {

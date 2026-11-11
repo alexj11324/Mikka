@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { TaskListPageInput } from '../task-list-page'
 
-type Cursor = TaskListPageInput['after']
+type Cursor = NonNullable<TaskListPageInput['after']>
 type Page<T> = { items: readonly T[]; next: Cursor | null }
 
 /** A live first-page replacement retires older authorized pages. Continuations

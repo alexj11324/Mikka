@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ComponentType, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import useSWR from 'swr'
 import { toast } from 'sonner'
@@ -19,6 +19,7 @@ import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } fr
 import { BotLookPicker } from './bot-look-picker'
 import { useBotPublicRole } from './bot-public-role-editor'
 import { useSaveBot } from './use-save-bot'
+import { BotOverview } from '@ui-slot/bot-overview'
 import type { BotOverviewItem, BotOverviewProps, BotOverviewTab } from '@/components/slots/bot-overview-contract'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -51,7 +52,7 @@ export function useBotLibrary(botId: string | null, enabled = true) {
   return { items, loadError: !!error && !data, remove }
 }
 
-/** An ordinary bot's rename and look saves, as BotNameEditor and BotLookEditor do them. */
+/** An ordinary bot's authorized name and appearance commands. */
 function useBotEdits(botId: string, color?: string, shape?: string): NonNullable<BotOverviewProps['edit']> {
   const t = useTranslations('Shell.panel')
   const actionError = useActionError()
@@ -75,12 +76,12 @@ function useBotEdits(botId: string, color?: string, shape?: string): NonNullable
 }
 
 /** 电脑, as AgentComputer gives it: the person's E2B key decides between the screen and 添加 E2B API Key. */
-function useComputer(target: { botId: string; name: string } | null, workspaceId: string | undefined) {
+function useComputer(target: { botId: string; name: string } | null, workspaceId: string | undefined, visible: boolean) {
   const [viewing, setViewing] = useState(false)
   const [adding, setAdding] = useState(false)
   const keyDialog = usePresence(adding)
   const mocked = target ? isMockedComputer(target.botId) : true
-  const status = useE2BKeyStatus(target && !mocked ? workspaceId : null)
+  const status = useE2BKeyStatus(target && !mocked && (visible || viewing || adding) ? workspaceId : null)
   const key = status.data && !status.data.error ? status.data : null
   if (!target) return { computer: null, dialogs: null }
   const loading = !mocked && !status.data && !status.error
@@ -98,8 +99,8 @@ function useComputer(target: { botId: string; name: string } | null, workspaceId
   return { computer, dialogs }
 }
 
-function RoleOf({ botId, workspaceId, children }: { botId: string; workspaceId?: string; children: (role: BotOverviewProps['details']['role']) => ReactNode }) {
-  return children(useBotPublicRole(botId, workspaceId))
+function RoleOf({ botId, workspaceId, visible, children }: { botId: string; workspaceId?: string; visible: boolean; children: (role: BotOverviewProps['details']['role']) => ReactNode }) {
+  return children(useBotPublicRole(botId, workspaceId, visible))
 }
 
 function EditsOf({ botId, color, shape, children }: { botId: string; color?: string; shape?: string; children: (edit: BotOverviewProps['edit']) => ReactNode }) {
@@ -107,11 +108,10 @@ function EditsOf({ botId, color, shape, children }: { botId: string; color?: str
 }
 
 /**
- * The 概览 tab's body through a UI layer's bot-overview slot: ContextPanel's state (the tab, the search, the bot's
- * threads and computer) plus the reads and saves its old body did in place (name, look, public role, library, PRs).
+ * The frame tab, standalone column and sheet share the Bot's name, appearance, public role,
+ * library, pull requests, computer and edit commands.
  */
-export function BotOverviewBody({ View, conversation, tabs, tab, onTab, query, onQuery, workspaceId, threads, issues, tasks, computer: target }: {
-  View: ComponentType<BotOverviewProps>
+export function BotOverviewBody({ conversation, tabs, tab, onTab, query, onQuery, workspaceId, threads, issues, tasks, computer: target }: {
   conversation: BotOverviewProps['conversation']
   tabs: { id: BotOverviewTab; label: string }[]
   tab: BotOverviewTab
@@ -127,10 +127,10 @@ export function BotOverviewBody({ View, conversation, tabs, tab, onTab, query, o
 }) {
   const t = useTranslations('Shell.panel')
   const botId = conversation.kind === 'bot' ? conversation.id ?? null : null
-  const { computer, dialogs } = useComputer(target, workspaceId)
+  const { computer, dialogs } = useComputer(target, workspaceId, tab === 'computer')
   // A bot's or the Coordinator's own documents; an older chat has no library.
   const own = botId !== null || conversation.kind === 'coordinator'
-  const files = useBotLibrary(botId, own)
+  const files = useBotLibrary(botId, own && tab === 'details')
   const library = { items: files.items, loadError: files.loadError, ...(own ? { onDelete: files.remove } : {}) }
   const all = pullRequestsOf(threads, issues)
   const rows = all.filter(row => {
@@ -147,9 +147,9 @@ export function BotOverviewBody({ View, conversation, tabs, tab, onTab, query, o
       }) }
     }).filter(group => group.rows.length),
   }
-  const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit']) => <View conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
+  const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit']) => <BotOverview conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
     edit={edit} details={{ role, routines: [], library }} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
   if (!botId) return draw(null, null)
-  return <RoleOf key={botId} botId={botId} workspaceId={workspaceId}>{role =>
+  return <RoleOf key={botId} botId={botId} workspaceId={workspaceId} visible={tab === 'details'}>{role =>
     <EditsOf botId={botId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit)}</EditsOf>}</RoleOf>
 }

@@ -35,7 +35,7 @@ import { PullRequestStatus } from './issue-pull-request-link'
 
 type Issue = IssueView
 
-/** What TaskForm hands over when a layer draws the page (components/workspace/task-detail.tsx). */
+/** Data and commands the shared Task controller supplies to the official renderer. */
 export type FramedTaskProps = {
   Frame: ComponentType<TaskDetailFrameProps>
   rootRef: RefObject<HTMLDivElement | null>
@@ -86,10 +86,6 @@ export type FramedTaskProps = {
 
 const REOPENED = 'todo'
 
-/**
- * A task's page drawn by a layer (task-detail slot): every value, choice and save of the community page, as data
- * and actions. The layer draws them with its own controls; the editor, 验收, an open thread and the dialogs stay Mikka's.
- */
 export function FramedTask(props: FramedTaskProps) {
   const { Frame, task, preview, locked, userId, onOpen, getCurrent, adopt } = props
   const t = useTranslations('IssueDetail')

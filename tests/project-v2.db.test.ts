@@ -258,6 +258,27 @@ test('Project v2: split database migration, canonical relationships and live ten
       assert.equal(unchanged.leadUserId, owner)
     })
 
+    await t.test('Project viewers share the stored people and receive their own current write permission', async () => {
+      const { changeResourceAccess } = await import('../lib/resource-access/store')
+      const reference = { kind: 'project' as const, id: createdId, workspaceId: alpha }
+      const policy = async () => (await application.query('select revision from resource_access_policies where kind=$1 and id=$2', ['project', createdId])).rows[0]
+      await changeResourceAccess(member, reference, { expectedRevision: (await policy()).revision, visibility: 'private', confirmExpansion: true,
+        grants: [{ subjectId: owner, capabilities: ['canReadContent'], expiresAt: null }] })
+      try {
+        for (const [viewer, canEdit] of [[owner, false], [member, true]] as const) {
+          const [view] = await accessibleProjects(viewer, projectDb, alpha, createdId)
+          assert.equal(view.canEditProperties, canEdit)
+          assert.equal(view.leadUserId, owner)
+          assert.deepEqual(view.memberIds.toSorted(), [member, owner].sort())
+        }
+        const refused = await actAs(owner, () => actions.updateProjectProperties({ id: createdId, workspaceId: alpha, revision: 1, changes: { memberIds: [owner] } }))
+        assert.ok('error' in refused)
+        assert.deepEqual((await accessibleProjects(member, projectDb, alpha, createdId))[0].memberIds.toSorted(), [member, owner].sort())
+      } finally {
+        await changeResourceAccess(member, reference, { expectedRevision: (await policy()).revision, visibility: 'shared', grants: [], confirmExpansion: true })
+      }
+    })
+
     await t.test('more than 100 tasks and a different optional Team are allowed in the same tenant', async () => {
       const many = await makeTasks(alpha, 125)
       await workspace.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`, [many[0], secondTeam, alpha, owner])

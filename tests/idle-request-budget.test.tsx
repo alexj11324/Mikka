@@ -8,6 +8,7 @@ import { LIVE_KINDS } from '../lib/live/events'
 import { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE } from '../lib/bot-shapes'
 import { issueWithMetadata } from '../lib/issue-metadata'
 import { taskPresentation } from '../lib/task-presentation'
+import type { BoardScreenProps } from '../components/slots/board-contract'
 
 // Idle request budget (#1212): each main page's real client component, real SWR with the app's defaults
 // (components/swr-defaults.tsx) and a healthy live channel, over one idle, visible minute on fake timers.
@@ -48,6 +49,21 @@ mock.module(new URL('components/nav/bot-avatar.tsx', root).href, { namedExports:
   BOT_MOOD_SECONDS: { idle: 2.4, thinking: 2.6, wink: 1.6, exclaim: 2, sleep: 2.4, wide: 1.8, hexagon: 1.6, burst: 2.6 }, colorFor: () => DEFAULT_BOT_COLOR,
   COORDINATOR_AVATAR: { color: 'encre', shape: 'cercle' }, CoordinatorAvatar: avatar, BotAvatar: avatar,
 } })
+
+// Keep the real Task controller, document reader and open run during the budget measurement.
+let BudgetThreadPanel: typeof import('../components/workspace/issue-thread-panel').IssueThreadPanel
+mock.module(new URL('components/slots/task-conversation.tsx', root).href, { namedExports: {
+  TaskConversation: ({ issueId, runId }: import('../components/slots/task-conversation-contract').TaskConversationProps) =>
+    <BudgetThreadPanel issueId={issueId} runId={runId} bare />,
+} })
+mock.module(new URL('components/slots/task-detail.tsx', root).href, { namedExports: {
+  TaskDetailFrame: (props: import('../components/slots/task-detail-contract').TaskDetailFrameProps) =>
+    <section><h1>{props.title}</h1>{props.description({ afterDescription: null, activity: () => null })}{props.panel}{props.dialogs}</section>,
+} })
+// The full Bot container still owns all measured reads. Its official slot only paints data.
+mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) =>
+  <section>{entries?.map(entry => <div key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, i) =>
+    part.kind === 'text' ? <span key={i}>{part.node || part.text}</span> : null)}</div>)}</section> } })
 
 // Feature flags come from PostHog, not from Mikka's server.
 mock.module('posthog-js', { defaultExport: { getFeatureFlag: () => undefined, onFeatureFlags: () => () => {}, capture: () => {}, isFeatureEnabled: () => false } })
@@ -116,6 +132,14 @@ before(async () => {
     if (value !== undefined) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: typeof value === 'function' && !/^[A-Z]/.test(key) ? (value as (...args: unknown[]) => unknown).bind(browser) : value })
   }
   for (const [key, value] of Object.entries({ window: browser, requestAnimationFrame: timers.requestAnimationFrame, cancelAnimationFrame: timers.cancelAnimationFrame, WebSocket: FakeSocket, IS_REACT_ACT_ENVIRONMENT: true })) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
+  // The official board supplies the layout. Mount the real toolbar, card menus
+  // and their subscriptions while the public-only fixture renders their props.
+  const board = await import('../components/slots/board')
+  const { Button } = await import('../components/ui/button')
+  mock.module('@ui-slot/board', { namedExports: { ...board,
+    BoardScreen: ({ cards, tools, wrapCard, onOpen }: BoardScreenProps) => <>{tools}<ul>{cards.map(card =>
+      <li key={card.id} data-board-task={card.id} data-task-state={card.state?.kind}>{wrapCard(card.id, <Button onClick={() => onOpen(card.id)}>{card.title}</Button>)}</li>)}</ul></>,
+  } })
   // happy-dom has no Web Animations; Base UI asks for running animations before it unmounts a popup.
   const elementPrototype = browser.Element.prototype as unknown as { getAnimations?: () => unknown[] }
   elementPrototype.getAnimations ??= () => []
@@ -160,10 +184,11 @@ async function measure(page: ReactNode) {
   // Dialogs and sheets render in a portal on the body.
   const text = document.body.textContent ?? ''
   const chatLoadFailure = Boolean(document.querySelector('[data-chat-failure=load]'))
+  const boardStates = new Map(Array.from(document.querySelectorAll<HTMLElement>('[data-board-task]'), item => [item.dataset.boardTask, item.dataset.taskState ?? null] as const))
   await act(async () => { view.unmount() }); container.remove()
   // Nothing a page left scheduled may fire into the next page's count.
   fakeClock(Date.now())
-  return { idle, missing: new Set(missing), sockets: open, text, chatLoadFailure }
+  return { idle, missing: new Set(missing), sockets: open, text, chatLoadFailure, boardStates }
 }
 
 const OWNER = '10000000-0000-4000-8000-000000000001'
@@ -204,6 +229,8 @@ Object.assign(fixtures, {
       id, taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, undefined, null, () => false),
     ])),
   }),
+  'teams.listTeams': () => [],
+  'team-relations.getIssueTeam': () => null,
   // The authorized live scope each read returns (app/actions/collaboration.ts, agents.ts).
   'collaboration.exchangeDocument': () => ({ version: 'v1', workspaceId: WORKSPACE }),
   'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true, live: { workspaceId: WORKSPACE } }),
@@ -242,6 +269,7 @@ routes['/api/approved-writes'] = () => ({ enabled: false })
 // Sub-agent login prompts: one read on mount, then only on a subagent_events push.
 routes['/api/computer/events'] = url => ({ events: [], cursor: url.searchParams.get('after') ?? '0', hasMore: false })
 routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, workspaceId: url.searchParams.get('workspaceId') })
+routes['/api/factory/questions'] = () => ({ questions: [] })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
@@ -280,10 +308,15 @@ const shows: Record<string, string[]> = {
 const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
     const { BoardPage } = await import('../components/workspace/board-page')
-    return <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
+    const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
+    const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed' }, null, () => false)
+    return <TaskPresentationsContext.Provider value={{ [ISSUE]: failed }}>
+      <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
+    </TaskPresentationsContext.Provider>
   },
   // A task with a running thread open on the right, its relations and its members (the members dialog's body).
   'task-detail': async () => {
+    ;({ IssueThreadPanel: BudgetThreadPanel } = await import('../components/workspace/issue-thread-panel'))
     const { TaskDetail } = await import('../components/workspace/task-detail')
     const { IssueMembers } = await import('../components/workspace/issue-members')
     return <><TaskDetail id={ISSUE} thread={RUN} origin="Board" user={user} navigation={{ index: 0, total: 1, onOpen: noop }} onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={noop} /><IssueMembers id={ISSUE} /></>
@@ -339,6 +372,10 @@ for (const [name, page] of Object.entries(pages)) test(`${name}: an idle, visibl
   assert.deepEqual([...result.missing], [], 'every read the page makes has a fixture, so no failure retries are counted')
   assert.equal(result.chatLoadFailure, false, 'the native chat session must be healthy before its idle budget is accepted')
   for (const words of shows[name]) assert.ok(result.text.includes(words), `${name} shows “${words}”`)
+  if (name === 'board') {
+    assert.equal(result.boardStates.get(ISSUE), 'blocked', 'the Board uses the authorized failed Run projection')
+    assert.equal(result.boardStates.get(boardIssues[2]!.id), null, 'a card with no authorized presentation shows no inferred execution state')
+  }
   assert.equal(result.sockets.open, result.sockets.opened, 'every live channel the page opened is still connected')
   const allowed = budgets.pages[name] ?? {}
   const over = [...result.idle].filter(([call, calls]) => calls > (allowed[call]?.max ?? 0)).map(([call, calls]) => `${call}: ${calls} calls, budget ${allowed[call]?.max ?? 0}`)

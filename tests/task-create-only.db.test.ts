@@ -9,7 +9,7 @@ import type { CreateOnlyCommand } from '../lib/task-create-command'
 const enabled = disposableDatabase()
 if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Task creation requires a disposable loopback database')
 
-test('a create-only command has one durable Task receipt and no dispatch or inference', { skip: !enabled }, async () => {
+test('a create-only command has one durable Task receipt and no dispatch or inference', { skip: !disposableDatabase() }, async () => {
   const { pool } = await import('../lib/db')
   const { createTaskOnly } = await import('../app/actions/issues')
   const { getTaskPresentation } = await import('../app/actions/task-domain')
@@ -67,6 +67,11 @@ test('an explicit automatic-destination dispatch is bound before execution and c
     const request = () => new Request('http://localhost/agent', { headers: { 'x-mikka-submission-id': requestId } })
     const read = () => withActivitySession(user, () => getDispatchedTaskReceipt(args), workspaceId)
     assert.equal(await read(), null)
+    const removedProject = { ...context, taskCommand: { ...context.taskCommand, projectId: randomUUID() } }
+    const refused = new Request('http://localhost/agent', { headers: { 'x-mikka-submission-id': randomUUID(), cookie: 'fixture=1' } })
+    await assert.rejects(withActivitySession(user, () => acceptEveMessage(scope, text, removedProject, refused), workspaceId), /projectMoveFailed/)
+    assert.equal((await pool.query('select 1 from coordinator_events where "userId"=$1 and kind=$2', [user, 'user_message'])).rowCount, 0, 'a refused create must not leave a pending dispatch')
+    assert.equal((await pool.query('select 1 from issues where "userId"=$1', [user])).rowCount, 0)
     const first = request(), second = request()
     const [{ eventId }, replay] = await Promise.all([acceptEveMessage(scope, text, context, first), acceptEveMessage(scope, text, context, second)])
     assert.equal(eventId, replay.eventId)
@@ -98,6 +103,22 @@ test('an explicit automatic-destination dispatch is bound before execution and c
     for (const result of factory) assert.ok(result !== null && typeof result === 'object' && !('error' in result), JSON.stringify(result))
     assert.equal((await pool.query('select count(*)::int n from issues where "userId"=$1', [user])).rows[0].n, 1)
     assert.deepEqual((await pool.query('select "issueId" from factory_tasks where "userId"=$1', [user])).rows, [{ issueId: receipt.taskId }])
+    const { requestedTaskSelection } = await import('../lib/factory/profile-request')
+    const selection = await requestedTaskSelection(pool, { ownerId: user, workspaceId, botId }, eventId, undefined)
+    assert.equal(selection.commandIssueId, receipt.taskId)
+    const { seedAgent, seedRun } = await import('./support/workspace-admin-db')
+    const agentId = await seedAgent(pool, user)
+    const runId = await seedRun(pool, { userId: user, agentId, workspaceId, botId, issueId: receipt.taskId, status: 'done' })
+    const { rows: [boundFactory] } = await pool.query('select id from factory_tasks where "userId"=$1 and "issueId"=$2', [user, receipt.taskId])
+    await pool.query('insert into factory_events ("taskId","eventId",request,result) values ($1,$2,$3,$4)', [boundFactory.id, randomUUID(),
+      JSON.stringify({ key: 'fixture-physical-queue', digest: 'fixture', sourceEventId: eventId }), JSON.stringify({ runId })])
+    const { dispatchToTask } = await import('../lib/thread-dispatch')
+    const again = () => dispatchToTask(user, receipt.taskId, { creation: { eventId, botId, workspaceId }, note: 'Regenerated tool note',
+      start: async () => { throw new Error('must not run again') } })
+    const replays = await Promise.all([again(), again()])
+    for (const replay of replays) assert.deepEqual(replay, { thread: 'existing', runId, threadId: runId })
+    assert.equal((await pool.query('select 1 from agent_runs where "issueId"=$1', [receipt.taskId])).rowCount, 1)
+    await pool.query('delete from agent_runs where "userId"=$1', [user])
     await pool.query('delete from factory_tasks where "userId"=$1', [user])
     // Deletion retains the command tombstone even if the owning user event cascades.
     await pool.query('delete from issues where id=$1', [receipt.taskId])
@@ -105,5 +126,68 @@ test('an explicit automatic-destination dispatch is bound before execution and c
     await assert.rejects(acceptEveMessage(scope, text, context, request()), /submissionConflict|issueNotFound/)
   } finally {
     await pool.query('delete from "user" where id=$1', [user])
+  }
+})
+
+
+test('an explicit Team backlog task checks the exact selected tenant and reconciles repeated creates without dispatch', { skip: !disposableDatabase() }, async () => {
+  const { pool } = await import('../lib/db')
+  const { createTaskOnly } = await import('../app/actions/issues')
+  const { seedUser, seedWorkspace, seedTeam } = await import('./support/workspace-admin-db')
+  const user = await seedUser(pool, 'Task team owner'), other = await seedUser(pool, 'Other workspace owner')
+  try {
+    const workspace = await seedWorkspace(pool, user, [{ userId: user, role: 'admin' }]), foreign = await seedWorkspace(pool, other, [{ userId: other, role: 'admin' }])
+    const { id: team } = await seedTeam(pool, workspace.id, user), { id: foreignTeam } = await seedTeam(pool, foreign.id, other)
+    const input = { version: 1 as const, intent: 'create_only' as const, workspaceId: workspace.id, teamId: team, requestId: randomUUID(),
+      title: 'A team backlog item', content: { type: 'doc' }, priority: 'normal' as const, status: 'todo' as const }
+    const send = (command: typeof input) => withActivitySession(user, () => createTaskOnly(command), workspace.id)
+    assert.equal((await send({ ...input, teamId: foreignTeam })).error, 'teamIssueAccessDenied')
+    assert.equal((await pool.query('select 1 from issues where "userId"=$1', [user])).rowCount, 0)
+    const results = await Promise.all([send(input), send(input)])
+    assert.ok('taskId' in results[0], JSON.stringify(results))
+    assert.deepEqual(results[1], results[0])
+    const id = results[0].taskId
+    assert.deepEqual((await pool.query('select "teamId","workspaceId" from mikka_team_issues where "issueId"=$1', [id])).rows, [{ teamId: team, workspaceId: workspace.id }])
+    assert.equal((await pool.query('select 1 from agent_runs where "issueId"=$1', [id])).rowCount, 0)
+    assert.equal((await pool.query('select 1 from coordinator_events where "issueId"=$1', [id])).rowCount, 0)
+  } finally {
+    await pool.query('delete from issues where "userId"=any($1::text[])', [[user, other]])
+    await pool.query('delete from "user" where id=any($1::text[])', [[user, other]])
+  }
+})
+
+test('Project UUID is checked before commit and survives duplicate names, rename, retries and a subsequent move', { skip: !enabled }, async () => {
+  const { pool } = await import('../lib/db')
+  const { createTaskOnly } = await import('../app/actions/issues')
+  const { moveIssueToProject } = await import('../app/actions/projects')
+  const { seedUser, seedPersonalWorkspace, seedProject } = await import('./support/workspace-admin-db')
+  const user = await seedUser(pool, 'Project-task-owner'), other = await seedUser(pool, 'Unrelated-project-owner')
+  try {
+    const workspaceId = await seedPersonalWorkspace(pool, user)
+    const first = await seedProject(pool, user, []), target = await seedProject(pool, user, []), foreign = await seedProject(pool, other, [])
+    const input: CreateOnlyCommand = { version: 1, intent: 'create_only', workspaceId, projectId: target, requestId: randomUUID(),
+      title: 'Project task', content: { type: 'doc' }, status: 'todo', priority: 'normal' }
+    const run = <T,>(operation: () => Promise<T>) => withActivitySession(user, operation, workspaceId)
+    assert.ok((await run(() => createTaskOnly({ ...input, projectId: foreign }))).error)
+    assert.equal((await pool.query('select 1 from issues where "userId"=$1', [user])).rowCount, 0)
+    assert.equal((await pool.query('select 1 from task_creation_receipts where "userId"=$1', [user])).rowCount, 0)
+    await pool.query('update workspace_projects set name=$2 where id=$1', [target, 'Renamed target'])
+    const receipt = await run(() => createTaskOnly(input))
+    assert.ok('taskId' in receipt && receipt.taskId, JSON.stringify(receipt))
+    const taskId = receipt.taskId
+    const relation = async () => (await pool.query('select "projectId" from workspace_project_tasks where "issueId"=$1', [taskId])).rows[0]?.projectId
+    assert.equal(await relation(), target)
+    assert.deepEqual(await run(() => createTaskOnly(input)), receipt)
+    await pool.query('delete from workspace_project_tasks where "issueId"=$1', [taskId])
+    assert.deepEqual(await run(() => createTaskOnly(input)), receipt, 'a lost Workspace commit is repairable from the original APP binding')
+    assert.equal(await relation(), target)
+    const revision = (await pool.query('select revision from issues where id=$1', [taskId])).rows[0].revision
+    assert.ok('issue' in await run(() => moveIssueToProject({ workspaceId, projectId: first, issueId: taskId, revision })))
+    assert.deepEqual(await run(() => createTaskOnly(input)), receipt)
+    assert.equal(await relation(), first)
+    assert.equal((await pool.query('select 1 from agent_runs where "issueId"=$1', [taskId])).rowCount, 0)
+  } finally {
+    await pool.query('delete from issues where "userId"=any($1::text[])', [[user, other]])
+    await pool.query('delete from "user" where id=any($1::text[])', [[user, other]])
   }
 })

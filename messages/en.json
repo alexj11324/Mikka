@@ -1,4 +1,19 @@
 {
+  "ServerStatus": {
+    "title": "Mikka server",
+    "address": "Server address",
+    "version": "Version",
+    "web": "Open Mikka Web",
+    "desktop": "Download Mikka Desktop",
+    "iosUnavailable": "To use the iOS app, enable its sign-in origin on this server.",
+    "ios": "In Mikka for iOS, choose this address on the sign-in screen.",
+    "create": "Create the first account",
+    "ready": "Ready",
+    "unavailable": "Unavailable",
+    "configuration": "Configuration",
+    "database": "Database",
+    "authentication": "Authentication"
+  },
   "MobileTaskSchedule": {
     "daily": "Every day at {time}",
     "interval": "Every {minutes, plural, one {1 minute} other {# minutes}}"
@@ -1786,6 +1801,9 @@
       "leadUnset": "Unassigned",
       "leadNone": "No lead",
       "currentAccount": "Current account",
+      "directoryUnavailable": "Member directory unavailable",
+      "unavailablePerson": "Former member",
+      "inactivePerson": "{name} (suspended)",
       "memberCurrentAccount": "Currently accessible account",
       "dependencyCount": "{count, plural, =1 {1 dependency} other {# dependencies}}"
     },
