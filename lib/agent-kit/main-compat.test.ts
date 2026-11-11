@@ -314,8 +314,12 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    if(sql==='INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)'){
     assert.ok(insertedRunId);assert.deepEqual(args,[insertedRunId,botId,workspace,owner]);return fixtureRows([])
    }
-   if(sql===`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`){
-    assert.ok(insertedRunId);assert.equal(args.length,5);assert.deepEqual(args.slice(0,4),[insertedRunId,workspace,owner,botId]);assert.match(String(args[4]),/^[0-9a-f-]{36}$/)
+   if(sql===`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state,"issueId") VALUES ($1,$2,$3,$4,$5,$6,'starting',$7) ON CONFLICT DO NOTHING`){
+    assert.ok(insertedRunId)
+    assert.equal(args.length,7)
+    assert.deepEqual(args.slice(0,5),[insertedRunId,workspace,owner,botId,'pending'])
+    assert.match(String(args[5]),/^[0-9a-f-]{36}$/)
+    assert.equal(args[6],null,'an ordinary cloud run does not reserve a sponsored task machine')
     return fixtureRows([])
    }
    throw new Error(`Unexpected cloud queue SQL: ${sql}`)
