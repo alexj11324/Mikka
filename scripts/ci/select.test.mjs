@@ -121,20 +121,39 @@ test('every heavy consumer uses the same trusted triage and required names remai
 
 test('the actual required gate scripts reject unselected failures and selected skips', () => {
   const workflow = readFileSync('.github/workflows/ui-policy.yml','utf8')
+  const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'IMAGE', 'DESKTOP', 'ANALYTICS', 'GOVERNANCE']
   for (const job of ['ui-policy','browser-tests']) {
     const block = workflow.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]*:\n/)[0]
     const script = block.split('        run: |\n')[1].split('      - uses:')[0].split('\n').map(line => line.slice(10)).join('\n')
     const run = overrides => {
-      const env = {PATH:process.env.PATH,GITHUB_STEP_SUMMARY:'/dev/null',CHANGES_RESULT:'success',EXPECT_CORE:'true',EXPECT_INTEGRATION:'true',EXPECT_SOURCE:'true',EXPECT_DAEMON:'true',CORE:'success',INTEGRATION:'success',SOURCE:'success',DAEMON:'success',EXPECT_IMAGE:'true',EXPECT_DESKTOP:'true',EXPECT_ANALYTICS:'true',IMAGE:'success',DESKTOP:'success',ANALYTICS:'success',EXPECT_DB:'true',DB_RESULT:'success',...overrides}
+      const env = {
+        PATH: process.env.PATH,
+        GITHUB_STEP_SUMMARY: '/dev/null',
+        CHANGES_RESULT: 'success',
+        EXPECT_DB: 'true',
+        DB_RESULT: 'success',
+      }
+      for (const key of uiChecks) {
+        env['EXPECT_' + key] = 'true'
+        env[key] = 'success'
+      }
+      Object.assign(env, overrides)
       try { execFileSync('bash',['-e','-c',script],{env,stdio:'ignore'});return true } catch { return false }
     }
     assert(run({}))
     assert(!run({CHANGES_RESULT:'failure'}))
     for(const result of ['skipped','failure','cancelled','timed_out','']) {
-      if(job==='ui-policy') for(const key of ['CORE','INTEGRATION','SOURCE','DAEMON','IMAGE','DESKTOP','ANALYTICS']) assert(!run({[key]:result}))
+      if(job==='ui-policy') for(const key of uiChecks) assert(!run({[key]:result}))
       else assert(!run({DB_RESULT:result}))
     }
-    if(job==='ui-policy') for(const key of ['IMAGE','DESKTOP','ANALYTICS']) { assert(run({['EXPECT_'+key]:'false',[key]:'skipped'}));assert(!run({['EXPECT_'+key]:'false',[key]:'failure'})) }
+    if (job === 'ui-policy') {
+      for (const key of uiChecks) {
+        assert(run({['EXPECT_' + key]: 'false', [key]: 'skipped'}), key)
+        for (const result of ['success', 'failure', 'cancelled']) {
+          assert(!run({['EXPECT_' + key]: 'false', [key]: result}), key)
+        }
+      }
+    }
     if(job==='browser-tests') { assert(run({EXPECT_DB:'false',DB_RESULT:'skipped'}));assert(!run({EXPECT_DB:'false',DB_RESULT:'failure'})) }
   }
 })
