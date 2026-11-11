@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { publishedActions, rendererActionName } from '../../lib/renderer-actions.mjs'
+export { publishedActions }
 import { decode, DESKTOP_RPC_VERSION, encode } from '../../lib/desktop-rpc/wire.ts'
 
 // This is deliberately the existing five read operations, not the RPC registry.
@@ -9,17 +11,6 @@ export const readRpcActions = Object.freeze({
   pollIssue: 'issues.pollIssue',
   pollIssueVersionSummaries: 'issues.pollIssueVersionSummaries',
 })
-const actionName = /^[a-z][a-z0-9-]*\.[A-Za-z][A-Za-z0-9]*$/
-
-export function publishedActions(manifest) {
-  assert.equal(manifest?.version, 1, 'The public action manifest must have a supported version')
-  assert.equal(manifest.target, 'web', 'The observed manifest must belong to the web build')
-  assert.ok(Array.isArray(manifest.usedActions) && manifest.usedActions.length > 0 && manifest.usedActions.length <= 1000)
-  assert.ok(manifest.usedActions.every(name => typeof name === 'string' && actionName.test(name)))
-  assert.equal(new Set(manifest.usedActions).size, manifest.usedActions.length)
-  return new Set(manifest.usedActions)
-}
-
 export function publishedReadActions(manifest) {
   const published = publishedActions(manifest)
   assert.ok(Object.values(readRpcActions).every(name => published.has(name)), 'Every measured read must be used by this real web build')
@@ -64,7 +55,7 @@ export function observedAction(request, pathname, basePath, actionIds) {
   if ([`${basePath}/api/rpc`, `${basePath}/api/desktop/rpc`].includes(pathname)) {
     try {
       const value = request.postDataJSON()
-      if (value?.version !== DESKTOP_RPC_VERSION || !actionName.test(value.action ?? '') || !Array.isArray(value.args)) return null
+      if (value?.version !== DESKTOP_RPC_VERSION || !rendererActionName.test(value.action ?? '') || !Array.isArray(value.args)) return null
       if (pathname === `${basePath}/api/rpc` && request.headers()['x-mikka-rpc'] !== '1') return null
       return { kind: 'rpc', action: value.action }
     } catch { return null }

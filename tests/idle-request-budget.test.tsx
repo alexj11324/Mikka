@@ -339,8 +339,12 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     return <ArtifactViewer artifactId={ARTIFACT} onArtifactChange={noop} onClose={noop} bot={{ name: 'Scout', avatar: null }} quotes={[]} chat={() => null} />
   },
   'nav-bot-list': async () => {
-    const { BotList } = await import('../components/nav/bot-list')
-    return <BotList bots={bots} workspaceId={WORKSPACE} threads={[listedThread]} issues={boardIssues as never} active={{ kind: 'coordinator' }} onOpen={noop} onNewBot={noop} rail={null} onRail={noop} user={user} onSettings={noop} onSignOut={noop} signingOut={false} />
+    const { useChatNav } = await import('../components/nav/bot-list')
+    function ChatNavigation() {
+      const { entries } = useChatNav({ bots, workspaceId: WORKSPACE, threads: [listedThread], issues: boardIssues as never, active: { kind: 'coordinator' }, userId: user.id })
+      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}</span>)}</>
+    }
+    return <ChatNavigation />
   },
   'group-chat': async () => {
     const { GroupChatView } = await import('../components/workspace/group-chat-view')

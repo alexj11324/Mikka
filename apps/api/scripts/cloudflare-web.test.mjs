@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { readRendererActions, rendererActionContract } from '../../../lib/renderer-actions.mjs'
 import gateway from '../../../cloudflare/web/gateway.mjs'
 import release from '../../../cloudflare/web/release.mjs'
 import { gatewayConfig, prepareRelease, releaseConfig } from '../../../cloudflare/web/prepare.mjs'
@@ -73,11 +74,53 @@ test('gateway honors retained asset/API pins, uses current for version and navig
   assert.equal((await go('/mikka/api/version')).status, 503)
 })
 
+test('encoded route and asset names retain the same deployment and cache contract', async () => {
+  const env = { CURRENT_RELEASE: 'new', RELEASES: { old: 'OLD', new: 'NEW' } }
+  const seen = []
+  for (const [id, binding] of Object.entries(env.RELEASES)) {
+    const releaseEnv = services()
+    releaseEnv.RELEASE_SHA = id
+    releaseEnv.OVERLAY_SHA = id + '-ui'
+    releaseEnv.API.fetch = async req => {
+      const path = new URL(req.url).pathname
+      seen.push([id, path])
+      if (path === '/mikka/api/version') {
+        assert.equal(req.method, 'GET')
+        assert.equal(req.headers.has('cookie'), false)
+        return Response.json({ build: id, overlaySha: id + '-ui', minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null })
+      }
+      assert.equal(await req.text(), 'existing stream request')
+      return new Response(id)
+    }
+    releaseEnv.ASSETS.fetch = () => new Response(id)
+    env[binding] = { fetch: req => release.fetch(req, releaseEnv) }
+  }
+  const stream = '/mikka/%61pi/agents/stream'
+  const retained = await gateway.fetch(request(stream, { method: 'POST', headers: { 'x-deployment-id': 'old' }, body: 'existing stream request' }), env)
+  assert.equal(await retained.text(), 'old')
+  assert.deepEqual(seen, [['old', stream]])
+  const stale = await gateway.fetch(request(stream + '?dpl=retired'), env)
+  assert.equal(stale.status, 409)
+  const conflict = await gateway.fetch(request(stream + '?dpl=new', { headers: { 'x-deployment-id': 'old' } }), env)
+  assert.equal(conflict.status, 400)
+  const file = await gateway.fetch(request('/mikka/assets/example%2Ejs?dpl=old'), env)
+  assert.equal(await file.text(), 'old')
+  assert.equal(file.headers.get('cache-control'), 'public, max-age=31536000, immutable')
+  for (const [route, method] of [['/mikka/%61pi/version', 'GET'], ['/mikka/api/%76ersion', 'HEAD']]) {
+    const result = await gateway.fetch(request(route + '?dpl=old', { method, headers: { cookie: 'fixture' } }), env)
+    assert.equal(result.headers.get('cache-control'), 'no-store, max-age=0')
+    if (method === 'GET') assert.equal((await result.json()).build, 'new')
+    else assert.equal(await result.text(), '')
+  }
+  assert.deepEqual(seen, [['old', stream], ['new', '/mikka/api/version']])
+})
+
 test('release config requires the official compiled shell, matching pins and private service bindings', async t => {
   const assets = await mkdtemp(join(tmpdir(), 'cf-web-'))
   t.after(() => rm(assets, { recursive: true, force: true }))
   const input = { sourceSha: 'abcdef0' + '0'.repeat(33), overlaySha: 'b'.repeat(40), id: 'abcdef0-1-1', assets, api: 'mikka-api-fixture', cloud: 'mikka-cloud-fixture' }
-  const inventory = { target: 'web', serverModules: [], inputs: ['components/slots/navigation.tsx'] }
+  const inventory = { version: 1, rendererBuild: 'a'.repeat(64), usedActions: ['issues.pollIssue'],
+    modules: { issues: ['pollIssue', 'unusedAction'], internal: ['privateExport'] }, target: 'web', serverModules: [], inputs: ['components/slots/navigation.tsx'] }
   const put = data => writeFile(join(assets, 'renderer-manifest.json'), JSON.stringify(data))
   await put(inventory)
   await writeFile(join(assets, 'index.html'), '<script src="/mikka/assets/main.js?dpl=abcdef0-1-1"></script>')
@@ -95,7 +138,10 @@ test('release config requires the official compiled shell, matching pins and pri
   await writeFile(join(assets, '.vite', 'manifest.json'), '{}')
   await writeFile(join(assets, '_redirects'), '/old /new')
   const ready = await prepareRelease(input, parent)
-  assert.deepEqual(await readdir(ready.assets.directory), ['index.html'])
+  assert.deepEqual((await readdir(ready.assets.directory)).sort(), ['index.html', 'renderer-actions.json'])
+  const actions = JSON.parse(await readFile(join(ready.assets.directory, 'renderer-actions.json'), 'utf8'))
+  assert.deepEqual(actions, { version: 1, target: 'web', rendererBuild: 'a'.repeat(64),
+    usedActions: ['issues.pollIssue'], modules: { issues: ['pollIssue'] } })
   assert.equal(await readFile(join(ready.assets.directory, 'index.html'), 'utf8'), await readFile(join(assets, 'index.html'), 'utf8'))
   assert.ok((await readFile(join(assets, 'renderer-manifest.json'), 'utf8')).includes('.hosted-ui'))
   await assert.rejects(prepareRelease(input, assets), /OUTPUT_INSIDE_BUILD/)
@@ -136,4 +182,26 @@ test('version recovers from a stale overlay, unavailable backend and invalid doc
   const env = { RELEASE_SHA: source, OVERLAY_SHA: overlay, API: { fetch: async () => replies.shift() } }
   for (let i = 0; i < 4; i++) assert.equal((await release.fetch(request('/mikka/api/version'), env)).status, 503)
   assert.deepEqual(await (await release.fetch(request('/mikka/api/version'), env)).json(), value)
+})
+
+test('published actions retain the compiler evidence and use the same deployment pin on the private-manifest 404', async () => {
+  const compiled = { version: 1, target: 'web', rendererBuild: 'b'.repeat(64),
+    usedActions: ['issues.pollIssue'], modules: { issues: ['pollIssue', 'unused'] } }
+  const contract = rendererActionContract(compiled)
+  for (const changed of [{ rendererBuild: 'wrong' }, { modules: {} },
+    { modules: { issues: ['pollIssue', 'pollIssue'] } }, { usedActions: ['issues.unregistered'] }]) {
+    assert.throws(() => rendererActionContract({ ...compiled, ...changed }))
+  }
+  const calls = []
+  const result = await readRendererActions(async path => {
+    calls.push(path)
+    return path.includes('renderer-manifest') ? new Response(null, { status: 404 }) : Response.json(contract)
+  }, '/mikka', 'abcdef0-1-1')
+  assert.deepEqual(calls, ['/mikka/renderer-manifest.json?dpl=abcdef0-1-1', '/mikka/renderer-actions.json?dpl=abcdef0-1-1'])
+  assert.deepEqual(await result.json(), contract)
+  for (const status of [200, 401, 403, 500]) {
+    let count = 0
+    assert.equal((await readRendererActions(async () => { count++; return new Response(null, { status }) })).status, status)
+    assert.equal(count, 1)
+  }
 })

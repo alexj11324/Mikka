@@ -49,6 +49,7 @@ async function query(sql: string, values: unknown[] = []) {
     // Its qualified payload projection is separate from destination admission.
     if (sql.startsWith('SELECT payload') || sql.startsWith('SELECT e.payload,c."taskId" AS "commandIssueId" FROM coordinator_events e')) {
       profileSourceQueries.push(sql)
+      assert.deepEqual(values, [sourceEventId, owner, botId, workspaceId])
       const ownSource = requestSource?.userId === values[1] && requestSource?.botId === values[2] && requestSource?.kind === 'user_message'
       return { rows: ownSource ? [{ payload: requestSource!.payload, commandIssueId: null }] : [], rowCount: Number(ownSource) }
     }

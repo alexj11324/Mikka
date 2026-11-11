@@ -1,5 +1,7 @@
 // A service binding belongs to one immutable API release. Store only public
 // values read from that backend. Never retain a Response or request-scoped I/O.
+import { versionPath } from './route-path.mjs'
+
 const versions = new WeakMap()
 const fields = ['build', 'overlaySha', 'minMobileBuild', 'mobileUpdateUrl', 'minDesktopVersion']
 const headers = { 'cache-control': 'no-store, max-age=0', 'content-type': 'application/json' }
@@ -15,7 +17,7 @@ export async function publicVersion(request, env) {
   }
   // This pre-login route never needs client authority. Read the exact private
   // backend even for HEAD, so no client cookies or request headers enter state.
-  const url = new URL('/mikka/api/version', request.url)
+  const url = new URL(versionPath, request.url)
   let value
   try {
     const upstream = await env.API.fetch(new Request(url, { redirect: 'manual', signal: request.signal }))
