@@ -132,6 +132,18 @@ security, storage, API, protocol, migration and release contracts. Review
 preserved evidence before deleting any test. See
 [test ownership and CI cost](docs/ci/test-ownership.md).
 
+### Draft PR checks
+
+Keep work-in-progress pull requests as drafts. Mandatory CI and security
+checks still run on draft heads because GitHub counts conditionally skipped
+required checks as successful; we do not replace merger proof with that
+status. Standalone non-required HTTP, runtime, E2B, search and SSH checks may
+defer runner allocation while drafting. Mark a PR **Ready for review** when
+its source and focused proof are ready: the `ready_for_review` event triggers
+all applicable deferred checks on the current head without requiring a
+meaningless new commit. Every real selected acceptance still has to pass
+before the PR can merge, including exact-source production release gates.
+
 ### Before asking Alex: look at how leading products do it
 
 A choice goes to Alex only when leading products (Linear, Slack, GitHub, Figma,
