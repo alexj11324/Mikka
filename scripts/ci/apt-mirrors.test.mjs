@@ -4,28 +4,32 @@ import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { prepareAptMirrors, skipAzureMirror } from './apt-mirrors.mjs'
+import { prepareAptMirrors, prepareMirrorList, ubuntuHttpsMirror } from './apt-mirrors.mjs'
 
 const azure = 'http://azure.archive.ubuntu.com/ubuntu/\tpriority:1\n'
 const fallback = 'https://archive.ubuntu.com/ubuntu/\tpriority:2\nhttps://security.ubuntu.com/ubuntu/\tpriority:3\n'
+const preferred = ubuntuHttpsMirror + '\tpriority:1\n'
 
-test('only the failing Azure preference is removed; official fallback bytes and order are retained', () => {
-  assert.equal(skipAzureMirror(azure + fallback), fallback)
-  assert.equal(skipAzureMirror(azure.replace('http:', 'https:') + fallback), fallback)
-  assert.equal(skipAzureMirror((azure + fallback).replaceAll('\n', '\r\n')), fallback.replaceAll('\n', '\r\n'))
-  assert.equal(skipAzureMirror(fallback), fallback)
-  assert.equal(skipAzureMirror(skipAzureMirror(azure + fallback)), fallback)
+test('a registered independent HTTPS mirror is preferred while official fallback bytes and order are retained', () => {
+  assert.equal(prepareMirrorList(azure + fallback), preferred + fallback)
+  assert.equal(prepareMirrorList(azure.replace('http:', 'https:') + fallback), preferred + fallback)
+  assert.equal(prepareMirrorList((azure + fallback).replaceAll('\n', '\r\n')), (preferred + fallback).replaceAll('\n', '\r\n'))
+  assert.equal(prepareMirrorList(fallback), preferred + fallback)
+  assert.equal(prepareMirrorList(prepareMirrorList(azure + fallback)), preferred + fallback)
+  assert.equal(prepareMirrorList(ubuntuHttpsMirror + '\tpriority:5\n' + fallback), preferred + fallback)
 })
 
 test('a missing official fallback fails before an Azure-only or private mirror list can be emptied', () => {
   for (const source of [azure, azure + '# https://archive.ubuntu.com/ubuntu/\n', azure + 'https://private.invalid/ubuntu/\n'])
-    assert.throws(() => skipAzureMirror(source), /ci_apt_official_fallback_missing/)
+    assert.throws(() => prepareMirrorList(source), /ci_apt_official_fallback_missing/)
 })
 
 test('comments, lookalike domains and other configured mirrors are never rewritten', () => {
   const unchanged = '# ' + azure + 'https://azure.archive.ubuntu.com.evil.invalid/ubuntu/\nhttps://private.invalid/ubuntu/\n'
-  assert.equal(skipAzureMirror(unchanged), unchanged)
-  assert.equal(skipAzureMirror(azure + fallback + unchanged), fallback + unchanged)
+  assert.equal(prepareMirrorList(unchanged), unchanged)
+  assert.equal(prepareMirrorList(azure + fallback + unchanged), preferred + fallback + unchanged)
+  const lookalike = 'https://mirror.umd.edu.evil.invalid/ubuntu/\tpriority:1\n'
+  assert.equal(prepareMirrorList(fallback + lookalike), preferred + fallback + lookalike)
 })
 
 test('actual file preparation is idempotent, preserves mode, and missing-list runners remain supported', async () => {
@@ -34,8 +38,8 @@ test('actual file preparation is idempotent, preserves mode, and missing-list ru
     const file = join(directory, 'apt-mirrors.txt'), unrelated = join(directory, 'ubuntu.sources')
     const signedSource = 'URIs: mirror+file:/etc/apt/apt-mirrors.txt\nSuites: noble noble-security\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n'
     await writeFile(file, azure + fallback); await chmod(file, 0o640); await writeFile(unrelated, signedSource)
-    assert.deepEqual(await prepareAptMirrors(file), { changed: true, reason: 'azure_mirror_removed' })
-    assert.equal(await readFile(file, 'utf8'), fallback)
+    assert.deepEqual(await prepareAptMirrors(file), { changed: true, reason: 'independent_https_mirror_preferred' })
+    assert.equal(await readFile(file, 'utf8'), preferred + fallback)
     assert.equal((await stat(file)).mode & 0o777, 0o640)
     assert.equal(await readFile(unrelated, 'utf8'), signedSource)
     assert.deepEqual(await prepareAptMirrors(file), { changed: false, reason: 'already_prepared' })
@@ -52,7 +56,7 @@ test('the real CLI reports only its closed outcome, not configured mirror conten
     const file = join(directory, 'apt-mirrors.txt')
     await writeFile(file, azure + fallback + 'https://private.invalid/DO_NOT_LOG_THIS\n')
     const output = execFileSync(process.execPath, [new URL('./apt-mirrors.mjs', import.meta.url).pathname, file], { encoding: 'utf8' })
-    assert.deepEqual(JSON.parse(output), { event: 'ci_apt_mirrors', changed: true, reason: 'azure_mirror_removed' })
+    assert.deepEqual(JSON.parse(output), { event: 'ci_apt_mirrors', changed: true, reason: 'independent_https_mirror_preferred' })
     assert.ok(!output.includes('DO_NOT_LOG_THIS'))
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
