@@ -22,6 +22,12 @@ export const userOnboarding = pgTable('user_onboarding', {
 
 export const issueMembers = pgTable('issue_members', {
   issueId: uuid('issueId').notNull(), userId: text('userId').notNull(), memberId: text('memberId').notNull(),
+  /** Who may invite members and change the task's visibility; see issueMemberRole. */
+  role: text('role').$type<'owner' | 'member'>().notNull().default('member'),
+  /** Whether this member hears about the task; false mutes it without leaving. */
+  subscribed: boolean('subscribed').notNull().default(true),
+  /** The account that added this member; null when no inviter was recorded. */
+  invitedBy: text('invitedBy'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.issueId, table.memberId] }), index('issue_members_member_idx').on(table.memberId, table.issueId)])
 export const issueDocuments = pgTable('issue_documents', {

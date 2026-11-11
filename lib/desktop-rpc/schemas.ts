@@ -147,6 +147,8 @@ export const desktopActionSchemas = {
   'collaboration.listMembers': oneId,
   'collaboration.inviteMember': tuple(uuid, z.email().max(254)),
   'collaboration.removeMember': tuple(uuid, id),
+  'collaboration.setMemberRole': tuple(uuid, id, z.enum(['owner', 'member'])),
+  'collaboration.setMemberSubscribed': tuple(uuid, id, bool),
   'coordinator.pollCoordinatorChat': coordinatorRead,
   'coordinator.syncCoordinatorChat': coordinatorRead,
   'coordinator.coordinatorHistory': tuple(bot, count, z.number().int().min(1).max(200).optional()),
