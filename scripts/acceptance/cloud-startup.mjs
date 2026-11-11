@@ -15,6 +15,7 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { selectTeamWorkspace } from './team-workspace.mjs'
+import { PERSONAL_FAILURE_CODES, selectAcceptancePersonal, personalReadiness, personalFallbackPolicy } from './personal-workspace.mjs'
 import { isSmokeAccountEmail } from '../../lib/smoke-account.ts'
 import { OWNED_CODEX_ACTOR, isOwnedCodexEmail, ownedCodexAccount, selectOwnedCodexWorkspace } from './owned-codex-actor.mjs'
 
@@ -33,7 +34,7 @@ const PREPARATION_PHASES = new Set([...STARTUP_PHASES, 'daemon.adapter.cli_init.
 const sha = value => createHash('sha256').update(value).digest('hex')
 const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cause } : undefined) }
 export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
-  'team_selection', 'workspace_selection', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
+  'team_selection', 'workspace_selection', 'personal_selection', 'personal_readiness', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
   'chat_model_selection', 'issue_create', 'coordinator_submit', 'coordinator_stream', 'thread_lookup', 'coordinator_stop',
   'subscription_proof', 'bootstrap_publication', 'execution_watch', 'execution_receipt', 'cleanup'])
 // These are driver-owned codes, never a prefix rule accepting arbitrary error
@@ -60,7 +61,7 @@ export const STARTUP_FAILURE_CODES = Object.freeze([
   'owned_account_required', 'owned_actor_model_invalid', 'owned_workspace_mismatch', 'acceptance_actor_invalid',
   'owned_subscription_model_missing_or_ambiguous', 'owned_subscription_identity_mismatch',
   'owned_chat_model_ambiguous', 'owned_chat_model_unavailable',
-].map(code => `startup_${code}`))
+].map(code => `startup_${code}`).concat(PERSONAL_FAILURE_CODES))
 const failureCodes = new Set(STARTUP_FAILURE_CODES)
 export function startupFailure(error, phase = 'unknown') {
   const at = STARTUP_FAILURE_PHASES.includes(phase) ? phase : 'unknown'
@@ -118,7 +119,8 @@ export function parseOptions(args, env = process.env) {
     'max-startup-ms': 'maxStartupMs', 'timeout-ms': 'timeoutMs', 'expected-build': 'expectedBuild', revision: 'revision', output: 'output',
     'device-id': 'deviceId', 'agent-id': 'agentId', 'bot-id': 'botId', 'align-report': 'alignReport', 'dispatch-timings': 'dispatchTimings',
     'expected-worker-sha': 'expectedWorkerSha', 'expected-worker-source': 'expectedWorkerSource',
-    'runtime-evidence': 'runtimeEvidence', 'official-timing': 'officialTiming' }
+    'runtime-evidence': 'runtimeEvidence', 'official-timing': 'officialTiming',
+    'workspace-kind': 'workspaceKind', operation: 'operation' }
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--help') return { help: true }
     const key = names[args[i].replace(/^--/, '')]
@@ -128,6 +130,7 @@ export function parseOptions(args, env = process.env) {
   if (options.alignReport) { assert(options.dispatchTimings, 'dispatch_timings_required'); return options }
   for (const key of ['runs', 'maxStartupMs', 'timeoutMs']) options[key] = Number(options[key])
   assert(!options.workspace || UUID.test(options.workspace), 'workspace_invalid')
+  validatePersonalOptions(options)
   assert(['both', 'claude_code', 'codex'].includes(options.harness), 'harness_invalid')
   assert(['baseline', 'acceptance', 'candidate'].includes(options.mode), 'mode_invalid')
   options.runtimeEvidence ??= options.mode === 'acceptance' ? 'required' : 'optional'
@@ -150,6 +153,23 @@ export function parseOptions(args, env = process.env) {
   assert((!options.expectedWorkerSha && !options.expectedWorkerSource) || (/^[a-f0-9]{40}$/.test(options.expectedWorkerSha ?? '')
     && /^[a-f0-9]{40}$/.test(options.expectedWorkerSource ?? '')), 'worker_pin_invalid')
   return options
+}
+
+/** The shared production path keeps its defaults. A personal attempt is always
+ * deliberate and targets an existing local device, never implicit cloud spend. */
+export function validatePersonalOptions(options) {
+  assert(options.workspaceKind === undefined || ['team', 'personal'].includes(options.workspaceKind), 'personal_options_invalid')
+  if (options.workspaceKind !== 'personal') {
+    assert(options.operation === undefined || options.operation === 'execute', 'personal_options_invalid')
+    return
+  }
+  assert(options.actor === undefined || options.actor === 'shared_smoke', 'personal_options_invalid')
+  assert(UUID.test(options.workspace ?? ''), 'personal_workspace_required')
+  options.operation ??= 'readiness'
+  assert(['readiness', 'execute'].includes(options.operation), 'personal_options_invalid')
+  if (options.operation === 'execute') assert(options.mode === 'candidate' && ['claude_code', 'codex'].includes(options.harness)
+    && options.runs === 1 && UUID.test(options.deviceId ?? '') && UUID.test(options.agentId ?? '')
+    && /^[a-f0-9]{40}$/.test(options.expectedBuild ?? '') && /^[a-f0-9]{40}$/.test(options.revision ?? ''), 'personal_options_invalid')
 }
 
 /** Read only the published runtime's public identifiers, never export the
@@ -221,6 +241,23 @@ export function smokeAcceptanceAccount(env) {
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
   assert(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'smoke_account_required')
   return { email, password }
+}
+
+export async function personalAcceptanceAccount(options, env) {
+  if (isSmokeAccountEmail(env.SMOKE_OWNER_EMAIL)) return smokeAcceptanceAccount(env)
+  try {
+    const origin = new URL(options.origin)
+    assert(env.MIKKA_LOCAL_TEST_ACCOUNTS === '1' && origin.protocol === 'http:'
+      && ['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname), 'personal_account_unavailable')
+    const { loadEnvironment, assertDeploymentIdentity } = await import('../test-accounts/environment.mjs')
+    const environment = await loadEnvironment(env)
+    assert(environment.origin === origin.origin && environment.deploymentSha === env.MIKKA_TEST_DEPLOYMENT_SHA
+      && (!options.expectedBuild || options.expectedBuild === environment.deploymentSha)
+      && /^test-[a-f0-9-]{36}@example\.test$/.test(env.SMOKE_OWNER_EMAIL ?? '')
+      && typeof env.SMOKE_OWNER_PASSWORD === 'string' && env.SMOKE_OWNER_PASSWORD.length >= 32, 'personal_account_unavailable')
+    await assertDeploymentIdentity(environment)
+    return { email: env.SMOKE_OWNER_EMAIL, password: env.SMOKE_OWNER_PASSWORD }
+  } catch { throw new Error('startup_personal_account_unavailable') }
 }
 
 /** Keep trusted IDs in memory. The caller restores the original normal session
@@ -740,8 +777,8 @@ function safeIdentity(identity) {
 }
 
 export async function subscriptionProof(client, record, scope, profile) {
-  const owned = scope.actor === OWNED_CODEX_ACTOR
-  const payerId = owned ? scope.ownerId : scope.adminId, access = owned ? 'owner' : 'workspace_share'
+  const personal = scope.workspaceKind === 'personal', owned = scope.actor === OWNED_CODEX_ACTOR
+  const payerId = personal || owned ? scope.ownerId : scope.adminId, access = personal || owned ? 'owner' : 'workspace_share'
   const evidence = await client.json(`/api/runs/${record.runId}/evidence`), run = evidence.run
   assert(run?.id === record.runId && run.issueId === record.issueId && run.harness === record.harness
     && run.model === MODELS[record.harness] && run.credentialType === 'subscription'
@@ -765,11 +802,11 @@ export async function subscriptionProof(client, record, scope, profile) {
     && /^(0|[1-9][0-9]*)$/.test(subscription.revision ?? '')
     && payer.ownerId === payerId && payer.resourceId === subscription.id
     && run.agentProfile.version === profile.version && run.agentProfile.digest === profile.digest && run.agentProfile.source === 'explicit',
-  owned ? 'owned_subscription_identity_mismatch' : 'shared_subscription_identity_mismatch')
+  personal ? 'personal_subscription_identity_mismatch' : owned ? 'owned_subscription_identity_mismatch' : 'shared_subscription_identity_mismatch')
   record.execution = { harness: run.harness, model: run.model, credentialType: run.credentialType,
     deviceId: device.id, subscriptionRoute: run.subscriptionRoute, identity: safeIdentity(identity),
-    [owned ? 'ownedScope' : 'sharedScope']: { verified: true, requesterHash: sha(scope.ownerId).slice(0, 16), payerHash: sha(payerId).slice(0, 16),
-      workspaceHash: owned ? scope.evidence.workspaceHash : scope.evidence.teamWorkspaceHash, connectionHash: sha(profile.model.source.connectionId).slice(0, 16),
+    [personal ? 'personalScope' : owned ? 'ownedScope' : 'sharedScope']: { verified: true, requesterHash: sha(scope.ownerId).slice(0, 16), payerHash: sha(payerId).slice(0, 16),
+      workspaceHash: personal ? scope.evidence.personalWorkspaceHash : owned ? scope.evidence.workspaceHash : scope.evidence.teamWorkspaceHash, connectionHash: sha(profile.model.source.connectionId).slice(0, 16),
       bindingHash: sha(subscription.id).slice(0, 16), connectionRevision: subscription.revision,
       profileVersion: profile.version, profileDigest: profile.digest, access } }
 }
@@ -881,9 +918,10 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued, createCaseProbe, onFixture }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
-  const owned = scope?.actor === OWNED_CODEX_ACTOR
-  assert(scope?.ownerId && (owned ? scope.evidence?.kind === 'personal' && scope.evidence.membershipVerified === true
-    : scope.adminId && scope.ownerId !== scope.adminId) && scope.botId === botId
+  const owned = scope?.actor === OWNED_CODEX_ACTOR, personal = scope?.workspaceKind === 'personal'
+  assert(scope?.ownerId && (personal ? scope.adminId === scope.ownerId && scope.evidence?.personalWorkspaceConfirmed === true
+    : owned ? scope.evidence?.kind === 'personal' && scope.evidence.membershipVerified === true
+      : scope.adminId && scope.ownerId !== scope.adminId) && scope.botId === botId
     && UUID.test(scope.workspaceId ?? '') && profile?.id === profileId && /^[a-f0-9]{64}$/.test(profile.digest ?? ''),
   owned ? 'owned_workspace_mismatch' : 'shared_scope_required')
   assert(Object.hasOwn(MODELS, harness) && model === MODELS[harness], 'model_invalid')
@@ -896,6 +934,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId) || leaseAudit, requireOfficialTiming: officialTiming === 'enabled',
     requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required' || leaseAudit),
     stages: [], status: 'running', phase: 'build_pin', ...(sourceCommit ? { sourceCommit } : {}) }
+  if (scope.workspaceKind === 'personal') record.workspaceKind = 'personal'
   const pin = pinBuild ?? (async () => {
     const { build } = await client.json('/api/version')
     assert(typeof build === 'string' && (!expectedBuild || build === expectedBuild), 'build_mismatch')
@@ -913,15 +952,22 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     initialPinPassed = true
     record.phase = 'session_identity'
     const identity = await client.json('/api/auth/get-session')
-    assert(identity.user?.id === scope.ownerId && (owned ? isOwnedCodexEmail(identity.user.email) : isSmokeAccountEmail(identity.user.email)), 'session_identity_mismatch')
+    assert(identity.user?.id === scope.ownerId && (personal ? sha(identity.user.email?.toLowerCase() ?? '') === scope.acceptanceEmailHash
+      : owned ? isOwnedCodexEmail(identity.user.email) : isSmokeAccountEmail(identity.user.email)), 'session_identity_mismatch')
     record.phase = 'workspace_identity'
     const workspace = await client.json('/api/workspace')
     assert(workspace.currentUserId === scope.ownerId && workspace.workspace?.id === scope.workspaceId, 'workspace_identity_mismatch')
+    if (scope.workspaceKind === 'personal') assert(workspace.workspace.kind === 'personal' && workspace.role === 'admin', 'personal_workspace_identity_mismatch')
     record.phase = 'bot_identity'
     const bot = await client.json(`/api/bots/${botId}`)
     assert(bot.id === botId && /^测试\s*1505(?:\s|$)/.test(bot.name ?? ''), 'test_bot_required')
+    if (personal) {
+      record.phase = 'personal_readiness'
+      const fallback = await personalFallbackPolicy(client, scope.workspaceId)
+      if (fallback.code) throw Error(fallback.code)
+    }
     record.phase = 'chat_model_selection'
-    await chooseSharedChatModel(client, botId, harness, owned)
+    await chooseSharedChatModel(client, botId, harness, owned || personal)
     record.phase = 'issue_create'
     const leaseDriver = leaseAudit ? await import('./cloud-lease-audit.mjs') : null
     const leaseInstructions = leaseDriver ? await leaseDriver.leaseAuditInstructions(sampleId, harness) : ''
@@ -1008,16 +1054,19 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
   readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued, createCaseProbe, caseProfileInstructions, onFixture } = {}) {
-  const actor = options.actor ?? 'shared_smoke', owned = actor === OWNED_CODEX_ACTOR
+  options = { ...options }
+  validatePersonalOptions(options)
+  const personal = options.workspaceKind === 'personal', actor = options.actor ?? 'shared_smoke', owned = actor === OWNED_CODEX_ACTOR
   assert(owned || actor === 'shared_smoke', 'acceptance_actor_invalid')
   assert(!owned || options.harness === 'codex', 'owned_actor_model_invalid')
-  const { email, password } = owned ? ownedCodexAccount(env) : smokeAcceptanceAccount(env)
+  const { email, password } = personal ? await personalAcceptanceAccount(options, env) : owned ? ownedCodexAccount(env) : smokeAcceptanceAccount(env)
   assert(typeof WebSocketImpl === 'function', 'node_websocket_required')
   const client = createSessionClient(options.origin, fetchImpl), fixtureId = randomUUID()
   const report = { schemaVersion: 1, issue: 1505, actor, fixtureId, startedAt: iso(now()), mode: options.mode,
     origin: options.origin, repository: REPOSITORY, requestedStrategy: options.strategy,
     strategyEvidence: 'operator_label_requires_template_or_pool_log_evidence', revision: options.revision ?? null,
-    target: options.deviceId ? 'candidate_device' : 'cloud', maxStartupMs: options.maxStartupMs,
+    target: options.workspaceKind === 'personal' && options.operation === 'readiness' ? 'personal_readiness'
+      : options.deviceId ? 'candidate_device' : 'cloud', maxStartupMs: options.maxStartupMs,
     timingMethod: 'dispatch_run_entry to later of agent_start database receipt and actual official task acceptance; missing entry boundary is legacy lower-bound evidence only',
     executionGate: options.runtimeEvidence === 'required' ? 'later_of_agent_start_and_actual_official_cli_acceptance' : 'legacy_agent_start_actual_ack_unavailable',
     samples: [], cleanup: { errors: [] }, status: 'running', phase: 'build_pin' }
@@ -1047,9 +1096,21 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
     assert(identity.user?.email?.toLowerCase() === email.toLowerCase() && typeof identity.user.id === 'string' && identity.user.id.length > 0, 'session_identity_mismatch')
     ownerId = identity.user.id
     report.accountHash = sha(identity.user.id).slice(0, 16)
-    report.phase = owned ? 'workspace_selection' : 'team_selection'
-    scope = await (owned ? selectOwnedCodexWorkspace : selectAcceptanceTeam)(client, { ownerId, workspace: options.workspace }, value => { originalWorkspaceId = value })
-    if (owned) report.workspace = scope.evidence
+    report.phase = personal ? 'personal_selection' : owned ? 'workspace_selection' : 'team_selection'
+    scope = await (personal ? selectAcceptancePersonal : owned ? selectOwnedCodexWorkspace : selectAcceptanceTeam)(client,
+      { ownerId, workspace: options.workspace }, value => { originalWorkspaceId = value })
+    if (personal) {
+      scope.acceptanceEmailHash = sha(email.toLowerCase())
+      report.personal = scope.evidence
+      report.phase = 'personal_readiness'
+      report.readiness = await personalReadiness(client, scope, options)
+      if (options.operation === 'readiness') {
+        report.phase = 'build_pin'
+        await pin()
+        return report
+      }
+      assert(report.readiness.status === 'ready_for_attempt', 'personal_readiness_blocked')
+    } else if (owned) report.workspace = scope.evidence
     else report.team = scope.evidence
     report.phase = 'timing_configuration'
     if (options.officialTiming === 'enabled') {
@@ -1095,8 +1156,8 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       try {
         const candidates = (order.candidates ?? []).filter(item => item.harness === harness && item.model === MODELS[harness]
           && item.source?.kind === 'subscription' && UUID.test(item.source.connectionId ?? ''))
-        assert(candidates.length === 1 && candidates[0].credentialOwnerId === (owned ? scope.ownerId : scope.adminId),
-          owned ? 'owned_subscription_model_missing_or_ambiguous' : 'shared_subscription_model_missing_or_ambiguous')
+        assert(candidates.length === 1 && candidates[0].credentialOwnerId === (personal || owned ? scope.ownerId : scope.adminId),
+          personal ? 'personal_model_missing_or_ambiguous' : owned ? 'owned_subscription_model_missing_or_ambiguous' : 'shared_subscription_model_missing_or_ambiguous')
         const candidate = candidates[0]
         phase = 'profile_create'
         const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
@@ -1160,12 +1221,18 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       catch (error) { report.cleanup.errors.push({ step: 'sign_out', code: safeError(error) }) }
     }
     client.clear()
+    if (options.workspaceKind === 'personal' && options.operation === 'readiness') {
+      report.finishedAt = iso(now())
+      report.status = report.error || report.cleanup.errors.length || report.readiness?.status !== 'ready_for_attempt' ? 'blocked' : 'ready_for_attempt'
+      report.executionVerified = false
+    }
   }
   report.finishedAt = iso(now())
   report.status = report.error || report.cleanup.errors.length || report.samples.length !== options.runs
     || report.samples.some(sample => sample.status === 'failed' || sample.cleanup.status !== 'passed') ? 'failed'
       : options.mode === 'candidate' && report.samples.every(sample => sample.replyVerified) ? 'candidate_subscription_proved'
         : 'awaiting_server_timings'
+  if (options.workspaceKind === 'personal') report.executionVerified = report.status === 'candidate_subscription_proved'
   return report
 }
 
@@ -1244,7 +1311,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       await mkdir(dirname(output), { recursive: true })
       await writeFile(output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 })
       console.log(JSON.stringify({ status: report.status, samples: report.samples.length, report: output }))
-      if (report.status === 'failed' || (options.mode === 'acceptance' && report.status !== 'passed')) process.exitCode = 1
+      if (['failed', 'blocked'].includes(report.status) || (options.mode === 'acceptance' && report.status !== 'passed')) process.exitCode = 1
     }
   } catch (error) {
     console.error(JSON.stringify({ status: 'failed', code: safeError(error), ...(output ? { report: output } : {}) }))
