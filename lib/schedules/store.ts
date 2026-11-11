@@ -86,7 +86,15 @@ export class ScheduleStore {
       if(row.visibility==='owner'&&(row.owner_id!==actor.ownerId||row.bot_id!==actor.botId)) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
       if((cmd.action==='update'||cmd.action==='resume')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
-      if(cmd.action==='history') return {occurrences:(await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])).rows}
+      if(cmd.action==='history'){
+        const seen=await tx.query('SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,started_at,finished_at,reported_at FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100',[row.id])
+        // Seeing that a workspace schedule ran is collaboration; reading what it returned is not. Only the
+        // creator, and an owner/admin, get result, error and the operation identity; any other active member
+        // sees the run's status and timestamps with those fields blank. A member of a workspace that has no
+        // roles runs as 'member'. Visibility is unchanged: an owner-only row is already 404 above.
+        const privileged=row.owner_id===actor.ownerId||access.role!=='member'
+        return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null}))}
+      }
       await this.source(tx,actor,row.workspace_id)
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')

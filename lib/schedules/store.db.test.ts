@@ -125,6 +125,23 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
    assert.equal((await pool.query('SELECT count(*)::int n FROM coordinator_messages WHERE id=$1 AND "userId"=$2 AND "botId"=$3',[done.operation_id,owner,botId])).rows[0].n,1,'the creator chat receives the cancellation')
    assert.equal((await pool.query('SELECT count(*)::int n FROM coordinator_messages WHERE id=$1 AND "userId"=$2 AND "botId"=$3',[done.operation_id,member,memberBot])).rows[0].n,0,'the member chat does not receive the creator result')
   })
+  await t.test('a member sees a workspace schedule ran, not what it returned',async()=>{
+   const row=await create(def({kind:'reminder',text:'Controlled reminder'}))
+   now=new Date(now.getTime()+60_000);await store().tick()
+   const creator=(await history(row.id))[0]
+   assert.equal(creator.status,'succeeded')
+   assert.equal((creator.result as {text?:string}).text,'Controlled reminder','the creator reads the result')
+   assert.ok(creator.operation_id)
+   const seen=(await store().command(memberActor,{action:'history',scheduleId:row.id}) as {occurrences:Array<Record<string,unknown>>}).occurrences[0]
+   assert.equal(seen.status,'succeeded','a member still sees that it ran')
+   assert.ok(seen.due_at)
+   assert.equal(seen.result,null,'the result body stays with the creator')
+   assert.equal(seen.operation_id,null)
+   assert.equal(seen.error,null)
+   const admin={...memberActor,ownerId:owner,botId}
+   const adminSeen=(await store().command(admin,{action:'history',scheduleId:row.id}) as {occurrences:Array<Record<string,unknown>>}).occurrences[0]
+   assert.equal((adminSeen.result as {text?:string}).text,'Controlled reminder','an owner reads the result')
+  })
   await t.test('creator or workspace admin may update and resume; ordinary members may not',async()=>{
    const repeat=def();repeat.timing={kind:'interval',start:new Date(now.getTime()+60_000).toISOString(),minutes:60};const row=await create(repeat)
    const edited={...repeat,title:'Member edit'}
