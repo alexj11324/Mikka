@@ -216,6 +216,21 @@ jobs:
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
       - name: Existing mailbox CLI integration tests
         run: pnpm --filter @mikka/daemon test:mailbox-cli
+      - name: Install the integrity-pinned official CLIs for native MCP fixtures
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          import { ensureHarness } from './packages/daemon/harness/install.mjs'
+          const store = { root: join(process.env.RUNNER_TEMP, 'mikka-native-mcp-cli') }
+          const [claude, codex] = await Promise.all(['claude_code', 'codex'].map(harness => ensureHarness(store, harness)))
+          appendFileSync(process.env.GITHUB_ENV, `MIKKA_NATIVE_CLAUDE_BIN=${claude}\nMIKKA_NATIVE_CODEX_BIN=${codex}\n`)
+          JS
+      - name: Official CLI native HTTP, STDIO and SSE initialization without model calls
+        run: pnpm --filter @mikka/daemon test:native-mcp-cli
+        env:
+          REQUIRE_NATIVE_CLI_TESTS: '1'
+          MIKKA_NATIVE_SSE_BRIDGE: '1'
       # Part of the daemon's own test script, which otherwise runs only when main publishes.
       - name: Daemon repository identity, GitHub credential and trusted endpoint tests
         run: |
@@ -423,7 +438,7 @@ jobs:
           RUN_DISPATCH_DB_TESTS: '1'
           FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
           CREDENTIAL_TEST_RETAIN_RESOURCES: '1'
-          DB_TEST_EXPECTED: test:abuse-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:chat-attachments-db,test:cloud-backend-db,test:cloud-services-db,test:coding-workspace-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:device-enrollment-db,test:device-revocation-db,test:domain-lifecycle-db,test:drive-db,test:enterprise-db,test:execution-settings-db,test:factory,test:factory-activity-db,test:factory-activity-http-db,test:factory-all-dispatch-db,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:github-connections-db,test:group-turns,test:groups,test:inbox-db,test:issue-search-db,test:live-db,test:local-repository-migration-db,test:migration-steps-db,test:model-admission-db,test:onboarding-db,test:ops-db,test:pat-api-db,test:pat-db,test:personal-mailbox-default-off-db,test:plugins-db,test:preview-driver,test:project-decisions-db,test:project-resources-db,test:project-v2-db,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:run-recovery-db,test:schedules-db,test:scope-detachment-db,test:secrets-db,test:self-improvement-db,test:self-improvement-unit,test:session-mailbox-db,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:suggestion-artifact-db,test:task-identity-db,test:task-presentation-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:web-auth-db,test:worker-authorization-db,test:workspace-admin-db,test:workspace-migration-db,test:workspace-permissions-migration-db
+          DB_TEST_EXPECTED: test:abuse-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:chat-attachments-db,test:cloud-backend-db,test:cloud-services-db,test:coding-workspace-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:device-enrollment-db,test:device-revocation-db,test:domain-lifecycle-db,test:drive-db,test:enterprise-db,test:eve-db,test:execution-settings-db,test:factory,test:factory-activity-db,test:factory-activity-http-db,test:factory-all-dispatch-db,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:github-connections-db,test:group-turns,test:groups,test:inbox-db,test:issue-search-db,test:live-db,test:local-repository-migration-db,test:migration-steps-db,test:model-admission-db,test:onboarding-db,test:ops-db,test:pat-api-db,test:pat-db,test:personal-mailbox-default-off-db,test:plugins-db,test:preview-driver,test:project-decisions-db,test:project-resources-db,test:project-v2-db,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:run-recovery-db,test:schedules-db,test:scope-detachment-db,test:secrets-db,test:self-improvement-db,test:self-improvement-unit,test:session-mailbox-db,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:suggestion-artifact-db,test:task-identity-db,test:task-presentation-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:web-auth-db,test:worker-authorization-db,test:workspace-admin-db,test:workspace-migration-db,test:workspace-permissions-migration-db
       - name: Preserve synthetic CLI approval database evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

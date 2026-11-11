@@ -1,3 +1,4 @@
+import { nativeCall, eveResponse } from '../../tests/support/eve-acceptance.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash, randomUUID } from 'node:crypto'
@@ -111,7 +112,7 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation) {
   const profileId = uuid(3), issueId = uuid(4), deviceId = uuid(5), connectionId = uuid(6)
   const email = 'acceptance+mikka-smoke@example.invalid', model = 'gpt-6-luna', digest = '6'.repeat(64)
   const source = { kind: 'subscription', connectionId }, calls = []
-  let profile, issue, bot, machineEnded = false, observed = false
+  let dispatchInput, profile, issue, bot, machineEnded = false, observed = false
   const workspace = { currentUserId: ownerId, workspace: { id: workspaceId, kind: 'team' }, role: 'member',
     choices: [{ id: workspaceId, kind: 'team' }],
     members: [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] }
@@ -120,10 +121,9 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation) {
     async request(path) {
       calls.push(path)
       if (path === '/api/auth/sign-in/email' || path === '/api/auth/sign-out') return new Response('{}')
-      assert.equal(path, `/api/coordinator/stream?botId=${botId}&wait=1`)
-      return new Response([{ type: 'tool', name: 'dispatch_run', state: 'running', call: 'dispatch', input: issueId },
-        { type: 'tool', name: 'dispatch_run', state: 'done', call: 'dispatch' }].map(item => JSON.stringify(item)).join('\n') + '\n',
-      { headers: { 'content-type': 'application/x-ndjson' } })
+      if (path === `/api/agents/eve/v1/session?botId=${botId}`) return Response.json({ ok: true, sessionId: 'wrun_secrets' })
+      assert.equal(path, `/api/agents/eve/v1/session/wrun_secrets/stream?botId=${botId}&startIndex=0`)
+      return eveResponse(nativeCall('dispatch', dispatchInput, { runId }))
     },
     async json(path, init) {
       calls.push(path)
@@ -166,7 +166,8 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation) {
       if (name === 'execution-settings.getBotModelMenu') return { groups: [{ kind: 'subscription', provider: 'codex', owner: adminId, options: [selected] }] }
       if (name === 'execution-settings.chooseBotModel') return { current: { ...selected, kind: 'subscription', chosen: true, available: true } }
       if (name === 'issues.saveIssue') { issue = { ...args[0], id: issueId, revision: 1 }; return { issue } }
-      if (['coordinator.sendCoordinatorMessage', 'coordinator.stopCoordinatorTurn', 'issue-operations.setIssueDeleted'].includes(name)) return {}
+      if (name === 'coordinator.sendCoordinatorMessage') { dispatchInput = JSON.parse(args[0].match(/参数：(.*)。使用/)[1]); return {} }
+      if ([ 'coordinator.stopCoordinatorTurn', 'issue-operations.setIssueDeleted'].includes(name)) return {}
       if (name === 'agents.pollIssueThreads') return { threads: [{ id: runId, ownedByCurrentUser: true }] }
       if (name === 'agents.getThreadMachine') return { kind: 'cloud', state: machineEnded ? 'ended' : 'running',
         cloud: machineEnded ? null : { template: env.EXPECTED_CODEX_TEMPLATE, sandboxId: 'synthetic-task-vm' } }

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { timedModelStream, type ModelCallTiming } from './model-call-timing'
-import { timedTools, type ToolTiming } from './subscription-workflow-turn'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -73,20 +72,6 @@ test('a call with no text and a failing stream still logs once, marked interrupt
   assert.deepEqual([lines[0].interrupted, lines[0].firstTokenMs, lines[0].firstTextMs, lines[0].inputTokens, lines[0].cacheReadTokens, lines[0].cacheWriteTokens, lines[0].workflowRunId], [true, null, null, null, null, null, null])
   const silent = timedModelStream({ stream: streamOf([{ type: 'finish', usage: {} }]) }, { route: 'hosted', model: 'm', tools: 0, startedAt: 0, requestedAt: 0 }, clock(5), () => { throw new Error('log sink down') })
   assert.equal((await drain(silent.stream)).length, 1, 'a failing log never fails the call')
-})
-
-test('each tool call is timed by name, failures included, and its result is unchanged', async () => {
-  const timings: ToolTiming[] = []
-  const tools = timedTools({
-    dispatch_run: { description: 'd', inputSchema: undefined as never, execute: async (input: { repo: string }) => ({ runId: `run-${input.repo}` }) },
-    broken: { description: 'b', inputSchema: undefined as never, execute: async () => { throw new Error('tool failed') } },
-    schema_only: { description: 's', inputSchema: undefined as never },
-  } as never, timings, clock(100, 2_600, 3_000, 3_400))
-  const options = { toolCallId: 'c', messages: [] } as never
-  assert.deepEqual(await tools.dispatch_run.execute!({ repo: 'Mikka_test' }, options), { runId: 'run-Mikka_test' })
-  await assert.rejects(tools.broken.execute!({}, options), /tool failed/)
-  assert.equal(tools.schema_only.execute, undefined, 'a tool without execute is left as it is')
-  assert.deepEqual(timings, [{ tool: 'dispatch_run', ms: 2_500, failed: false }, { tool: 'broken', ms: 400, failed: true }])
 })
 
 test('provider error parts mark timing interrupted and malformed counts or finish text are not logged', async () => {

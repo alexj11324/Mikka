@@ -52,6 +52,13 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
   { marker: 'lib/chat-attachments/store.ts', file: 'lib/chat-attachments/store.db.test.ts', script: 'test:chat-attachments-db' },
   { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
+  { marker: 'lib/eve/scheduled-read.ts', file: 'lib/eve/scheduled-read.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/scope.ts', file: 'lib/eve/scope.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/auth-bot.ts', file: 'lib/eve/auth-bot.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/sandbox.ts', file: 'lib/eve/sandbox.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/settlement.ts', file: 'lib/eve/settlement.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/outcome-delivery.ts', file: 'lib/eve/outcome-delivery.db.test.ts', script: 'test:eve-db' },
+  { marker: 'lib/eve/approval-store.ts', file: 'lib/eve/approval-bridge.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/schedules/store.ts', file: 'lib/schedules/store.db.test.ts', script: 'test:schedules-db' },
   { marker: 'lib/run-leases.ts', file: 'tests/run-recovery.db.test.ts', script: 'test:run-recovery-db' },
   { marker: 'app/v1/runs/[runId]/checkpoint/route.ts', file: 'tests/checkpoint-recovery.db.test.ts', script: 'test:run-recovery-db' },
@@ -179,6 +186,7 @@ export const SELF_MANAGED = [
 // Register exact files so another pg-backed test in the same folder still fails
 // inventory until it has its own explicit gate.
 export const BROWSER_SUITES = [
+  // Compatibility path; the retained local MVP now uses native Eve HTTP only.
   { file: 'tests/mvp/coordinator-streaming.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
   { file: 'tests/mvp/core-loop.spec.ts', config: 'playwright.mvp.config.ts', script: 'test:e2e:mvp' },
 ]

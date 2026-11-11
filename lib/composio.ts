@@ -12,8 +12,8 @@ export function getComposio() {
   return apiKey ? new Composio({ apiKey }) : null
 }
 
-export function runComposioAction(userId: string, action: ComposioActionName, input: unknown, accountId?: string, gate?: ComposioDispatchGate): Promise<ComposioActionResult> {
-  return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit), accountId, gate)
+export function runComposioAction(userId: string, action: ComposioActionName, input: unknown, accountId?: string, gate?: ComposioDispatchGate, signal?:AbortSignal): Promise<ComposioActionResult> {
+  return executeComposioAction(userId, action, input, getComposio(), toolkit => chosenComposioDefault(userId, toolkit), accountId, gate, signal)
 }
 
 export async function resolveActionAccount(userId: string, action: ComposioActionName, accountId?: string) {

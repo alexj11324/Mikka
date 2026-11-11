@@ -1,5 +1,9 @@
 # Credential exposure is distinct from execution-machine authority
 
+Superseded for explicitly configured **task MCP credentials only** by
+[native MCP delivery, 2026-11-11](2026-11-11-0534-eve-and-native-mcp.md).
+Other credential classes and unrelated third-party Secrets keep this boundary.
+
 - Date: 2026-11-08 02:40 UTC
 - Source: Alex's correction to the interpretation of [#1505](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691833153): 「我当时是要求，就是说执行机器直接持有的是GitHub的credential，没让他就是说把所有的这个密钥都给到这个执行机器啊。」 This clarifies the scope of credential delivery, not the [removal of repeated remote authorization](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691871552).
 - Rule: Task-machine execution, credentials, user/workspace/repository Secret delivery, cloud and local runners.

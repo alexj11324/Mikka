@@ -7,7 +7,7 @@ import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
-import { coordinatorHistory, retryCoordinatorTurn, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { coordinatorHistory, retryCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { getBotModelMenu } from '@/app/actions/execution-settings'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
 import { metadataEntities } from '@/lib/coordinator/chat-poll'
@@ -38,12 +38,14 @@ import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { CoordinatorContextUsage } from './coordinator-context-usage'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
-import { useCoordinatorStream } from './use-coordinator-stream'
+import { useCoordinatorAgent } from './use-coordinator-agent'
+import { activeTurn } from 'eve/events'
+import { EveInteractions } from './eve-interactions'
 import { useLiveKey, useLiveKeys, useLiveScope, watchPageVisibility } from '@/hooks/use-live-key'
 import { ListReadScopeError, listReadDeadline, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { heldRevision } from '@/lib/live/revisions'
 import { useLiveCitations } from './use-live-citations'
-import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
+import type { CoordinatorLiveReply } from '@/lib/eve/chat-view'
 import { ThreadCard } from './thread-card'
 import { firstThreadCards, staleEventPositions, visibleDivider } from '@/lib/coordinator/chat-dedupe'
 import { ActivityExpansionContext, ReplyActivity, useActivityExpansion, useThreadToolRows } from './reply-activity'
@@ -132,7 +134,7 @@ function replyRows(item: Chat['items'][number], live: CoordinatorLiveReply | und
 
 /** A live reply's thinking as the activity shows it: still thinking, or the whole seconds it took (at least one). */
 function liveThinking(reply: CoordinatorLiveReply) {
-  return reply.thinking && { active: reply.thinking.since !== undefined, seconds: Math.max(1, Math.round(reply.thinking.ms / 1000)), ...(reply.thinking.text ? { text: reply.thinking.text } : {}) }
+  return reply.thinking && { active: reply.thinking.since !== undefined, ...(reply.thinking.ms ? { seconds: Math.max(1, Math.round(reply.thinking.ms / 1000)) } : {}), ...(reply.thinking.text ? { text: reply.thinking.text } : {}) }
 }
 
 /** A sent message's words, under the reply words it quotes (lib/chat-quote.ts) and anything else it carries. */
@@ -167,7 +169,7 @@ const showThread = ({ runId }: { runId: string }) => openThread(runId)
 /** Starting goals offered in an empty Coordinator chat (coordinator's choice, 2026-11-08). */
 const STARTERS = ['fixBug', 'reviewPullRequests', 'summarizeToday', 'dailyBriefing'] as const
 
-export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId, pill = true }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string
+function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId, pill = true }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string
   /** A floating title pill sits over the chat on wide screens (ConversationPill): the layer's screen starts below it. */
   pill?: boolean }) {
   const t = useTranslations('Coordinator')
@@ -237,7 +239,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     } catch { toast.error(actionError()) } finally { setLoadingHistory(false) }
   }
   // A sent message waits in the inbox for its turn: the stream opens now, so the first words show as they come.
-  const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, waiting: Boolean(data?.working && !data.streamRunId), cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
+  const stream = useCoordinatorAgent({ botId, enabled: Boolean(data), persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
+  const working = stream.status === 'busy'
+  const resuming = stream.status === 'resuming'
   useEffect(() => { reconnectStream.current = stream.reconnect }, [stream.reconnect])
   const stateKey = `bot-chat:${botId ?? 'coordinator'}:${embedded?.activeArtifactId ?? 'main'}`
   const [localSend, setLocalSend] = useState({ key: stateKey, count: 0 })
@@ -276,7 +280,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // `retryOf`: the stored failed message this send retries in place (重新发送); it stays hidden from then on.
   const [failed, setFailed] = useState<{ text: string; withNotes: boolean; message: string; after: number; retryOf?: number } | null>(null)
   const [retrying, setRetrying] = useState<ReadonlySet<number>>(() => new Set())
-  const { submit, failureMessage } = useCoordinatorSubmit()
+  const { submit, failureMessage } = useCoordinatorSubmit(stream)
   // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader).
   const browser = useBrowserNotesComposer(!embedded)
   const noteCount = browser?.notes.length ?? 0
@@ -319,19 +323,19 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const workingAtOpen = useRef(false)
   useEffect(() => {
     if (!data) return
-    if (!loaded.current) { loaded.current = true; workingAtOpen.current = Boolean(data.working) }
-    else if (!data.working) workingAtOpen.current = false
+    if (!loaded.current) { loaded.current = true; workingAtOpen.current = Boolean(working) }
+    else if (!working) workingAtOpen.current = false
   })
   const workingEnter = loaded.current && !workingAtOpen.current
   const entering = (item: (typeof items)[number]) => arriving(`item-${item.position}`) && !(item.from === 'coordinator' && item.position <= streamedThrough.current)
   // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
-  const refusal = data?.working ? null : hostedRefusal(data?.error)
+  const refusal = working ? null : hostedRefusal(data?.error)
   // The chosen subscription refused it: the mapped line, never the raw step error.
-  const declined = data?.working || refusal ? null : subscriptionRefusal(data?.error)
-  const apiBalance = !data?.working && !refusal && !declined && chatBalanceRefusal(data?.error)
+  const declined = working || refusal ? null : subscriptionRefusal(data?.error)
+  const apiBalance = !working && !refusal && !declined && chatBalanceRefusal(data?.error)
   // 重试 on any failed reply, never on a wake still being retried by the server.
   const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
-  const liveFailure = data?.error && !data.working ? chatFailure({ working: false, error: data.error, cause: data.cause }) : null
+  const liveFailure = data?.error && !working ? chatFailure({ working: false, error: data.error, cause: data.cause }) : null
   const cloudCode = liveFailure?.kind === 'failed' ? liveFailure.cloudCode : undefined
   const liveRaw = liveFailure?.raw ?? null
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
@@ -341,9 +345,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // The failure of the newest turn sits under the message it was answering (it carries the mark, store.failTurn),
   // with its way on; an older failure keeps only its reason there. Without the mark it stays above the composer.
   const lastSaid = items.findLast(item => item.from !== 'event')
-  const failedAt = data?.error && !data.working && (lastSaid?.from === 'person' || lastSaid?.welcome) && lastSaid.failure ? lastSaid.position : null
+  const failedAt = data?.error && !working && (lastSaid?.from === 'person' || lastSaid?.welcome) && lastSaid.failure ? lastSaid.position : null
   // The welcome never came: its failure is the chat's one line, on the Bot's side, never only a banner (11 people on 11-02).
-  const welcomeFailed = Boolean(data?.error && !data.working && (lastSaid?.welcome || (!items.length && !stream.replies.length)))
+  const welcomeFailed = Boolean(data?.error && !working && (lastSaid?.welcome || (!items.length && !stream.replies.length)))
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
   // A welcome Mikka 默认 refused runs again once its model becomes runnable while this chat is open (the trial points
@@ -355,7 +359,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const wasRunnable = useRef<boolean | undefined>(undefined)
   const rewelcomed = useRef<string | null>(null)
   useEffect(() => {
-    if (!data?.enabled || data.working || welcomed.current) return
+    if (!data?.enabled || working || resuming || !stream.session || welcomed.current) return
     if (data.error) {
       if (document.visibilityState !== 'visible') return
       const was = wasRunnable.current
@@ -375,7 +379,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
     {apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="balance">{t('apiBalance')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><Button size="sm" onClick={() => openModelPicker(botId)}>{t('modelPicker.changeModel')}</Button></span></Alert>}
-    {data?.error && !data.working && !cloudCode && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
+    {data?.error && !working && !cloudCode && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
     {/* The stored codes, and the turn failure behind a wake code, only under 详情 (decision 2026-11-05-0330). */}
     {liveRaw && <RunErrorDetails code={liveRaw} />}
   </>
@@ -436,20 +440,18 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // 停止 shows at once, as Esc does in Claude Code and Codex: the reply in flight reads 已停止 and the composer is free
   // again while the turn ends on the server, keeping what it had said.
   const [stopping, setStopping] = useState(false)
-  const working = Boolean(data?.working)
   useEffect(() => { if (!working) setStopping(false) }, [working])
   async function stop() {
     setStopping(true)
     try {
-      const result = await stopCoordinatorTurn(botId)
-      if (result.error) { setStopping(false); toast.error(actionError(result.error)) }
+      await stream.cancel()
       await mutate()
     } catch { setStopping(false); toast.error(actionError()) }
   }
 
   /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`: sent, failed (now a failed bubble), or skipped. */
   async function deliver(text: string, withNotes = false, retryOf?: number): Promise<'sent' | 'failed' | 'skipped'> {
-    if (!text || sending || deliveryInFlight.current) return 'skipped'
+    if (!text || sending || resuming || deliveryInFlight.current) return 'skipped'
     deliveryInFlight.current = true
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     const fail = (message: string | null) => {
@@ -506,7 +508,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   if (Screen) {
     // The live failure as the thread's error line: a plain failure says 回复失败 (or why the wake failed) once, on the
     // line, with 重试 under it; a failure with its own reason (cloud, refusal, subscription, API balance) keeps its notice.
-    const plainFailure = Boolean(data?.error && !data.working && !cloudCode && !refusal && !declined && !apiBalance)
+    const plainFailure = Boolean(data?.error && !working && !cloudCode && !refusal && !declined && !apiBalance)
     const liveFailurePart: ThreadEntryPart = plainFailure
       ? { kind: 'error', text: wakeError ? t(`wakeErrors.${wakeError}`) : t('failedTitle'), actions: <>{retry}{liveRaw && <RunErrorDetails code={liveRaw} />}</> }
       : { kind: 'error', text: t('failedTitle'), actions: failureNotice }
@@ -553,7 +555,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     }
     if (failed) entries.push({ id: 'failed', role: 'person', at: Date.now(), text: splitReplyQuote(failed.text).text, status: 'failed', onRetry: () => { void deliver(failed.text, failed.withNotes, failed.retryOf) } })
     // Before the reply has anything to show: the Bot's turn, still empty, with its caret.
-    if (data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && !stopping)
+    if (working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && !stopping)
       entries.push({ id: 'waiting', role: 'bot', at: Date.now(), parts: [], streaming: true })
     if (welcomeFailed && !items.length) entries.push({ id: 'welcome-failure', role: 'bot', at: Date.now(), parts: [liveFailurePart] })
     const empty = data && !items.length && !stream.replies.length && !data.error ? (data.enabled
@@ -563,6 +565,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     const notices = <>
       {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle></Alert>}
       {failedAt === null && !welcomeFailed && failureNotice}
+      <EveInteractions agent={stream} />
       {!data?.error && <HostedUnavailableNotice botId={botId} />}
       {!refusal && (declined === 'quotaUsed' || !data?.error) && <QuotaNotice botId={botId} stopped={declined === 'quotaUsed'}
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
@@ -575,14 +578,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       </p>}
       <PendingActions />
     </>
-    return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
+    return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()) }}>
       {/* The page's floating title pill sits over the top 56px on wide screens: the screen starts below it. Without one (the
           hosted shell owns the header and the thread names itself) no band is left. */}
       <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col', pill && 'md:pt-14')}>
         <Screen botId={botId} name={name} mark={avatar('pill')} entries={data ? entries : null} empty={empty} panels={compact ? undefined : panels} work={work.work}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
-          working={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
-          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending, onSubmit: () => { void send() },
+          working={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
+          composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: sending || resuming, onSubmit: () => { void send() },
             attachmentScope: data?.botId ? { kind: 'bot', id: data.botId } : undefined, running: working && !stopping }}
           pending={[
             ...(replyQuote ? [{ id: 'reply-quote', name: replyQuote, meta: tMessage('quote'), onRemove: () => setReplyQuote(null) }] : []),
@@ -599,7 +602,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     </AgentInteractionContext></AgentThemeProvider>
   }
 
-  return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
+  return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(working), continueFromAnswer: prompt => post(prompt.trim()) }}>
   {/* The chat never widens what holds it: whatever a message carries scrolls or wraps inside its own box, and anything that still
       reaches past the column is clipped here instead of scrolling the whole page sideways. */}
   <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip', CHAT_SURFACE)}>
@@ -695,7 +698,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             {/* Before the reply has anything to show: the Trace's Thinking row. Once the reply streams, its own Trace takes
                 over. It fades in (R-37: opacity on a duration) and leaves at once: an exit would keep its height after the
                 reply lands and pull the scroll position back (coordinator-scroll.spec). */}
-            {data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && (stopping
+            {working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && (stopping
               ? <Message align="start"><MessageContent><MessageFooter><p role="status">{t('stopped')}</p></MessageFooter></MessageContent></Message>
               : <div className={cn('flex', workingEnter && ENTER)}><ChatWaiting speaker={speaker} /></div>)}
             </ActivityExpansionContext>
@@ -711,6 +714,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <Alert variant="destructive" role="status" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="load">{t('loadError')}</AlertTitle></Alert>}
       {failedAt === null && !welcomeFailed && failureNotice}
+      <EveInteractions agent={stream} />
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
       {/* On Mikka 默认 with no points here: said before sending (decision 2026-11-02-1450). */}
       {!data?.error && <HostedUnavailableNotice botId={botId} />}
@@ -724,8 +728,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
         {waitingQuestions[0].runId && <Button variant="link" size="xs" className="h-auto min-w-0 max-w-full px-0 font-normal" onClick={() => showThread({ runId: waitingQuestions[0].runId! })}><span className="min-w-0 truncate">{waitingQuestions[0].title}</span></Button>}
       </p>}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
-        running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || resuming} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
+        running={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
         model={<div className="flex min-w-0 items-center gap-1">
           <BotModelPicker botId={botId ?? null} running={working || sending} />
           {/* How near the next fold is (lib/coordinator/context-usage.ts). Beside the model chip,
@@ -741,4 +745,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     <SelectionQuote root={rootRef} onQuote={quoteReply} />
   </section>
   </AgentInteractionContext></AgentThemeProvider>
+}
+
+/** Eve binds one immutable session per mount; identity changes destroy that reader and its state. */
+export function CoordinatorChat(props: Parameters<typeof CoordinatorChatSession>[0]) {
+  const scope = useLiveScope()
+  return <CoordinatorChatSession key={`${props.userId ?? scope?.ownerId ?? 'session'}:${scope?.workspaceId ?? ''}:${props.bot?.id ?? 'coordinator'}`} {...props} />
 }

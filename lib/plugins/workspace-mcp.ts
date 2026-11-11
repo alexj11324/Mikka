@@ -5,7 +5,7 @@ import { assertOrganizationResourceShare, organizationResourceAllowed, workspace
 
 type Query = Pick<Pool | PoolClient, 'query'>
 type Workspace = { id: string; kind: 'personal' | 'team'; name: string }
-type Row = { id: string; user_id: string; name: string; url: string; transport: 'http' | 'sse'; enabled: boolean; revision: number; auth_header: string | null; created_at: Date; grant_id: string | null }
+type Row = { id: string; user_id: string; name: string; url: string; transport: 'http' | 'sse' | 'stdio'; enabled: boolean; revision: number; auth_header: string | null; created_at: Date; grant_id: string | null }
 const columns = 's.id,s.user_id,s.name,s.url,s.transport,s.enabled,s.revision,s.auth_header,s.created_at'
 const unavailable = () => new PluginError('mcpUnavailable', 403)
 
@@ -79,7 +79,7 @@ export class WorkspaceMcpStore {
     const names = await this.activeNames(workspaceId, [userId, ...rows.map(row => row.user_id)])
     const servers: McpWorkspaceServerView[] = rows.map(row => ({
       id: row.id, name: row.name, url: row.user_id === userId ? row.url : null,
-      transport: row.transport, enabled: row.enabled, revision: row.revision, authKind: row.auth_header ? 'header' : 'none',
+      transport: row.transport, enabled: row.enabled, revision: row.revision, authKind: row.transport === 'stdio' ? 'env' : row.auth_header ? 'header' : 'none',
       createdAt: row.created_at.toISOString(), ownerId: row.user_id, ownerName: names.get(row.user_id) ?? null,
       mine: row.user_id === userId, shared: Boolean(row.grant_id),
     }))

@@ -35,8 +35,8 @@ stub('./composio.ts', {
   resolveActionAccount: async (_userId: string, _action: string, requested?: string) => ({ accountId: requested ?? selected, accounts: [] }),
   runComposioAction: async (...args: unknown[]) => {
     calls.push(args)
-    const gate = args[4] as ((accountId: string, tool: { tags?: string[] }) => Promise<{ error: string } | null>) | undefined
-    const stopped = gate ? await gate(String(args[3] ?? selected), { tags: toolTags }) : null
+    const gate = args[4] as ((accountId: string, tool: { tags?: string[]; version?: string }) => Promise<{ error: string } | null>) | undefined
+    const stopped = gate ? await gate(String(args[3] ?? selected), { tags: toolTags, version: 'pinned-v1' }) : null
     if (stopped) return stopped
     return actionError ? { error: actionError } : { data: { summary: 'event' }, accountId: args[3] } },
 })
@@ -49,6 +49,27 @@ stub('./app-tools-server.ts', { executeAppToolCall: async (_client: unknown, use
 stub('./plugins/catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), isNoAuthToolkit: async (_list: unknown, id: string) => id === 'hackernews' })
 let store: typeof import('./pending-action-store'), actions: typeof import('./pending-actions')
 before(async () => { store = await import('./pending-action-store'); actions = await import('./pending-actions') })
+
+test('native mail review stops before storing a card; exact native Ask satisfaction retains a done receipt', async () => {
+  workspacePolicy = { gmail: 'ask' }; row = {}; selected = 'account-native'
+  const input = { to: ['recipient@example.invalid'], subject: 'Final subject', body: 'Final text' }
+  try {
+    let binding: unknown
+    const stopped = await store.writeAccountAction('u', 'send_email', input, undefined, BOT, async () => { throw Error('explicit Ask never judges') }, async (decision, prepared) => {
+      assert.equal(decision, 'ask'); binding = prepared; return 'deny'
+    })
+    assert.deepEqual(stopped, { error: 'integrationActionDenied' })
+    assert.deepEqual(row, {}, 'native request creates no parallel pending-action UI')
+    assert.deepEqual(binding, { ownerId: 'u', botId: BOT, action: 'send_email', input, accountId: 'account-native', version: 'pinned-v1', policy: 'ask' })
+    const done = await store.writeAccountAction('u', 'send_email', input, undefined, BOT, async () => 'ask', async (decision, prepared) => {
+      assert.equal(decision, 'ask'); assert.deepEqual(prepared, binding); return 'allow'
+    })
+    assert.equal('status' in done && done.status, 'done'); assert.equal(row.status, 'done')
+    workspacePolicy = { gmail: 'deny' }; row = {}
+    const denied = await store.writeAccountAction('u', 'send_email', input, undefined, BOT, async () => 'allow', async () => 'allow')
+    assert.deepEqual(denied, { error: 'integrationActionDenied' }); assert.deepEqual(row, {})
+  } finally { workspacePolicy = null }
+})
 
 test('proposal freezes the account used to read the event, and approval uses it after default changes', async () => {
   selected = 'account-a'; calls.length = 0; liveEffects.length = 0

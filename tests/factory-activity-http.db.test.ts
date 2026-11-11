@@ -37,6 +37,41 @@ async function freePort(): Promise<number> {
   return address.port
 }
 
+test('HTTP network guard isolates compiler metadata while refusing external model and credentialed requests', async () => {
+  const directory=await mkdtemp(join(tmpdir(),'factory-activity-network-'))
+  const receipt=join(directory,'network.txt')
+  try {
+    const script=`
+      import assert from 'node:assert/strict'
+      import net from 'node:net'
+      import {createServer} from 'node:http'
+      const catalog='https://ai-gateway.vercel.sh/v1/models/catalog'
+      assert.equal((await fetch(catalog)).status,503)
+      for(const [url,init] of [
+        [catalog+'?extra=1'],[catalog,{method:'POST'}],
+        [catalog,{headers:{authorization:'Bearer synthetic'}}],
+        [catalog,{headers:{cookie:'synthetic=1'}}],
+        [new Request(catalog,{headers:{authorization:'Bearer synthetic'}})],
+        ['https://ai-gateway.vercel.sh/v1/chat/completions',{method:'POST'}],
+        ['https://another.invalid/v1/models/catalog'],
+      ]) await assert.rejects(Promise.resolve().then(()=>fetch(url,init)),/FACTORY_ACTIVITY_HTTP_EXTERNAL_TRANSPORT_FORBIDDEN/)
+      assert.throws(()=>net.connect({host:'another.invalid',port:443}),/FACTORY_ACTIVITY_HTTP_EXTERNAL_TRANSPORT_FORBIDDEN/)
+      const server=createServer((_request,response)=>response.end('owned-local-listener'))
+      await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
+      try {
+        const response=await fetch('http://127.0.0.1:'+server.address().port)
+        assert.equal(await response.text(),'owned-local-listener')
+      } finally {server.closeAllConnections();await new Promise(resolve=>server.close(resolve))}
+    `
+    await execute(process.execPath,['--import',resolve('tests/fixtures/factory-activity-http-network.mjs'),'--input-type=module','--eval',script],{
+      cwd:process.cwd(),env:{...process.env,NODE_OPTIONS:'',FACTORY_ACTIVITY_HTTP_NETWORK_RECEIPT:receipt},timeout:15_000,maxBuffer:64*1024,
+    })
+    const observation=await readFile(receipt,'utf8')
+    assert.equal(observation.split('\n').filter(line=>line==='model-catalog-offline').length,1)
+    assert.equal(observation.split('\n').filter(line=>line==='blocked').length,8)
+  } finally {await rm(directory,{recursive:true,force:true})}
+})
+
 test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable versions and historical video posters',
   {skip:!enabled,timeout:300_000},async t=>{
   const adminUrl=assertE2eTarget(base!), name=`activity_http_${randomUUID().replaceAll('-','')}_e2e`
@@ -467,5 +502,5 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   assert.match(transport,/guard-start/);assert.ok(!transport.includes('blocked'),'application made no external transport attempt')
   assert.equal((await pool.query("SELECT count(*)::int AS n FROM agent_runs WHERE status IN ('queued','running')")).rows[0].n,0)
   t.diagnostic(JSON.stringify({revision,origin,database:name,runtime:'Vite+Nitro',authentication:'leased Better Auth cookie sessions and browser-created PATs',
-    attempts:24,taskMedia:25,externalTransportAttempts:0,modelRunsStarted:0,serverStdoutBytes:stdoutBytes,serverStderrBytes:stderrBytes}))
+    attempts:24,taskMedia:25,externalTransportAttempts:0,offlineCompilerCatalogReads:transport.split('\n').filter(line=>line==='model-catalog-offline').length,modelRunsStarted:0,serverStdoutBytes:stdoutBytes,serverStderrBytes:stderrBytes}))
 })
