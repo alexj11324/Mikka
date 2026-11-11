@@ -23,23 +23,30 @@ export class EveRuntime extends Container {
       capability = crypto.randomUUID() + crypto.randomUUID()
       ctx.storage.kv.put('eve-world-capability', capability)
     }
-    this.envVars = { ...this.configuration.runtimeEnv, MIKKA_EVE_WORLD_TOKEN: capability,
+    let productCapability = ctx.storage.kv.get('eve-product-capability')
+    if (!productCapability) {
+      productCapability = crypto.randomUUID() + crypto.randomUUID()
+      ctx.storage.kv.put('eve-product-capability', productCapability)
+    }
+    this.envVars = { ...this.configuration.runtimeEnv, MIKKA_EVE_WORLD_TOKEN: capability, MIKKA_EVE_PRODUCT_TOKEN: productCapability,
       NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt' }
     this.labels = { component: 'eve-runtime', release: this.configuration.releaseId }
   }
 
-  async bindWorld() {
+  async bindOutboundServices() {
     await this.ctx.container.interceptOutboundHttps('world.internal',
       this.ctx.exports.EveWorldOutbound({ props: { capability: this.envVars.MIKKA_EVE_WORLD_TOKEN } }))
+    await this.ctx.container.interceptOutboundHttps('product.internal',
+      this.ctx.exports.EveProductOutbound({ props: { capability: this.envVars.MIKKA_EVE_PRODUCT_TOKEN } }))
   }
 
   async start(...args) {
-    await this.bindWorld()
+    await this.bindOutboundServices()
     return super.start(...args)
   }
 
   async startAndWaitForPorts(...args) {
-    await this.bindWorld()
+    await this.bindOutboundServices()
     return super.startAndWaitForPorts(...args)
   }
 
