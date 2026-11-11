@@ -5,6 +5,7 @@ import React, { act, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import messages from '../messages/en.json'
+import { Input } from '../components/ui/input'
 import { Textarea } from '../components/ui/textarea'
 
 // Exercise the real read owners and Sonner action buttons. The only reads are
@@ -74,7 +75,7 @@ stub('components/nav/group-avatar.tsx', { GroupAvatar: Empty, groupMembersKey: (
 stub('components/nav/letter-avatar.tsx', { LetterAvatar: Empty })
 stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Empty })
 // The task page's layer frame (docs/ui-overlay.md task-detail); this test reads through the open-source layout.
-stub('components/workspace/task-detail-frame.tsx', { FramedTask: ({ titleField }: import('../components/workspace/task-detail-frame').FramedTaskProps) => <input id="task-title" value={titleField.value} readOnly /> })
+stub('components/workspace/task-detail-frame.tsx', { FramedTask: ({ titleField }: import('../components/workspace/task-detail-frame').FramedTaskProps) => <Input id="task-title" value={titleField.value} readOnly /> })
 stub('components/slots/task-conversation.tsx', { TaskConversation: ({ issueId, runId }: { issueId: string; runId: string }) => <ol data-task-conversation={issueId}><li>{runId}</li></ol> })
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
