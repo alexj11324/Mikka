@@ -25,7 +25,7 @@ export function useGoogleSignIn(googleEnabled: boolean) {
   }, { revalidateOnFocus: false })
   const [linkedHere, setLinkedHere] = useState(false)
   /** null while it is not known yet */
-  const linked = !googleEnabled ? false : linkedHere || (accounts.data ?? (accounts.error ? false : null))
+  const linked = !googleEnabled ? false : linkedHere || (accounts.data ?? null)
   const [pending, setPending] = useState(false)
   const [actionError, setActionError] = useState('')
   const error = actionError || (accounts.error && accounts.data === undefined ? t('googleStatusFailed') : '')
@@ -49,6 +49,7 @@ export function useGoogleSignIn(googleEnabled: boolean) {
   }, [t])
 
   async function link() {
+    if (!googleEnabled || linked !== false || pending) return
     setPending(true); setActionError(''); setSuccess('')
     try {
       const handoff = await openSettingsInBrowser('account')
@@ -67,5 +68,5 @@ export function useGoogleSignIn(googleEnabled: boolean) {
     }
   }
 
-  return { linked, pending, error, success, link }
+  return { linked, pending, error, success, link, reload: () => { setActionError(''); return mutate() } }
 }

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
 import { FieldError } from '@/components/ui/field'
 import { useSecurity } from '@/hooks/settings/use-security'
@@ -16,6 +16,7 @@ import { useSecurity } from '@/hooks/settings/use-security'
 /** N1: password, signed-in devices. Passkey and 2FA wait for their backend. */
 export function SecuritySettings() {
   const t = useTranslations('Settings.security')
+  const commonT = useTranslations('Common')
   const locale = useLocale()
   const security = useSecurity()
   const { passwordError, hasPassword, devices, pendingSession, signOutError } = security
@@ -47,11 +48,13 @@ export function SecuritySettings() {
 
   return <>
     <SettingsSection id="password-heading" title={t('signInMethods')}>
-      <SettingRow title={t('password')} description={passwordError ?? (hasPassword ? undefined : t('passwordNotSet'))}>
-        <Button type="button" variant="secondary" size="sm" disabled={security.passwordLoading} onClick={open}>
+      <SettingRow title={t('password')} description={hasPassword === false ? t('passwordNotSet') : undefined}>
+        {hasPassword !== null && <Button type="button" variant="secondary" size="sm" disabled={security.passwordLoading} onClick={open}>
           {hasPassword ? t('changePassword') : t('setPassword')}
-        </Button>
+        </Button>}
       </SettingRow>
+      {security.passwordLoading && <SettingsLoading label={commonT('loading')} rows={1} bare />}
+      {passwordError && <SettingsSaveError message={passwordError} retryLabel={commonT('retry')} onRetry={() => { void security.reloadPassword() }} />}
     </SettingsSection>
 
     <SettingsSection id="devices-heading" title={t('devices')}>
@@ -93,7 +96,7 @@ export function SecuritySettings() {
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setEditing(false)} disabled={saving}>{t('cancel')}</Button>
-          <Button type="button" disabled={saving || !next || mismatch || (hasPassword && !current)} onClick={() => { void save() }}>{saving ? t('saving') : t('save')}</Button>
+          <Button type="button" disabled={saving || hasPassword === null || !next || mismatch || (hasPassword && !current)} onClick={() => { void save() }}>{saving ? t('saving') : t('save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
-import { SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
 import { usePresence } from '@/lib/use-presence'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,7 @@ type Editing = { kind: 'new' } | { kind: 'password'; login: SavedLogin }
  */
 export function SavedLoginsSettings() {
   const t = useTranslations('Settings.logins')
+  const common = useTranslations('Common')
   const locale = useLocale()
   const saved = useSavedLogins()
   const { logins, deleteError, remove } = saved
@@ -43,7 +44,7 @@ export function SavedLoginsSettings() {
   return <>
     <SettingsSection id="saved-logins-heading" title={t('heading')} action={logins.length > 0 ? <Button {...settingsSectionAction} onClick={add}>{t('add')}</Button> : undefined}>
       {isLoading && <SettingsLoading label={t('loading')} rows={3} bare />}
-      {error && <FieldError className="px-5 py-3">{t('loadError')}</FieldError>}
+      {error && <SettingsSaveError message={t('loadError')} retryLabel={common('retry')} onRetry={() => { void saved.reload() }} />}
       {!isLoading && !error && logins.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm text-muted-foreground">{t('empty')}</p>
         <Button type="button" variant="secondary" size="sm" onClick={add}><Plus data-icon="inline-start" />{t('add')}</Button>
@@ -155,10 +156,11 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
 
 function UsageList({ id }: { id: string }) {
   const t = useTranslations('Settings.logins')
+  const common = useTranslations('Common')
   const locale = useLocale()
-  const { uses, loading: isLoading, failed: error } = useSavedLoginUsage(id)
+  const { uses, loading: isLoading, failed: error, reload } = useSavedLoginUsage(id)
   if (isLoading) return <SettingsLoading label={t('usageLoading')} rows={2} bare />
-  if (error) return <FieldError>{t('usageError')}</FieldError>
+  if (error) return <SettingsSaveError message={t('usageError')} retryLabel={common('retry')} onRetry={() => { void reload() }} />
   if (uses.length === 0) return <p className="text-sm text-muted-foreground">{t('usageEmpty')}</p>
   return <div className="flex max-h-80 flex-col divide-y divide-border overflow-auto">
     {uses.map(use => <div key={use.id} className="flex flex-col gap-0.5 py-2.5">
