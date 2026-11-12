@@ -1,21 +1,36 @@
 import 'server-only'
-import type { Pool } from 'pg'
+import { randomUUID } from 'node:crypto'
+import type { Pool, PoolClient } from 'pg'
 import type { AccountCleanupReport } from './cleanup-result'
 import type { SubscriptionService } from '@/lib/subscription-service'
 
 type Service = Pick<SubscriptionService, 'repository' | 'worker' | 'status'>
-export type SubscriptionCleanupFactory = () => Promise<Service>
-const runtime: SubscriptionCleanupFactory = async () => (await import('@/lib/subscription-runtime')).subscriptionRuntime(false, true)
+export type SubscriptionDeletionLease = { id: string; client: PoolClient }
+export type SubscriptionCleanupFactory = (grant?: string) => Promise<Service>
+const runtime: SubscriptionCleanupFactory = async grant => (await import('@/lib/subscription-runtime')).subscriptionRuntime(false, true, { accountDeletionGrant: grant })
 
 /** Uses the existing owner-bound worker, never its operator-wide cleanup batch. */
-export async function cleanupAccountSubscriptions(ownerId: string, database: Pool, serviceFactory = runtime): Promise<AccountCleanupReport> {
+export async function cleanupAccountSubscriptions(ownerId: string, database: Pool, serviceFactory = runtime, job?: SubscriptionDeletionLease): Promise<AccountCleanupReport> {
   const connections = (await database.query<{ id: string }>(`SELECT c.id FROM byos_connections c WHERE c."ownerId"=$1 AND (
     c."credentialVersion">0 OR c.state NOT IN ('pending','disconnected') OR c."secretName" IS NOT NULL OR c."accessSecretName" IS NOT NULL OR c."stagedSecretName" IS NOT NULL OR c."stagedAccessName" IS NOT NULL
     OR EXISTS(SELECT 1 FROM byos_secret_artifacts a WHERE a."connectionId"=c.id)
     OR EXISTS(SELECT 1 FROM byos_enrollment_sources a WHERE a."connectionId"=c.id)) ORDER BY c.id`, [ownerId])).rows
   if (!connections.length) return { blockedReasons: [], warnings: [] }
+  if (!job) return drain(ownerId, database, connections, serviceFactory)
+  // The existing deletion session owns the job lock until physical disconnect.
+  // A random companion lock grants its private custody child temporary access.
+  const grant = randomUUID(), key = 'mikka-account-byos-cleanup:' + job.id + ':' + grant
+  await job.client.query("SELECT pg_advisory_lock(hashtextextended($1,0)), set_config('mikka.byos_cleanup_grant',$2,false)", [key, grant])
+  try {
+    return await drain(ownerId, database, connections, serviceFactory, grant)
+  } finally {
+    await job.client.query("SELECT pg_advisory_unlock(hashtextextended($1,0)), set_config('mikka.byos_cleanup_grant','',false)", [key])
+  }
+}
+
+async function drain(ownerId: string, database: Pool, connections: { id: string }[], serviceFactory: SubscriptionCleanupFactory, grant?: string): Promise<AccountCleanupReport> {
   let service: Service
-  try { service = await serviceFactory() } catch { return { blockedReasons: ['subscription_custody_cleanup_required'], warnings: [] } }
+  try { service = await serviceFactory(grant) } catch { return { blockedReasons: ['subscription_custody_cleanup_required'], warnings: [] } }
   const reasons = new Set<string>(), warnings = new Set<string>()
   for (const { id } of connections) {
     try {

@@ -38,7 +38,7 @@ test('authenticated binding migrates one escrow through actual canonical publica
   const h = receiptDigest.subarray(0,16).toString('hex')
   const receiptName = `mikka-byos-${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`
   values.set(`/claims/${receiptName}`, JSON.stringify({schema:'mikka.byos.creation-result.v1',principal,id,digest:createHash('sha256').update(values.get(`/pending/mikka-byos-${id}`)).digest('hex'),grantUncertain:false,attemptSettled:true}))
-  let failProjection = true, failSourceDeletes = true
+  let failProjection = true, failSourceDeletes = true, rejectSettledDelete = null
   const vault = createServer({ key: await readFile(key), cert: await readFile(certificate) }, async (request, response) => {
     assert.equal(request.headers.authorization, 'Bearer fixture-custody')
     const url = new URL(request.url, 'https://127.0.0.1'), name = url.pathname.split('/').at(-1)
@@ -49,7 +49,7 @@ test('authenticated binding migrates one escrow through actual canonical publica
       if (failProjection && path === '/access') { response.writeHead(503).end(); return }
       if (values.has(lookup)) { response.writeHead(409).end(); return }
       values.set(lookup, body.secretValue)
-    } else if (request.method === 'DELETE') { if (failSourceDeletes && ['/pending','/attempts'].includes(path)) { response.writeHead(503).end(); return }; values.delete(lookup); response.writeHead(200).end('{}'); return } else assert.equal(request.method, 'GET')
+    } else if (request.method === 'DELETE') { if (name === rejectSettledDelete || (failSourceDeletes && ['/pending','/attempts'].includes(path))) { response.writeHead(503).end(); return }; values.delete(lookup); response.writeHead(200).end('{}'); return } else assert.equal(request.method, 'GET')
     if (!values.has(lookup)) { response.writeHead(404).end(); return }
     response.setHeader('content-type', 'application/json')
     response.end(JSON.stringify({ secret: { secretKey: name, secretValue: values.get(lookup), version: 1 } }))
@@ -81,7 +81,8 @@ test('authenticated binding migrates one escrow through actual canonical publica
     // The cron/service selector must find source-only leftovers, with no
     // inference reader and no retired canonical artifacts to select instead.
     let invalidCleanupConfig = false
-    const service = new SubscriptionService(new SubscriptionRepository(pool), scope => new SubscriptionWorkerClient({binary:resolve('packages/subscription-worker/bin/mikka-subscription-worker'),env:{SSL_CERT_FILE:certificate}}, {scope,databaseUrl,infisicalOrigin:`https://127.0.0.1:${vault.address().port}`,project:'fixture-project',environment:'staging',path:'/canonical',workloadToken:'fixture-custody',accessPath:'/access',enrollmentAttemptPath:'/attempts',enrollmentClaimPath:'/claims',enrollmentGrantPath:invalidCleanupConfig ? '/attempts' : '/pending',enableRuntime:false}), {ready:()=>false,nativeIsolation:'none'}, undefined, async (user, workspaceId) => {assert.equal(user,owner);assert.equal(workspaceId,workspace)})
+    const custodyService = (database = pool, workerUrl = databaseUrl) => new SubscriptionService(new SubscriptionRepository(database), scope => new SubscriptionWorkerClient({binary:resolve('packages/subscription-worker/bin/mikka-subscription-worker'),env:{SSL_CERT_FILE:certificate}}, {scope,databaseUrl:workerUrl,infisicalOrigin:`https://127.0.0.1:${vault.address().port}`,project:'fixture-project',environment:'staging',path:'/canonical',workloadToken:'fixture-custody',accessPath:'/access',enrollmentAttemptPath:'/attempts',enrollmentClaimPath:'/claims',enrollmentGrantPath:invalidCleanupConfig ? '/attempts' : '/pending',enableRuntime:false}), {ready:()=>false,nativeIsolation:'none'}, undefined, async (user, workspaceId) => {assert.equal(user,owner);assert.equal(workspaceId,workspace)})
+    const service = custodyService()
     invalidCleanupConfig = true
     const misconfigured = await service.status(owner,bound.id);assert.equal(misconfigured.state,'connected');assert.equal(misconfigured.cleanup.enrollment.state,'configuration_required')
     invalidCleanupConfig = false
@@ -104,6 +105,48 @@ test('authenticated binding migrates one escrow through actual canonical publica
     // but a late remote commit remains possible and must stay visibly queued.
     assert.ok(!values.has(`/canonical/${before.stagedSecretName}`));assert.ok(!values.has(`/access/${before.stagedAccessName}`))
     assert.equal((await post({id,workspaceId:workspace})).status,409)
+
+    // The lost projection POST can still commit late. Keep that row visible
+    // across an account-owned cleanup, even after a different settled delete succeeds.
+    const deletionId = randomUUID(), settledName = 'mikka-byos-' + randomUUID()
+    const lease = await acquireAccountDeletionLock(pool, deletionId)
+    try {
+      values.set('/canonical/' + settledName, 'disposable-owned-value')
+      await pool.query(`INSERT INTO byos_secret_artifacts(name,"connectionId","ownerId","workspaceId",provider,kind,
+        "notBefore","publishedAt","createStarted","createSettled") VALUES($1,$2,$3,$4,'claude','grant',now(),now(),true,true)`,
+        [settledName,bound.id,owner,workspace])
+      await pool.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash",stage,plan)
+        VALUES($1,$2,repeat('0',64),'external_pending',$3)`, [deletionId,owner,JSON.stringify({solo:[workspace]})])
+      await pool.query('INSERT INTO account_deletion_guards("subjectId","jobId") VALUES($1,$2)', [owner,deletionId])
+      await pool.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") VALUES($1,$2)', [workspace,deletionId])
+      const scoped = async grant => {
+        const target = new URL(databaseUrl)
+        target.searchParams.set('mikka.byos_cleanup_grant', grant)
+        return custodyService(lease.client, target.href)
+      }
+      const runCleanup = () => cleanupAccountSubscriptions(owner, pool, scoped, { id: deletionId, client: lease.client })
+      rejectSettledDelete = settledName
+      const failed = await runCleanup()
+      assert.deepEqual(failed.blockedReasons, ['subscription_custody_cleanup_required'])
+      assert.equal(values.has('/canonical/' + settledName), true)
+      const pending = await pool.query('SELECT "deletedAt","lastError" FROM byos_secret_artifacts WHERE name=$1',[settledName])
+      assert.deepEqual(pending.rows, [{deletedAt:null,lastError:'deletion_failed'}])
+      rejectSettledDelete = null
+      const retry = await runCleanup()
+      assert.deepEqual(retry.blockedReasons, ['subscription_custody_cleanup_required'])
+      assert.deepEqual(retry.warnings, [])
+      assert.equal(values.has('/canonical/' + settledName), false)
+      const receipts = await pool.query(`SELECT count(*) FILTER (WHERE name=$2 AND "deletedAt" IS NOT NULL)::int AS settled,
+        count(*) FILTER (WHERE "deletedAt" IS NULL AND ("createUncertain" OR ("createStarted" AND NOT "createSettled")))::int AS unsettled
+        FROM byos_secret_artifacts WHERE "connectionId"=$1`,[bound.id,settledName])
+      assert.deepEqual(receipts.rows, [{settled:1,unsettled:1}])
+      assert.equal((await pool.query('SELECT "removedAt" FROM byos_connections WHERE id=$1',[bound.id])).rows[0].removedAt,null)
+    } finally {
+      await lease.close()
+      await pool.query('DELETE FROM account_deletion_workspace_guards WHERE "workspaceId"=$1 AND "jobId"=$2',[workspace,deletionId])
+      await pool.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2',[owner,deletionId])
+      await pool.query('DELETE FROM account_deletion_jobs WHERE id=$1 AND "subjectUserId"=$2',[deletionId,owner])
+    }
 
   } finally {
     if (oldCA === undefined) delete process.env.SSL_CERT_FILE; else process.env.SSL_CERT_FILE = oldCA
@@ -136,6 +179,7 @@ test('the deletion lease drains the owner connection through the installed custo
   assert.ok(databaseUrl && new URL(databaseUrl).hostname === '127.0.0.1' && new URL(databaseUrl).pathname.endsWith('_e2e'))
   const pool = new Pool({ connectionString: databaseUrl })
   const id = randomUUID(), owner = randomUUID(), workspace = randomUUID(), connection = randomUUID()
+  const otherOwner = randomUUID(), otherConnection = randomUUID()
   const environment = {
     MIKKA_BYOS_ENABLED: '1',
     MIKKA_BYOS_INFISICAL_ORIGIN: 'https://127.0.0.1:1',
@@ -150,18 +194,37 @@ test('the deletion lease drains the owner connection through the installed custo
   try {
     Object.assign(process.env, environment)
     await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,"credentialVersion")
-      VALUES($1,$2,$3,'codex','reconnect_required',1)`, [connection, owner, workspace])
+      VALUES($1,$2,$3,'codex','reconnect_required',1),($4,$5,$3,'codex','reconnect_required',1)`, [connection, owner, workspace, otherConnection, otherOwner])
     await pool.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash",stage,plan)
       VALUES($1,$2,repeat('0',64),'external_pending',$3)`, [id, owner, JSON.stringify({solo:[workspace]})])
     await pool.query('INSERT INTO account_deletion_guards("subjectId","jobId") VALUES($1,$2)', [owner, id])
     await pool.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") VALUES($1,$2)', [workspace, id])
     await assert.rejects(pool.query('UPDATE byos_connections SET paused=true WHERE id=$1',[connection]), { code: '55000' })
+    const denied = async (grant, statement, target) => {
+      const peer = await pool.connect()
+      try {
+        await peer.query('BEGIN')
+        await peer.query("SELECT set_config('mikka.byos_cleanup_grant',$1,true)",[grant])
+        await assert.rejects(peer.query(statement, [target]), { code: '55000' })
+      } finally { await peer.query('ROLLBACK'); peer.release() }
+    }
+    let usedGrant
+    const factory = async grant => {
+      usedGrant = grant
+      await denied(grant, "UPDATE byos_connections SET state='disconnected',epoch=epoch+1 WHERE id=$1", otherConnection)
+      await denied(grant, 'UPDATE byos_connections SET paused=true WHERE id=$1', connection)
+      const { subscriptionRuntime } = await import('../lib/subscription-runtime.ts')
+      return subscriptionRuntime(false, true, { accountDeletionGrant: grant })
+    }
     const report = await withDatabaseClient(lock.client, () =>
-      cleanupAccountSubscriptions(owner, pool, undefined, { id, client: lock.client }))
+      cleanupAccountSubscriptions(owner, pool, factory, { id, client: lock.client }))
     assert.deepEqual(report.blockedReasons, [])
     assert.deepEqual(report.warnings, ['subscription_upstream_revocation_not_supported_revoke_at_provider'])
     const { rows: [row] } = await pool.query('SELECT state,epoch,"removedAt" IS NOT NULL AS removed FROM byos_connections WHERE id=$1', [connection])
     assert.deepEqual(row, { state: 'disconnected', epoch: '2', removed: true })
+    await denied(usedGrant, 'UPDATE byos_connections SET "removedAt"=now() WHERE id=$1', connection)
+    const foreign = await pool.query('SELECT state,epoch,"removedAt" FROM byos_connections WHERE id=$1',[otherConnection])
+    assert.deepEqual(foreign.rows, [{state:'reconnect_required',epoch:'1',removedAt:null}])
     await assert.rejects(pool.query('UPDATE byos_connections SET paused=true WHERE id=$1',[connection]), { code: '55000' })
   } finally {
     for (const [key, value] of previous) { if (value === undefined) delete process.env[key]; else process.env[key] = value }
@@ -170,6 +233,7 @@ test('the deletion lease drains the owner connection through the installed custo
     await pool.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2',[owner,id])
     await pool.query('DELETE FROM account_deletion_jobs WHERE id=$1 AND "subjectUserId"=$2',[id,owner])
     await pool.query('DELETE FROM byos_connections WHERE id=$1 AND "ownerId"=$2',[connection,owner])
+    await pool.query('DELETE FROM byos_connections WHERE id=$1 AND "ownerId"=$2',[otherConnection,otherOwner])
     await pool.end()
   }
 })

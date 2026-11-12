@@ -18,6 +18,7 @@ import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-wo
 import { infisicalWorkloadToken } from './infisical-workload'
 import { AccessProjectionMissing, authorizedAccessName, subscriptionAccessSnapshot } from './subscription-access-snapshot'
 import { join } from 'node:path'
+import { sessionDatabaseURL } from '../scripts/postgres-connection.mjs'
 
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string, borrowerId?: string) {
   z.uuid().parse(workspaceId)
@@ -42,11 +43,19 @@ export async function authorizeSubscriptionUse(userId: string, workspaceId: stri
     if (bot && (bot.ownerId === null || (bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))))) throw new SubscriptionRefusal('account_unavailable')
   }
 }
-export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean } = {}): SubscriptionService {
+export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean; accountDeletionGrant?: string } = {}): SubscriptionService {
   if (!byosEnabled() && !(custodyOnly && byosEnrollmentEnabled())) throw new SubscriptionRefusal('backend_unavailable')
   const binary = process.env.MIKKA_BYOS_WORKER_BINARY ?? join(process.cwd(), 'packages/subscription-worker/bin/mikka-subscription-worker')
   // pool is request-scoped; never send a preview worker to the production DB.
-  const databaseUrl = pool.options.connectionString
+  let databaseUrl = pool.options.connectionString
+  if (options.accountDeletionGrant !== undefined) {
+    if (!custodyOnly || nativeBroker || !databaseUrl || !z.uuid().safeParse(options.accountDeletionGrant).success) throw new SubscriptionRefusal('backend_unavailable')
+    // pgx passes this private setting on the original child stdin. Use the
+    // existing direct endpoint resolver so transaction pooling cannot leak it.
+    const target = new URL(sessionDatabaseURL(databaseUrl))
+    target.searchParams.set('mikka.byos_cleanup_grant', options.accountDeletionGrant)
+    databaseUrl = target.href
+  }
   // Capture the proxy's bound query while still in this request's DB scope;
   // later stream/tool callbacks must keep that same pool as the Go worker.
   const database = captureDatabaseQuery(pool)
