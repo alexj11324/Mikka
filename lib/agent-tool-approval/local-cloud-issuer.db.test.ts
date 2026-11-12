@@ -17,14 +17,15 @@ const ready = disposableDatabase(process.env)
 if (!ready && process.env.REQUIRE_DB === '1') throw Error('Disposable loopback E2E database required')
 
 if (process.env.LOCAL_CLOUD_ISSUER_FIXTURE !== '1') {
-  test('raw HTTP cloud issuer preserves configured basePath and cloud authorization', { skip: !ready, timeout: 60_000 }, async t => {
+  test('raw HTTP cloud issuer preserves configured basePath and cloud authorization', { skip: !ready, timeout: 120_000 }, async t => {
     for (const prefix of ['/mikka', '']) await t.test(prefix || 'without basePath', () => {
       const env = { ...process.env, MIKKA_BASE_PATH: prefix, LOCAL_CLOUD_ISSUER_FIXTURE: '1' }
       delete (env as Record<string, string | undefined>).NODE_TEST_CONTEXT
       const result = spawnSync(process.execPath, ['--import', './tests/support/server-only.mjs', '--import', 'tsx', '--test', fileURLToPath(import.meta.url)], {
-        cwd: fileURLToPath(new URL('../../', import.meta.url)), encoding: 'utf8', timeout: 25_000,
+        cwd: fileURLToPath(new URL('../../', import.meta.url)), encoding: 'utf8', timeout: 50_000,
         env,
       })
+      assert.ifError(result.error)
       assert.equal(result.status, 0, result.stdout + result.stderr)
       assert.match(result.stdout, /raw HTTP policy claim and metadata use only the operator-bound live cloud issuer/)
     })

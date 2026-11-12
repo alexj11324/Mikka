@@ -47,6 +47,13 @@ streaming and rollback on the same source pair.
 
 ## Official runtime configuration
 
+Changed template inputs require a successful Web build serving the exact current
+main commit before the E2B release takes its lock or allocates builders. A
+frozen publisher with no matching run leaves the runtime unpublished. After
+the matching Web release is serving, the existing manual E2B release accepts a
+retry reason. It rechecks the live version after building and validates both
+official subscriptions before publishing template IDs.
+
 See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
 ## Logs are public
