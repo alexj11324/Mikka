@@ -73,6 +73,7 @@ export function gatewayConfig({ current, retained }) {
   const bindings = retained.map((id, index) => [id, `RELEASE_${index}`])
   return {
     ...common, name: 'mikka-app-gateway', main: resolve(here, 'gateway.mjs'),
+    version_metadata: { binding: 'CF_VERSION_METADATA' },
     vars: { CURRENT_RELEASE: current, RELEASES: Object.fromEntries(bindings) },
     services: bindings.map(([id, binding]) => ({ binding, service: nameForRelease(id) })),
   }

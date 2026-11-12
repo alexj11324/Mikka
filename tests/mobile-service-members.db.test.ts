@@ -6,6 +6,8 @@ import { registerHooks } from 'node:module'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
 import { serve } from 'srvx/node'
+import { DESKTOP_RPC_VERSION } from '../lib/desktop-rpc/wire'
+import { saveProfileName } from '../apps/mobile/lib/profile-name'
 import { parseSetCookieHeader } from 'better-auth/cookies'
 import { apiAliases } from '../apps/api/compat-aliases.mjs'
 import { createApiHandler } from '../apps/api/src/application'
@@ -61,6 +63,34 @@ test('mobile Settings and confirmed browser handoff require a current team admin
   const { withBasePath } = await import('../lib/base-path')
   const personal = await seedPersonalWorkspace(pool, owner)
   const api = origin + '/mikka/api/'
+  await t.test('native profile edits and the Web workspace read the current name across two signed sessions', async () => {
+    const second = await sessionCookie(owner)
+    const initial = await fetch(api + 'auth/get-session', { headers: { cookie: second } })
+    assert.equal(initial.status, 200)
+    const signedData = initial.headers.getSetCookie().find(value => value.startsWith(auth.authCookies.sessionData.name + '='))
+    assert.ok(signedData, 'carry the pre-edit signed session data through both reads')
+    const cached = second + '; ' + signedData.split(';', 1)[0]
+    const rpc = async (credentials: string, body: unknown) => {
+      const response = await fetch(api + 'rpc', { method: 'POST', headers: {
+        origin, cookie: credentials, 'content-type': 'application/json', 'x-mikka-rpc': '1',
+      }, body: JSON.stringify(body) })
+      if (!response.ok) throw new Error('rpc ' + response.status)
+      return response.json()
+    }
+    const save = (name: string, credentials: string) => saveProfileName(name, (_path, init) => rpc(credentials, init.body))
+    await assert.rejects(save('x'.repeat(81), cookie))
+    assert.equal(await save(' Native edit ', cookie), 'Native edit')
+    const native = () => fetch(api + 'mobile/settings?view=profile', { headers: { cookie: cached } }).then(response => {
+      assert.equal(response.status, 200)
+      return response.json()
+    })
+    assert.equal((await native()).user.name, 'Native edit')
+    const web = await rpc(cached, { version: DESKTOP_RPC_VERSION, action: 'desktop.bootstrap', args: [] })
+    assert.equal(web.result.user.name, 'Native edit')
+    await rpc(cookie, { version: DESKTOP_RPC_VERSION, action: 'account.updateDisplayName', args: ['Web edit'] })
+    assert.equal((await native()).user.name, 'Web edit')
+  })
+
   const settings = async (credentials: string, workspaceId: string) => {
     const response = await fetch(api + 'mobile/settings', { headers: { cookie: credentials, 'x-mikka-workspace-id': workspaceId } })
     assert.equal(response.status, 200)
