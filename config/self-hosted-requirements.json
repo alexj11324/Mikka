@@ -498,10 +498,17 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/governance/service-identity-client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the selected server and same-origin session to manage Workspace service identities, Project grants and dedicated credentials.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/governance/service-project-access.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Replace explicit service grants through existing Project access policies, with confirmation and concurrent-change checks.",
+    "behavior": "Replace explicit grants only with Project management authority and list only active Projects the administrator may both read and share.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },

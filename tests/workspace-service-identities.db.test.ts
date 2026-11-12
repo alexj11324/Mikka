@@ -98,6 +98,59 @@ test('registered service identity routes enforce a fresh Workspace admin through
   assert.deepEqual(restored.body, { ...rename.body, enabled: true, revision: 4 })
   assert.equal((await request(admin.token, first.id, 'PATCH', item, { action: 'restore', revision: 4, subscription: 'personal' })).status, 400)
 
+  await t.test('the Project picker exposes manageable names only to a current Workspace admin', async () => {
+    const options = projectEndpoint + '?view=choices'
+    const response = await request({ cookie }, first.id, 'GET', options)
+    assert.equal(response.status, 200)
+    const { rows: visible } = await pool.query('SELECT id,name FROM workspace_projects WHERE id=$1', [project])
+    assert.deepEqual(response.body, { projects: visible, nextCursor: null })
+    assert.deepEqual((await request(admin.token, first.id, 'GET', options + '&after=' + project)).body.projects, [])
+    assert.equal((await request(ordinary.token, first.id, 'GET', options)).status, 403)
+    assert.equal((await request(other.token, second.id, 'GET', options)).status, 404)
+  })
+
+  await t.test('the public Members client manages service identities on the selected server through real HTTP', async clientTest => {
+    const { serviceIdentityClient, ServiceIdentityRequestError } = await import('../lib/governance/service-identity-client')
+    const { withBasePath } = await import('../lib/base-path')
+    const apiPrefix = withBasePath('/api/')
+    const directFetch = globalThis.fetch
+    const methods = new Set<string>()
+    // Node has no page origin or cookie jar. Supply those browser facilities and
+    // forward the original method, query and body to the registered HTTP routes.
+    clientTest.mock.method(globalThis, 'fetch', (path: string, init: RequestInit) => {
+      assert.ok(typeof path === 'string' && path.startsWith(apiPrefix))
+      const url = new URL(path, origin)
+      assert.equal(url.origin, origin)
+      assert.equal(init.credentials, 'same-origin')
+      assert.equal(init.cache, 'no-store')
+      const method = init.method ?? 'GET'
+      methods.add(method)
+      const headers = new Headers(init.headers)
+      assert.equal(headers.has('authorization'), false)
+      headers.set('cookie', cookie)
+      if (method !== 'GET') headers.set('origin', origin)
+      url.pathname = '/mikka/api/' + url.pathname.slice(apiPrefix.length)
+      return directFetch(url, { ...init, headers })
+    })
+    const client = serviceIdentityClient(first.id)
+    const created = await client.create('Public client reporter', randomUUID())
+    assert.equal(created.workspaceId, first.id)
+    const renamed = await client.change(created, { action: 'rename', name: 'Renamed client reporter' })
+    assert.equal((await client.get(created.id)).name, renamed.name)
+    assert.deepEqual((await client.choices(created.id)).projects.map(row => row.id), [project])
+    assert.deepEqual(await client.replaceProjects(created.id, [], [project], true), { projectIds: [project] })
+    assert.deepEqual(await client.projects(created.id), { projectIds: [project] })
+    const issued = await client.rotate(created.id, renamed.revision, null)
+    assert.ok(issued.token.startsWith('mksvc_'))
+    const state = await client.credential(created.id)
+    assert.equal(state.configured, true)
+    assert.equal(Object.hasOwn(state, 'token'), false)
+    await assert.rejects(client.revoke(created.id, renamed.revision),
+      (error: unknown) => error instanceof ServiceIdentityRequestError && error.status === 409 && error.detail === 'service_identity_changed')
+    assert.equal((await client.revoke(created.id, state.revision)).configured, false)
+    assert.deepEqual([...methods].sort(), ['GET', 'PATCH', 'POST', 'PUT'])
+  })
+
   await t.test('project assignment uses the canonical ACL and preserves other principals', async () => {
     const serviceAllowed = async (id: string, kind: string) => (await pool.query(
       "SELECT mikka_resource_acl_allowed('service',$1,$2,'project',$3,$4) AS allowed", [identity.id, first.id, id, kind],
