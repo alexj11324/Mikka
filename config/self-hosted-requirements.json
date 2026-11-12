@@ -375,6 +375,12 @@
     "test": "lib/eve/product-tool.test.ts",
     "suite": "test:eve"
   },
+  "lib/eve/session-control-delivery.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Propagate only a verified native cancel or end request to its own session wake, across asynchronous calls from the official Eve channel.",
+    "test": "lib/eve/session-control-delivery.test.mjs"
+  },
   "lib/factory/evidence-folder-index.ts": {
     "mode": "built-in",
     "environment": [],
