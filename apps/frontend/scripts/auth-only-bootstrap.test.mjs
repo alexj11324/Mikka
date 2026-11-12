@@ -33,7 +33,7 @@ const fixtureModules = new Map([
   ['@/components/blocks/auth-19/components/auth-card', `export const AuthCard = ${wrapper};`],
   ['@/components/workspace/workspace-loading', 'import { createElement } from "react"; export const WorkspaceLoading = () => createElement("div", { "data-loading": true });'],
   ['@/components/workspace/create-workspace-form', 'export const CreateWorkspaceForm = () => null;'],
-  ['@/components/workspace/invitation-card', 'export const InvitationCard = () => null;'],
+  ['@/components/workspace/invitation-card', `import { createElement } from 'react'; export const InvitationCard = () => null; export const OrganizationInvitationCard = () => createElement('div', { 'data-organization-invitation': true });`],
   ['@/components/device-authorization', 'export const DeviceAuthorization = () => null;'],
   ['@/components/plugins/github-settings', 'export const GitHubSettings = () => null;'],
   ['@/components/app-shell/not-found', 'export default () => null;'],
@@ -142,6 +142,14 @@ test('a server authentication document preserves the PKCE identity-only boundary
   assert.equal(f.state.requests.filter(item => item.path === '/mikka/api/desktop/config').length, 1)
   assert.equal(f.state.workspaceMounts, 0)
   assert.equal(f.state.githubMounts, 0)
+})
+
+test('a server Organization invitation handoff retains the auth-only boundary', async t => {
+  const f = await fixture(t, { path: `/mikka/en/organization-invite/${'b'.repeat(64)}`, serverDocument: 'authentication' })
+  assert.ok(f.container.querySelector('[data-organization-invitation]'))
+  assert.equal(f.state.workspaceMounts, 0)
+  assert.equal(f.state.githubMounts, 0)
+  assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), ['desktop.session'])
 })
 
 test('a signed-in server GitHub document renders only its handoff before and after intent cleanup', async t => {

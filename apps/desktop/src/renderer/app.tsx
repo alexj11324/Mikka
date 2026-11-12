@@ -13,7 +13,7 @@ import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { AuthCard } from '@/components/blocks/auth-19/components/auth-card'
 import { WorkspaceLoading } from '@/components/workspace/workspace-loading'
 import { CreateWorkspaceForm } from '@/components/workspace/create-workspace-form'
-import { InvitationCard } from '@/components/workspace/invitation-card'
+import { InvitationCard, OrganizationInvitationCard } from '@/components/workspace/invitation-card'
 import { DeviceAuthorization } from '@/components/device-authorization'
 import NotFound from '@/components/app-shell/not-found'
 import { safeAuthReturn } from '@/lib/auth-return'
@@ -168,6 +168,7 @@ function Routes({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   const serverDocument = platform === 'web' ? serverDocumentKind() : null
   const authentication = path === '/sign-in' || path === '/sign-up'
   const invitation = /^\/invite\/([^/]+)$/.exec(path)
+  const organizationInvitation = /^\/organization-invite\/([^/]+)$/.exec(path)
   const sharedArtifact = /^\/a\/([^/]+)$/.exec(path)
   const workspaceLink = /^\/w\/([a-z0-9]([a-z0-9-]{1,62}[a-z0-9]))$/.exec(path)
   const browserRoute = path === '/forgot-password' || path === '/reset-password' || path === '/verify-email' || path === '/oauth/consent'
@@ -179,7 +180,7 @@ function Routes({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
       const destination = authenticatedReturn(location)
       if (destination !== null) navigate(destination, true)
     }
-    else if (!user && !authentication && !invitation && !browserRoute && !sharedArtifact) {
+    else if (!user && !authentication && !invitation && !organizationInvitation && !browserRoute && !sharedArtifact) {
       const next = safeAuthReturn(`${path}${location.search}`)
       navigate(`/sign-in${next === '/' ? '' : `?next=${encodeURIComponent(next)}`}`, true, { locale }, true)
     }
@@ -187,6 +188,7 @@ function Routes({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   if (browserRoute || (platform === 'desktop' && path === '/sign-up')) return <BrowserRoute signUp={path === '/sign-up'} account={user?.email ?? null} />
   if (sharedArtifact) return <Suspense fallback={<WorkspaceLoading />}><SharedArtifactRoute key={sharedArtifact[1]} token={sharedArtifact[1]} /></Suspense>
   if (invitation) return <main className="flex min-h-dvh items-center justify-center bg-muted/30 p-5"><InvitationCard token={/^[a-f0-9]{64}$/.test(invitation[1]) ? invitation[1] : ''} email={user?.email ?? null} /></main>
+  if (organizationInvitation) return <main className="flex min-h-dvh items-center justify-center bg-muted/30 p-5"><OrganizationInvitationCard token={/^[a-f0-9]{64}$/.test(organizationInvitation[1]) ? organizationInvitation[1] : ''} email={user?.email ?? null} /></main>
   if (authentication || !user) return <AuthForm key={path} mode={path === '/sign-up' ? 'sign-up' : 'sign-in'} addAccount={query.get('addAccount') === '1'} next={query.get('next') ?? undefined} googleEnabled={bootstrap.value.googleEnabled} githubEnabled={bootstrap.value.githubEnabled} emailEnabled={bootstrap.value.emailEnabled} oauthFailed={query.get('oauth') === 'failed' || query.has('error')} signedInAs={user ? { name: user.name, email: user.email, image: user.image } : null} />
   if (bootstrap.scope !== 'workspace') return <WorkspaceLoading />
   if (workspaceLink) return <Suspense fallback={<WorkspaceLoading />}><WorkspaceLinkRoute key={workspaceLink[1]} slug={workspaceLink[1]} /></Suspense>

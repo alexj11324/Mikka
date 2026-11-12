@@ -6,7 +6,7 @@ export type ServerPageKind = 'authentication' | 'github'
 export function serverPageKind(url: URL): ServerPageKind | null {
   const path = url.pathname.replace(/^\/mikka(?=\/|$)/, '').replace(/^\/(?:en|zh-CN)(?=\/|$)/, '') || '/'
   if (['/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/verify-email', '/device', '/oauth/consent', '/workspaces/new'].includes(path)
-    || /^\/invite\/[a-f0-9]{64}$/.test(path) || /^\/a\/[^/]+$/.test(path)
+    || /^\/(?:invite|organization-invite)\/[a-f0-9]{64}$/.test(path) || /^\/a\/[^/]+$/.test(path)
     || /^\/w\/[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(path)) return 'authentication'
   if (path !== '/' || url.searchParams.get('section') !== 'plugins' || url.searchParams.get('app') !== 'github') return null
   const keys = [...url.searchParams.keys()]
