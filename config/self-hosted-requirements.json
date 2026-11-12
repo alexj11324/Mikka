@@ -117,6 +117,27 @@
     "behavior": "The official Eve host opts into its private Cloudflare World explicitly. Leaving the selector unset preserves the normal workflow selection.",
     "test": "cloudflare/eve-runtime/test/config.test.mjs"
   },
+  "drizzle/20261109143100_coding_review_sessions.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store bounded terminal and preview leases in PostgreSQL, fence revoked credentials and retain the remote close target through acknowledgement.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261109143101_coding_review_task_workspace.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fence existing review leases in the same PostgreSQL transaction when the stored Task or Run workspace changes.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "drizzle/20261109143102_coding_review_task_thread.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fence review leases when a newer Task run or late Factory checker binding changes which run the owner may review.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
   "drizzle/20261112030502_task_attachments.sql": {
     "mode": "built-in",
     "environment": [
@@ -242,6 +263,64 @@
     "behavior": "Question recovery locks the current PostgreSQL task, owner, run and operation before reusing a retained machine. Self-hosted recovery uses its existing database and configured execution provider.",
     "test": "lib/factory/checks.db.test.ts",
     "suite": "test:factory-checks-db"
+  },
+  "lib/coding-workspace/preview/runtime.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "AUTH_TRUSTED_ORIGINS",
+      "BETTER_AUTH_URL",
+      "HTTPS_PROXY"
+    ],
+    "behavior": "Open a one-use preview on the authorized existing owner-provided E2B guest and allow only an origin trusted by the installation. An unavailable guest yields no preview ticket.",
+    "test": "lib/coding-workspace/preview/runtime.test.ts",
+    "suite": "test:coding-review-transports"
+  },
+  "lib/coding-workspace/review-authority.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authorize the current credential, workspace, task owner and immutable checkout in PostgreSQL before granting review.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/review-machine.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "HTTPS_PROXY"
+    ],
+    "behavior": "Resume the same parked guest with its owner’s E2B credential only while its PostgreSQL review lease is current, and recheck the binding after resume.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/review-sessions.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bind each review lease to its credential and checkout in PostgreSQL, retain failed remote closes for recovery and release only the acknowledged lease.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/terminal/runtime.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "HTTPS_PROXY"
+    ],
+    "behavior": "Use the owner’s E2B credential and an installation-derived gateway key to access the existing terminal. Reject an unverified gateway and avoid resuming a guest during revocation.",
+    "test": "lib/coding-workspace/terminal/runtime.test.ts",
+    "suite": "test:coding-review-transports"
+  },
+  "lib/coding-workspace/terminal/test-fixture.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Construct synthetic terminal identities and leases for local tests without a provider or database credential.",
+    "test": "lib/coding-workspace/terminal/wire.test.ts",
+    "suite": "test:coding-review-transports"
+  },
+  "lib/coding-workspace/terminal/wire.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bind one-use terminal tickets to the exact owner, workspace, guest, operation and request bytes using a caller-supplied signing key.",
+    "test": "lib/coding-workspace/terminal/wire.test.ts",
+    "suite": "test:coding-review-transports"
   },
   "lib/coordinator/ci-suite-transport.ts": {
     "mode": "built-in",
@@ -613,6 +692,13 @@
     "behavior": "Task resource registration persists its workspace and privacy defaults under the authorized PostgreSQL transaction.",
     "test": "tests/task-resource-registration.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/task-thread-run.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Select the Task thread in PostgreSQL while excluding group chats and Factory checker runs, including checkers bound later in the transaction.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
   },
   "lib/task-workspace.ts": {
     "mode": "built-in",
