@@ -15,7 +15,7 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { projectViewsForTasks } from '@/lib/project-access'
 import { issuePropertyChoices } from '@/lib/issue-property-choices'
 import { requireIssueAccess } from '@/lib/issue-access'
-import { listProjects } from '@/app/actions/projects'
+import { listWorkspaceProjects } from '@/app/actions/projects'
 import { issueView } from '@/lib/task-identifier-server'
 import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
@@ -47,7 +47,7 @@ export async function getIssuePropertyOptions(id: string) {
   const members = activeMembers.length ? await tx.select({ id: users.id, name: users.name, image: users.image }).from(users)
     .where(inArray(users.id, activeMembers.map(member => member.id))) : []
   const choices = await issuePropertyChoices(user.id)
-  const projectRecords = await listProjects()
+  const projectRecords = await listWorkspaceProjects(locked.workspaceId!)
   return {
     members,
     projects: [...new Set(projectRecords.map(item => item.name))].sort(),

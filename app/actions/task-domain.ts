@@ -11,7 +11,20 @@ export async function getTaskPresentations(input: TaskPresentationsInput) {
   const parsed = taskPresentationsInput.parse(input)
   const user = await requireUser()
   if (await effectiveRequestWorkspace(user) !== parsed.workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-  return readTaskPresentations(user, parsed)
+  const batch = await readTaskPresentations(user, parsed)
+  if (parsed.includeReview && Object.keys(batch.items).length) {
+    const { taskReviewSummaries } = await import('@/lib/coding-workspace/task-review/summaries')
+    const reviews = await taskReviewSummaries(user, Object.keys(batch.items), parsed.workspaceId)
+    for (const [id, summary] of reviews) {
+      if (!summary.pr && !summary.files) continue
+      batch.items[id]!.review = {
+        pr: summary.pr && { number: summary.pr.number, state: summary.pr.state },
+        files: summary.files, additions: summary.additions, deletions: summary.deletions,
+        checks: summary.checks && { failed: summary.checks.failed }, running: summary.running,
+      }
+    }
+  }
+  return batch
 }
 
 /** Existing detail contract and its canonical Factory authorization stay intact. */

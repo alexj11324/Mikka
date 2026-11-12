@@ -38,6 +38,7 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 ## Connect and run Mikka
 
 - [Self-hosting](self-hosting.md) deploys the public server and connects clients.
+- [Self-hosted stable releases and updates](self-hosted-updates.md) covers Docker host upgrades, backups, migration gates and signed release notifications.
 - [Self-hosted model credentials](self-hosting-byok.md),
   [realtime](self-hosting-realtime.md) and
   [GitHub cloud connection](self-hosting-github-cloud.md) cover their setup.
@@ -55,10 +56,10 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 - [UI review checklist](review-checklist.md) applies before presenting UI.
 - [Shared web and desktop runtime](operations/web-runtime.md) documents build
   outputs, startup and rollback.
-- [Web deployment](operations/web-deploy.md) covers production publication.
-- [Production smoke](production-smoke.md) describes the automatic deployed check.
+- [Hosted operations](operations/README.md) directs authorized operators to the private deployment and credential runbooks.
+- [Web deployment](operations/web-deploy.md) and [production smoke](production-smoke.md) retain links to their private operating guides.
 - [Tracing](operations/tracing.md) locates requests and database queries.
-- [Infisical Cloud](infisical-cloud.md) describes existing credential delivery.
+- [Hosted credential operations](infisical-cloud.md) points to the private operating guide.
 
 - [Inbox API](inbox-api.md) defines pending, snoozed and completed items, actions, permissions and live refresh.
 

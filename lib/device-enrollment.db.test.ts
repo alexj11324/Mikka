@@ -8,7 +8,7 @@ import { createRequestDatabaseScope } from './db/request-scope'
 import { mintDeviceEnrollment, consumeDeviceEnrollment } from './device-enrollment'
 import { authenticateDevice, hashDeviceToken, linkDeviceToken } from './device-link'
 import { enqueueDeviceCommand, pendingDeviceCommands } from './device-management'
-import { removeOwnedDevice } from './device-removal'
+import { removeOwnedDevice, setOwnedDeviceEnabled } from './device-removal'
 import { checkOwnedEnrollment, enrollmentToken } from '../scripts/acceptance/self-hosted-daemon.mjs'
 
 const url = process.env.E2E_DATABASE_URL
@@ -58,6 +58,20 @@ test('desktop account context reads only the current browser owner\'s active loc
     browserOwner = 'desktop-b'
     assert.deepEqual(await (await GET(request())).json(), { ownerId: 'desktop-b', deviceIds: [foreign] })
   } finally { browserOwner = null }
+}))
+
+test('the Settings scheduling switch changes only a visible owned local device', () => run(async () => {
+  const { pool } = await import('./db')
+  const own = randomUUID(), foreign = randomUUID(), cloud = randomUUID(), removed = randomUUID()
+  await pool.query(`INSERT INTO devices(id,"ownerId",kind,"removedAt") VALUES
+    ($1,'switch-owner','local',NULL),($2,'switch-other','local',NULL),($3,'switch-owner','cloud',NULL),($4,'switch-owner','local',now())`,
+  [own, foreign, cloud, removed])
+  for (const deviceId of [foreign, cloud, removed, randomUUID()]) {
+    await assert.rejects(setOwnedDeviceEnabled('switch-owner', deviceId, false), /deviceNotFound/)
+  }
+  assert.deepEqual(await setOwnedDeviceEnabled('switch-owner', own, false), { success: true })
+  const disabled = await pool.query('SELECT id FROM devices WHERE id=ANY($1::uuid[]) AND NOT enabled', [[own, foreign, cloud, removed]])
+  assert.deepEqual(disabled.rows, [{ id: own }])
 }))
 
 test('local setup owner view retains fresh session checks without reading unused devices', () => run(async () => {

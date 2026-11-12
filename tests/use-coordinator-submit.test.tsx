@@ -10,6 +10,13 @@ mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) 
 mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: {
   getSession: async () => ({ data: { user: { id: owner } }, error: null }),
 } } })
+const receiptKeys: string[] = []
+let returnReceipt = true
+mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedExports: { getDispatchedTaskReceipt: async ({ requestId }: { requestId: string }) => {
+  receiptKeys.push(requestId)
+  if (!returnReceipt) throw Error('receipt response lost')
+  return { version: 1, taskId: 'task', identifier: 'MIK-5', dispatch: { sourceEventId: 'event', botId: 'bot' } }
+} } })
 const browser = new Window()
 let createRoot: typeof import('react-dom/client')['createRoot']
 let useCoordinatorSubmit: typeof import('../components/coordinator/use-coordinator-submit')['useCoordinatorSubmit']
@@ -56,4 +63,47 @@ test('uncertain native sends retain their logical identity across other sends an
     assert.equal((await composer.submit('Conflicting')).kind, 'conflict')
     assert.equal(sent.length, requests, 'a terminal conflict cannot mint another key and send again')
   } finally { await act(async () => { root.unmount() }) }
+})
+
+test('a lost Task receipt retries only the authorized read of the accepted delivery', async () => {
+  let sends = 0
+  const agent = { send: async () => { sends++ } } as unknown as Pick<UseEveAgentReturn, 'send'>
+  const root = createRoot(browser.document.createElement('div') as unknown as HTMLDivElement)
+  let hook!: ReturnType<typeof useCoordinatorSubmit>
+  function Probe() { hook = useCoordinatorSubmit(agent); return null }
+  const context = { expectedWorkspaceId: 'workspace', taskCommand: { version: 1, intent: 'create_and_dispatch', description: 'Do work' } } as const
+  try {
+    await act(async () => { root.render(<Probe />) })
+    returnReceipt = false
+    assert.equal((await hook.submit('Do work', context)).kind, 'uncertain')
+    returnReceipt = true
+    const outcome = await hook.submit('Do work', context)
+    assert.equal(sends, 1)
+    assert.equal(receiptKeys.length, 2)
+    assert.equal(receiptKeys[0], receiptKeys[1])
+    assert.ok(outcome.kind === 'accepted')
+    assert.equal(outcome.task?.taskId, 'task')
+    assert.equal(outcome.task?.identifier, 'MIK-5')
+    assert.equal(outcome.sourceEventId, 'event')
+  } finally { returnReceipt = true; await act(async () => { root.unmount() }) }
+})
+
+
+test('confirming a hosted Project scope retries the same submission ID', async () => {
+  const sent: { id: string; approved: boolean }[] = []
+  const agent = { send: async (_text: string, options: { headers: Record<string, string>; clientContext: { confirmTaskAccess?: boolean } }) => {
+    const approved = options.clientContext.confirmTaskAccess === true
+    sent.push({ id: options.headers['x-mikka-submission-id'], approved })
+    if (!approved) throw new ClientError(409, '{"code":"accessChangeConfirmationRequired"}')
+  } } as unknown as Pick<UseEveAgentReturn, 'send'>
+  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
+  let hook!: ReturnType<typeof useCoordinatorSubmit>
+  function Probe() { hook = useCoordinatorSubmit(agent); return null }
+  const context = { expectedWorkspaceId: 'workspace', taskCommand: { version: 1, intent: 'create_and_dispatch', description: 'Do work', projectId: 'project' } } as const
+  try {
+    await act(async () => { root.render(<Probe />) })
+    assert.deepEqual(await hook.submit('Do work', context), { kind: 'rejected', error: 'accessChangeConfirmationRequired' })
+    assert.equal((await hook.submit('Do work', { ...context, confirmTaskAccess: true })).kind, 'accepted')
+    assert.deepEqual(sent, [{ id: sent[0].id, approved: false }, { id: sent[0].id, approved: true }])
+  } finally { await act(async () => root.unmount()) }
 })

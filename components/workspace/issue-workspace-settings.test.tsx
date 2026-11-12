@@ -39,13 +39,13 @@ mock.module('@/lib/use-presence', { namedExports: { usePresence: (open: boolean)
 mock.module('@/hooks/use-workspace', { namedExports: { useWorkspace: () => ({ data: workspaceReady ? workspace() : undefined, error: workspaceError, mutate: async () => { workspaceError = undefined; workspaceReady = true } }) } })
 mock.module('@/hooks/use-agent-history', { namedExports: { useAgentHistory: () => ({ data: { sessions: [] } }) } })
 mock.module('@/hooks/use-focus-return', { namedExports: { focusChatComposer: nothing, useOpenerFocus: () => () => true } })
-mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing } })
+mock.module('@/hooks/use-live-key', { namedExports: { LiveProvider: plain, useLiveKey: nothing, useLiveKeys: nothing, useLiveScope: () => null } })
 mock.module('@/hooks/use-live-lists', { namedExports: {
   useLiveIssueList: () => emptyList, useLiveThreadList: () => emptyList,
   useLiveBotRoster: () => botList, useLiveBotChatList: () => ({ data: { items: {} } }), useLiveGroupList: () => ({ data: [] }),
 } })
 for (const [file, names] of [
-  ['../../app/actions/projects.ts', ['listProjects']], ['../../app/actions/teams.ts', ['listTeams']],
+  ['../../app/actions/projects.ts', ['listProjects', 'listWorkspaceProjects']], ['../../app/actions/teams.ts', ['listTeams']],
   ['../../app/actions/team-relations.ts', ['listProjectTeams']], ['../../app/actions/workspace-secrets.ts', ['saveE2BKey']],
   ['../../app/actions/bots.ts', ['listBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, async () => []])) })
@@ -68,10 +68,12 @@ for (const [file, names] of [
   ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']], ['./group-chat-view.tsx', ['GroupChatView']],
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
-  ['./create-issue-dialog.tsx', ['CreateIssueDialog']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
 mock.module('../browser/browser-pane', { namedExports: { BrowserPane: () => <section data-browser-pane="" /> } })
-mock.module('@/components/nav/bot-list', { namedExports: { BotList: empty, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
+mock.module('@/components/nav/new-group-dialog', { namedExports: {
+  NewGroupDialog: ({ open, workspaceId }: { open: boolean; workspaceId: string }) => open ? <div data-create-group={workspaceId} /> : null,
+} })
+mock.module('@/components/nav/bot-list', { namedExports: { BotList: () => <div data-retired-bot-list="" />, useChatNav: () => ({ entries: [], reloadGroups: async () => {} }) } })
 mock.module('@/components/nav/thread-list', { namedExports: { threadName: () => '' } })
 mock.module('@/components/nav/bot-avatar', { namedExports: { BotAvatar: empty, COORDINATOR_AVATAR: {} } })
 mock.module('@/components/nav/all-threads', { namedExports: { AllThreadsColumn: empty, AllThreadsToggle: empty, waitingCount: () => 0 } })
@@ -80,9 +82,9 @@ mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetConten
 mock.module('@/components/nav/global-search', { namedExports: { GlobalSearch: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => open ? <div data-search-open=""><Button onClick={() => onOpenChange(false)}>dismiss search</Button></div> : null, SearchPill: ({ onSearch }: { onSearch: () => void }) => <Button onClick={onSearch}>search</Button> } })
 mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTaskDialog: ({ open }: { open: boolean }) => open ? <div data-new-task-open="" /> : null } })
 let railMounts = 0
-mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSettings, onNavigate }: { onSettings: () => void; onNavigate: (destination: 'chats') => void }) => {
+mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSettings, onNavigate, chats }: { onSettings: () => void; onNavigate: (destination: 'chats') => void; chats?: { onNewGroup: () => void } }) => {
   useEffect(() => { railMounts++ }, [])
-  return <div role="navigation" aria-label="Main navigation"><Button onClick={() => onSettings()}>settings</Button><Button onClick={() => onNavigate('chats')}>chats</Button></div>
+  return <div role="navigation" aria-label="Main navigation"><Button onClick={() => onSettings()}>settings</Button><Button onClick={() => onNavigate('chats')}>chats</Button>{chats && <Button onClick={chats.onNewGroup}>new group</Button>}</div>
 } } })
 
 let useBrowserNotes: typeof import('../browser/browser-notes')['useBrowserNotes']
@@ -114,13 +116,11 @@ function Conversation({ bot: activeBot }: { bot?: { id: string; name: string } }
   return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<p>Cached conversation</p><Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} />{panels?.revealId === 'browser' && panels.tabs.find(tab => tab.id === 'browser')?.content}</>
 }
 mock.module('./workspace-overview', { namedExports: { WorkspaceOverview: Conversation } })
-mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, children, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; children?: ReactNode; onRail: (destination: 'chats') => void }) => {
+mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, workspaceId: id, inviteInitially, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; workspaceId?: string; inviteInitially?: boolean; onRail: (destination: 'chats') => void }) => {
   notes = useBrowserNotes()
   computerThread = useConversationThread(conversationId)
-  return <main data-settings-section={activeSection ?? initialSection} data-team={selectedTeamId}><Button onClick={() => onRail('chats')}>leave settings</Button>{children}</main>
+  return <main data-settings-section={activeSection ?? initialSection} data-team={selectedTeamId} data-workspace={id} data-invite={inviteInitially}><Button onClick={() => onRail('chats')}>leave settings</Button></main>
 } } })
-mock.module('@/components/teams/team-directory', { namedExports: { TeamDirectory: ({ workspaceId: id }: { workspaceId: string }) => <div data-team-workspace={id} /> } })
-mock.module('@/components/workspace/members-settings', { namedExports: { MembersSettings: ({ workspaceId: id, inviteInitially }: { workspaceId: string; inviteInitially: boolean }) => <div data-members-workspace={id} data-invite={inviteInitially} /> } })
 
 let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -153,7 +153,7 @@ before(async () => {
   const hostedModule = new URL('./issue-workspace.tsx?hosted-provider-test', import.meta.url).href
   ;({ IssueWorkspace: HostedIssueWorkspace } = await import(hostedModule))
   const shell = await import('../app-shell')
-  mock.module('../app-shell', { namedExports: { ...shell, FRAME_OWNS_PANEL: true } })
+  mock.module('../app-shell', { namedExports: { ...shell, FRAME_OWNS_PANEL: true, FRAME_LISTS_CHATS: undefined } })
   ;({ IssueWorkspace: OfficialIssueWorkspace } = await import(new URL('./issue-workspace.tsx?browser-panel-test', import.meta.url).href))
 })
 beforeEach(() => {
@@ -207,6 +207,22 @@ test('an invalid browser address does not reveal or create a browser pane', asyn
 })
 
 const render = async (props: Partial<Parameters<typeof IssueWorkspace>[0]> = {}) => { await act(async () => root.render(<IssueWorkspace user={user} {...props} />)) }
+for (const value of ['false', 'undefined']) test(`a frame with FRAME_LISTS_CHATS ${value} keeps one chat navigation and group command`, async () => {
+  if (value === 'false') {
+    const { FRAME_LISTS_CHATS } = await import('../slots/app-frame')
+    assert.equal(FRAME_LISTS_CHATS, false)
+    await render()
+  } else {
+    await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  }
+  assert.ok(container.querySelector('[aria-label="Main navigation"]'))
+  assert.equal(Boolean(container.querySelector('[data-retired-bot-list]')), false)
+  const createGroup = [...container.querySelectorAll('button')].find(button => button.textContent === 'new group')
+  assert.ok(createGroup)
+  await act(async () => createGroup.click())
+  assert.equal(container.querySelector('[data-create-group]')?.getAttribute('data-create-group'), workspaceId)
+})
+
 const renderHosted = async () => { await act(async () => root.render(<HostedIssueWorkspace user={user} />)) }
 const frame = () => container.querySelector('[data-slot="app-frame-content"]')
 const bar = () => container.querySelector('[data-slot="window-bar"]')
@@ -284,7 +300,7 @@ test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps 
   assert.ok(frame() === original.frame, 'the frame DOM node must survive Settings navigation')
   assert.equal(railMounts, 1)
   await go('/settings/teams?workspace=workspace-one&team=team-one')
-  assert.equal(container.querySelector('[data-team-workspace]')?.getAttribute('data-team-workspace'), workspaceId)
+  assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-workspace'), workspaceId)
   assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-team'), 'team-one')
   await go('/settings/members?workspace=workspace-one&invite=1')
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
@@ -477,7 +493,7 @@ test('a standalone Settings shell still provides its frame and route-specific me
   assert.equal(container.querySelectorAll('[data-slot="app-frame-content"]').length, 1)
   assert.ok(bar() && rail())
   assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-settings-section'), 'members')
-  assert.equal(container.querySelector('[data-members-workspace]')?.getAttribute('data-members-workspace'), workspaceId)
+  assert.equal(container.querySelector('[data-settings-section]')?.getAttribute('data-workspace'), workspaceId)
   assert.equal(container.querySelector('[data-invite]')?.getAttribute('data-invite'), 'true')
 })
 

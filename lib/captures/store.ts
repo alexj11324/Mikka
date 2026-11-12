@@ -2,6 +2,7 @@ import type { RunAgentProfile } from '@/lib/agent-runs'
 import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
 import { agentProfileSkillSource } from '@/lib/factory/agent-profile-skills'
 import { profileSkillRunReportSchema } from '@mikka/protocol/skill'
+import { causeFields } from '@mikka/protocol/coded-error'
 import 'server-only'
 import { z } from 'zod'
 import { createHash, randomBytes } from 'node:crypto'
@@ -13,7 +14,7 @@ import {
 import { withAccountWrite } from '@/lib/account/write-guard'
 import { db, pool } from '@/lib/db'
 import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib/db/schema'
-import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
+import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, ObjectStorageReadError, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
 import { modelRoutingEvidenceSchema } from '@/lib/thread-execution-identity-view'
@@ -186,8 +187,17 @@ async function writableCompleteUpload(owner: CaptureOwner, captureId: string): P
     return winner ? captureView(winner) : { error: 'not_found', message: 'No open upload with that id for this run.' }
   }
   const storage = artifactStorage()
-  const bytes = row.inlineContent ? new Uint8Array(row.inlineContent)
-    : storage === 'r2' ? await getArtifactObjectBytes(row.storageKey).catch(() => null) : null
+  let bytes = row.inlineContent ? new Uint8Array(row.inlineContent) : null
+  if (!bytes && storage === 'r2') {
+    try {
+      bytes = await getArtifactObjectBytes(row.storageKey)
+    } catch (error) {
+      if (!(error instanceof ObjectStorageReadError && error.code === 404)) {
+        console.warn('[capture upload] object read unavailable', { causes: causeFields(error) })
+        return { error: 'unavailable', message: 'Capture storage is unavailable. Retry the upload completion.' }
+      }
+    }
+  }
   if (!bytes) return { error: 'not_found', message: 'The file has not arrived.' }
   const problem = bytes.length !== row.size ? `Expected ${row.size} bytes, got ${bytes.length}.`
     : sha256(bytes) !== row.sha256 ? 'The file does not match its sha256.'

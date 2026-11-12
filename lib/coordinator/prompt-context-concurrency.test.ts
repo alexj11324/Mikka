@@ -45,7 +45,7 @@ stub('./github-context.ts', { githubPromptContext: async (...args: unknown[]) =>
 stub('../profile/store.ts', { profilePromptSection: async (...args: unknown[]) => { await enter('profile', args); return '' } })
 stub('./execution-context.ts', { executionContextParts: async (...args: unknown[]) => { await enter('execution', args); return facts } })
 stub('../personal-mailbox-config.ts', { personalMailboxEnabled: () => false })
-stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: forbidden })
+stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: forbidden, withDatabaseTransaction: forbidden })
 stub('../issue-visibility.ts', { issueVisibility: forbidden })
 stub('../agent-runs.ts', { addRunMessage: forbidden, queueRun: forbidden, queueFactoryRun: forbidden, readRun: forbidden, requestRunStop: forbidden, visibleRuns: forbidden })
 stub('../search/index.ts', { webSearch: forbidden })

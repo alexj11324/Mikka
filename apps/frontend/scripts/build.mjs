@@ -17,8 +17,8 @@ async function assetFiles(directory) {
   return result
 }
 
-export async function buildFrontend({ target = 'web', outdir = resolve(frontend, 'dist', target), clean = true } = {}) {
-  const config = await frontendConfig({ target, outdir, clean })
+export async function buildFrontend({ target = 'web', outdir = resolve(frontend, 'dist', target), clean = true, serverPages = false, publicTestFixture = false } = {}) {
+  const config = await frontendConfig({ target, outdir, clean, serverPages, publicTestFixture })
   outdir = resolve(config.root, config.build.outDir)
   // This directory belongs to the build. Complete its removal before Vite
   // writes anything, then verify the emitted inventory before publishing it.
@@ -63,6 +63,6 @@ export async function buildFrontend({ target = 'web', outdir = resolve(frontend,
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const target = process.argv.includes('--desktop') ? 'desktop' : 'web'
-  const result = await buildFrontend({ target })
+  const result = await buildFrontend({ target, serverPages: process.argv.includes('--server-pages'), publicTestFixture: process.argv.includes('--public-test-fixture') })
   process.stdout.write(`${JSON.stringify({ target, rendererBuild: result.rendererBuild, actions: result.usedActions.length, exports: result.exports, serverModules: result.serverModules })}\n`)
 }

@@ -18,7 +18,8 @@ for (const development of [false,true]) test(`self-hosted ${development?'develop
   await writeFile(join(directory, 'server/index.mjs'), 'export default {}')
   await writeFile(join(directory, 'mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.0.0-rc.9', revision: 'a'.repeat(40) }))
   const data = join(root, 'data')
-  const env = { MIKKA_DATA_DIR: data, WORKFLOW_TARGET_WORLD: 'local', WORKFLOW_LOCAL_DATA_DIR: '/data/workflow', WORKFLOW_LOCAL_BASE_URL: 'https://main.test' }
+  const env = { MIKKA_DATA_DIR: data, WORKFLOW_TARGET_WORLD: 'local', WORKFLOW_LOCAL_DATA_DIR: '/data/workflow', WORKFLOW_LOCAL_BASE_URL: 'https://main.test',
+    NITRO_SSL_CERT: 'installation-certificate', NITRO_SSL_KEY: 'installation-tls-key', NITRO_UNIX_SOCKET: '/run/mikka/frontend.sock' }
   let spawned, stopped = 0
   const service = await startEveService({ root, env, development, allocatePort: async () => 43127, spawnProcess: (_command, _args, options) => {
     spawned = options
@@ -36,6 +37,10 @@ for (const development of [false,true]) test(`self-hosted ${development?'develop
   assert.equal(spawned.env.WORKFLOW_LOCAL_DATA_DIR, join(data, 'eve-workflow'))
   assert.equal(await realpath(join(directory, '.eve/.workflow-data')), join(data, 'eve-workflow'))
   assert.equal(env.WORKFLOW_LOCAL_DATA_DIR, '/data/workflow')
+  for (const key of ['NITRO_SSL_CERT', 'NITRO_SSL_KEY', 'NITRO_UNIX_SOCKET']) {
+    assert.equal(spawned.env[key], undefined, `the loopback HTTP peer inherited ${key}`)
+    assert.ok(env[key], `the public listener still needs ${key}`)
+  }
   assert.equal(spawned.cwd, directory)
   await service.close(); await service.close()
   assert.equal(stopped, 1)

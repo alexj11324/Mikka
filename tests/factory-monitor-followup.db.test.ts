@@ -15,7 +15,8 @@ if(!target&&process.env.REQUIRE_DB==='1')throw Error('Monitor follow-up tests re
 // transaction. Upstream probe/approval validation has independent monitor tests.
 test('completed deliveries create one private regression issue in the incident transaction', {skip:!target}, async t=>{
   const pool=new Pool({connectionString:target,max:12})
-  t.after(async()=>{await pool.end();const {pool:appPool}=await import('../lib/db');await appPool.end()})
+  t.after(async()=>{await pool.end();const {pool:appPool}=await import('../lib/db');const {workspacePool}=await import('../lib/workspace-db');await Promise.all([appPool.end(),workspacePool.end()])})
+  const {withTaskWorkspace}=await import('../lib/task-workspace')
   await pool.query(await readFile(new URL('../drizzle/20261031060510_monitor_followup_issues.sql',import.meta.url),'utf8'))
   const owner=`monitor-followup-${randomUUID()}`
   await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())',[owner,`${owner}@example.invalid`])
@@ -38,9 +39,11 @@ test('completed deliveries create one private regression issue in the incident t
     return {ownerId:owner,workspaceKey:`personal:${owner}`,fingerprint:'f'.repeat(64),checkKey:'c'.repeat(64),issueId,eventId:randomUUID(),outcome:'unhealthy' as const,publicationId:randomUUID(),candidateId,runId,evidenceDigest:'e'.repeat(64)}
   }
   async function write(input:Parameters<typeof recordMonitorIncident>[1],rollback=false){
-    const tx=await pool.connect()
-    try{await tx.query('BEGIN');const result=await recordMonitorIncident(tx,input);await tx.query(rollback?'ROLLBACK':'COMMIT');return result}
-    catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
+    return withTaskWorkspace(owner,workspaceId,async()=>{
+      const tx=await pool.connect()
+      try{await tx.query('BEGIN');const result=await recordMonitorIncident(tx,input);await tx.query(rollback?'ROLLBACK':'COMMIT');return result}
+      catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
+    })
   }
   await t.test('ten replays create one follow-up; distinct events append to it and recovery retains it',async()=>{
     const input=await seed()

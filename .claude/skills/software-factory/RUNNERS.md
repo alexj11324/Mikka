@@ -30,7 +30,7 @@ Starting points:
 
 An SDK call creates an isolated microVM (vendors say "sandbox") in about a second; the orchestrator execs commands into it, or starts an agent CLI inside it. Cost is per second of vCPU and RAM. The orchestrator creates one per run, kills it at the end, and sets a timeout as the backstop. Providers also sell persistence (pause/resume, snapshots, drives); a factory uses it as a cache, and keeps memory between runs in the ticket tracker, git host and orchestrator.
 
-**Pick it when** the factory has its own orchestrator (a server, a queue) and wants many short-lived, parallel runs with no machines to manage. Compare on max run length, concurrency cap, and whether time spent waiting on the model is billed: as of 2026-10, Vercel bills only active CPU, so model-wait time is nearly free there.
+**Pick it when** the factory has its own orchestrator (a server, a queue) and wants many short-lived, parallel runs with no machines to manage. Compare on max run length, concurrency cap, and whether time spent waiting on the model is billed: Mikka’s engineering runs accrue provisioned memory while waiting, even when CPU use is low. Submit the supported suites to the [Cloudflare engineering runner](../../../docs/operations/engineering-sandbox.md).
 
 Starting points: [E2B](https://e2b.dev/pricing), [Daytona](https://www.daytona.io/pricing), [Modal Sandboxes](https://modal.com/docs/guide/sandboxes), [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox/pricing).
 

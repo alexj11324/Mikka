@@ -1,6 +1,7 @@
 import { eveChannel } from 'eve/channels/eve'
 import { POST, type RouteHandlerArgs, type HttpRouteDefinition } from 'eve/channels'
 import { z } from 'zod'
+import { ActionFailureError } from '../action-error'
 import { authenticateEveRequest, internalEveScope } from './auth'
 import { assertSessionScope, conversationAddress, registerSession, scopeFromAuth, scopeAuth, type EveScope } from './scope'
 import { priorHistory } from './history'
@@ -14,13 +15,29 @@ async function sessionFor(args: RouteHandlerArgs, scope: EveScope) {
   return result.session
 }
 
+const accessRefusals = new WeakSet<Request>()
+
+async function admit(request: Request, deliver: () => Response | Promise<Response>) {
+  const refused = () => Response.json({ ok: false, code: 'accessChangeConfirmationRequired', error: 'accessChangeConfirmationRequired' }, { status: 409 })
+  try {
+    const response = await deliver()
+    return accessRefusals.has(request) ? refused() : response
+  } catch (error) {
+    if (accessRefusals.has(request)) return refused()
+    throw error
+  }
+}
+
 /** Keep eve's protocol, changing only ownership, prior history and product ingress. */
 export function mikkaEveChannel() {
   const base = eveChannel({ auth: authenticateEveRequest, turnPolicy: 'queue', audience: 'private',
     async onMessage(ctx, message) {
       const scope = scopeFromAuth(ctx.eve.caller)
       const { acceptEveMessage } = await import('./submission')
-      const accepted = await acceptEveMessage(scope, message, ctx.eve.clientContext, ctx.eve.request)
+      const accepted = await acceptEveMessage(scope, message, ctx.eve.clientContext, ctx.eve.request).catch(error => {
+        if (error instanceof ActionFailureError && error.code === 'accessChangeConfirmationRequired' && error.confirmable) accessRefusals.add(ctx.eve.request)
+        throw error
+      })
       return { auth: { ...scopeAuth(scope), attributes: { ...scopeAuth(scope).attributes, sourceEventId: accepted.eventId } }, context: accepted.context, clientContext: [] }
     },
   })
@@ -42,7 +59,7 @@ export function mikkaEveChannel() {
           if (submission) payload.idempotencyKey = z.uuid().parse(submission)
           const url = new URL(request.url); url.pathname = `/eve/v1/session/${session.id}`
           const forwarded = forwardEveRequest(request,url,JSON.stringify(payload))
-          const response = await follow.handler(forwarded, { ...args, params:{sessionId:session.id} })
+          const response = await admit(forwarded, () => follow.handler(forwarded, { ...args, params:{sessionId:session.id} }))
           if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
           return response
         }
@@ -64,7 +81,7 @@ export function mikkaEveChannel() {
           payload.idempotencyKey = z.uuid().parse(request.headers.get('x-mikka-submission-id'))
           forwarded = forwardEveRequest(request,request.url,JSON.stringify(payload))
         }
-        const response = await route.handler(forwarded,args)
+        const response = await admit(forwarded, () => route.handler(forwarded,args))
         if (response.ok) await (await import('./submission')).commitEveIngress(forwarded)
         if (response.ok && response.body && request.method === 'GET' && route.path.endsWith('/stream')) {
           const [{credentialChatFingerprints},{maskEveStream}] = await Promise.all([import('../credentials/chat-guard'),import('./stream-mask')])

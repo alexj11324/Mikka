@@ -157,7 +157,8 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     if (!parsed.success) return { error: 'validationGeneric' }
     const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
     try {
-      const created = await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined)
+      const created = await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined,
+        async id => issueResult(unwrap(await getIssue(id)).issue))
       if (!teamId) return created
       const requestId = requestIdFor(userId, toolCallId)
       const [prior] = await db.select().from(teamIssuePromotions).where(eq(teamIssuePromotions.requestId, requestId)).limit(1)

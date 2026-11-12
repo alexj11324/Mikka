@@ -73,7 +73,7 @@ const defaultIO: CliIO = {
 export async function runCli(
   argv: string[],
   io: CliIO = defaultIO,
-  privateConfig?: { protectionBypass?: string; preloadedModels?: HostedModelProbe; initialRunId?: string; collectCliTiming?: boolean; anonymousClaudeCandidate?: AnonymousClaudeCandidate; anonymousCodexCandidate?: AnonymousCodexCandidate }
+  privateConfig?: { taskRegistered?: () => void; protectionBypass?: string; preloadedModels?: HostedModelProbe; initialRunId?: string; collectCliTiming?: boolean; anonymousClaudeCandidate?: AnonymousClaudeCandidate; anonymousCodexCandidate?: AnonymousCodexCandidate }
 ): Promise<number | null> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -233,6 +233,7 @@ export async function runCli(
       fixturesDir: values["fixtures-dir"],
       retainResources: values["retain-resources"],
       hostedSubscriptions: values["hosted-subscriptions"],
+      taskRegistered: privateConfig?.taskRegistered,
       preloadedModels: privateConfig?.preloadedModels,
       initialRunId: privateConfig?.initialRunId,
       anonymousClaudeCandidate: privateConfig?.anonymousClaudeCandidate, anonymousCodexCandidate: privateConfig?.anonymousCodexCandidate,

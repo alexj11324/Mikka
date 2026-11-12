@@ -25,6 +25,9 @@ export function orderMigrations(names) {
 
 // Earlier branch and deployment names are aliases only for identical SQL.
 export const MIGRATION_EQUIVALENTS = {
+  '20261112030506_drive_blob_workspace_admission.sql': ['20261112030502_drive_blob_workspace_admission.sql'],
+  '20261112030507_scope_personal_drive_names_by_workspace.sql': ['20261112030505_scope_personal_drive_names_by_workspace.sql'],
+  '20261112030505_task_creation_receipts.sql': ['20261112030502_task_creation_receipts.sql'],
   '20261112030508_workspace_service_identities.sql': ['20261112030505_workspace_service_identities.sql'],
   '20261031000251_issue_owner_number_unique.sql': ['20261030213401_issue_owner_number_unique.sql', '20261030203401_issue_owner_number_unique.sql'],
   '20261031000250_issue_number_counter_expand.sql': ['20261030213400_issue_number_counter_expand.sql', '20261030203400_issue_number_counter_expand.sql'],
@@ -69,6 +72,9 @@ export const MIGRATION_EQUIVALENTS = {
   '20261027164515_workspace_computer_policy.sql': ['20261027040514_workspace_computer_policy.sql', '20261027000700_workspace_computer_policy.sql'],
 }
 const EQUIVALENT_SQL_SHA256 = {
+  '20261112030506_drive_blob_workspace_admission.sql': '556a765112dafd61fdaf922d4ff78a2fb133d02d47ece04fd9fc5d9847c42b53',
+  '20261112030507_scope_personal_drive_names_by_workspace.sql': 'c46c75385e55cf5cca5770330c1da2ba763955efe8596e96b6d7dd3abd95c21d',
+  '20261112030505_task_creation_receipts.sql': 'd9d0692cb505330c864b70c3a2f6cec69da1ca6090d44f619874f034902f60da',
   '20261112030508_workspace_service_identities.sql': '7f354d579dc7cfbd59685bee73d0f70e0e8d60038d6bb58fb495a7108f41fe93',
   '20261031000251_issue_owner_number_unique.sql': '940f564d977aaf7d0c7b17d27ac185052d81b2880ad696e8d47a2fb5a4700d11',
   '20261031000250_issue_number_counter_expand.sql': 'dcebd6c3d9fd4ec923958f4c19dcfa87c2422f3a83317b79d052768041e8db03',
