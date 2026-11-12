@@ -5805,6 +5805,10 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "review_scope_denied": {
+      "default": "You do not have access to review this task.",
+      "sponsored_placement": "The hosted workspace is no longer available for reviewing this task."
+    },
     "workspace_not_found": {
       "default": "This code workspace is unavailable to your account."
     },

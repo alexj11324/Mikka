@@ -5805,6 +5805,10 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "review_scope_denied": {
+      "default": "你没有权限查看此任务。",
+      "sponsored_placement": "此任务的托管工作区已无法用于查看任务。"
+    },
     "workspace_not_found": {
       "default": "当前账号无法访问此代码工作区。"
     },

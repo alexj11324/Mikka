@@ -119,6 +119,11 @@ test('task review: current owner, session, tenant and immutable physical checkou
       assert.equal(rows.length,2)
       assert.ok(rows.every(row=>row.provider==='cloudflare' && row.repositoryKey===f.remoteKey && row.reviewOperationId===terminal.reviewOperationId))
       await refused(read(f,f.peer),403,'not_owner_terminal')
+      process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = f.otherWorkspaceId
+      await assert.rejects(read(f), (error: unknown) =>
+        error instanceof ReviewAuthorityError && error.status === 403 && error.code === 'review_scope_denied' &&
+        error.detail === 'sponsored_placement' && error.cause instanceof Error)
+      process.env.MIKKA_CLOUDFLARE_TASK_WORKSPACES = f.workspaceId
       await pool.query('UPDATE thread_machines SET "snapshotId"=$2 WHERE "runId"=$1',[f.runId,'synthetic'])
       await refused(read(f),403,'review_scope_denied')
     } finally {

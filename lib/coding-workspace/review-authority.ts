@@ -218,7 +218,9 @@ export async function resolveTaskReviewAuthority<T>(database: Pool, membership: 
           !machine.sandboxId || !/^[a-f0-9]{64}$/.test(machine.sandboxId)) throw denied()
       try {
         sponsoredPlacement = await sponsoredReviewPlacement(client, {userId:session.user.id, workspaceId}, run.id)
-      } catch { throw denied() }
+      } catch (cause) {
+        throw new ReviewAuthorityError('review_scope_denied', {detail:'sponsored_placement', cause})
+      }
       if (sponsoredPlacement.operationId !== machine.operationId || sponsoredPlacement.repositoryKey !== repo.repoPath) throw denied()
       const checkpoint = readReviewCheckpoint(machine.lifecycle?.sponsoredPreparedCheckpoint, machine.sandboxId)
       if (checkpoint) sponsoredPlacement = {...sponsoredPlacement, checkpoint}
