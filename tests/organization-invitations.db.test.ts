@@ -131,6 +131,18 @@ test('Organization invitations grant only a verified Member without inheriting W
     }, outsider))
   })
 
+  await t.test('an invitation issued by a suspended member cannot be accepted', async () => {
+    const issued = await invite.issueOrganizationInvitations(organizationId, other.id, { emails: [outsider.email] })
+    const record = issued.outcomes[0]
+    if (!record.created) throw new Error('fixture invitation missing')
+    await workspaceDb.update(organizationMembers).set({ status: 'suspended' })
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, other.id)))
+    await assert.rejects(invite.acceptOrganizationInvitation({ token: record.path.split('/').at(-1)! }, outsider))
+    await workspaceDb.update(organizationMembers).set({ status: 'active' })
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, other.id)))
+    await invite.revokeOrganizationInvitation(organizationId, owner.id, { invitationId: record.id })
+  })
+
   await t.test('removing a sender revokes outstanding links without opening the recipient workspace', async () => {
     const sent = await invite.issueOrganizationInvitations(organizationId, sender.id, { emails: [outsider.email] })
     const record = sent.outcomes[0]
