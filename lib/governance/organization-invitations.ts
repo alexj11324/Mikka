@@ -137,6 +137,11 @@ export async function acceptOrganizationInvitation(input: unknown, user: { id: s
         eq(organizationInvitations.tokenHash, tokenHash))).for('update').limit(1)
     if (!invitation || invitation.status !== 'pending' || invitation.expiresAt <= new Date()
       || invitation.email !== canonical.email.toLowerCase()) throw new GovernanceError('invalid_request')
+    // Pending invites cannot outlive the issuer's current Organization membership, including SCIM suspensions.
+    const [issuer] = await tx.select({ userId: organizationMembers.userId }).from(organizationMembers)
+      .where(and(eq(organizationMembers.organizationId, candidate.organizationId),
+        eq(organizationMembers.userId, invitation.createdBy), eq(organizationMembers.status, 'active'))).limit(1)
+    if (!issuer) throw new GovernanceError('invalid_request')
     await assertOrganizationAccountWritable(tx, user.id)
     const [existing] = await tx.select({ status: organizationMembers.status })
       .from(organizationMembers).where(and(eq(organizationMembers.organizationId, candidate.organizationId),
