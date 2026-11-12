@@ -144,25 +144,27 @@ export function comparePressure(before,after){
   return {...result,status:regression?'regression':'pass',reasons:regression?['application_cpu_per_observed_request_increased']:[],beforeMs:prior,afterMs:current}
 }
 
-/** Conservatively surface a possible legacy-device threshold breach using
- * only totals. A positive bound needs per-device operator diagnosis and exposes
- * no device ID. A total <= 18 rules out a single device exceeding 18. */
+/** The provider log stream can omit starts. Its distinct IDs give an observed
+ * total across devices, without certifying an upper bound for any device. */
 export function legacyFilesystemBudget(events,start,end) {
   if(end-start!==fiveMinutes||start%fiveMinutes!==0) fail('filesystem_window_invalid')
   const seen=new Set()
-  let traffic=false
+  let traffic=false, malformed=false
   for(const event of events){
     const value=JSON.parse(event.message)
     if(value.msg!=='api_request_started')continue
     const at=Date.parse(value.timestamp)
     if(dateMatch(at,start,end))traffic=true
     if(value.route!=='/v1/devices/[deviceId]/fs/requests')continue
-    if(!Number.isFinite(at)||typeof value.invocationId!=='string'||!value.invocationId)
-      return {status:'insufficient',reason:'filesystem_coverage_unknown'}
-    if(dateMatch(at,start,end))seen.add(value.invocationId)
+    if(!Number.isFinite(at)){malformed=true;continue}
+    if(!dateMatch(at,start,end))continue
+    if(typeof value.invocationId!=='string'||!value.invocationId){malformed=true;continue}
+    seen.add(value.invocationId)
   }
-  if(!traffic)return {status:'insufficient',reason:'no_observed_requests'}
-  return {status:seen.size>18?'investigate':'within_bound',requests:seen.size,singleDeviceUpperBound:seen.size,threshold:18}
+  const observed={requests:seen.size,singleDeviceUpperBound:null,threshold:18}
+  if(seen.size>18)return {...observed,status:'investigate',reason:'combined_observed_count_above_threshold'}
+  const reason=malformed?'filesystem_coverage_unknown':traffic?'origin_completeness_unverified':'no_observed_requests'
+  return {...observed,status:'insufficient',reason}
 }
 
 /** The configured three-sigma tests compare complete, nonoverlapping quarters

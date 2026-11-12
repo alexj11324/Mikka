@@ -66,7 +66,7 @@ Invocation counts and CPU must use the same route, deployment and time window.
 Process-wide CPU under concurrent execution cannot attribute a single request;
 telemetry aggregates do not by themselves reconcile a provider bill.
 
-On Cloudflare, compare API application CPU and peak instance memory in the same five-minute windows as HTTP route templates, status, request volume and paired p50/p95 latency. Record background and concurrent work as part of application usage. The CPU per observed HTTP request ratio is a deployment-pressure diagnostic. It does not identify a request's CPU. A 15-minute anomaly check keeps missing observations distinct from verified recovery. The old per-device filesystem budget can also be bounded by the combined count of observed legacy requests without retaining concrete device paths. A possible breach requires operator diagnosis.
+On Cloudflare, compare API application CPU and peak instance memory in the same five-minute windows as HTTP route templates, status, request volume and paired p50/p95 latency. Record background and concurrent work as part of application usage. The CPU per observed HTTP request ratio is a deployment-pressure diagnostic. It does not identify a request's CPU. A 15-minute anomaly check keeps missing observations distinct from verified recovery. For the legacy filesystem budget, the origin logs give a deduplicated observed count across devices. With incomplete origin coverage, 18 or fewer observed starts leave the per-device budget unknown. More than 18 starts across all devices prompts investigation. A per-device breach requires separate evidence for one device in the same five-minute window.
 
 ## Explicit outcomes and collection coverage
 

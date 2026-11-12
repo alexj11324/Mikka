@@ -47,12 +47,21 @@ test('one physical app CPU delta can fire then recover without assigning it to a
  assert.equal(comparePressure(previous,w(end,1000,traffic(20,500,end))).status,'regression')
  assert.throws(()=>comparePressure(previous,previous))
 })
-test('all-device upper bound never suppresses a possible five-minute polling budget breach',()=>{
- const items=n=>Array.from({length:n},(_,i)=>request(String(i),'/v1/devices/[deviceId]/fs/requests')).flat()
- assert.deepEqual(legacyFilesystemBudget(items(19),start,end),{status:'investigate',requests:19,singleDeviceUpperBound:19,threshold:18})
- assert.equal(legacyFilesystemBudget(items(18),start,end).status,'within_bound')
- assert.equal(legacyFilesystemBudget(items(19),end,end+5*minute).status,'insufficient')
- assert.equal(legacyFilesystemBudget(request('q','/api/one',200,50,end),end,end+5*minute).status,'within_bound')
+test('sampled or dropped filesystem starts cannot establish an upper bound for one device',()=>{
+ const route='/v1/devices/[deviceId]/fs/requests'
+ const items=n=>Array.from({length:n},(_,i)=>request(String(i),route)).flat()
+ const few=items(18)
+ assert.deepEqual(legacyFilesystemBudget([...few,...few],start,end),{
+  status:'insufficient',reason:'origin_completeness_unverified',requests:18,singleDeviceUpperBound:null,threshold:18})
+ assert.deepEqual(legacyFilesystemBudget(items(19),start,end),{
+  status:'investigate',reason:'combined_observed_count_above_threshold',requests:19,singleDeviceUpperBound:null,threshold:18})
+ const invalid={message:JSON.stringify({msg:'api_request_started',route,timestamp:new Date(start).toISOString()})}
+ assert.deepEqual(legacyFilesystemBudget([invalid,...few],start,end),{
+  status:'insufficient',reason:'filesystem_coverage_unknown',requests:18,singleDeviceUpperBound:null,threshold:18})
+ assert.deepEqual(legacyFilesystemBudget(items(19),end,end+5*minute),{
+  status:'insufficient',reason:'no_observed_requests',requests:0,singleDeviceUpperBound:null,threshold:18})
+ assert.deepEqual(legacyFilesystemBudget(request('q','/api/one',200,50,end),end,end+5*minute),{
+  status:'insufficient',reason:'origin_completeness_unverified',requests:0,singleDeviceUpperBound:null,threshold:18})
 })
 test('same-app 15-minute anomalies detect fresh pressure and recover; missing history never resolves incidents',()=>{
  const q=15*minute,w=(n,cpu=2000,count=100)=>({capacity:{start:start+n*q,end:start+(n+1)*q,status:'observed',application:app,cpuMs:cpu},
