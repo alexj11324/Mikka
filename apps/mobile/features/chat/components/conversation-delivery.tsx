@@ -90,7 +90,7 @@ export function useConversationDelivery(target: ConversationTarget | null, recei
 
   function send(text: string, mentions: ConversationCommand['mentions'] = []) {
     if (!target || !owner || !workspace || !text.trim()) return false
-    const previous = read().find(row => row.phase !== 'accepted' && sameConversationCommand(row, target, text, mentions))
+    const previous = read().find(row => row.phase === 'failed' && sameConversationCommand(row, target, text, mentions))
     void deliver(previous ?? { target, id: uuid.v4(), text, at: Date.now(), expectedOwnerId: owner, expectedWorkspaceId: workspace, mentions })
     return true
   }
