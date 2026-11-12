@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { switchWorkspace } from '@/app/actions/workspace'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { AuthCard } from '@/components/blocks/auth-19/components/auth-card'
 import { Button } from '@/components/ui/button'
@@ -51,10 +52,11 @@ export default function MobileTaskHandoff({ launch }: { launch: Launch }) {
         if (!response.ok) throw Error()
         result = await response.json()
       }
-      if (window.location.href !== document || !validTarget(result) || directory.getSnapshot().version !== snapshot.version || (!cloud && result.userId !== snapshot.account?.user.id)) throw Error()
+      if (!validTarget(result) || (!cloud && result.userId !== snapshot.account?.user.id)) throw Error()
+      const isCurrent = () => window.location.href === document && directory.getSnapshot().version === snapshot.version
       const query = new URLSearchParams(result.target.slice(2))
       query.set('workspace', result.workspaceId)
-      showMobileTaskLocation(document, query)
+      if (!await showMobileTaskLocation(document, query, switchWorkspace, isCurrent)) throw Error()
       window.history.replaceState({ ...window.history.state, mobileTask: { server, ref, ...result } }, '', window.location.href)
     } catch { setFailed(true) }
     finally { busy.current = false; setPending(false) }

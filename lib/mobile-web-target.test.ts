@@ -53,8 +53,8 @@ test('the native Task rendezvous is HTTPS, bounded, keeps the physical URL entit
     new URLSearchParams({ mobileTask: ref, server: 'http://self.example' }),
     new URLSearchParams({ mobileTask: ref, server: 'https://self.example', issue: BOT }),
   ]) assert.equal(mobileTaskLaunch(new URL(origin + '#' + fragment)), null)
-  const params = new URLSearchParams({ issue: BOT })
-  showMobileTaskLocation(launch.href, params)
+  const params = new URLSearchParams({ issue: BOT, workspace: BOT })
+  await showMobileTaskLocation(launch.href, params, async () => ({ ok: true }), () => true)
   assert.equal(launch.search, '')
   assert.equal(new URL(mobileTaskLocation(launch.href)).searchParams.get('issue'), BOT)
   assert.equal(mobileTaskLocation('https://elsewhere.example'), 'https://elsewhere.example')
@@ -72,4 +72,26 @@ test('restoring a saved handoff only resumes the currently selected server and a
   assert.equal(canResumeMobileTask(server, false, 'other', { account: self, expiredServer: null }), false)
   assert.equal(canResumeMobileTask('https://other.example', false, 'reader', { account: self, expiredServer: null }), false)
   assert.equal(canResumeMobileTask(server, true, 'reader', { account: null, expiredServer: server }), false)
+})
+
+test('the authorized source workspace must be selected before rendering its Task', async () => {
+  const { showMobileTaskLocation, mobileTaskLocation } = await import('./web-connection/mobile-task-location')
+  const document = 'https://official.example/#mobileTask=workspace'
+  const query = new URLSearchParams({ issue: BOT, workspace: BOT })
+  let active = true
+  let allow = false
+  const selected: string[] = []
+  const select = async (id: string) => { selected.push(id); return { ok: allow } }
+  assert.equal(await showMobileTaskLocation(document, query, select, () => active), false)
+  assert.equal(mobileTaskLocation(document), document)
+  allow = true
+  assert.equal(await showMobileTaskLocation(document, query, async id => {
+    active = false
+    return select(id)
+  }, () => active), false)
+  assert.equal(mobileTaskLocation(document), document)
+  active = true
+  assert.equal(await showMobileTaskLocation(document, query, select, () => active), true)
+  assert.deepEqual(selected, [BOT, BOT, BOT])
+  assert.equal(new URL(mobileTaskLocation(document)).searchParams.get('issue'), BOT)
 })

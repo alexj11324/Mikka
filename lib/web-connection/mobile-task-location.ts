@@ -4,11 +4,17 @@ import { webSelectionVersion } from './selection'
 // router. The physical document URL and referrer contain only the opaque index.
 let opened: { document: string; route: string; generation: number } | undefined
 
-export function showMobileTaskLocation(document: string, query: URLSearchParams) {
+export async function showMobileTaskLocation(
+  document: string, query: URLSearchParams,
+  selectWorkspace: (id: string) => Promise<{ ok: boolean }>, isCurrent: () => boolean,
+) {
+  const workspace = query.get('workspace')
+  if (!workspace || !isCurrent() || !(await selectWorkspace(workspace)).ok || !isCurrent()) return false
   const route = new URL(document)
   route.hash = ''
   route.search = query.toString()
   opened = { document, route: route.href, generation: webSelectionVersion() }
+  return true
 }
 
 export function mobileTaskLocation(href: string) {
