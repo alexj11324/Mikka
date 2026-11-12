@@ -4,7 +4,9 @@ import { StyleSheet, TextInput, View } from 'react-native'
 import { Avatar, Row, SettingsPage } from '@/components/settings'
 import { Text } from '@/components/Text'
 import { Group } from '@/components/ui'
-import { authClient } from '@/lib/auth'
+import { api, apiConnection } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
+import { saveProfileName } from '@/lib/profile-name'
 import { useSettings } from '@/lib/settings'
 import { colors, font } from '@/lib/theme'
 import { openAccountDeletion } from '@/lib/web'
@@ -26,10 +28,14 @@ export default function ProfileScreen() {
     if (next === data.user.name) { dirty.current = false; setName(next); setProblem(null); return }
     saving.current = true; setBusy(true); setProblem(null)
     try {
-      const result = await authClient.updateUser({ name: next })
-      if (result.error) throw new Error('name_save_failed')
-      setData(current => current && { ...current, user: { ...current.user, name: next } })
-      dirty.current = false; setName(next)
+      const connection = apiConnection()
+      const context = apiCache.context()
+      const saved = await saveProfileName(next, (path, init) => api(path, init, connection))
+      apiCache.commit(context, () => {
+        setData(current => current && { ...current, user: { ...current.user, name: saved } })
+        dirty.current = false; setName(saved)
+        connection.client.$store.notify('$sessionSignal')
+      })
     } catch { setProblem('名字未保存，修改已保留。') }
     finally { saving.current = false; setBusy(false) }
   }
