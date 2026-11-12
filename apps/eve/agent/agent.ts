@@ -17,5 +17,8 @@ export default defineAgent({
     return { model: await modelForSession(ctx), modelContextWindowTokens: 128_000 }
   }),
   limits: { sessionTimeoutMs: false },
-  experimental: { workflow: { retention: 'default' } },
+  experimental: { workflow: {
+    retention: 'default',
+    ...(process.env.MIKKA_EVE_WORKFLOW_WORLD === 'cloudflare' ? { world: '@mikka/eve-cloudflare-world' } : {}),
+  } },
 })

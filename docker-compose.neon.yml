@@ -14,7 +14,6 @@ services:
       - "127.0.0.1:${MIKKA_PORT:-3000}:3000"
     environment:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
-      MIKKA_COMMUNITY_UI: ${MIKKA_COMMUNITY_UI:-0}
       # Transaction-pooled SQL traffic. Workspace and app schemas share the
       # same database, matching the bundled PostgreSQL Compose configuration.
       MIKKA_DATABASE_URL: ${MIKKA_DATABASE_URL:?Set MIKKA_DATABASE_URL to the PostgreSQL pooled URI in .env}

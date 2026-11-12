@@ -42,6 +42,7 @@ test('Factory store selects marker-backed suites and real downstream imports', a
   for (const suite of ['test:factory','test:factory-routing-db']) assert(result.db_suites.includes(suite), suite)
   assert(result.affected.includes(dbId('test:factory')))
   assert(result.db_suites.length < plan.db.scripts.length)
+  assert(result.image, 'a new backend capability must validate self-hosted dependencies and exercise the image')
 })
 test('Eve model changes select native unit tests and schedule authority selects its database gate', async () => {
   const unit = await pick('lib/eve/streaming-model.ts')
@@ -67,6 +68,7 @@ test('a migration keeps every DB suite without turning on the packaged desktop b
   assert(!r.full)
   assert.equal(r.db_suites.length, plan.db.scripts.length)
   assert(!r.desktop)
+  assert(r.image, 'a schema migration must validate the real self-hosted image')
 })
 test('deletes, renames, executable modes, symlinks and empty diffs run all', async () => {
   for(const extra of [{status:'D'},{status:'R100'},{mode:'100755'},{mode:'120000'},{oldMode:'100755'}]) assert((await pick('README.md', extra)).full)
@@ -119,7 +121,7 @@ test('every heavy consumer uses the same trusted triage and required names remai
 
 test('the actual required gate scripts reject unselected failures and selected skips', () => {
   const workflow = readFileSync('.github/workflows/ui-policy.yml','utf8')
-  const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'IMAGE', 'DESKTOP', 'ANALYTICS', 'GOVERNANCE']
+  const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'IMAGE', 'ANALYTICS', 'GOVERNANCE']
   for (const job of ['ui-policy','browser-tests']) {
     const block = workflow.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]*:\n/)[0]
     const script = block.split('        run: |\n')[1].split('      - uses:')[0].split('\n').map(line => line.slice(10)).join('\n')
@@ -145,6 +147,10 @@ test('the actual required gate scripts reject unselected failures and selected s
       else assert(!run({DB_RESULT:result}))
     }
     if (job === 'ui-policy') {
+      assert(!/\b(?:EXPECT_)?DESKTOP\b/.test(script), 'the automatic gate has no Desktop consumer')
+      for (const result of ['success', 'skipped', 'failure', 'cancelled', 'timed_out', '']) {
+        assert(run({ EXPECT_DESKTOP: 'true', DESKTOP: result }), 'a retired Desktop result does not affect the automatic gate')
+      }
       for (const key of uiChecks) {
         assert(run({['EXPECT_' + key]: 'false', [key]: 'skipped'}), key)
         for (const result of ['success', 'failure', 'cancelled']) {

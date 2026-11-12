@@ -90,6 +90,7 @@ export async function probeMobileServer(input: unknown, options: {
       if (response.status === 426 || code === 'desktop_client_update_required') return { status: 'app_update_required', minimum: text(body?.minDesktopVersion, 100) }
       const found = response.ok ? discovery(body) : null
       if (found) {
+        if (address.pathname !== '/' && found.basePath !== path) return { status: 'not_mikka' }
         if (found.max < MOBILE_SERVER_PROTOCOL) return { status: 'server_update_required', version: found.version }
         let belowMinimum = false
         try { belowMinimum = !!found.minimum && !meetsMinimumVersion(options.appVersion, found.minimum) }

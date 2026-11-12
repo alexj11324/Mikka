@@ -61,6 +61,12 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
     const proof = presenceScope.token(context)
     if (proof) headers['x-mikka-presence-scope'] = proof
   }
+  if (path === '/api/rpc') {
+    headers['x-mikka-rpc'] = '1'
+    // Native fetch has no browser Origin. Bind the cookie and origin to the
+    // same saved connection even if the person switches servers in flight.
+    if (Platform.OS !== 'web') headers.origin = new URL(connection.account.server.url).origin
+  }
   if (init.body !== undefined) headers['content-type'] = 'application/json'
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? REQUEST_TIMEOUT_MS)

@@ -12,10 +12,11 @@ import { Field, FieldContent, FieldGroup, FieldLabel } from '@/components/ui/fie
 import { PROPERTY_LABEL } from '@/components/workspace/issue-property-row'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTeamChoices } from './team-choices'
+import { isIssueListKey } from '@/lib/live/list-read'
 
 const NO_TEAMS: Awaited<ReturnType<typeof listTeams>> = []
 
-type TeamProps = { issueId: string; disabled: boolean; onChosen?: (issueId: string, teamId: string | null) => void }
+type TeamProps = { issueId: string; viewerId: string; disabled: boolean; onChosen?: (issueId: string, teamId: string | null) => void }
 
 export function IssueTeamControl(props: TeamProps) {
   const { issueId, disabled, onChosen } = props
@@ -32,7 +33,7 @@ export function IssueTeamControl(props: TeamProps) {
 }
 
 /** 团队's choices and its save, for IssueTeamControl and a layer that draws the row itself (which saves on pick). */
-export function useIssueTeam({ issueId, disabled, onChosen }: TeamProps) {
+export function useIssueTeam({ issueId, viewerId, disabled, onChosen }: TeamProps) {
   const i18nText = useTranslations()
   const { data: teams = NO_TEAMS, error: teamsError } = useSWR('teams', listTeams)
   const { data, error: readError, mutate } = useSWR(['issue-team', issueId], () => getIssueTeam(issueId))
@@ -49,9 +50,15 @@ export function useIssueTeam({ issueId, disabled, onChosen }: TeamProps) {
     setPending(true); setError('')
     try {
       const result = await setIssueTeam({ issueId, teamId: value || null, expectedTeamId: data })
-      if (!result.ok) { setError(result.error); return }
-      await mutate(result.data, { revalidate: false }); setNext(undefined); await refresh('issues')
+      if (!result.ok) {
+        setError(result.error)
+        if (result.code === 'teamIssueChanged') await mutate()
+        return
+      }
+      await mutate(result.data, { revalidate: false })
+      setNext(undefined)
       onChosen?.(issueId, result.data)
+      if (result.data !== data) await refresh(key => isIssueListKey(key, viewerId))
     } catch { setError(i18nText("FeatureCopy.c_95310b50")) }
     finally { setPending(false) }
   }

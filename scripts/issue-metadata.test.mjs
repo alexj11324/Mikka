@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { taskProjectOptions } from '../lib/task-project-options.ts'
 import assert from 'node:assert/strict'
 import { issueWithMetadata, readIssueMetadata, withIssueMetadata, metadataSchema, pullRequestSchema } from '../lib/issue-metadata.ts'
 
@@ -49,4 +50,17 @@ test('a PR keeps its line counts when GitHub reported them; they are optional, w
   for (const bad of [{ additions: -1 }, { deletions: 1.5 }, { additions: '3' }]) assert.equal(pullRequestSchema.safeParse({ url, state: 'open', ...bad }).success, false)
   const saved = JSON.parse(JSON.stringify(withIssueMetadata({ type: 'doc' }, metadataSchema.parse({ pullRequests: [{ url, state: 'open', additions: 7, deletions: 2 }] }))))
   assert.deepEqual(readIssueMetadata(saved).pullRequests, [{ url, state: 'open', additions: 7, deletions: 2 }])
+})
+
+test('Project choices retain same-name IDs and follow the linked ID across a rename', () => {
+  const first = '40000000-0000-4000-8000-000000000001'
+  const second = '40000000-0000-4000-8000-000000000002'
+  const records = [{ id: first, name: 'Shared name' }, { id: second, name: 'Shared name' }]
+  assert.deepEqual(taskProjectOptions(records, second), [
+    { id: first, label: 'Shared name', description: first, checked: false },
+    { id: second, label: 'Shared name', description: second, checked: true },
+  ])
+  records[1].name = 'Updated name'
+  assert.deepEqual(taskProjectOptions(records, second)[1], { id: second, label: 'Updated name', checked: true, description: undefined })
+  assert.equal(taskProjectOptions(records, null).some(item => item.checked), false)
 })

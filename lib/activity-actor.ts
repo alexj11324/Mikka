@@ -3,8 +3,8 @@ import type { EnterprisePrincipal } from './enterprise/principal'
 
 // Who caused an issue_versions row. Always decided on the server from the
 // verified session, MCP token or job that is running; never read from input.
-export const ACTIVITY_ACTOR_TYPES = ['user', 'agent', 'system'] as const
-export type ActivityActorType = typeof ACTIVITY_ACTOR_TYPES[number]
+export { ACTIVITY_ACTOR_TYPES, type ActivityActorType } from './activity-actor-view'
+import type { ActivityActorType } from './activity-actor-view'
 export type ActivityActor = { actorType: ActivityActorType; actorId: string | null }
 
 export const userActor = (userId: string): ActivityActor => ({ actorType: 'user', actorId: userId })

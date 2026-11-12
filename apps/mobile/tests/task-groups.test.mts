@@ -3,7 +3,7 @@ import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { attemptState, groupOf, groupOfThread, rowState, taskListRows } from '../features/tasks/model/task-groups.ts'
-import { activityEntries, boundary, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
+import { activityEntries, activityEntryId, boundary, conversationReplyRun, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
 
 test('a task\'s current thread decides its group, by R-52\'s judgement', () => {
   assert.equal(groupOfThread('waiting'), 'pending')
@@ -101,6 +101,15 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
 })
 
+test('opening another segment keeps the reply target, and a read-only response has no composer', () => {
+  const run = (runId: string, n: number, stage: 'review' | 'implement' | 'verify') => ({ kind: 'attempt' as const, runId, n, stage, group: 'idle' as const, harness: 'codex', createdAt: '', failed: false })
+  const activity = [run('review', 3, 'review'), run('write', 2, 'implement'), run('verify', 1, 'verify')]
+  assert.equal(conversationReplyRun({ replyRunId: 'write' }, activity), 'write')
+  assert.equal(conversationReplyRun({ replyRunId: null }, activity), null)
+  assert.equal(conversationReplyRun({}, activity), 'write')
+  assert.equal(conversationReplyRun({}, activity.filter(row => row.runId !== 'write')), null)
+})
+
 // Alex 2026-11-09: a task is one conversation; no 「尝试」, no numbering and no switch verb (as Warp): where the Agent changed, the next Agent itself.
 test('runs with the same Agent read as one; where the Agent changed, the divider is the next Agent', () => {
   const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
@@ -180,4 +189,15 @@ test('an Agent brand mark is the package\'s own markup, sized by its caller, wit
   assert.match(file('codex-color.svg'), /fill="#fff"/)
   assert.doesNotMatch(agentMark(file('codex-color.svg')), /fill="#fff"/)
   assert.match(agentMark(file('cursor.svg')), /currentColor/)
+})
+
+test('native task activity interleaves discussion and history facts with runs, once and oldest first', () => {
+  const at = '2026-11-01T09:00:00Z'
+  const later = '2026-11-01T09:01:00Z'
+  const run = { kind: 'attempt' as const, runId: 'a', n: 1, group: 'running' as const, harness: 'Codex', createdAt: later, failed: false }
+  const discussion = { kind: 'reply' as const, id: 'discussion:t:m2', threadId: 't', messageId: 'm2', at, author: 'Alex', authorId: 'u', body: 'Ack', resolved: false }
+  const history = { kind: 'history' as const, id: 'history:created-v1', at, event: { id: 'created-v1', at, kind: 'created' as const } }
+  const activity = [run, { kind: 'created' as const, by: 'Alex', createdAt: at }]
+  assert.deepEqual(activityEntries(activity, [history, discussion]).map(activityEntryId), ['discussion:t:m2', 'history:created-v1', 'run:a'])
+  assert.deepEqual(activityEntries(activity).map(activityEntryId), ['created', 'run:a'])
 })

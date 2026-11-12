@@ -1,6 +1,8 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { once } from 'node:events'
+import { createServer } from 'node:http'
 import test from 'node:test'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
@@ -24,6 +26,69 @@ async function load() {
 async function addUser(pool: { query: (text: string, values?: unknown[]) => Promise<unknown> }, id: string) {
   await pool.query(`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, $1, $2, true, now(), now())`, [id, `${id}@example.com`])
 }
+
+dbTest('avatar object replacement and metadata rollback keep exactly the committed bytes', async t => {
+  const { createRequestDatabaseScope, pool, avatar } = await load()
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const objects = new Map<string, Buffer>()
+  let refuseDelete = false
+  const server = createServer(async (request, response) => {
+    const key = decodeURIComponent(request.url!.slice('/avatar-test/'.length))
+    assert.match(request.headers.authorization ?? '', /AWS4-HMAC-SHA256/)
+    if (request.method === 'PUT') {
+      const chunks = []
+      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      objects.set(key, Buffer.concat(chunks))
+    } else if (request.method === 'DELETE') {
+      if (refuseDelete) { response.writeHead(403).end(); return }
+      objects.delete(key)
+    } else { response.writeHead(objects.has(key) ? 200 : 404).end(objects.get(key)); return }
+    response.end()
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const env = { S3_ENDPOINT: `http://127.0.0.1:${(server.address() as { port: number }).port}`, S3_BUCKET: 'avatar-test', S3_ACCESS_KEY_ID: 'local-avatar', S3_SECRET_ACCESS_KEY: 'local-avatar-test' }
+  const original = Object.fromEntries(Object.keys(env).map(name => [name, process.env[name]]))
+  Object.assign(process.env, env)
+  const owner = `avatar-recovery-${randomUUID()}`
+  t.after(async () => {
+    server.closeAllConnections(); server.close()
+    for (const [name, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+    await scope.run(async () => {
+      await pool.query('delete from account_storage_retirements where "userId"=$1', [owner])
+      await pool.query('delete from "user" where id=$1', [owner])
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await addUser(pool, owner)
+    const first = await avatar.saveAvatar(owner, 'image/png', PNG(1))
+    const [originalKey] = objects.keys()
+    await avatar.saveAvatar(owner, 'image/png', PNG(2))
+    assert.equal(await avatar.saveAvatar(owner, 'image/png', PNG(1)), first)
+    assert.equal(objects.has(originalKey), false, 'reusing an image does not revive a retired key')
+    const hash = first.split('/').at(-1)!
+    const current = (await pool.query('select "storageKey" from user_avatars where "userId"=$1', [owner])).rows[0].storageKey
+    assert.deepEqual((await avatar.readAvatar(owner, hash))?.bytes, PNG(1))
+    const oversize = new Uint8Array(204801)
+    const failedCheck = (error: unknown) => {
+      const cause = (error as { cause?: { code?: string } }).cause
+      return cause?.code === '23514' || (error as { code?: string }).code === '23514'
+    }
+    await assert.rejects(avatar.saveAvatar(owner, 'image/png', oversize), failedCheck)
+    assert.deepEqual([...objects.keys()], [current], 'the failed PG CHECK after PUT removed only its new object')
+    refuseDelete = true
+    await assert.rejects(avatar.saveAvatar(owner, 'image/png', oversize), failedCheck)
+    const pending = await pool.query('select "storageKey" from account_storage_retirements where "userId"=$1', [owner])
+    assert.equal(pending.rowCount, 1, 'failed provider cleanup remains discoverable by account deletion')
+    assert.notEqual(pending.rows[0].storageKey, current)
+    assert.equal(objects.has(pending.rows[0].storageKey), true)
+    assert.deepEqual((await avatar.readAvatar(owner, hash))?.bytes, PNG(1))
+  })
+})
 
 dbTest('devices, shared links, export links and avatars belong to one person', async t => {
   const { createRequestDatabaseScope, pool, sessions, sharedLinks, exportStore, avatar } = await load()
@@ -123,6 +188,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
   const solo = randomUUID(), shared = randomUUID(), carolsTeam = randomUUID(), team = randomUUID()
   const bot = randomUUID(), agent = randomUUID(), device = randomUUID(), run = randomUUID()
   const personalIssue = randomUUID(), teamIssue = randomUUID(), bobIssue = randomUUID()
+  const personalFile = `task-files/${personalIssue}/${randomUUID()}`, teamFile = `task-files/${teamIssue}/${randomUUID()}`
   const group = randomUUID(), dm = randomUUID(), connection = randomUUID(), artifact = randomUUID()
   const soloBot = randomUUID(), soloRun = randomUUID(), coordinator = randomUUID(), coordinatorRun = randomUUID(), liveRun = randomUUID()
   t.after(async () => {
@@ -138,6 +204,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
       await pool.query('delete from conversations where id = any($1::uuid[])', [[group, dm]])
       await pool.query('delete from issue_documents where "issueId" = any($1::uuid[])', [[personalIssue, teamIssue, bobIssue]])
       await pool.query('delete from issues where id = any($1::uuid[])', [[personalIssue, teamIssue, bobIssue]])
+      await pool.query('delete from chat_attachment_retirements where "storageKey" = any($1::text[])', [[personalFile, teamFile]])
       await pool.query('delete from user_facts where "userId" = any($1::text[])', [[alice, bob, carol, dave]])
       for (const table of ['workspace_settings', 'workspace_secrets', 'workspace_e2b_keys', 'hosted_allowances']) await pool.query(`delete from ${table} where "workspaceId" = any($1::uuid[])`, [[solo, shared]])
       await pool.query('delete from "user" where id = any($1::text[])', [[alice, bob, carol, dave]])
@@ -170,6 +237,10 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     const bobHome = await seedFixtureWorkspace(pool, bob)
     const issue = (iid: string, owner: string, scope: string, workspaceId: string) => pool.query(`insert into issues (id, "userId", "workspaceId", title, content, status, priority, scope) values ($1, $2, $4, 'T', '{}'::jsonb, 'todo', 'normal', $3)`, [iid, owner, scope, workspaceId])
     await issue(personalIssue, alice, 'personal', solo); await issue(teamIssue, alice, 'workspace', shared); await issue(bobIssue, bob, 'personal', bobHome)
+    for (const [taskId, key] of [[personalIssue, personalFile], [teamIssue, teamFile]]) {
+      await pool.query(`insert into task_attachments ("taskId", id, name, size, sha256, "storageKey", "userId")
+        values ($1,$2,'sample.bin',1,repeat('0',64),$3,$4)`, [taskId, randomUUID(), key, alice])
+    }
     for (const iid of [personalIssue, teamIssue]) await pool.query(`insert into issue_documents ("issueId", "userId", state) values ($1, $2, 'doc')`, [iid, alice])
     await pool.query(`insert into issue_members ("issueId", "userId", "memberId") values ($1, $2, $3)`, [bobIssue, bob, alice])
     await pool.query(`insert into mikka_team_issues ("issueId", "teamId", "workspaceId", "userId") values ($1, $2, $3, $4)`, [teamIssue, team, shared, alice])
@@ -211,7 +282,13 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from "user" where id = $1', [carol])).rowCount, 1)
     assert.equal((await pool.query('select 1 from user_facts where "userId" = $1', [carol])).rowCount, 1)
 
-    assert.deepEqual(await deletion.deleteAccount(alice, `${alice}@example.com`, { externalCleanup: async () => [] }), { ok: true })
+    const removedFiles: string[] = []
+    assert.deepEqual(await deletion.deleteAccount(alice, `${alice}@example.com`, {
+      externalCleanup: async () => [], deleteObject: async key => { removedFiles.push(key) },
+    }), { ok: true })
+    assert.deepEqual(removedFiles, [personalFile], 'deletion retires the personal task object and preserves the shared task object')
+    assert.deepEqual((await pool.query('select "taskId","storageKey" from task_attachments where "userId"=$1', [alice])).rows,
+      [{ taskId: teamIssue, storageKey: teamFile }])
 
     // Nothing with Alice as its owner is left, in any table (bar the append-only skill ledgers),
     // except her bot in the shared workspace and its threads, which stay for the team.
@@ -221,7 +298,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     const left: string[] = []
     for (const { table, column } of columns) {
       // Team issues of the shared workspace keep their owner column; they stay on purpose.
-      if (['issues', 'issue_documents', 'mikka_team_issues', 'mikka_teams', 'mikka_workspaces'].includes(table)) continue
+      if (['issues', 'issue_documents', 'task_attachments', 'mikka_team_issues', 'mikka_teams', 'mikka_workspaces'].includes(table)) continue
       if (['bots', 'agent_runs', 'agents', 'run_messages', 'artifacts'].includes(table)) continue
       if (['task_identifier_aliases', 'mikka_task_identifier_aliases'].includes(table)) {
         const aliases = (await pool.query(`select distinct "issueId" from "${table}" where "ownerId"=$1`, [alice])).rows

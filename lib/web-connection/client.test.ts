@@ -326,3 +326,80 @@ for (const order of ['before', 'after'] as const) {
     assert.equal(cloud.headers.has('authorization'), false)
   })
 }
+
+test('self-host POST bodies remain replayable over HTTP/1.1, including prepared Requests and multipart uploads', async () => {
+  const forwarded: RequestInit[] = []
+  const f = fixture(fetch => (input, init) => {
+    if (init?.headers && new Headers(init.headers).has('authorization')) forwarded.push(init)
+    return fetch(input, init)
+  })
+  await f.signIn()
+  await f.directory.fetch('/mikka/api/rpc', { method: 'POST', body: '{"action":"desktop.bootstrap"}' })
+  assert.equal(forwarded.at(-1)?.body, '{"action":"desktop.bootstrap"}')
+  const parts = new FormData()
+  parts.append('content', new Blob([new Uint8Array([0, 255, 17])]), 'example.bin')
+  await f.directory.fetch(new Request('https://app.aspectlylabs.com/mikka/api/files', { method: 'POST', body: parts }))
+  assert.ok(forwarded.at(-1)?.body instanceof Blob)
+  const remote = f.calls.at(-1)!
+  assert.equal(remote.credentials, 'omit')
+  assert.equal(remote.redirect, 'error')
+  const file = (await remote.formData()).get('content') as File
+  assert.equal(file.name, 'example.bin')
+  assert.deepEqual([...new Uint8Array(await file.arrayBuffer())], [0, 255, 17])
+})
+
+test('a renewed remote credential survives a late rejection of the previous credential', async () => {
+  const f = fixture()
+  await f.signIn('a')
+  const oldResponse = Promise.withResolvers<Response>()
+  const entered = Promise.withResolvers<void>()
+  const renewed = 'r'.repeat(40)
+  f.respond(request => {
+    if (new URL(request.url).pathname.endsWith('/late')) {
+      entered.resolve()
+      return oldResponse.promise
+    }
+    return new Response(null, { headers: { 'x-mikka-session-token': renewed } })
+  })
+  const late = f.directory.fetch('/mikka/api/late')
+  await entered.promise
+  await f.directory.fetch('/mikka/api/workspace')
+  oldResponse.resolve(new Response(null, { status: 401 }))
+  assert.equal((await late).status, 401)
+  f.respond(() => new Response(null))
+  await f.directory.fetch('/mikka/api/workspace')
+  assert.equal(new URL(f.calls.at(-1)!.url).origin, 'https://a.test')
+  assert.equal(f.calls.at(-1)!.headers.get('authorization'), 'Bearer ' + renewed)
+  assert.equal(JSON.stringify([...f.storage.values]).includes(renewed), false)
+  await f.directory.signOut()
+  assert.equal(f.calls.at(-1)!.url, 'https://a.test/mikka/api/web/revoke')
+  assert.equal(f.calls.at(-1)!.headers.get('authorization'), 'Bearer ' + renewed)
+})
+
+test('a revoked account stays on its installation across reload and cannot write to Cloud until selected', async () => {
+  const f = fixture()
+  await f.signIn('b')
+  await f.signIn('a')
+  f.respond(() => new Response(null, { status: 401 }))
+  assert.equal((await f.directory.fetch('/mikka/api/workspace')).status, 401)
+  assert.equal(f.directory.getActiveAccount(), null)
+  assert.equal(f.directory.getSnapshot().expiredServer, 'https://a.test/mikka')
+  const restored = new WebServerDirectory({ appUrl: f.directory.app.href, fetch: f.fetch, storage: f.storage, sessionStorage: f.sessionStorage })
+  assert.equal(restored.getSnapshot().expiredServer, 'https://a.test/mikka')
+  assert.equal(restored.getServers().find(server => server.active)?.url, 'https://a.test/mikka')
+  const before = f.calls.length
+  const refused = await restored.fetch('/mikka/api/rpc', switching(workspaceA))
+  assert.equal(refused.status, 401)
+  assert.equal(restored.isCurrentResponse(refused), true, 'a settled refusal belongs to this pinned account generation')
+  assert.equal(f.calls.length, before)
+  assert.equal(await restored.readSession(), null)
+  f.respond(() => new Response(null))
+  await restored.switchServer('https://b.test/mikka', 'b')
+  assert.equal(restored.isCurrentResponse(refused), false, 'switching accounts retires the pinned refusal')
+  await restored.fetch('/mikka/api/workspace')
+  assert.equal(new URL(f.calls.at(-1)!.url).origin, 'https://b.test')
+  await restored.switchServer(null)
+  await restored.fetch('/mikka/api/workspace')
+  assert.equal(new URL(f.calls.at(-1)!.url).origin, restored.app.origin)
+  assert.equal(f.calls.at(-1)!.headers.has('authorization'), false)
+})

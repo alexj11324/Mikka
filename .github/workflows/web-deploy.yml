@@ -36,7 +36,10 @@ permissions:
   contents: read
 jobs:
   deploy:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    # Temporary Vercel publication freeze requested on 2026-11-11. Keep the
+    # current production deployment serving while Cloudflare migration proceeds.
+    # Remove the final `&& false` only when publication is explicitly resumed.
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     concurrency:

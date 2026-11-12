@@ -9,7 +9,7 @@ function source(payload?: Record<string, unknown>, onRead?: () => void) {
   return { query: async (sql: string, params: unknown[]) => {
     onRead?.()
     assert.match(sql, /kind='user_message'/)
-    assert.deepEqual(params, [id(4), scope.ownerId, scope.botId])
+    assert.deepEqual(params, [id(4), scope.ownerId, scope.botId, scope.workspaceId])
     return { rows: payload ? [{ payload }] : [], rowCount: payload ? 1 : 0 }
   } } as unknown as Pick<Pool, 'query'>
 }

@@ -230,13 +230,15 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         for (const user of users) if (await directory(group.workspaceId, user.id, [])) visibleUsers.push({ ...user, memberType: 'user' })
         result = { members: [...visibleUsers, ...participants.map(p => ({ ...p, memberType: p.memberType ?? 'agent' }))] }
       } else if (req.resource === 'members' && ['POST', 'DELETE'].includes(req.method)) {
-        if (group.role !== 'owner') return fail(403)
+        if (req.method === 'POST' && group.role !== 'owner') return fail(403)
         const input = parse(member, req.body)
         if (req.method === 'POST') {
           if (!await directory(group.workspaceId, userId, [input])) return fail(404)
           await q(`INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,'member')
             ON CONFLICT ("conversationId","memberType","memberId") DO UPDATE SET "leftAt"=NULL,"joinedAt"=CASE WHEN conversation_members."leftAt" IS NULL THEN conversation_members."joinedAt" ELSE now() END`, [req.id, input.memberType, input.memberId])
         } else {
+          const leavingSelf = input.memberType === 'user' && input.memberId === userId
+          if (group.role !== 'owner' && !leavingSelf) return fail(403)
           // Owner transfer is not part of this API; never strand a group with no owner.
           const { rows } = await q('SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"=$2 AND "memberId"=$3 AND "leftAt" IS NULL', [req.id, input.memberType, input.memberId])
           if (!rows.length) return fail(404)

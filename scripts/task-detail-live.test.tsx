@@ -44,6 +44,7 @@ let readViewerId = owner
 let knownVersions: (string | undefined)[]
 let documentHold: Promise<void> | null = null
 let documentWaits = 0
+let latestDocumentUpdate: string | undefined
 let writes: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0][]
 mock.module(at('app/actions/issues.ts'), { namedExports: {
   pollIssue: async (id: string, known?: string) => {
@@ -66,9 +67,10 @@ mock.module(at('app/actions/issues.ts'), { namedExports: {
   },
 } })
 mock.module(at('app/actions/collaboration.ts'), { namedExports: {
-  exchangeDocument: async (input: { id: string; seed: string; known?: string }) => {
+  exchangeDocument: async (input: { id: string; seed: string; known?: string; update?: string }) => {
     assert.equal(input.id, issueId)
     documentReads++
+    if (input.update) latestDocumentUpdate = input.update
     if (documentHold) { documentWaits++; await documentHold }
     return { ...(!input.known ? { update: input.seed } : {}), version: 'fixture-document', workspaceId }
   },
@@ -82,19 +84,30 @@ for (const [file, names] of [
   ['issue-relations', ['IssueRelations']], ['issue-members', ['IssueMembers']], ['issue-thread-panel', ['IssueThreadPanel']],
   ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']],
 ] as const) mock.module(at(`components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, none])) })
-mock.module(at('components/workspace/issue-detail-actions.tsx'), { namedExports: { IssueDetailActions: ({ onHistory, disabled }: { onHistory: () => void; disabled: boolean }) => <button disabled={disabled} data-history="" onClick={onHistory}>History</button> } })
 const emptyThreads = { data: [] }
 mock.module(at('components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: none, ThreadEventRow: none, useIssueThreads: () => emptyThreads, useAgentActivity: () => ({ rows: [], error: null }) } })
-// The layer-drawn page (task-detail slot) is not under test here; its hooks read actions these mocks leave out.
-mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: { FramedTask: () => null } })
-mock.module(at('components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ actions }: { actions: ReactNode }) => <header>Task{actions}</header> } })
-mock.module(at('components/workspace/issue-detail-properties.tsx'), { namedExports: { IssueDetailProperties: ({ status, priority, task }: { status: string; priority: string; task: IssueView }) =>
-  <output data-properties="" data-revision={task.revision}>{status}:{priority}</output> } })
+// The controller is mounted with a minimal renderer for the official frame contract.
+const { IssueActivityFeed } = await import('../components/workspace/issue-activity-feed')
+mock.module(at('components/workspace/task-detail-frame.tsx'), { namedExports: {
+  FramedTask: (props: import('../components/workspace/task-detail-frame').FramedTaskProps) => {
+    const { rootRef, onKeyDown, preview, locked, status, priority, titleField, onHistory, task } = props
+    return <div ref={rootRef} onKeyDown={onKeyDown} role="region" aria-busy={preview}>
+      <textarea id="task-title" value={titleField.value} readOnly={titleField.readOnly}
+        onChange={event => titleField.onChange(event.currentTarget.value)} onBlur={titleField.onBlur}
+        onCompositionStart={titleField.onCompositionStart} onCompositionEnd={titleField.onCompositionEnd} onKeyDown={titleField.onKeyDown} />
+      <button data-history="" disabled={locked} onClick={onHistory}>History</button>
+      <output data-properties="" data-revision={task.revision}>{status}:{priority}</output>
+      {props.editor(null, () => null)}
+      <section data-activity="">{!preview && <IssueActivityFeed versions={props.versions} children={[]} agents={props.agentActivity.rows} />}</section>
+      {props.panel}{props.dialogs}
+    </div>
+  },
+} })
 mock.module(at('components/workspace/issue-editor.tsx'), { namedExports: {
   // An empty valid Yjs seed keeps the real DocumentSync lifecycle in this test.
   createDocumentSeed: () => new Uint8Array([0, 0]),
-  IssueEditor: ({ content, disabled, onChange, activity, afterDescription }: { content: JSONContent; disabled: boolean; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
-    <><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}<section data-activity="">{activity}</section></>,
+  IssueEditor: ({ content, sharedDoc, disabled, onChange, activity, afterDescription }: { sharedDoc?: import('yjs').Doc; content: JSONContent; disabled: boolean; onChange: (value: JSONContent) => void; activity: ReactNode; afterDescription: ReactNode }) =>
+    <><button data-discussion-write="" disabled={disabled} onClick={() => sharedDoc?.getMap('threads').set('fixture-comment', 'Only a discussion changed')}>Comment</button><textarea data-description="" readOnly={disabled} value={bodyText(content)} onChange={event => onChange(body(event.currentTarget.value))} />{afterDescription}{activity}</>,
 } })
 
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })
@@ -146,7 +159,7 @@ beforeEach(() => {
   notices.clear(); dirty = false
   stored = { id: issueId, userId: owner, title: 'Accepted report', content: body('Original description'), status: 'review', priority: 'normal', revision: 1,
     identifier: 'ALEX-60', metadata: {}, createdAt: new Date('2026-11-05T08:00:00Z'), updatedAt: new Date('2026-11-05T08:00:00Z') } as IssueView
-  versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; flush = null; cache = new Map(); sockets.length = 0
+  versions = [version(stored)]; writes = []; issueReads = 0; versionReads = 0; fullVersionReads = 0; documentReads = 0; knownVersions = []; readFailure = null; readViewerId = owner; readOverride = null; documentHold = null; documentWaits = 0; latestDocumentUpdate = undefined; flush = null; cache = new Map(); sockets.length = 0
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (input, options) => {
@@ -175,12 +188,12 @@ function HydrateFixtureCache() {
   }, [cache, mutate])
   return null
 }
-async function renderDetail(visible: boolean) {
+async function renderDetail(visible: boolean, origin = 'Tasks') {
   // Keep the provider mounted when a task closes: SWR retains both completed
   // and pending reads across a quick reopen, with its default dedupe interval.
   await act(async () => root.render(<SWRConfig value={{ ...(cache instanceof PersistentReadCache ? swrDefaults : {}), provider: () => cache, shouldRetryOnError: false }}>
     {cache instanceof PersistentReadCache && <HydrateFixtureCache />}
-    <LiveProvider ownerId={owner} workspaceId={workspaceId}>{visible && <TaskDetail id={issueId} thread={null} origin="Tasks"
+    <LiveProvider ownerId={owner} workspaceId={workspaceId}>{visible && <TaskDetail id={issueId} thread={null} origin={origin}
       user={{ id: owner, name: 'Owner', email: 'owner@example.invalid' }} navigation={{ index: -1, total: 0, onOpen: noop }}
       onOpen={noop} onSaved={noop} onDirty={recordDirty} onClose={noop} onDeleted={noop} onRegisterFlush={registerFlush} />}</LiveProvider>
   </SWRConfig>))
@@ -394,6 +407,29 @@ for (const refusal of ['workspaceAccessDenied', 'foreign-viewer'] as const) test
   } finally { release() }
 })
 
+test('a comment-only Yjs change flushes without a title or body edit', async () => {
+  await mount()
+  await act(async () => document.querySelector<HTMLButtonElement>('[data-discussion-write]')!.click())
+  await until(() => Boolean(latestDocumentUpdate && Buffer.from(latestDocumentUpdate, 'base64').includes(Buffer.from('Only a discussion changed'))), 'the discussion reached the document writer')
+  assert.equal(writes.length, 0, 'saving a discussion cannot create a task revision')
+})
+
+test('a confirmed read-only grant shows activity without enabling title, body or document writes', async () => {
+  stored = { ...stored, workspaceId, canSteer: false, readOnlyDiscussions: [] }
+  await mount()
+  assert.equal(title().readOnly, true)
+  assert.equal(description().readOnly, true)
+  assert.equal(documentReads, 0)
+  await input(title(), 'Must not save')
+  await act(async () => { assert.equal(await flush!(), true) })
+  assert.equal(writes.length, 0)
+  assert.equal(title().value, stored.title)
+  accepted()
+  await emit()
+  await until(() => properties().textContent === 'done:normal', 'a read grant continues to observe the task')
+  assert.equal(documentReads, 0)
+})
+
 test('a committed acceptance event refreshes the mounted task status and activity without reload', { timeout: 10_000 }, async () => {
   await mount()
   assert.equal(properties().textContent, 'review:normal')
@@ -406,6 +442,37 @@ test('a committed acceptance event refreshes the mounted task status and activit
   assert.equal(properties().getAttribute('data-revision'), '2')
   assert.ok(issueReads > before.issueReads && versionReads > before.versionReads)
   assert.equal(writes.length, 0, 'a committed live read performs no save')
+})
+
+test('every Task entry revalidates the shared saved value and withholds its editor on denial', { timeout: 40_000 }, async () => {
+  await mount()
+  await input(title(), 'Shared title from Tasks')
+  await act(async () => { assert.equal(await flush!(), true) })
+  for (const origin of ['Board', 'Project', 'Team', 'Search', 'Notifications', 'Inbox', 'Coordinator']) {
+    await renderDetail(false)
+    let allowRead!: () => void
+    const pending = new Promise<void>(resolve => { allowRead = resolve })
+    readOverride = async () => { await pending; return structuredClone(stored) }
+    try {
+      await renderDetail(true, origin)
+      await until(() => title()?.value === 'Shared title from Tasks', origin + ' sees the saved Task')
+      assert.ok(title().readOnly, origin + ' cannot write through cached data')
+    } finally { allowRead() }
+    await until(() => title()?.readOnly === false, origin + ' rechecks the current grant')
+    assert.equal(writes.length, 1, origin + ' opening an entry never replays the edit')
+  }
+  readFailure = 'workspaceAccessDenied'
+  await emit()
+  await until(() => container.textContent?.includes('unavailableTitle') === true, 'a revoked grant removes the refreshed editor')
+  assert.equal(flush, null)
+  for (const origin of ['Notifications', 'Project', 'Search']) {
+    await renderDetail(false)
+    await renderDetail(true, origin)
+    await until(() => container.textContent?.includes('unavailableTitle') === true, origin + ' cannot restore a denied edit')
+    assert.equal(title(), null)
+    assert.equal(flush, null)
+  }
+  assert.equal(writes.length, 1)
 })
 
 test('a background transport failure keeps the authorized editor, unsaved text and selection through retry', { timeout: 10_000 }, async () => {

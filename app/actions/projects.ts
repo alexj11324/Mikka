@@ -1,6 +1,6 @@
 'use server'
 import { getTranslations } from 'next-intl/server'
-import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, getTableColumns, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
@@ -215,7 +215,9 @@ export async function listProjectEvents(id: string, workspaceId?: string) {
   if (!reference) throw new ActionFailureError('projectNotFound')
   return withResourceAccess(context.user, reference, 'canReadContent', async () => {
     await readProject(projectDb, context.user, context.workspaceId, id)
-    return projectDb.select().from(projectEvents).where(eq(projectEvents.projectId, id)).orderBy(desc(projectEvents.createdAt)).limit(100)
+    return projectDb.select({ ...getTableColumns(projectEvents), actorName: workspaceMembers.name }).from(projectEvents)
+      .leftJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, context.workspaceId), eq(workspaceMembers.userId, projectEvents.userId), eq(workspaceMembers.status, 'active')))
+      .where(eq(projectEvents.projectId, id)).orderBy(desc(projectEvents.createdAt)).limit(100)
   })
 }
 

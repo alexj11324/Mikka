@@ -1,7 +1,33 @@
 {
+  "ServerStatus": {
+    "title": "Mikka 服务器",
+    "address": "服务器地址",
+    "version": "版本",
+    "web": "打开 Mikka 网页版",
+    "desktop": "下载 Mikka 桌面版",
+    "iosUnavailable": "要连接 iOS 客户端，请先在服务器上配置其登录来源。",
+    "ios": "在 Mikka iOS 客户端的登录页选择此服务器地址。",
+    "create": "创建首个账号",
+    "ready": "就绪",
+    "unavailable": "不可用",
+    "configuration": "配置",
+    "database": "数据库",
+    "authentication": "认证"
+  },
   "MobileTaskSchedule": {
     "daily": "每天 {time}",
     "interval": "每 {minutes} 分钟"
+  },
+  "TaskAttachments": {
+    "title": "附件",
+    "add": "添加文件",
+    "empty": "暂无附件",
+    "remove": "移除 {name}",
+    "failed": "附件修改未保存。",
+    "downloadFailed": "附件下载失败。",
+    "readFailed": "附件加载失败。",
+    "size": "请选择不超过 3 MiB 的非空文件。",
+    "limit": "每个任务最多 10 个文件。"
   },
   "Common": {
     "privacyPolicy": "隐私政策",
@@ -1775,6 +1801,9 @@
       "leadUnset": "未指定",
       "leadNone": "未指定负责人",
       "currentAccount": "当前账号",
+      "directoryUnavailable": "无法读取成员目录",
+      "unavailablePerson": "原成员",
+      "inactivePerson": "{name}（已暂停）",
       "memberCurrentAccount": "当前可访问账号",
       "dependencyCount": "{count} 个依赖"
     },
@@ -2742,7 +2771,8 @@
         "subscription": "模型订阅",
         "native_login": "设备上的模型账户",
         "local_device": "个人设备",
-        "e2b": "个人 E2B 账户"
+        "e2b": "个人 E2B 账户",
+        "cloudflare_sponsored": "Mikka Cloudflare 账户"
       },
       "accountAmounts": {
         "provider_unknown": "由供应商计费/金额未知",
@@ -4334,6 +4364,8 @@
       "costModelSubscription": "模型费用由{owner} {provider} 订阅承担",
       "costModelApiKey": "模型费用由{owner} {provider} API key 承担",
       "costModelLogin": "模型用电脑上已登录的 Agent 账号运行",
+      "sponsoredCloudflare": "Mikka 付费的 Cloudflare 任务机器",
+      "costRuntimeCloudflare": "此任务的 Cloudflare 机器费用由 Mikka 支付",
       "costRuntimeE2b": "云电脑费用由{owner} E2B 账号承担",
       "costRuntimeDevice": "电脑是{owner} {device}",
       "costMikkaFree": "Mikka 不收费",
@@ -4397,7 +4429,8 @@
         "subscription": "订阅",
         "native_login": "本机登录",
         "local_device": "本地电脑",
-        "e2b": "E2B"
+        "e2b": "E2B",
+        "cloudflare_sponsored": "Mikka Cloudflare 账户"
       },
       "amounts": {
         "provider_unknown": "外部费用未知",
@@ -4772,6 +4805,11 @@
       "noneToday": "今天还没有新的建议。"
     },
     "newTaskDialog": {
+      "intent": "创建方式",
+      "backlogTitlePlaceholder": "标题（可选，默认为首行）",
+      "createOnly": "仅创建",
+      "createAndDispatch": "创建并派发",
+      "sponsoredCloud": "Cloudflare 编程机器 · Mikka 付费",
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",
@@ -6745,6 +6783,7 @@
     "moreMany": "{first}、{second} 等 {count, number} 个"
   },
   "HostedTasks": {
+    "loadMore": "加载更多任务",
     "open": "打开任务",
     "status": "状态",
     "factoryStage": "Factory 阶段",
@@ -7072,6 +7111,7 @@
   },
   "CodeReview": {
     "summary": {
+      "fileCount": "{count} 个文件",
       "pr": "PR #{number}",
       "files": "{count} 个文件 +{additions} −{deletions}",
       "failed": "⚠ {count} 项检查失败",
@@ -7172,5 +7212,33 @@
     "content": "内容",
     "readFailed": "{label}加载失败。",
     "refreshFailed": "{label}更新失败，仍显示上次内容。"
+  },
+  "PersonalFiles": {
+    "overviewSub": "个人保存的文件和任务交付的成果。",
+    "folders": "文件夹",
+    "overviewEmpty": "还没有文件。",
+    "createFolder": "新建文件夹",
+    "folderName": "文件夹名称",
+    "folderNameTaken": "已有同名文件夹，请换一个名称。",
+    "create": "创建",
+    "personalFolder": "我的文件 · {name}",
+    "back": "Artifact",
+    "file": "文件",
+    "empty": "文件夹中暂无文件。",
+    "upload": "上传文件",
+    "history": "版本历史",
+    "currentVersion": "当前版本",
+    "version": "版本 {seq} · {count} 个文件 · {date}",
+    "moreVersions": "更多版本",
+    "moreFolders": "更多文件夹",
+    "restore": "恢复版本",
+    "restoreTitle": "恢复此版本？",
+    "replace": "替换文件",
+    "replaceTitle": "替换同名文件？",
+    "conflict": "文件已更新，请查看最新版本后重试。",
+    "tooLarge": "文件过大。",
+    "accessUnavailable": "当前账号已无法访问这些文件。",
+    "saveUnconfirmed": "无法确认修改结果，请刷新文件夹后再试。",
+    "loadError": "无法加载个人文件。"
   }
 }

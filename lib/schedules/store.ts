@@ -17,6 +17,8 @@ export type Schedule = { id: string; owner_id: string; workspace_id: string | nu
 export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
 export const SCHEDULE_LEASE_MS = 5 * 60_000
 const MAX_ATTEMPTS = 3
+// The frozen request key is internal; keep the existing tool-response fields.
+const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,version,next_at,created_at,updated_at'
 
 /** The earliest persisted due time of any schedule work (epoch ms, rounded up from PostgreSQL microseconds), or null. */
 /** Each persisted due time of schedule work, as rows of `at` (no parameters). */
@@ -68,17 +70,17 @@ export class ScheduleStore {
     return this.workspace(actor.ownerId,actor.workspaceId,access=>this.transaction(async tx=>{
       await this.conversation(tx,actor)
       await this.safeMessage(tx,actor.ownerId,cmd)
-      if (cmd.action==='list') return { schedules:(await tx.query<Schedule>(`SELECT * FROM user_schedules WHERE workspace_id IS NOT DISTINCT FROM $1::uuid AND ((visibility='workspace' AND $1::uuid IS NOT NULL) OR (visibility='owner' AND owner_id=$2 AND bot_id IS NOT DISTINCT FROM $3::uuid)) ORDER BY created_at DESC LIMIT 100`,[actor.workspaceId,actor.ownerId,actor.botId])).rows }
+      if (cmd.action==='list') return { schedules:(await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE workspace_id IS NOT DISTINCT FROM $1::uuid AND ((visibility='workspace' AND $1::uuid IS NOT NULL) OR (visibility='owner' AND owner_id=$2 AND bot_id IS NOT DISTINCT FROM $3::uuid)) ORDER BY created_at DESC LIMIT 100`,[actor.workspaceId,actor.ownerId,actor.botId])).rows }
       if (cmd.action==='create') {
         if (!actor.workspaceId) throw new ScheduleError('scheduleWorkspaceRequired',400)
         await this.source(tx,actor,actor.workspaceId)
         const def = definitionSchema.parse(cmd.definition); def.timezone = timezone(def.timezone)
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[JSON.stringify(['schedule',actor.ownerId,actor.botId,cmd.requestId])])
-        const old = (await tx.query<Schedule>('SELECT * FROM user_schedules WHERE owner_id=$1 AND bot_id IS NOT DISTINCT FROM $2::uuid AND request_id=$3',[actor.ownerId,actor.botId,cmd.requestId])).rows[0]
+        const old = (await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE owner_id=$1 AND request_origin=CASE WHEN $2::uuid IS NULL THEN 'coordinator' ELSE 'bot:'||$2::uuid::text END AND request_id=$3`,[actor.ownerId,actor.botId,cmd.requestId])).rows[0]
         if (old) { if (!isDeepStrictEqual(old.request_definition,def) || old.workspace_id!==actor.workspaceId) throw new ScheduleError('scheduleRequestConflict'); return { schedule:old,replayed:true } }
         await this.permission(tx,actor.ownerId,actor.botId,def)
         const next=nextTime(def,this.clock(),true)
-        const {rows}=await tx.query<Schedule>(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,next_at) VALUES($1,$2,$3,$4,'workspace',$5,$6,$7,$7,'active',$8) RETURNING *`,[randomUUID(),actor.ownerId,actor.workspaceId,actor.botId,actor.sourceEventId,cmd.requestId,def,next])
+        const {rows}=await tx.query<Schedule>(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,next_at,request_origin) VALUES($1,$2,$3,$4,'workspace',$5,$6,$7,$7,'active',$8,CASE WHEN $4::uuid IS NULL THEN 'coordinator' ELSE 'bot:'||$4::uuid::text END) RETURNING ${SCHEDULE_COLUMNS}`,[randomUUID(),actor.ownerId,actor.workspaceId,actor.botId,actor.sourceEventId,cmd.requestId,def,next])
         return {schedule:rows[0],replayed:false}
       }
       const row=(await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 AND workspace_id IS NOT DISTINCT FROM $2::uuid FOR UPDATE',[cmd.scheduleId,actor.workspaceId])).rows[0]
@@ -106,7 +108,7 @@ export class ScheduleStore {
       const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
       await this.lockChat(tx,row)
       for(const item of stale.rows){await this.retireEvent(tx,item.event_id);await this.report(tx,row,item,'cancelled',null,'scheduleChanged')}
-      return {schedule:(await tx.query<Schedule>('UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5 WHERE id=$1 RETURNING *',[row.id,def,status,next,this.clock()])).rows[0]}
+      return {schedule:(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock()])).rows[0]}
     }))
   }
   async materialize(limit=50){return this.transaction(async tx=>{

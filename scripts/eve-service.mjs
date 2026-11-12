@@ -26,6 +26,11 @@ export async function startEveService({ root = process.cwd(), env = process.env,
     EVE_PUBLIC_ROUTE_PREFIX: '',
     WORKFLOW_TARGET_WORLD: 'local',
     WORKFLOW_LOCAL_DATA_DIR: env.MIKKA_EVE_DATA_DIR ?? join(env.MIKKA_DATA_DIR ?? join(root, '.cache'), 'eve-workflow') }
+  // This peer has its own HTTP loopback listener. The installation's public
+  // TLS certificate, key and optional socket belong only to the outer listener.
+  delete childEnv.NITRO_SSL_CERT
+  delete childEnv.NITRO_SSL_KEY
+  delete childEnv.NITRO_UNIX_SOCKET
   // eve's local World deliberately uses cwd/.eve/.workflow-data rather than
   // WORKFLOW_LOCAL_DATA_DIR. Bind that documented mount to persistent storage.
   await mkdir(childEnv.WORKFLOW_LOCAL_DATA_DIR, { recursive: true, mode: 0o700 })

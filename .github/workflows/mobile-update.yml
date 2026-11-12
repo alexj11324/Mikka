@@ -6,9 +6,7 @@ name: Mobile OTA update
 # can be opened in a preview build. Production reads the existing Expo token
 # from Infisical using the trusted main workload's OIDC identity. PR previews
 # retain their existing repository-secret delivery; forks cannot publish.
-# Production bundles the private UI layer's mobile/ folder when the existing
-# read key can check it out (docs/ui-overlay.md, 「iOS app」); without it, the
-# app's default slots ship.
+# Production requires the official mobile UI checkout before publishing.
 on:
   push:
     branches: [main]
@@ -64,7 +62,6 @@ jobs:
           include-imports: false
       - name: Read the private UI checkout credential through OIDC
         if: env.EXPO_TOKEN != ''
-        continue-on-error: true
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
@@ -89,12 +86,9 @@ jobs:
         if: env.EXPO_TOKEN != ''
         run: |
           echo "HOSTED_UI_READ_KEY=" >> "$GITHUB_ENV"
-          if [ -d .hosted-ui/mobile ]; then
-            echo "MIKKA_MOBILE_OVERLAY_DIR=.hosted-ui/mobile" >> "$GITHUB_ENV"
-            echo "::notice::Bundling the private UI layer at $(git -C .hosted-ui rev-parse HEAD)."
-          else
-            echo "::notice::No private mobile layer; the default slots ship."
-          fi
+          test -d .hosted-ui/mobile || { echo "::error::Official mobile UI checkout required."; exit 1; }
+          echo "MIKKA_MOBILE_OVERLAY_DIR=.hosted-ui/mobile" >> "$GITHUB_ENV"
+          echo "::notice::Bundling the private UI layer at $(git -C .hosted-ui rev-parse HEAD)."
       - name: Publish to production
         if: env.EXPO_TOKEN != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         working-directory: apps/mobile

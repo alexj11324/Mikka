@@ -10,7 +10,7 @@ export const cloudAuthClient = createAuthClient({ basePath: withBasePath('/api/a
 
 async function getServerSession(...args: Parameters<typeof cloudAuthClient.getSession>) {
   const servers = currentWebServers()
-  if (!servers?.getActiveAccount()) return cloudAuthClient.getSession(...args)
+  if (!servers || (!servers.getActiveAccount() && !servers.getSnapshot().expiredServer)) return cloudAuthClient.getSession(...args)
   try { return { data: await servers.readSession(), error: null } }
   catch (cause) { return { data: null, error: { code: 'web_connection_session_unavailable', message: 'web_connection_session_unavailable', status: 503, statusText: 'Service Unavailable', cause } } }
 }
@@ -22,12 +22,12 @@ function useServerSession(...args: Parameters<typeof cloudAuthClient.useSession>
   }, [cloud.data?.user.id])
   // This is an application projection only. Never fabricate or write a remote
   // credential into Better Auth's official-cloud cookie/session atom.
-  return remote.account ? { ...cloud, data: remote.account, error: null, isPending: false, isRefetching: false,
+  return remote.account || remote.expiredServer ? { ...cloud, data: remote.account, error: null, isPending: false, isRefetching: false,
     refetch: () => getServerSession() } : cloud
 }
 async function signOutServer(...args: Parameters<typeof cloudAuthClient.signOut>) {
   const servers = currentWebServers()
-  if (!servers?.getActiveAccount()) {
+  if (!servers || (!servers.getActiveAccount() && !servers.getSnapshot().expiredServer)) {
     // A handoff already in flight must not sign back in after a cloud logout.
     await servers?.switchServer(null)
     return cloudAuthClient.signOut(...args)

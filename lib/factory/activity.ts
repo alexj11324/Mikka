@@ -1,3 +1,4 @@
+import { taskFactoryEvents } from '../task-factory-events'
 import type { Pool, PoolClient } from 'pg'
 import { actingContext } from '../activity-actor'
 import { readFactoryComputerSessions } from '../cloud-computer/thread-machine-sessions'
@@ -27,7 +28,7 @@ interface AttemptRow extends FactoryAttemptViewSource {
 }
 interface TransitionRow extends FactoryAttemptTransitionSource {
   id: string; createdAt: Instant; stage: FactoryTask['stage'] | null; status: FactoryTask['status'] | null
-  revision: number | null; taskId: string | null
+  revision: number | null; taskId: string | null; receiptCandidateId: string | null
 }
 export interface FactoryActivityWait {
   id: string; kind: FactoryNeedsYou['kind']; attemptId: string | null; runId: string | null
@@ -152,7 +153,7 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
       e.request->>'kind' AS kind,e.result->'task'->>'attemptId' AS "attemptId",e.request->'binding'->>'attemptId' AS "previousAttemptId",
       e.result->'task'->>'stage' AS stage,e.result->'task'->>'status' AS status,
       CASE WHEN jsonb_typeof(e.result->'task'->'revision')='number' THEN (e.result->'task'->>'revision')::integer END AS revision,
-      e.result->'task'->>'id' AS "taskId"
+      e.result->'task'->>'id' AS "taskId",e.result->'task'->>'candidateId' AS "receiptCandidateId"
     FROM factory_events e WHERE e."taskId"=$1 AND e.result->'task'->>'id'=$1::text
     ORDER BY e."createdAt",revision,e."eventId"`, [task.id])
   const presentation = projectFactoryAttempts(attempts, events)
@@ -172,10 +173,10 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
   const documents = (await readFactoryActivityDocuments(tx, task)).filter(document => !hiddenRuns.has(document.runId))
   const { rows: publications } = await tx.query<{ runId: string; attemptId: string; candidateId: string | null; url: string; title: string | null; state: string | null; createdAt: Instant }>(
     `SELECT r.id AS "runId",attempt.id AS "attemptId",attempt."candidateId",p."pullRequest"->>'url' AS url,
-      left(p."pullRequest"->>'title',200) AS title,p."pullRequest"->>'state' AS state,p."createdAt"
+      left(p."pullRequest"->>'title',200) AS title,p."pullRequest"->>'state' AS state,p."updatedAt" AS "createdAt"
     FROM factory_attempts attempt JOIN agent_runs r ON r.id=attempt."runId" AND r."userId"=$2 AND r."issueId"=$3
     JOIN run_publications p ON p."runId"=r.id AND p."userId"=$2 AND p."issueId"=$3
-    WHERE attempt."taskId"=$1 AND p.status='published' AND p."pullRequest" IS NOT NULL ORDER BY p."createdAt",r.id`,
+    WHERE attempt."taskId"=$1 AND p.status='published' AND p."pullRequest" IS NOT NULL ORDER BY p."updatedAt",r.id`,
     [task.id, task.userId, task.issueId])
   const attemptsByRun = new Map(attempts.filter(attempt => attempt.runId).map(attempt => [attempt.runId!,attempt.id]))
   const artifacts = [
@@ -235,6 +236,7 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     task: { ...taskFlow, status: task.status, createdAt: iso(times.createdAt), startedAt: starts[0] ?? null,
       endedAt, endedAtSource: endedAt ? endedAtSource : null },
     timeline: { attempts: timelineAttempts, computers, waits }, agents, artifacts,
+    events: taskFactoryEvents(task.id, events, attempts, artifacts),
   }
 }
 
