@@ -2,6 +2,7 @@
 
 import { effectiveRequestWorkspace } from '@/lib/request-workspace'
 import { nextTaskListCursor, taskListPageInput, TASK_LIST_PAGE_SIZE, type TaskListPageInput } from '@/lib/task-list-page'
+import { dispatchedByBot } from '@/lib/task-dispatches'
 import { singleFlight } from '@/lib/single-flight'
 
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
@@ -162,9 +163,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // Restore that known ID in the DTO instead of transferring it per row.
   // Membership survives a later Run by a different Bot. Ask only about
   // the reader's own authorized dispatch history in this exact workspace.
-  const dispatched = dispatchedBy ? sql`exists (select 1 from agent_runs r join bots b on b.id=r."botId"
-    and b."ownerId"=${userId} and b."workspaceId"=${context.workspace.id}
-    where r."userId"=${userId} and r."workspaceId"=${context.workspace.id} and r."issueId"=${issues.id} and r.source is distinct from 'mcp' and b.id=${dispatchedBy})` : undefined
+  const dispatched = dispatchedBy ? dispatchedByBot(userId, context.workspace.id, dispatchedBy) : undefined
   let continuation
   if (after) {
     // JavaScript timestamps carry milliseconds; PostgreSQL orders the exact

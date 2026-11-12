@@ -3,6 +3,7 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import * as live from '@/hooks/use-live-key'
 import * as groupMessages from '@/lib/group-messages'
 import type { GroupMessage, GroupMessagePage } from '@/lib/group-messages'
 import { ViewStateProvider, useViewState } from '@/lib/hooks/view-state'
@@ -27,7 +28,7 @@ mock.module('sonner', { namedExports: { toast: {
   error: (message: string, options?: { id?: string; action?: { label: string; onClick: (event: Event) => void } }) => { notices.set(options?.id ?? message, { message, action: options?.action }) },
   dismiss: (id: string) => { notices.delete(id) },
 } } })
-mock.module('@/hooks/use-live-key', { namedExports: { useLiveKey: nothing } })
+mock.module('@/hooks/use-live-key', { namedExports: { ...live, useLiveKey: nothing } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => translate } })
 mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
 mock.module('@/app/actions/link-preview', { namedExports: { getLinkPreview: async () => null } })

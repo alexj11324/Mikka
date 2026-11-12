@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
+import { readTaskDispatches } from '@/lib/task-dispatches'
 import { teamIssues } from '@/lib/db/team-schema'
 import { readFactoryFlowStates } from '@/lib/factory/public-flow'
 import { factoryEvidenceFolderCounts } from '@/lib/factory/evidence-folder-index'
@@ -93,6 +94,16 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         const visible = tasks.filter(readable)
         if (!visible.length) return {}
         const ids = visible.map(task => task.id)
+        const dispatchByIssue = new Map<string, NonNullable<TaskPresentation['botDispatches']>>()
+        if (parsed.includeBotDispatches) {
+          const dispatches = await readTaskDispatches(reader.id, workspaceId, ids)
+          for (const { issueId, ...dispatch } of dispatches) {
+            if (!issueId) continue
+            const bots = dispatchByIssue.get(issueId)
+            if (bots) bots.push(dispatch)
+            else dispatchByIssue.set(issueId, [dispatch])
+          }
+        }
         const byId = new Map(visible.map(task => [task.id, task]))
         const status = new Map(rows.filter(readable).map(task => [task.id, task.status]))
         const identifiers = new Map(rows.filter(readable).map(task => [task.id, task.identifier]))
@@ -122,6 +133,7 @@ async function readPresentationBatch(user: Reader, input: TaskPresentationsInput
         }, runByIssue.get(task.id), flowByIssue.get(task.id) ?? null,
         id => !['done', 'canceled', 'duplicate'].includes(status.get(id) ?? 'todo'),
         { schedule: task.schedule, blockerIdentifier: id => identifiers.get(id) ?? null }),
+        ...(parsed.includeBotDispatches ? { botDispatches: dispatchByIssue.get(task.id) ?? [] } : {}),
         ...((parsed.includeFactoryIdentity || counts) && factoryByIssue.has(task.id) ? { factoryTaskId: factoryByIssue.get(task.id) } : {}),
         ...(counts?.has(factoryByIssue.get(task.id) ?? '') ? { factoryExtraCount: counts.get(factoryByIssue.get(task.id)!) } : {}) }]))
       })

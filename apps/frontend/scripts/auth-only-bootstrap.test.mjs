@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
+import { applicationPlugin } from './application-plugin.mjs'
 import { Window } from 'happy-dom'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -48,6 +49,7 @@ const fixtureModules = new Map([
   ['@/lib/auth-client', `export const authClient = { $store: { atoms: { session: { subscribe: listener => ${stateAccess}.subscribe(listener) } } } }; export const cloudAuthClient = authClient;`],
   ['@/lib/swr/persistent-cache', `export const clearPersistentReadCaches = async () => { ${stateAccess}.cacheClears++; };`],
 ])
+const application = await applicationPlugin('web')
 const compiled = await build({
   absWorkingDir: repository,
   stdin: { contents: 'export { App } from "./app"; export { navigate, installNavigation, refresh } from "./location"; export { getClientConfiguration } from "./client-configuration"; export { getTransportState } from "./transport-state";', resolveDir: renderer, sourcefile: 'auth-only-contract.ts', loader: 'ts' },
@@ -56,6 +58,9 @@ const compiled = await build({
   define: { 'process.env.NODE_ENV': '"test"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}' },
   plugins: [{ name: 'auth-only-public-boundaries', setup(builder) {
     builder.onResolve({ filter: /^(?:react(?:\/.*)?|swr)$/ }, args => ({ path: require.resolve(args.path), external: true }))
+    // Use the same client-side RPC modules as a production Web build.
+    builder.onResolve({ filter: /^@\/app\/actions\/[\w-]+$/ }, async args => ({ path: await application.resolveId(args.path), namespace: 'web-action' }))
+    builder.onLoad({ filter: /.*/, namespace: 'web-action' }, async args => ({ contents: await application.load(args.path), resolveDir: repository }))
     builder.onResolve({ filter: /^mikka:platform$/ }, () => ({ path: resolve(web, 'platform.tsx') }))
     builder.onResolve({ filter: /.*/ }, args => fixtureModules.has(args.path) ? { path: args.path, namespace: 'auth-fixture' } : undefined)
     builder.onResolve({ filter: /^(?:\.\/|\.\.\/).*rpc$/ }, args => {
