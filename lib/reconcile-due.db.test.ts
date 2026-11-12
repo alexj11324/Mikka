@@ -14,7 +14,7 @@ const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL &
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Reconcile tests require matching isolated loopback _e2e URLs')
 
 const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'agent_runs', 'devices', 'cloud_machines',
-  'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
+  'thread_machines', 'coding_review_sessions', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
   'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'chat_attachments', 'chat_attachment_retirements',
   'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox', 'mobile_push_receipts', 'coding_workspace_requests', 'coding_workspace_mentions']
 
@@ -63,6 +63,21 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await insert(`now()-interval '1 second'`)
     assert.deepEqual(await due(), { ...none, schedules: true })
     await clear()
+  })
+
+  await t.test('a lost review close wakes only recovery even with Factory disabled', async () => {
+    const id = randomUUID()
+    const withoutFactory = () => reconcileDue(pool, { factoryLifecycle: false, workspace: pool })
+    await pool.query(`INSERT INTO coding_review_sessions
+      (id,kind,"taskId","runId","ownerId","workspaceId","deviceId","repoId","deviceTokenId","bindingId","sandboxId",
+       "machineEpoch","machineOperationId","credentialKind","credentialId","expiresAt")
+      VALUES ($1,'terminal',$1,$1,'owner',$1,$1,$1,$1,$2,'fixture',0,$1,'session','credential',now()+interval '4 minutes')`,
+    [id, 'a'.repeat(64)])
+    assert.deepEqual(await withoutFactory(), none)
+    await pool.query(`UPDATE coding_review_sessions SET "revokedAt"=now(),reason='run_control',"retryAt"=now() WHERE id=$1`, [id])
+    assert.deepEqual(await withoutFactory(), { ...none, recovery: true })
+    await clear()
+    assert.deepEqual(await withoutFactory(), none)
   })
 
   await t.test('run recovery is due for an expired lease, not for a live one', async () => {
