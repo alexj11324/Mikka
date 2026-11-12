@@ -1,7 +1,8 @@
 /** A single user's logical send has one row in this group, even when the acknowledgement is lost. */
-export async function groupSubmissionMessageId(ownerId: string, groupId: string, requestId: string) {
+export async function groupSubmissionMessageId(ownerId: string, groupId: string, requestId: string,
+  hash: (identity: Uint8Array<ArrayBuffer>) => Promise<ArrayBuffer> = identity => crypto.subtle.digest('SHA-256', identity)) {
   const identity = new TextEncoder().encode(JSON.stringify(['group-message', ownerId, groupId, requestId]))
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', identity)).slice(0, 16)
+  const digest = new Uint8Array(await hash(identity)).slice(0, 16)
   digest[6] = (digest[6] & 15) | 128
   digest[8] = (digest[8] & 63) | 128
   const hex = Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('')

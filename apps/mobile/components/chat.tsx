@@ -12,6 +12,7 @@ import { ENTER, SNAP_BACK } from '@/lib/springs'
 import { StatusIcon } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
+import { mobileMessages } from '@/lib/messages'
 import { press, tap } from '@/lib/haptics'
 import { splitQuoted } from '@/lib/quote'
 import { apiConnection, authHeaders } from '@/lib/api'
@@ -86,9 +87,9 @@ export function useChatPhotos(): (messageId: string | undefined, count: number |
  * A pending message keeps its words and its retry action. Missing receipts say
  * 未确认; only a known server refusal says 未发送.
  */
-export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRetry }: { text: string; photos?: string[]; failed: boolean; unconfirmed?: boolean; onRetry: () => void }) {
+export function OutgoingBubble({ text, photos, failed, unconfirmed = false, error, onRetry }: { text: string; photos?: string[]; failed: boolean; unconfirmed?: boolean; error?: string; onRetry: () => void }) {
   return (
-    <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityHint={failed ? '重试' : undefined} disabled={!failed} onPress={onRetry} style={styles.outgoing}>
+    <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityHint={failed ? mobileMessages.Common.retry : undefined} disabled={!failed} onPress={onRetry} style={styles.outgoing}>
       <View style={[{ alignItems: 'flex-end', gap: 4 }, !failed && { opacity: 0.6 }]}>
         {photos?.length ? <ChatImages images={photos.map(uri => ({ uri }))} align="right" /> : null}
         {text ? (
@@ -100,7 +101,7 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
       {failed ? (
         <View style={styles.retryRow}>
           <CircleAlert size={14} color={colors.danger} strokeWidth={2.2} />
-          <Text style={styles.retry}>{unconfirmed ? '发送未确认 · 重试' : '未发送 · 重试'}</Text>
+          <Text style={styles.retry}>{`${unconfirmed ? mobileMessages.Coordinator.sendUncertain : error ?? mobileMessages.GroupChat.notSent} · ${mobileMessages.Common.retry}`}</Text>
         </View>
       ) : null}
     </Pressable>
