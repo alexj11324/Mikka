@@ -1,11 +1,11 @@
-import { Circle, CircleDashed, CircleDot, CircleCheck, CircleX, CircleSlash2, CircleGauge, CircleAlert, SignalHigh, SignalMedium, SignalLow, type LucideIcon, type LucideProps } from 'lucide-react'
+import { Circle, CircleDashed, CircleDot, CircleCheck, CircleX, CircleSlash2, CircleGauge, CircleAlert, SignalHigh, SignalMedium, SignalLow, type LucideIcon } from 'lucide-react'
 
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES, type IssuePriority, type IssueStatus } from '@/lib/issue-meta'
 import { statusTone } from '@/lib/status-appearance'
 
 type Option = { label: string; icon: LucideIcon }
 type StatusOption = Option & { indicatorClassName: string; surfaceClassName: string; borderClassName: string }
-type PriorityOption = Option & { iconProps: Pick<LucideProps, 'strokeWidth' | 'viewBox'> }
+type PriorityOption = Option & { iconProps: { strokeWidth: number; viewBox?: string } }
 
 const statusOptions = {
   backlog: { label: 'Backlog', icon: CircleDashed, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
