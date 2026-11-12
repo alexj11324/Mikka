@@ -44,13 +44,10 @@ passes, download the `self-hosted-upgrade-<tag>` artifact and open both JSON fil
   release body and rejected an invalid signature. Its transport field states
   how the message reached the test receiver.
 
-The first stable drill uses the migration inventory published by main commit
-`c0774a3764f72110b3f3c64fc35e155f18bddac0`. Its Linux/amd64 baseline is
-`ghcr.io/alexj11324/mikka@sha256:64331979e56acc1b5a05271ab2e99e2e8641160065fc81320f6e37edfaf657ab`.
-Its [image job](https://github.com/alexj11324/Mikka/actions/runs/43132363699/job/130899790146)
-exercised both database configurations and restarted the persisted installation
-before publishing that digest. Use the release's own receipt to identify the
-previous images actually selected for each recovery case.
+If a concurrent main merge adds a migration while the promotion PR is open,
+wait for an accepted SHA image with the new inventory. Check that image by
+digest before merging the promotion. The `baseline` fields in `upgrade.json`
+identify the images actually used for rollback and forward recovery.
 
 The [first stable delivery record](https://github.com/alexj11324/Mikka/issues/1963)
 tracks the immutable release and the original upgrade and recovery receipts.

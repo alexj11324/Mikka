@@ -5,6 +5,16 @@ import { APPLICATION_BASELINE, ARTIFACT_COMPATIBILITY, orderMigrations, alreadyA
 import { planMigration } from './migration-steps.mjs'
 import { createHash } from 'node:crypto'
 
+test('the service identity ledger distinguishes other migrations at the original timestamp', () => {
+  const name = '20261112030508_workspace_service_identities.sql'
+  const original = '20261112030505_workspace_service_identities.sql'
+  const sql = readFileSync(new URL('../drizzle/' + name, import.meta.url), 'utf8')
+  for (const other of ['20261112030505_scope_personal_drive_names_by_workspace.sql', '20261112030505_task_creation_receipts.sql'])
+    assert.equal(alreadyApplied(name, new Set([other]), sql), false)
+  assert.equal(alreadyApplied(name, new Set([original]), sql), true)
+  assert.throws(() => alreadyApplied(name, new Set([original]), sql + ' '), /content changed/)
+})
+
 test('only the explicit baseline precedes legacy migrations, without changing their IDs', () => {
   const names = ['20261024000000_future.sql', '0004_b.sql', APPLICATION_BASELINE, '0001_a.sql', '0004_a.sql']
   assert.deepEqual(orderMigrations(names), [APPLICATION_BASELINE, '0001_a.sql', '0004_a.sql', '0004_b.sql', '20261024000000_future.sql'])

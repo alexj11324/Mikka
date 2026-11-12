@@ -39,6 +39,10 @@ export const AUDIT_ACTIONS = {
   'env.updated': 'secret',
   'env.deleted': 'secret',
   // 安全
+  'service_identity.created': 'security',
+  'service_identity.renamed': 'security',
+  'service_identity.disabled': 'security',
+  'service_identity.restored': 'security',
   'token.created': 'security',
   'token.revoked': 'security',
   'token.rotated': 'security',
@@ -108,6 +112,10 @@ export const AUDIT_METADATA = {
   'env.created': z.object({ scope }).partial().strict(),
   'env.updated': z.object({ scope }).partial().strict(),
   'env.deleted': z.object({ scope }).partial().strict(),
+  'service_identity.created': none,
+  'service_identity.renamed': none,
+  'service_identity.disabled': none,
+  'service_identity.restored': none,
   'token.created': z.object({
     tokenName: label,
     expiresAt: z.string().datetime({ offset: true }).nullable(),
