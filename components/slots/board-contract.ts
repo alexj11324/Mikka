@@ -108,7 +108,8 @@ export type BoardScreenProps = {
   onNew: () => void
   onOpen: (id: string) => void
   /** A card dropped into another column; Mikka saves the status or 受阻. */
-  onMove: (id: string, column: BoardScreenColumn['id']) => void
+  /** True after the server has acknowledged the move. Older bindings return no receipt. */
+  onMove: (id: string, column: BoardScreenColumn['id']) => Promise<boolean> | void
   /** Mikka's context menu around a card or row; render the result in the card's place. */
   wrapCard: (id: string, card: ReactNode) => ReactNode
 }

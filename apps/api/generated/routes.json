@@ -2365,7 +2365,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "3c1f1fbb02dbc04def1a5fca54e85e7c35a70c5ee1c0dea01b4a84f1a21d2ae9"
+      "sourceHash": "821f48f81a3d9ffc3f4276effda50c4df6c2dc98ed5e770d32e0c1b500985838"
     },
     {
       "path": "/mikka/api/test-environment",

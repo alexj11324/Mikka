@@ -93,6 +93,6 @@ export function BoardScreenView({ issues, columns: visible, hidden, blocks, newe
 
   return <>
     <p role="status" aria-live="polite" className="sr-only">{saves.message}</p>
-    <BoardScreen {...screen} columns={columns} cards={cards} onOpen={onOpen} wrapCard={wrapCard} onMove={(id, column) => { if (column !== 'hidden') saves.moveTo(id, column) }} />
+    <BoardScreen {...screen} columns={columns} cards={cards} onOpen={onOpen} wrapCard={wrapCard} onMove={(id, column) => column === 'hidden' ? undefined : saves.moveTo(id, column)} />
   </>
 }

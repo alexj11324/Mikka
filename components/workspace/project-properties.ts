@@ -23,7 +23,17 @@ export const PROJECT_HEALTH = [
 export type ProjectControlField = 'status' | 'priority' | 'lead' | 'members' | 'startDate' | 'targetDate' | 'labels' | 'dependencyIds' | 'health'
 
 import type { listProjects } from '@/app/actions/projects'
-export type Project = Awaited<ReturnType<typeof listProjects>>[number]
+type ProjectListRow = Awaited<ReturnType<typeof listProjects>>[number]
+export type Project = Omit<ProjectListRow, 'taskCounts'> & Partial<Pick<ProjectListRow, 'taskCounts'>>
+export type ProjectTaskPaging = { hasMore: boolean; loading: boolean; failed: boolean; loadMore: () => Promise<void> }
+
+/** Older servers have no summary. Only display a percentage if every linked Task is present. */
+export function projectTaskCounts(project: Project, tasks: readonly { id: string; status: string }[]) {
+  if (project.taskCounts) return project.taskCounts
+  const ids = new Set(project.issueIds)
+  const linked = tasks.filter(task => ids.has(task.id))
+  return linked.length === ids.size ? { total: linked.length, done: linked.filter(task => task.status === 'done').length } : null
+}
 export const PROJECT_STATUSES = [
   { value: 'backlog', icon: CircleDashed },
   { value: 'planned', icon: Circle },
