@@ -65,16 +65,23 @@ export async function prepareRelease(input, outputDirectory) {
   }
 }
 
-export function gatewayConfig({ current, retained }) {
+export function gatewayConfig({ current, retained, githubWebhook }) {
   if (!Array.isArray(retained) || !retained.includes(current) || new Set(retained).size !== retained.length
       || retained.some(id => !isValidDeploymentId(id) || id !== id.toLowerCase() || !serviceName.test(nameForRelease(id)))) {
     throw new Error('WEB_RELEASE_RETENTION_INVALID')
   }
+  const gateway = 'mikka-app-gateway'
+  if (githubWebhook !== undefined && (typeof githubWebhook !== 'string' || !serviceName.test(githubWebhook)
+      || githubWebhook === gateway || retained.some(id => githubWebhook === nameForRelease(id)))) {
+    throw new Error('WEB_GITHUB_WEBHOOK_SERVICE_INVALID')
+  }
   const bindings = retained.map((id, index) => [id, `RELEASE_${index}`])
+  const services = bindings.map(([id, binding]) => ({ binding, service: nameForRelease(id) }))
+  if (githubWebhook !== undefined) services.push({ binding: 'GITHUB_WEBHOOK', service: githubWebhook })
   return {
-    ...common, name: 'mikka-app-gateway', main: resolve(here, 'gateway.mjs'),
+    ...common, name: gateway, main: resolve(here, 'gateway.mjs'),
     vars: { CURRENT_RELEASE: current, RELEASES: Object.fromEntries(bindings) },
-    services: bindings.map(([id, binding]) => ({ binding, service: nameForRelease(id) })),
+    services,
   }
 }
 
