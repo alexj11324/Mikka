@@ -13,7 +13,7 @@ test('Desktop platform caches warm on changed main install inputs without duplic
   assert.deepEqual(warmer.on.push.branches, ['main'])
   assert(!warmer.on.pull_request)
   for (const path of ['pnpm-lock.yaml', 'pnpm-workspace.yaml', '**/package.json', '.github/actions/pnpm-install/**', 'scripts/ci/dependency-cache.mjs']) assert(warmer.on.push.paths.includes(path), path)
-  assert.deepEqual(warmer.jobs['desktop-dependencies'].strategy.matrix.os, ['ubuntu-latest', 'macos-26'])
+  assert.equal(warmer.jobs['desktop-dependencies']['runs-on'], 'ubuntu-latest')
   assert.deepEqual(warmer.permissions, { contents: 'read' })
   const setup = warmer.jobs['desktop-dependencies'].steps.find(step => step.uses === './.github/actions/pnpm-install')
   assert.deepEqual(setup.with, { profile: 'desktop', 'skip-electron': 'true' })
@@ -53,24 +53,23 @@ test('the analytics gate accepts a reused decision but rejects failed, cancelled
   }
 })
 
-test('macOS acceptance starts independently and retains icon, package, crypto and functional checks', () => {
-  const desktop = workflow('desktop'), native = desktop.jobs['native-arm64']
-  assert.deepEqual(native.needs, ['changes'])
-  assert(!desktop.jobs.icon, 'icon preflight shares the native runner')
+test('Desktop keeps Linux checks and acceptance without allocating Mac acceptance runners', () => {
+  const desktop = workflow('desktop')
+  assert.equal(desktop.jobs['native-arm64'], undefined)
+  assert.equal(workflow('cloud-computer').jobs['local-driver-macos'], undefined)
+  assert.deepEqual(Object.keys(workflow('local-device-node22').jobs), ['node22-unit'])
   // Assert the purpose — one reusable dependency installation whose credential
   // handling main's pinned-pnpm boundary can audit — not the mechanism. A
   // desktop job may reach that through the shared composite action or through a
   // literal install step, so long as exactly one step installs and no job hands
   // dependency caching to setup-node (which uploads per-PR caches).
-  for (const name of ['checks', 'smoke', 'native-arm64']) {
+  for (const name of ['checks', 'smoke']) {
     const job = desktop.jobs[name]
     const shared = job.steps.filter(step => step.uses === './.github/actions/pnpm-install')
     const literal = job.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')
     assert.equal(shared.length + literal.length, 1, `${name}: exactly one dependency installation`)
     assert(!job.steps.some(step => step.with?.cache === 'pnpm'), `${name}: PRs must not upload setup-node caches`)
   }
-  const commands = native.steps.map(step => step.run || '').join('\n')
-  for (const required of ['actool', 'pnpm build:app', 'package-dev.mjs --acceptance', 'native-crypto.mjs', 'bundled-smoke parity lifecycle', 'native-evidence.mjs']) assert(commands.includes(required), required)
   assert(desktop.jobs.smoke.steps.some(step => step.run?.includes('test:desktop-auth')))
 })
 
@@ -97,7 +96,7 @@ test('installed cache writes are main-only and a miss installs; hits do not inst
   // lives there rather than on the composite's install step: main's credential
   // boundary requires that step's env to carry FFMPEG_GITHUB_TOKEN alone.
   const desktop = workflow('desktop')
-  const desktopInstalls = ['checks', 'smoke', 'native-arm64'].map(name => desktop.jobs[name].steps.find(step => step.run === 'pnpm install --frozen-lockfile'))
+  const desktopInstalls = ['checks', 'smoke'].map(name => desktop.jobs[name].steps.find(step => step.run === 'pnpm install --frozen-lockfile'))
   assert(desktopInstalls.every(Boolean), 'every desktop job installs dependencies')
   const fingerprint = action.runs.steps.find(step => step.id === 'modules-key')
   for (const [optIn, inherited, expected] of [['true', '', '1'], ['false', '1', '1'], ['false', undefined, '']]) {
@@ -105,9 +104,8 @@ test('installed cache writes are main-only and a miss installs; hits do not inst
     assert.equal(evaluate(fingerprint.env.ELECTRON_SKIP_BINARY_DOWNLOAD, context), expected)
   }
   // Only `checks` installs without the Electron runtime: it only typechecks, lints
-  // and tests, so the checksum-verifying installer never runs there. `smoke` and
-  // `native-arm64` do install it, and main's credential boundary pins their
-  // install env to FFMPEG_GITHUB_TOKEN alone.
+  // and tests, so the checksum-verifying installer never runs there. `smoke`
+  // installs it, with its install env pinned to FFMPEG_GITHUB_TOKEN alone.
   const [checksInstall, ...installerJobs] = desktopInstalls
   assert.equal(checksInstall.env.ELECTRON_SKIP_BINARY_DOWNLOAD, '1')
   for (const step of installerJobs) assert.equal(step.env.ELECTRON_SKIP_BINARY_DOWNLOAD, undefined)

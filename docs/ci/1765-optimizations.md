@@ -13,18 +13,11 @@ CI runs its trusted selector once. Selected Desktop, Analytics and Image calls
 receive `selected: true`, skipping their nested selector. A standalone dispatch
 or Image push retains trusted classification and conservative full coverage.
 
-Desktop's macOS job does not consume Linux smoke output. It starts independently
-and retains its own ARM64 backend build, disposable database, packaged integrity,
-Keychain and functional acceptance. Icon compilation runs first on that same
-macOS runner, replacing the separate icon job. Linux smoke, static checks and
-native acceptance all contribute to the reusable workflow conclusion and the
-unchanged `UI policy (strict)` gate. A failing lane cannot be replaced by another
-lane's success.
-
-This removes one macOS runner allocation, up to three nested selector allocations
-for a full CI run, and the Linux-smoke dependency on the native critical path.
-Public GitHub runner capacity still controls external queue delays; no paid
-runners or persistent pool are added.
+Desktop's reusable workflow now retains only Linux static checks and Electron
+runtime acceptance. Mac packaged, local-driver and installer acceptance jobs were
+removed from CI on 2026-11-12 at Alex's request. The native acceptance drivers
+remain in source for explicit local runs. Official macOS release signing,
+notarization, integrity checks and publication remain in `desktop-release.yml`.
 
 ## Installed dependencies
 
@@ -51,7 +44,7 @@ Electron installer on every job. Tests, signed packages, database state and
 acceptance results are not cached. Release workflows and their gates are unchanged.
 
 The first main run for a new key pays installation and cache-upload costs.
-`ci-dependencies.yml` warms the macOS and Desktop Linux keys on main when
+`ci-dependencies.yml` warms the Desktop Linux key on main when
 installation inputs change; ordinary main CI populates the full Linux tree.
 Manual dispatch can repopulate evicted keys or warm a changed runner/tool image.
 Later PRs restore those default-branch entries. Cache eviction or a changed
