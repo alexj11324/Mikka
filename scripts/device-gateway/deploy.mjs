@@ -2,14 +2,13 @@ import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
+import { affectsWorker } from './select-release.mjs'
+import { parsePromotionRecord, readWebAuthority } from '../release/cloudflare-promoted-web.mjs'
 
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
 export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 export const ALIAS = 'app.aspectlylabs.com'
 export const WORKER = 'mikka-device-gateway'
-export const RELEASE_PATHS = ['cloudflare/device-gateway', 'lib/device-gateway-ticket.ts', 'lib/device-presence.ts', 'lib/device-presence-grant.ts',
-  'lib/live/presence.ts', 'lib/live/events.ts', 'lib/live/scope.ts',
-  'lib/device-gateway-client.ts', 'lib/device-gateway-notify.ts', 'scripts/device-gateway', '.github/workflows/device-gateway.yml']
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const CONFIG = 'cloudflare/device-gateway/wrangler.jsonc'
 const SHA = /^[a-f0-9]{40}$/
@@ -66,6 +65,45 @@ export function productionDeployment(alias, deployment) {
   return { id: deployment.id, sha }
 }
 
+/** The protected private caller revalidates its immutable promotion and authority on every read. */
+export async function applicationWitness({ sourceCommit, vercelToken, readPromotedWeb, fetchImpl = fetch }) {
+  if (!SHA.test(sourceCommit ?? '')) fail('release_sha_invalid')
+  if (readPromotedWeb !== undefined) {
+    if (typeof readPromotedWeb !== 'function') fail('production_promotion_invalid')
+    let verified
+    return async () => {
+      const raw = JSON.stringify(await readPromotedWeb())
+      const record = parsePromotionRecord(raw)
+      if (record.product !== sourceCommit || (verified !== undefined && raw !== verified)) fail('production_promotion_changed')
+      verified = raw
+      return { id: record.releasePin, sha: record.product }
+    }
+  }
+  if (!vercelToken) fail('release_credentials_unavailable')
+  const legacy = async () => {
+    const current = await readWebAuthority(fetchImpl)
+    if (current.provider !== 'vercel') fail('production_legacy_origin_inactive')
+    return current
+  }
+  await legacy()
+  const vercel = path => {
+    const url = new URL(path, 'https://api.vercel.com')
+    url.searchParams.set('teamId', TEAM)
+    return readJson(url, vercelToken, fetchImpl)
+  }
+  const project = await vercel(`/v9/projects/${PROJECT}`)
+  if (project.id !== PROJECT || project.accountId !== TEAM || project.link?.type !== 'github'
+    || String(project.link.repoId) !== '1427517699') fail('production_project_mismatch')
+
+  return async () => {
+    const current = await legacy()
+    const alias = await vercel(`/v4/aliases/${ALIAS}?projectId=${PROJECT}`)
+    if (!/^dpl_[A-Za-z0-9]+$/.test(alias.deploymentId ?? '')) fail('production_identity_mismatch')
+    const production = productionDeployment(alias, await vercel(`/v13/deployments/${alias.deploymentId}`))
+    return production?.sha === current.sha ? production : null
+  }
+}
+
 export function gitRepository(cwd = ROOT) {
   const git = async args => {
     try { return (await execute('git', args, { cwd, timeout: 30_000, maxBuffer: 2_000_000 })).stdout.trim() }
@@ -84,7 +122,8 @@ export function gitRepository(cwd = ROOT) {
     },
     async sameInputs(before, after) {
       if (!SHA.test(before) || !SHA.test(after)) fail('release_sha_invalid')
-      return (await git(['diff', '--name-only', before, after, '--', ...RELEASE_PATHS])) === ''
+      const changed = await git(['diff', '--no-renames', '--name-only', '-z', before, after])
+      return !changed.split('\0').some(file => affectsWorker('device', file))
     },
     async assertCheckout(sourceCommit) {
       if (await git(['rev-parse', 'HEAD']) !== sourceCommit || await git(['status', '--porcelain', '--untracked-files=no'])) fail('release_checkout_changed')
@@ -95,18 +134,13 @@ export function gitRepository(cwd = ROOT) {
 }
 
 /** Wait for the app first: repairing the socket before presence ships makes idle devices look offline. */
-export async function deployGateway({ sourceCommit, accountId, cloudflareToken, vercelToken, repository = gitRepository(),
+export async function deployGateway({ sourceCommit, accountId, cloudflareToken, vercelToken, readPromotedWeb, repository = gitRepository(),
   configText = readFileSync(new URL(`../../${CONFIG}`, import.meta.url), 'utf8'), fetchImpl = fetch,
-  deployWorker, wait = sleep, maxPolls = 60, log = console.log }) {
+  deployWorker = wranglerDeploy, wait = sleep, maxPolls = 60, log = console.log }) {
   if (!SHA.test(sourceCommit ?? '')) fail('release_sha_invalid')
-  if (!/^[a-f0-9]{32}$/.test(accountId ?? '') || !cloudflareToken || !vercelToken) fail('release_credentials_unavailable')
+  if (!/^[a-f0-9]{32}$/.test(accountId ?? '') || !cloudflareToken) fail('release_credentials_unavailable')
   validateConfig(configText)
   await repository.assertCheckout(sourceCommit)
-  const vercel = path => {
-    const url = new URL(path, 'https://api.vercel.com')
-    url.searchParams.set('teamId', TEAM)
-    return readJson(url, vercelToken, fetchImpl)
-  }
   const cloudflare = async path => {
     const response = await readJson(new URL(`/client/v4/accounts/${accountId}/workers/${path}`, 'https://api.cloudflare.com'), cloudflareToken, fetchImpl)
     if (response.success !== true || !response.result) fail('cloudflare_response_invalid')
@@ -114,17 +148,13 @@ export async function deployGateway({ sourceCommit, accountId, cloudflareToken, 
   }
   const preflight = async () => existingWorker(await cloudflare(`scripts/${WORKER}/settings`), await cloudflare(`services/${WORKER}`))
   const namespaceId = await preflight()
-  const project = await vercel(`/v9/projects/${PROJECT}`)
-  if (project.id !== PROJECT || project.accountId !== TEAM || project.link?.type !== 'github'
-    || String(project.link.repoId) !== '1427517699') fail('production_project_mismatch')
+  const readApplication = await applicationWitness({ sourceCommit, vercelToken, readPromotedWeb, fetchImpl })
 
   const releaseState = async () => {
     const main = await repository.refreshMain()
     if (!SHA.test(main) || !await repository.contains(sourceCommit, main)) fail('release_source_not_main')
     if (!await repository.sameInputs(sourceCommit, main)) return { state: 'superseded' }
-    const alias = await vercel(`/v4/aliases/${ALIAS}?projectId=${PROJECT}`)
-    if (!/^dpl_[A-Za-z0-9]+$/.test(alias.deploymentId ?? '')) fail('production_identity_mismatch')
-    const production = productionDeployment(alias, await vercel(`/v13/deployments/${alias.deploymentId}`))
+    const production = await readApplication()
     if (!production || !await repository.contains(sourceCommit, production.sha)) return { state: 'waiting' }
     if (!await repository.contains(production.sha, main) || !await repository.sameInputs(sourceCommit, production.sha)) fail('production_release_mismatch')
     return { state: 'ready', production, main }
@@ -139,7 +169,7 @@ export async function deployGateway({ sourceCommit, accountId, cloudflareToken, 
       if (final.state === 'superseded') return { skipped: true, reason: 'newer_gateway_source' }
       if (final.state === 'ready' && final.production.id === state.production.id) {
         await repository.assertCheckout(sourceCommit)
-        const versionId = await deployWorker(sourceCommit)
+        const versionId = await deployWorker(sourceCommit, { accountId, cloudflareToken })
         if (!UUID.test(versionId ?? '')) fail('gateway_deploy_receipt_missing')
         const { deployments } = await cloudflare(`scripts/${WORKER}/deployments`)
         const versions = deployments?.[0]?.versions
@@ -153,15 +183,15 @@ export async function deployGateway({ sourceCommit, accountId, cloudflareToken, 
   fail('production_release_wait_timeout')
 }
 
-async function wranglerDeploy(sourceCommit) {
+async function wranglerDeploy(sourceCommit, { accountId, cloudflareToken }) {
   let stdout
   try {
     // Credentials stay in the child environment; no Vercel token/OIDC bearer is passed to Wrangler.
-    const env = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'NODE_EXTRA_CA_CERTS', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN']
+    const env = Object.fromEntries(['PATH', 'HOME', 'TMPDIR', 'NODE_EXTRA_CA_CERTS']
       .filter(key => process.env[key] !== undefined).map(key => [key, process.env[key]]))
     const result = await execute(process.execPath, [fileURLToPath(new URL('../../node_modules/wrangler/bin/wrangler.js', import.meta.url)),
       'deploy', '--config', CONFIG, '--keep-vars', '--message', `Mikka device gateway ${sourceCommit}`],
-    { cwd: ROOT, env: { ...env, CI: 'true', NO_COLOR: '1', WRANGLER_SEND_METRICS: 'false' }, timeout: 180_000, maxBuffer: 2_000_000 })
+    { cwd: ROOT, env: { ...env, CLOUDFLARE_ACCOUNT_ID: accountId, CLOUDFLARE_API_TOKEN: cloudflareToken, CI: 'true', NO_COLOR: '1', WRANGLER_SEND_METRICS: 'false' }, timeout: 180_000, maxBuffer: 2_000_000 })
     stdout = result.stdout
   } catch { fail('gateway_deploy_failed_or_uncertain') }
   // Do not retry an uncertain provider write, or dump arbitrary CLI output.
@@ -173,7 +203,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (process.env.GITHUB_ACTIONS !== 'true' || process.env.GITHUB_REPOSITORY !== 'alexj11324/Mikka'
       || process.env.GITHUB_REF !== 'refs/heads/main' || !['push', 'workflow_dispatch'].includes(process.env.GITHUB_EVENT_NAME)) fail('reviewed_main_workflow_required')
     const report = await deployGateway({ sourceCommit: process.env.GITHUB_SHA, accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-      cloudflareToken: process.env.CLOUDFLARE_API_TOKEN, vercelToken: process.env.VERCEL_TEAM_TOKEN, deployWorker: wranglerDeploy })
+      cloudflareToken: process.env.CLOUDFLARE_API_TOKEN, vercelToken: process.env.VERCEL_TEAM_TOKEN })
     console.log(JSON.stringify(report))
   } catch (error) {
     console.error(error instanceof Error && /^[a-z0-9_]+$/.test(error.message) ? error.message : 'gateway_release_failed')
