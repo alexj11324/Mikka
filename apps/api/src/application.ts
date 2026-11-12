@@ -64,7 +64,16 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
     })
     return trace.run(async () => {
       let prepared: WebTransport | Response | null | undefined
-      try { prepared = await prepareWebTransport?.(original, template) }
+      const serviceBearer = /^Bearer\s+mksvc_/i.test(original.headers.get('authorization') ?? '')
+      const serviceProjectRead = template === '/api/service-identity/projects'
+        || (template === '/api/service-identity/projects/[projectId]' && original.method === 'GET')
+      if (serviceBearer && !serviceProjectRead) {
+        result = failure(401)
+        return result
+      }
+      // Service authentication consumes its original bearer; a selected web
+      // connection or ambient human cookie cannot substitute for that principal.
+      try { prepared = serviceBearer ? null : await prepareWebTransport?.(original, template) }
       catch (error) {
         caught = error
         throw error

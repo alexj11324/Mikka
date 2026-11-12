@@ -63,7 +63,8 @@ before(async () => {
   await pool.query('INSERT INTO agent_kit_heads(owner_id,bot_id,workspace_id) VALUES($1,$2,$3)', [actor.userId, botId, actor.workspaceId])
   await pool.query('INSERT INTO workspace_computer_policies("workspaceId") VALUES($1)', [actor.workspaceId])
   await pool.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","sandboxId",state,"runtimeReady") VALUES($1,$2,$3,$4,$5,true)', [actor.workspaceId, actor.userId, randomUUID(), 'fixture-machine', 'running'])
-  mock.module('@/lib/live/notify', { namedExports: {
+  const live = await import('../live/notify')
+  mock.module('@/lib/live/notify', { namedExports: { ...live,
     notifyLive(scope: LiveScope, events: LiveInvalidation[]) {
       const probe = readComputerEvents(observer, scope, '0').then(page => { notices.push({ scope, events, page }) })
       probes.push(probe)
