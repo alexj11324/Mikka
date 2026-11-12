@@ -32,17 +32,28 @@ export class InboxStore {
     return { text: `
       WITH sources AS (
         SELECT i.id,'task' AS type,'agent' AS source,i.title,i.id AS "issueId",i."userId" AS "ownerId", i."updatedAt" AS "occurredAt",
-          (r."userId"=$1) AS "canReply",
+          (r.id IS NOT NULL) AS "canReply",
           attention.reason IS NOT NULL AS pending,
-          NULL::timestamptz AS "rejectedAt", NULL::text AS "rejectedBy", r.id AS "runId",
+          NULL::timestamptz AS "rejectedAt", NULL::text AS "rejectedBy", coalesce(r.id,shared.id) AS "runId",
           coalesce(attention.reason, 'confirm') AS reason, questions.total AS "questionCount"
         FROM issues i
         LEFT JOIN LATERAL (
           SELECT id,"userId",status,outcome,"pauseReason","stopReason","threadReplacedBy",
                  (${approvalFact}) AS "awaitingApproval", (${failureFact}) AS failure
-          FROM agent_runs WHERE "issueId"=i.id AND "workspaceId"=i."workspaceId"
+          FROM agent_runs WHERE "issueId"=i.id AND "workspaceId"=i."workspaceId" AND "userId"=$1
           ORDER BY "createdAt" DESC,id DESC LIMIT 1
         ) r ON true
+        -- An authorized teammate may see an explicit request for a reply. Its
+        -- existence cannot replace the current reader's Task state or grant
+        -- access to the peer's private tool approvals or execution details.
+        LEFT JOIN LATERAL (
+          SELECT last.id FROM (
+            SELECT id,status,outcome,"threadReplacedBy" FROM agent_runs
+            WHERE r.id IS NULL AND "issueId"=i.id AND "workspaceId"=i."workspaceId" AND "userId"<>$1
+            ORDER BY "createdAt" DESC,id DESC LIMIT 1
+          ) last WHERE last."threadReplacedBy" IS NULL AND (last.status='waiting_input'
+            OR (last.status NOT IN ('queued','preparing','running','finishing','paused','failed') AND last.outcome='needs_input'))
+        ) shared ON true
         CROSS JOIN LATERAL (SELECT coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo') AS metadata) issue
         CROSS JOIN LATERAL (SELECT CASE WHEN jsonb_typeof(issue.metadata->'pullRequests')='array'
           THEN issue.metadata->'pullRequests' ELSE '[]'::jsonb END AS items) pull_requests
@@ -72,13 +83,13 @@ export class InboxStore {
                (r.outcome='blocked' OR r."stopReason" IN ('device_lost','quota_exhausted') OR r."pauseReason"='quota_exhausted'
                 OR r.failure->>'category' IN ('quota','subscription','api_key','access_denied') OR r.failure->>'code'='run_quota_exceeded'
                 OR (r.status='paused' AND r."pauseReason" IS DISTINCT FROM 'human_control')) THEN NULL
-          WHEN r."threadReplacedBy" IS NULL AND r."userId"=$1 AND
-               (r."awaitingApproval" OR (r.status='paused' AND r."pauseReason"='human_control')) THEN 'confirm'
+          WHEN r."threadReplacedBy" IS NULL AND (r."awaitingApproval" OR (r.status='paused' AND r."pauseReason"='human_control')) THEN 'confirm'
           WHEN r."threadReplacedBy" IS NULL AND r.status='waiting_input' THEN 'needsReply'
           WHEN r."threadReplacedBy" IS NULL AND r.status IN ('queued','preparing','running','finishing','paused') THEN NULL
           WHEN r."threadReplacedBy" IS NULL AND r.outcome='needs_input' THEN 'needsReply'
           WHEN r."threadReplacedBy" IS NULL AND (r.status='failed' OR r.outcome='failed') THEN NULL
           WHEN i.status=$6 OR EXISTS(SELECT 1 FROM jsonb_array_elements(pull_requests.items) pr WHERE pr->>'state'=ANY($7::text[])) THEN 'review'
+          WHEN r.id IS NULL AND shared.id IS NOT NULL THEN 'needsReply'
           WHEN r.id IS NULL OR r."threadReplacedBy" IS NOT NULL OR r.outcome IN ('done','idle') THEN NULL
           WHEN EXISTS(SELECT 1 FROM jsonb_array_elements(pull_requests.items) pr WHERE pr->>'state'='merged') THEN NULL
           ELSE 'confirm' END AS reason) attention

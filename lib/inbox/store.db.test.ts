@@ -117,6 +117,12 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     assert.deepEqual([before.state,before.reason], ['waiting','approval'])
     assert.equal((await ownerRow())?.reason, 'confirm')
     assert.ok(!(await list(peer)).items.some(item => item.id === issue), 'a private tool prompt cannot create a teammate action')
+    await pool.query("UPDATE issues SET status='review' WHERE id=$1", [issue])
+    const peerReview = (await list(peer)).items.find(item => item.id === issue)
+    assert.equal(peerReview?.reason, 'review', 'an owner-only running attempt cannot hide the reviewer’s own manual review')
+    assert.equal(peerReview?.runId, null)
+    assert.deepEqual(peerReview?.actions, ['open','snooze'])
+    await pool.query("UPDATE issues SET status='todo' WHERE id=$1", [issue])
     await pool.query(`UPDATE agent_runs SET "failureDetails"=$2 WHERE id=$1`, [run, {
       schemaVersion:1, runId:run, code:'run_failed', category:'subscription', occurredAt:'2026-11-08T00:00:00Z', appVersion:'fixture',
     }])
