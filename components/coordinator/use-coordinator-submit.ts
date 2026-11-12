@@ -82,6 +82,7 @@ export function useCoordinatorSubmit(agent?: Pick<UseEveAgentReturn, 'send'>) {
     if (outcome.kind === 'uncertain') return t('sendUncertain')
     if (outcome.kind === 'authRequired') return tErrors('authRequired')
     if (outcome.kind === 'conflict') return tErrors('submissionConflict')
+    if (outcome.error === 'workspaceAccessDenied') return t('sendAccessDenied')
     if (outcome.error === 'rateLimited') return t('sendRateLimited')
     return tErrors(outcome.error === 'originRejected' || outcome.error === 'failed' ? 'generic' : outcome.error)
   }, [t, tErrors])
