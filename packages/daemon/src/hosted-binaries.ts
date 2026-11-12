@@ -12,7 +12,7 @@ const MANIFEST_PATHS = [HOSTED_CLI_MANIFEST, LEGACY_HOSTED_CLI_MANIFEST] as cons
 type Harness = 'claude_code' | 'codex'
 const binarySchema = z.object({ path: z.string().min(1), sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
 const manifestSchema = z.object({
-  version: z.literal(1), kind: z.enum(['claude', 'codex', 'desktop']),
+  version: z.literal(1), kind: z.enum(['claude', 'codex', 'desktop', 'task']),
   original: z.object({ claude_code: binarySchema.nullable(), codex: binarySchema.nullable() }).strict(),
   added: z.object({ claude_code: binarySchema.optional(), codex: binarySchema.optional() }).strict(),
 }).strict()

@@ -7,6 +7,7 @@ import useSWR from 'swr'
 import { Box, Check, Circle, GitPullRequest, Link2, Tag, X } from 'lucide-react'
 import { getIssuePropertyOptions, updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { LABEL_COLORS, type IssueLabel, type IssueMetadata, type IssuePullRequest } from '@/lib/issue-metadata'
+import { taskProjectOptions } from '@/lib/task-project-options'
 import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,7 +34,7 @@ export function LabelDot({ color, small = false }: { color: IssueLabel['color'];
 }
 
 export function IssueMetadataControls({ task, section = 'all', compact = false, disabled = false, onSaved, onBusyChange, request, assigneeAvatar }: {
-  task: { id: string; revision: number; metadata: IssueMetadata }
+  task: { id: string; revision: number; metadata: IssueMetadata; projectId?: string | null; workspaceId?: string | null }
   /** Replaces the assignee button's avatar, as the board card's avatar group (R-25). */
   assigneeAvatar?: ReactNode
   /** 'dialog': only the dialog, opened by `request` for any target but the assignee (a layer draws the values). */
@@ -59,24 +60,25 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
   const [prState, setPrState] = useState<IssuePullRequest['state']>('open')
   const fieldId = useId()
   const { data: options } = useSWR(target === 'project' || target === 'labels' ? ['issue-property-options', task.id] : null, () => getIssuePropertyOptions(task.id))
+  const query = name.trim().toLowerCase()
   const busy = disabled || pending
   useEffect(() => {
     if (!request || request.target === 'assignee') return
     const matches = section === 'all' || section === 'dialog' || section === request.target || (section === 'assignee' && request.target === 'invite')
     if (matches) {
-      setError(''); setTarget(request.target); setName(request.target === 'project' ? task.metadata.project ?? '' : '')
+      setError(''); setTarget(request.target); setName('')
       setLabels(task.metadata.labels); setPrs(task.metadata.pullRequests); setPrState('open')
     }
   }, [request, section])
 
   function open(value: Target) {
-    setError(''); setTarget(value); setName(value === 'project' ? task.metadata.project ?? '' : '')
+    setError(''); setTarget(value); setName('')
     setLabels(task.metadata.labels); setPrs(task.metadata.pullRequests); setPrState('open')
   }
   async function submit(event: FormEvent) {
     event.preventDefault()
     let patch: IssueMetadataPatch = {}
-    if (target === 'project') { await project(name.trim() || null); return }
+    if (target === 'project') return
     if (target === 'labels') {
       const next = name.trim() ? [...labels.filter(label => label.name.toLowerCase() !== name.trim().toLowerCase()), { name: name.trim(), color }] : labels
       patch = { labels: next }
@@ -84,8 +86,8 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
     if (target === 'pullRequests') patch = { pullRequests: name.trim() ? [...prs.filter(pr => pr.url !== name.trim()), { url: name.trim(), state: prState }] : prs }
     if (await persist(patch, target === 'invite' ? name.trim().toLowerCase() : undefined)) setTarget(null)
   }
-  async function project(value: string | null) {
-    if (await moveToProject(value, options?.projectRecords)) setTarget(null)
+  async function project(projectId: string | null) {
+    if (projectId === task.projectId || await moveToProject(projectId)) setTarget(null)
   }
   const metadata = task.metadata
   return <>
@@ -108,7 +110,24 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
       <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-md">
         <DialogHeader><DialogTitle>{target ? titles[target] : tProperty('taskProperties')}</DialogTitle></DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          {target === 'project' && <Command shouldFilter={false}><CommandInput placeholder={tProperty('projectPlaceholder')} aria-label={tProperty('projectNameAria')} value={name} onValueChange={setName} maxLength={100} /><CommandList><CommandEmpty>{tProperty('noProjectFound')}</CommandEmpty><CommandGroup heading={tProperty('projectGroup')}><CommandItem disabled={busy} onSelect={() => { void project(null) }}><Box /><span className="flex-1">{tProperty('noProject')}</span>{!metadata.project && <Check />}</CommandItem>{(options?.projects ?? []).filter(item => item.toLowerCase().includes(name.toLowerCase())).map(item => <CommandItem key={item} disabled={busy} onSelect={() => { void project(item) }}><Box /><span className="flex-1 truncate">{item}</span>{metadata.project === item && <Check />}</CommandItem>)}</CommandGroup></CommandList></Command>}
+          {target === 'project' && <Command shouldFilter={false}>
+            <CommandInput placeholder={tProperty('projectPlaceholder')} aria-label={tProperty('projectNameAria')} value={name} onValueChange={setName} maxLength={100} />
+            <CommandList>
+              <CommandEmpty>{tProperty('noProjectFound')}</CommandEmpty>
+              <CommandGroup heading={tProperty('projectGroup')}>
+                {!query && <CommandItem value="none" disabled={busy} onSelect={() => { void project(null) }}>
+                  <Box /><span className="flex-1">{tProperty('noProject')}</span>{!task.projectId && !metadata.project && <Check />}
+                </CommandItem>}
+                {taskProjectOptions(options?.projectRecords ?? [], task.projectId)
+                  .filter(item => item.label.toLowerCase().includes(query) || item.id.includes(query))
+                  .map(item => <CommandItem key={item.id} value={item.id} disabled={busy} onSelect={() => { void project(item.id) }}>
+                    <Box /><span className="min-w-0 flex-1"><span className="block truncate">{item.label}</span>
+                      {item.description && <span className="block text-xs text-muted-foreground">{item.description}</span>}
+                    </span>{item.checked && <Check />}
+                  </CommandItem>)}
+              </CommandGroup>
+            </CommandList>
+          </Command>}
           {target === 'labels' && <>
             <FieldSet>
               <FieldLegend variant="label">{tProperty('existingLabels')}</FieldLegend>
@@ -127,7 +146,7 @@ export function IssueMetadataControls({ task, section = 'all', compact = false, 
           </>}
           {target === 'invite' && <FieldGroup><Field><FieldLabel htmlFor={fieldId}>{tProperty('memberEmail')}</FieldLabel><Input id={fieldId} type="email" value={name} onChange={event => setName(event.target.value)} placeholder={tProperty('memberEmailPlaceholder')} required maxLength={254} disabled={busy} /></Field></FieldGroup>}
           {error && <FieldError>{error}</FieldError>}
-          <DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setTarget(null)}>{tCommon('cancel')}</Button><Button type="submit" disabled={busy}>{pending ? tCommon('saving') : target === 'invite' ? tProperty('inviteAction') : tCommon('save')}</Button></DialogFooter>
+          <DialogFooter><Button type="button" variant="ghost" disabled={pending} onClick={() => setTarget(null)}>{tCommon('cancel')}</Button>{target !== 'project' && <Button type="submit" disabled={busy}>{pending ? tCommon('saving') : target === 'invite' ? tProperty('inviteAction') : tCommon('save')}</Button>}</DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
@@ -158,7 +177,7 @@ export function AccessChangeDialog({ change, pending, onConfirm, onCancel }: { c
 }
 
 /** The metadata saves behind IssueMetadataControls, for it and for a layer that draws the values itself. */
-export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyChange }: { task: { id: string; revision: number }; disabled?: boolean; onSaved: (issue: MetadataSavedIssue) => void; onBusyChange?: (busy: boolean) => void }) {
+export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyChange }: { task: { id: string; revision: number; workspaceId?: string | null }; disabled?: boolean; onSaved: (issue: MetadataSavedIssue) => void; onBusyChange?: (busy: boolean) => void }) {
   const tProperty = useTranslations('Metadata.property')
   const actionError = useActionError()
   const [pending, setPending] = useState(false)
@@ -177,17 +196,11 @@ export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyCh
   }
   /** A project move the server refused until the person confirms who it removes. */
   const [accessChange, setAccessChange] = useState<{ projectId: string | null; tasks: number } | null>(null)
-  /** Moves the task to an existing project (null: none); false when it did not. */
-  async function project(value: string | null, records: { id: string; name: string }[] | undefined) {
+  async function project(projectId: string | null, confirmAccess = false) {
     if (saving.current || disabled) return false
-    const selected = records?.find(item => item.name === value)
-    if (value && !selected) { setError(tProperty('selectExistingProject')); return false }
-    return save(selected?.id ?? null)
-  }
-  async function save(projectId: string | null, confirmAccess = false) {
     saving.current = true; setPending(true); setError(''); onBusyChange?.(true)
     try {
-      const result = await moveIssueToProject({ issueId: task.id, revision: task.revision, projectId, ...(confirmAccess ? { confirmAccess } : {}) })
+      const result = await moveIssueToProject({ issueId: task.id, revision: task.revision, projectId, ...(task.workspaceId ? { workspaceId: task.workspaceId } : {}), ...(confirmAccess ? { confirmAccess } : {}) })
       // The move changes who can read the task: nothing was written, and the same
       // move replays once the person confirms.
       if (result.error && 'confirmable' in result && result.confirmable) {
@@ -201,6 +214,6 @@ export function useIssueMetadataSave({ task, disabled = false, onSaved, onBusyCh
   }
   return { pending, error, setError, persist, project, accessChange,
     /** Replays the refused move with the confirmation the server asked for. */
-    confirmAccess: async () => { const pendingMove = accessChange; setAccessChange(null); if (!pendingMove) return false; return save(pendingMove.projectId, true) },
+    confirmAccess: async () => { const pendingMove = accessChange; setAccessChange(null); if (!pendingMove) return false; return project(pendingMove.projectId, true) },
     cancelAccessChange: () => setAccessChange(null) }
 }

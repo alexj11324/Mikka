@@ -19,6 +19,7 @@ const TERMINAL = new Set(['succeeded', 'failed', 'stopped', 'cancelled'])
 type Actor = { userId: string; workspaceId: string }
 export type ThreadLifecycleMetadata = {
   owner?: 'run-recovery'; phase?: string; reason?: string; failures?: number
+  sponsoredUntil?: string
   pausedAt?: number; executionDeadline?: number; providerDeadline?: number | null
   observedStatus?: string; observedStop?: boolean; observedClosed?: boolean
   reconcileId?: string; reconcileUntil?: number; reconcileVersion?: number
@@ -33,7 +34,7 @@ export type ThreadLifecycleMetadata = {
 type Instant = Date | string | number | null
 export type ThreadLifecycleRow = {
   runId: string; ownerId: string; workspaceId: string; epoch: number
-  sandboxId: string | null; state: string; deviceId: string | null; operationId?: string
+  snapshotId?: string; sandboxId: string | null; state: string; deviceId: string | null; operationId?: string
   workerLeaseId?: string | null; workerLeaseUntil: Instant; leaseExpiresAt: Instant; lastActiveAt: Instant
   runningSince: Instant; computeSeconds: string | number; lifecycleAt: Instant
   /** PostgreSQL text preserves the microseconds lost by pg's Date decoder. */
@@ -191,6 +192,10 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
     LEFT JOIN issues i ON i.id=m."issueId" LEFT JOIN run_checkpoints c ON c."runId"=r.id AND c."userId"=r."userId"
     WHERE m."runId"=$1 AND m."ownerId"=$2 AND m."workspaceId"=$3`, [runId, actor.userId, actor.workspaceId])).rows[0]
   if (!row) return false
+  if (row.snapshotId === 'cloudflare-task-v1') {
+    const { reconcileSponsoredTaskMachine } = await import('./sponsored-lifecycle')
+    return reconcileSponsoredTaskMachine(pool, actor, runId, row, now)
+  }
   // A replay of the legacy monitor is not new task demand. Share the stored
   // deadline with recovery so two sequential callbacks cannot both renew a
   // VM, and provider failures respect their persisted backoff.

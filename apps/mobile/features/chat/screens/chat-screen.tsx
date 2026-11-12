@@ -100,8 +100,8 @@ function ChatScreenSession({ botId, name, color, shape, draft, focus, compose, c
   // The person's proposals: the web's key (components/coordinator/pending-actions.tsx), on the same home channel.
   // The title menu's threads: read when the chat opens, again when a thread list changes; never while idle.
   // The title menu's tasks: the ones this bot dispatched (the Coordinator's are its bot row's).
-  const tasks = useTasks()
   const ownBotId = self === 'coordinator' ? homeBots?.find(item => item.coordinator)?.id : self
+  const tasks = useTasks(Boolean(ownBotId), ownBotId)
   const pending = useLiveApi<PendingAction[]>('/api/pending-actions', items => ({
     refs: [listRef('pending_actions', home)], deadline: pendingActionsDeadline(items),
   }))

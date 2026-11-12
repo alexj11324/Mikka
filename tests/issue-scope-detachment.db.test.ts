@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from './helpers/task-workspace'
+import { registeredTask } from './helpers/registered-task'
 import { tokenWorkspace } from '../lib/tokens/principal'
 import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
 import { scopeSubtest, scopeResumeBootstrap } from './support/scope-acceptance.mjs'
@@ -167,14 +168,14 @@ test('provider policy preserves task tenancy and independent membership gates on
     await pool.query(`drop index linear_sync_outbox_open_issue_key;
     create unique index linear_sync_outbox_open_issue_key on linear_sync_outbox("issueId") where status in ('queued','processing')`)
     await pool.query(await readFile(new URL('../drizzle/20261029043641_team_issue_creation_gate.sql',import.meta.url),'utf8'))
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Legacy failed-only task\',$3,\'todo\',\'normal\',\'workspace\',$4,\'bound\',\'explicit\')',[legacyFailed,owner,doc,workspace])
+    await registeredTask(pool, owner, workspace, legacyFailed, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Legacy failed-only task\',$3,\'todo\',\'normal\',\'workspace\',$4,\'bound\',\'explicit\')',[legacyFailed,owner,doc,workspace]))
     await pool.query('update linear_sync_outbox set status=\'failed\',attempts=8 where "issueId"=$1',[legacyFailed])
     assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status=\'failed\'',[legacyFailed])).rows[0].n,1)
     fixtureIds.push(legacyFailed)
     // A synthetic legacy Linear-origin task imported before verified-target
     // migration, now on generation 2. The trusted migration derives the flag
     // from its immutable revision-1 Linear history; no fixture sets it directly.
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"scopeVersion",revision,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Legacy imported task\',$3,\'todo\',\'normal\',\'workspace\',2,1,$4,\'bound\',\'explicit\')',[legacyImported,owner,doc,workspace])
+    await registeredTask(pool, owner, workspace, legacyImported, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"scopeVersion",revision,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Legacy imported task\',$3,\'todo\',\'normal\',\'workspace\',2,1,$4,\'bound\',\'explicit\')',[legacyImported,owner,doc,workspace]))
     await pool.query('insert into issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id) values ($1,$2,$3,1,\'Legacy imported task\',$4,\'todo\',\'normal\',\'system\',\'linear\')',[randomUUID(),legacyImported,owner,doc])
     await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$2::uuid::text,\'MIK-legacy\')',[legacyLink,legacyImported,owner,sync])
     await pool.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[legacyImported])
@@ -215,9 +216,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   async function seed(id: string, remoteId = id, linked = true) {
     if (!fixtureIds.includes(id)) fixtureIds.push(id)
     const content = id === issue ? mainDoc : doc
-    const tx = await pool.connect()
-    try {
-      await tx.query('begin')
+    await registeredTask(pool, owner, workspace, id, async tx => {
       // These are explicit synthetic provider-origin rows. Keep every current
       // tenant/target trigger enabled; real new imports are exercised below.
       await tx.query("select set_config('mikka.linear_sync_source','linear',true)")
@@ -228,9 +227,7 @@ test('provider policy preserves task tenancy and independent membership gates on
       finally { document.destroy() }
       if(linked) await tx.query(`insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier","externalTargetVerified","linearUpdatedAt") values ($1,$2,$3,$4,$5,'MIK-184',true,'2020-01-01T00:00:00Z')`,[randomUUID(),id,owner,sync,remoteId])
       await tx.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,owner])
-      await tx.query('commit')
-    } catch(error) { await tx.query('rollback'); throw error }
-    finally { tx.release() }
+    })
     if(linked) await pool.query('insert into linear_sync_outbox (id,"issueId","scopeVersion") values ($1,$2,1)',[randomUUID(),id])
   }
   const localFlip = async (id: string, revision = 1) => {
@@ -264,7 +261,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   }
   await scopeSubtest(t, 'context and stale classifier cannot publish a personal task without a user choice', async () => {
     const id=randomUUID();fixtureIds.push(id)
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Ship team work urgently\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')',[id,owner,doc,workspace])
+    await registeredTask(pool, owner, workspace, id, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Ship team work urgently\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')',[id,owner,doc,workspace]))
     await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,owner])
     const { judgeIssueScope }=await import('../lib/issue-scope-judge')
     for (const context of ['Telegram','the Mikka app','ambiguous team conversation']) await judgeIssueScope(id,context)
@@ -531,7 +528,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     fixtureIds.push(id)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Complete owner\',$2,true,now(),now())',[localOwner,`${localOwner}@example.invalid`])
     await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Complete owner\',$3,\'member\',\'active\')',[workspace,localOwner,`${localOwner}@example.invalid`])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Unlinked completion fixture\',$3,\'todo\',\'normal\',\'workspace\',$4,\'bound\',\'explicit\')',[id,localOwner,doc,workspace])
+    await registeredTask(pool, localOwner, workspace, id, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Unlinked completion fixture\',$3,\'todo\',\'normal\',\'workspace\',$4,\'bound\',\'explicit\')',[id,localOwner,doc,workspace]))
     await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,localOwner])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId",status) values ($1,$2,$3,$4,$5,\'running\')',[run,member,id,agent,device])
     const prepared=Promise.withResolvers<void>(),release=Promise.withResolvers<void>()
@@ -639,7 +636,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     const fixtureWorkspace=scope==='workspace'?workspace:await seedFixtureWorkspace(pool,issueOwner)
     if(withIssue) {
       fixtureIds.push(id)
-      await pool.query(`insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,'Completion fixture',$3,'todo','normal',$4,$5,'bound',$6)`,[id,issueOwner,doc,scope,fixtureWorkspace,scope==='workspace'?'explicit':'disabled'])
+      await registeredTask(pool, issueOwner, fixtureWorkspace, id, client => client.query(`insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,'Completion fixture',$3,'todo','normal',$4,$5,'bound',$6)`,[id,issueOwner,doc,scope,fixtureWorkspace,scope==='workspace'?'explicit':'disabled']))
       if(withTeam && scope==='workspace') await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,issueOwner])
     }
     await pool.query(`insert into agent_runs (id,"userId","issueId","workspaceId","agentId","deviceId",status,kind,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,'running',$7,$8)`,[run,actor,withIssue?id:null,fixtureWorkspace,actor===owner?ownerAgent:agent,actor===owner?ownerDevice:device,kind,new Date(Date.now()+RUN_LEASE_MS)])
@@ -1148,7 +1145,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   })
   await scopeSubtest(t, 'no verified Linear target means promotion, editing, old claims and manual retry cannot publish',async()=>{
     const id=randomUUID();fixtureIds.push(id)
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Explicit team control\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')',[id,owner,doc,workspace])
+    await registeredTask(pool, owner, workspace, id, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Explicit team control\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')',[id,owner,doc,workspace]))
     const before=provider.requests.length
     assert.deepEqual(await action(()=>setIssueScope({id,revision:1,scope:'workspace'})),{error:'issueScopeTeamRequired'})
     const result=await promoteExistingIssueForUser(owner,{requestId:randomUUID(),issueId:id,revision:1,teamId:team,expectedTeamId:null})

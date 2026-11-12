@@ -55,8 +55,8 @@ export default function BotInfo() {
   const computer = useLiveApi<ComputerStatus>(computerBot ? `/api/bots/${computerBot}/computer` : null, current => computerLive(current, computerBot))
   const refresh = useRefresh(async () => { await Promise.all([page.reload(), computer.reload(), allTasks.reload()]) })
   // Its tasks, waiting ones first (2026-11-07: lists show tasks; a thread opens inside its task).
-  const allTasks = useTasks()
-  const ownTasks = (allTasks.data?.tasks ?? []).filter(task => task.bot?.id === computerBot)
+  const allTasks = useTasks(Boolean(computerBot), computerBot)
+  const ownTasks = allTasks.paging.items.filter(task => computerBot && (task.dispatchedBy === computerBot || task.bot?.id === computerBot))
   const tasks = menuTasks(ownTasks, computerBot, SHOWN)
   const pullRequests = page.data?.pullRequests ?? []
   const schedules = page.data?.schedules ?? []

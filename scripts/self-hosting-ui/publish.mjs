@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { appendFile, lstat, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { verifyCreatedRef } from './verify-created-ref.mjs'
 import { githubEvidenceFailure } from './github-error.mjs'
 
 // Only a same-repository PR can publish. There is no update-ref, delete, force
@@ -63,8 +64,7 @@ for (const { file, bytes } of contents) {
 const tree = await api('/trees', { tree: entries })
 const commit = await api('/commits', { message: `Synthetic self-hosting UI evidence for ${head}, run ${env.GITHUB_RUN_ID} [skip ci]`, tree: tree.sha, parents: [] })
 await api('/refs', { ref: `refs/heads/${branch}`, sha: commit.sha })
-const published = await api(`/ref/heads/${branch}`)
-if (published.object?.sha !== commit.sha) throw new Error('EVIDENCE_PUBLICATION_MISMATCH')
+await verifyCreatedRef(allowMissing => api(`/ref/heads/${branch}`, undefined, allowMissing), commit.sha)
 const fixedUrl = `${repositoryUrl}/tree/${commit.sha}`
 await appendFile(env.GITHUB_STEP_SUMMARY, `## Self-hosting UI evidence\n\n**Synthetic records · visual only · awaiting review.**\n\n${pictures.length} PNGs from source \`${head}\`.\n\n- [Evidence branch](${repositoryUrl}/tree/${branch})\n- [Immutable evidence commit and image gallery](${fixedUrl})\n- [HTML gallery](${repositoryUrl}/blob/${commit.sha}/index.html)\n- [Capture manifest](${repositoryUrl}/blob/${commit.sha}/evidence.json)\n\nNo OAuth, billing, discovery, push or native iOS acceptance is claimed.\n`)
 console.log(`Created ${branch} at ${commit.sha}; source ${head}; ${pictures.length} synthetic screenshots.`)

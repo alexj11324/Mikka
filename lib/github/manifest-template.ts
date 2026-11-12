@@ -2,7 +2,9 @@ import type { GitHubAppTemplate } from './manifest'
 
 // Authenticated official mikka-github GET /app snapshot, 2026-11-07T11:43:44.314Z.
 // OIDC/Infisical Actions run 42369222955, job 128393675936; see docs/github-app-manifest.md.
-// Bundled metadata only: creating a self-hosted App never calls the official App.
+// Bundled baseline metadata only: creating a self-hosted App never calls the official App.
+// check_suite and status below are additive subscriptions for NEW Apps only;
+// this file does not change the existing official App's live webhook events.
 export const GITHUB_APP_MANIFEST_TEMPLATE: GitHubAppTemplate = {
   "permissions": {
     "actions": "write",
@@ -30,11 +32,13 @@ export const GITHUB_APP_MANIFEST_TEMPLATE: GitHubAppTemplate = {
     "workflows": "write"
   },
   "events": [
+    "check_suite",
     "deployment_protection_rule",
     "issues",
     "issue_comment",
     "pull_request",
     "pull_request_review",
-    "pull_request_review_comment"
+    "pull_request_review_comment",
+    "status"
   ]
 }

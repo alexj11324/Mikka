@@ -91,14 +91,19 @@ export type TaskSubtask = {
 }
 
 export type TaskActivityItem =
-  | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; time: string }
+  | { kind: 'event'; id: string; at: string; who: string | null; mark?: TaskMark; text: string; time: string; onOpen?: () => void }
   /** An Agent's stretch of runs (R-62): opens the task's conversation at its first thread. */
   | { kind: 'agent'; id: string; at: string; who: string; mark: TaskMark; text: string; time: string; open: boolean; onOpen: (() => void) | null; openLabel: string }
-  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; excerpt: string | null; time: (at: string) => string }
+  | { kind: 'comment'; id: string; at: string; thread: IssueDiscussions['threads'][number]; message?: { record: IssueDiscussions['threads'][number]['messages'][number]; first: boolean; last: boolean }; excerpt: string | null; time: (at: string) => string }
 
 export type TaskDetailFrameProps = {
   /** The loaded task's identity, for task-specific navigation such as Review. Absent in older callers. */
   taskId?: string
+  /** The task-bound file dialog; the existing template supplies its toolbar trigger. */
+  attachments?: (trigger: (label: string, open: () => void) => ReactNode) => ReactNode
+  workspaceId?: string | null
+  /** The same authorized presentation that supplies the status row also identifies its Factory receipts. */
+  factoryTaskId?: string
   rootRef: RefObject<HTMLDivElement | null>
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
   /** The page's accessible name: the title, or the title field's label while it is empty. */
@@ -140,6 +145,8 @@ export type TaskDetailFrameProps = {
   /** 活动: the task's events and Agent rows; the comments come with `discussions`. */
   activity: {
     items: (discussions: IssueDiscussions) => TaskActivityItem[]
+    /** New renderers display each reply at its own time; commands still use the original thread. */
+    timeline?: (discussions: IssueDiscussions, additional?: readonly TaskActivityItem[]) => TaskActivityItem[]
     failed: { text: string; retry: () => void }[]
     /** The comment being written and the reply open on one discussion; sending goes to the discussions last drawn. */
     drafts: { body: string; setBody: (value: string) => void; replyTo: string | null; setReplyTo: (id: string | null) => void; reply: string; setReply: (value: string) => void; submit: () => void; sendReply: (id: string) => void }

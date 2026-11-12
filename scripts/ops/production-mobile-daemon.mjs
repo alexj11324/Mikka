@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // One bounded normal-owner production API proof. It runs no daemon service,
 // agents, model calls, cloud machines or SQL. Credentials never enter reports.
+import { readRendererActions } from '../../lib/renderer-actions.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
@@ -202,7 +203,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   async function owner(path, method = 'GET', body, cookieOverride) {
     const known = new Set(['/api/auth/sign-in/email', '/api/auth/sign-out',
       '/api/auth/get-session?disableCookieCache=true', '/api/auth/get-session', '/api/workspace', '/api/mobile/home',
-      '/api/device-tokens', '/api/devices/enrollment', '/api/rpc', '/renderer-manifest.json'])
+      '/api/device-tokens', '/api/devices/enrollment', '/api/rpc', '/renderer-manifest.json', '/renderer-actions.json'])
     check(known.has(path) || (core && method === 'GET' && body === undefined && (path === '/api/desktop/discovery'
       || ownerLiveWorkspaceId && path === '/api/live/ticket?workspace=' + ownerLiveWorkspaceId))
       || (method === 'GET' && body === undefined && isTeamWorkspaceReadPath(BASE + path))
@@ -383,7 +384,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       report.checks.discoveryAndFlags = true
     }
     phase = 'resource-baseline'
-    const manifest = await owner('/renderer-manifest.json')
+    const manifest = await readRendererActions(owner)
     check(manifest.status === 200, 'manifest_unavailable')
     const used = publishedActions(manifest.body)
     check(ACTIONS.every(action => used.has(action)), 'manifest_unavailable')

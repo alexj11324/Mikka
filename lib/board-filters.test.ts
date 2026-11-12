@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { personFilters } from './board-filters'
+import { boardProjectFilters, personFilters } from './board-filters'
 
 const me = 'user-me'
 const myAgent = 'agent-mine'
@@ -31,4 +31,13 @@ test('我创建的 matches the tasks I created, whoever holds them', () => {
   assert.equal(personFilters(task(me, null), me, mine()).creator, true)
   assert.equal(personFilters(task(me, { kind: 'member', id: 'user-other' }), me, mine()).creator, true)
   assert.equal(personFilters(task('user-other', { kind: 'member', id: me }), me, mine(true)).creator, false)
+})
+
+test('saved Board project names retain all visible matches and UUID filters survive renames', () => {
+  const projects = new Map([['a', 'Same'], ['b', 'Same'], ['c', 'Elsewhere']])
+  assert.deepEqual(boardProjectFilters(['Same', 'a', 'none', 'Unloaded'], projects), ['a', 'b', 'none', 'Unloaded'])
+  projects.set('a', 'Renamed')
+  assert.deepEqual(boardProjectFilters(['a'], projects), ['a'])
+  assert.deepEqual(boardProjectFilters(['Missing'], new Map()), ['Missing'])
+  assert.equal(boardProjectFilters(undefined, projects), undefined)
 })

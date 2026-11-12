@@ -37,7 +37,7 @@ async function lockAllowedTeam(tx: WorkspaceTx, userId: string, teamId: string) 
 /** The team supplies a verified workspace before the application insert.
  * A retry reconciles the separate relation receipt without changing ownership.
  * requestId is an idempotency key; provider synchronization stays disabled. */
-export async function createTeamIssueForUser(userId: string, input: unknown, actor: ActivityActor = userActor(userId)) {
+export async function createTeamIssueForUser(userId: string, input: unknown, actor: ActivityActor = userActor(userId), command?: { workspaceId: string }) {
   const parsed = schema.safeParse(input)
   if (!parsed.success) return { error: 'teamIssueInvalid' as const }
   const { requestId, teamId, ...content } = parsed.data
@@ -46,6 +46,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
   try {
     const issueId = await withTeamWorkspace(userId, teamId, async workspace => {
       const team = await lockAllowedTeam(workspace, userId, teamId)
+      if (command && team.workspaceId !== command.workspaceId) throw new TeamCreateError('teamIssueAccessDenied')
       const [receipt] = await workspace.select().from(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.requestId, requestId)).for('update')
       if (receipt && (receipt.teamId !== teamId || receipt.workspaceId !== team.workspaceId || receipt.ownerId !== userId)) throw new TeamCreateError('teamIssueRequestConflict')
       const id = await db.transaction(async tx => {
@@ -60,7 +61,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
         // A caller's outer application transaction may have rolled back
         // after the workspace receipt committed. Reuse its reserved identity.
         const id = receipt?.issueId ?? crypto.randomUUID()
-        const issue = await createIssueForUserInTransaction(tx, userId, content, actor, { workspaceId: team.workspaceId, id, linearSyncBlocked: true })
+        const issue = await createIssueForUserInTransaction(tx, userId, content, actor, { workspaceId: team.workspaceId, id, linearSyncBlocked: true, deriveShortTitle: !command })
         if (!issue) throw new TeamCreateError('teamIssueRequestConflict')
         await tx.insert(teamIssueCreateRequests).values({ requestId, issueId: id, ownerId: userId, teamId, fingerprint })
         return id
@@ -71,9 +72,10 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
       if (!link || link.teamId !== teamId || link.workspaceId !== team.workspaceId || link.userId !== userId) throw new TeamCreateError('teamIssueChanged')
       if (!receipt) await workspace.insert(teamIssueCreateReceipts).values({ requestId, issueId: id, teamId, workspaceId: team.workspaceId, ownerId: userId })
       return id
-    })
+    }, command?.workspaceId)
     return await withTeamWorkspace(userId, teamId, async workspace => {
       const team = await lockAllowedTeam(workspace, userId, teamId)
+      if (command && team.workspaceId !== command.workspaceId) throw new TeamCreateError('teamIssueAccessDenied')
       const [link] = await workspace.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).for('update')
       if (!link || link.teamId !== teamId || link.workspaceId !== team.workspaceId || link.userId !== userId) throw new TeamCreateError('teamIssueChanged')
       promotionStarted = true
@@ -93,7 +95,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
         await issueListScopeChanged(tx, issueId, previousLists)
         return { issue: await issueView(saved, tx), linearSync: { enabled: false as const, reason: 'no_explicit_target' as const } }
       })
-    })
+    }, command?.workspaceId)
   } catch (error) {
     if (error instanceof TeamCreateError) return { error: error.code, requestId }
     if (error instanceof ActionFailureError && (error.code === 'workspaceAccessDenied' || error.code === 'teamIssueAccessDenied')) return { error: 'teamIssueAccessDenied' as const, requestId }

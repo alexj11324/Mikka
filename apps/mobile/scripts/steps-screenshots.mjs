@@ -54,8 +54,10 @@ function apiResponse(url) {
   if (path.endsWith('/api/auth/get-session')) return json(session)
   if (path === '/api/version') return json({})
   if (path === '/api/mobile/home') return json(home)
-  if (path === '/api/mobile/tasks') return json({ tasks: real.tasks })
-  if (path.startsWith('/api/mobile/tasks/')) return json(real.task)
+  if (path === '/api/mobile/task-presentations') return json({ version: 1, workspaceId: WORKSPACE, items: Object.fromEntries(real.tasks.map(task =>
+    [task.id, { version: 1, state: task.state, group: task.group, reason: task.reason, blockedBy: task.blockedBy ?? null, primaryStatus: task.status }])) })
+  if (path === '/api/mobile/tasks') return json({ workspaceId: WORKSPACE, tasks: real.tasks })
+  if (path.startsWith('/api/mobile/tasks/')) return json({ ...real.task, live: { workspaceId: WORKSPACE } })
   if (path.startsWith('/api/mobile/threads/')) return json(real.threads[path.split('/').pop()] ?? Object.values(real.threads)[0])
   if (path === '/api/pending-actions') return json([])
   if (path.startsWith('/api/live/')) return json({ error: 'offline' }, 404)
