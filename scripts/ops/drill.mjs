@@ -50,7 +50,7 @@ try {
     await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,$3)', [id, owner, 'Controlled recovery workspace'])
     await workspace.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$3,\'admin\')', [id, owner, `${owner}@example.invalid`])
   }
-  await main.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'Original backup task\',\'{}\',\'todo\',\'normal\')', [issue, survivor])
+  await main.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,\'Original backup task\',\'{}\',\'todo\',\'normal\')', [issue, survivor, ws])
   await main.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'codex\',\'Recovery fixture\')', [agent, survivor])
   await main.query('INSERT INTO agent_runs(id,"userId","agentId","issueId",status,"createdAt","leaseExpiresAt") VALUES($1,$2,$3,$4,\'running\',now()-interval \'10 minutes\',now()-interval \'5 minutes\')', [run, survivor, agent, issue])
   await main.query('INSERT INTO pending_actions(id,"userId",action,input) VALUES($1,$2,\'controlled.noop\',\'{}\')', [approval, survivor])
