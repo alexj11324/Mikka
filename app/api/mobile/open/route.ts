@@ -6,13 +6,14 @@ import { withBasePath } from '@/lib/base-path'
 import { isCloudEdition } from '@/lib/edition'
 import { isTaskReference, mobileTaskTarget } from '@/lib/mobile-task-handoff'
 import { webConnectionEnabled, webConnectionURL } from '@/lib/web-connection/policy'
-import { mobileWebTarget } from '@/lib/mobile-web-target'
+import { mobileMembersPage, mobileWebTarget } from '@/lib/mobile-web-target'
 import { handoffSessionCookie, openHandoff, sealHandoff } from '@/lib/mobile-handoff'
 import { mobileWebWorkspace, MobileWebScopeError } from '@/lib/mobile-web-scope'
 import en from '@/messages/en.json'
 import zh from '@/messages/zh-CN.json'
 
 export const dynamic = 'force-dynamic'
+type HandoffSession = { session: { id: string }; user: { id: string; email: string } }
 const pendingCookie = 'mikka-mobile-handoff'
 const path = withBasePath('/api/mobile/open')
 const safeHeaders = { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'", 'X-Content-Type-Options': 'nosniff' }
@@ -25,6 +26,8 @@ async function handleGET(request: Request) {
   const url = new URL(request.url)
   const target = mobileWebTarget(url.searchParams.get('to'))
   const token = url.searchParams.get('token')
+  const members = target.startsWith(mobileMembersPage + '?')
+  if (members && !token) return new NextResponse(null, { status: 403, headers: safeHeaders })
   if (!token) return NextResponse.redirect(new URL(withBasePath(target), url.origin), { status: 303, headers: safeHeaders })
   try {
     // HTTP router mode prevents nextCookies() from mutating the ambient Next
@@ -33,8 +36,8 @@ async function handleGET(request: Request) {
       method: 'POST', headers: { 'content-type': 'application/json', origin: url.origin }, body: JSON.stringify({ token }),
     }))
     if (!exchanged.ok) throw new Error('Mobile handoff token unavailable')
-    const session = await exchanged.json() as { user: { id: string; email: string } }
-    const workspaceId = await mobileWebWorkspace(session.user.id, target)
+    const session = await exchanged.json() as HandoffSession
+    const workspaceId = await mobileWebWorkspace(session.user.id, target, session.session.id)
     const headers = exchanged.headers
     const csrf = randomBytes(32).toString('base64url')
     const state = sealHandoff({ cookies: headers.getSetCookie(), target, workspaceId, origin: url.origin, csrf, expires: Date.now() + 60_000 }, (await auth.$context).secret)
@@ -47,7 +50,7 @@ async function handleGET(request: Request) {
     result.cookies.set(pendingCookie, state, cookieOptions(request))
     return result
   } catch (error) {
-    if (error instanceof MobileWebScopeError) return new NextResponse(null, { status: 403, headers: safeHeaders })
+    if (members || error instanceof MobileWebScopeError) return new NextResponse(null, { status: 403, headers: safeHeaders })
     return NextResponse.redirect(new URL(withBasePath(target), url.origin), { status: 303, headers: safeHeaders })
   }
 }
@@ -62,10 +65,15 @@ async function handlePOST(request: Request) {
   const form = await request.formData().catch(() => null)
   const csrf = form?.get('csrf')
   if (!state || state.origin !== url.origin || typeof csrf !== 'string' || !same(state.csrf, csrf)) return new NextResponse(null, { status: 403, headers: safeHeaders })
-  const session = await auth.api.getSession({ headers: new Headers({ cookie: handoffSessionCookie(state.cookies) }), query: { disableCookieCache: true } })
+  // Read against the store without emitting Better Auth's refreshed session-data cookie
+  // into the outer browser response before scope and membership are confirmed.
+  const current = await auth.handler(new Request(new URL(withBasePath('/api/auth/get-session?disableCookieCache=true'), url.origin), {
+    headers: { cookie: handoffSessionCookie(state.cookies) },
+  }))
+  const session = current.ok ? await current.json() as HandoffSession | null : null
   if (!session) return new NextResponse(null, { status: 403, headers: safeHeaders })
   let workspaceId: string | null
-  try { workspaceId = await mobileWebWorkspace(session.user.id, state.target) }
+  try { workspaceId = await mobileWebWorkspace(session.user.id, state.target, session.session.id) }
   catch { return new NextResponse(null, { status: 403, headers: safeHeaders }) }
   if (workspaceId !== (state.workspaceId ?? null)) return new NextResponse(null, { status: 403, headers: safeHeaders })
   const task = mobileTaskTarget(state.target)

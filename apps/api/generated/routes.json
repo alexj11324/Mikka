@@ -1497,7 +1497,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "8b2b26ab682a8112bf04af636e22c3cb1bae0d125cd7e7bc8e1a9958c5395e78"
+      "sourceHash": "94453166adffc7fa652783bc375e592326cd054283ac48efe8cc910b81db4ee6"
     },
     {
       "path": "/mikka/api/mobile/pending-actions/[id]",
@@ -1545,7 +1545,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "0a7f4d96a0a9c554222ae3a1718cbfba4f79e193ac5a03c3fe6f6c29081c94f9"
+      "sourceHash": "0a9d660b275c3d202ed5bade44776472e32ff2ec1bd31244b035185c071969bf"
     },
     {
       "path": "/mikka/api/mobile/task-presentations",

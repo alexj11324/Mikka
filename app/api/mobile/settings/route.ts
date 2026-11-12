@@ -8,6 +8,9 @@ import { listComposioPages } from '@/lib/composio-pagination'
 import { readPreferences } from '@/lib/preferences'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { listOrganizations } from '@/lib/governance/organizations'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
+import { isCloudEdition } from '@/lib/edition'
+import { mobileMembersPage } from '@/lib/mobile-web-target'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 
 export const dynamic = 'force-dynamic'
@@ -51,7 +54,12 @@ async function handleGET(request: Request) {
   return json({
     billingScope: context.role === 'admin' ? { kind: 'workspace', id: context.workspace.id } : organization ? { kind: 'organization', id: organization.id } : null,
     user: { id: user.id, name: user.name, email: user.email, image: user.image ?? null },
-    workspace: context.workspace,
+    workspace: {
+      ...context.workspace,
+      ...(isCloudEdition() && user[enterprisePrincipal]?.kind === 'session' && context.workspace.kind === 'team' && context.role === 'admin' && {
+        serviceIdentityManagementPath: `${mobileMembersPage}?workspace=${context.workspace.id}`,
+      }),
+    },
     workspaces: context.choices,
     preferences,
     // The session's updatedAt moves with every turn, so the memory carries no 更新于 time.
