@@ -47,8 +47,6 @@ const ERROR_KEYS: Record<string, ErrorKey> = {
   factoryPolicyAttestationRequired: 'attestationRequired',
 }
 
-/** The approve call still takes an expiry until #517 lands; approving publishes at once, so the bar shows none. */
-
 /** GitHub's refusals of a merge (#528): the task keeps waiting, and the person can open the PR on GitHub. */
 const MERGE_REFUSALS = new Set(['githubMergeAuthorizationRequired', 'githubMergeForbidden', 'githubMergeBlocked', 'githubMergeConflict', 'githubMergeHeadMoved', 'githubMergeClosed', 'githubUnavailable'])
 type Derived = { state: AcceptanceState; active?: unknown; publication?: unknown; superseded?: unknown; refusal?: string }
