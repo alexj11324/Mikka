@@ -26,10 +26,10 @@ function signed(payload) {
     'content-type': 'application/json', 'x-slack-request-timestamp': timestamp, 'x-slack-signature': signature,
   } })
 }
-function harness({ respond = false, failure = false } = {}) {
+function harness({ respond = false, failure = false, channelEnv = env } = {}) {
   const sends = [], classifications = [], scopes = [], api = [], addresses = [], tasks = []
   const channel = createMikkaSlackChannel({
-    env: () => env,
+    env: () => channelEnv,
     resolveScope: async (ownerId, selected) => { scopes.push([ownerId, selected]); return { ownerId, botId, workspaceId } },
     shouldJoin: async (scope, text) => { classifications.push([scope, text]); if (failure) throw new Error('provider unavailable'); return respond },
     recordSource: async () => '00000000-0000-4000-8000-000000000003',
@@ -64,6 +64,20 @@ test('signed URL verification does no DB, model or Slack API work', async () => 
   const h = harness()
   const response = await h.post({ type: 'url_verification', challenge: 'test-challenge' })
   assert.deepEqual(await response.json(), { challenge: 'test-challenge' })
+  assert.deepEqual([h.scopes, h.api, h.classifications, h.sends], [[], [], [], []])
+})
+
+test('an app can verify its URL before a team installs the bot', async () => {
+  const h = harness({ channelEnv: { SLACK_SIGNING_SECRET: env.SLACK_SIGNING_SECRET } })
+  const challenge = { type: 'url_verification', challenge: 'before-installation' }
+  const response = await h.post(challenge)
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { challenge: challenge.challenge })
+  const tampered = signed(challenge)
+  tampered.headers.set('x-slack-signature', 'v0=' + '0'.repeat(64))
+  assert.equal((await h.route.handler(tampered, h.args)).status, 401)
+  assert.equal((await h.post(event('1', 'help'))).status, 503)
+  assert.equal((await harness({ channelEnv: {} }).post(challenge)).status, 503)
   assert.deepEqual([h.scopes, h.api, h.classifications, h.sends], [[], [], [], []])
 })
 
