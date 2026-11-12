@@ -189,3 +189,34 @@ test('the official Web client can send its original Eve submission id to a selec
     assert.deepEqual(await (await post({ authorization })).json(), { accepted: id })
   } finally { await server.close() }
 })
+
+test('only a successful authenticated Eve stream exposes its version and available replay cursor to the official Web reader', async () => {
+  const eve = '/api/agents/eve/v1/session/example/stream'
+  const rpc = '/api/desktop/rpc'
+  const version = 'x-eve-stream-version', tail = 'x-eve-stream-tail-index'
+  const stream = async (req: Request) => {
+    const params = new URL(req.url).searchParams
+    const headers = new Headers({ 'content-type': 'application/x-ndjson', [version]: '27', 'x-eve-stream-format': 'ndjson', 'x-eve-private': 'private' })
+    if (!params.has('noTail')) headers.set(tail, '3')
+    return new Response('{}\n', { status: params.has('gone') ? 404 : 200, headers })
+  }
+  const transport = createWebTransport({ env: {}, authenticate: async () => ({ user: { id: 'owner' }, session: { id: 'session' } }), scope: (_, work) => work() })
+  const server = await nodeApplication(createApiHandler([fixture(eve, 'GET', stream), fixture(rpc, 'GET', stream)], () => ({ run: work => work(), finish: () => {} }), transport))
+  const get = (path: string, bearer = true) => fetch(server.origin + '/mikka' + path, { headers: bearer ? { origin: officialOrigin, authorization } : { origin: officialOrigin } })
+  const exposed = (response: Response) => response.headers.get('access-control-expose-headers')?.split(', ').filter(name => name.startsWith('x-eve-'))
+  try {
+    const response = await get(eve)
+    assert.equal(response.status, 200)
+    assert.deepEqual(exposed(response), [version, tail])
+    assert.equal(response.headers.get(version), '27'); assert.equal(response.headers.get(tail), '3')
+    assert.deepEqual(exposed(await get(eve + '?noTail')), [version])
+    assert.deepEqual(exposed(await get(eve + '?gone')), [])
+    assert.deepEqual(exposed(await get(rpc)), [])
+    const unauthorized = await get(eve, false)
+    assert.equal(unauthorized.status, 401)
+    assert.deepEqual(exposed(unauthorized), [])
+    const preflight = await fetch(server.origin + '/mikka' + eve, { method: 'OPTIONS', headers: { origin: officialOrigin, 'access-control-request-method': 'GET', 'access-control-request-headers': 'authorization' } })
+    assert.equal(preflight.status, 204)
+    assert.deepEqual(exposed(preflight), [])
+  } finally { await server.close() }
+})
