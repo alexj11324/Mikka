@@ -26,6 +26,7 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/restore$`), ['POST']],
 ]
 const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
+const WORKSPACE_GOVERNANCE = new RegExp(`^/api/workspaces/${UUID}/governance$`)
 const SERVICE_IDENTITY_DIRECTORY = `/api/workspaces/${UUID}/service-identities`
 const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
   [new RegExp(`^${SERVICE_IDENTITY_DIRECTORY}$`), 'POST'],
@@ -88,7 +89,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (path.startsWith('/api/workspaces/') && path.includes('/service-identities')) {
     return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
   }
-  if (path === '/api/organizations') return method === 'GET'
+  if (WORKSPACE_GOVERNANCE.test(path) || path === '/api/organizations') return method === 'GET'
   // Viewer grants are capabilities and must be obtained through owner-bound IPC.
   if (/^\/api\/bots\/[^/]+\/(?:computer\/(?:viewer|takeover)|subagents\/[^/]+\/viewer)$/.test(path)) return false
   return ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method === 'HEAD' ? 'GET' : method))
