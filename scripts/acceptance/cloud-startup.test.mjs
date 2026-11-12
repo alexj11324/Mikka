@@ -278,6 +278,11 @@ test('product canary pins both native subscriptions, exact production destinatio
   await assert.rejects(runCloudStartup({...selected,origin:'https://another.example'},{
     env:{},fetchImpl:async()=>{called=true;throw Error('unexpected request')},
   }),/startup_option_invalid/)
+  for (const override of [{taskProvider:undefined}, {actor:'owned_codex'}, {workspaceKind:'personal'}]) {
+    await assert.rejects(runCloudStartup({...selected,...override}, {
+      env:{}, verifyCompletedTask:async()=>{}, fetchImpl:async()=>{called=true;throw Error('unexpected request')},
+    }),/startup_/)
+  }
   assert.equal(called,false)
 })
 

@@ -140,6 +140,8 @@ test('registered service identity routes enforce a fresh Workspace admin through
     assert.deepEqual((await client.choices(created.id)).projects.map(row => row.id), [project])
     assert.deepEqual(await client.replaceProjects(created.id, [], [project], true), { projectIds: [project] })
     assert.deepEqual(await client.projects(created.id), { projectIds: [project] })
+    await assert.rejects(client.rotate(created.id, renamed.revision, null, randomUUID()),
+      (error: unknown) => error instanceof ServiceIdentityRequestError && error.status === 403)
     const issued = await client.rotate(created.id, renamed.revision, null)
     assert.ok(issued.token.startsWith('mksvc_'))
     const state = await client.credential(created.id)
@@ -180,6 +182,159 @@ test('registered service identity routes enforce a fresh Workspace admin through
     const { rows: events } = await pool.query(`SELECT action,"actorId" FROM resource_access_events WHERE "resourceKind"='project'
       AND "resourceId"=$1 AND source='service_project_assignment' AND detail->>'subjectId'=$2 ORDER BY revision`, [project, identity.id])
     assert.deepEqual(events, [{ action: 'grant_insert', actorId: owner }, { action: 'grant_delete', actorId: owner }])
+  })
+
+  await t.test('an organization-scoped key requires both administrators and expires with the original attachment', async t => {
+    const orgRequest = async (method: string, suffix: string, body: object) => {
+      const response = await fetch(origin + '/mikka/api/organizations' + suffix, {
+        method, headers: { cookie, origin, 'content-type': 'application/json' }, body: JSON.stringify(body),
+      })
+      assert.equal(response.status, 200)
+      return response.json()
+    }
+    const firstOrg = (await orgRequest('POST', '', { name: 'Original key organization' })).id
+    const otherOrg = (await orgRequest('POST', '', { name: 'Other key organization' })).id
+    t.after(async () => {
+      await pool.query('DELETE FROM mikka_organizations WHERE id=ANY($1::uuid[])', [[firstOrg, otherOrg]])
+      await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`, [first.id, member])
+    })
+    const attachment = (organizationId: string, method: string) => orgRequest(method, '/' + organizationId + '/workspaces', { workspaceId: first.id })
+    await attachment(firstOrg, 'POST')
+    const created = await request({ cookie, origin }, first.id, 'POST', '', { requestId: randomUUID(), name: 'Organization reporter' })
+    assert.equal(created.status, 200)
+    const resource = '/' + created.body.id
+    const credential = resource + '/credential'
+    assert.equal((await request({ cookie, origin }, first.id, 'PUT', resource + '/projects', assign)).status, 200)
+    const scoped = { action: 'rotate', revision: 1, organizationId: firstOrg }
+    const memberSession = await auth.internalAdapter.createSession(member)
+    const memberSignature = createHmac('sha256', auth.secret).update(memberSession.token).digest('base64')
+    const memberCookie = auth.authCookies.sessionToken.name + '=' + encodeURIComponent(memberSession.token + '.' + memberSignature)
+    await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`, [first.id, member])
+    assert.equal((await request({ cookie: memberCookie, origin }, first.id, 'POST', credential, scoped)).status, 403)
+    await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`, [first.id, member])
+    await orgRequest('POST', '/' + firstOrg + '/members', { userId: member, role: 'admin' })
+    assert.equal((await request({ cookie: memberCookie, origin }, first.id, 'POST', credential, scoped)).status, 403)
+    assert.equal((await request(admin.token, first.id, 'POST', credential, scoped)).status, 403)
+    assert.equal((await request({ cookie, origin }, first.id, 'POST', credential, { ...scoped, organizationId: otherOrg })).status, 403)
+
+    const projectRead = async (token: string, suffix = '') => {
+      const response = await fetch(origin + '/mikka/api/service-identity/projects' + suffix, { headers: { authorization: 'Bearer ' + token } })
+      return response.status
+    }
+    const issued = await request({ cookie, origin }, first.id, 'POST', credential, scoped)
+    assert.equal(issued.status, 200)
+    assert.equal(issued.body.organizationId, firstOrg)
+    const directory = async (organizationId: string, headers: Record<string, string>, suffix = '', input?: unknown) => {
+      const response = await fetch(origin + '/mikka/api/organizations/' + organizationId + '/api-keys' + suffix, {
+        method: input === undefined ? 'GET' : 'PATCH', headers: { 'content-type': 'application/json', ...headers },
+        ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+      })
+      return { status: response.status, body: await response.json() }
+    }
+    const listing = await directory(firstOrg, { cookie })
+    const key = listing.body.keys[0]
+    assert.ok(key.id !== created.body.id)
+    assert.deepEqual(listing, { status: 200, body: { keys: [{ id: key.id, name: null, workspaceId: first.id,
+      serviceIdentityId: created.body.id, serviceIdentityName: 'Organization reporter', expiresAt: null }], nextCursor: null } })
+    const path = '/' + key.id
+    await t.test('the app-only directory lists and names a single current credential under both live roles', async t => {
+      const name = 'Nightly project report'
+      assert.deepEqual((await directory(firstOrg, { cookie }, '?after=' + key.id)).body.keys, [])
+      assert.equal((await directory(firstOrg, { cookie }, '?after=invalid')).status, 400)
+      assert.deepEqual((await directory(otherOrg, { cookie })).body.keys, [])
+      assert.equal((await directory(otherOrg, { cookie, origin }, path, { name })).status, 404)
+      assert.deepEqual((await directory(firstOrg, { cookie: memberCookie })).body.keys, [])
+      assert.equal((await directory(firstOrg, { cookie: memberCookie, origin }, path, { name })).status, 404)
+      for (const [bearer, expectedStatus] of [[issued.body.token, 401], [admin.token, 403]] as const) {
+        assert.equal((await directory(firstOrg, { cookie, authorization: 'Bearer ' + bearer })).status, expectedStatus)
+        assert.equal((await directory(firstOrg, { cookie, origin, authorization: 'Bearer ' + bearer }, path, { name })).status, expectedStatus)
+      }
+      assert.equal((await directory(firstOrg, { cookie }, path, { name })).status, 403)
+      assert.equal((await directory(firstOrg, { cookie, origin }, path, { name: '  ' })).status, 400)
+      assert.equal((await directory(firstOrg, { cookie, origin }, path, { name, token: 'invalid' })).status, 400)
+      const auditAdmin = await seedUser(pool, 'organization-only-auditor')
+      t.after(async () => { await pool.query('DELETE FROM "user" WHERE id=$1', [auditAdmin]) })
+      await orgRequest('POST', '/' + firstOrg + '/members', { userId: auditAdmin, role: 'admin' })
+      const auditSession = await auth.internalAdapter.createSession(auditAdmin)
+      const auditSignature = createHmac('sha256', auth.secret).update(auditSession.token).digest('base64')
+      const auditCookie = auth.authCookies.sessionToken.name + '=' + encodeURIComponent(auditSession.token + '.' + auditSignature)
+      assert.deepEqual((await directory(firstOrg, { cookie: auditCookie })).body.keys, [])
+      type OrgEvent = { action: string; actorId: string; targetId: string | null; metadata: Record<string, unknown> }
+      const readOrganizationAudit = async (view: 'summary' | 'export'): Promise<OrgEvent[]> => {
+        const response = await fetch(origin + '/mikka/api/organizations/' + firstOrg + (view === 'export' ? '/audit-log' : ''), {
+          method: view === 'export' ? 'POST' : 'GET', headers: { cookie: auditCookie, origin, 'content-type': 'application/json' },
+          ...(view === 'export' && { body: '{}' }),
+        })
+        assert.equal(response.status, 200)
+        const body = await response.json()
+        if (view === 'export') {
+          t.after(async () => { await pool.query('DELETE FROM mikka_organization_audit_exports WHERE id=$1 AND "organizationId"=$2', [body.manifest.id, firstOrg]) })
+          return body.events
+        }
+        return body.audit
+      }
+      // The existing Organization audit already identifies attachments, independently of key issuance.
+      const baseline = await readOrganizationAudit('summary')
+      assert.ok(baseline.some(event => event.action === 'organization.workspace_attached' && event.targetId === first.id))
+      assert.equal(baseline.some(event => event.targetId === key.id || event.targetId === created.body.id), false)
+      assert.deepEqual(await directory(firstOrg, { cookie, origin }, path, { name }), { status: 200, body: { id: key.id, name } })
+      assert.deepEqual((await directory(firstOrg, { cookie })).body.keys, [{ ...key, name }])
+      assert.equal((await request({ cookie }, first.id, 'GET', credential)).body.revision, issued.body.revision)
+      assert.equal(await projectRead(issued.body.token), 200)
+      for (const view of ['summary', 'export'] as const) {
+        const events = (await readOrganizationAudit(view)).filter(event => event.action === 'organization.api_key_renamed')
+        assert.equal(events.length, 1)
+        assert.equal(events[0].actorId, owner)
+        assert.equal(events[0].targetId === null, true, 'the organization audit must omit the private key locator')
+        assert.deepEqual(events[0].metadata, {})
+      }
+
+      await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`, [first.id, member])
+      assert.deepEqual((await directory(firstOrg, { cookie: memberCookie })).body.keys, [{ ...key, name }])
+      await orgRequest('PATCH', '/' + firstOrg + '/members', { userId: member, role: 'member' })
+      assert.equal((await directory(firstOrg, { cookie: memberCookie })).status, 403)
+      assert.equal((await directory(firstOrg, { cookie: memberCookie, origin }, path, { name })).status, 403)
+      await orgRequest('PATCH', '/' + firstOrg + '/members', { userId: member, role: 'admin' })
+      await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`, [first.id, member])
+      assert.deepEqual((await directory(firstOrg, { cookie: memberCookie })).body.keys, [])
+      assert.equal((await directory(firstOrg, { cookie: memberCookie, origin }, path, { name })).status, 404)
+    })
+    const { rows: audit } = await pool.query(`SELECT payload->'metadata' AS metadata FROM workspace_audit_outbox
+      WHERE "workspaceId"=$1 AND payload->>'targetId'=$2 AND payload->>'action'='service_identity.credential_rotated'`, [first.id, created.body.id])
+    assert.deepEqual(audit, [{ metadata: { organizationId: firstOrg } }])
+    assert.equal((await request({ cookie }, first.id, 'GET', credential)).body.organizationId, firstOrg)
+    assert.equal(await projectRead(issued.body.token), 200)
+    assert.equal(await projectRead(issued.body.token, '/' + project), 200)
+    assert.equal(await projectRead(issued.body.token, '/' + privateProject), 404)
+
+    await attachment(firstOrg, 'DELETE')
+    assert.equal(await projectRead(issued.body.token), 401)
+    assert.deepEqual((await directory(firstOrg, { cookie })).body.keys, [])
+    const detached = await request({ cookie }, first.id, 'GET', credential)
+    assert.equal(detached.body.configured, false)
+    assert.equal(detached.body.revision, 3)
+    await attachment(otherOrg, 'POST')
+    assert.equal(await projectRead(issued.body.token, '/' + project), 401)
+    await attachment(otherOrg, 'DELETE')
+    await attachment(firstOrg, 'POST')
+    assert.equal(await projectRead(issued.body.token), 401)
+    const rebound = await request({ cookie, origin }, first.id, 'POST', credential, { ...scoped, revision: 3 })
+    assert.equal(rebound.status, 200)
+    assert.equal(await projectRead(rebound.body.token), 200)
+    const [replacement] = (await directory(firstOrg, { cookie })).body.keys
+    assert.notEqual(replacement.id, key.id)
+    assert.equal(replacement.name, null)
+    assert.equal((await directory(firstOrg, { cookie, origin }, path, { name: 'Stale attempt' })).status, 404)
+    const workspaceOnly = await request({ cookie, origin }, first.id, 'POST', credential, { action: 'rotate', revision: 4 })
+    assert.equal(workspaceOnly.status, 200)
+    assert.equal(await projectRead(rebound.body.token), 401)
+    assert.deepEqual((await directory(firstOrg, { cookie })).body.keys, [])
+    assert.equal((await directory(firstOrg, { cookie, origin }, '/' + replacement.id, { name: 'Replaced key' })).status, 404)
+    assert.equal((await request({ cookie }, first.id, 'GET', credential)).body.organizationId, undefined)
+    await attachment(firstOrg, 'DELETE')
+    assert.equal(await projectRead(workspaceOnly.body.token, '/' + project), 200)
+    assert.equal((await request({ cookie, origin }, first.id, 'POST', credential, { action: 'revoke', revision: 5 })).status, 200)
+    assert.equal(await projectRead(workspaceOnly.body.token), 401)
   })
 
   await t.test('an independent service bearer sees only explicit Projects and follows live revocation', async t => {
