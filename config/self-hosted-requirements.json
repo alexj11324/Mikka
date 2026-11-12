@@ -540,6 +540,13 @@
     "test": "lib/linear-sync/run-comment.test.ts",
     "suite": "test:linear-sync"
   },
+  "lib/mobile-web-target.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Preserve the allowlist for same-server mobile web handoff. The scoped Members destination requires the official page and current team administrator at exchange and confirmation.",
+    "test": "tests/mobile-service-members.db.test.ts",
+    "suite": "test:web-auth-db"
+  },
   "lib/platform/public-origin.ts": {
     "mode": "built-in",
     "environment": [],
