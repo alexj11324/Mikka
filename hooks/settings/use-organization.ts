@@ -4,7 +4,7 @@ import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
 import { withBasePath } from '@/lib/base-path'
 import { GovernanceRequestError, governanceKey, type GovernanceDetail } from '@/hooks/settings/use-workspace-governance'
-import { useLiveKey } from '@/hooks/use-live-key'
+import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 
 /**
  * Enterprise v1 (#1608 P2, #1642 「Claude 界面交接」): the Organization a Shared
@@ -138,6 +138,16 @@ export function useOrganizationIdentity(organizationId: string | null | undefine
 
 export function useOrganizationPolicy(organizationId: string | null | undefined) {
   return useSWR(organizationId ? policyKey(organizationId) : null, ([, id]) => request<ResourcePolicyState>(org(id, '/policy')), swr)
+}
+
+export function useOrganizationServiceKeys(organizationId: string, after: string | undefined, workspaceIds: readonly string[]) {
+  const key = ['organization-service-keys', organizationId, after ?? ''] as const
+  const result = useSWR(key, () => organizationApi.serviceKeys(organizationId, after), {
+    shouldRetryOnError: false, revalidateOnFocus: true,
+  })
+  const subscriptions = workspaceIds.map(id => ({ kind: 'workspace_settings' as const, id, workspaceId: id }))
+  useLiveKeys(subscriptions, [unstable_serialize(key)], undefined, { minIntervalMs: 2_000 })
+  return result
 }
 
 export type OrganizationServiceKey = {
