@@ -65,6 +65,12 @@
   },
   "Issue": {
     "scope": {
+      "workspaceUnavailable": "无法获取所属工作区",
+      "linearSync": "Linear 同步",
+      "linearEnabled": "已启用",
+      "disableLinear": "关闭 Linear 同步",
+      "disableLinkedLinear": "关闭同步并归档关联的 Linear Issue",
+      "linearDisabled": "已关闭 Linear 同步。",
       "label": "归属",
       "workspace": "工作区",
       "personal": "个人",
