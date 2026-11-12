@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/slack/installation-store.ts', file: 'tests/slack-installation.db.test.ts', script: 'test:slack-installation-db' },
   { marker: 'lib/coding-workspace/review-authority.ts', file: 'lib/coding-workspace/review-authority.db.test.ts', script: 'test:coding-workspace-db' },
   { marker: 'lib/coding-workspace/review-sessions.ts', file: 'lib/coding-workspace/review-team-scope.db.test.ts', script: 'test:coding-workspace-db' },
   { marker: 'lib/task-presentation-read.ts', file: 'tests/task-presentation.db.test.ts', script: 'test:task-presentation-db' },

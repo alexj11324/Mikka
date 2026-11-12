@@ -81,6 +81,20 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/organizations/[organizationId]/api-keys/[keyId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Require a fresh same-origin human session before renaming one visible organization-bound service credential.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/organizations/[organizationId]/api-keys/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List a page of key metadata for attached team Workspaces the signed-in Organization administrator also administers.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/service-identity/projects/[projectId]/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -101,45 +115,6 @@
     "behavior": "List, upload, download and delete task files under the task ACL using the installation database and configured attachment storage.",
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
-  },
-  "app/api/tasks/[taskId]/review/preview/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
-    "test": "lib/coding-workspace/preview/route.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "app/api/tasks/[taskId]/review/terminal/input/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
-    "test": "lib/coding-workspace/terminal/http.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "app/api/tasks/[taskId]/review/terminal/resize/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
-    "test": "lib/coding-workspace/terminal/http.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "app/api/tasks/[taskId]/review/terminal/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
-    "test": "lib/coding-workspace/terminal/http.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
   },
   "app/api/workspaces/[workspaceId]/service-identities/[identityId]/credential/route.ts": {
     "mode": "built-in",
@@ -301,12 +276,14 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
-  "drizzle/20261112030511_coding_review_provider_receipts.sql": {
+  "drizzle/20261112032026_organization_service_key_names.sql": {
     "mode": "built-in",
-    "environment": [],
-    "behavior": "Existing PostgreSQL review leases retain their E2B placement. New sponsored leases record their immutable repository and independent human operation for cleanup.",
-    "test": "lib/coding-workspace/review-authority.db.test.ts",
-    "suite": "test:coding-workspace-db"
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Give each existing and future organization-bound service key an independent public ID and a nullable name in the Workspace database.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "lib/abuse/workers-ai.ts": {
     "mode": "optional-cloud",
@@ -390,25 +367,6 @@
     "test": "lib/factory/checks.db.test.ts",
     "suite": "test:factory-checks-db"
   },
-  "lib/coding-workspace/cloudflare-review.ts": {
-    "mode": "optional-cloud",
-    "environment": [
-      "MIKKA_CLOUDFLARE_TASK_WORKSPACES",
-      "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
-    ],
-    "behavior": "A separately admitted sponsored checkout builds a bounded human lease. Local and owner-provided E2B review keep their existing transport.",
-    "test": "lib/coding-workspace/cloudflare-review.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
-  "lib/coding-workspace/preview/route.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
-    "test": "lib/coding-workspace/preview/route.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
-  },
   "lib/coding-workspace/preview/runtime.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -440,16 +398,6 @@
     "behavior": "Persist and fence terminal and preview leases in PostgreSQL. Preserve pending remote closes for the existing recovery timer.",
     "test": "lib/coding-workspace/review-authority.db.test.ts",
     "suite": "test:coding-workspace-db"
-  },
-  "lib/coding-workspace/terminal/http.ts": {
-    "mode": "operator-configured",
-    "environment": [
-      "BETTER_AUTH_SECRET",
-      "BETTER_AUTH_URL"
-    ],
-    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
-    "test": "lib/coding-workspace/terminal/http.test.ts",
-    "suite": "test:coding-workspace-review-runtime"
   },
   "lib/coding-workspace/terminal/runtime.ts": {
     "mode": "operator-configured",
@@ -671,6 +619,13 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/governance/organization-api-keys.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only current, explicitly bound service keys visible under both admin roles and rename by the ID of a single issuance.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/governance/service-credentials.ts": {
     "mode": "built-in",
     "environment": [],
@@ -733,6 +688,13 @@
     "behavior": "Accept only a validated Task or immutable receipt and an opaque rendezvous on the configured HTTPS server.",
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
+  },
+  "lib/mobile-web-target.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Preserve the allowlist for same-server mobile web handoff. The scoped Members destination requires the official page and current team administrator at exchange and confirmation.",
+    "test": "tests/mobile-service-members.db.test.ts",
+    "suite": "test:web-auth-db"
   },
   "lib/platform/public-origin.ts": {
     "mode": "built-in",
@@ -964,5 +926,227 @@
     "behavior": "The standalone broker is outside the standard Compose stack. When deployed separately its listen port is configurable and credential handlers enforce caller identity.",
     "test": "services/credential-broker/server.test.mjs",
     "suite": "test:self-hosted-broker"
+  },
+  "app/api/integrations/slack/callback/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Accept one browser-bound Slack OAuth code and encrypt the bot grant for the currently authorized workspace.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/integrations/slack/connect/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL"
+    ],
+    "behavior": "Consume an authenticated member’s one-time handoff before opening the official Slack consent URL.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/integrations/slack/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Show or update only an active member’s Slack installation and channel preferences. Missing platform configuration disables installation.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "app/api/internal/eve/slack-credential/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY",
+      "SLACK_APP_ID",
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Require the scoped Eve principal, recipient proof, current workspace membership, and current link generation to obtain the native bot credential.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "apps/eve/agent/hooks/slack-installation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store non-secret, verified Slack link coordinates in the official Eve session for rendering a resumed turn.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
+  },
+  "drizzle/20261112030512_slack_workspace_installations.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL"
+    ],
+    "behavior": "Persist single-use browser state, encrypted Workspace installations, and member-specific channel preferences in the existing application PostgreSQL database.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "lib/slack/channel-grant.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_EVE_HOST",
+      "MIKKA_APP_ORIGIN",
+      "BETTER_AUTH_URL",
+      "MIKKA_EVE_PRODUCT_TOKEN",
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Get an uncached, member-bound native Slack credential from the configured product host for this Eve session.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/channel-scope.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Carry only verified coordinates within Eve’s signed request and durable session; absent Slack identity cannot resolve credentials.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
+  },
+  "lib/slack/grant-proof.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
+    "behavior": "Bind the dedicated Slack grant proof to the timed Eve authorization, team, sender, installation and active member link.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/install-provider.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Use Slack OAuth, bot identity validation, member-visible conversation metadata and official revocation APIs for an operator-configured Slack app.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/installation-store.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_APP_ID",
+      "SLACK_CLIENT_ID",
+      "SLACK_CLIENT_SECRET",
+      "BETTER_AUTH_URL",
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "WORKSPACE_SECRETS_KEY"
+    ],
+    "behavior": "Encrypt grants under the workspace secret key, lock refreshes, verify the active member link and disable local use before remote uninstall.",
+    "test": "tests/slack-installation.db.test.ts",
+    "suite": "test:slack-installation-db"
+  },
+  "lib/slack/installed-routing.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read coordinates only from the platform-signed Slack app/team envelope, bound sender and validated revocation events.",
+    "test": "lib/slack/install-provider.test.ts",
+    "suite": "test:slack"
+  },
+  "lib/slack/eve-channel.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "SLACK_SIGNING_SECRET",
+      "SLACK_APP_ID"
+    ],
+    "behavior": "The official Eve Slack channel accepts signed events only from a verified Slack member with active workspace access and a current OAuth link.",
+    "test": "tests/slack-bot.test.mjs",
+    "suite": "test:slack"
+  },
+  "app/api/tasks/[taskId]/review/preview/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/input/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/resize/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/tasks/[taskId]/review/terminal/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "drizzle/20261112030511_coding_review_provider_receipts.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Existing PostgreSQL review leases retain their E2B placement. New sponsored leases record their immutable repository and independent human operation for cleanup.",
+    "test": "lib/coding-workspace/review-authority.db.test.ts",
+    "suite": "test:coding-workspace-db"
+  },
+  "lib/coding-workspace/cloudflare-review.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_CLOUDFLARE_TASK_WORKSPACES",
+      "MIKKA_TASK_MACHINE_BRIDGE_TOKEN"
+    ],
+    "behavior": "A separately admitted sponsored checkout builds a bounded human lease. Local and owner-provided E2B review keep their existing transport.",
+    "test": "lib/coding-workspace/cloudflare-review.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/preview/route.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Issue a one-use link only after checking the installation origin and current checkout. A missing local dev server returns unavailable.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
+  "lib/coding-workspace/terminal/http.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "BETTER_AUTH_SECRET",
+      "BETTER_AUTH_URL"
+    ],
+    "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
+    "test": "lib/coding-workspace/terminal/http.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
   }
 }

@@ -1,11 +1,15 @@
 # Engineering acceptance on Cloudflare
 
-Run the `Cloudflare engineering sandbox` Actions workflow on `main` to test a
-committed revision in a disposable Container. The caller supplies the Mikka
-issue, the exact upstream Git SHA and one of the supported workloads.
+Mikka maintainers submit development and acceptance jobs through the private
+operations repository. Its protected workflow supplies the identity trusted by
+the company Worker. Open the [private operations entry](https://github.com/alexj11324/mikka-cloud/blob/main/AGENTS.md).
+
+For a self-hosted runner, dispatch `Cloudflare engineering sandbox` on the main
+branch of the repository configured as `CALLER_REPOSITORY`. Supply the owning
+Mikka issue, the exact upstream Git SHA and one of the supported workloads.
 
 ```sh
-gh workflow run engineering-sandbox.yml --repo alexj11324/Mikka --ref main \
+gh workflow run engineering-sandbox.yml --repo "$CALLER_REPOSITORY" --ref main \
   -f issue=1503 -f workload=factory-handoff -f sha="$SOURCE_SHA"
 ```
 
@@ -20,8 +24,7 @@ For self-hosting, set the Worker variables CALLER_REPOSITORY and
 CALLER_REPOSITORY_ID to the dispatch workflow's full GitHub repository name and
 numeric ID. Set that repository's ENGINEERING_SANDBOX_URL Actions variable to
 the HTTPS origin of the deployed Worker. The workflow rejects pull requests
-and runs only explicitly dispatched main jobs. Company publishing belongs to
-the [private operations entry](https://github.com/alexj11324/mikka-cloud/blob/main/AGENTS.md).
+and runs only explicitly dispatched main jobs.
 
 Actions authenticates with its short-lived GitHub OIDC token. The Worker
 requires the upstream repository ID, trusted workflow path, main ref and event.

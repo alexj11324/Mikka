@@ -196,8 +196,9 @@ export function usePluginStore({ apps, ownRead, category, query, go }: { apps: C
   const byId = new Map<string, StoreApp>(store.map(item => [item.id, item]))
   // Ours have no Composio blurb: one line says what each brings (UI audit work-10).
   const own: StoreEntry[] = OWN_APPS.map(id => ({ id, ...info(id), description: t(`ownDescription.${id}`) }))
+  if (!byId.has('slack')) own.push({ id: 'slack', ...info('slack'), description: t('ownDescription.slack') })
   const entries = (ids: readonly string[]): StoreEntry[] => ids.flatMap(id => { const item = byId.get(id); return item ? [{ id, name: item.name, description: item.description, iconUrl: item.iconUrl, connect: item.connect }] : [] })
-  const stateOf = (id: string): StoreItemState | null => isOwnApp(id)
+  const stateOf = (id: string): StoreItemState | null => id === 'slack' && !byId.has(id) ? 'add' : isOwnApp(id)
     ? ownRead.data?.failed.includes(id) && ownRead.data.states[id] === undefined ? 'unavailable' : storeItemState({ kind: 'own', state: ownRead.data?.states[id] })
     : storeItemState({ kind: 'composio', connect: byId.get(id)?.connect, accounts: apps.accountsFor(id).length, canLink: byId.get(id)?.connect === 'credentials' ? apps.canEnterKey : apps.canLink, loading: apps.loading })
   // The sections, as Codex's: 热门 (ours first, then Composio's usage order), 新品推荐, then Composio's categories.
@@ -214,7 +215,7 @@ export function usePluginStore({ apps, ownRead, category, query, go }: { apps: C
   const addable = [...own, ...entries(catalog.data?.popular ?? [])].filter(item => stateOf(item.id) === 'add')
   /** + : ours open their own page, where their connect flow lives; a key opens the key form; the rest Composio's link. */
   function connect(id: string) {
-    if (isOwnApp(id)) go({ app: id, category })
+    if (isOwnApp(id) || id === 'slack') go({ app: id, category })
     else if (byId.get(id)?.connect === 'credentials') setKeyTarget({ app: id })
     else void apps.connect(id)
   }
