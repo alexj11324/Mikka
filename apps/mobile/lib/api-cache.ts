@@ -2,6 +2,7 @@
 export class ApiCache {
   private generation = 0
   private identity: string | null = null
+  private sessionId: string | null = null
   private ownerId: string | null = null
   private values = new Map<string, unknown>()
   private revisions = new Map<string, number>()
@@ -28,8 +29,9 @@ export class ApiCache {
   owner() { return this.ownerId }
   get<T>(path: string): T | null { return (this.values.get(path) as T | undefined) ?? null }
   clear() { this.generation++; this.values.clear(); this.revisions.clear() }
-  setIdentity(identity: string | null, ownerId: string | null = identity) {
-    if (this.identity === identity && this.ownerId === ownerId) return
+  setIdentity(identity: string | null, ownerId: string | null = identity, sessionId: string | null = null) {
+    if (this.identity === identity && this.ownerId === ownerId && this.sessionId === sessionId) return
+    this.sessionId = sessionId
     this.identity = identity
     this.ownerId = identity ? ownerId : null
     this.clear()
