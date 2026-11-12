@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { writeDeviceCommand } from '../lib/devices/copy-command.mjs'
+import { writeDeviceCommand } from '../components/devices/copy-command.mjs'
 
 test('a missing clipboard API cannot be reported as copied', async () => {
   assert.equal(await writeDeviceCommand('npm install -g agent', undefined), 'unavailable')
