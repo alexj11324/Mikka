@@ -104,7 +104,7 @@ test('Vite uses the same existing Lightning CSS color space and neutral mixing a
   assert.match(declarations.get('.dark/--sidebar-primary-soft'), /color-mix\(in oklab,\s*var\(--sidebar-primary\)\s*40%,\s*var\(--sidebar\)\)/)
 })
 
-test('official namespace consumers cannot silently render an alternate task detail after an export disappears', async t => {
+test('official Web and Desktop require the registered providers and link their mounted and lazy exports', async t => {
   const { UI_SLOTS, UI_SLOT_EXPORTS, PUBLIC_CONTRACT_SLOTS } = await import('../../../lib/ui-overlay.mjs')
   const dir = await mkdtemp(join(repository, '.hosted-test-'))
   t.after(() => rm(dir, { recursive: true, force: true }))
