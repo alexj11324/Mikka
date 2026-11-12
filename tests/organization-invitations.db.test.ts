@@ -41,6 +41,7 @@ test('Organization invitations grant only a verified Member without inheriting W
   t.after(async () => {
     if (organizationId) await check.query('delete from mikka_organizations where id=$1', [organizationId])
     if (secondOrganizationId) await check.query('delete from mikka_organizations where id=$1', [secondOrganizationId])
+    await check.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspaceId])
     await check.query('delete from mikka_workspaces where id=$1', [workspaceId])
     for (const user of people) await check.query('delete from "user" where id=$1', [user.id])
   })
