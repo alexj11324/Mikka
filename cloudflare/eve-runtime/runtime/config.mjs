@@ -27,13 +27,13 @@ export function hostConfiguration(env) {
     if (!key.startsWith('EVE_ENV_')) continue
     const name = key.slice('EVE_ENV_'.length)
     if (!/^[A-Z][A-Z0-9_]*$/.test(name) || typeof value !== 'string') return invalid()
-    // These values select hosting and durable storage, rather than credentials.
+    // Eve verifies Slack events. OAuth exchange and installation grant decryption live in the business API.
+    if (name.startsWith('SLACK_') && name !== 'SLACK_APP_ID' && name !== 'SLACK_SIGNING_SECRET') return invalid()
     if (['VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'VERCEL_DEPLOYMENT_ID',
       'EVE_QUEUE_SIGNING_KEY', 'WORLD_QUEUE_ED25519_PRIVATE_KEY', 'WORKFLOW_POSTGRES_URL', 'MIKKA_EVE_WORLD_TOKEN', 'MIKKA_EVE_PRODUCT_TOKEN',
       'WORKFLOW_DEPLOYMENT_ID', 'MIKKA_DEPLOYMENT_ID', 'NODE_EXTRA_CA_CERTS', 'MIKKA_EVE_ORIGIN', 'WORKFLOW_TARGET_WORLD', 'WORKFLOW_LOCAL_DATA_DIR',
       'WORKFLOW_LOCAL_BASE_URL', 'MIKKA_EVE_WORKFLOW_WORLD', 'MIKKA_EVE_HOST',
-      'SLACK_USER_BINDINGS', 'SLACK_WATCHED_CHANNELS', 'SLACK_CHANNEL_WORKSPACES',
-      'SLACK_TEAM_ID', 'SLACK_BOT_USER_ID', 'SLACK_BOT_TOKEN'].includes(name)) return invalid()
+      'WORKSPACE_SECRETS_KEY'].includes(name)) return invalid()
     runtime[name] = value
   }
   if (!/^[A-Za-z0-9+/]{43}=$/.test(env.WORLD_QUEUE_PUBLIC_KEY ?? '') || !env.WORLD_SERVICE?.fetch
