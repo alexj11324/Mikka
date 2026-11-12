@@ -1,3 +1,4 @@
+import type { Pool } from 'pg'
 import { afterJob } from '@/lib/background'
 import { setTimeout as delay } from 'node:timers/promises'
 import { deviceGatewayEndpoint } from './device-gateway-client'
