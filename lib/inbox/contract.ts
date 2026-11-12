@@ -3,7 +3,7 @@ export const itemType = z.enum(['task', 'suggestion'])
 export const inboxQuery = z.object({
   workspaceId: z.uuid(), tab: z.enum(['pending', 'snoozed', 'done']).default('pending'),
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  cursor: z.string().max(256).optional(),
+  cursor: z.string().max(256).optional(), count: z.literal('1').optional(),
 }).strict()
 export const inboxCommand = z.discriminatedUnion('action', [
   z.object({ workspaceId: z.uuid(), type: itemType, id: z.uuid(), action: z.literal('snooze'), until: z.iso.datetime({ offset: true }) }).strict(),

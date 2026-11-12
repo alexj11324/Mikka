@@ -142,6 +142,8 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     }
     assert.equal((await list()).items.length, 0)
     assert.equal((await list(owner, workspace, 'snoozed')).items.length, 2)
+    assert.equal(await store.pendingCount(owner, workspace), 0, 'badge excludes both snoozed rows')
+    assert.equal(await store.pendingCount(peer, workspace), 1, 'badge respects viewer scope')
     assert.equal((await list(peer)).items.length, 1, 'personal snooze never hides a teammate task')
     assert.equal(await store.nextDue(), due.getTime())
     const before = pushes.length

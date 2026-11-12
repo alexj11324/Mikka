@@ -16,6 +16,13 @@ async function inboxRequest(version: number, path: string, init: RequestInit) {
   return data
 }
 
+export async function readInboxCount(workspaceId: string, version: number): Promise<number> {
+  const query = new URLSearchParams({ workspaceId, count: '1' })
+  const result = await inboxRequest(version, '/api/inbox?' + query, {})
+  if (!Number.isSafeInteger(result?.count) || result.count < 0) throw new InboxRequestError('actionFailed', 0)
+  return result.count
+}
+
 export async function readInboxPage(workspaceId: string, tab: InboxTab, cursor: string | null, version: number): Promise<InboxPage> {
   const query = new URLSearchParams({ workspaceId, tab })
   if (cursor !== null) query.set('cursor', cursor)
