@@ -4,6 +4,7 @@ import { mkdir, realpath } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { hasGitHubOrigin } from './cloudflare-source.mjs'
+import { privateSourceCompilerEnvironment, privateSourceGitEnvironment } from './private-source-auth.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repository = 'alexj11324/Mikka'
@@ -42,12 +43,7 @@ export async function runCloudCi({ env = process.env, verify = false, publicRoot
     await mkdir(privateRoot)
     git(privateRoot, 'init')
     git(privateRoot, 'remote', 'add', 'origin', `https://github.com/${privateRepository}.git`)
-    const fetchEnv = env.MIKKA_CLOUD_READ_TOKEN ? {
-      ...process.env,
-      GIT_CONFIG_COUNT: '1',
-      GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
-      GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${env.MIKKA_CLOUD_READ_TOKEN}`).toString('base64')}`,
-    } : process.env
+    const fetchEnv = await privateSourceGitEnvironment({ env, repository: privateRepository, token: env.MIKKA_CLOUD_READ_TOKEN })
     gitWithEnv(privateRoot, fetchEnv, ['fetch', '--depth=1', 'origin', context.privateSource])
     git(privateRoot, 'checkout', '--detach', context.privateSource)
   }
@@ -56,7 +52,7 @@ export async function runCloudCi({ env = process.env, verify = false, publicRoot
       git(privateRoot, 'status', '--porcelain', '--untracked-files=no') !== '') fail('CLOUD_PUBLIC_CI_PRIVATE_SOURCE_MISMATCH')
   git(privateRoot, 'ls-files', '--error-unmatch', 'scripts/cloudflare-ci.mjs')
   const { runCi } = await import(pathToFileURL(resolve(privateRoot, 'scripts/cloudflare-ci.mjs')).href)
-  const receipt = await runCi({ env, verify, publicRoot, publicSource: context.publicSource })
+  const receipt = await runCi({ env: privateSourceCompilerEnvironment(env), verify, publicRoot, publicSource: context.publicSource })
   if (git(publicRoot, 'rev-parse', 'HEAD') !== context.publicSource || git(privateRoot, 'rev-parse', 'HEAD') !== context.privateSource) fail('CLOUD_PUBLIC_CI_SOURCE_CHANGED')
   if (!receipt?.excluded && (receipt?.context?.sha !== context.privateSource || receipt.context.publicSource !== context.publicSource ||
       receipt.context.repository !== repository || receipt.context.buildId !== context.buildId || receipt.context.branch !== context.branch ||

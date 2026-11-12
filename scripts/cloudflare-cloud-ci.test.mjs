@@ -49,6 +49,7 @@ test('public checkout invokes the pinned compiler and rejects provenance or chec
     const privateSource = await repository(privateRoot, 'alexj11324/mikka-cloud', {
       'scripts/cloudflare-ci.mjs': `export async function runCi({ env, verify, publicRoot, publicSource }) {
         if (!publicRoot || !publicSource) throw new Error('missing public owner')
+        if (Object.keys(env).some(key => key.startsWith('PRIVATE_SOURCE_GITHUB_APP_') || key.endsWith('_READ_TOKEN'))) throw new Error('source credentials reached compiler')
         return { publication: 'none', verified: verify, context: {
           provider: 'cloudflare-workers-builds', repository: 'alexj11324/Mikka', publicSource,
           sha: env.MIKKA_CLOUD_SOURCE_SHA, branch: env.WORKERS_CI_BRANCH,
@@ -56,7 +57,10 @@ test('public checkout invokes the pinned compiler and rejects provenance or chec
         } }
       }`,
     })
-    const buildEnv = { ...env, WORKERS_CI_COMMIT_SHA: publicSource, MIKKA_CLOUD_SOURCE_SHA: privateSource }
+    const buildEnv = { ...env, WORKERS_CI_COMMIT_SHA: publicSource, MIKKA_CLOUD_SOURCE_SHA: privateSource,
+      PRIVATE_SOURCE_GITHUB_APP_ID: '12345', PRIVATE_SOURCE_GITHUB_APP_PRIVATE_KEY: 'private-sentinel',
+      PRIVATE_SOURCE_GITHUB_APP_INSTALLATION_ID: '173164679', MIKKA_CLOUD_READ_TOKEN: 'token-sentinel',
+    }
     const result = await runCloudCi({ env: buildEnv, publicRoot, verify: true })
     assert.deepEqual(result.context, {
       provider: 'cloudflare-workers-builds', repository: 'alexj11324/Mikka', publicSource, privateSource,
