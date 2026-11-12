@@ -3,8 +3,6 @@ import type { Pool, PoolClient } from 'pg'
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import type { WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
 import type { TaskMachineGrant } from '@/lib/eve/cloudflare-task-connection'
-import { revalidateExecutionIdentity } from '@/lib/execution-identity'
-import { withRunProjectResources } from '@/lib/project-resources/run-lease'
 
 export type SponsoredTaskPlacement = Readonly<{
   provider: 'cloudflare'
@@ -18,7 +16,7 @@ export type SponsoredTaskPlacement = Readonly<{
 }>
 export type TaskMachineActor = { userId: string; workspaceId: string }
 type Query = Pick<PoolClient, 'query'>
-type ResourceRun = Parameters<typeof withRunProjectResources>[1]
+type ResourceRun = Parameters<typeof import('@/lib/project-resources/run-lease').withRunProjectResources>[1]
 type BoundRun = ResourceRun & {
   id: string
   botId: string
@@ -149,6 +147,8 @@ export async function withSponsoredTaskGrant<T>(
   work: (g: TaskMachineGrant) => Promise<T>,
 ) {
   const first = await readSponsoredTaskGrant(pool, actor, runId)
+  const { withRunProjectResources } = await import('@/lib/project-resources/run-lease')
+  const { revalidateExecutionIdentity } = await import('@/lib/execution-identity')
   return withRunProjectResources(pool, first.run, async () => {
     const tx = await pool.connect()
     try {
