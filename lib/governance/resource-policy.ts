@@ -15,7 +15,7 @@ import { armDueTimerAfterCommit } from '@/lib/due-timer'
 
 export const organizationResourcePolicyInput = z.object({
   modelCredentialSharing: z.enum(['allow', 'approval_required', 'deny']), mcpSharing: z.enum(['allow', 'approval_required', 'deny']),
-  allowedModelProviders: z.array(z.enum(['vercel-gateway', 'zerocat', 'openai-subscription', 'anthropic-subscription', 'api-key'])).max(5).nullable(),
+  allowedModelProviders: z.array(z.enum(['vercel-gateway', 'zerocat', 'cloudflare-workers-ai', 'openai-subscription', 'anthropic-subscription', 'api-key'])).max(6).nullable(),
   auditRetentionDays: z.number().int().min(1).max(36500).nullable(), legalHold: z.boolean(),
 }).strict()
 

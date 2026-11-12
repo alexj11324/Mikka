@@ -31,6 +31,7 @@ import { loadWorkspace, preloadWorkspace } from './workspace-loader'
 import { InstalledWorkspace } from './installed-workspace'
 import { serverDocumentKind, serverPageKind } from '@/lib/server-pages'
 
+const ServerStatus = lazy(() => import('@/components/server-status'))
 const Workspace = lazy(loadWorkspace)
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
 const WorkspaceLinkRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.WorkspaceLinkRoute })))
@@ -46,8 +47,11 @@ export function App() {
   const location = useLocation()
   const locale = localeOf(location.pathname)
   useEffect(() => { document.documentElement.lang = locale }, [locale])
+  const status = platform === 'web' && serverDocumentKind() === 'status'
   return <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : zh} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
-    <ThemeProvider><PlatformExtras /><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></ThemeProvider>
+    <ThemeProvider>{status
+      ? <RendererBoundary><Suspense fallback={<WorkspaceLoading />}><ServerStatus /></Suspense></RendererBoundary>
+      : <><PlatformExtras /><SWRDefaults><RendererBoundary><SessionApplication /></RendererBoundary></SWRDefaults><Toaster /></>}</ThemeProvider>
   </NextIntlClientProvider>
 }
 

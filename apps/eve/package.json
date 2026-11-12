@@ -8,6 +8,7 @@
     "dev": "eve dev --no-ui --host 127.0.0.1 --port 3002"
   },
   "dependencies": {
+    "@mikka/eve-cloudflare-world": "workspace:*",
     "eve": "1.0.0-rc.9"
   }
 }

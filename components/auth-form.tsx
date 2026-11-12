@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
 import { signInRefusal, signupRefusal, turnstileHeaders } from '@/lib/signup-refusal'
 import { Turnstile, type TurnstileHandle } from '@/components/auth/turnstile'
+import { selectedWebServer } from '@/lib/web-connection/selection'
+import { WebServerControl } from '@/components/settings/web-server-control'
 import { AuthSso } from '@ui-slot/auth-sso'
 
 const DESKTOP_OAUTH_STATE_KEY = 'mikka:desktop-oauth'
@@ -279,8 +281,17 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
   if (desktopStep.kind === 'choose-account' && (desktopFlow || webFlow) && signedInAs) return <Auth registering={registering} next={returnPath}>
     <DesktopAccountChoice account={signedInAs} continueHref={webFlow ? webAuthReturnPath(webFlow) : desktopAuthReturnPath(desktopFlow!.state, desktopFlow!.next, desktopFlow!.callback)} pending={pending} error={error} onSwitch={switchAccount} />
   </Auth>
+  const serverPicker = !registering && !desktopFlow && !webFlow && !continueURL
+    ? <WebServerControl afterSelection={cloud => {
+      // Adding a Cloud account keeps the Cloud login form, even if another
+      // Cloud cookie is already signed in. Remote login completes in its popup.
+      if (cloud && addAccount) window.location.replace(window.location.href)
+      else window.location.replace(home)
+    }} /> : null
+  if (serverPicker && selectedWebServer()) return <Auth registering={false} addAccount={addAccount} next={returnPath}>{serverPicker}</Auth>
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
     <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={webFlow ? webAuthQuery(webFlow) : desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} sso={!registering ? <AuthSso callbackURL={ssoCallbackURL} disabled={pending} /> : undefined} />
+    {serverPicker}
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>

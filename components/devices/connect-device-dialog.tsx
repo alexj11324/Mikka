@@ -8,10 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { CodeBlock, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from '@/components/reui/code-block/code-block'
 import { IconTile } from '@/components/reui/icon-tile'
-import { BASE_PATH } from '@/lib/base-path'
 import { daemonCommands } from '@/lib/daemon-commands'
 import { FieldError } from '@/components/ui/field'
-import { publicAppOrigin } from '@/lib/platform/public-origin'
+import { publicServiceAddress } from '@/lib/platform/public-origin'
 import { daemonPackageName } from '@/lib/platform/client-config'
 
 export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTrigger = false, reconnect = false }: {
@@ -63,7 +62,7 @@ export function DaemonCommandList({ open = true, reconnect = false }: { open?: b
   const [commands, setCommands] = useState<ReturnType<typeof daemonCommands> | null>(null)
   useEffect(() => {
     if (!open) return
-    try { setCommands(daemonCommands({ origin: publicAppOrigin(), basePath: BASE_PATH, packageName: daemonPackageName() })) }
+    try { setCommands(daemonCommands({ ...publicServiceAddress(), packageName: daemonPackageName() })) }
     catch { setCommands(null) }
   }, [open])
   return commands ? <div className="flex min-w-0 flex-col gap-4">

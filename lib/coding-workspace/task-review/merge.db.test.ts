@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test, { mock, type TestContext } from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../../db/commit-effects'
 import { z } from 'zod'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
 import { WorkspaceReviewError, type DiffFilePatch, type TaskReviewRef } from '@mikka/protocol/coding-workspace-review'
@@ -44,6 +45,8 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
   await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 16, connectionTimeoutMillis: 5000 })
+  // Match the HTTP route's request-scoped pool: real Factory writes publish after COMMIT.
+  observePoolCommits(pool)
   const environment = { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), ORVILO_DATABASE_URL: target.toString(),
     E2E_DATABASE_URL: target.toString(), BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     BETTER_AUTH_URL: 'http://127.0.0.1:3199', WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex'),

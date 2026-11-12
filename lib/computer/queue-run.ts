@@ -96,12 +96,13 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!existing) await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     if (digest) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-task:${digest}`])
-    const request = input.allowLocalRecovery === true && input.sourceEventId ? (await client.query(`SELECT payload->'taskDestination' AS destination FROM coordinator_events
+    const request = input.sourceEventId ? (await client.query(`SELECT payload->'taskDestination' AS destination FROM coordinator_events
       WHERE id=$1 AND "userId"=$2 AND kind='user_message' AND ("issueId"=$3 OR "issueId" IS NULL) FOR SHARE`, [input.sourceEventId, actor.userId, input.issueId])).rows[0] : undefined
-    const allowLocalRecovery = request && request.destination == null ? true as const : undefined
+    const sponsored = request?.destination?.kind === 'cloud' && request.destination.provider === 'cloudflare'
+    const allowLocalRecovery = input.allowLocalRecovery === true && request && request.destination == null ? true as const : undefined
     // Absent stays byte-compatible with historical fingerprints; a replay
     // cannot upgrade an old cloud-only run to a newly inferred permission.
-    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
+    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : []), ...(sponsored ? [{ cloudflareRequest:input.sourceEventId }] : []), ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.agentProfile ? [{ agentProfile: input.agentProfile }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])])).digest('hex')
     const target = await cloudTaskTarget(client, actor, input)
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
     const { rows: [repository] } = await client.query<{ repoPath: string; remoteUrl: string | null }>('SELECT "repoPath","remoteUrl" FROM device_repos WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 FOR SHARE', [input.deviceRepoId, actor.userId, target.deviceId])
@@ -147,6 +148,15 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       frozen.projectExecution = structuredClone(effectiveExecution)
     }
     const effectiveBaseBranch = effectiveExecution ? effectiveExecution.baseBranch : prior ? prior.baseBranch : projectExecution.baseBranch
+    const earlierPlacement = prior?.agentDefinition?.taskMachine
+    if (earlierPlacement || sponsored) {
+      if (input.withoutBot || !repository.remoteUrl || !effectiveExecution?.repositoryKey || !subscription || !['codex','claude_code'].includes(target.harness) ||
+          (prior && !earlierPlacement) || (earlierPlacement && (earlierPlacement.ownerId!==actor.userId || earlierPlacement.workspaceId!==actor.workspaceId ||
+             earlierPlacement.taskId!==input.issueId || earlierPlacement.botId!==input.botId || earlierPlacement.repositoryKey!==effectiveExecution.repositoryKey)))
+        throw new ComputerError(409,'Cloudflare coding task unavailable')
+      frozen.taskMachine=earlierPlacement ?? {provider:'cloudflare',payer:'mikka',ownerId:actor.userId,workspaceId:actor.workspaceId,
+        taskId:input.issueId,botId:input.botId,repositoryKey:effectiveExecution.repositoryKey,requestEventId:input.sourceEventId!}
+    }
     frozen.definitionDigest = workerDefinitionDigest(frozen)
     frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen }, undefined, actor.workspaceId)
     const profileOriginRunId = await admitProfileSelection(client, { ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: input.issueId, harness: target.harness, model: frozen.model, apiKeyId: frozen.apiKey?.keyId, subscriptionBindingId: frozen.subscription?.bindingId, selection: input.agentProfile, sourceRunId: input.threadRunId,
@@ -163,7 +173,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`, [runId, push.publication.userId, push.publication.issueId, push.publication.scopeVersion, push.publication.issueTitle, push.publication.remoteUrl, push.publication.remoteKey, push.publication.identifier, push.publication.branch, push.publication.baseBranch])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])
-    await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, randomUUID()])
+    await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state,"issueId") VALUES ($1,$2,$3,$4,$5,$6,'starting',$7) ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, frozen.taskMachine ? 'cloudflare-task-v1' : 'pending', randomUUID(), frozen.taskMachine ? input.issueId : null])
     await runListChanged(client, runId)
     await runChanged(client, runId)
     if (!existing) await client.query('COMMIT')

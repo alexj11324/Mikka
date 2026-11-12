@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
       - name: Check evidence failure diagnostics remain secret-free
-        run: node --test scripts/self-hosting-ui/github-error.test.mjs
+        run: node --test scripts/self-hosting-ui/*.test.mjs
       - name: Build the existing settings components in production mode
         run: node scripts/self-hosting-ui/build.mjs
       - name: Export the actual mobile application

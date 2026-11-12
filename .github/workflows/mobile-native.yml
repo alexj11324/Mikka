@@ -22,7 +22,7 @@ on:
         type: boolean
         default: true
       existing_build_id:
-        description: Completed production-profile EAS build to submit without rebuilding (requires expected_commit)
+        description: Completed official iOS build with original archive evidence (requires expected_commit)
         type: string
         default: ''
       expected_commit:
@@ -73,6 +73,13 @@ jobs:
           EXISTING_BUILD_ID: ${{ inputs.existing_build_id }}
           EXPECTED_BUILD_COMMIT: ${{ inputs.expected_commit }}
         run: node scripts/release/mobile-native.mjs source
+      - name: Recover the original verified official build and archive
+        if: steps.source.outputs.build_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXISTING_BUILD_ID: ${{ steps.source.outputs.build_id }}
+          EXPECTED_BUILD_COMMIT: ${{ steps.source.outputs.commit }}
+        run: node scripts/release/mobile-native.mjs recover
       - name: Verify production credential delivery boundaries
         run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs scripts/release/mobile-native.test.mjs
       - name: Validate the official UI pin before credential access
@@ -181,8 +188,6 @@ jobs:
         id: build
         env:
           NATIVE_SOURCE_SHA: ${{ steps.source.outputs.commit }}
-          # shortcut: existing-build recovery accepts production, add original hosted archive proof when hosted recovery is needed.
-          NATIVE_BUILD_PROFILE: ${{ steps.source.outputs.build_id == '' && 'hosted-production' || 'production' }}
           EXISTING_BUILD_ID: ${{ steps.source.outputs.build_id }}
         run: node scripts/release/mobile-native.mjs verify
       - name: Submit this build to TestFlight

@@ -28,7 +28,7 @@ import type { TaskDetail, ThreadDetail, ThreadItem } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { useStop } from '@/lib/useStop'
 import { colors } from '@/lib/theme'
-import { boundary, conversationSegments, currentAgent, reviewRun, type Attempt } from '../model/task-conversation'
+import { boundary, conversationReplyRun, conversationSegments, currentAgent, reviewRun, type Attempt } from '../model/task-conversation'
 import { STAGE_WORD, stageLine, verdictWord, type TaskFlow } from '../model/task-flow'
 
 type Conversation = { detail: TaskDetail; threads: Record<string, ThreadDetail> }
@@ -45,7 +45,7 @@ async function readConversation(id: string): Promise<Conversation> {
  * A task's one conversation (Alex 2026-11-07, 2026-11-08): every run's messages in order, oldest at the top. A line
  * only where the task switched Agent (the next Agent's glyph and name, no verb); a small marker
  * where a factory stage started (「独立审查」); same-Agent runs otherwise read as one. The bar is ← and the task's title over the current
- * Agent; the composer, 停止 and a quota pause act on the newest attempt. It updates on the task's and the newest
+ * Agent; the composer, 停止 and quota pause use the authorized conversation head. It updates on the task's and the newest
  * attempt's live keys.
  */
 export function TaskConversationScreen() {
@@ -58,12 +58,12 @@ export function TaskConversationScreen() {
   const read = useCallback(() => readConversation(id), [id])
   const { data, error, reload } = useLiveApi<Conversation>(`/api/mobile/tasks/${id}/conversation`, current => {
     const tasks = tasksLive(home?.live?.workspaceId, home?.workspace.id)
-    const newest = current ? conversationSegments(current.detail.activity, new Map()).at(-1)?.attempt.runId : undefined
+    const newest = current && conversationReplyRun(current.detail.task, current.detail.activity)
     const thread = newest ? threadLive(current?.threads[newest] ?? null, newest) : null
     return { minIntervalMs: tasks.minIntervalMs, refs: [...tasks.refs, ...(thread?.refs ?? [])] }
   }, read)
   const segments = data ? conversationSegments(data.detail.activity, new Map(Object.entries(data.threads))) : []
-  const newest = segments.at(-1)?.attempt.runId ?? null
+  const newest = data && conversationReplyRun(data.detail.task, data.detail.activity)
   const live = newest ? data?.threads[newest] ?? null : null
   const [sending, setSending] = useState(false)
   const [sendFailed, setSendFailed] = useState<string | null>(null)
@@ -124,12 +124,12 @@ export function TaskConversationScreen() {
             onLayout={event => { offsets.current.set(segment.attempt.runId, event.nativeEvent.layout.y); place() }}>
             {index > 0 ? <Boundary at={boundary(segments[index - 1]!.attempt, segment.attempt)} /> : null}
             {reviewRun(segment.attempt)
-              ? <ReviewCard flow={data?.detail.task.flow} running={Boolean(live?.active) && index === segments.length - 1}>
-                {segment.items.map((item, at) => <Item key={item.id} item={item} live={Boolean(live?.active) && index === segments.length - 1 && at === segment.items.length - 1} />)}
+              ? <ReviewCard flow={data?.detail.task.flow} running={data?.threads[segment.attempt.runId]?.active === true}>
+                {segment.items.map((item, at) => <Item key={item.id} item={item} live={data?.threads[segment.attempt.runId]?.active === true && at === segment.items.length - 1} />)}
               </ReviewCard>
-              : segment.items.map((item, at) => <Item key={item.id} item={item} live={Boolean(live?.active) && index === segments.length - 1 && at === segment.items.length - 1} />)}
+              : segment.items.map((item, at) => <Item key={item.id} item={item} live={data?.threads[segment.attempt.runId]?.active === true && at === segment.items.length - 1} />)}
             {/* A failed attempt's cause stays inside it, in words, with the raw code under 详情 (2026-11-05-0330). */}
-            {segment.error && !(index === segments.length - 1 && live?.active) && !segment.items.some(item => item.kind === 'error') ? <AttemptError raw={segment.error} /> : null}
+            {segment.error && !(data?.threads[segment.attempt.runId]?.active) && !segment.items.some(item => item.kind === 'error') ? <AttemptError raw={segment.error} /> : null}
           </View>
         ))}
         {sendFailed ? <Text style={styles.error}>{sendFailed}</Text> : null}

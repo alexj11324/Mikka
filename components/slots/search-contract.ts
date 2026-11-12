@@ -24,7 +24,7 @@ export type SearchRow = {
   identifier?: string
   /** The second line: the Coordinator's last line, a conversation's preview, a task's assignee, a thread's last reply, a project's summary. */
   detail?: string
-  /** A task's one state (localTaskState) or board status, in words. */
+  /** The authorized TaskPresentation for this hit, once available. */
   status?: { label: string; tone: StatusTone }
   /** Words on the row's end: 重试 on the retry row. */
   trailing?: string

@@ -90,7 +90,7 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, workspaceId, personalWorkspace = false, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string;
+export function BoardPage({ issues, userId, workspaceId, teamId, personalWorkspace = false, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
   /** In a personal workspace every task is the person's: no 全部 / 工作区 / 个人 segment and no lock on cards (glossary, Known naming debt). */
   personalWorkspace?: boolean
   issues: Issue[]
@@ -272,6 +272,6 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
         <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { setSheet(false); onOpen(id) }} />
       </SheetContent>
     </Sheet>
-    <NewTaskDialog workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onSent={openPanel} />
+    <NewTaskDialog teamId={teamId} workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onSent={openPanel} initialIntent="create_only" onCreated={id => { void onUpdated(); onOpen(id) }} />
   </div>
 }

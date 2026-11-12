@@ -167,6 +167,20 @@ test('bootstrap only transports a workspace selector and uses server-proved cach
   assert.deepEqual(requests[2].args, [])
 }))
 
+test('a pinned expired Web installation can reopen its own sign-in control while an actual outage stays unavailable', () => browser(async () => {
+  const { readBootstrap, readAuthentication } = await moduleFrom({ entry: 'bootstrap.ts' })
+  let configuration = () => Response.json({ error: 'web_auth_session_expired' }, { status: 401 })
+  globalThis.fetch = async path => String(path).endsWith('/api/desktop/config')
+    ? configuration() : Response.json({ error: 'unauthorized' }, { status: 401 })
+  const signedOut = { user: null, session: null, googleEnabled: false, githubEnabled: false, emailEnabled: false }
+  assert.deepEqual(await readBootstrap(), { ...signedOut, cacheWorkspace: null })
+  assert.deepEqual(await readAuthentication(), signedOut)
+  configuration = () => Response.json({ error: 'temporarily_unavailable' }, { status: 503 })
+  await assert.rejects(readBootstrap(), { code: 'desktop_backend_unreachable', status: 503 })
+  configuration = () => Response.json({ error: 'unexpected' }, { status: 401 })
+  await assert.rejects(readBootstrap(), { code: 'desktop_backend_unreachable', status: 401 })
+}))
+
 test('an old safe-session IPC completion cannot restore the previous account after an owner change', () => browser(async window => {
   const { authClient, setSession } = await moduleFrom({ entry: 'auth-client.ts' })
   const old = { user: { id: 'old-owner' }, session: { id: 'old-session' } }

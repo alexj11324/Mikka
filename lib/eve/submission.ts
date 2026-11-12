@@ -4,6 +4,8 @@ import type { Session } from 'eve/sessions'
 import { scopeAuth, assertEveScope, type EveScope } from './scope'
 import { withQuote, QUOTE_TEXT_MAX } from '../artifacts/quote'
 import { withBrowserNotes, NOTE_MAX, NOTES_MAX } from '../browser/note'
+import { isDeepStrictEqual } from 'node:util'
+import { dispatchTaskIntent } from '../task-create-command'
 import { taskDestinationSchema } from '../task-destination'
 import { taskTitleInputSchema } from '../task-title-input'
 import { agentProfileReferenceSchema } from '../factory/agent-profile-reference'
@@ -12,7 +14,7 @@ import { personalSubmissionInput, recordPersonalSubmission,personalSubmissionEve
 const quote = z.object({ artifactId:z.uuid(),version:z.number().int().positive(),kind:z.enum(['text','element']),text:z.string().min(1).max(QUOTE_TEXT_MAX),label:z.string().max(200).optional(),selector:z.string().max(1000).optional() })
 const notes = z.array(z.object({n:z.number().int().positive(),kind:z.enum(['element','region']),url:z.url({protocol:/^https?$/}).max(2000),label:z.string().min(1).max(200),note:z.string().min(1).max(NOTE_MAX),selector:z.string().max(1000).optional(),rect:z.object({x:z.number(),y:z.number(),width:z.number().nonnegative(),height:z.number().nonnegative(),viewportWidth:z.number().nonnegative(),viewportHeight:z.number().nonnegative()}).optional()})).max(NOTES_MAX)
 export const eveProductContext = z.object({
-  quote:quote.nullish(),notes:notes.nullish(),taskDestination:taskDestinationSchema.optional(),
+  taskCommand:dispatchTaskIntent.optional(),confirmTaskAccess:z.boolean().optional(),quote:quote.nullish(),notes:notes.nullish(),taskDestination:taskDestinationSchema.optional(),
   profileId:agentProfileReferenceSchema.optional(),taskTitle:taskTitleInputSchema.optional(),
   expectedWorkspaceId:z.uuid().optional(),retryOf:z.number().int().positive().optional(),botId:z.uuid().nullish(),
 }).strict()
@@ -29,10 +31,13 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
   const withNotes = withBrowserNotes(input.text,product.notes)
   if (withNotes === null) throw new Error('messageTooLong')
   const text = withQuote(withNotes,product.quote)
-  const { db } = await import('../db')
+  const { db, withDatabaseTransaction } = await import('../db')
   const { assertCredentialSafeChat } = await import('../credentials/chat-guard')
   await assertCredentialSafeChat(scope.ownerId,text)
-  const isTask = Boolean(product.taskDestination || product.profileId || product.taskTitle)
+  if (product.taskCommand && (!input.submissionId || !product.expectedWorkspaceId && !retry
+    || !input.text.includes(product.taskCommand.description))) throw new Error('validationGeneric')
+  if (product.taskCommand && retry && !isDeepStrictEqual(retry.payload.taskCommand, product.taskCommand)) throw new SubmissionConflictError()
+  const isTask = Boolean(product.taskCommand || product.taskDestination || product.profileId || product.taskTitle)
   if (isTask && !(await import('../coordinator/issue-tools-enabled')).issueMutationsEnabled()) throw new Error('issueToolsDisabled')
   if (product.taskDestination?.kind === 'device') {
     const {pool} = await import('../db')
@@ -52,20 +57,34 @@ export async function acceptEveMessage(scope:EveScope,message:MessageContent,con
     const session = await auth.api.getSession({headers,query:{disableCookieCache:true}})
     if (session?.user.id === scope.ownerId && !session.tokenWorkspaceId) humanSessionId = session.session.id
   }
-  const options={botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,...(product.retryOf?{retryOf:product.retryOf}:{}),...(retry?{taskRequestSourceEventId:retry.taskRequestSourceEventId}:{}),...(humanSessionId ? {humanSessionId} : {})}
+  if ((product.taskCommand?.teamId || product.taskCommand?.projectId) && !humanSessionId) throw new Error('teamIssueAccessDenied')
+  const options={botId:scope.botId,submissionId:input.submissionId,images:input.images,taskDestination:product.taskDestination,profileId:product.profileId,taskTitle:product.taskTitle,taskCommand:product.taskCommand,...(product.retryOf?{retryOf:product.retryOf}:{}),...(retry?{taskRequestSourceEventId:retry.taskRequestSourceEventId}:{}),...(humanSessionId ? {humanSessionId} : {})}
   const record=(executor:Parameters<typeof recordPersonalSubmission>[0])=>recordPersonalSubmission(executor,scope.ownerId,text,options)
-  let recorded
-  if(product.retryOf) {
-    const {sendRetryOf}=await import('../coordinator/store')
-    recorded=await sendRetryOf(scope.ownerId,scope.botId,product.retryOf,record)
-    if(!recorded) {
-      if(!input.submissionId||!await personalSubmissionEventId(db,scope.ownerId,scope.botId,input.submissionId))throw new SubmissionConflictError()
-      recorded=await record(db)
-    }
-  }else recorded=await record(db)
-  const {eventId}=recorded
+  async function recordMessage() {
+    if (!product.retryOf) return record(db)
+    const { sendRetryOf } = await import('../coordinator/store')
+    const retried = await sendRetryOf(scope.ownerId, scope.botId, product.retryOf, record)
+    if (retried) return retried
+    if (!input.submissionId || !await personalSubmissionEventId(db, scope.ownerId, scope.botId, input.submissionId)) throw new SubmissionConflictError()
+    return record(db)
+  }
+  async function accept() {
+    const { eventId } = await recordMessage()
+    if (!product.taskCommand) return { eventId, createdTaskId: undefined }
+    const { createIssueFromRequest } = await import('../coordinator/issue-create')
+    const title = product.taskTitle ?? product.taskCommand.description.split(/\r?\n/, 1)[0]!.slice(0, 200)
+    const created = await createIssueFromRequest(scope.ownerId, {
+      sourceEventId: retry?.taskRequestSourceEventId ?? eventId, title, confirmAccess: product.confirmTaskAccess,
+    })
+    return { eventId, createdTaskId: created.issueId }
+  }
+  // A rejected destination or audience must not leave a pending dispatch event.
+  const { eventId, createdTaskId } = product.taskCommand
+    ? await db.transaction(tx => withDatabaseTransaction(tx, accept))
+    : await accept()
   ingress.set(request,{scope,eventId})
   const contextual = text === input.text ? [] : [withQuote(withBrowserNotes('',product.notes) ?? '',product.quote)]
+  if (createdTaskId) contextual.push(`The person selected Create and dispatch. The host has created Task ${createdTaskId} for this request. Dispatch that Task with the existing Machine, Profile, approval and resource checks. Reuse any execution receipt for this request.`)
   if(retry)contextual.push('The person explicitly retried this failed request. Continue from the conversation and its completed tool receipts. Do not repeat actions that already succeeded. Keep the original task identity and selected destination, profile and title.')
   return {eventId,context:contextual}
 }

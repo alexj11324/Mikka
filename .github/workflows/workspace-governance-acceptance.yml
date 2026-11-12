@@ -3,9 +3,10 @@ name: Workspace governance acceptance
 # Run the existing non-model Item 11 on GitHub's exact merge candidate.
 # acceptance.mjs intentionally refuses CI: this workflow uses its exported
 # business case and the existing isolated test-account bootstrap, with CI intact.
+# Pull-request and merge-group acceptance uses the trusted CI selection.
+# Keep exact-main postmerge acceptance independent of CI's release queue.
 on:
-  pull_request:
-  merge_group:
+  workflow_call:
   push:
     branches: [main]
 

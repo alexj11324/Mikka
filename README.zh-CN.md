@@ -28,13 +28,17 @@ Mikka 为 Claude Code、Codex 和受支持的 Cursor 运行环境组织工作：
 
 **Mikka Cloud。** [打开应用](https://app.aspectlylabs.com/mikka)，直接注册账号即可开始使用 Mikka。具体步骤参见[快速入门指南](https://aspectlylabs.com/mikka/docs/quickstart)。
 
-**自托管服务器。** 你可以使用 Docker 和 PostgreSQL 在自己的 Linux 主机上运行 Mikka。按照[自托管指南](docs/self-hosting.md)配置所需信息，下载匹配版本的 Compose 文件，然后启动服务器：
+**自托管服务器。** 你可以使用 Docker 和 PostgreSQL 在自己的 Linux 主机上运行 Mikka。数据库可以选择 Compose 自带的 PostgreSQL，也可以使用托管 PostgreSQL（**[推荐 Neon](docs/self-hosting.md#managed-postgresql-neon-recommended)**，但不强制）。按照[自托管指南](docs/self-hosting.md)下载匹配版本的 Compose 文件，并配置必要的私有凭证。
+
+使用自带 PostgreSQL：
 
 ```sh
 docker compose up -d --wait
 ```
 
-Compose 部署会启动 Mikka 服务端和 PostgreSQL，**不会同时安装一份独立的官方界面**。请使用官方客户端连接你的服务器。选择自托管之前，请先阅读[客户端与源码范围](#客户端与源码范围)。
+使用 Neon：在私有 `.env` 中配置 pooled / direct 两条数据库连接 URL，然后运行 `docker compose -f docker-compose.neon.yml up -d --wait`。该模式不会启动本地 PostgreSQL 容器。
+
+自托管部署**不会同时安装一份独立的官方界面**。请使用官方客户端连接你的服务器。选择自托管之前，请先阅读[客户端与源码范围](#客户端与源码范围)。
 
 **已经在使用 Claude Code？** 可以将 Mikka 作为 MCP Server 接入：
 
@@ -74,7 +78,7 @@ Bot、Agent、任务、线程与运行的术语定义，请参见[术语表](doc
 
 Mikka 的官方网页、macOS 和 iOS 客户端使用同一套产品界面，可以连接 Mikka Cloud 或自托管服务器。
 
-本公开仓库包含服务端、Daemon、原生移动端源码以及大部分网页 UI 代码。**官方网页与桌面构建还使用了未在此公开的私有 UI 组件**，因此仅使用公开源码构建，**无法得到完整的官方网页或桌面界面**。仓库仍保留一个可通过开关启用的旧版内置工作区界面，但它不是第二套受支持的产品设计。
+本公开仓库包含服务端、Daemon、原生移动端源码以及大部分网页 UI 代码。**官方网页与桌面构建还使用了未在此公开的私有 UI 组件**，因此仅使用公开源码构建，**无法得到完整的官方网页或桌面界面**。自托管镜像提供服务器状态、登录和授权页面。在官方客户端的服务器名称旁选择「更改」，输入自托管状态页显示的 HTTPS 地址，即可连接。
 
 [UI 源码边界](docs/ui-overlay.md)和[自托管指南](docs/self-hosting.md)说明了可以构建、部署和连接的内容。源码实现情况与生产环境可用性需按照[验收规范](docs/acceptance.md)分别核验。
 

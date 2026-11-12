@@ -1,0 +1,23 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "mikka-eve-candidate",
+  "main": "src/entry.mjs",
+  "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "EVE_RUNTIME", "class_name": "EveRuntime" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["EveRuntime"] }],
+  "containers": [{
+    "class_name": "EveRuntime",
+    "image": "./Dockerfile",
+    "image_build_context": "../..",
+    "instance_type": "basic",
+    "max_instances": 1,
+    "rollout_step_percentage": 100,
+    "rollout_active_grace_period": 60
+  }]
+}

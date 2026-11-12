@@ -168,6 +168,125 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     if exists(select 1 from team184_controls where "teamId"=new."teamId" and pause) then perform pg_advisory_xact_lock(hashtextextended('team184-barrier',0)); end if;
     return new; end $$`)
   await workspace.query('create trigger team184_inject before insert on mikka_team_issues for each row execute function team184_inject()')
+  await scopeSubtest(t, 'task attachments use current task ACLs and persist independently of any thread', async () => {
+    const route = await import('../app/api/tasks/[taskId]/attachments/route')
+    const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+    const taskId = randomUUID(), otherId = randomUUID(), fileId = randomUUID()
+    await app.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority)
+      SELECT id,$1,$2,'bound','File test','{"type":"doc"}','todo','normal' FROM unnest($3::uuid[]) AS id`, [owner, workspaceId, [taskId, otherId]])
+    const token = async (user: string, tenant: string) => (await createLegacyPersonalAccessToken(user, tenant, { name: 'File acceptance' })).token
+    const editor = await token(owner, workspaceId), member = await token(racer, workspaceId), elsewhere = await token(owner, personalWorkspaceId)
+    const server = createServer(async (incoming, outgoing) => {
+      try {
+        const incomingBytes: Buffer[] = []
+        for await (const chunk of incoming) incomingBytes.push(chunk)
+        const request = new Request(`http://${incoming.headers.host}${incoming.url}`, {
+          method: incoming.method, headers: incoming.headers as Record<string, string>,
+          body: incoming.method === 'POST' ? Buffer.concat(incomingBytes) : undefined,
+        })
+        const id = new URL(request.url).pathname.split('/')[2]!
+        const method = incoming.method as 'GET' | 'POST' | 'DELETE'
+        const response = await route[method](request, { params: Promise.resolve({ taskId: id }) })
+        outgoing.writeHead(response.status, Object.fromEntries(response.headers))
+        outgoing.end(Buffer.from(await response.arrayBuffer()))
+      } catch { outgoing.writeHead(500); outgoing.end() }
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    try {
+      const address = server.address()
+      assert.ok(address && typeof address !== 'string')
+      const endpoint = `http://127.0.0.1:${address.port}/tasks/${taskId}/attachments`
+      const data = new Uint8Array([0, 80, 68, 70, 255]), name = '附件 (1).bin'
+      const request = (who: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', id = '', bytes = data, url = endpoint) => {
+        const body = new FormData()
+        body.set('file', new File([bytes], name))
+        return fetch(url + (id ? `?id=${id}` : ''), {
+          method, headers: { authorization: `Bearer ${who}` }, ...(method === 'POST' && { body }),
+        })
+      }
+      assert.equal((await request('mkp_' + '0'.repeat(43))).status, 401)
+      assert.deepEqual(await (await request(editor)).json(), { files: [], canEdit: true })
+      const file = { id: fileId, name, size: data.length }
+      for (const response of await Promise.all([request(editor, 'POST', fileId), request(editor, 'POST', fileId)])) {
+        assert.equal(response.status, 200)
+        assert.deepEqual(await response.json(), file)
+      }
+      assert.equal((await request(editor, 'POST', fileId, new Uint8Array([1]))).status, 409)
+      assert.deepEqual(await (await request(member)).json(), { files: [file], canEdit: true })
+      const download = await request(member, 'GET', fileId)
+      assert.equal(download.status, 200)
+      assert.match(download.headers.get('content-disposition')!, /^attachment;/)
+      assert.deepEqual(new Uint8Array(await download.arrayBuffer()), data)
+      assert.equal((await request(elsewhere, 'GET', fileId)).status, 404)
+      assert.equal((await request(editor, 'GET', fileId, data, endpoint.replace(taskId, otherId))).status, 404)
+      await app.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=$1`, [taskId])
+      assert.equal((await request(member)).status, 404)
+      await app.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+        VALUES('task',$1,'account',$2,ARRAY['canReadContent'])`, [taskId, racer])
+      assert.deepEqual(await (await request(member)).json(), { files: [file], canEdit: false })
+      assert.equal((await request(member, 'POST', randomUUID())).status, 404)
+      assert.equal((await request(member, 'DELETE', fileId)).status, 404)
+      await app.query(`UPDATE resource_access_grants SET capabilities=ARRAY['canSteer'] WHERE "resourceKind"='task' AND "resourceId"=$1 AND "subjectId"=$2`, [taskId, racer])
+      assert.equal((await request(member, 'GET', fileId)).status, 404)
+      assert.equal((await request(member, 'POST', randomUUID())).status, 404)
+      assert.equal((await request(member, 'DELETE', fileId)).status, 404)
+      assert.equal((await request(editor, 'DELETE', fileId)).status, 204)
+      assert.deepEqual(await (await request(editor)).json(), { files: [], canEdit: true })
+      assert.equal((await request(editor, 'GET', fileId)).status, 404)
+      // One more upload at the count boundary wins; declined uploads do not add rows.
+      for (let n = 0; n < 9; n++) assert.equal((await request(editor, 'POST', randomUUID())).status, 200)
+      const concurrent = await Promise.all([request(editor, 'POST', randomUUID()), request(editor, 'POST', randomUUID())])
+      assert.deepEqual(concurrent.map(r => r.status).sort(), [200, 409])
+      assert.equal((await (await request(editor)).json()).files.length, 10)
+      assert.equal((await request(editor, 'POST', randomUUID(), new Uint8Array(3 * 1024 * 1024 + 1))).status, 413)
+
+      // Drive the real S3 transport, retention trigger and existing cleanup worker
+      // against an isolated object server, including an interrupted final commit.
+      const objects = new Map<string, Buffer>()
+      const bucket = createServer(async (req, res) => {
+        const key = req.url!.slice('/private/'.length)
+        if (req.method === 'PUT') {
+          const parts = []
+          for await (const chunk of req) parts.push(Buffer.from(chunk))
+          objects.set(key, Buffer.concat(parts))
+          res.writeHead(200).end()
+        } else if (req.method === 'DELETE') { objects.delete(key); res.writeHead(204).end() }
+        else if (objects.has(key)) res.writeHead(200).end(objects.get(key))
+        else res.writeHead(404).end()
+      })
+      await new Promise<void>(resolve => bucket.listen(0, '127.0.0.1', resolve))
+      const bucketAddress = bucket.address()
+      assert.ok(bucketAddress && typeof bucketAddress !== 'string')
+      const settings = { S3_ENDPOINT: `http://127.0.0.1:${bucketAddress.port}`, S3_BUCKET: 'private', S3_ACCESS_KEY_ID: 'test', S3_SECRET_ACCESS_KEY: 'fixture-only' }
+      const previous = Object.fromEntries(Object.keys(settings).map(key => [key, process.env[key]]))
+      Object.assign(process.env, settings)
+      try {
+        const url = endpoint.replace(taskId, otherId), id = randomUUID()
+        assert.equal((await request(editor, 'POST', id, data, url)).status, 200)
+        assert.equal(objects.size, 1)
+        assert.deepEqual(new Uint8Array(await (await request(editor, 'GET', id, data, url)).arrayBuffer()), data)
+        const { cleanupChatFiles } = await import('../lib/chat-attachments/store')
+        const deniedId = randomUUID()
+        await app.query(`ALTER TABLE task_attachments ADD CONSTRAINT synthetic_commit_error CHECK(id <> '${deniedId}'::uuid)`)
+        assert.equal((await request(editor, 'POST', deniedId, data, url)).status, 500)
+        assert.equal(objects.size, 2)
+        assert.equal((await request(editor, 'GET', deniedId, data, url)).status, 404)
+        const retirement = await app.query(`UPDATE chat_attachment_retirements SET "notBefore"=now() WHERE "storageKey" LIKE $1 RETURNING "storageKey"`, [`task-files/${otherId}/%`])
+        assert.equal(retirement.rowCount, 1)
+        await cleanupChatFiles()
+        assert.equal(objects.size, 1)
+        assert.equal((await request(editor, 'DELETE', id, data, url)).status, 204)
+        await cleanupChatFiles()
+        assert.equal(objects.size, 0)
+      } finally {
+        for (const [key, value] of Object.entries(previous)) {
+          if (value === undefined) delete process.env[key]
+          else process.env[key] = value
+        }
+        await new Promise<void>((resolve, reject) => bucket.close(error => error ? reject(error) : resolve()))
+      }
+    } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
+  })
   await scopeSubtest(t, 'save, legacy scope click, title/document writes and manual retry keep personal data out of Linear',async()=>{
     const created=await withAfter(()=>actAs(owner,()=>saveIssue({title:'Legacy UI task',content,status:'todo',priority:'normal'})))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
@@ -578,10 +697,11 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const value=input(teamId), {requestId,teamId:selectedTeam,...fields}=value
     const fingerprint=createHash('sha256').update(JSON.stringify({teamId:selectedTeam,...fields})).digest('hex')
     const id=randomUUID()
-    await db.transaction(async tx=>{
+    const {withTaskWorkspace}=await import('../lib/task-workspace')
+    await withTaskWorkspace(owner,workspaceId,()=>db.transaction(async tx=>{
       assert.ok(await createIssueForUserInTransaction(tx,owner,fields,userActor(owner),{workspaceId,id,linearSyncBlocked:true}))
       await tx.insert(teamIssueCreateRequests).values({requestId,issueId:id,ownerId:owner,teamId:selectedTeam,fingerprint})
-    })
+    }))
     await workspace.query('insert into team_issue_create_receipts ("requestId","issueId","ownerId","teamId","workspaceId") values ($1,$2,$3,$4,$5)',[requestId,id,owner,selectedTeam,workspaceId])
     assert.deepEqual(await query(owner,value),{error:'teamIssueChanged',requestId})
     assert.equal((await workspace.query('select count(*)::int n from mikka_team_issues where "issueId"=$1',[id])).rows[0].n,0)

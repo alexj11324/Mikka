@@ -13,10 +13,12 @@ import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { currentUser } from '@/lib/acting-user'
 import { accessibleTeamScopes } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
+import type { ThreadRecord } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueTeamScope } from '@/lib/issue-team-access'
 import { db } from '@/lib/db'
-import { agents, issues, issueVersions, issueMembers, users } from '@/lib/db/schema'
+import { agents, issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
@@ -29,6 +31,9 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { issueShortTitle } from '@/lib/short-title-sql'
 import { createTeamIssueForUser } from '@/lib/team-issue-create'
+import { createUnstartedTask } from '@/lib/task-create-only'
+import { readTaskDispatchReceipt } from '@/lib/task-dispatch-receipt'
+import type { CreateOnlyCommand, DispatchReceiptInput } from '@/lib/task-create-command'
 import { promoteExistingIssueForUser } from '@/lib/team-issue-promotion'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
@@ -36,6 +41,7 @@ import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
 import { issueStatusEvent } from '@/lib/coordinator-events'
 import { changeIssueScopeLocally, previewPersonalScope } from '@/lib/issue-scope-store'
 import { TASK_SCOPES } from '@/lib/task-identifier'
+import { taskActivityVersions } from '@/lib/task-activity-versions'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { actingContext, activityActor } from '@/lib/activity-actor'
 import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
@@ -51,7 +57,7 @@ import { cacheReadAction } from '@/lib/cache-read-action'
 import { requireTaskWorkspace, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 
 type IssueRow = typeof issues.$inferSelect
-export type IssueView = Awaited<ReturnType<typeof issueView<IssueRow>>>
+export type IssueView = Awaited<ReturnType<typeof issueView<IssueRow>>> & { canSteer?: boolean; readOnlyDiscussions?: ThreadRecord[] }
 
 async function getUserId() {
   const user = await currentUser()
@@ -244,7 +250,7 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
     const { issue, user } = await requireIssueAccessWithoutBody(id)
     if (!issue.issuedIdentifier) await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope }])
     return db.transaction(async tx => {
-      const [locked] = await tx.select({ ...issueSummaryColumns, content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
+      const [locked] = await tx.select({ ...issueSummaryColumns, canSteer: resourceAccessPredicate(user.id, issues.workspaceId, 'task', issues.id, 'canSteer'), content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
       await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // Same unavailable task as the entry ACL, when deletion committed before
@@ -255,6 +261,15 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
       if (known === version) return { viewerId: user.id, version, unchanged: true as const }
       const [body] = await tx.select({ content: issues.content }).from(issues).where(eq(issues.id, id))
       const { bodyVersion: _bodyVersion, ...view } = summary
+      if (!view.canSteer) {
+        // A reader may view discussions without sending the editor's initial Yjs seed or an update.
+        const [document] = await tx.select({ state: issueDocuments.state }).from(issueDocuments)
+          .where(and(eq(issueDocuments.issueId, id), eq(issueDocuments.userId, issue.userId)))
+        const { loadIssueDocument, readIssueThreads } = await import('@/lib/linear-sync/document')
+        const doc = document ? loadIssueDocument(document.state, body.content) : null
+        try { return { viewerId: user.id, version, issue: { ...view, content: body.content, readOnlyDiscussions: doc ? readIssueThreads(doc) : [] } } }
+        finally { doc?.destroy() }
+      }
       return { viewerId: user.id, version, issue: { ...view, content: body.content } }
     })
   }))
@@ -343,6 +358,14 @@ export async function createIssueForTeam(input: { requestId: string; teamId: str
   })
 }
 
+export async function createTaskOnly(input: CreateOnlyCommand) {
+  return runAction(() => createUnstartedTask(input))
+}
+
+export async function getDispatchedTaskReceipt(input: DispatchReceiptInput) {
+  return readTaskDispatchReceipt(input)
+}
+
 /** Attach an existing task to a team in the task's immutable workspace. */
 export async function promoteIssueToTeam(input: { requestId: string; issueId: string; revision: number; teamId: string; expectedTeamId: string | null }) {
   return runAction(async () => {
@@ -409,22 +432,19 @@ export async function listIssueVersions(id: string) {
   return enrichActivityActors(versions, userId)
 }
 
-const { content: _versionBody, ...versionSummaryColumns } = getTableColumns(issueVersions)
-
 /** Activity reads metadata only. Complete historical bodies are loaded by
  * listIssueVersions when the person opens the description-history dialog. */
 export async function pollIssueVersionSummaries(id: string, known?: string, previous?: readonly ListPosition[]) {
   return cacheReadAction(() => withDatabaseOperation('/actions/issues/activity', async () => {
     const { issue, user } = await requireIssueAccessWithoutBody(id)
-    const held = readListPositions(previous, 50)
+    const held = readListPositions(previous, 51)
     const result = await db.transaction(async tx => {
       const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
       await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
       // The same deleted-task refusal as pollIssue, after taking the shared lock.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
-      const summaries = tx.select({ ...versionSummaryColumns, content: sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issueVersions.content}->'attrs')`.as('content') })
-        .from(issueVersions).where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, issue.userId))).orderBy(desc(issueVersions.revision), desc(issueVersions.id)).limit(50).as('activity_versions')
+      const summaries = taskActivityVersions(tx, id, issue.userId)
       const signatures = tx.select({ id: summaries.id, revision: summaries.revision, item: sql`to_jsonb(activity_versions)`.as('item'), actor: sql`jsonb_build_array(
         (select jsonb_build_array(${users.name}, ${users.image}) from ${users} where ${users.id}=${summaries.actorId} and ${summaries.actorType}='user'),
         (select ${agents.harness} from ${agents} where ${agents.id}::text=${summaries.actorId} and ${agents.userId}=${issue.userId} and ${summaries.actorType}='agent')

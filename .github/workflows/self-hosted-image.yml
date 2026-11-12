@@ -13,8 +13,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: self-hosted-image-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: self-hosted-image-${{ github.event_name }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 jobs:
   changes:
     if: ${{ !inputs.selected }}
@@ -25,6 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      # Reusable jobs inherit the caller's workflow_ref. Only this repository's
+      # standalone push workflow has authority to write its registry tags.
+      PUBLISH_IMAGE: ${{ github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.workflow_ref == format('{0}/.github/workflows/self-hosted-image.yml@{1}', github.repository, github.ref) }}
       COMPOSE_FILE: docker-compose.yml:tests/self-hosted/compose.services.yml
       COMPOSE_PROJECT_NAME: mikka-selfhost-ci
     permissions:
@@ -32,17 +35,74 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Validate backend and migration dependencies for self-hosted installations
+        run: |
+          node --test scripts/ci/self-hosted-requirements.test.mjs scripts/release/self-hosted-stable.test.mjs
+          node scripts/ci/self-hosted-requirements.mjs
       - name: Verify disposable acceptance target guards and model fixture
-        run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
-      - name: Build the public standalone application
+        run: node --test scripts/self-hosted-source.test.mjs scripts/acceptance/self-hosted-fixtures.test.mjs
+      - name: Verify stable release webhook and safe self-hosted update policy
+        run: node --test scripts/self-hosted-update.test.mjs scripts/self-hosted-update-smoke.test.mjs scripts/self-hosted-update-events.test.mjs
+      - name: Verify managed PostgreSQL Compose contract (offline)
+        run: node --test scripts/acceptance/self-hosted-neon-compose.test.mjs
+      - name: Restore backup from the host updater into a fresh PostgreSQL database
+        run: node --test scripts/acceptance/self-hosted-update-backup.test.mjs
+      - name: Reuse an already-published immutable SHA image on tag builds and reruns
+        id: existing
+        if: env.PUBLISH_IMAGE == 'true'
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          image=ghcr.io/alexj11324/mikka
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          if digest=$(skopeo inspect --format '{{.Digest}}' "docker://$image:$GITHUB_SHA" 2>"$RUNNER_TEMP/registry-status"); then
+            docker pull "$image@$digest"
+            revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image@$digest")
+            test "$revision" = "$GITHUB_SHA"
+            docker tag "$image@$digest" mikka-self-hosted:check
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          elif ! grep -Eiq 'manifest unknown|manifest_unknown|name unknown' "$RUNNER_TEMP/registry-status"; then
+            cat "$RUNNER_TEMP/registry-status" >&2
+            exit 1
+          fi
+      # Reuse the expensive subscription-worker and app build stages across
+      # fresh hosted runners. Only the trusted default branch may publish a
+      # cache; PRs and tags read it and still build/test their exact source.
+      - name: Set up Docker Buildx
+        if: steps.existing.outputs.digest == ''
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Resolve exact image inputs
+        if: steps.existing.outputs.digest == ''
+        id: image-inputs
         run: |
           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
-          docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --build-arg MIKKA_BUILD_WORKER_SHA="$mikka_image_worker_sha" --tag mikka-self-hosted:check .
+          echo "worker-sha=$mikka_image_worker_sha" >> "$GITHUB_OUTPUT"
+      - name: Build the public standalone application
+        if: steps.existing.outputs.digest == ''
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          push: false
+          tags: mikka-self-hosted:check
+          build-args: |
+            MIKKA_BUILD_REVISION=${{ github.sha }}
+            MIKKA_BUILD_WORKER_SHA=${{ steps.image-inputs.outputs.worker-sha }}
+          # A fork PR cannot borrow the owner's cache through its own ref.
+          # Missing/expired cache never replaces an actual build.
+          cache-from: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'type=gha,scope=mikka-selfhost-public' || '' }}
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=mikka-selfhost-public,mode=max' || '' }}
       - name: Verify packaged subscription binaries without network or credentials
         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
+      - name: Verify startup migration locks bypass transaction pooling
+        run: docker run --rm --network none --entrypoint node mikka-self-hosted:check --test scripts/self-hosted-start.test.mjs
       - name: Start with an empty database and no Mikka credentials
         run: |
           node --input-type=module <<'JS'
@@ -54,6 +114,8 @@ jobs:
           }
           appendFileSync(process.env.GITHUB_ENV, 'MIKKA_IMAGE=mikka-self-hosted:check\n')
           JS
+      - name: Start an independent external Compose installation against isolated PG17
+        run: bash scripts/acceptance/self-hosted-external-postgres.sh
       - name: Build the pinned upstream MinIO fixture
         run: docker compose build minio
       - name: Apply migrations and wait for health
@@ -62,6 +124,8 @@ jobs:
         run: node scripts/self-hosted-smoke.mjs
         env:
           MIKKA_EXPECTED_REVISION: ${{ github.sha }}
+      - name: Exercise the host updater's post-activation API checks on this image
+        run: docker compose exec -T -e "MIKKA_EXPECTED_REVISION=$GITHUB_SHA" app node scripts/self-hosted-update-smoke.mjs
       - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 app node scripts/acceptance/self-hosted-services.mjs
@@ -74,6 +138,34 @@ jobs:
         uses: ./.github/actions/pnpm-install
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Execute declared self-hosted compatibility tests in community mode
+        env:
+          MIKKA_EDITION: community
+        run: |
+          set -euo pipefail
+          needs_db=$(node scripts/ci/self-hosted-requirements.mjs --needs-db)
+          case "$needs_db" in
+            true)
+              # This runner-owned service has its own cluster and volume. The
+              # running installation and its application database stay separate.
+              trap 'docker compose --profile dependency-tests rm --stop --force --volumes dependency-postgres' EXIT
+              docker compose --profile dependency-tests up --detach --no-deps --wait --wait-timeout 90 dependency-postgres
+              endpoint=$(docker compose --profile dependency-tests port dependency-postgres 5432)
+              [[ "$endpoint" =~ ^127\.0\.0\.1:([0-9]+)$ ]] || { echo 'Expected a loopback PG17 fixture port' >&2; exit 1; }
+              export MIKKA_TEST_DB_PORT="${BASH_REMATCH[1]}"
+              export E2E_DATABASE_URL="postgresql://e2e:${POSTGRES_PASSWORD}@${endpoint}/self_hosted_e2e"
+              # Some suites create separate app and workspace databases and
+              # change both URLs. Their migrations must follow those targets.
+              unset MIKKA_DATABASE_URL_UNPOOLED DATABASE_URL_UNPOOLED ORVILO_DATABASE_URL
+              export MIKKA_DATABASE_URL="$E2E_DATABASE_URL" DATABASE_URL="$E2E_DATABASE_URL"
+              export BETTER_AUTH_SECRET="$SELF_HOSTED_FIXTURE_KEY" BETTER_AUTH_URL=http://localhost:3100
+              export MIKKA_TEST_DEPLOYMENT_SHA="$GITHUB_SHA" REQUIRE_DB=1
+              pnpm test:e2e:setup
+              ;;
+            false) ;;
+            *) echo 'Invalid declared database-test selection' >&2; exit 1 ;;
+          esac
+          node scripts/ci/self-hosted-requirements.mjs --run-tests
       - name: Exercise the real daemon against the registered community user
         timeout-minutes: 6
         run: |
@@ -85,8 +177,10 @@ jobs:
           docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})'
           node --import tsx scripts/acceptance/self-hosted-daemon.mjs
       - name: Prepare Ubuntu package mirrors
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         run: sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
       - name: Install the native desktop runtime dependencies
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -94,8 +188,9 @@ jobs:
           sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
           node apps/desktop/scripts/install-electron.mjs
       - name: Build one packaged acceptance desktop with an independent default server
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         run: |
-          pnpm --filter @mikka/desktop build
+          pnpm --filter @mikka/desktop build --public-test-fixture
           pnpm --filter @mikka/desktop exec electron-builder --dir --linux --config electron-builder.acceptance.yml --config.linux.executableName=mikka-selfhost-acceptance --publish never
           sudo chown root:root apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
           sudo chmod 4755 apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
@@ -103,6 +198,7 @@ jobs:
           MIKKA_DESKTOP_FLAVOR: dev
           MIKKA_DESKTOP_APP_URL: http://localhost:3001/mikka
       - name: Verify packaged desktop email login, chat and built-in live against the actual image
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         timeout-minutes: 5
         run: |
           node --test apps/desktop/test/self-hosted.test.mjs
@@ -149,31 +245,26 @@ jobs:
           docker compose restart app
           docker compose up --detach --wait --wait-timeout 120
           node scripts/self-hosted-smoke.mjs
-      - name: Verify the older built-in UI remains opt-in with the same data
-        run: |
-          MIKKA_COMMUNITY_UI=1 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
-          MIKKA_EXPECT_COMMUNITY_UI=1 node scripts/self-hosted-smoke.mjs
-          MIKKA_COMMUNITY_UI=0 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
-          node scripts/self-hosted-smoke.mjs
       - name: Publish the tested revision
-        if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
+        if: env.PUBLISH_IMAGE == 'true'
         env:
-          REGISTRY_TOKEN: ${{ github.token }}
+          EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
         run: |
-          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          set -euo pipefail
           image=ghcr.io/alexj11324/mikka
-          docker tag mikka-self-hosted:check "$image:$GITHUB_SHA"
-          docker push "$image:$GITHUB_SHA"
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            docker tag mikka-self-hosted:check "$image:$GITHUB_REF_NAME"
-            docker push "$image:$GITHUB_REF_NAME"
-          elif [ "$GITHUB_REF" = refs/heads/main ]; then
-            docker tag mikka-self-hosted:check "$image:latest"
-            docker push "$image:latest"
+          if [[ -z "$EXISTING_DIGEST" ]]; then
+            docker tag mikka-self-hosted:check "$image:$GITHUB_SHA"
+            docker push "$image:$GITHUB_SHA"
+          fi
+          digest=$(skopeo inspect --format '{{.Digest}}' "docker://$image:$GITHUB_SHA")
+          if [[ -n "$EXISTING_DIGEST" ]]; then test "$digest" = "$EXISTING_DIGEST"; fi
+          skopeo copy --preserve-digests "docker://$image@$digest" "docker://$image:ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [[ "$GITHUB_REF" == refs/heads/main && "$(git ls-remote origin refs/heads/main | cut -f1)" == "$GITHUB_SHA" ]]; then
+            skopeo copy --preserve-digests "docker://$image@$digest" "docker://$image:latest"
           fi
       - name: Retain startup diagnostics on failure
         if: failure()
         run: docker compose logs --no-color --tail=150
       - name: Stop disposable services
         if: always()
-        run: docker compose down --volumes --remove-orphans
+        run: docker compose --profile dependency-tests down --volumes --remove-orphans

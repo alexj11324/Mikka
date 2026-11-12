@@ -1,6 +1,8 @@
+import { taskFactoryLabel, type TaskFactoryEvent } from '../../../../../lib/task-factory-events'
+import { chronologicalActivity, taskHistoryLabel, type TaskActivityFact } from '../../../../../lib/task-activity-timeline'
 import { HARNESS } from '@/lib/harness'
 import { mobileMessages } from '@/lib/messages'
-import type { TaskActivity, ThreadItem } from '@/lib/types'
+import type { TaskActivity, TaskDetail, ThreadItem } from '@/lib/types'
 
 export type Attempt = Extract<TaskActivity, { kind: 'attempt' }>
 /** One attempt's part of the task's conversation, and the raw error it ended with (2026-11-05-0330: inside the attempt). */
@@ -22,6 +24,17 @@ export function conversationSegments(activity: readonly TaskActivity[], threads:
     segments.unshift({ attempt, items, error: thread?.error ?? null })
   }
   return segments
+}
+
+/** Older servers sent numbered attempts but no explicit reply target. Keep their readable
+ * conversation working and exclude any independently marked review or verification. */
+export function conversationReplyRun(task: Pick<TaskDetail['task'], 'replyRunId'>, activity: readonly TaskActivity[]): string | null {
+  if (task.replyRunId !== undefined) return task.replyRunId
+  let latest: Attempt | undefined
+  for (const item of activity) {
+    if (item.kind === 'attempt' && item.stage !== 'verify' && item.stage !== 'review' && (!latest || item.n > latest.n)) latest = item
+  }
+  return latest?.runId ?? null
 }
 
 const agent = (harness: string) => HARNESS[harness] ?? harness
@@ -56,10 +69,39 @@ export function boundary(previous: Attempt, next: Attempt): Boundary {
 }
 
 /** 活动 on the task's page: its creation and replaced threads, and one row per Agent's stretch, oldest first. */
-export type ActivityEntry = Exclude<TaskActivity, Attempt> | { kind: 'agent'; run: AgentRun }
-export function activityEntries(activity: readonly TaskActivity[]): ActivityEntry[] {
+export type ActivityEntry = Exclude<TaskActivity, Attempt> | TaskActivityFact | TaskFactoryEvent | { kind: 'agent'; run: AgentRun }
+
+export function nativeActivityLabel(item: TaskActivityFact | TaskFactoryEvent) {
+  if (item.kind === 'factory_gate' || item.kind === 'evidence') return taskFactoryLabel(item, {
+    ...mobileMessages.GroupTask, ...mobileMessages.FactoryAcceptance.kind, pullRequest: mobileMessages.FactoryAcceptance.pullRequest,
+  })
+  if (item.kind !== 'history') return [item.author, item.body].filter(Boolean).join(' · ')
+  const { Workspace, Issue } = mobileMessages
+  const lookup = (map: Record<string, string>, key: string) => map[key] ?? key
+  const description = taskHistoryLabel(item.event, {
+    created: Workspace.detail.createdTask,
+    activity: (key, values = {}) => Workspace.activity[key].replace(/\{(\w+)\}/g, (whole, name: string) => values[name] ?? whole),
+    status: value => lookup(Issue.status, value),
+    priority: value => lookup(Issue.priority, value),
+  })
+  return [item.event.actor?.name, description].filter(Boolean).join(' · ')
+}
+
+export function activityEntryId(item: ActivityEntry) {
+  if ('id' in item) return item.id
+  if (item.kind === 'agent') return `run:${item.run.attempts[0]!.runId}`
+  if (item.kind === 'replaced') return `replaced:${item.runId}`
+  return 'created'
+}
+export function activityEntries(activity: readonly TaskActivity[], facts: readonly (TaskActivityFact | TaskFactoryEvent)[] = []): ActivityEntry[] {
   // The server sends 活动 newest first.
-  const oldestFirst = [...activity].reverse()
+  const hasCreation = facts.some(item => item.kind === 'history' && item.event.kind === 'created')
+  const oldestFirst = chronologicalActivity([
+    ...activity.filter(item => !(hasCreation && item.kind === 'created')).map(item => ({
+      id: item.kind === 'attempt' ? `run:${item.runId}` : item.kind === 'replaced' ? `replaced:${item.runId}` : 'created', at: item.createdAt, item,
+    })),
+    ...facts.map(item => ({ id: item.id, at: item.at, item })),
+  ]).map(row => row.item)
   const entries: ActivityEntry[] = []
   for (const item of oldestFirst) {
     if (item.kind !== 'attempt') { entries.push(item); continue }

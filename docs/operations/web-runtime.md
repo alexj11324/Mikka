@@ -1,6 +1,7 @@
 # Web 与桌面共享运行时
 
-本文说明Issue #1415共享运行时的运行、构建与回退约定。当前目标是正常功能CI、生产功能验证和正式桌面release。性能实测及其门槛、一小时idle、旧首页对照和Dev ZIP交付已取消；polling-policy、idle-budget等功能合同检查继续保留。各轮发布、失败与验收的精确来源见 [验收报告](../acceptance/issue-1415/final-report.md) 和 [完整证据](../acceptance/issue-1415/final-evidence.md)。正式桌面504已满足一次性交付要求。2026-11-07 01:28:30 UTC，固定APP354f/Dg的完整四段生产验收及清理已通过；此文档自身的正常PR/CI/合并/Web发布和最后资源停止，由Issue收口评论另行记录。
+本文说明 Web、桌面和独立 API 的共享运行时、公开构建与自托管合同。
+公司生产部署、账号、切换和验收记录统一从[私有运维入口](README.md)读取。
 
 ## 入口与输出
 
@@ -60,7 +61,7 @@ Workflow 使用官方 `workflow/nitro` 集成，扫描根目录现有 workflow/s
 
 `WORKFLOW_TARGET_WORLD=local` 时，插件注册 close hook，再调用官方 World 的 start；关停时调用 close。开发入口为每个端口保留独立本地数据目录。本地 World 的重启恢复验证与 Vercel 托管队列验证是两件事，前者不能证明生产分布式行为。
 
-每个 Node/Vercel 入口先静态载入 `mikka-tracing.mjs`，再动态载入应用图，保证 tracing 初始化早于实际 `pg` 导入；仅靠较晚的 Nitro 插件不满足这个顺序。`pg` 和 OTel 使用真实外部依赖及其 package 元数据。请求 span 按实际响应结束收尾，后台 `after` 工作保留捕获的上下文。真实 HTTP → SQL → 后台任务 trace、流断开和导出结果仍须在固定环境单独验收，不能由 bundle 文件存在推断通过。 已保留的7ed链路样本使用默认0.1 sampler，并预先选择该采样器接受的traceID；它只证明一条真实API→DB→本地OTLP导出链路，不测采样率，也不证明生产供应商入库。
+每个 Node/Vercel 入口先静态载入 `mikka-tracing.mjs`，再动态载入应用图，保证 tracing 初始化早于实际 `pg` 导入；仅靠较晚的 Nitro 插件不满足这个顺序。`pg` 和 OTel 使用真实外部依赖及其 package 元数据。请求 span 按实际响应结束收尾，后台 `after` 工作保留捕获的上下文。真实 HTTP → SQL → 后台任务 trace、流断开和导出结果仍须在固定环境单独验收，不能由 bundle 文件存在推断通过。
 
 ## 开发与 Node 启动
 
@@ -75,7 +76,7 @@ pnpm dev --host 127.0.0.1 --port 3000
 | --- | --- |
 | `pnpm dev` | Nitro API watch + Vite 同源页面/HMR；内部 API 用独立 loopback 端口；公共入口 `/mikka` |
 | `pnpm dev:local` | 既有完整本地循环：同源前端/API、受隔离 guard 保护的数据库、源码 daemon 与 GitHub/邮件等本地替身；不是生产验收 |
-| `pnpm build:app` | 先构建 Web Vite，再构建 API；默认 `node-server`，不执行完整发布链的最后迁移步骤 |
+| `pnpm build:app` | 构建当前安装的页面与 API。公开 checkout 生成认证和服务状态页面，提供私有 UI 与配对 SHA 时生成官方工作区。默认使用 `node-server`，不执行迁移 |
 | `pnpm build` | subscription worker → agent UI 生成 → build:app → 完整 typecheck → **数据库迁移** |
 | `pnpm start --hostname 127.0.0.1 --port 3000` | 验证已编译 `.output` 后启动实际 Node 产品；不构建、不迁移 |
 | `pnpm --filter @mikka/desktop build` | Electron 主进程/preload 与同图桌面 Vite renderer |
@@ -90,31 +91,20 @@ Docker 的公开验收入口使用同一次 Nitro 编译图的 `mikka-docker.mjs
 
 ## Vercel 构建与生产切换记录
 
-当前 [`web-deploy.yml`](../../.github/workflows/web-deploy.yml) 保留 GitHub runner 上构建并上传 prebuilt 的流程，`vercel.json` 设置 `framework: null`，Git 自动部署关闭。发布从固定 main 提交开始，读既有 Infisical workload identity，拉取现有 production 项目配置；不新建身份或改生产数据位置。
-
-[`build-vercel.mjs`](../../scripts/release/build-vercel.mjs) 要求 Node 24、锁定 pnpm、源 SHA 与 CI SHA 一致；给 frontend/API 设置相同应用 build，选择每次 run attempt 唯一的 deployment ID，清除测试环境标记，再执行完整 `pnpm build`。上传前再次拒绝过时 main；通过 `deploy --prebuilt --prod` 上传后，现有 verify 步骤检查公开域名版本。仅有 READY 状态不足以完成业务验收。
-
-生产环境文件的值采用JSON字符串编码，builder直接使用发布helper已经解析、补值和校验的对象，不能再交给另一种dotenv解码器。环境选择保留旧CLI的合同：非空job值优先，空或缺失才使用文件值；生产、仓库、源提交与deployment身份仍显式固定。完整构建前用原`directDatabaseURL`纯校验两个最终目标，不改写连接串。两类已修复问题的实际诊断和失败尝试见[验收报告](../acceptance/issue-1415/final-report.md#两次受阻的生产发布与已确认的环境根因)，不在运维步骤中重复发布时间线。
-
-以下步骤保留 Issue #1415 的一次性生产切换流程和 Owner 当时指定的目标。
-迁移已经完成。日常发布按 [Web 部署指南](web-deploy.md) 和当前 workflow 执行。
-Web 与 Mac 可并行构建，桌面发布继续核验来源/后代关系和 overlay 绑定。
-
-1. 固定准备合并的完整commit，完成其功能CI与完整清理；记录PR head、实际checkout/tree和run/job。保留各历史版本证据的范围，不新增已取消的性能或Dev ZIP门槛。
-2. 切换前刷新上一READY生产部署、可回滚状态、Vercel项目framework/build配置、队列入口及未完成run的部署归属；核对主线迁移的向后兼容性。Owner指定的操作回滚目标是 `dpl_A2gvRemMPjimhZTKYY4Rw4SsgLUN`，操作前再次核验其 READY 状态；当时最新部署只是切换前快照，不能擅自代换 Owner 目标。
-3. **先把Vercel项目framework设为Other/null，再立即正常合并已通过的PR。** 这样main的Web deploy首次pull到正确配置；仅仓库vercel.json为null不能证明远端项目已修改。
-4. 由原串行Web发布流程执行固定main的完整构建、迁移、prebuilt上传和公开version核验。保存实际deployment及产物配置；历史7ed的本机产物检查不冒充本次Vercel上线。
-5. 用正常owner权限核验生产浏览器、任务/托管Workflow及到期timer、mobile/来源daemon HTTP、OAuth/MCP；记录精确应用SHA与正常资源清理。没有成功的实际回执就保持pending。
-6. 按当前桌面workflow，main preflight先执行专用await-desktop-web并绑定生产overlay；Mac随后完成构建、Developer ID签名、公证、staple、生产fuses、updater与seal。发布前在同一macos job再次核精确来源CI、await-desktop-web和封存候选/hosted证据，最后正常发布；第二次检查不能省略。Web可并行前进，但必须满足同源或后代关系及overlay绑定。CI的ad-hoc验收包不是正式release。
-7. 最后确认任务临时资源和安全证据去向，不保留为了已取消验收而运行的机器。
+Vercel 输出使用 Build Output API，并保留官方 Workflow 生成的队列入口和函数配置。
+frontend、API 和 Eve 输出必须绑定同一源码版本；仅有编译成功或 READY 状态不能
+证明外部服务、队列投递或业务验收通过。
 
 Vercel TLS 终止后的 origin 由服务端配置的应用域名和平台 deployment host 精确选取；不能信任任意 Forwarded/Host 来扩大认证 origin。Docker 与 Vercel 的 ingress 适配分别验收，普通 Web RPC 的同源校验保持独立。
 
+公司现有项目设置、身份交付、上传操作和生产切换记录见[私有运维入口](README.md)。
+通用 Eve 输出与独立 World 的要求见 [Bot runtime](eve-runtime.md)。
+
 ## 回滚操作
 
-Issue #1415 切换时，Owner 指定的操作回滚目标为 **`dpl_A2gvRemMPjimhZTKYY4Rw4SsgLUN`**，来源 `184a375f`，2026-11-06 22:54:07 UTC 已核 READY。该记录属于当次切换。后续事故需要核对本次已验收目标、现有部署状态和迁移兼容性，再按 Owner 的当前授权回滚。`dpl_63kkAf86gNLuztV169tXfDH5qw4h` / main `62281b19` 是切换前正在服务的快照，不是可以擅自替换的回滚目标。
-
-回滚单位是上一完整已验收版本及对应运行配置。仓库回滚通过 **revert PR**；不 force-push main、不删 deployment、不改 Neon、不撤销共享凭据，也不运行破坏性的 down migration。
+自托管升级或回退需要同时保留应用、Agent、持久会话和数据库的兼容性。
+不能通过删除数据、清空迁移账本或把未完成 Workflow 重定向到另一版本来回退。
+公司发布与后端回滚步骤见[私有运维入口](README.md)。
 
 桌面 renderer 的现成回退开关为 `MIKKA_DESKTOP_RENDERER=hosted`。在 macOS 上先完全退出 Mikka，再直接启动应用包内的可执行文件，使进程实际继承该变量（安装位置不同时相应调整路径）：
 
@@ -130,47 +120,44 @@ env -u MIKKA_DESKTOP_RENDERER /Applications/Mikka.app/Contents/MacOS/Mikka
 
 按 Owner 指定目标执行后端回滚时，可配合此开关切回 hosted renderer；开关本身不回滚后端或数据库。参见 [桌面 README](../../apps/desktop/README.md#transition-and-rollback)。
 
-在记录的迁移merge commit已核对、且没有需要保留的后续依赖变更时，先创建 `/tmp/runtime-rollback.md`，写明事故、原版本/目标版本、迁移兼容性、项目配置恢复和验证计划，不含秘密；随后执行：
-
-```sh
-git fetch origin
-git switch -c revert/shared-web-runtime origin/main
-migration_merge='<替换为证据中记录的迁移 PR merge commit>'
-git show --no-patch --format=fuller "$migration_merge"
-git revert -m 1 "$migration_merge"
-pnpm install --frozen-lockfile
-git push -u origin revert/shared-web-runtime
-gh pr create --title 'Revert shared web runtime migration' --body-file /tmp/runtime-rollback.md
-```
-
-若迁移跨多个合并提交，先明确依赖与按逆序需要 revert 的提交，不能只回退一个目录。CI 根据实际回滚版本运行；合并 revert PR 后由恢复的发布链重建、执行原迁移 guard 并部署。
-
-Vercel 项目设置不由 `git revert` 自动回滚。按切换前留存的配置恢复原 Next.js framework/build 配置及对应官方 Workflow 队列入口，核对旧部署未完成 run 仍能继续；不要猜测项目值或另建队列。恢复后确认公开应用版本、登录、workspace 权限、关键读写、流/回调、Workflow 和 trace。若已有 schema 变化不兼容旧代码，保留现有数据并先修复兼容性，不能用恢复数据库来代替源码回滚。
+回退前确认目标版本支持现有 schema 和队列合同；不能证明兼容时，先修复兼容性。
+桌面 renderer 开关只切换客户端呈现方式，不回退服务端或数据库。
 
 ## 验收与证据边界
 
-生产验证必须记录真实驱动、实际部署应用、公开版本和正常owner身份。原自动验收及普通Web发布继续使用原current-main门禁；桌面发布按已合入的来源/后代关系与overlay合同执行。本次独立手动入口使用下面的显式已部署目标合同，不伪造或重写旧run的事件来源。部署READY、公开匿名HTTP通过、ad-hoc原生功能包和正式Developer ID发布是不同证据；任何一次成功不能改写其他来源的失败或skip。各次验证的时间、状态与回执入口统一放在[验收报告](../acceptance/issue-1415/final-report.md)，完整字段和历史哈希放在[final-evidence.md](../acceptance/issue-1415/final-evidence.md)。
+源码路由清单、合同测试、隔离 HTTP 请求、编译入口测试与实际部署请求分别记录。
+构建成功不代表 OAuth、模型供应商或正式桌面签名发布通过；数据库结果 JSON 大小
+也不等于 PostgreSQL wire 字节。
 
-路由源码清单、合同测试、隔离HTTPS请求、编译入口的进程内Request/Response及真实生产请求分别记录，不把其中一种扩称为全部公开HTTP路径已实测。tracing近似DB字节与PG协议wire字节也不能相加或互换；默认0.1采样器下预选其接受的traceID，仅证明该条真实导出链路，不测采样率，也不证明供应商入库。
-
-截图从GitHub实际run/artifact页面访问，受正常权限与保留期限制；不使用停止的Docker服务链接，也不声称未执行的90天上传已留存。正常release应核对manifest列出的文件及manifest自身：504有7个清单文件加manifest共8个资产，manifest自身的SHA由seal输出提供，不通过自包含manifest证明自己。504已满足本Issue一次性正常桌面发布要求；后续release不新增为关闭门槛，CI、签名、公证与封存条件保持；桌面专用await-desktop-web按已合入的来源/祖先规则等待，普通await-web仍严格。现有SBOM只覆盖desktop runtime依赖图，不声称完整包含共享UI。
-
-保留所有原鉴权、精确来源、采样和清理门禁；未通过时按原结果记录。私密账号、环境descriptor、凭据及原始OTLP不进入公开材料。相关操作见[部署](web-deploy.md)、[tracing](tracing.md)、[本地循环](../local-runtime.md)和[验收规则](../acceptance.md)。
+公开功能验收使用[本地运行环境](../local-runtime.md)和[验收规则](../acceptance.md)。
+公司生产验证账号、固定部署记录与各次结果见[私有运维入口](README.md)。
 
 ## 显式已部署目标入口
 
-正常 [PR1520](https://github.com/alexj11324/Mikka/pull/1520) 新增独立main `workflow_dispatch` 入口，真实inputs为 `application_sha`、`web_run_id`、`deployment_id`。真实driver的 `GITHUB_SHA`、run、attempt与被测APP分开记录；不能改写这些GitHub身份来复用旧事件，也不能把source相同但deployment不同的发布混为同一个目标。
-
-在读取owner凭据前，共享attestor验证真实driver事件、指定成功Web来源、固定project/team、READY deployment、当前生产alias与公开版本。各段业务前后以及最终汇总重新验证同一目标；目标变化不能通过，正常会话与资源清理仍须执行。历史APP2960先后有两个正常同SHA部署，第一轮因旧deployment被替换而在凭据前拒绝，说明deployment绑定并非多余条件。
-
-业务顺序为浏览器→Coordinator与到期timer→mobile/source-daemon→OAuth/MCP。仅显式deployed模式关闭截图、trace、video并设置零重试；原UI断言和默认业务合同保持。只有四段真实成功、各自正常清理、共同target/driver/team绑定以及最终现场核验齐全，才能声明全流程通过。2026-11-07的实际run42323706132已在APP354f/Dg上完成四段及最终现场核验，全部要求的清理成立。源码daemon仅验证正常HTTP/protocol3，不是OS安装；MCP仅正常会话、PKCE、initialize与25项目录，0tools/call/0model，非团队数据工具或OS listener验收。Managed保留timerTerminalRequired/concurrentReconciliationExcluded为false，sessionClosed依据sign-out响应。旧8180未知locator的浏览器失败和全部历史结果继续保留；具体身份、原始报告与限制见[验收报告](../acceptance/issue-1415/final-report.md)。
-
-按 [AGENTS f363](https://github.com/alexj11324/Mikka/blob/f3635e534b2de87d354e3c53c28542782588f609/AGENTS.md) 和 [Owner指定身份的评论](https://github.com/alexj11324/Mikka/issues/1504#issuecomment-6691409495)，后续完整验收使用已有共享SMOKE账号，在Alex团队工作区通过正常成员权限执行，不登录Alex本人。#1555的helper读取每个有界team候选，以可信身份哈希匹配唯一active admin且非SMOKE，随后正常switch并无query回读；共享账号可以是member。四段报告必须含相同team hash、`teamAdminMembershipVerified:true`以及固定basis/attribution，不输出成员邮箱、ID或token。MCP仅证owner-session，catalogue不代表团队数据访问证明。历史 `personalWorkspaceConfirmed` 保留原义，不能重标成团队通过。
-
-[Owner在#1515的单次授权](https://github.com/alexj11324/Mikka/issues/1515#issuecomment-6694934529) 所需前提设置已通过正常接口完成：共享SMOKE已加入既有 **Acme Inc.**，Claude和Codex两个已有订阅来源对它可见，双方会话已正常退出。该次自有API key为0，未执行key分享请求或模型prompt。此例外不扩大普通验收权限，后续仍仅使用SMOKE；验收在Acme Inc.中执行，见 [验收账号约定](../acceptance.md)。该次设置只证明前提完成；后续完整业务通过由独立run42323706132的四份报告、清理和目标核验建立。
-
-Owner要求的桌面后代Web兼容和过期任务取消已通过正常合并落实。桌面专用await-desktop-web接受经过来源与祖先关系核验的同源或后代Web；当前workflow在preflight和发布前两次检查，并保留私有overlay绑定与封存复核。过期候选与正在签名作业的并发策略由当前desktop-release workflow管理；来源、overlay和发布门禁保持独立。普通await-web、strict E2B、CI、签名、公证与seal门禁仍保留。正式504已满足一次性桌面交付，旧临时冻结窗口已结束，不增加“每次外部main前进都必须再出一个桌面版本”的收口条件。
+公司已部署目标验证、账号和来源绑定的操作步骤见[私有运维入口](README.md)。
+对任何环境，实际驱动源码、被测应用源码与具体部署身份都应分别记录；同一源码
+可以有多个部署，不能仅凭应用版本号认定两次运行使用同一部署。
 
 ## 文档更新的发布影响
 
-最终十个Markdown/SVG路径的实际静态分类为docs-only，且不匹配桌面release路径；已核8180→74d及74d→f363的比较没有改动这些路径、分类器或发布workflow，后来的README许可、贡献和任务编号内容保持。Web workflow另有独立规则：每次正常main push都设置runtime refresh并要求实际Web build。因此docs-only不等于不构建Web；最终文档须通过正常PR并保留这条发布规则，不修改分类器或发布门禁。后续main若改变相关workflow或README，提交前重新只读核对。完整静态调用、源码hash及历史记录在[完整证据](../acceptance/issue-1415/final-evidence.md)。
+文档的 CI 分类与发布触发条件是不同合同。具体触发条件以当前 workflow 为准，
+公司发布观察流程见[私有运维入口](README.md)。移动运维文档不改变现有构建、
+队列、签名、迁移或发布门禁。
+
+### Cloudflare Node 24 API image
+
+Build the shared API as `NITRO_PRESET=node-server` with the official frontend output from the same release. Set `MIKKA_BUILD_REVISION`, `MIKKA_UI_OVERLAY_SHA` and `MIKKA_DEPLOYMENT_ID` in that build. Package only the completed API output using a named Docker build context.
+
+```sh
+docker buildx build --platform linux/amd64 \
+  --build-context release=.output \
+  --build-arg MIKKA_BUILD_REVISION --build-arg MIKKA_UI_OVERLAY_SHA \
+  --build-arg MIKKA_DEPLOYMENT_ID -f cloudflare/api/Dockerfile cloudflare/api
+```
+
+The image verifies all three identifiers while building. At startup the unprivileged Node process requires the cloud edition, the existing application and workspace PostgreSQL connections, the canonical HTTPS application origin, its authentication secret, a separate HTTPS Eve origin and an explicit hosted Workflow target. Supply runtime configuration through the approved private deployment identity. The image starts the existing Nitro listener once. The release owns database migrations. The separate Eve service owns agent sessions and their lifetime. The existing `/mikka/api/health` endpoint tests process liveness, and `/mikka/api/version` reports the compiled release. The Web release Worker owns frontend assets for this target.
+
+
+Install the locked ingress dependency with `npm ci --ignore-scripts --prefix cloudflare/api/ingress`. Generate the private staging Worker configuration with `node cloudflare/api/ingress/config.mjs <output.json> <deployment-id> <private-image@sha256:digest> <canonical-https-origin>`. Each release names one shared API host. Staging caps this host at one basic container, with a five-minute idle interval. The Cloudflare Container library protects active HTTP bodies and WebSocket connections; individual Task settlement never stops the host. The public release Worker calls this service through its private binding. The ingress rewrites forwarding headers and target port before applying the existing Node authority policy.
+
+Set the scoped app bindings on that release through the approved private pipeline. Only the bindings named in the ingress are passed to the Node process. Identity provisioning, external Workflow support, production instance sizing and the authenticated release checks are required before promotion.

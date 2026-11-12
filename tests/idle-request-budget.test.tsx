@@ -50,6 +50,25 @@ mock.module(new URL('components/nav/bot-avatar.tsx', root).href, { namedExports:
   COORDINATOR_AVATAR: { color: 'encre', shape: 'cercle' }, CoordinatorAvatar: avatar, BotAvatar: avatar,
 } })
 
+// Keep the real Task controller, document reader and open run during the budget measurement.
+let BudgetThreadPanel: typeof import('../components/workspace/issue-thread-panel').IssueThreadPanel
+mock.module(new URL('components/slots/task-conversation.tsx', root).href, { namedExports: {
+  TaskConversation: ({ issueId, runId }: import('../components/slots/task-conversation-contract').TaskConversationProps) =>
+    <BudgetThreadPanel issueId={issueId} runId={runId} bare />,
+} })
+mock.module(new URL('components/slots/task-detail.tsx', root).href, { namedExports: {
+  TaskDetailFrame: (props: import('../components/slots/task-detail-contract').TaskDetailFrameProps) =>
+    <section><h1>{props.title}</h1>{props.description({ afterDescription: null, activity: () => null })}{props.panel}{props.dialogs}</section>,
+} })
+// Keep the real, closed NewTaskDialog and its reads; only its required visual
+// export is supplied, as with the other official slots in this public fixture.
+mock.module(new URL('components/slots/new-task.tsx', root).href, { namedExports: { NewTask: () => null } })
+
+// The full Bot container still owns all measured reads. Its official slot only paints data.
+mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) =>
+  <section>{entries?.map(entry => <div key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, i) =>
+    part.kind === 'text' ? <span key={i}>{part.node || part.text}</span> : null)}</div>)}</section> } })
+
 // Feature flags come from PostHog, not from Mikka's server.
 mock.module('posthog-js', { defaultExport: { getFeatureFlag: () => undefined, onFeatureFlags: () => () => {}, capture: () => {}, isFeatureEnabled: () => false } })
 
@@ -191,7 +210,7 @@ const noop = () => {}
 const AT = '2026-11-05T08:00:00.000Z'
 const live = { ownerId: OWNER, workspaceId: OWNER_HOME }
 const doc = (text: string) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
-const issue = (id: string, title: string, status = 'todo') => ({ ...issueWithMetadata({ id, userId: OWNER, title, content: doc(title), status, priority: 'normal', scope: 'workspace' as const, scopeVersion: 1, linearSyncBlocked: false, scopeSetBy: 'user' as const, scopeConfidence: null, revision: 3, createdAt: new Date(AT), updatedAt: new Date(AT) }), identifier: 'MIK-7', linearTargetVerified: false })
+const issue = (id: string, title: string, status = 'todo') => ({ ...issueWithMetadata({ id, userId: OWNER, workspaceId: WORKSPACE, title, content: doc(title), status, priority: 'normal', scope: 'workspace' as const, scopeVersion: 1, linearSyncBlocked: false, scopeSetBy: 'user' as const, scopeConfidence: null, revision: 3, createdAt: new Date(AT), updatedAt: new Date(AT) }), identifier: 'MIK-7', linearTargetVerified: false })
 const CHAT_VERSION = '0123456789abcdef0123456789abcdef'
 const chat = { botId: BOT, enabled: true, version: CHAT_VERSION, working: false, error: null, cursor: 2, sources: {}, artifacts: {}, persistedStreamIds: [], live, items: [
   { id: 'm1', position: 1, from: 'person', text: 'Can you fix the sign-in redirect?', tools: [], threads: [], artifacts: [], createdAt: AT },
@@ -209,6 +228,13 @@ Object.assign(fixtures, {
   'issues.listIssueVersions': () => [],
   'issue-operations.getDeletedIssue': () => null,
   'issue-operations.listIssueConnections': () => [],
+  'task-domain.getTaskPresentations': (input: { workspaceId: string; issueIds: string[] }) => ({
+    version: 1, workspaceId: input.workspaceId, items: Object.fromEntries(input.issueIds.map(id => [
+      id, taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, undefined, null, () => false),
+    ])),
+  }),
+  'teams.listTeams': () => [],
+  'team-relations.getIssueTeam': () => null,
   // The authorized live scope each read returns (app/actions/collaboration.ts, agents.ts).
   'collaboration.exchangeDocument': () => ({ version: 'v1', workspaceId: WORKSPACE }),
   'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true, live: { workspaceId: WORKSPACE } }),
@@ -247,6 +273,7 @@ routes['/api/approved-writes'] = () => ({ enabled: false })
 // Sub-agent login prompts: one read on mount, then only on a subagent_events push.
 routes['/api/computer/events'] = url => ({ events: [], cursor: url.searchParams.get('after') ?? '0', hasMore: false })
 routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, workspaceId: url.searchParams.get('workspaceId') })
+routes['/api/factory/questions'] = () => ({ questions: [] })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
@@ -293,6 +320,7 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   },
   // A task with a running thread open on the right, its relations and its members (the members dialog's body).
   'task-detail': async () => {
+    ;({ IssueThreadPanel: BudgetThreadPanel } = await import('../components/workspace/issue-thread-panel'))
     const { TaskDetail } = await import('../components/workspace/task-detail')
     const { IssueMembers } = await import('../components/workspace/issue-members')
     return <><TaskDetail id={ISSUE} thread={RUN} origin="Board" user={user} navigation={{ index: 0, total: 1, onOpen: noop }} onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={noop} /><IssueMembers id={ISSUE} /></>
@@ -311,8 +339,12 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     return <ArtifactViewer artifactId={ARTIFACT} onArtifactChange={noop} onClose={noop} bot={{ name: 'Scout', avatar: null }} quotes={[]} chat={() => null} />
   },
   'nav-bot-list': async () => {
-    const { BotList } = await import('../components/nav/bot-list')
-    return <BotList bots={bots} workspaceId={WORKSPACE} threads={[listedThread]} issues={boardIssues as never} active={{ kind: 'coordinator' }} onOpen={noop} onNewBot={noop} rail={null} onRail={noop} user={user} onSettings={noop} onSignOut={noop} signingOut={false} />
+    const { useChatNav } = await import('../components/nav/bot-list')
+    function ChatNavigation() {
+      const { entries } = useChatNav({ bots, workspaceId: WORKSPACE, threads: [listedThread], issues: boardIssues as never, active: { kind: 'coordinator' }, userId: user.id })
+      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}</span>)}</>
+    }
+    return <ChatNavigation />
   },
   'group-chat': async () => {
     const { GroupChatView } = await import('../components/workspace/group-chat-view')
