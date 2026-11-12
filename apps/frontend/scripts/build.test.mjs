@@ -22,6 +22,10 @@ test('real frontend builds retain incremental files without fingerprinting them 
     assert.equal(incremental.rendererBuild, clean.rendererBuild, 'unreferenced old files cannot change the current application identity')
     assert.deepEqual(incremental.usedActions, clean.usedActions)
     assert.deepEqual(clean.serverModules, [])
+    for (const path of ['favicon.ico', 'apple-icon.png', 'brand/mikka-app-icon-48.png', 'brand/mikka-app-icon-96.png', 'brand/mikka-app-icon-192.png']) {
+      assert.deepEqual(await readFile(join(directory, path)), await readFile(new URL(`../../../public/${path}`, import.meta.url)))
+    }
+    await assert.rejects(readFile(join(directory, 'icon.svg')), { code: 'ENOENT' })
   } finally {
     if (previous === undefined) delete process.env.MIKKA_DEPLOYMENT_ID
     else process.env.MIKKA_DEPLOYMENT_ID = previous
