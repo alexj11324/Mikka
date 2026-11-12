@@ -462,6 +462,12 @@
     "test": "lib/platform/public-origin.test.ts",
     "suite": "test:platform"
   },
+  "lib/renderer-actions.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose only the release-bound action names and renderer identity needed by the selected installation. Reject invalid or duplicate actions and keep private build inputs, server modules and unused exports out of the public contract.",
+    "test": "apps/api/scripts/cloudflare-web.test.mjs"
+  },
   "lib/run-app-mcp.ts": {
     "mode": "built-in",
     "environment": [],
