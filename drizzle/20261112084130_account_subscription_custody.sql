@@ -20,12 +20,12 @@ BEGIN
     JOIN account_deletion_guards g USING ("jobId")
     JOIN account_deletion_jobs j ON j.id=w."jobId" AND j."subjectUserId"=g."subjectId"
     JOIN byos_connections c ON c.id=conn_id::uuid AND c."ownerId"=g."subjectId" AND c."workspaceId"=w."workspaceId"::text
-    JOIN pg_locks holder ON holder.locktype='advisory' AND holder.mode='ExclusiveLock' AND holder.granted AND holder.objsubid=1
+    JOIN pg_catalog.pg_locks holder ON holder.locktype='advisory' AND holder.mode='ExclusiveLock' AND holder.granted AND holder.objsubid=1
       AND ((holder.classid::bigint<<32) | holder.objid::bigint)=hashtextextended('mikka-account-deletion-job:' || j.id::text,0)
-    JOIN pg_locks child ON child.pid=holder.pid AND child.database=holder.database AND child.locktype='advisory'
+    JOIN pg_catalog.pg_locks child ON child.pid=holder.pid AND child.database=holder.database AND child.locktype='advisory'
       AND child.mode='ExclusiveLock' AND child.granted AND child.objsubid=1
       AND ((child.classid::bigint<<32) | child.objid::bigint)=hashtextextended('mikka-account-byos-cleanup:' || j.id::text || ':' || grant_value,0)
-    WHERE holder.database=(SELECT oid FROM pg_database WHERE datname=current_database())
+    WHERE holder.database=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())
       AND j.stage='external_pending' AND j.plan->'solo' ? (before_row->>'workspaceId')
       AND g."subjectId"=before_row->>'ownerId' AND c."workspaceId"=before_row->>'workspaceId'
       AND (NOT (before_row ? 'provider') OR c.provider=before_row->>'provider')
