@@ -38,6 +38,8 @@ test('a human lease only admits a matching scoped checkout for its original five
   const value={leaseId:id, deviceId:crypto.randomUUID(),repoId:crypto.randomUUID(),sourceOperationId:crypto.randomUUID(),
     bindingId:'a'.repeat(64),epoch:7,kind:'terminal',expiresAt:now+30_000,worktreePath:'/workspace/worktrees/task'}
   assert.deepEqual(reviewScope(value,now),value)
+  for (let code = 0; code < 32; code++)
+    assert.throws(() => reviewScope({...value, worktreePath:value.worktreePath + String.fromCharCode(code)}, now))
   for(const overrides of [{sourceOperationId:'x'},{kind:'shell'},{epoch:-1},{expiresAt:now},{expiresAt:now+300001},
     {worktreePath:'/workspace/worktrees/../other'},{worktreePath:'/workspace/worktrees/a//b'}])
     assert.throws(()=>reviewScope({...value,...overrides},now))

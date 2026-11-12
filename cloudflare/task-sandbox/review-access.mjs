@@ -9,7 +9,7 @@ export function reviewScope(value, now = Date.now()) {
       !['terminal', 'preview'].includes(value.kind) || !Number.isSafeInteger(value.expiresAt) ||
       value.expiresAt <= now || value.expiresAt > now + GUEST_LEASE_MS ||
       typeof value.worktreePath !== 'string' || value.worktreePath.length > 4096 ||
-      !value.worktreePath.startsWith('/workspace/worktrees/') || /[\x00-\x1f]/.test(value.worktreePath) ||
+      !value.worktreePath.startsWith('/workspace/worktrees/') || Array.from(value.worktreePath).some(character => character.charCodeAt(0) < 32) ||
       value.worktreePath.split('/').slice(1).some(s => !s || s === '.' || s === '..')) throw Error('Invalid task review scope')
   const { leaseId, deviceId, repoId, sourceOperationId, bindingId, epoch, kind, expiresAt, worktreePath } = value
   return { leaseId, deviceId, repoId, sourceOperationId, bindingId, epoch, kind, expiresAt, worktreePath }
