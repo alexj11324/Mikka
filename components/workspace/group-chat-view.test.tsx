@@ -14,7 +14,7 @@ mock.module('next-intl', { namedExports: {
 } })
 const infinite: { config?: Record<string, unknown> } = {}
 const liveKeys: unknown[][] = []
-mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module('swr/infinite', {
   defaultExport: (_key: unknown, _fetcher: unknown, config: Record<string, unknown>) => { infinite.config = config; return { data: pages, size: 1, setSize: async () => {}, mutate: async () => {}, isValidating: false } },
   namedExports: { unstable_serialize: (getKey: (index: number, previous: null) => unknown) => '$inf$' + JSON.stringify(getKey(0, null)) },
