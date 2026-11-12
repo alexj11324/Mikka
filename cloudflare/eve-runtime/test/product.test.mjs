@@ -67,3 +67,28 @@ export default { fetch(request, env) {
   assert.equal(denied.status, 502)
   assert.equal(denied.headers.get('location'), null)
 })
+
+test('every redirect class returns an empty 502 even if the upstream body reset during cleanup', async () => {
+  for (const status of [300, 301, 302, 303, 304, 307, 308, 399]) {
+    let calls = 0
+    let cancelled = false
+    const body = status === 304 ? null : new ReadableStream({
+      cancel() {
+        cancelled = true
+        if (status === 307) throw new Error('upstream reset')
+      },
+    })
+    const result = await productRequest(request(), {
+      fetch(forwarded) {
+        calls++
+        assert.equal(forwarded.redirect, 'manual')
+        return new Response(body, { status, headers: { location: 'https://elsewhere.example/receipt' } })
+      },
+    }, origin, 'private-local')
+    assert.equal(calls, 1)
+    assert.equal(cancelled, status !== 304)
+    assert.equal(result.status, 502)
+    assert.equal(result.headers.get('location'), null)
+    assert.equal(await result.text(), '')
+  }
+})

@@ -20,7 +20,8 @@ export async function productRequest(request, api, publicOrigin, capability) {
     headers: { 'content-type': 'application/json', authorization: auth },
   }))
   if (response.status >= 300 && response.status < 400) {
-    await response.body?.cancel()
+    // A reset during cleanup still leaves the redirect unsafe to return.
+    await response.body?.cancel().catch(() => {})
     return new Response(null, { status: 502 })
   }
   return response
