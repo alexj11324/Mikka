@@ -62,6 +62,7 @@ export async function runCloudCi({ env = process.env, verify = false, publicRoot
       receipt.context.repository !== repository || receipt.context.buildId !== context.buildId || receipt.context.branch !== context.branch ||
       receipt.context.provider !== context.provider || receipt.publication !== 'none')) fail('CLOUD_PUBLIC_CI_RECEIPT_SOURCE_MISMATCH')
   console.log(JSON.stringify({ result: receipt?.excluded ? 'evidence-branch-excluded' : verify ? 'verified' : 'passed', context, publication: 'none' }))
+  if (verify && !receipt?.excluded) console.log(`MIKKA_CF_CLOUD_CI_RECEIPT=${JSON.stringify({ version: 1, context, receipt, publication: 'none' })}`)
   return { context, receipt }
 }
 

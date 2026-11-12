@@ -37,8 +37,10 @@ async function repository(directory, origin, files) {
   return git(directory, 'rev-parse', 'HEAD')
 }
 
-test('public checkout invokes the pinned compiler and rejects provenance or checkout drift', async () => {
+test('public checkout invokes the pinned compiler and rejects provenance or checkout drift', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-public-cloud-ci-'))
+  const logs = []
+  t.mock.method(console, 'log', line => logs.push(line))
   try {
     const publicRoot = join(directory, 'public')
     const publicSource = await repository(publicRoot, 'alexj11324/Mikka', { '.gitignore': '/.mikka-cloud/\n' })
@@ -60,6 +62,12 @@ test('public checkout invokes the pinned compiler and rejects provenance or chec
       branch: 'main', buildId: 'public-build-uuid',
     })
     assert.equal(result.receipt.verified, true)
+    await runCloudCi({ env: buildEnv, publicRoot })
+    const markers = logs.filter(line => line.startsWith('MIKKA_CF_CLOUD_CI_RECEIPT='))
+    assert.equal(markers.length, 1)
+    assert.deepEqual(JSON.parse(markers[0].slice('MIKKA_CF_CLOUD_CI_RECEIPT='.length)), {
+      version: 1, context: result.context, receipt: result.receipt, publication: 'none',
+    })
     await assert.rejects(runCloudCi({ env: { ...buildEnv, WORKERS_CI_BRANCH: 'wrong-receipt' }, publicRoot }), /RECEIPT_SOURCE_MISMATCH/)
     await assert.rejects(runCloudCi({ env: { ...buildEnv, MIKKA_CLOUD_SOURCE_SHA: 'c'.repeat(40) }, publicRoot }), /PRIVATE_SOURCE_MISMATCH/)
     await writeFile(join(privateRoot, 'scripts/cloudflare-ci.mjs'), 'throw new Error("dirty compiler executed")')
