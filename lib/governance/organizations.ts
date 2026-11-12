@@ -1,8 +1,8 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, isNull, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, inArray, or } from 'drizzle-orm'
 import { z } from 'zod'
-import { organizationAuditEvents, organizationBillingAccounts, organizationEntitlements, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
+import { organizationAuditEvents, organizationBillingAccounts, organizationEntitlements, organizationInvitations, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
 import { requireWorkspace, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { invalidateTaskWorkspaceOrganization } from '@/lib/task-workspace'
@@ -150,6 +150,12 @@ export async function removeOrganizationMember(organizationId: string, actorId: 
       if (actor.membership.role !== 'owner') throw new GovernanceError('access_denied')
       await assertOtherActiveOrganizationOwner(tx, organizationId, userId)
     }
+    // A departed member's outstanding links cannot continue admitting people after revocation.
+    // Also revoke any pending link addressed to the removed identity, so a deleted membership
+    // cannot be restored by presenting an old bearer.
+    await tx.update(organizationInvitations).set({ status: 'revoked', updatedAt: new Date() }).where(and(
+      eq(organizationInvitations.organizationId, organizationId), eq(organizationInvitations.status, 'pending'),
+      or(eq(organizationInvitations.createdBy, userId), eq(organizationInvitations.email, member.email.toLowerCase()))))
     await tx.delete(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
     if (ids.length) await tx.update(workspaceMembers).set({ status: 'suspended' }).where(and(inArray(workspaceMembers.workspaceId, ids), eq(workspaceMembers.userId, userId)))
     for (const id of ids) await enqueueMemberLifecycle(tx, id, userId, 'suspend')
