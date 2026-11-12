@@ -40,7 +40,9 @@ Vendored on 2026-10-29, unmodified, from these pinned commits:
 | [openclaw/openclaw](https://github.com/openclaw/openclaw) | `4947e40db109a28c1fbdcf692eb431db19d46720` | MIT, (c) 2026 OpenClaw Foundation | `test-audit` (vendored 2026-11-12 at Alex's request, from `.agents/skills/test-audit/`), including `CAMPAIGN.md` and `references/audit.md`. Changed: added a Mikka usage pointer to `SKILL.md` and pinned the cross-repository boundary/proof links. Mikka's companion `README.md` routes OpenClaw-specific commands to existing project validation; no scripts or extra framework are included |
 
 Full license texts are in [`../skill-licenses/`](../skill-licenses/). The
-`update-docs` license is retained in [`update-docs/LICENSE.md`](update-docs/LICENSE.md).
+`update-docs` and `test-audit` licenses are retained in their skill directories:
+[`update-docs/LICENSE.md`](update-docs/LICENSE.md) and
+[`test-audit/LICENSE.md`](test-audit/LICENSE.md).
 
 ## Which skill to use
 
