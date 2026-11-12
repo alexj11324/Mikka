@@ -20,6 +20,11 @@ export class InboxStore {
         SELECT i.id,'task' AS type,'agent' AS source,i.title,i.id AS "issueId",i."userId" AS "ownerId",
           (r."userId"=$1) AS "canReply",
           CASE WHEN i.status IN ('done','canceled','duplicate') THEN false
+            WHEN EXISTS(SELECT 1 FROM factory_questions q JOIN factory_tasks f ON f.id=q."taskId"
+              WHERE q."issueId"=i.id AND q."userId"=$1 AND f."userId"=$1 AND f."issueId"=i.id
+                AND f.status NOT IN ('cancelled','revoked') AND f."candidateId" IS NOT DISTINCT FROM q."candidateId"
+                AND q.status IN ('open','waiting_user','blocked') AND q."answerId" IS NULL
+                AND (q."expiresAt" IS NULL OR q."expiresAt">now())) THEN true
             WHEN EXISTS(SELECT 1 FROM factory_tasks f WHERE f."issueId"=i.id AND f.stage='approval' AND f.status IN ('pending','waiting')) THEN true
             WHEN r.id IS NULL OR r.status IN ('queued','preparing','running','finishing','paused') THEN false
             WHEN r.status='waiting_input' THEN true
