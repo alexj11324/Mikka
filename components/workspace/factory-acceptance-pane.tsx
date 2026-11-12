@@ -48,7 +48,6 @@ const ERROR_KEYS: Record<string, ErrorKey> = {
 }
 
 /** The approve call still takes an expiry until #517 lands; approving publishes at once, so the bar shows none. */
-const APPROVAL_HOURS = 1
 
 /** GitHub's refusals of a merge (#528): the task keeps waiting, and the person can open the PR on GitHub. */
 const MERGE_REFUSALS = new Set(['githubMergeAuthorizationRequired', 'githubMergeForbidden', 'githubMergeBlocked', 'githubMergeConflict', 'githubMergeHeadMoved', 'githubMergeClosed', 'githubUnavailable'])
@@ -211,6 +210,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   const deciding = useRef(false)
   const retrying = useRef(false)
   const completionRequest = useRef<{ revision: number; eventId: string } | null>(null)
+  const [activation, setActivation] = useViewState<{ revision: number; candidateId: string | null; eventId: string } | null>(`factory:${task.id}:activation`, null)
   const [checkRequest, setCheckRequest] = useViewState<{ key: string; eventId: string; reason: string } | null>(`factory:${task.id}:check-retry`, null)
   const [checkError, setCheckError] = useState<{ key: string; unknown: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -250,16 +250,19 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   }
 
   async function run(operation: 'approve' | 'publish' | 'reconcile' | 'revoke', input: Record<string, unknown>) {
-    setBusy(true); setError(null)
+    if (deciding.current) return
+    deciding.current = true
+    setBusy(true)
+    setError(null)
     try {
-      const result = await request(`/api/factory/tasks/${task.id}/approval`, { operation, input })
-      await Promise.all([reload(), ...(v2 ? [reloadFlow()] : [])])
-      return result
+      await request(`/api/factory/tasks/${task.id}/approval`, { operation, input })
     } catch (caught) {
       setError(caught instanceof RequestError ? caught.code : 'factoryUnavailable')
-      await reload().catch(() => {})
-      return null
-    } finally { setBusy(false) }
+    } finally {
+      await reloadDecision()
+      deciding.current = false
+      setBusy(false)
+    }
   }
 
   async function retryCompletion() {
@@ -322,17 +325,16 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
   /** A skill candidate has no PR: it is still enabled through the approval. */
   async function approve() {
     const approvedCandidate = evidence?.manifest?.candidate
-    if (!task.isSkillCandidate || !evidence || !approvedCandidate || !environment) return
-    const action = 'activate_skill'
-    const target = 'mikka-builtin:run-report'
+    if (!task.isSkillCandidate || !evidence || !approvedCandidate || !environment || deciding.current) return
     const binding = evidence.binding
-    const approved = await run('approve', {
-      binding, eventId: crypto.randomUUID(), candidate: approvedCandidate, action, target,
-      targetEnvironment: environment, expiresAt: new Date(Date.now() + APPROVAL_HOURS * 60 * 60 * 1000).toISOString(),
+    const submission = activation?.revision === binding.revision && activation.candidateId === binding.candidateId ? activation
+      : { revision: binding.revision, candidateId: binding.candidateId, eventId: crypto.randomUUID() }
+    setActivation(submission)
+    // Approval reserves and activates the skill atomically. Read the durable ledger after the response.
+    await run('approve', {
+      binding, eventId: submission.eventId, candidate: approvedCandidate,
+      action: 'activate_skill', target: 'mikka-builtin:run-report', targetEnvironment: environment,
     })
-    if (!approved?.approvalId) return
-    // The approval advances the task; publish must carry the returned binding.
-    await run('publish', { binding: approved.binding ?? binding, eventId: crypto.randomUUID(), approvalId: approved.approvalId, action, target, targetEnvironment: environment })
   }
 
   async function reconcile() {
