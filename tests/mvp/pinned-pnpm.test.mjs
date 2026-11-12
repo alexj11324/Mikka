@@ -265,19 +265,19 @@ test('credential opt-ins honor job overrides and reject unknown or API-write per
   }
 })
 
-test('the actual Apple direct install passes its read-only token to real lifecycle scripts', t => {
+test('the actual Desktop runtime install passes its read-only token to real lifecycle scripts', t => {
   const workflow = readYaml('.github/workflows/desktop.yml')
-  const native = workflow.jobs['native-arm64']
+  const native = workflow.jobs.smoke
   assert.ok(apiReadOnly(native.permissions ?? workflow.permissions))
   const installs = native.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')
   assert.equal(installs.length, 1)
   assert.equal(installLifecyclePresence(t, installs[0]), true)
 })
 
-test('all three desktop direct installs explicitly opt in under API-read-only permissions', () => {
+test('both desktop direct installs explicitly opt in under API-read-only permissions', () => {
   const workflow = readYaml('.github/workflows/desktop.yml')
   assertCredentialScopes(workflow)
-  for (const name of ['checks', 'smoke', 'native-arm64']) {
+  for (const name of ['checks', 'smoke']) {
     const job = workflow.jobs[name]
     assert.ok(apiReadOnly(job.permissions ?? workflow.permissions), name)
     const installs = job.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')
