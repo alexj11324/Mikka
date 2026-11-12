@@ -3,6 +3,9 @@ import ts from 'typescript'
 const actionControls = /^(?:button|Button|SidebarMenu(?:Sub)?Button|SidebarMenu(?:Sub)?Action|InputGroupButton|DropdownMenuItem|ContextMenuItem|MenubarItem|CommandItem|NavigationMenuLink)$/
 const behaviorControls = /^(?:MorphPopoverTrigger|(?:Dialog|AlertDialog|Sheet|Drawer)(?:Trigger|Close|Cancel)|(?:DropdownMenu|ContextMenu|Menubar|Popover|HoverCard|Collapsible|Accordion|Select|Combobox|NavigationMenu)(?:Trigger|SubTrigger)|(?:Tabs|ToggleGroup|RadioGroup)(?:Trigger|Item)|Toggle|SidebarTrigger|SidebarRail|KanbanItemHandle)$/
 const ignoredCalls = /^(?:console\.(?:log|info|debug|warn|error)|(?:[\w.]+\.)?(?:preventDefault|stopPropagation|stopImmediatePropagation))$/
+// A toast or native alert conveys feedback; on its own it never performs the button's command.
+// A handler that mutates state and then reports its result remains a valid action.
+const notificationOnlyCalls = /^(?:(?:window\.)?alert|toast\.(?:info|success|warning|warn|error))$/
 const placeholderText = /(?:coming\s+soon|not\s+implemented|待实现|尚未实现|敬请期待|功能开发中)/i
 
 export function auditInteractions(file, text) {
@@ -72,7 +75,7 @@ export function auditInteractions(file, text) {
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return hasEffects(node.body, seen)
     if (ts.isCallExpression(node)) {
       const call = node.expression.getText(source)
-      if (ignoredCalls.test(call) || /^Promise\.(?:resolve|reject)$/.test(call) && !node.arguments.some(arg => hasEffects(arg, seen))) return false
+      if (ignoredCalls.test(call) || notificationOnlyCalls.test(call) || /^Promise\.(?:resolve|reject)$/.test(call) && !node.arguments.some(arg => hasEffects(arg, seen))) return false
       if (node.arguments.some(arg => ts.isStringLiteralLike(arg) && placeholderText.test(arg.text))) return false
       if (ts.isIdentifier(node.expression) && binding(node.expression)) return meaningful(node.expression, seen)
       return true
