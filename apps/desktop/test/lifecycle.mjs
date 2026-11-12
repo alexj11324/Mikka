@@ -27,6 +27,7 @@ import { waitForNativeDevice } from './native-device-ready.mjs'
 import { signInBundledAccount } from './bundled-sign-in.mjs'
 import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
 import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
+import { selectWorkspaceMenuItem } from './parity-page-ready.mjs'
 import { observeComposerDiagnostics, readComposerDiagnostics } from './composer-diagnostics.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
@@ -148,31 +149,25 @@ async function usable(page, draft = '') {
     const input = document.querySelector('textarea[data-chat-composer]')
     return input instanceof HTMLTextAreaElement && !input.disabled && !input.readOnly && input.getBoundingClientRect().width > 100
   })
+  let readback
   try {
     await input.fill(draft)
-    assert.equal(await input.inputValue(), draft)
+    readback = await input.inputValue()
+    assert.equal(readback, draft)
   } catch (error) {
     evidence.composerFailure = { expectedLength: draft.length, ...await readComposerDiagnostics(page) }
     throw error
   }
   await assertNativeViewport(page, viewport)
+  return readback.length
 }
 
 async function selectFixture(page) {
   await page.waitForFunction(() => document.documentElement.lang === 'en' || document.documentElement.lang === 'zh-CN')
   const locale = await page.evaluate(() => document.documentElement.lang)
   await page.getByRole('button', { name: menuNames[locale], exact: true }).first().click()
-  const item = page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true })
-  if (await item.getAttribute('aria-current') === 'true') await item.click()
-  else {
-    // The switch action assigns a new document after its async write/cache clear,
-    // even at the same URL. Arm its fresh load before the click; the old document
-    // can still satisfy the chat locators while that navigation is pending.
-    await Promise.all([
-      page.waitForEvent('domcontentloaded', { timeout: 60_000 }),
-      item.click(),
-    ])
-  }
+  const item = page.getByRole('menuitemradio', { name: fixtures.fixture.workspaceName, exact: true })
+  await selectWorkspaceMenuItem(page, item, 60_000)
   await usable(page)
   return locale
 }
@@ -363,10 +358,10 @@ try {
         ? await beginQueryWindow(`startup-${mode}`, { client: `${mode}-electron`, phase: 'authenticated-launch-to-usable-workspace', pair }) : null
       run = await launch(mode)
       application = run.app
-      await usable(run.page, 'Lifecycle readiness draft')
+      const draftCharacters = await usable(run.page, 'Lifecycle readiness draft')
       const milliseconds = Math.round((performance.now() - run.started) * 100) / 100
       if (startupQueries) await checkpointQueryWindow(startupQueries, 'launch-to-usable', true)
-      evidence.samples.push({ pair, order: order.indexOf(mode) + 1, mode, milliseconds,
+      evidence.samples.push({ pair, order: order.indexOf(mode) + 1, mode, milliseconds, draftCharacters,
         launchTiming: run.launchTiming, startup: await readNativeStartup(run.app, run.page) })
       await recordNativeState(run.page, `cold-pair-${pair}`, mode)
       assert.equal(run.errors.length, 0, 'cold launch must not produce uncaught renderer errors')
@@ -389,8 +384,9 @@ try {
   mark('multiowner-menu-locale')
   const menuLocale = await run.page.evaluate(() => document.documentElement.lang)
   await run.page.getByRole('button', { name: menuNames[menuLocale], exact: true }).first().click()
-  const ownerGroup = run.page.getByRole('group').filter({ has: run.page.getByText(ownerEmail, { exact: true }) })
-  await ownerGroup.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }).click()
+  const ownerWorkspace = run.page.getByRole('menuitemradio', { name: fixtures.fixture.workspaceName, exact: true })
+    .and(run.page.locator(`[aria-description=${JSON.stringify(ownerEmail)}]`))
+  await selectWorkspaceMenuItem(run.page, ownerWorkspace, 60_000)
   mark('multiowner-retained-session')
   await waitForBundledSession(run.page, scope.owner.userId)
   await usable(run.page)
@@ -425,7 +421,7 @@ try {
   await run.page.evaluate(({ issue, thread }) => window.mikka.notifications.show({ id: 'lifecycle-native-click', kind: 'finished', title: 'Desktop acceptance', body: 'Open the review task', href: `/?issue=${issue}&thread=${thread}` }), { issue: fixtures.fixture.issue, thread: fixtures.fixture.run })
   await run.app.evaluate(() => { if (!globalThis.__mikkaLifecycleNotification) throw new Error('NATIVE_NOTIFICATION_NOT_CREATED'); globalThis.__mikkaLifecycleNotification.emit('click') })
   await run.page.waitForURL(url => url.searchParams.get('issue') === fixtures.fixture.issue)
-  await run.page.getByText(fixtures.fixture.issueTitle, { exact: false }).first().waitFor({ state: 'visible' })
+  await run.page.getByRole('region', { name: fixtures.fixture.issueTitle, exact: true }).waitFor({ state: 'visible' })
   check('native notification click event follows the real preload bridge to the requested task/thread')
 
   mark('native-repository-picker')

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import { taskPresentation } from '../lib/task-presentation'
-import { groupPresentedTasks, waitingTasks } from '../lib/task-collection'
+import { ISSUE_STATUS_CODES } from '../lib/issue-meta'
+import { groupPresentedTasks, waitingTasks, type CollectionIssue } from '../lib/task-collection'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { taskStateOf, type TaskState as CanonicalTaskState, type TaskReason, type TaskStateRun } from '@/lib/task-state'
@@ -8,15 +9,32 @@ import type { listIssues } from '../app/actions/issues'
 import type { Thread } from '../app/actions/task-runs'
 import type { TaskState } from './use-bot-tasks'
 import * as legacySlot from './use-bot-tasks'
-import { inboxCount, inboxSelection, localTaskState, pendingTaskCount, tasksOf, TASK_GROUPS } from './use-bot-tasks'
+import { localTaskState, TASK_GROUPS } from './use-bot-tasks'
 
 const issue = (id: string, status = 'doing', pullRequests: { url: string; state: 'open' | 'draft' | 'merged' | 'closed' }[] = []) =>
   ({ id, status, title: id, metadata: { pullRequests } }) as never
 const thread = (id: string, issueId: string | null, status: string, createdAt: string, outcome: string | null = null) =>
   ({ id, issueId, status, createdAt, outcome, botId: 'bot', prompt: '', updatedAt: createdAt }) as never
 
+// The fixtures list each Task's newest Run first, matching the server response.
+function fixtureGroups(threads: Thread[], issues: CollectionIssue[]) {
+  const byId = new Map(issues.map(issue => [issue.id, issue]))
+  const isOpen = (id: string) => {
+    const blocker = byId.get(id)
+    return Boolean(blocker && !['done', 'canceled', 'duplicate'].includes(blocker.status))
+  }
+  const presentations = Object.fromEntries(issues.map(issue => {
+    const run = threads.find(thread => thread.issueId === issue.id)
+    const status = ISSUE_STATUS_CODES.find(code => code === issue.status)
+    assert.ok(status, `invalid fixture Task status: ${issue.status}`)
+    return [issue.id, taskPresentation({ ...issue, status }, run && { ...run, runId: run.id }, null, isOpen,
+      { blockerIdentifier: id => byId.get(id)?.identifier ?? null })]
+  }))
+  return groupPresentedTasks(issues, threads, presentations, 'workspace')
+}
+
 test('a task is one row, grouped by its newest thread; threads without a listed task have none', () => {
-  const groups = tasksOf([
+  const groups = fixtureGroups([
     thread('r2', 'a', 'running', '2026-11-07T10:00:00Z'),
     thread('r1', 'a', 'failed', '2026-11-07T09:00:00Z'),
     thread('r3', 'b', 'waiting_input', '2026-11-07T08:00:00Z'),
@@ -25,7 +43,7 @@ test('a task is one row, grouped by its newest thread; threads without a listed 
     thread('r6', null, 'running', '2026-11-07T05:00:00Z'),
     thread('r7', 'missing', 'running', '2026-11-07T04:00:00Z'),
   ], [issue('a'), issue('b'), issue('c', 'todo'), issue('d')])
-  assert.deepEqual(TASK_GROUPS.map(group => groups[group].map(row => [row.issue.id, row.current.id, row.attempts])), [
+  assert.deepEqual(TASK_GROUPS.map(group => groups[group].map(row => [row.issue.id, row.current?.id, row.attempts])), [
     [['b', 'r3', 1]],
     [['a', 'r2', 2]],
     [['c', 'r4', 1], ['d', 'r5', 1]],
@@ -43,7 +61,7 @@ test('an In Review task with an open PR whose newest run succeeded without an ou
 })
 
 test('a closed task is done whatever its thread is doing', () => {
-  const groups = tasksOf([thread('r1', 'a', 'running', '2026-11-07T10:00:00Z')], [issue('a', 'canceled')])
+  const groups = fixtureGroups([thread('r1', 'a', 'running', '2026-11-07T10:00:00Z')], [issue('a', 'canceled')])
   assert.equal(groups.done[0]?.issue.id, 'a')
 })
 
@@ -60,14 +78,14 @@ test('each task gets one state; the hand is only 等你处理, and the count lea
     thread('rh', 'h', 'running', '2026-11-07T03:00:00Z'),
     thread('ri', 'i', 'succeeded', '2026-11-07T02:00:00Z'),
   ]
-  const groups = tasksOf(threads, issues)
+  const groups = fixtureGroups(threads, issues)
   const states = Object.fromEntries(TASK_GROUPS.flatMap(group => groups[group].map(row => [row.issue.id, [group, row.state, row.reason]])))
   assert.deepEqual(states, {
     a: ['pending', 'waiting', 'needs_input'], b: ['pending', 'failed', null], c: ['running', 'queued', null],
     d: ['pending', 'waiting', 'pr_review'], e: ['pending', 'blocked', 'quota'], f: ['todo', 'todo', null],
     g: ['running', 'running', null], h: ['done', 'duplicate', null], i: ['todo', 'todo', null],
   })
-  assert.equal(pendingTaskCount(threads, issues), 2)
+  assert.equal(waitingTasks(groups, []).length, 2)
 })
 
 test('with no attempt the shared view preserves open tasks; a successful attempt alone never closes them', () => {
@@ -80,11 +98,11 @@ test('web groups and window count use current task state, excluding blocked, fai
   const issues = ['reply', 'approval', 'review', 'quota', 'blocked', 'failed', 'closed', 'retry', 'relation'].map(id => ({ id, status: id === 'closed' ? 'done' : id === 'review' ? 'review' : 'todo', identifier: `MIK-${id}`, metadata: { pullRequests: [], blockedByIds: id === 'relation' ? ['retry'] : [] } })) as unknown as Awaited<ReturnType<typeof listIssues>>
   const threads = issues.map(issue => ({ id: issue.id, issueId: issue.id, createdAt: '2026-11-07T00:00:00Z', status: ({ reply: 'waiting_input', approval: 'running', quota: 'paused', failed: 'failed', closed: 'waiting_input', retry: 'running' } as Record<string, string>)[issue.id] ?? 'succeeded', outcome: issue.id === 'blocked' ? 'blocked' : 'idle', awaitingApproval: issue.id === 'approval' })) as Thread[]
   threads.push({ ...threads[0], id: 'older', issueId: 'retry', createdAt: '2026-11-06T00:00:00Z' })
-  const groups = tasksOf(threads, issues)
-  assert.equal(pendingTaskCount(threads, issues), 3)
+  const groups = fixtureGroups(threads, issues)
+  assert.equal(waitingTasks(groups, []).length, 3)
   assert.deepEqual(groups.pending.map(row => row.state), ['waiting', 'waiting', 'waiting', 'blocked', 'blocked', 'failed'])
   assert.equal(groups.done[0].state, 'done')
-  assert.equal(groups.running[0].current.id, 'retry')
+  assert.equal(groups.running[0].current?.id, 'retry')
   assert.equal(groups.running[0].attempts, 2)
   assert.deepEqual([groups.todo[0].reason, groups.todo[0].blockedBy], ['blocked_by', 'MIK-retry'])
 })
@@ -107,7 +125,7 @@ test('released hosted Run cards show a completed attempt while its business Task
   assert.deepEqual(taskStateOf(open, { ...finished, runId: 'r', outcome: 'done' }), {
     state: 'todo', reason: null, group: 'todo', blockedBy: null,
   })
-  const groups = tasksOf([thread('r', 'a', 'succeeded', '2026-11-07T10:00:00Z', 'done')], [issue('a')])
+  const groups = fixtureGroups([thread('r', 'a', 'succeeded', '2026-11-07T10:00:00Z', 'done')], [issue('a')])
   assert.equal(groups.todo[0]?.state, 'todo')
   assert.equal(groups.done.length, 0)
   assert.deepEqual(legacySlot.localTaskState(open, { status: 'succeeded', outcome: 'idle' }), { state: 'idle', reason: null })
@@ -177,11 +195,11 @@ test("收件箱's count is what it lists: one row per waiting task (not per thre
     thread('ry', null, 'waiting_input', '2026-11-07T03:00:00Z'),
   ]
   const questions = [{ questionId: 'q1', issueId: 'b' }, { questionId: 'q2', issueId: null }]
-  const listed = inboxSelection(threads, issues, questions)
-  assert.deepEqual(listed.tasks.map(row => row.issue.id), ['a'])
-  assert.deepEqual(listed.questions.map(question => question.questionId), ['q1', 'q2'])
-  assert.equal(inboxCount(threads, issues, questions, 4), 1 + 2 + 4)
-  assert.equal(inboxCount(threads, issues, [], 0), 2, 'without its question, task b waits on the person itself')
+  const groups = fixtureGroups(threads, issues)
+  const waiting = waitingTasks(groups, questions)
+  assert.deepEqual(waiting.map(row => row.issue.id), ['a'])
+  assert.equal(waiting.length + questions.length + 4, 7)
+  assert.equal(waitingTasks(groups, []).length, 2, 'without its question, task b waits on the person itself')
 })
 
 test('workspace and Bot lists use the authorized Task presentation, including work without a thread', () => {
