@@ -1642,6 +1642,24 @@
       "sourceHash": "b8fc718d704bb3843de16f2bf3824b720f1c25a215236ad993017bb87568724e"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/api-keys",
+      "template": "/api/organizations/[organizationId]/api-keys",
+      "source": "app/api/organizations/[organizationId]/api-keys/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "45eddd2d96aedaa760f8c1bb29321d52c5b8f1ec2c9a1d6e1aa43a1f14417bc0"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/api-keys/[keyId]",
+      "template": "/api/organizations/[organizationId]/api-keys/[keyId]",
+      "source": "app/api/organizations/[organizationId]/api-keys/[keyId]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "sourceHash": "14510ca874701e7929d27a8e70ea28ab4d1a2507e34fd3c4fe170cef91ee65b0"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/approvals",
       "template": "/api/organizations/[organizationId]/approvals",
       "source": "app/api/organizations/[organizationId]/approvals/route.ts",

@@ -81,6 +81,20 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/organizations/[organizationId]/api-keys/[keyId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Require a fresh same-origin human session before renaming one visible organization-bound service credential.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/organizations/[organizationId]/api-keys/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List a page of key metadata for attached team Workspaces the signed-in Organization administrator also administers.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/service-identity/projects/[projectId]/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -238,6 +252,15 @@
       "DATABASE_URL"
     ],
     "behavior": "Bind explicitly organization-scoped service keys to their current Workspace attachment and invalidate the matching credential when the attachment is removed.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "drizzle/20261112032026_organization_service_key_names.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Give each existing and future organization-bound service key an independent public ID and a nullable name in the Workspace database.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
@@ -507,6 +530,13 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Governance mutations recheck the Workspace-scoped session and validate request origin and JSON before applying a change.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/governance/organization-api-keys.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only current, explicitly bound service keys visible under both admin roles and rename by the ID of a single issuance.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
