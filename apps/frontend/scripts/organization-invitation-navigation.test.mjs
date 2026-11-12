@@ -8,6 +8,7 @@ import { Window } from 'happy-dom'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { serverDocumentKind } from '../../../lib/server-pages.ts'
+import { cn } from '../../../lib/utils.ts'
 
 const require = createRequire(import.meta.url)
 const source = await readFile(new URL('../../../components/workspace/invitation-card.tsx', import.meta.url), 'utf8')
@@ -46,6 +47,7 @@ for (const locale of ['en', 'zh-CN']) {
         '@/components/ui/alert': { Alert: plain, AlertDescription: plain },
         '@/i18n/navigation': { Link: props => createElement('a', props) },
         '@/lib/server-pages': { serverDocumentKind },
+        '@/lib/utils': { cn },
         '@/lib/use-action-error': { useActionError: () => String },
         '@/hooks/settings/use-organization': { organizationApi: { acceptInvitation: accept }, useOrganizationErrorText: () => String },
         '@/app/actions/workspace': { acceptWorkspaceInvitation: acceptWorkspace }, '@/lib/auth-client': {},
