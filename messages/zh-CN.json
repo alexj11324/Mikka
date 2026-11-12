@@ -3471,6 +3471,8 @@
     "signInToAccept": "登录并接受邀请",
     "createAccount": "创建账号",
     "backToWorkspace": "返回工作台",
+    "joined": "已加入工作区。",
+    "viewServerAndApps": "查看服务器和可用客户端",
     "acceptFailed": "暂时无法接受邀请。",
     "signOutFailed": "退出失败。"
   },

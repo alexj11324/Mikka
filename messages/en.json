@@ -3471,6 +3471,8 @@
     "signInToAccept": "Sign in and accept",
     "createAccount": "Create account",
     "backToWorkspace": "Back to workspace",
+    "joined": "You joined the workspace.",
+    "viewServerAndApps": "View server and available apps",
     "acceptFailed": "Could not accept the invitation.",
     "signOutFailed": "Sign out failed."
   },

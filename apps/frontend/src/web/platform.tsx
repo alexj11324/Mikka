@@ -22,11 +22,21 @@ import { currentWebServers, subscribeWebServers } from '@/lib/web-connection/bro
 export { authenticatedReturn } from './auth-routing'
 export const platform = 'web' as const
 
-/** Organization invitation acceptance needs only the current account session.
- * Never load Workspace bootstrap or its member-scoped data on a public invitation page. */
+const organizationInvitationPath = /^\/organization-invite\/[a-f0-9]{64}$/
+
+function isOrganizationInvitationHandoff(location: URL): boolean {
+  const path = withoutLocale(location.pathname)
+  if (path !== '/sign-in' && path !== '/sign-up') return organizationInvitationPath.test(path)
+  // The two links on the invitation card supply exactly one validated return destination.
+  const next = webAuthentication(location).next
+  return !location.hash && location.searchParams.size === 1
+    && next === location.searchParams.get('next') && organizationInvitationPath.test(next)
+}
+
+/** Organization invitation acceptance and its account handoff require only the current session. */
 export function bootstrapScope(location: URL): BootstrapScope {
-  const organizationInvite = serverDocumentKind() === 'authentication'
-    && /^\/organization-invite\/[a-f0-9]{64}$/.test(withoutLocale(location.pathname))
+  const documentKind = serverDocumentKind()
+  const organizationInvite = (documentKind === null || documentKind === 'authentication') && isOrganizationInvitationHandoff(location)
   return typeof window !== 'undefined' && !bridgeFromWindow(window) && (isDesktopHandoffPage(location) || organizationInvite)
     ? 'authentication' : 'workspace'
 }
