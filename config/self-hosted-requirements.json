@@ -81,12 +81,33 @@
     "test": "tests/mobile-handoff.test.ts",
     "suite": "test:desktop-auth"
   },
+  "app/api/service-identity/projects/[projectId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one live, explicitly granted Project and return its permitted repository and branch metadata without exposing local filesystem aliases.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/service-identity/projects/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List live Projects explicitly granted to the service identity under its current organization policy and Project access rules.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/tasks/[taskId]/attachments/route.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "List, upload, download and delete task files under the task ACL using the installation database and configured attachment storage.",
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
+  },
+  "app/api/workspaces/[workspaceId]/service-identities/[identityId]/credential/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Let a current Workspace administrator inspect or revoke the credential and issue its replacement from a same-origin browser session.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "app/api/workspaces/[workspaceId]/service-identities/[identityId]/projects/route.ts": {
     "mode": "built-in",
@@ -199,6 +220,15 @@
       "DATABASE_URL"
     ],
     "behavior": "Store service identities and idempotent creation receipts in the configured Workspace PostgreSQL database.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "drizzle/20261112030509_service_identity_credentials.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Store the unique credential digest and optional expiry in the configured Workspace PostgreSQL database.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
@@ -381,6 +411,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "lib/enterprise/live-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Hold the shared organization policy lock while admitting a service credential.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/eve/cloudflare-task-bridge.ts": {
     "mode": "optional-cloud",
     "environment": [
@@ -457,17 +494,31 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/governance/service-credentials.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Issue, rotate or revoke dedicated credentials and authorize Project lists and details using the live Workspace identity, organization policy and recursive Project ACL.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "lib/governance/service-identities.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Manage the Workspace service identity registry under a current administrator membership lease.",
+    "behavior": "Manage the Workspace service identity registry under a current administrator membership lease. Disabling an identity clears its credential and records the change in the Workspace audit.",
+    "test": "tests/workspace-service-identities.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "lib/governance/service-identity-client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the selected server and same-origin session to manage Workspace service identities, Project grants and dedicated credentials.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
   "lib/governance/service-project-access.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "Replace explicit service grants through existing Project access policies, with confirmation and concurrent-change checks.",
+    "behavior": "Replace explicit grants only with Project management authority and list only active Projects the administrator may both read and share.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },

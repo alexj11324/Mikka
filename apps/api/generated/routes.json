@@ -2059,6 +2059,24 @@
       "sourceHash": "a83d54ed97c9ac9bbda8b2d45043f5be9d3db427f86425039892556941daea9f"
     },
     {
+      "path": "/mikka/api/service-identity/projects",
+      "template": "/api/service-identity/projects",
+      "source": "app/api/service-identity/projects/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "3b54f651f26e84dcf89b0200cc356daad193de27798f11cb4d2f7f2fd2d7fa19"
+    },
+    {
+      "path": "/mikka/api/service-identity/projects/[projectId]",
+      "template": "/api/service-identity/projects/[projectId]",
+      "source": "app/api/service-identity/projects/[projectId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "85d6af82886f281bc3eda4f5f8daf16bf2e0d9370da2e681ebde563f7be3dae5"
+    },
+    {
       "path": "/mikka/api/settings/[read]",
       "template": "/api/settings/[read]",
       "source": "app/api/settings/[read]/route.ts",
@@ -2560,6 +2578,16 @@
       "sourceHash": "599bf0c6c520951250fc3602bfe1a6ee9beb8784502147c5ff01bda1638d8983"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/service-identities/[identityId]/credential",
+      "template": "/api/workspaces/[workspaceId]/service-identities/[identityId]/credential",
+      "source": "app/api/workspaces/[workspaceId]/service-identities/[identityId]/credential/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "f34c2a0b2b265d72bad3fb3c8b6e9087363ed7480c8051698cf4e183b8140fcf"
+    },
+    {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities/[identityId]/projects",
       "template": "/api/workspaces/[workspaceId]/service-identities/[identityId]/projects",
       "source": "app/api/workspaces/[workspaceId]/service-identities/[identityId]/projects/route.ts",
@@ -2567,7 +2595,7 @@
         "GET",
         "PUT"
       ],
-      "sourceHash": "5aee0fcbc517f0a953914b6acc61bdf13bc7f0c1656dc48336c4d43282e40e39"
+      "sourceHash": "dd706909e7fe93a2f59e60a836a9225934937e7d3a0c20f71c51258316d3f1d2"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/skills",
