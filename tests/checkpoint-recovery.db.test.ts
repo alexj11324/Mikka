@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../lib/db/commit-effects'
 import { runCheckpointReceiptSchema, type RunCheckpoint, type RunCheckpointReceipt } from '@mikka/protocol/device'
 import { emptyRunReport } from '@mikka/protocol/run'
 import { observePoolCommits } from '../lib/db/commit-effects'
@@ -29,7 +30,11 @@ test('checkpoint recovery availability persists through the actual authenticated
   await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Checkpoint worker\')', [agentId, userId, deviceId])
   await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId","workspaceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$6,\'running\',$5)', [runId, userId, agentId, deviceId, new Date(Date.now() + 300_000), workspaceId])
   const token = await issueDeviceToken(userId)
-  t.after(async () => { await pool.end(); await (await import('../lib/db')).pool.end() })
+  t.after(async () => {
+    await (await import('../lib/builtin-gateway/runtime')).builtinGateway()?.stop()
+    await pool.end()
+    await (await import('../lib/db')).pool.end()
+  })
   const checkpoint = { baseCommit: 'a'.repeat(40), patch: gzipSync(Buffer.from('initial patch fixture\n')).toString('base64'), files: 1, takenAt: '2099-01-01T00:00:00Z' }
   const uploadFor = (id: string, value: RunCheckpoint = checkpoint) => POST(new Request(`http://localhost/mikka/v1/runs/${id}/checkpoint`, {
     method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(value),

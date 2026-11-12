@@ -304,7 +304,7 @@ const shows: Record<string, string[]> = {
   'bot-chat': ['Can you fix the sign-in redirect?', 'Done: the redirect is fixed.'],
   devices: ['Ada’s MacBook'],
   'artifact-viewer': ['Release notes', 'Sign-in redirect fixed.'],
-  'nav-bot-list': ['Scout'],
+  'nav-bot-list': ['Scout', 'Fix sign-in redirect', 'blocked'],
   'group-chat': ['Who can fix the sign-in redirect?', 'Looking into the redirect now.'],
   'subscription-settings': ['ada@example.invalid'],
   'pull-request-badge': ['#81'],
@@ -339,10 +339,12 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     return <ArtifactViewer artifactId={ARTIFACT} onArtifactChange={noop} onClose={noop} bot={{ name: 'Scout', avatar: null }} quotes={[]} chat={() => null} />
   },
   'nav-bot-list': async () => {
+    const presentations = { [ISSUE]: { ...taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, undefined, null, () => false),
+      state: 'blocked' as const, reason: 'blocked_by' as const, botDispatches: [{ botId: BOT, runId: RUN, harness: 'claude_code', name: 'Scout' }] } }
     const { useChatNav } = await import('../components/nav/bot-list')
     function ChatNavigation() {
-      const { entries } = useChatNav({ bots, workspaceId: WORKSPACE, threads: [listedThread], issues: boardIssues as never, active: { kind: 'coordinator' }, userId: user.id })
-      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}</span>)}</>
+      const { entries } = useChatNav({ bots, workspaceId: WORKSPACE, threads: [listedThread], issues: boardIssues.map(issue => ({ ...issue, workspaceId: WORKSPACE })) as never, presentations, active: { kind: 'coordinator' }, userId: user.id })
+      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}{entry.work?.map(row => <span key={row.id}>{row.fullName} {row.state}</span>)}</span>)}</>
     }
     return <ChatNavigation />
   },

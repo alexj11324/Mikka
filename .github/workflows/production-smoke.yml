@@ -272,6 +272,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Verify egress collector contracts
+        if: always()
+        run: node --test scripts/ops/egress-monitor.test.mjs
       - name: Read the existing Vercel token through Infisical workload identity
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
@@ -281,6 +284,7 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
           recursive: false
           include-imports: false
       - name: Compare fixed production deployment windows
@@ -288,7 +292,20 @@ jobs:
       - name: Collect production request outcomes
         if: always()
         run: node scripts/ops/runtime-outcomes.mjs
-      - name: Read monitoring ingestion configuration through the existing identity
+      - name: Read only the Neon usage key for the egress collector
+        if: always()
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: NEON_API_KEY
+          recursive: false
+          include-imports: false
+      - name: Read only the existing PostHog project ingestion key
         if: always()
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
@@ -298,11 +315,9 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /vercel
+          secret-name: NEXT_PUBLIC_POSTHOG_KEY
           recursive: false
           include-imports: false
-      - name: Verify egress collector contracts
-        if: always()
-        run: node --test scripts/ops/egress-monitor.test.mjs
       - name: Collect database egress and publish aggregate health
         if: always()
         run: node scripts/ops/egress-monitor.mjs

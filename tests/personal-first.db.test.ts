@@ -42,8 +42,13 @@ test('personal workspace first', { skip: !dbUrl }, async t => {
   await t.test('accepting an invitation makes the personal workspace first', async () => {
     const owner = await signIn('first-owner')
     const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
-    const invited = await actions.createWorkspaceInvitation({ workspaceId: team.id, emails: ['first-joiner@example.invalid'], role: 'member' })
+    const email = 'first-joiner@example.invalid'
+    const invited = await actions.createWorkspaceInvitation({ workspaceId: team.id, emails: [email, email.toUpperCase()], role: 'member' })
     if (!invited.ok) throw new Error('Invitation unexpectedly failed')
+    assert.equal(invited.data.length, 1)
+    assert.deepEqual(invited.outcomes.map(outcome => [outcome.email, outcome.created ? 'created' : outcome.reason]), [
+      [email, 'created'], [email, 'duplicate'],
+    ])
     const token = invited.data[0].path.split('/').at(-1)!
     const joiner = await seedUser(pool, 'first-joiner')
     user = { id: joiner, name: 'first-joiner', email: 'first-joiner@example.invalid' }

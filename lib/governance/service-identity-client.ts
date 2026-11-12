@@ -2,7 +2,7 @@ import { withBasePath } from '@/lib/base-path'
 
 export type ServiceIdentityRow = { id: string; workspaceId: string; name: string; enabled: boolean; revision: number }
 export type ServiceIdentityPage = { identities: ServiceIdentityRow[]; nextCursor: string | null }
-export type ServiceCredentialState = { enabled: boolean; revision: number; configured: boolean; expiresAt: string | null }
+export type ServiceCredentialState = { enabled: boolean; revision: number; configured: boolean; expiresAt: string | null; organizationId?: string }
 type IdentityChange = { action: 'rename'; name: string } | { action: 'disable' | 'restore' }
 
 export class ServiceIdentityRequestError extends Error {
@@ -39,8 +39,8 @@ export function serviceIdentityClient(workspaceId: string) {
     replaceProjects: (id: string, expectedProjectIds: string[], projectIds: string[], confirmExpansion: boolean) =>
       request<{ projectIds: string[] }>(item(id) + '/projects', 'PUT', { expectedProjectIds, projectIds, confirmExpansion }),
     credential: (id: string) => request<ServiceCredentialState>(item(id) + '/credential'),
-    rotate: (id: string, revision: number, expiresAt: string | null) =>
-      request<ServiceCredentialState & { token: string }>(item(id) + '/credential', 'POST', { action: 'rotate', revision, expiresAt }),
+    rotate: (id: string, revision: number, expiresAt: string | null, organizationId?: string) =>
+      request<ServiceCredentialState & { token: string }>(item(id) + '/credential', 'POST', { action: 'rotate', revision, expiresAt, organizationId }),
     revoke: (id: string, revision: number) =>
       request<ServiceCredentialState>(item(id) + '/credential', 'POST', { action: 'revoke', revision }),
   }

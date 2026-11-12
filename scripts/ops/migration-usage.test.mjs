@@ -33,6 +33,71 @@ test('same-team project tags, shared adjustments and multi-currency costs reconc
   assert.doesNotMatch(JSON.stringify(result),/private-name|never-publish|unstructured private tag/)
 })
 
+const utc = (day, hour = 0) => new Date(Date.UTC(2026, 10, day, hour)).toISOString()
+const period = (from, to) => ({ from, to })
+const charge = (from, to, projectId = 'prj_projectA') => JSON.stringify({
+  ServiceName: 'Compute', BillingCurrency: 'USD', BilledCost: 1, EffectiveCost: 1,
+  ChargePeriodStart: from, ChargePeriodEnd: to, Tags: { ProjectId: projectId },
+})
+
+test('seven-day evidence retains internal gaps and both out-of-window tails across projects', async () => {
+  const rows = [
+    charge(utc(10), utc(12)), charge(utc(4), utc(5, 12), 'prj_projectB'), charge(utc(8), utc(9)),
+    charge(utc(3), utc(5)), charge(utc(5, 12), utc(6)), charge(utc(13), utc(14)),
+    charge(utc(3), utc(5), 'prj_projectB'),
+  ]
+  const result = await vercelTotals(rows, period(utc(4), utc(11)))
+  assert.deepEqual(result.chargePeriodCoverage, {
+    scope: 'returned-team-charge-records',
+    observed: [period(utc(3), utc(6)), period(utc(8), utc(9)), period(utc(10), utc(12)), period(utc(13), utc(14))],
+    unobservedInRequest: [period(utc(6), utc(8)), period(utc(9), utc(10))],
+    observedOutsideRequest: [period(utc(3), utc(4)), period(utc(11), utc(12)), period(utc(13), utc(14))],
+  })
+  assert.equal(result.firstPeriodStart, utc(3))
+  assert.equal(result.lastPeriodEnd, utc(14))
+  assert.deepEqual(result.totalsByCurrency, [{ currency: 'USD', billed: 7, effective: 7 }])
+  assert.deepEqual(result.projects.map(p => [p.projectId, p.records, p.billed]), [['prj_projectA', 5, 5], ['prj_projectB', 2, 2]])
+})
+
+test('provider reporting lag leaves the end of the requested UTC day unobserved', async () => {
+  const result = await vercelTotals([charge(utc(10, 8), utc(11, 8))], period(utc(11), utc(12)))
+  assert.deepEqual(result.chargePeriodCoverage, {
+    scope: 'returned-team-charge-records', observed: [period(utc(10, 8), utc(11, 8))],
+    unobservedInRequest: [period(utc(11, 8), utc(12))], observedOutsideRequest: [period(utc(10, 8), utc(11))],
+  })
+})
+
+test('adjacent charge periods cover 48 hours and touching outer periods do not cover any part of the request', async () => {
+  const window = period(utc(8), utc(10))
+  const full = await vercelTotals([charge(utc(9), utc(10)), charge(utc(8), utc(9))], window)
+  assert.deepEqual(full.chargePeriodCoverage.observed, [window])
+  assert.deepEqual(full.chargePeriodCoverage.unobservedInRequest, [])
+  assert.deepEqual(full.chargePeriodCoverage.observedOutsideRequest, [])
+  const outside = await vercelTotals([charge(utc(7), utc(8)), charge(utc(10), utc(11))], window)
+  assert.deepEqual(outside.chargePeriodCoverage.unobservedInRequest, [window])
+  assert.deepEqual(outside.chargePeriodCoverage.observedOutsideRequest, [period(utc(7), utc(8)), period(utc(10), utc(11))])
+})
+
+test('empty and zero-duration rows cover no time and reversed charge periods reject the report', async () => {
+  const window = period(utc(8), utc(10))
+  const empty = await vercelTotals([], window)
+  assert.equal(empty.records, 0)
+  assert.equal(empty.firstPeriodStart, null)
+  assert.equal(empty.lastPeriodEnd, null)
+  assert.deepEqual(empty.chargePeriodCoverage, {
+    scope: 'returned-team-charge-records', observed: [], unobservedInRequest: [window], observedOutsideRequest: [],
+  })
+  const point = await vercelTotals([charge(utc(9), utc(9))], window)
+  assert.deepEqual(point.chargePeriodCoverage, empty.chargePeriodCoverage)
+  assert.deepEqual(point.totalsByCurrency, [{ currency: 'USD', billed: 1, effective: 1 }])
+  const noWindow = await vercelTotals([charge(utc(8), utc(10))])
+  assert.deepEqual(noWindow.chargePeriodCoverage, {
+    scope: 'returned-team-charge-records', observed: [window], unobservedInRequest: null, observedOutsideRequest: null,
+  })
+  await assert.rejects(vercelTotals([charge(utc(10), utc(8))], window), /Reversed provider charge period/)
+  await assert.rejects(vercelTotals([], period(utc(10), utc(8))), /Invalid requested charge window/)
+})
+
 test('terminal receipts deduplicate and older receipts are distinct from missing provider samples', () => {
   const from = '2026-11-10T00:00:00Z', to = '2026-11-11T00:00:00Z', start = Date.parse(from)
   const job = { owner: '100/1/startup-timing', workload: 'startup-timing', issue: 1948, sha: 'a'.repeat(40) }

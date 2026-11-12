@@ -30,7 +30,7 @@ test('the safety-net check names exactly the jobs with work already due', { skip
   if (originTrigger) await admin.query(originTrigger.definition.replace('ON public.user_schedules ', `ON ${schema}.user_schedules `))
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 2 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
-  const due = () => reconcileDue(pool, { factoryLifecycle: true, workspace: pool })
+  const due = (factoryLifecycle = true) => reconcileDue(pool, { factoryLifecycle, workspace: pool })
   const none = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }
   const clear = async () => { for (const table of TABLES) await pool.query(`DELETE FROM ${table}`) }
   const event = (values: string) => pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"nextWakeAt","wakeLeaseUntil",tier,"deliveredAt") VALUES ($1,'owner',$2,'user_message',$3,'{}',${values})`, [randomUUID(), randomUUID(), randomUUID()])
@@ -87,6 +87,19 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await run(`now()-interval '1 second'`)
     assert.deepEqual(await due(), { ...none, recovery: true })
     await clear()
+  })
+  await t.test('a revoked review lease with a near close retry needs recovery even with Factory off', async () => {
+    const id = randomUUID()
+    await pool.query(`INSERT INTO coding_review_sessions
+      (id,kind,"taskId","runId","ownerId","workspaceId","deviceId","repoId","deviceTokenId","bindingId","sandboxId",
+       "machineEpoch","machineOperationId","credentialKind","credentialId","expiresAt")
+      VALUES ($1,'terminal',$1,$1,'owner',$1,$1,$1,$1,$2,'fixture',0,$1,'session','credential',now()+interval '5 minutes')`,
+    [id, 'a'.repeat(64)])
+    assert.deepEqual(await due(false), none)
+    await pool.query(`UPDATE coding_review_sessions SET "revokedAt"=now(),reason='run_control',"retryAt"=now()+interval '30 seconds' WHERE id=$1`, [id])
+    assert.deepEqual(await due(false), { ...none, recovery: true })
+    await pool.query('DELETE FROM coding_review_sessions WHERE id=$1', [id])
+    assert.deepEqual(await due(false), none)
   })
   await t.test('an account deletion is due once requested; a retired object at its notBefore', async () => {
     await pool.query(`INSERT INTO chat_attachment_retirements ("storageKey","userId","notBefore") VALUES ('key','owner',now()+interval '5 minutes')`)

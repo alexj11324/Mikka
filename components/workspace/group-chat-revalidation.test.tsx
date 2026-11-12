@@ -4,6 +4,7 @@ import { act } from 'react'
 import type { Root } from 'react-dom/client'
 import type { Cache } from 'swr'
 import { Window } from 'happy-dom'
+import * as live from '@/hooks/use-live-key'
 import * as groupMessages from '@/lib/group-messages'
 import { ViewStateProvider } from '@/lib/hooks/view-state'
 import { Textarea } from '@/components/ui/textarea'
@@ -23,7 +24,7 @@ mock.module('@/lib/group-messages', { namedExports: { ...groupMessages, fetchGro
   return { messages: [{ id: 'message-one', conversationId: 'group-one', position: '1', authorType: 'user', authorId: 'owner', body: 'Stored history', mentions: [], replyToId: null, createdAt: '2026-11-07T00:00:00Z' }], nextBefore: null } satisfies groupMessages.GroupMessagePage
 } } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
-mock.module('@/hooks/use-live-key', { namedExports: { useLiveKey: nothing } })
+mock.module('@/hooks/use-live-key', { namedExports: { ...live, useLiveKey: nothing } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => translate } })
 mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
 mock.module('@/app/actions/link-preview', { namedExports: { getLinkPreview: async () => null } })

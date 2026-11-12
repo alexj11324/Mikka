@@ -10,13 +10,16 @@ Paid component source (BoardUI Pro, affectUI, beUI Pro) lives only in
 `mikka-hosted-ui`; this repository never imports it. The build pipeline that
 checks the private repository out is issue #1527.
 
-Slots are a mechanism, not a requirement: fix a page where its code lives,
-and don't add a slot only to make a fix possible. The build without
-`mikka-hosted-ui` only has to compile.
+Use an existing page or slot when it owns the change.
+
+A public checkout builds a runnable self-hosted server with its authentication,
+server status and connection pages. The official client connects to that server
+for the workspace. A fork can build, start and test the server without a private
+checkout or credentials. See the [self-hosting guide](self-hosting.md).
 
 ## Renderer source selection
 
-| | Build without `mikka-hosted-ui` (compile only) | Official build |
+| Binding | Public server and compile-time contracts | Official Web and Desktop |
 | --- | --- | --- |
 | `MIKKA_UI_OVERLAY_DIR` | unset | path of the `mikka-hosted-ui` checkout, inside this repository (CI uses `.hosted-ui/`, which is gitignored) |
 | `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` for every required provider. Only `auth-sso`, `settings-governance` and `settings-organization` can use their public no-content contracts |
@@ -26,10 +29,16 @@ and don't add a slot only to make a fix possible. The build without
 (`apps/frontend/scripts/application-plugin.mjs`) applies it to both Web and
 desktop renderer builds; it is the only place the mapping is applied.
 Production uses the [shared frontend/API runtime](operations/web-runtime.md).
-`tsconfig.json` maps `@ui-slot/*` to the defaults, so typecheck, lint and tests
-in this repository always see the build without `mikka-hosted-ui`. The layer must sit inside
-the repository, as `uiOverlay()` enforces, and resolves `react` and this app's modules from this repository's `node_modules`.
-A missing directory, or one outside the repository, fails the build.
+`tsconfig.json` maps `@ui-slot/*` to the public contracts for type checking.
+`pnpm build:server` produces the public installation. Renderer tests may select
+`--public-test-fixture` explicitly.
+
+Official release builds pin `MIKKA_UI_OVERLAY_DIR` and the matching 40-character
+`MIKKA_UI_OVERLAY_SHA`. The directory must be inside the public checkout and
+resolves React and shared application modules from its `node_modules`. An invalid
+checkout, missing required provider, or missing required export fails the official
+build. The [slot inventory](design/one-ui-slot-inventory.md) identifies the three
+public no-content contracts and the required providers.
 
 ## Slots
 
