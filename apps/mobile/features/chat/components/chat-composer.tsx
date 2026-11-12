@@ -194,7 +194,9 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
 /** The composer's fade over the end of the list, in the page's colour for the scheme (a CSS gradient takes no system colour). */
 function fade(scheme: 'light' | 'dark') {
   const page = plainColor('page', scheme)
-  return { paddingTop: 28, backgroundImage: `linear-gradient(to bottom, ${page}00 0%, ${page}D9 45%, ${page}F7 100%)` }
+  // Finish the fade inside the empty top inset, including when the tray or input grows.
+  const paddingTop = 28
+  return { paddingTop, backgroundImage: `linear-gradient(to bottom, ${page}00 0px, ${page} ${paddingTop}px)` }
 }
 
 
