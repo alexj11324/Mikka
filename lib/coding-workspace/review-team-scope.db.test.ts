@@ -27,6 +27,12 @@ test('review capabilities follow real team relation changes and their transactio
   const migrations = new URL('../../drizzle/', import.meta.url)
   for (const file of orderMigrations((await readdir(migrations)).filter(file => file.endsWith('.sql')))) await pool.query(await readFile(new URL(file, migrations), 'utf8'))
   Object.assign(process.env, { E2E_DATABASE_URL: url.toString(), MIKKA_DATABASE_URL: url.toString(), DATABASE_URL: url.toString() })
+  // Run real after() work at the request boundary. Bare Node otherwise starts
+  // unrelated Live membership readers inside the gateway's exclusive lock probe.
+  const next = await import('next/server')
+  const afterResponse: Array<() => unknown> = []
+  t.mock.module('next/server', { namedExports: { ...next, after: (work: () => unknown) => { afterResponse.push(work) } } })
+  t.afterEach(async () => { await Promise.all(afterResponse.splice(0).map(work => work())) })
   // Framework translation and audit request metadata are outside this SQL
   // regression. Session rows, membership, issue access, action authorization
   // and transactions are real; actAs uses the existing verified-actor path.
@@ -76,6 +82,7 @@ test('review capabilities follow real team relation changes and their transactio
   const expectedMembers = new Map<string, string | null>()
   const failClose = new Set<string>()
   const closeIds: string[] = []
+  let priorLockProbe = Promise.resolve()
   t.mock.method(reviewSessionTransport, 'close', async (...[target, ids, _expiresAt, kind]: Parameters<typeof reviewSessionTransport.close>) => {
     assert.equal(kind, 'terminal')
     const rows = await pool.query('SELECT "taskId","revokedAt","sandboxId" FROM coding_review_sessions WHERE id=ANY($1::uuid[])', [ids])
@@ -86,19 +93,25 @@ test('review capabilities follow real team relation changes and their transactio
       const link = (await workspacePool!.query('SELECT "workspaceId" FROM mikka_team_issues WHERE "issueId"=$1', [taskId])).rows[0]
       assert.equal(link?.workspaceId ?? null, expectedLinks.get(taskId), 'the relation outcome is committed before gateway IO')
     }
-    const scope = await workspacePool!.connect(), machine = await pool.connect()
-    try {
-      await scope.query('BEGIN'); await machine.query('BEGIN')
-      assert.equal((await scope.query("SELECT pg_try_advisory_xact_lock(hashtextextended('mikka-team-relations',0)) AS acquired")).rows[0].acquired, true,
-        'gateway close does not hold the global Workspace relation lock')
-      await scope.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR UPDATE NOWAIT', [target.workspaceId])
-      const member = (await scope.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [target.workspaceId, target.ownerId])).rows[0]
-      if (expectedMembers.has(target.workspaceId)) assert.equal(member?.status ?? null, expectedMembers.get(target.workspaceId), 'membership outcome committed before gateway IO')
-      await machine.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR UPDATE NOWAIT', [target.runId])
-    } finally {
-      await scope.query('ROLLBACK'); scope.release()
-      await machine.query('ROLLBACK'); machine.release()
-    }
+    // Several independent gateway ACKs are intentionally concurrent. Only
+    // their test probes take this exclusive, database-wide relation lock.
+    const lockProbe = priorLockProbe.then(async () => {
+      const scope = await workspacePool!.connect(), machine = await pool.connect()
+      try {
+        await scope.query('BEGIN'); await machine.query('BEGIN')
+        assert.equal((await scope.query("SELECT pg_try_advisory_xact_lock(hashtextextended('mikka-team-relations',0)) AS acquired")).rows[0].acquired, true,
+          'gateway close does not hold the global Workspace relation lock')
+        await scope.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR UPDATE NOWAIT', [target.workspaceId])
+        const member = (await scope.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT', [target.workspaceId, target.ownerId])).rows[0]
+        if (expectedMembers.has(target.workspaceId)) assert.equal(member?.status ?? null, expectedMembers.get(target.workspaceId), 'membership outcome committed before gateway IO')
+        await machine.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR UPDATE NOWAIT', [target.runId])
+      } finally {
+        await scope.query('ROLLBACK'); scope.release()
+        await machine.query('ROLLBACK'); machine.release()
+      }
+    })
+    priorLockProbe = lockProbe.catch(() => {})
+    await lockProbe
     if (ids.some(id => failClose.has(id))) throw new Error('synthetic close acknowledgement unavailable')
     closeIds.push(...ids)
   })
@@ -190,6 +203,19 @@ test('review capabilities follow real team relation changes and their transactio
     // A grouping write does not move the immutable tenant. Its old lease was
     // closed, but the still-authorized owner may explicitly open a fresh one.
     assert.equal((await resolve(pool, workspacePool!, session, f.taskId)).workspaceId, workspaceA)
+    const later = await grant(f)
+    assert.notEqual(later.lease.id, current.lease.id)
+    await closeReviewSession(later.authority, { kind: 'terminal', id: later.lease.id }, pool)
+  })
+  await t.test('failed promotion restores a lease first fenced in the second APP stage', async () => {
+    const f = await fixture(true), current = await grant(f)
+    await pool.query('INSERT INTO review_scope_faults("taskId","rejectScope") VALUES($1,true)', [f.taskId])
+    expectedLinks.set(f.taskId, workspaceA)
+    const result = await promoteExistingIssueForUser(owner, { requestId: randomUUID(), issueId: f.taskId, revision: 1, teamId: teamA, expectedTeamId: teamA })
+    assert.equal('error' in result ? result.error : null, 'teamIssueOutcomeUnknown')
+    assert.equal((await pool.query('SELECT scope FROM issues WHERE id=$1', [f.taskId])).rows[0].scope, 'personal')
+    assert.ok(closeIds.includes(current.lease.id))
+    assert.equal(await leaseRow(current.lease.id), undefined)
     const later = await grant(f)
     assert.notEqual(later.lease.id, current.lease.id)
     await closeReviewSession(later.authority, { kind: 'terminal', id: later.lease.id }, pool)

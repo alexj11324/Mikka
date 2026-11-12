@@ -42,7 +42,9 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
   let promotionStarted = false
   const reviewIds = new Set<string>()
   const fenceReview = async (database: Pick<typeof pool, 'query'>) => {
-    for (const id of await markReviewSessionsRevoked(database, { taskId: issueId }, 'task_changed')) reviewIds.add(id)
+    const captured = await markReviewSessionsRevoked(database, { taskId: issueId }, 'task_changed')
+    for (const id of captured) reviewIds.add(id)
+    return captured
   }
   try {
     await withTeamWorkspace(userId, teamId, async workspace => {
@@ -90,6 +92,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
       const [link] = await workspace.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).for('update')
       if (!link || link.teamId !== teamId || link.workspaceId !== team.workspaceId || link.userId !== userId) throw new PromotionError('teamIssueChanged')
       promotionStarted = true
+      let capturedInApp: string[] = []
       return db.transaction(async tx => {
         const [issue] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
         const [request] = await tx.select().from(teamIssuePromotions).where(eq(teamIssuePromotions.requestId, requestId)).for('update')
@@ -101,7 +104,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         const previousLists = await issueListScopesBeforeChange(issue)
         // Both promotion stages own the relation lock. Capture a grant made
         // between them, then close only these IDs outside the outer WS locks.
-        await fenceReview(captureDatabaseQuery(tx))
+        capturedInApp = await fenceReview(captureDatabaseQuery(tx))
         const [saved] = await tx.update(issues).set({ linearSyncPolicy: 'disabled', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: issue.revision + 1, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...actor })
         await tx.update(teamIssuePromotions).set({ status: 'complete' }).where(eq(teamIssuePromotions.requestId, requestId))
@@ -112,6 +115,12 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         const stopped = await tx.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId }))
         notifyStoppedPolicyRuns(workspace, stopped.rows)
         return { issue: await issueView(saved, tx), linearSync: syncResult }
+      }).catch(async error => {
+        // The failed APP transaction rolled back its fence. The Workspace
+        // relation lock still excludes new grants. Persist only the exact
+        // leases this authorized transaction observed, then drain after unlock.
+        if (capturedInApp.length) await markReviewSessionsRevoked(pool, { leaseIds: capturedInApp }, 'task_changed')
+        throw error
       })
     })
   } catch (error) {
