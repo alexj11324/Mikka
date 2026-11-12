@@ -2600,6 +2600,8 @@
           "permission_changed": "set {integration} to {to}"
         },
         "service_identity": {
+          "credential_rotated": "Service identity credential issued or rotated",
+          "credential_revoked": "Service identity credential revoked",
           "created": "created service identity {target}",
           "renamed": "renamed service identity {target}",
           "disabled": "disabled service identity {target}",

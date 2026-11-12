@@ -2600,6 +2600,8 @@
           "permission_changed": "把 {integration} 改为{to}"
         },
         "service_identity": {
+          "credential_rotated": "已签发或轮换服务身份凭据",
+          "credential_revoked": "已撤销服务身份凭据",
           "created": "创建了服务身份 {target}",
           "renamed": "重命名了服务身份 {target}",
           "disabled": "停用了服务身份 {target}",

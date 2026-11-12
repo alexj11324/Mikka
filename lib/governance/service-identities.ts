@@ -15,7 +15,7 @@ const changeInput = z.discriminatedUnion('action', [
   z.object({ action: z.enum(['disable', 'restore']), revision: z.number().int().positive() }).strict(),
 ])
 type ServiceIdentity = { id: string; workspaceId: string; name: string; enabled: boolean; revision: number }
-type AuditAction = 'created' | 'renamed' | 'disabled' | 'restored'
+type AuditAction = 'created' | 'renamed' | 'disabled' | 'restored' | 'credential_rotated' | 'credential_revoked'
 const publicColumns = sql`id, "workspaceId", name, enabled, revision`
 
 export function withServiceIdentityAdmin<T>(workspaceId: string, actor: EnterpriseReader, work: (tx: WorkspaceTransaction, actorName: string) => Promise<T>) {
@@ -26,7 +26,7 @@ export function withServiceIdentityAdmin<T>(workspaceId: string, actor: Enterpri
   })
 }
 
-async function recordChange(tx: WorkspaceTransaction, identity: ServiceIdentity, actorId: string, actorName: string, action: AuditAction) {
+export async function recordServiceIdentityChange(tx: WorkspaceTransaction, identity: Pick<ServiceIdentity, 'workspaceId' | 'id'>, actorId: string, actorName: string, action: AuditAction) {
   await enqueueWorkspaceAudit(tx, {
     workspaceId: identity.workspaceId, actor: { type: 'user', id: actorId, name: actorName },
     action: `service_identity.${action}`, target: { type: 'service_identity', id: identity.id },
@@ -62,7 +62,7 @@ export function createServiceIdentity(workspaceId: string, actor: EnterpriseRead
       VALUES (${workspaceId}::uuid, ${value.name}, ${actor.id}, ${value.requestId}::uuid, ${value.name})
       ON CONFLICT ("workspaceId", "createdBy", "requestId") DO NOTHING RETURNING ${publicColumns}`)
     if (created) {
-      await recordChange(tx, created, actor.id, actorName, 'created')
+      await recordServiceIdentityChange(tx, created, actor.id, actorName, 'created')
       return created
     }
     const { rows: [existing] } = await tx.execute<ServiceIdentity>(sql`SELECT ${publicColumns} FROM mikka_workspace_service_identities
@@ -85,9 +85,12 @@ export function updateServiceIdentity(workspaceId: string, actor: EnterpriseRead
     const enabled = change.action === 'rename' ? current.enabled : change.action === 'restore'
     if (name === current.name && enabled === current.enabled) return current
     const { rows: [updated] } = await tx.execute<ServiceIdentity>(sql`UPDATE mikka_workspace_service_identities
-      SET name=${name}, enabled=${enabled}, revision=revision+1 WHERE "workspaceId"=${workspaceId}::uuid AND id=${identityId}::uuid
+      SET name=${name}, enabled=${enabled}, revision=revision+1,
+        "credentialHash"=CASE WHEN ${enabled} THEN "credentialHash" ELSE NULL END,
+        "credentialExpiresAt"=CASE WHEN ${enabled} THEN "credentialExpiresAt" ELSE NULL END
+      WHERE "workspaceId"=${workspaceId}::uuid AND id=${identityId}::uuid
       RETURNING ${publicColumns}`)
-    await recordChange(tx, updated, actor.id, actorName, change.action === 'rename' ? 'renamed' : enabled ? 'restored' : 'disabled')
+    await recordServiceIdentityChange(tx, updated, actor.id, actorName, change.action === 'rename' ? 'renamed' : enabled ? 'restored' : 'disabled')
     return updated
   })
 }

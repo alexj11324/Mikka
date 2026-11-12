@@ -2059,6 +2059,15 @@
       "sourceHash": "a83d54ed97c9ac9bbda8b2d45043f5be9d3db427f86425039892556941daea9f"
     },
     {
+      "path": "/mikka/api/service-identity/projects",
+      "template": "/api/service-identity/projects",
+      "source": "app/api/service-identity/projects/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "72272482c9c9bec8fe2d970113747a0b5da9fc6e29353407315846802509f0fb"
+    },
+    {
       "path": "/mikka/api/settings/[read]",
       "template": "/api/settings/[read]",
       "source": "app/api/settings/[read]/route.ts",
@@ -2558,6 +2567,16 @@
         "PATCH"
       ],
       "sourceHash": "599bf0c6c520951250fc3602bfe1a6ee9beb8784502147c5ff01bda1638d8983"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/service-identities/[identityId]/credential",
+      "template": "/api/workspaces/[workspaceId]/service-identities/[identityId]/credential",
+      "source": "app/api/workspaces/[workspaceId]/service-identities/[identityId]/credential/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "f34c2a0b2b265d72bad3fb3c8b6e9087363ed7480c8051698cf4e183b8140fcf"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities/[identityId]/projects",
