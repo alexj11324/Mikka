@@ -39,6 +39,7 @@ export const pollingAllowlist = {
   // Daemon: loops that call our server, which reads the database.
   'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down (always so for a cloud computer, whose server pushes), 1 s against a server older than run-control push; a watcher with timedFloorMs runs at most that often on timer ticks', 1),
   'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second; with review push it syncs only when the pending set changes, on a gateway push, or every 5 s for presence (the server takes decisions on requests seen in the last 10 s); every second only against a server without review push or while the gateway is down', 1),
+  'packages/daemon/src/coordinator/runner.ts': db(daemon, 'awaitToolResult fallback timer only: none while the gateway pushes Coordinator tool results (a 15 s safety re-ask), every 5 s while it is down, 500 ms against a server older than that push', 1),
   'packages/daemon/src/login.ts': db(daemon, 'device login polls the token endpoint at the server-given interval until approved (RFC 8628)', 1),
   'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a periodic write, not a read; saves an idle run\'s checkpoint to the server at most every 2 min', 1),
   // Third-party APIs.
@@ -78,31 +79,8 @@ const rules = [
   { rule: 'polling/refresh-interval', pattern: /[{,]\s*(?:refreshInterval|refetchInterval)\s*(?=[,}])/g },
   { rule: 'polling/set-interval', pattern: /\bsetInterval\s*\(/g },
   { rule: 'polling/poll-constant', pattern: /\b[A-Z][A-Z0-9_]*(?:_POLL_MS|POLL_INTERVAL[A-Z0-9_]*|_EVERY_MS)\s*=(?!=)/g },
-  // The daemon's gate.watch is push-driven; its fallback timer counts in tool-approval.ts.
   { rule: 'polling/helper', skip: definition, pattern: /\bpollUntil\(/g },
 ]
-
-// Mobile useApi's second argument is a reader, not the retired interval.
-// Parse calls so commas in the path expression and reader callbacks cannot be
-// mistaken for an interval. Typechecking the application still requires a reader.
-function useApiIntervals(file, source) {
-  if (!/\buseApi\b/.test(source)) return []
-  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
-  const options = { noLib: true, noResolve: true, allowJs: true }
-  const checker = ts.createProgram([file], options, {
-    ...ts.createCompilerHost(options), getSourceFile: name => name === file ? ast : undefined,
-  }).getTypeChecker()
-  const found = []
-  const interval = type => type.isUnion() ? type.types.some(interval)
-    : Boolean(type.flags & ts.TypeFlags.NumberLike) && !(type.isNumberLiteral() && type.value === 0)
-  function visit(node) {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'useApi'
-        && node.arguments[1] && interval(checker.getTypeAtLocation(node.arguments[1]))) found.push(node.getStart(ast))
-    ts.forEachChild(node, visit)
-  }
-  visit(ast)
-  return found
-}
 
 /** Where a loop body ends: a braced block, or the rest of its single-statement line. */
 function loopBody(source, from) {
@@ -138,6 +116,28 @@ function sleepLoops(source) {
   return found
 }
 
+// The one-shot mobile API accepts a named decoder. The old positional interval
+// and any unrecognized options still fail, even with nested calls in the path.
+function mobilePollingCalls(file, source) {
+  if (!source.includes('useApi')) return []
+  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+  const positions = []
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'useApi' && node.arguments.length > 1) {
+      const option = node.arguments[1]
+      const disabled = option.kind === ts.SyntaxKind.NullKeyword ||
+        (ts.isIdentifier(option) && option.text === 'undefined') || (ts.isNumericLiteral(option) && Number(option.text) === 0)
+      const property = ts.isObjectLiteralExpression(option) && option.properties.length === 1 ? option.properties[0] : null
+      const reader = property && ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) &&
+        property.name.text === 'read' && ts.isIdentifier(property.initializer)
+      if (node.arguments.length !== 2 || !(disabled || reader)) positions.push(node.expression.getStart(tree))
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return positions
+}
+
 function at(file, source, index, rule) {
   const before = source.slice(0, index)
   return { file, line: before.split('\n').length, column: index - before.lastIndexOf('\n'), rule, message: pollingMessage }
@@ -152,8 +152,8 @@ export function findPolling(file, source) {
       found.push(at(file, source, match.index, rule))
     }
   }
+  for (const index of mobilePollingCalls(file, source)) found.push(at(file, source, index, 'polling/helper'))
   for (const index of sleepLoops(source)) found.push(at(file, source, index, 'polling/sleep-loop'))
-  for (const index of useApiIntervals(file, source)) found.push(at(file, source, index, 'polling/helper'))
   return found.sort((a, b) => a.line - b.line || a.column - b.column)
 }
 

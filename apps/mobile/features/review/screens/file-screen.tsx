@@ -27,7 +27,7 @@ export function FileScreen() {
   const insets = useSafeAreaInsets()
   const r = useReview(id)
   const ref = r.review?.diff.reviewRef
-  const read = useApi<ReviewFileRead>(id && path && r.review && ref !== null ? filePath(id, path, ref) : null, readFilePath)
+  const read = useApi<ReviewFileRead>(id && path && r.review && ref !== null ? filePath(id, path, ref) : null, { read: readFilePath })
   const file = read.data?.file ?? r.review?.diff.files.find(item => item.path === path)
   const hunks = useMemo(() => parsePatch(read.data?.file.patch ?? null), [read.data])
   const sentComments = read.data?.comments ?? []
