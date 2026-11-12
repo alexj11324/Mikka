@@ -6293,6 +6293,19 @@
     "renderHint": "请重试打开页面。"
   },
   "Organization": {
+    "serviceKeys": {
+      "title": "组织服务密钥",
+      "empty": "你管理的工作区中暂无绑定此组织的服务密钥。",
+      "unnamed": "未命名的服务密钥",
+      "identity": "{identity} · {workspace}",
+      "expires": "于{date}到期",
+      "expired": "已于{date}到期",
+      "rename": "重命名{key}",
+      "name": "密钥名称",
+      "previous": "上一页",
+      "next": "下一页",
+      "saved": "已保存密钥名称。"
+    },
     "title": "组织",
     "intro": "组织是共享工作区之上的管理层：统一登录方式、目录同步、资源策略与组织审计。组织角色只用于管理组织，不会授予任何工作区、任务或内容的访问；工作区成员仍在「成员」中管理。",
     "loadFailed": "组织信息没有加载出来",

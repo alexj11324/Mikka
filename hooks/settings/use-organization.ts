@@ -140,7 +140,15 @@ export function useOrganizationPolicy(organizationId: string | null | undefined)
   return useSWR(organizationId ? policyKey(organizationId) : null, ([, id]) => request<ResourcePolicyState>(org(id, '/policy')), swr)
 }
 
+export type OrganizationServiceKey = {
+  id: string; name: string | null; workspaceId: string; serviceIdentityId: string; serviceIdentityName: string; expiresAt: string | null
+}
+
 export const organizationApi = {
+  serviceKeys: (id: string, after?: string) => request<{ keys: OrganizationServiceKey[]; nextCursor: string | null }>(
+    org(id, '/api-keys') + (after ? '?' + new URLSearchParams({ after }) : '')),
+  nameServiceKey: (id: string, keyId: string, name: string) =>
+    send<{ id: string; name: string }>(org(id, '/api-keys/' + encodeURIComponent(keyId)), 'PATCH', { name }),
   create: (name: string) => send<OrganizationListItem>('/api/organizations', 'POST', { name }),
   rename: (id: string, name: string) => send<{ organization: OrganizationSummary['organization'] }>(org(id), 'PATCH', { name }),
   /** Owner only; needs every workspace unbound and every provider and SCIM connection closed first. */
