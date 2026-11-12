@@ -1,4 +1,6 @@
 import 'server-only'
+import { hostedSnapshot, sponsoredReviewPlacement } from '../cloud-computer/sponsored-task'
+import { readReviewCheckpoint, type ReviewCheckpoint } from './cloudflare-review'
 import { createHash } from 'node:crypto'
 import { isAbsolute, normalize } from 'node:path'
 import type { Pool, PoolClient } from 'pg'
@@ -35,6 +37,7 @@ export type TaskReviewAuthority = {
   machineStatus: string; runStatus: string; pauseReason: string | null
   leaseExpiresAt: string | null; nativeExitedProof: boolean; bindingId: string
   /** A parked completed run keeps its old claim only as provenance. */
+  sponsoredPlacement?: { operationId:string; repositoryKey:string; checkpoint?:ReviewCheckpoint }
   deviceTokenActive: boolean
   credential: ReviewCredential; credentialExpiresAt: string | null
 }
@@ -49,12 +52,12 @@ type Run = {
   admissionOwner: string | null; admissionTask: string | null
   frozenKey: string | null; botWorkspace: string | null
   bindingWorkspace: string | null; bindingOwner: string | null
-  safeExit: boolean; exitObservedAt: string | null
+  taskProvider: string | null; safeExit: boolean; exitObservedAt: string | null
 }
 type Device = { id: string; ownerId: string; kind: string; enabled: boolean; removedAt: Date | null }
 type Repository = { id: string; userId: string; deviceId: string; repoPath: string; remoteUrl: string | null }
 type Machine = { runId: string; ownerId: string; workspaceId: string; issueId: string | null; deviceId: string | null
-  repoId: string | null; sandboxId: string | null; epoch: number; operationId: string; state: string; lifecycle: { phase?: string } }
+  repoId: string | null; sandboxId: string | null; snapshotId:string | null; epoch: number; operationId: string; state: string; lifecycle: { phase?: string; sponsoredPreparedCheckpoint?:unknown } }
 type DeviceToken = { id: string; userId: string; boundWorkspaceId: string | null; boundDeviceId: string | null
   revokedAt: Date | null; revokedBy: string | null; explicitRevocation: boolean; expiresAt: Date | null }
 const ACTIVE = new Set(['preparing', 'running', 'paused', 'waiting_input', 'finishing'])
@@ -63,7 +66,7 @@ const denied = () => new ReviewAuthorityError('review_scope_denied')
 
 const RUN_COLUMNS = `r.id,r."userId",r."issueId",r."deviceId",r."deviceRepoId",r."deviceTokenId",r."worktreePath",
   r.status,r."pauseReason",r."leaseExpiresAt",r."stopRequestedAt",r."startedAt",r."finishedAt",r."sessionId",r.attempt,r."machineAuthority",
-  r."workspaceId" AS "storedWorkspace",
+  r."workspaceId" AS "storedWorkspace",r."agentDefinition"#>>'{taskMachine,provider}' AS "taskProvider",
   r."agentDefinition"#>>'{executionIdentity,workspaceId}' AS "frozenWorkspace",
   r."agentDefinition"#>>'{repositoryAdmission,workspaceId}' AS "admissionWorkspace",
   r."agentDefinition"#>>'{repositoryAdmission,deviceId}' AS "admissionDevice",
@@ -73,7 +76,7 @@ const RUN_COLUMNS = `r.id,r."userId",r."issueId",r."deviceId",r."deviceRepoId",r
   b."workspaceId" AS "botWorkspace",c."workspaceId" AS "bindingWorkspace",c."ownerId" AS "bindingOwner",
   COALESCE(r.report->'safePoint'->>'session'='exited',false) AS "safeExit",r.report->'safePoint'->>'observedAt' AS "exitObservedAt"`
 const RUN_JOINS = `LEFT JOIN bots b ON b.id=r."botId" LEFT JOIN computer_run_bindings c ON c."runId"=r.id`
-const MACHINE_COLUMNS = '"runId","ownerId","workspaceId","issueId","deviceId","repoId","sandboxId",epoch,"operationId",state,lifecycle'
+const MACHINE_COLUMNS = '"runId","ownerId","workspaceId","issueId","deviceId","repoId","sandboxId","snapshotId",epoch,"operationId",state,lifecycle'
 
 function credentialOf(session: ApiSession): ReviewCredential {
   if (!session.user.id || !session.session.id) throw new ReviewAuthorityError('review_auth_required')
@@ -209,16 +212,27 @@ export async function resolveTaskReviewAuthority<T>(database: Pool, membership: 
       || ACTIVE.has(run.status) && (!run.leaseExpiresAt || run.leaseExpiresAt.getTime() <= now)) throw new ReviewAuthorityError('review_machine_gone')
     if (!ACTIVE.has(run.status) && !ENDED.has(run.status)) throw new ReviewAuthorityError('review_checkout_unavailable')
     if (!run.worktreePath || !isAbsolute(run.worktreePath) || normalize(run.worktreePath) !== run.worktreePath || /[\0\r\n]/.test(run.worktreePath)) throw new ReviewAuthorityError('review_checkout_unavailable')
+    let sponsoredPlacement: TaskReviewAuthority['sponsoredPlacement']
+    if (run.taskProvider === 'cloudflare' || machine?.snapshotId === hostedSnapshot) {
+      if (run.taskProvider !== 'cloudflare' || machine?.snapshotId !== hostedSnapshot ||
+          !machine.sandboxId || !/^[a-f0-9]{64}$/.test(machine.sandboxId)) throw denied()
+      try {
+        sponsoredPlacement = await sponsoredReviewPlacement(client, {userId:session.user.id, workspaceId}, run.id)
+      } catch { throw denied() }
+      if (sponsoredPlacement.operationId !== machine.operationId || sponsoredPlacement.repositoryKey !== repo.repoPath) throw denied()
+      const checkpoint = readReviewCheckpoint(machine.lifecycle?.sponsoredPreparedCheckpoint, machine.sandboxId)
+      if (checkpoint) sponsoredPlacement = {...sponsoredPlacement, checkpoint}
+    }
     const bindingId = createHash('sha256').update(JSON.stringify([run.id, workspaceId, run.userId, taskId, run.deviceId,
       repo.id, token.id, repo.repoPath, run.worktreePath, run.attempt, run.sessionId, machine?.sandboxId ?? null,
-      machine?.epoch ?? null, machine?.operationId ?? null])).digest('hex')
+      machine?.epoch ?? null, machine?.operationId ?? null, ...(sponsoredPlacement ? ['cloudflare', sponsoredPlacement.repositoryKey] : [])])).digest('hex')
     if (expected.bindingId && expected.bindingId !== bindingId) throw new ReviewAuthorityError('review_binding_changed')
     const result: TaskReviewAuthority = { taskId, runId: run.id, userId: session.user.id, ownerId: run.userId, workspaceId,
       deviceId: device.id, repoId: repo.id, deviceTokenId: token.id, remoteKey: repo.repoPath, repoPath: repo.repoPath,
       worktreePath: run.worktreePath, machineKind: device.kind, sandboxId: machine?.sandboxId ?? null,
       machineEpoch: machine?.epoch ?? null, machineOperationId: machine?.operationId ?? null,
       machineStatus: machine?.state ?? 'running', runStatus: run.status, pauseReason: run.pauseReason,
-      leaseExpiresAt: run.leaseExpiresAt?.toISOString() ?? null, nativeExitedProof, deviceTokenActive, bindingId, credential, credentialExpiresAt }
+      leaseExpiresAt: run.leaseExpiresAt?.toISOString() ?? null, nativeExitedProof, deviceTokenActive, bindingId, credential, credentialExpiresAt, ...(sponsoredPlacement ? {sponsoredPlacement} : {}) }
     // Only bounded database work belongs here (e.g. recording a lease).
     // Provider installation and other network IO happen before authorization.
     const value = work ? await work(result, client) : result

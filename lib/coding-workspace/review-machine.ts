@@ -3,9 +3,11 @@ import { Sandbox } from 'e2b'
 import type { Pool } from 'pg'
 import { TerminalError } from '@mikka/protocol/coding-terminal'
 import { e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { cloudflareReview, reviewReply } from './cloudflare-review'
+import type { ReviewSessionLease } from './review-sessions'
 import type { TaskReviewAuthority } from './review-authority'
 
-type Lease = { id: string; expiresAt: string }
+type Lease = ReviewSessionLease
 type Dependencies = { database: Pick<Pool, 'connect' | 'query'>; resume: (scope: TaskReviewAuthority & { sandboxId: string }, milliseconds: number, signal?: AbortSignal) => Promise<void> }
 const TERMINAL = new Set(['succeeded', 'failed'])
 
@@ -13,7 +15,13 @@ const TERMINAL = new Set(['succeeded', 'failed'])
  * device credential, worker bootstrap, repository checkout or new sandbox. */
 export async function resumeReviewMachine(scope: TaskReviewAuthority, lease: Lease, signal?: AbortSignal,
   dependencies?: Dependencies): Promise<void> {
-  if (scope.machineKind !== 'cloud' || scope.machineStatus === 'running') return
+  if (scope.machineKind !== 'cloud') return
+  const sponsored = scope.sponsoredPlacement && cloudflareReview(scope,lease,lease.reviewKind ?? 'terminal')
+  const attach = async () => {
+    if (sponsored && (await reviewReply(sponsored,'attach',{},signal)).attached !== true)
+      throw new TerminalError('terminal_binding_changed')
+  }
+  if (scope.machineStatus === 'running') { await attach(); return }
   if (!scope.sandboxId || scope.machineStatus !== 'paused' || !scope.nativeExitedProof || !TERMINAL.has(scope.runStatus))
     throw new TerminalError('terminal_already_controlled')
   signal?.throwIfAborted()
@@ -61,7 +69,8 @@ export async function resumeReviewMachine(scope: TaskReviewAuthority, lease: Lea
     signal?.throwIfAborted()
     const remaining = Math.min(300_000, Date.parse(lease.expiresAt) - Date.now())
     if (remaining <= 0) throw new TerminalError('terminal_unavailable', { detail: 'lease' })
-    await resume({ ...scope, sandboxId: scope.sandboxId }, remaining, signal)
+    if (sponsored) await attach()
+    else await resume({ ...scope, sandboxId: scope.sandboxId }, remaining, signal)
     signal?.throwIfAborted()
     const applied = await database.query(`UPDATE thread_machines m SET state='running',"runningSince"=clock_timestamp(),
       "lastActiveAt"=clock_timestamp(),"lifecycleAt"=(SELECT "expiresAt" FROM coding_review_sessions WHERE id=$8),

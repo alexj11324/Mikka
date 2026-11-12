@@ -10,8 +10,9 @@ import { taskThreadRunPredicate } from '../task-thread-run'
 
 export const REVIEW_SESSION_MS = 5 * 60_000
 export type ReviewSessionKind = 'terminal' | 'preview'
-export type ReviewSessionLease = { id: string; expiresAt: string }
-export type ReviewRevokeTarget = { runId: string; ownerId: string; workspaceId: string; sandboxId: string }
+export type ReviewSessionLease = { id: string; expiresAt:string; reviewOperationId?:string; reviewKind?:ReviewSessionKind }
+type SponsoredClose = { taskId:string; repositoryKey:string; operationId:string }
+export type ReviewRevokeTarget = { sponsored?:SponsoredClose; runId: string; ownerId: string; workspaceId: string; sandboxId: string }
 export type ReviewSessionTarget = { runIds: readonly string[] } | { userId: string } | { workspaceId: string; ownerId?: string }
   | { taskId: string } | { taskIds: readonly string[] } | { credentialKind: 'session' | 'pat'; credentialId: string } | { deviceTokenId: string }
   | { id: string; bindingId: string; ownerId: string; kind: ReviewSessionKind } | { leaseIds: readonly string[] }
@@ -20,8 +21,9 @@ export type ReviewRevokeReason = 'run_control' | 'run_changed' | 'task_changed' 
 type Database = Pick<Pool, 'query'>
 type StoredLease = ReviewRevokeTarget & { id: string; kind: ReviewSessionKind; taskId: string; deviceId: string; repoId: string
   deviceTokenId: string; bindingId: string; machineEpoch: number; machineOperationId: string
+  provider:'e2b' | 'cloudflare'; repositoryKey:string | null; reviewOperationId:string | null
   credentialKind: 'session' | 'pat'; credentialId: string; revokedAt: Date | null; expiresAt: Date }
-const leaseView = (row: StoredLease): ReviewSessionLease => ({ id: row.id, expiresAt: row.expiresAt.toISOString() })
+const leaseView = (row: StoredLease): ReviewSessionLease => ({ id: row.id, expiresAt: row.expiresAt.toISOString(), ...(row.reviewOperationId ? {reviewOperationId:row.reviewOperationId, reviewKind:row.kind} : {}) })
 
 /** This callback must run inside withTaskReviewAuthority, with its fresh
  * credential, Workspace/member, Task, Run and machine locks still held. A
@@ -46,6 +48,10 @@ export async function beginReviewSession(authority: TaskReviewAuthority,
   // A close pending on this exact run must ACK before another capability can
   // be minted. Otherwise a delayed revoke could close a replacement session.
   if (rows.some(row => row.revokedAt || row.expiresAt.getTime() <= now)) throw new ReviewAuthorityError('review_binding_changed')
+  const placement = authority.sponsoredPlacement
+  if (rows.some(row => row.provider !== (placement ? 'cloudflare' : 'e2b') ||
+      (placement && (row.repositoryKey !== placement.repositoryKey || !row.reviewOperationId))))
+    throw new ReviewAuthorityError('review_binding_changed')
   const current = rows.find(row => row.kind === options.kind)
   if (current) {
     if (current.bindingId !== authority.bindingId || current.credentialKind !== authority.credential.kind
@@ -58,13 +64,15 @@ export async function beginReviewSession(authority: TaskReviewAuthority,
     }
     return leaseView(current)
   }
+  const reviewOperationId = placement ? (rows[0]?.reviewOperationId ?? randomUUID()) : null
   const { rows: [created] } = await client.query<StoredLease>(`INSERT INTO coding_review_sessions
     (id,kind,"taskId","runId","ownerId","workspaceId","deviceId","repoId","deviceTokenId","bindingId","sandboxId",
-      "machineEpoch","machineOperationId","credentialKind","credentialId","createdAt","expiresAt")
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+      "machineEpoch","machineOperationId","credentialKind","credentialId","createdAt","expiresAt",provider,"repositoryKey","reviewOperationId")
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
   [randomUUID(), options.kind, authority.taskId, authority.runId, authority.ownerId, authority.workspaceId, authority.deviceId,
     authority.repoId, authority.deviceTokenId, authority.bindingId, authority.sandboxId, authority.machineEpoch,
-    authority.machineOperationId, authority.credential.kind, authority.credential.id, clock.now, new Date(deadline)])
+    authority.machineOperationId, authority.credential.kind, authority.credential.id, clock.now, new Date(deadline),
+    placement ? 'cloudflare' : 'e2b', placement?.repositoryKey ?? null, reviewOperationId])
   await client.query(`UPDATE thread_machines SET "lifecycleAt"=clock_timestamp(),lifecycle=lifecycle-'reconcileId'-'reconcileUntil'
     WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "sandboxId"=$4 AND epoch=$5`,
   [authority.runId, authority.ownerId, authority.workspaceId, authority.sandboxId, authority.machineEpoch])
@@ -90,6 +98,13 @@ export async function readReviewSession(authority: TaskReviewAuthority, options:
  * was issued. Network detach is not a close: the gateway owns its grace time. */
 export async function closeReviewSession(authority: TaskReviewAuthority, options: { kind: ReviewSessionKind; id?: string }, database?: Database) {
   const db = database ?? (await import('../db')).pool
+  if (authority.sponsoredPlacement) {
+    const id = options.id ?? (await readReviewSession(authority, {kind:options.kind}, db))?.id
+    if (!id) return
+    const result = await revokeReviewSession(authority, {kind:options.kind,id}, db)
+    if (result.pending) throw Error('Task review close unconfirmed')
+    return
+  }
   const { rows } = await db.query<{ id: string }>(`DELETE FROM coding_review_sessions
     WHERE "runId"=$1 AND kind=$2 AND "ownerId"=$3 AND "workspaceId"=$4 AND "bindingId"=$5
       AND "credentialKind"=$6 AND "credentialId"=$7 AND ($8::uuid IS NULL OR id=$8) RETURNING id`,
@@ -118,6 +133,7 @@ function targetWhere(target: ReviewSessionTarget): { where: string; values: unkn
  * tombstones these exact lease IDs before closing PTY/HTTP/WS and returning. */
 export const reviewSessionTransport = {
   close: async (target: ReviewRevokeTarget, leaseIds: string[], expiresAt: string, kind: ReviewSessionKind) => {
+    if (target.sponsored) return (await import('./cloudflare-review')).revokeCloudflareReview({ ...target, ...target.sponsored }, kind, leaseIds)
     if (kind === 'terminal') await (await import('./terminal/runtime')).revokeRunTerminal(target, { leaseIds, expiresAt })
     else await (await import('./preview/runtime')).revokeRunPreview(target, { leaseIds, expiresAt })
   },
@@ -126,15 +142,26 @@ export const reviewSessionTransport = {
 async function closeRevoked(database: Database, rows: StoredLease[]) {
   const groups = new Map<string, StoredLease[]>()
   for (const row of rows) {
-    const key = JSON.stringify([row.runId, row.ownerId, row.workspaceId, row.sandboxId, row.kind])
+    const key = JSON.stringify([row.runId, row.ownerId, row.workspaceId, row.sandboxId, row.kind, row.provider, row.reviewOperationId])
     const group = groups.get(key) ?? []; group.push(row); groups.set(key, group)
   }
   let closed = 0
   const closeGroup = async (group: StoredLease[]) => {
     const first = group[0]!, ids = group.map(row => row.id)
-    const target = { runId: first.runId, ownerId: first.ownerId, workspaceId: first.workspaceId, sandboxId: first.sandboxId }
+    const target: ReviewRevokeTarget = { runId: first.runId, ownerId: first.ownerId, workspaceId: first.workspaceId, sandboxId: first.sandboxId }
     try {
-      await reviewSessionTransport.close(target, ids, new Date(Math.max(...group.map(row => row.expiresAt.getTime()))).toISOString(), first.kind)
+      if (first.provider === 'cloudflare') {
+        if (!first.reviewOperationId || !first.repositoryKey) throw Error('Missing persisted Cloudflare review placement')
+        target.sponsored = {taskId:first.taskId, repositoryKey:first.repositoryKey, operationId:first.reviewOperationId}
+      }
+      const receipt = await reviewSessionTransport.close(target, ids, new Date(Math.max(...group.map(row => row.expiresAt.getTime()))).toISOString(), first.kind)
+      if (receipt) {
+        await database.query(`UPDATE thread_machines SET state='paused',"runningSince"=NULL,"computeSeconds"="computeSeconds"+
+          CASE WHEN "runningSince" IS NULL THEN 0 ELSE GREATEST(0,ceil(extract(epoch FROM clock_timestamp()-"runningSince")))::integer END,
+          lifecycle=(lifecycle-'sponsoredPreparedCheckpoint')||jsonb_strip_nulls(jsonb_build_object('phase','paused','sponsoredPreparedCheckpoint',$7::jsonb)),
+          "lifecycleAt"=clock_timestamp() WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "sandboxId"=$4 AND epoch=$5 AND "operationId"=$6`,
+        [first.runId, first.ownerId, first.workspaceId, first.sandboxId, first.machineEpoch, first.machineOperationId, JSON.stringify(receipt.checkpoint ?? null)])
+      }
       await database.query('DELETE FROM coding_review_sessions WHERE id=ANY($1::uuid[]) AND "revokedAt" IS NOT NULL', [ids])
       await database.query('UPDATE thread_machines SET "lifecycleAt"=clock_timestamp(),lifecycle=lifecycle-\'reconcileId\'-\'reconcileUntil\' WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3',
         [first.runId, first.machineEpoch, first.sandboxId])

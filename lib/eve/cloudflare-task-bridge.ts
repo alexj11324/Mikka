@@ -22,9 +22,15 @@ function token() {
   if (!capability) throw Error('Private task machine bridge unavailable')
   return 'Bearer '+capability
 }
+function request(path:string, body:unknown, signal = AbortSignal.timeout(70_000)) {
+  return fetch(origin + '/v1/'+path,{method:'POST',redirect:'error',cache:'no-store',
+    headers:{'content-type':'application/json',authorization:token()},body:JSON.stringify(body),signal})
+}
+export function taskReviewRequest(grant:TaskMachineGrant, operation:Record<string,unknown>, signal?:AbortSignal) {
+  return request('review',{grant,operation},signal)
+}
 async function post(path:string, body:unknown) {
-  const response=await fetch(origin + '/v1/'+path,{method:'POST',redirect:'error',cache:'no-store',
-    headers:{'content-type':'application/json',authorization:token()},body:JSON.stringify(body),signal:AbortSignal.timeout(70_000)})
+  const response = await request(path,body)
   if (!response.ok) { await response.body?.cancel(); throw Error('Private task machine '+path+' HTTP '+response.status) }
   return response
 }

@@ -439,7 +439,13 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
       if (machine.state !== 'paused') {
         const tail = machine.snapshotId === hostedSnapshot ? null : await readTail(machine.sandboxId)
         if (tail) await saveWorkerTail(client, runId, tail, await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })).catch(() => undefined)
-        if (machine.snapshotId === hostedSnapshot) await releaseOwnedCloudflareTaskMachine(client,actor,runId,machine.operationId)
+        if (machine.snapshotId === hostedSnapshot) {
+          const checkpoint = await releaseOwnedCloudflareTaskMachine(client, actor, runId, machine.operationId)
+          if (checkpoint && checkpoint.instanceId === machine.sandboxId)
+            await client.query(`UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('sponsoredPreparedCheckpoint',$4::jsonb)
+              WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3 AND "operationId"=$5`,
+            [runId, machine.epoch, machine.sandboxId, JSON.stringify(checkpoint), machine.operationId])
+        }
         else await pause(machine.sandboxId)
       }
     }

@@ -93,6 +93,17 @@ function frozenGrant(run: BoundRun | undefined, actor: TaskMachineActor): TaskMa
   }
 }
 
+/** A human review may read the frozen placement of a completed Run. It cannot
+ * mint the former CLI grant or bypass owner/workspace/repository admission. */
+export async function sponsoredReviewPlacement(query: Query, actor: TaskMachineActor, runId: string) {
+  if (!hostedTaskEnabled(actor.workspaceId)) throw denied()
+  const result = await query.query<BoundRun>(bindingSql + ' FOR SHARE OF r,b,m,repo', [
+    runId, actor.userId, actor.workspaceId, hostedSnapshot,
+  ])
+  const grant = frozenGrant(result.rows[0], actor)
+  return { operationId:grant.operationId, repositoryKey:grant.repositoryKey }
+}
+
 export async function readSponsoredTaskGrant(query: Query, actor: TaskMachineActor, runId: string, lock = false) {
   if (!hostedTaskEnabled(actor.workspaceId)) throw denied()
   const result = await query.query<BoundRun>(bindingSql + activeSql + (lock ? ' FOR SHARE OF r,b,m,repo' : ''), [
