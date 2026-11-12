@@ -53,7 +53,7 @@ import { CHAT_SURFACE, ChatMessage, ChatWaiting } from '@ui-slot/chat-message'
 import { ThreadScreen } from '@ui-slot/thread'
 import { useConversationPanels, useWorkTabs } from '@/components/coordinator/conversation-panels'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
-import { useFactoryQuestions } from '@/hooks/use-factory-questions'
+import { factoryQuestionUnavailable, useFactoryQuestions } from '@/hooks/use-factory-questions'
 import { noteChipText } from '@/lib/browser/note'
 import { PERSON_BUBBLE } from '@/components/slots/chat-message'
 import type { ChatSpeaker } from '@/components/slots/chat-message-contract'
@@ -613,9 +613,17 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
             ...(browser?.notes ?? []).map(note => ({ id: `note-${note.n}`, name: noteChipText(note), meta: tNavAll('Editor.richText.annotate'), onRemove: () => browser?.remove(note.n) })),
           ]}
           notices={<>{notices}{factory.error && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1">{actionError()}</AlertTitle><Button variant="ghost" size="sm" onClick={() => { void factory.reload() }}>{tCommon('retry')}</Button></Alert>}</>}
-          questions={factory.questions.map(question => ({ id: question.questionId, question: question.question, task: question.task, taskId: question.issueId ?? undefined,
-            kind: question.type === 'permission' ? 'approval' : question.options.length ? 'decision' : 'question', ...(question.options.length ? { options: question.options.map(option => ({ id: option.value, title: option.label })) } : {}) }))}
-          onAnswer={(id, text) => { const question = factory.questions.find(item => item.questionId === id); if (question) void factory.answer(question, text).then(error => { if (error) toast.error(actionError(error)) }) }}
+          questions={factory.questions.map(question => {
+            const reason = factoryQuestionUnavailable(question.status)
+            return { id: question.questionId, revision: question.reference.questionRevision, question: question.question, task: question.task, unavailable: reason ? actionError(reason) : undefined, taskId: question.issueId ?? undefined,
+            kind: question.type === 'permission' ? 'approval' : question.options.length ? 'decision' : 'question', ...(question.options.length ? { options: question.options.map(option => ({ id: option.value, title: option.label })) } : {}) }
+          })}
+          onAnswer={async (id, text) => {
+            const question = factory.questions.find(item => item.questionId === id)
+            if (!question) return { status: 'unavailable', error: actionError('factoryQuestionClosed') }
+            const receipt = await factory.submitAnswer(question, text)
+            return receipt.status === 'accepted' ? receipt : { ...receipt, error: actionError(receipt.error) }
+          }}
           running={Object.values(sources ?? {}).filter(source => source.kind === 'run' && !source.finishedAt).length}
           onOpenTask={openTask} onOpenInbox={() => navigate({ section: 'suggestions' })} />
         <SelectionQuote root={rootRef} onQuote={quoteReply} />
