@@ -88,9 +88,9 @@ async function processStopped(pid) {
   return false
 }
 
-function remainingTime(deadline, maximum = 20_000) {
+function remainingTime(deadline, maximum = 20_000, timeoutCode = 'NATIVE_DAEMON_EXIT_TIMEOUT') {
   const remaining = deadline - Date.now()
-  if (remaining <= 0) throw new Error('NATIVE_DAEMON_EXIT_TIMEOUT')
+  if (remaining <= 0) throw new Error(timeoutCode)
   return Math.min(remaining, maximum)
 }
 
@@ -139,16 +139,17 @@ async function socketExists(socketPath) {
   return true
 }
 
-async function connectForCleanup(connect, directory, deadline, protocolVersion) {
+async function connectForCleanup(connect, directory, deadline, { protocolVersion, timeoutCode = 'NATIVE_DAEMON_EXIT_TIMEOUT' } = {}) {
+  const budget = remainingTime(deadline, 20_000, timeoutCode)
   let accepting = true
   const connecting = connect(directory, { name: 'mikka-native-acceptance-cleanup', version: '1' }, {
-    drainOnMismatch: false, protocolVersion, timeoutMs: remainingTime(deadline, 3000),
+    drainOnMismatch: false, protocolVersion, timeoutMs: Math.min(budget, 3000),
   }).then(client => {
     // A late hello must not retain a client after the cleanup deadline.
     if (!accepting) client.close()
     return client
   })
-  try { return await bounded(connecting, remainingTime(deadline), 'NATIVE_DAEMON_EXIT_TIMEOUT') } finally { accepting = false }
+  try { return await bounded(connecting, budget, timeoutCode) } finally { accepting = false }
 }
 
 /** Drain only the exact profiles created by this harness. The daemon secret
@@ -175,7 +176,10 @@ export async function stopLocalDaemons(profiles) {
       if (await socketExists(socketPath)) {
         try {
           try {
-            client = await connectForCleanup(connectDaemonInDataDir, directory, deadline)
+            // The filesystem checks above can outlast the final poll. Preserve the last
+            // observation while no PID has appeared to establish process ownership.
+            const timeoutCode = unproven && pid === null ? 'NATIVE_DAEMON_STOP_UNPROVEN' : 'NATIVE_DAEMON_EXIT_TIMEOUT'
+            client = await connectForCleanup(connectDaemonInDataDir, directory, deadline, { timeoutCode })
           } catch (error) {
             if (!isProtocolMismatch(error)) throw error
             // Inspect the authenticated PID before any drain. Reconnect using
@@ -184,7 +188,7 @@ export async function stopLocalDaemons(profiles) {
             assertDaemonPid(error.data?.pid, pid)
             const protocolVersion = error.data?.protocolVersion
             assert.ok(Number.isSafeInteger(protocolVersion) && protocolVersion > 0, 'Native daemon protocol version is invalid')
-            client = await connectForCleanup(connectDaemonInDataDir, directory, deadline, protocolVersion)
+            client = await connectForCleanup(connectDaemonInDataDir, directory, deadline, { protocolVersion })
           }
         } catch (error) {
           if (isNoDaemon(error) && error.code !== 'ENOENT') refused = true
