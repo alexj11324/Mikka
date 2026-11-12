@@ -6,7 +6,7 @@
   "ci_executes_remote_query": false,
   "recorded_at_utc": "2026-11-12T09:46:24.388Z",
   "mcp_roundtrip_ms": 5787,
-  "sql_sha256": "62bca1ac15ae80924f1dd3917e6aa27990e5eac671fc5659b89deec29d923d03",
+  "sql_sha256": "166eaa4a75a92f3fcc16fdffb38b32ccb7cdc84111b58428911ade8f786120a0",
   "fixtures_sha256": "249c6924547ce9658ebf3d12cc06711bd6370f69ac19c1988de697a8e7a977f2",
   "synthetic_query_sha256": "369848ba90281791502bb353b9c1c08f895d083e8b44ea064474049b810d4c66",
   "baseline_sha256": "7abab6631e0c1cd33c0cde46a15d369533f153d20b1f7f5ef8598f7ef29c5f8d",
@@ -40,7 +40,8 @@
     "CI checks that SQL, fixtures, generated query and recorded result hashes still match and verifies the exact output sets. CI does not execute PostHog.",
     "All fixture traces/spans are deterministic synthetic IDs. The generated query has no production table source and performs no writes.",
     "Distinct excluded identities and raw arrayJoin output rows are recorded separately; duplicate physical input rows are not counted as different span identities.",
-    "Elapsed time is the roundtrip from submitting this exact literal query to receiving its last row. The unchanged baseline still reproduces the two historical attribution failures."
+    "Elapsed time is the roundtrip from submitting this exact literal query to receiving its last row. The unchanged baseline still reproduces the two historical attribution failures.",
+    "The source digest covers the complete SQL file, including its final LF. The generated literal query and provider result are unchanged by this file terminator."
   ],
   "acceptance_script_sha256": "247c48826ef331afc02bad3564d83fb863f6c98bd45825804d459c478e767bbc"
 }
