@@ -1459,7 +1459,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "479f666a4bbd214de0012e8b19e4ab64fb7a65dbe9fc27eac15e9b4208d509e0"
+      "sourceHash": "58f9554f3c96bb835abd8d3ebb776ccbccb252223d0e4d35de628bb1ae7efd9b"
     },
     {
       "path": "/mikka/api/mobile/chat-order",
