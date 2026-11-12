@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { auditDigest } from '@/lib/audit/integrity'
+import { afterCommit, afterDatabaseCommit } from '@/lib/db/commit-effects'
 import { dbUrl, seedIssue, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { applyAccountDeletionManifest, exportAccountDeletionManifest, requestAccountDeletion, resumeAccountDeletion } from './deletion-jobs'
 
@@ -79,7 +80,38 @@ test('current deletion journal replays only into explicit isolated restore targe
   assert.deepEqual(manifest.jobs[0].plan.shared, [], 'the source creator already left this Shared workspace')
   const removed: string[] = []
   await assert.rejects(applyAccountDeletionManifest({ ...manifest, digest: '0'.repeat(64) }, { mainPool: restored, workspacePool: restored }), /accountDeletionManifestInvalid/)
-  await assert.rejects(applyAccountDeletionManifest(manifest, { mainPool: restored, workspacePool: restored, deleteObject: async object => { removed.push(object); throw new Error('object unavailable') } }), /accountDeletionRestoreCleanupPending/)
+  await assert.rejects(applyAccountDeletionManifest(manifest, { mainPool: restored, workspacePool: restored }), /accountDeletionRestoreCleanupPending/)
+  const restoreStarted = Promise.withResolvers<void>(), permitRetry = Promise.withResolvers<void>()
+  const sent: string[] = []
+  async function publishChange(database: Pool, tenant: string) {
+    const client = await database.connect()
+    try {
+      await client.query('BEGIN')
+      assert.equal((await client.query('UPDATE "user" SET name=name WHERE id=$1', [untouched])).rowCount, 1)
+      afterCommit(client, 'changed', () => { sent.push(tenant) })
+      await client.query('COMMIT')
+    } finally { client.release() }
+    afterDatabaseCommit(database, 'changed', () => { sent.push(tenant + ':autocommit') })
+  }
+  let checkedOtherTarget = false
+  const blocked = assert.rejects(applyAccountDeletionManifest(manifest, { mainPool: restored, workspacePool: restored, deleteObject: async object => {
+    removed.push(object)
+    assert.throws(() => afterDatabaseCommit({}, 'unknown', () => {}), /observed node-postgres executor/)
+    await publishChange(restored, 'restore')
+    if (!checkedOtherTarget) {
+      checkedOtherTarget = true
+      await publishChange(source, 'other-target')
+    }
+    restoreStarted.resolve()
+    await permitRetry.promise
+    throw new Error('object unavailable')
+  } }), /accountDeletionRestoreCleanupPending/)
+  try {
+    await Promise.race([restoreStarted.promise, blocked.then(() => { throw new Error('restore did not reach its object target') })])
+    await publishChange(source, 'source')
+  } finally { permitRetry.resolve() }
+  await blocked
+  assert.deepEqual(sent, ['other-target', 'other-target:autocommit', 'source', 'source:autocommit'])
   assert.equal((await restored.query('SELECT stage FROM account_deletion_jobs WHERE id=$1', [request.id])).rows[0].stage, 'storage_pending')
   assert.deepEqual(await applyAccountDeletionManifest(manifest, { mainPool: restored, workspacePool: restored, deleteObject: async object => { removed.push(object) } }), { applied: 1 })
   assert.deepEqual(removed, [key, key], 'reapplying a manifest must retain object references whose DB pointers are already deleted')

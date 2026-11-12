@@ -6,6 +6,14 @@ on:
       - 'packages/daemon/harness/**'
       - 'packages/daemon/bin/cloud-worker.ts'
       - 'packages/daemon/src/cloudflare-task-handoff.ts'
+      - 'packages/daemon/src/runs/workspace-control*.ts'
+      - 'packages/daemon/src/runs/supervisor.ts'
+      - 'packages/daemon/src/main.ts'
+      - 'packages/daemon/scripts/workspace-control-install.py'
+      - 'packages/daemon/scripts/workspace-ingress.py'
+      - 'scripts/e2b/terminal-gateway*.py'
+      - 'scripts/e2b/preview-gateway*.py'
+      - 'scripts/e2b/preview_firewall.py'
       - 'packages/daemon/src/hosted-binaries.ts'
       - 'packages/daemon/scripts/build-cloud-worker.mjs'
       - 'packages/daemon/scripts/prepare-worker-install.py'
@@ -28,7 +36,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --prefix cloudflare/task-sandbox
-      - run: node --test cloudflare/task-sandbox/grant.test.mjs
+      - run: node --test cloudflare/task-sandbox/*.test.mjs
       - run: python3 cloudflare/task-sandbox/native-history.test.py
       - name: Verify the task image and both repository-pinned official CLIs offline
         run: |
@@ -47,3 +55,16 @@ jobs:
               claude --version
               codex --version
             '
+      - name: Verify the product image isolates every review listener before restoring a task
+        run: |
+          docker run --rm --network none --cap-add NET_ADMIN \
+            --mount "type=bind,source=$PWD/cloudflare/task-sandbox/review-guest-image.test.py,target=/opt/mikka/review-guest-image.test.py,readonly" \
+            --entrypoint sh mikka-task-sandbox -ec '
+            export PYTHONDONTWRITEBYTECODE=1
+            python3 -I /opt/mikka/runtime/ingress-v1/guard.py prepare-cloudflare
+            python3 -I /opt/mikka/task-sandbox/workspace-control-install.py --cloudflare-task
+            test "$(stat -c %u:%g:%a /run/mikka-review-control/machine.lock)" = 0:1000:660
+            python3 -I /opt/mikka/runtime/ingress-v1/guard.py verify
+            python3 -c "import sys;sys.path[:0]=[\"/opt/mikka/preview\",\"/opt/mikka/runtime/preview-python-3.14.0\"];import aiohttp,preview_firewall;assert aiohttp.__version__ == \"3.14.0\""
+            python3 -I /opt/mikka/review-guest-image.test.py
+          '

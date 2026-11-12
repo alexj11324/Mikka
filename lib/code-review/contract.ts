@@ -1,3 +1,5 @@
+import type { TaskReviewRef } from '@mikka/protocol/coding-workspace-review'
+
 // The code review contract (#1722 backend, #1732 UI; decision 2026-11-08 「审阅」).
 // One set of types for the web, the hosted layer and iOS: every field ties to an
 // acceptance line, quoted in its comment. Only lib/code-review/client.ts knows
@@ -16,8 +18,9 @@ export type ReviewDenialReason =
   | 'not_owner_terminal'
   /** GitHub refused the merge: "clear failure reason if GitHub permission is insufficient". */
   | 'github_permission'
+  | 'review_unavailable'
 
-export const REVIEW_DENIAL_REASONS = ['not_owner_merge', 'not_owner_send', 'not_owner_terminal', 'github_permission'] as const satisfies readonly ReviewDenialReason[]
+export const REVIEW_DENIAL_REASONS = ['not_owner_merge', 'not_owner_send', 'not_owner_terminal', 'github_permission', 'review_unavailable'] as const satisfies readonly ReviewDenialReason[]
 
 /** What this viewer may do on the review page; a teammate sees the actions disabled with the reason (R11). */
 export type ReviewPermissions = {
@@ -37,11 +40,15 @@ export type ReviewSummary = {
   /** The task (issue) id. */
   taskId: string
   /** Null before a PR exists (R6). */
-  pr: { number: number; state: ReviewPullRequestState; url: string } | null
-  files: number
-  additions: number
-  deletions: number
-  checks: { failed: number; passed: number; pending: number }
+  pr: { number: number; state: ReviewPullRequestState; url: string; observedAt?: string } | null
+  reviewRef?: TaskReviewRef | null
+  countsKnown?: boolean
+  reclaimed?: boolean
+  mergeTarget?: { reviewRef: TaskReviewRef; binding: { taskId: string; issueId: string; attemptId: string; candidateId: string; revision: number }; expectedHeadSha: string } | null
+  files: number | null
+  additions: number | null
+  deletions: number | null
+  checks: { failed: number; passed: number; pending: number; neutral?: number; total?: number; sha?: string; observedAt?: string; fingerprint?: string } | null
   /** The agent is running on the task (R6 「运行中」). */
   running: boolean
   /** Shown in ⋯ and tooltips, never on the bar (R-91). */
@@ -56,14 +63,15 @@ export type ReviewSummary = {
  * PR diff. Always return actual source + time" — 「机器已回收，显示的是最后一次检查点 / PR 的改动」.
  */
 export type ReviewDiffSource = {
-  kind: 'machine' | 'checkpoint' | 'pr'
+  kind: 'machine' | 'checkpoint' | 'commit' | 'pr'
+  stale?: boolean
   /** ISO time of the source. */
   at: string
   /** The machine was reclaimed, so this is a fallback. */
   reclaimed: boolean
 }
 
-export type ReviewFileStatus = 'added' | 'modified' | 'deleted' | 'renamed'
+export type ReviewFileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'unavailable'
 
 /** One changed file in the middle column, `+N −M`, with 「已看」 (R1). */
 export type ReviewFile = {
@@ -71,8 +79,11 @@ export type ReviewFile = {
   /** The old path of a renamed file. */
   previousPath?: string
   status: ReviewFileStatus
-  additions: number
-  deletions: number
+  additions: number | null
+  deletions: number | null
+  countsKnown?: boolean
+  fileVersion?: string
+  format?: 'unloaded' | 'text' | 'binary' | 'too_large' | 'unavailable'
   /** Marked as viewed by this viewer. */
   viewed?: boolean
   /** The file's unified diff (lib/thread-changes.ts parses it). Null when paged or too large: fetch it per file (R12 「按文件加载」). */
@@ -88,8 +99,12 @@ export type ReviewDiff = {
   source: ReviewDiffSource
   /** Pushed live while the agent runs and no PR exists (R6 「实时」). */
   live: boolean
-  base: string
-  head: string
+  reviewRef?: TaskReviewRef | null
+  boardRevision?: number | null
+  availability?: 'available' | 'empty' | 'unavailable'
+  reason?: string | null
+  base: string | null
+  head: string | null
   files: ReviewFile[]
   /** "Explicit empty state" (R12 no changes). */
   empty: boolean
@@ -104,7 +119,7 @@ export type ReviewRead = { summary: ReviewSummary; diff: ReviewDiff }
 export type ReviewSentComment = { id: string; path: string; line: number; side: ReviewCommentSide; body: string; author: string; sentAt: string }
 
 /** GET …/review/file?path=: one file with its patch and the comments already sent on it, per file so a big PR does not send them all up front. */
-export type ReviewFileRead = { file: ReviewFile; comments: ReviewSentComment[] }
+export type ReviewFileRead = { reviewRef?: TaskReviewRef; file: ReviewFile; comments: ReviewSentComment[]; nextCommentsCursor?: string }
 
 /** Which side of a diff line a comment is on: the old file (deleted line) or the new one. */
 export type ReviewCommentSide = 'old' | 'new'
@@ -114,7 +129,7 @@ export type ReviewCheck = {
   /** Stable id; two checks in different workflows may share a name. 附到评论 uses it. */
   id: string
   name: string
-  status: 'failed' | 'passed' | 'pending'
+  status: 'failed' | 'passed' | 'pending' | 'neutral'
   logExcerpt?: string
   /** Native GitHub check page, verified against the current repository/check. */
   logUrl?: string

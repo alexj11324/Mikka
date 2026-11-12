@@ -6,6 +6,7 @@ import { Pool } from 'pg'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
 import { WorkspaceReviewError, type DiffFileMetadata, type DiffFilePatch, type GitHubReviewMutation,
   type ReviewAnchor, type ReviewBatchReceipt } from '@mikka/protocol/coding-workspace-review'
+import { observePoolCommits } from '../../db/commit-effects'
 import { GitHubAccessError } from '../../github/user-access-error'
 import type { RequestBudget } from '../../request-budget'
 import type { ReviewActor } from './authority'
@@ -48,6 +49,7 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 16, connectionTimeoutMillis: 5000 })
+  observePoolCommits(pool)
   const environment = { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), ORVILO_DATABASE_URL: target.toString(),
     E2E_DATABASE_URL: target.toString(), BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     BETTER_AUTH_URL: 'http://127.0.0.1:3199', WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex'),

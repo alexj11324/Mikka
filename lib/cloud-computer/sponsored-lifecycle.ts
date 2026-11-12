@@ -26,13 +26,20 @@ type Handoff = {
 async function reserve(tx: PoolClient, actor: TaskMachineActor, runId: string): Promise<Handoff | null> {
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', ['thread-machine:' + runId])
   const parent = (
-    await tx.query(`SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3`, [
+    await tx.query(`SELECT "issueId","questionContinuation",status,"startedAt" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3`, [
       runId,
       actor.userId,
       actor.workspaceId,
     ])
   ).rows[0]
   if (!parent?.issueId) throw unavailable()
+  // The established answer/recovery receipt locks the Factory task before the
+  // Run or machine. A Run's claimed native session ID alone cannot authorize a wake.
+  const wakingQuestion = parent.questionContinuation?.requireSessionResume && parent.status === 'queued' && !parent.startedAt
+  if (wakingQuestion) {
+    const { lockQuestionRuntimeUpgrade } = await import('./thread-machines')
+    await lockQuestionRuntimeUpgrade(tx, actor, runId, parent.questionContinuation.questionId)
+  }
   await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
     'thread-task-machine:' + actor.userId + ':' + actor.workspaceId + ':' + parent.issueId,
   ])
@@ -75,13 +82,23 @@ async function reserve(tx: PoolClient, actor: TaskMachineActor, runId: string): 
     run.startedAt ||
     run.sessionId ||
     run.deviceTokenId ||
-    run.questionContinuation?.requireSessionResume ||
     (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now())
   )
     throw unavailable()
   const origin = new URL(process.env.MIKKA_CLOUD_WORKER_URL ?? '')
   if (origin.protocol !== 'https:' || origin.username || origin.password || origin.search || origin.hash)
     throw unavailable()
+  let requiredCheckpoint = machine.lifecycle.sponsoredRestore
+  if (run.questionContinuation?.requireSessionResume) {
+    const expected = run.questionContinuation.requiredSandboxId
+    if (!wakingQuestion || !/^[0-9a-f]{64}$/.test(expected) || expected !== machine.lifecycle.sponsoredInstanceId ||
+        machine.deviceId !== run.deviceId || machine.repoId !== run.deviceRepoId ||
+        machine.lifecycle.sponsoredPreviousRun !== (run.continuesRunId ?? run.questionContinuation.originRunId) ||
+        !machine.lifecycle.sponsoredPreviousOperation) throw unavailable()
+    if (!requiredCheckpoint) requiredCheckpoint = await releaseOwnedCloudflareTaskMachine(tx, actor,
+      machine.lifecycle.sponsoredPreviousRun, machine.lifecycle.sponsoredPreviousOperation)
+    if (!requiredCheckpoint || requiredCheckpoint.instanceId !== expected) throw unavailable()
+  }
   if (machine.lifecycle.sponsoredUntil) await releaseOwnedCloudflareTaskMachine(tx, actor, runId, machine.operationId)
   const leaseId = randomUUID(),
     operationId = randomUUID(),
@@ -135,8 +152,8 @@ async function reserve(tx: PoolClient, actor: TaskMachineActor, runId: string): 
     `UPDATE thread_machines SET state='starting',epoch=epoch+1,"sandboxId"=NULL,"operationId"=$2,"workerLeaseId"=$3,
     "workerLeaseUntil"=clock_timestamp()+interval '90 seconds',"lifecycleAt"=clock_timestamp()+interval '90 seconds',
     lifecycle=lifecycle||jsonb_build_object('phase','create_requested','sponsoredUntil',clock_timestamp()+interval '15 minutes',
-      'sponsoredRepositoryKey',$4::text) WHERE "runId"=$1`,
-    [runId, operationId, leaseId, run.repoPath],
+      'sponsoredRepositoryKey',$4::text) || CASE WHEN $5::jsonb IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('sponsoredRestore',$5::jsonb) END WHERE "runId"=$1`,
+    [runId, operationId, leaseId, run.repoPath, requiredCheckpoint ? JSON.stringify(requiredCheckpoint) : null],
   )
   await tx.query(`UPDATE device_tokens SET "expiresAt"=clock_timestamp()+interval '15 minutes' WHERE id=$1`, [tokenId])
   return {
@@ -194,7 +211,8 @@ export async function ensureSponsoredTaskMachine(pool: Pool, actor: TaskMachineA
   try {
     const { connection, instanceId } = await openOwnedCloudflareTaskMachine(pool, actor, runId)
     const changed = await pool.query(
-      `UPDATE thread_machines SET "sandboxId"=$2,"runningSince"=clock_timestamp()
+      `UPDATE thread_machines SET "sandboxId"=$2,"runningSince"=clock_timestamp(),
+        lifecycle=lifecycle||jsonb_build_object('sponsoredInstanceId',$2::text)
       WHERE "runId"=$1 AND "operationId"=$3 AND "workerLeaseId"=$4 AND state='starting'`,
       [runId, instanceId, handoff.operationId, handoff.leaseId],
     )
@@ -241,6 +259,40 @@ export async function ensureSponsoredTaskMachine(pool: Pool, actor: TaskMachineA
   }
 }
 
+/** The Factory has authenticated the human answer and will recheck it when it
+ * transfers custody. Hosted images are immutable. Prepare that exact failed
+ * continuation's checkpoint without starting its VM or issuing credentials. */
+export async function prepareSponsoredQuestionRecovery(pool: Pool, actor: TaskMachineActor, runId: string) {
+  const tx = await pool.connect()
+  try {
+    await tx.query('BEGIN')
+    const {rows:[m]} = await tx.query(`SELECT m."operationId",m.lifecycle,r."questionContinuation" AS question
+      FROM thread_machines m JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId" AND r."workspaceId"=m."workspaceId" AND r."issueId"=m."issueId"
+      JOIN factory_questions q ON q."continuationRunId"=r.id AND q."userId"=r."userId" AND q."issueId"=r."issueId"
+        AND q.id::text=r."questionContinuation"->>'questionId' AND q."originSessionId"=r."questionContinuation"->>'originSessionId'
+      JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId" AND t."issueId"=q."issueId"
+      WHERE m."runId"=$1 AND m."ownerId"=$2 AND m."workspaceId"=$3 AND m."snapshotId"=$4
+        AND r.status='failed' AND r."stopRequestedAt" IS NULL AND q.status='blocked' AND t.status='blocked'
+        AND q."answerId" IS NOT NULL AND r."questionContinuation"->>'requireSessionResume'='true'
+      FOR UPDATE OF m FOR SHARE OF r`, [runId,actor.userId,actor.workspaceId,hostedSnapshot])
+    if (!m) { await tx.query('COMMIT'); return false }
+    const prior = m.lifecycle.sponsoredUntil
+      ? {runId, operationId:m.operationId}
+      : {runId:m.lifecycle.sponsoredPreviousRun, operationId:m.lifecycle.sponsoredPreviousOperation}
+    if (!prior.runId || !prior.operationId) throw unavailable()
+    const checkpoint = await releaseOwnedCloudflareTaskMachine(tx,actor,prior.runId,prior.operationId)
+    if (!checkpoint || checkpoint.instanceId !== m.question.requiredSandboxId ||
+        checkpoint.instanceId !== m.lifecycle.sponsoredInstanceId) throw unavailable()
+    await tx.query(`UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('sponsoredPreparedCheckpoint',$3::jsonb)
+      WHERE "runId"=$1 AND "operationId"=$2`, [runId,m.operationId,JSON.stringify(checkpoint)])
+    await tx.query('COMMIT')
+    return true
+  } catch (error) {
+    await tx.query('ROLLBACK')
+    throw error
+  } finally { tx.release() }
+}
+
 type Reconciliation = {
   epoch: number
   sandboxId: string | null
@@ -277,7 +329,7 @@ export async function reconcileSponsoredTaskMachine(
       const done = await client.query(
         `UPDATE thread_machines SET state=CASE WHEN state='ended' THEN state WHEN $6 THEN 'paused' ELSE state END,
         "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),
-        "runningSince"=NULL,"sandboxId"=NULL,"workerLeaseId"=NULL,"workerLeaseUntil"=NULL,"lifecycleAt"=NULL
+        "runningSince"=NULL,"sandboxId"=CASE WHEN state='ended' THEN NULL ELSE "sandboxId" END,"workerLeaseId"=NULL,"workerLeaseUntil"=NULL,"lifecycleAt"=NULL
         WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND "operationId"=$5 RETURNING "deviceId"`,
         [runId, actor.userId, actor.workspaceId, row.epoch, row.operationId, terminal],
       )

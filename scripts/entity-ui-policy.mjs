@@ -27,6 +27,12 @@ export const entityContracts = [
     sources: [['components/nav/use-save-bot.ts', 'useSaveBot'], ['app/actions/bots.ts', 'updateBot']] },
   { entity: 'Settings device', sources: [['components/devices/use-device-actions.ts', 'useDeviceActions'],
     ['app/actions/agents.ts', 'renameDevice', 'setDeviceEnabled', 'removeDevice', 'sendDeviceCommand']] },
+  // These are cross-entry read and submission-state owners. Layouts may differ,
+  // but must not fork the Inbox count, Factory question or composer state machine.
+  { entity: 'Inbox and Factory questions',
+    sources: [['hooks/use-inbox-count.ts', 'useInboxCount'],
+      ['hooks/use-factory-questions.ts', 'factoryQuestionsVersion', 'useFactoryQuestions']] },
+  { entity: 'Chat composer', sources: [['hooks/use-chat-composer.ts', 'useChatComposer']] },
 ]
 
 const taskDetail = entityContracts[0].detail[0]
@@ -34,6 +40,14 @@ const registered = new Set(entityContracts.flatMap(contract => [contract.detail,
   .filter(Boolean).map(([file, name]) => file + '#' + name)))
 const detailName = /^[A-Z][A-Za-z0-9]*Detail(?:Page|Panel|Screen)?$/
 const taskController = /^(?:(?:use)?(?:Task|Issue)(?:Detail|Panel)Controller|TaskPanel|TaskForm)$/
+// Guard the named shared state-machine owners as well as the details above.
+// Native clients deliberately keep their own UI adapters and are excluded.
+const sharedHookOwners = new Map([
+  ['useInboxCount', 'hooks/use-inbox-count.ts'],
+  ['factoryQuestionsVersion', 'hooks/use-factory-questions.ts'],
+  ['useFactoryQuestions', 'hooks/use-factory-questions.ts'],
+  ['useChatComposer', 'hooks/use-chat-composer.ts'],
+])
 const nativeDetailPath = /^apps\/mobile\/app\/(?:[^/]+\/)*\[[^/]+\](?:\/index)?\.tsx$/
 const nativeRoutes = new Map(entityContracts.flatMap(contract => (contract.routes ?? []).map(route => [route[0], route])))
 
@@ -79,16 +93,21 @@ export function auditEntityDetail(file, text) {
   if (/\.(?:test|spec|stories)\./.test(file)) return []
   if (nativeDetailPath.test(file)) return auditNativeRoute(file, text)
   if (!/^(?:components|hooks|lib|apps\/mobile\/(?:features|app)|apps\/desktop\/src\/renderer)\//.test(file)
-    || !/(?:Detail|TaskPanel|TaskForm|PanelController)/.test(text)) return []
+    || !/(?:Detail|TaskPanel|TaskForm|PanelController|useInboxCount|factoryQuestionsVersion|useFactoryQuestions|useChatComposer)/.test(text)) return []
   const source = sourceFile(file, text)
   const violations = []
   for (const entry of declarations(source)) {
     const duplicate = taskController.test(entry.name) && file !== taskDetail
     const unregistered = !file.startsWith('lib/') && entry.exported && detailName.test(entry.name) && !registered.has(file + '#' + entry.name)
-    if (!duplicate && !unregistered) continue
+    const duplicateSharedHook = !file.startsWith('apps/mobile/') &&
+      sharedHookOwners.has(entry.name) && sharedHookOwners.get(entry.name) !== file
+    if (!duplicate && !unregistered && !duplicateSharedHook) continue
     const position = source.getLineAndCharacterOfPosition(entry.node.getStart(source))
-    violations.push({ file, line: position.line + 1, column: position.character + 1, rule: 'entity/detail-source',
-      message: `${entry.name} must use a registered canonical business operation or its compact/native adapter.` })
+    violations.push({ file, line: position.line + 1, column: position.character + 1,
+      rule: duplicateSharedHook ? 'entity/shared-hook-owner' : 'entity/detail-source',
+      message: duplicateSharedHook
+        ? `${entry.name} must use the registered shared hook in ${sharedHookOwners.get(entry.name)}.`
+        : `${entry.name} must use a registered canonical business operation or its compact/native adapter.` })
   }
   return violations
 }

@@ -14,8 +14,8 @@ const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL &
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Reconcile tests require matching isolated loopback _e2e URLs')
 
 const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'agent_runs', 'devices', 'cloud_machines',
-  'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
-  'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'chat_attachments', 'chat_attachment_retirements',
+  'thread_machines', 'coding_review_sessions', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
+  'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'account_deletion_guards', 'chat_attachments', 'chat_attachment_retirements',
   'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox', 'mobile_push_receipts', 'coding_workspace_requests', 'coding_workspace_mentions']
 
 test('the safety-net check names exactly the jobs with work already due', { skip: !valid }, async t => {
@@ -30,7 +30,7 @@ test('the safety-net check names exactly the jobs with work already due', { skip
   if (originTrigger) await admin.query(originTrigger.definition.replace('ON public.user_schedules ', `ON ${schema}.user_schedules `))
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 2 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
-  const due = () => reconcileDue(pool, { factoryLifecycle: true, workspace: pool })
+  const due = (factoryLifecycle = true) => reconcileDue(pool, { factoryLifecycle, workspace: pool })
   const none = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }
   const clear = async () => { for (const table of TABLES) await pool.query(`DELETE FROM ${table}`) }
   const event = (values: string) => pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"nextWakeAt","wakeLeaseUntil",tier,"deliveredAt") VALUES ($1,'owner',$2,'user_message',$3,'{}',${values})`, [randomUUID(), randomUUID(), randomUUID()])
@@ -65,6 +65,21 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await clear()
   })
 
+  await t.test('a lost review close wakes only recovery even with Factory disabled', async () => {
+    const id = randomUUID()
+    const withoutFactory = () => reconcileDue(pool, { factoryLifecycle: false, workspace: pool })
+    await pool.query(`INSERT INTO coding_review_sessions
+      (id,kind,"taskId","runId","ownerId","workspaceId","deviceId","repoId","deviceTokenId","bindingId","sandboxId",
+       "machineEpoch","machineOperationId","credentialKind","credentialId","expiresAt")
+      VALUES ($1,'terminal',$1,$1,'owner',$1,$1,$1,$1,$2,'fixture',0,$1,'session','credential',now()+interval '4 minutes')`,
+    [id, 'a'.repeat(64)])
+    assert.deepEqual(await withoutFactory(), none)
+    await pool.query(`UPDATE coding_review_sessions SET "revokedAt"=now(),reason='run_control',"retryAt"=now() WHERE id=$1`, [id])
+    assert.deepEqual(await withoutFactory(), { ...none, recovery: true })
+    await clear()
+    assert.deepEqual(await withoutFactory(), none)
+  })
+
   await t.test('run recovery is due for an expired lease, not for a live one', async () => {
     const run = (lease: string) => pool.query(`INSERT INTO agent_runs (id,"userId","agentId",kind,status,"leaseExpiresAt") VALUES ($1,'owner',$2,'local','running',${lease})`, [randomUUID(), randomUUID()])
     await run(`now()+interval '5 minutes'`)
@@ -72,6 +87,19 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await run(`now()-interval '1 second'`)
     assert.deepEqual(await due(), { ...none, recovery: true })
     await clear()
+  })
+  await t.test('a revoked review lease with a near close retry needs recovery even with Factory off', async () => {
+    const id = randomUUID()
+    await pool.query(`INSERT INTO coding_review_sessions
+      (id,kind,"taskId","runId","ownerId","workspaceId","deviceId","repoId","deviceTokenId","bindingId","sandboxId",
+       "machineEpoch","machineOperationId","credentialKind","credentialId","expiresAt")
+      VALUES ($1,'terminal',$1,$1,'owner',$1,$1,$1,$1,$2,'fixture',0,$1,'session','credential',now()+interval '5 minutes')`,
+    [id, 'a'.repeat(64)])
+    assert.deepEqual(await due(false), none)
+    await pool.query(`UPDATE coding_review_sessions SET "revokedAt"=now(),reason='run_control',"retryAt"=now()+interval '30 seconds' WHERE id=$1`, [id])
+    assert.deepEqual(await due(false), { ...none, recovery: true })
+    await pool.query('DELETE FROM coding_review_sessions WHERE id=$1', [id])
+    assert.deepEqual(await due(false), none)
   })
   await t.test('an account deletion is due once requested; a retired object at its notBefore', async () => {
     await pool.query(`INSERT INTO chat_attachment_retirements ("storageKey","userId","notBefore") VALUES ('key','owner',now()+interval '5 minutes')`)

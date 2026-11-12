@@ -211,8 +211,8 @@ export function personalSkillCatalog(
  * body it must carry.
  *
  * Deciding here rather than at each call site keeps the prompt and the tool
- * grant in one place: both call sites pass `snapshot.effectiveTools`
- * (workflows/coordinator/steps.ts and native-steps.ts), and the same frozen
+ * grant in one place: the Eve product instruction path passes `snapshot.effectiveTools`
+ * (workflows/coordinator/steps.ts), and the same frozen
  * snapshot produced the tools.
  */
 export function coordinatorSkillSection(

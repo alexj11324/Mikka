@@ -5,6 +5,8 @@ import { mock, test } from 'node:test'
 import type { PoolClient } from 'pg'
 
 const callbacks: (() => Promise<void>)[] = []
+const revokeReviews = mock.fn(async (_database: unknown, _scope: unknown, _reason: string) => ({ closed: 0, pending: 0 }))
+mock.module(new URL('./coding-workspace/review-sessions.ts', import.meta.url).href, { namedExports: { revokeReviewSessions: revokeReviews } })
 let outsideNext = false
 mock.module('next/server', { namedExports: { after: (callback: () => Promise<void>) => {
   if (outsideNext) throw new Error('No request scope')
@@ -75,10 +77,26 @@ test('a stop or policy write wakes the devices holding its runs only after it co
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   callbacks.length = 0
   try {
-    // Without a gateway nothing is looked up or sent.
+    // Human review revocation also runs where there is no device gateway.
     delete process.env.DEVICE_GATEWAY_URL
     await notifyRunControl(lookup, { userId: 'owner-1' })
     assert.equal(lookups.length, 0)
+    assert.deepEqual(revokeReviews.mock.calls.map(call => call.arguments), [[lookup, { userId: 'owner-1' }, 'run_control']])
+    revokeReviews.mock.resetCalls()
+    await client.query('BEGIN')
+    runControlChanged(client, { runIds: [id] }, lookup)
+    await client.query('ROLLBACK')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.equal(revokeReviews.mock.callCount(), 0)
+    await client.query('BEGIN')
+    runControlChanged(client, { runIds: [id] }, lookup)
+    assert.equal(revokeReviews.mock.callCount(), 0)
+    await client.query('COMMIT')
+    await new Promise(resolve => setImmediate(resolve))
+    assert.deepEqual(revokeReviews.mock.calls.map(call => call.arguments), [[lookup, { runIds: [id] }, 'run_control']])
+    assert.equal(lookups.length, 0)
+    assert.equal(callbacks.length, 0)
+    revokeReviews.mock.resetCalls()
     process.env.DEVICE_GATEWAY_URL = 'http://127.0.0.1:9'
     process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-test-gateway-secret'
 
@@ -95,6 +113,7 @@ test('a stop or policy write wakes the devices holding its runs only after it co
     await client.query('COMMIT')
     await new Promise(resolve => setImmediate(resolve))
     assert.equal(lookups.length, 1, 'repeated changes in one transaction coalesce')
+    assert.deepEqual(revokeReviews.mock.calls.map(call => call.arguments), [[lookup, { runIds: [id] }, 'run_control']])
     assert.deepEqual(lookups[0]!.values, [[id]])
     assert.equal(callbacks.length, devices.length, 'one wake per device holding the runs')
 

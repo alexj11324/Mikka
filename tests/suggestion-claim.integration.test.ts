@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import type { Pool } from 'pg'
 import { before, after as afterTests, mock, test } from 'node:test'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { suggestions, coordinatorEvents } from '../lib/db/schema'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { seedFixtureWorkspace } from './helpers/task-workspace'
@@ -90,8 +90,10 @@ check('failed insert rolls claim back; a successful send has an idempotent recei
   owner = 'foreign'; assert.deepEqual(await action(retry), { error: 'suggestionNotFound', params: undefined }); owner = 'owner'
   assert.deepEqual(await action(retry), { queued: true })
   assert.deepEqual(await action(retry), { queued: true })
+  await db.execute(sql`update coordinator_events set payload=payload-'submissionId' where payload ? 'submissionId'`)
+  assert.deepEqual(await action(retry), { queued: true }, 'an existing pre-echo receipt still recovers the same send')
   assert.equal((await db.select().from(coordinatorEvents)).length, 1)
-  assert.equal(callbacks.length, 2)
+  assert.equal(callbacks.length, 3)
 })
 
 check('two concurrent sends commit one event and both receive a receipt', async () => {

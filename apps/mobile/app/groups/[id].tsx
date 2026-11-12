@@ -1,3 +1,4 @@
+import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { ChatMessageList, type ChatListHandle } from '@/features/chat/components/chat-message-list'
@@ -52,7 +53,6 @@ export default function GroupChat() {
   const [composerHeight, setComposerHeight] = useState(90)
   const [text, setText] = useState('')
   const [quote, setQuote] = useState<string | null>(null)
-  const [sendFailed, setSendFailed] = useState(false)
   const groups = useApi<{ conversations: GroupSummary[] }>(home.data ? `/api/conversations?workspaceId=${home.data.workspace.id}` : null)
   const summary = groups.data?.conversations.find(group => group.id === id)
   const title = summary?.title ?? ''
@@ -124,19 +124,15 @@ export default function GroupChat() {
   const member = (type: string, memberId: string) => members.data?.members.find(item => item.memberType === type && item.id === memberId)
   const bots = (members.data?.members ?? []).filter(item => item.memberType !== 'user')
 
-  // The composer has put the quote ahead of the words and clears both once this returns true.
-  const send = async (body: string) => {
-    setSendFailed(false)
-    setSentHere(true)
-    list.current?.toLatest(!reduceMotion)
-    try {
-      await api(`/api/conversations/${id}/messages`, { method: 'POST', body: { body, mentions: mentionsIn(body, bots) } })
-      await page.reload()
-      return true
-    } catch {
-      setSendFailed(true)
-      return false
+  const canSend = Boolean(page.data && members.data && !conversationAccessDenied(page.error) && !conversationAccessDenied(members.error))
+  const delivery = useConversationDelivery(canSend ? { kind: 'group', id } : null, messages.map(message => message.id), page.reload)
+  const send = (body: string) => {
+    const queued = delivery.send(body, mentionsIn(body, bots))
+    if (queued) {
+      setSentHere(true)
+      list.current?.toLatest(!reduceMotion)
     }
+    return queued
   }
 
   const react = async (messageId: string, emoji: string | null) => {
@@ -215,17 +211,17 @@ export default function GroupChat() {
           </>}
           footer={<>
         {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
-        {page.data && !messages.length ? <Text style={styles.empty}>@ 一个 Bot，或直接说</Text> : null}
+        {page.data && !messages.length && !delivery.bubbles.length ? <Text style={styles.empty}>@ 一个 Bot，或直接说</Text> : null}
         {page.data?.routingError && !working ? <Text style={styles.error}>没有 Bot 接这条，@ 它的名字</Text> : null}
         {page.data?.stopped && !working ? <Text style={styles.stopped}>已停止</Text> : null}
-        {sendFailed ? <Text accessibilityRole="alert" style={styles.error}>没发出去，消息仍在输入框中。</Text> : null}
+        {delivery.bubbles}
         {stopFailed ? <StopFailed busy={stopping} onRetry={() => void stop()} /> : null}
           </>} />
         <ListTopFade color={colors.page} />
       </View>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
+      <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
         notice={reactionFailure ? <View accessibilityRole="alert" style={styles.reactionNotice}><Text style={styles.error}>回应没保存。</Text><GlassButton label="重试" onPress={() => void react(reactionFailure.id, reactionFailure.emoji)} /></View> : undefined}
         quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} />
     </View>

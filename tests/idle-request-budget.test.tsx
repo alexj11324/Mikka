@@ -2,13 +2,14 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { after, before, mock, test } from 'node:test'
-import { act, type ReactNode } from 'react'
+import { act, useLayoutEffect, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE } from '../lib/bot-shapes'
 import { issueWithMetadata } from '../lib/issue-metadata'
 import { taskPresentation } from '../lib/task-presentation'
 import type { BoardScreenProps } from '../components/slots/board-contract'
+import type { ThreadScreenProps } from '../components/slots/thread-contract'
 
 // Idle request budget (#1212): each main page's real client component, real SWR with the app's defaults
 // (components/swr-defaults.tsx) and a healthy live channel, over one idle, visible minute on fake timers.
@@ -65,9 +66,12 @@ mock.module(new URL('components/slots/task-detail.tsx', root).href, { namedExpor
 mock.module(new URL('components/slots/new-task.tsx', root).href, { namedExports: { NewTask: () => null } })
 
 // The full Bot container still owns all measured reads. Its official slot only paints data.
-mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) =>
-  <section>{entries?.map(entry => <div key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, i) =>
-    part.kind === 'text' ? <span key={i}>{part.node || part.text}</span> : null)}</div>)}</section> } })
+let observeThread: ((props: ThreadScreenProps) => void) | undefined
+mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: (props: ThreadScreenProps) => {
+  useLayoutEffect(() => { observeThread?.(props) })
+  return <section>{props.entries?.map(entry => <div key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, i) =>
+    part.kind === 'text' ? <span key={i}>{part.node || part.text}</span> : null)}</div>)}</section>
+} } })
 
 // Feature flags come from PostHog, not from Mikka's server.
 mock.module('posthog-js', { defaultExport: { getFeatureFlag: () => undefined, onFeatureFlags: () => () => {}, capture: () => {}, isFeatureEnabled: () => false } })
@@ -167,7 +171,7 @@ async function advance(ms: number, step = 100) {
   for (let elapsed = 0; elapsed < ms; elapsed += step) await act(async () => { mock.timers.tick(Math.min(step, ms - elapsed)); await flush() })
 }
 
-async function measure(page: ReactNode) {
+async function measure(page: ReactNode, beforeFirstRead?: () => Promise<void>) {
   const { createRoot } = await import('react-dom/client')
   const { SWRConfig } = await import('swr')
   const { SWRDefaults } = await import('../components/swr-defaults')
@@ -179,6 +183,7 @@ async function measure(page: ReactNode) {
   const view = createRoot(container)
   calls.clear(); missing.clear(); sockets.length = 0
   await act(async () => { view.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}><SWRDefaults><SWRConfig value={{ provider: () => new Map() }}><LiveProvider ownerId={OWNER} workspaceId={WORKSPACE}><SidebarProvider>{page}</SidebarProvider></LiveProvider></SWRConfig></SWRDefaults></NextIntlClientProvider>) })
+  await beforeFirstRead?.()
   // The first load settles: reads, the live ticket and its catch-up read after the socket opens.
   await advance(5_000, 50)
   calls.clear()
@@ -315,7 +320,7 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
     const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed', outcome: null }, null, () => false)
     return <TaskPresentationsContext.Provider value={{ [ISSUE]: failed }}>
-      <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
+      <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
     </TaskPresentationsContext.Provider>
   },
   // A task with a running thread open on the right, its relations and its members (the members dialog's body).
@@ -374,6 +379,27 @@ test('the budget file lists exactly the measured pages, and every allowance name
     assert.ok(Number.isInteger(budget.max) && budget.max > 0, `${page} ${call}: a budget is a positive whole number; a call with none is allowed 0`)
     assert.match(budget.tracking ?? '', /^#\d+$/, `${page} ${call}: an idle allowance names the issue that removes it`)
   }
+})
+
+test('a user submission renders with its stable pending id before the first Bot history response', async () => {
+  let rendered!: ThreadScreenProps
+  observeThread = props => { rendered = props }
+  const text = 'Send while the first chat read is outstanding'
+  try {
+    await measure(await pages['bot-chat'](), async () => {
+      assert.equal(rendered.entries, null, 'the transcript is still loading')
+      await act(async () => { rendered.composer.onChange(text) })
+      assert.equal(rendered.composer.value, text)
+      await act(async () => { rendered.composer.onSubmit() })
+      assert.equal(rendered.composer.value, '')
+      const entries: ThreadScreenProps['entries'] = (() => rendered)().entries
+      const person = entries?.filter(row => row.role === 'person').filter(row => row.text === text)
+      assert.equal(person?.length, 1)
+      assert.equal(person?.[0]?.status, 'sending')
+      assert.match(person?.[0]?.id ?? '', /^[0-9a-f-]{36}$/)
+      assert.ok(document.body.textContent?.includes(text))
+    })
+  } finally { observeThread = undefined }
 })
 
 for (const [name, page] of Object.entries(pages)) test(`${name}: an idle, visible minute stays within its request budget`, { timeout: 60_000 }, async () => {
