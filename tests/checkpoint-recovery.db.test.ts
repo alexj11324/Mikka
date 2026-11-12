@@ -6,6 +6,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { runCheckpointReceiptSchema, type RunCheckpoint, type RunCheckpointReceipt } from '@mikka/protocol/device'
 import { emptyRunReport } from '@mikka/protocol/run'
+import { observePoolCommits } from '../lib/db/commit-effects'
 
 const connection = process.env.E2E_DATABASE_URL
 if (connection) {
@@ -18,6 +19,7 @@ if (process.env.REQUIRE_DB === '1' && !connection) throw new Error('Checkpoint D
 
 test('checkpoint recovery availability persists through the actual authenticated route', { skip: !connection, timeout: 60_000 }, async t => {
   const pool = new Pool({ connectionString: connection, max: 4 })
+  observePoolCommits(pool)
   const { POST } = await import('../app/v1/runs/[runId]/checkpoint/route')
   const { issueDeviceToken } = await import('../lib/device-link')
   const userId = `checkpoint-${randomUUID()}`, runId = randomUUID(), deviceId = randomUUID(), agentId = randomUUID()
