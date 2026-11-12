@@ -55,8 +55,8 @@ export function renameOrganizationApiKey(organizationId: string, actor: Enterpri
       SET name=${name} WHERE "keyId"=${keyId}::uuid AND "organizationId"=${organizationId}::uuid
         AND "workspaceId"=${key.workspaceId}::uuid RETURNING "keyId" AS id,name`)
     if (!renamed) throw new GovernanceError('not_found')
-    await enqueueOrganizationAudit(tx, { organizationId, actorId: actor.id, action: 'organization.api_key_renamed',
-      targetId: keyId, metadata: { workspaceId: key.workspaceId } })
+    // Organization audit readers may have no membership in the credential's Workspace.
+    await enqueueOrganizationAudit(tx, { organizationId, actorId: actor.id, action: 'organization.api_key_renamed' })
     return renamed
   })
 }
