@@ -88,3 +88,7 @@ next-env.d.ts
 
 # Native Eve session data for the default self-hosted service.
 /.cache/eve-workflow/
+
+# Cloudflare build receipts and release artifacts.
+/.cloudflare-ci/
+/.mikka-cloud/
